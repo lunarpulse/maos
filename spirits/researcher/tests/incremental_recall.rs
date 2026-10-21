@@ -260,6 +260,7 @@ impl LogRecallPort for EndlessRecall {
         Ok(LogRecallPage::new(
             Vec::new(),
             Some(LogRecallCursor::new(1, [1; 16])),
+            maos_domain::log_recall::RecallScope::Participant,
         ))
     }
 

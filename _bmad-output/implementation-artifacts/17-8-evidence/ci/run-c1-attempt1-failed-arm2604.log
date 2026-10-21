@@ -1,0 +1,1081 @@
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	﻿2026-10-21T11:46:27.8912256Z ##[group]Run cargo test -p maos-host -p maos-wasm-host --locked
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8912716Z ^[[36;1mcargo test -p maos-host -p maos-wasm-host --locked^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8942170Z shell: /usr/bin/bash -e {0}
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8942408Z env:
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8942580Z   CARGO_HOME: /home/runner/.cargo
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8942806Z   CARGO_INCREMENTAL: 0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8942997Z   CARGO_TERM_COLOR: always
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8943197Z   CACHE_ON_FAILURE: false
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:27.8943384Z ##[endgroup]
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0785145Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0785932Z   ^[[1m^[[94m--> ^[[0mcrates/maos-domain/src/ports/iac_bus.rs:44:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0786245Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0786718Z ^[[1m^[[94m44^[[0m ^[[1m^[[94m|^[[0m     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0787206Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0787495Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0788123Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0788829Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(async_fn_in_trait)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0789701Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0790624Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0791126Z ^[[1m^[[94m44^[[0m ^[[91m- ^[[0m    ^[[91masync ^[[0mfn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0792244Z ^[[1m^[[94m44^[[0m ^[[92m+ ^[[0m    fn deliver(&self, frame: IacFrame) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<LogBeforeDeliver<()>, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0792850Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0792959Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0793330Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0793959Z   ^[[1m^[[94m--> ^[[0mcrates/maos-domain/src/ports/iac_bus.rs:58:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0794263Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0794505Z ^[[1m^[[94m58^[[0m ^[[1m^[[94m|^[[0m     async fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0794797Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0795034Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0795653Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0797334Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0798027Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0798251Z ^[[1m^[[94m58^[[0m ^[[92m~ ^[[0m    fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0798544Z ^[[1m^[[94m59^[[0m ^[[1m^[[94m|^[[0m         &self,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0798796Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0799084Z ^[[1m^[[94m62^[[0m ^[[1m^[[94m|^[[0m         retracting_spirit: &SpiritId,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0799764Z ^[[1m^[[94m63^[[0m ^[[92m~ ^[[0m    ) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<RetractOutcome, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0800510Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0800621Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0800809Z ^[[1m^[[33mwarning^[[0m: `maos-domain` (lib) generated 2 warnings
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0803770Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `maos_domain::invariants::i7::ScalarTapEvent`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0804318Z   ^[[1m^[[94m--> ^[[0mcrates/maos-capability/src/working_memory/mod.rs:19:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0804651Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0805011Z ^[[1m^[[94m19^[[0m ^[[1m^[[94m|^[[0m use maos_domain::invariants::i7::ScalarTapEvent;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0805447Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0806183Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0806567Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0806870Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0807296Z ^[[1m^[[33mwarning^[[0m: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0807907Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `DecisionId`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0808260Z   ^[[1m^[[94m--> ^[[0mcrates/maos-acp/src/server.rs:13:45
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0808536Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0808962Z ^[[1m^[[94m13^[[0m ^[[1m^[[94m|^[[0m use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0809469Z    ^[[1m^[[94m|^[[0m                                             ^[[1m^[[33m^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0809778Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0810361Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0810698Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0810898Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `other`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0811254Z    ^[[1m^[[94m--> ^[[0mcrates/maos-acp/src/server.rs:223:25
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0811544Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0811823Z ^[[1m^[[94m223^[[0m ^[[1m^[[94m|^[[0m                         other => {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0812411Z     ^[[1m^[[94m|^[[0m                         ^[[1m^[[33m^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_other`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0812869Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0813263Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0813586Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0814017Z ^[[1m^[[33mwarning^[[0m: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0814565Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `Instant`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0814960Z   ^[[1m^[[94m--> ^[[0mcrates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0815288Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0815621Z ^[[1m^[[94m18^[[0m ^[[1m^[[94m|^[[0m use tokio::time::{interval, Instant};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0816005Z    ^[[1m^[[94m|^[[0m                             ^[[1m^[[33m^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0816285Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0816658Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0816958Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0817126Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `referenced`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0817569Z    ^[[1m^[[94m--> ^[[0mcrates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0818577Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0818891Z ^[[1m^[[94m122^[[0m ^[[1m^[[94m|^[[0m     let referenced = match referenced {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0819499Z     ^[[1m^[[94m|^[[0m         ^[[1m^[[33m^^^^^^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_referenced`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0819970Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0820568Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0820886Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0821083Z ^[[1m^[[33mwarning^[[0m^[[1m: variable does not need to be mutable^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0821541Z     ^[[1m^[[94m--> ^[[0mcrates/maos-iac/src/adapter/transparency_log.rs:1338:13
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0821905Z      ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0822184Z ^[[1m^[[94m1338^[[0m ^[[1m^[[94m|^[[0m         let mut inner = self
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0822554Z      ^[[1m^[[94m|^[[0m             ^[[1m^[[94m----^[[0m^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0822882Z      ^[[1m^[[94m|^[[0m             ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0823217Z      ^[[1m^[[94m|^[[0m             ^[[1m^[[94mhelp: remove this `mut`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0823513Z      ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0823873Z      ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0824445Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0824744Z ^[[1m^[[33mwarning^[[0m^[[1m: hiding a lifetime that's elided elsewhere is confusing^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0825222Z    ^[[1m^[[94m--> ^[[0mcrates/maos-iac/src/adapter/metrics.rs:230:21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0825526Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0825894Z ^[[1m^[[94m230^[[0m ^[[1m^[[94m|^[[0m     pub fn inflight(&self, service: Service) -> InflightGuard {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0826527Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[33m^^^^^^[[0m                       ^[[1m^[[33m^^^^^^^^^^^^^^[[0m ^[[1m^[[33mthe same lifetime is hidden here^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0827002Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[33m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0827370Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[33mthe lifetime is elided here^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0827684Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0828145Z     ^[[1m^[[94m= ^[[0m^[[1mhelp^[[0m: the same lifetime is referred to in inconsistent ways, making the signature confusing
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0828755Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0829148Z ^[[1m^[[96mhelp^[[0m: use `'_` for type paths
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0829406Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0829829Z ^[[1m^[[94m230^[[0m ^[[1m^[[94m| ^[[0m    pub fn inflight(&self, service: Service) -> InflightGuard^[[92m<'_>^[[0m {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0830639Z     ^[[1m^[[94m|^[[0m                                                              ^[[92m++++^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0830885Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0831263Z ^[[1m^[[33mwarning^[[0m: `maos-iac` (lib) generated 4 warnings (run `cargo fix --lib -p maos-iac` to apply 4 suggestions)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0831846Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `on_confidence_below`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0832274Z     ^[[1m^[[94m--> ^[[0mcrates/maos-manifest/src/manifest.rs:1318:21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0832585Z      ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0832940Z ^[[1m^[[94m1318^[[0m ^[[1m^[[94m|^[[0m                 let on_confidence_below = r.on_confidence_below;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0833665Z      ^[[1m^[[94m|^[[0m                     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_on_confidence_below`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0834188Z      ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0834576Z      ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0834889Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0835055Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `file_name`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0835449Z    ^[[1m^[[94m--> ^[[0mcrates/maos-eval/src/distillate_corpus.rs:106:17
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0835765Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0836202Z ^[[1m^[[94m106^[[0m ^[[1m^[[94m|^[[0m             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0855367Z     ^[[1m^[[94m|^[[0m                 ^[[1m^[[33m^^^^^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_file_name`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0855894Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0856289Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0856617Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0856778Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `halt_id`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0857168Z   ^[[1m^[[94m--> ^[[0mcrates/maos-director-surface/src/halt_ui.rs:59:9
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0857488Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0857734Z ^[[1m^[[94m59^[[0m ^[[1m^[[94m|^[[0m         halt_id: HaltId,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0858282Z    ^[[1m^[[94m|^[[0m         ^[[1m^[[33m^^^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_halt_id`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0858723Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0859108Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0859424Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0859841Z ^[[1m^[[33mwarning^[[0m: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0860891Z ^[[1m^[[33mwarning^[[0m: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0862052Z ^[[1m^[[33mwarning^[[0m: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0862714Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `InferenceOptions`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0863118Z   ^[[1m^[[94m--> ^[[0mcrates/maos-providers/src/anthropic.rs:10:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0863418Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0863917Z ^[[1m^[[94m10^[[0m ^[[1m^[[94m|^[[0m     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0864597Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0864867Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0865241Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0865543Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0865726Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `InferenceOptions`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0866120Z   ^[[1m^[[94m--> ^[[0mcrates/maos-providers/src/ollama.rs:11:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0866415Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0866909Z ^[[1m^[[94m11^[[0m ^[[1m^[[94m|^[[0m     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0867439Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0867613Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0867799Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `InferenceOptions`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0868191Z   ^[[1m^[[94m--> ^[[0mcrates/maos-providers/src/openai.rs:11:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0868481Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0868973Z ^[[1m^[[94m11^[[0m ^[[1m^[[94m|^[[0m     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0869509Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0869684Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0869853Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `McpResponse`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0870376Z   ^[[1m^[[94m--> ^[[0mcrates/maos-mcp/src/client.rs:15:70
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0870683Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0871309Z ^[[1m^[[94m15^[[0m ^[[1m^[[94m|^[[0m use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0871959Z    ^[[1m^[[94m|^[[0m                                                                      ^[[1m^[[33m^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0872298Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0872668Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0872968Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0873118Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `Child`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0873887Z  ^[[1m^[[94m--> ^[[0mcrates/maos-mcp/src/transport/stdio.rs:8:20
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0874186Z   ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0874524Z ^[[1m^[[94m8^[[0m ^[[1m^[[94m|^[[0m use std::process::{Child, Command, Stdio};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0874905Z   ^[[1m^[[94m|^[[0m                    ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0875085Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0875518Z ^[[1m^[[33mwarning^[[0m: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0876313Z ^[[1m^[[33mwarning^[[0m: `maos-mcp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-mcp` to apply 2 suggestions)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0876991Z ^[[1m^[[92m   Compiling^[[0m maos-host v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-host)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0877768Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `maos_domain::frame::EpistemicHaltPayload`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0878354Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0878768Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0879111Z ^[[1m^[[94m13^[[0m ^[[1m^[[94m|^[[0m use maos_domain::frame::EpistemicHaltPayload;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0879535Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0879832Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0881266Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0881924Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0882237Z ^[[1m^[[33mwarning^[[0m^[[1m: unexpected `cfg` condition value: `test-introspection`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0882738Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/capability/mod.rs:392:21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0883065Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0883398Z ^[[1m^[[94m392^[[0m ^[[1m^[[94m|^[[0m     #[cfg(any(test, feature = "test-introspection"))]
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0883841Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0884145Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0884717Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0885471Z     ^[[1m^[[94m= ^[[0m^[[1mhelp^[[0m: consider adding `test-introspection` as a feature in `Cargo.toml`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0886377Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0887138Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unexpected_cfgs)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0887368Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0887541Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `HaltJournal`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0887929Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/halt/mod.rs:29:34
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0888231Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0888699Z ^[[1m^[[94m29^[[0m ^[[1m^[[94m|^[[0m     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0889252Z    ^[[1m^[[94m|^[[0m                                  ^[[1m^[[33m^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0889474Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0889687Z ^[[1m^[[33mwarning^[[0m^[[1m: private item shadows public glob re-export^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0890342Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/iac.rs:19:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0890730Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0891130Z ^[[1m^[[94m19^[[0m ^[[1m^[[94m|^[[0m use maos_iac::mailbox::SpiritActivityTracker;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0891553Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0891851Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0892331Z ^[[1m^[[92mnote^[[0m: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0892890Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/iac.rs:13:9
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0893174Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0893452Z ^[[1m^[[94m13^[[0m ^[[1m^[[94m|^[[0m pub use maos_iac::*;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0893766Z    ^[[1m^[[94m|^[[0m         ^[[1m^[[92m^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0894518Z ^[[1m^[[92mnote^[[0m: but the private item here shadows it
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0894881Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/iac.rs:19:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0895162Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0895513Z ^[[1m^[[94m19^[[0m ^[[1m^[[94m|^[[0m use maos_iac::mailbox::SpiritActivityTracker;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0895941Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[92m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0896358Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(hidden_glob_reexports)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0896602Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0896887Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `crate::capability::WorkingMemoryStore`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0897363Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/inference/mod.rs:22:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0897684Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0898019Z ^[[1m^[[94m22^[[0m ^[[1m^[[94m|^[[0m use crate::capability::WorkingMemoryStore;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0898425Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0898638Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0898847Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `std::sync::Arc`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0899262Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/isolation/runner.rs:10:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0899591Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0899852Z ^[[1m^[[94m10^[[0m ^[[1m^[[94m|^[[0m use std::sync::Arc;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0900627Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0900805Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0901103Z ^[[1m^[[33mwarning^[[0m^[[1m: unused imports: `IsolationAttackCategory` and `IsolationCorpus`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0901626Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/isolation/runner.rs:13:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0901949Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0902356Z ^[[1m^[[94m13^[[0m ^[[1m^[[94m|^[[0m     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0902884Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^[[0m  ^[[1m^[[33m^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0903126Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0903424Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `maos_domain::invariants::i1::TokenId`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0903886Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/journal/mod.rs:60:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0904196Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0904525Z ^[[1m^[[94m60^[[0m ^[[1m^[[94m|^[[0m use maos_domain::invariants::i1::TokenId;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0904930Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0905134Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0905320Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `LifecycleEntry`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0905730Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/journal/mod.rs:61:65
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0906044Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0906574Z ^[[1m^[[94m61^[[0m ^[[1m^[[94m|^[[0m use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0907205Z    ^[[1m^[[94m|^[[0m                                                                 ^[[1m^[[33m^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0907463Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0907734Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `maos_domain::halt::TerminationKind`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0908216Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0908549Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0908874Z ^[[1m^[[94m12^[[0m ^[[1m^[[94m|^[[0m use maos_domain::halt::TerminationKind;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0909273Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0909481Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0909730Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `crate::halt::terminate_spirit`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0927692Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0928244Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0928626Z ^[[1m^[[94m16^[[0m ^[[1m^[[94m|^[[0m use crate::halt::terminate_spirit;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0929016Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0929213Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0929911Z ^[[1m^[[33mwarning^[[0m^[[1m: unused imports: `ClassSection` and `GatewaysSection`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0930717Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0931066Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0931488Z ^[[1m^[[94m22^[[0m ^[[1m^[[94m|^[[0m use crate::security::manifest::{ClassSection, GatewaysSection};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0932027Z    ^[[1m^[[94m|^[[0m                                 ^[[1m^[[33m^^^^^^^^^^^^^[[0m  ^[[1m^[[33m^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0932284Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0932440Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `TokenId`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0932821Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/mcp/mod.rs:12:59
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0933127Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0933541Z ^[[1m^[[94m12^[[0m ^[[1m^[[94m|^[[0m use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0934059Z    ^[[1m^[[94m|^[[0m                                                           ^[[1m^[[33m^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0934299Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0934467Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `McpRequest`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0934849Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/mcp/mod.rs:13:73
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0935147Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0935627Z ^[[1m^[[94m13^[[0m ^[[1m^[[94m|^[[0m use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0936561Z    ^[[1m^[[94m|^[[0m                                                                         ^[[1m^[[33m^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0936820Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0936984Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `Path`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0937382Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/private.rs:12:17
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0937710Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0938018Z ^[[1m^[[94m12^[[0m ^[[1m^[[94m|^[[0m use std::path::{Path, PathBuf};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0938357Z    ^[[1m^[[94m|^[[0m                 ^[[1m^[[33m^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0938534Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0938696Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `AtomicU64`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0939134Z  ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0939488Z   ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0939828Z ^[[1m^[[94m9^[[0m ^[[1m^[[94m|^[[0m use std::sync::atomic::{AtomicU64, Ordering};
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0940501Z   ^[[1m^[[94m|^[[0m                         ^[[1m^[[33m^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0940731Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0941040Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `crate::scheduler::kernel_ctx::KernelCtx`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0941559Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0941910Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0942350Z ^[[1m^[[94m18^[[0m ^[[1m^[[94m|^[[0m use crate::scheduler::kernel_ctx::KernelCtx;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0942771Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0942985Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0943180Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `DispositionOutcome`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0943670Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0944034Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0944518Z ^[[1m^[[94m16^[[0m ^[[1m^[[94m|^[[0m     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0945068Z    ^[[1m^[[94m|^[[0m                 ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0945274Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0945418Z ^[[1m^[[33mwarning^[[0m^[[1m: unreachable pattern^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0945874Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0946265Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0946715Z ^[[1m^[[94m332^[[0m ^[[1m^[[94m|^[[0m                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0947278Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[33m^^^^^^^^^^^^[[0m ^[[1m^[[33mno value can reach this^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0947622Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0948347Z ^[[1m^[[92mnote^[[0m: multiple earlier patterns match some of the same values
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0948885Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0949273Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0949705Z ^[[1m^[[94m329^[[0m ^[[1m^[[94m|^[[0m                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0950568Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[94m-----------------------------^[[0m ^[[1m^[[94mmatches some of the same values^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0951301Z ^[[1m^[[94m330^[[0m ^[[1m^[[94m|^[[0m                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0951921Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[94m---------------^[[0m ^[[1m^[[94mmatches some of the same values^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0952486Z ^[[1m^[[94m331^[[0m ^[[1m^[[94m|^[[0m                     (Err(_), _) => DisconnectOutcome::Timeout,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0953016Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[94m-----------^[[0m ^[[1m^[[94mmatches some of the same values^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0953650Z ^[[1m^[[94m332^[[0m ^[[1m^[[94m|^[[0m                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0954236Z     ^[[1m^[[94m|^[[0m                     ^[[1m^[[92m^^^^^^^^^^^^[[0m ^[[1m^[[92mcollectively making this unreachable^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0955125Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0955455Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0955959Z ^[[1m^[[33mwarning^[[0m^[[1m: use of deprecated method `std::sync::atomic::Atomic::<u32>::fetch_update`: renamed to `try_update` for consistency^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0956656Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/scheduler/scheduler_loop.rs:69:10
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0957018Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0957433Z ^[[1m^[[94m69^[[0m ^[[1m^[[94m|^[[0m         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0957875Z    ^[[1m^[[94m|^[[0m          ^[[1m^[[33m^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0958137Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0958435Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(deprecated)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0958829Z ^[[1m^[[96mhelp^[[0m: replace the use of the deprecated method
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0959132Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0959578Z ^[[1m^[[94m69^[[0m ^[[91m- ^[[0m        .^[[91mfetch_update^[[0m(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0960413Z ^[[1m^[[94m69^[[0m ^[[92m+ ^[[0m        .^[[92mtry_update^[[0m(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0960865Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0960967Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0961228Z ^[[1m^[[33mwarning^[[0m^[[1m: unused import: `maos_providers::Provider`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0961666Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/inference/mod.rs:28:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0961982Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0962275Z ^[[1m^[[94m28^[[0m ^[[1m^[[94m|^[[0m use maos_providers::Provider;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0962631Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0962818Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0962977Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `event`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0963472Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0963888Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0964134Z ^[[1m^[[94m66^[[0m ^[[1m^[[94m|^[[0m         let event = self
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0964769Z    ^[[1m^[[94m|^[[0m             ^[[1m^[[33m^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_event`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0965216Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0965607Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0965923Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0966093Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `spirit_id`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0966609Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0967412Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0967664Z ^[[1m^[[94m69^[[0m ^[[1m^[[94m|^[[0m     spirit_id: &str,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0968211Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_spirit_id`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0968579Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0968756Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `spirit_pid`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0969262Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0969671Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0969911Z ^[[1m^[[94m70^[[0m ^[[1m^[[94m|^[[0m     spirit_pid: u32,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0970660Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_spirit_pid`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0971033Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0971232Z ^[[1m^[[33mwarning^[[0m^[[1m: variable does not need to be mutable^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0971727Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:619:9
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0972116Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0972441Z ^[[1m^[[94m619^[[0m ^[[1m^[[94m|^[[0m     let mut child = spawn_child(&mut spec, &argv)?;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0972851Z     ^[[1m^[[94m|^[[0m         ^[[1m^[[94m----^[[0m^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0973155Z     ^[[1m^[[94m|^[[0m         ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0973759Z     ^[[1m^[[94m|^[[0m         ^[[1m^[[94mhelp: remove this `mut`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0974050Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0974413Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0974700Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0974912Z ^[[1m^[[33mwarning^[[0m^[[1m: value assigned to `outcome` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0975371Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0975710Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0976121Z ^[[1m^[[94m157^[[0m ^[[1m^[[94m|^[[0m                         outcome = UpgradeOutcome::Failed;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0976576Z     ^[[1m^[[94m|^[[0m                         ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0976887Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0977190Z     ^[[1m^[[94m= ^[[0m^[[1mhelp^[[0m: maybe it is overwritten before being read?
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0977722Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0978042Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0978255Z ^[[1m^[[33mwarning^[[0m^[[1m: value assigned to `outcome` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0978715Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0979053Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0979420Z ^[[1m^[[94m229^[[0m ^[[1m^[[94m|^[[0m                         outcome = UpgradeOutcome::Failed;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0979869Z     ^[[1m^[[94m|^[[0m                         ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0980369Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0980686Z     ^[[1m^[[94m= ^[[0m^[[1mhelp^[[0m: maybe it is overwritten before being read?
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0980928Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0981076Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `e`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0981530Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0981951Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0982235Z ^[[1m^[[94m161^[[0m ^[[1m^[[94m|^[[0m                         Err(e) => {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0982808Z     ^[[1m^[[94m|^[[0m                             ^[[1m^[[33m^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_e`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0983169Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0983317Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `ctx`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0983772Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0984166Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0984450Z ^[[1m^[[94m132^[[0m ^[[1m^[[94m|^[[0m             let ctx = GatewayCtx {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0985360Z     ^[[1m^[[94m|^[[0m                 ^[[1m^[[33m^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_ctx`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0985717Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0985878Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `now_ns`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0986324Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/supervision/crash_detector.rs:195:13
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0986700Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0987148Z ^[[1m^[[94m195^[[0m ^[[1m^[[94m|^[[0m         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0987810Z     ^[[1m^[[94m|^[[0m             ^[[1m^[[33m^^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_now_ns`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0988174Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0988394Z ^[[1m^[[33mwarning^[[0m^[[1m: value assigned to `owned_guard` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0988896Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:389:27
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0989259Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0989540Z ^[[1m^[[94m389^[[0m ^[[1m^[[94m|^[[0m     let mut owned_guard = None;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.0990040Z     ^[[1m^[[94m|^[[0m                           ^[[1m^[[33m^^^^^[[0m ^[[1m^[[33mthis value is reassigned later and never used^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1011086Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1011605Z ^[[1m^[[94m442^[[0m ^[[1m^[[94m|^[[0m     owned_guard = Some(SandboxedContainerChild::own(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1012775Z     ^[[1m^[[94m|^[[0m     ^[[1m^[[94m-----------^[[0m ^[[1m^[[94m`owned_guard` is overwritten here before the previous value is read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1013161Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1013328Z ^[[1m^[[33mwarning^[[0m^[[1m: unused variable: `total`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1013768Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/supervision/disposition.rs:22:9
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1014129Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1014420Z ^[[1m^[[94m22^[[0m ^[[1m^[[94m|^[[0m     let total = drained_tasks.len();
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1014998Z    ^[[1m^[[94m|^[[0m         ^[[1m^[[33m^^^^^^[[0m ^[[1m^[[33mhelp: if this is intentional, prefix it with an underscore: `_total`^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1015363Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1015543Z ^[[1m^[[33mwarning^[[0m^[[1m: field `boot_nonce` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1015963Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/halt/resolver.rs:101:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1016298Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1016579Z ^[[1m^[[94m 95^[[0m ^[[1m^[[94m|^[[0m pub struct KernelHaltResolver {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1017034Z     ^[[1m^[[94m|^[[0m            ^[[1m^[[94m------------------^[[0m ^[[1m^[[94mfield in this struct^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1017381Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1017623Z ^[[1m^[[94m101^[[0m ^[[1m^[[94m|^[[0m     boot_nonce: u64,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1017931Z     ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1018183Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1018544Z     ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1018830Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1019033Z ^[[1m^[[33mwarning^[[0m^[[1m: field `next_frame_counter` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1019474Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/mod.rs:84:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1019782Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1020063Z ^[[1m^[[94m79^[[0m ^[[1m^[[94m|^[[0m pub struct MemoryManagerAdapter {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1020825Z    ^[[1m^[[94m|^[[0m            ^[[1m^[[94m--------------------^[[0m ^[[1m^[[94mfield in this struct^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1021188Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1021465Z ^[[1m^[[94m84^[[0m ^[[1m^[[94m|^[[0m     next_frame_counter: AtomicU64,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1021813Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1021991Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1022180Z ^[[1m^[[33mwarning^[[0m^[[1m: method `mint_frame_id` is never used^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1022593Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/mod.rs:710:8
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1022910Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1023178Z ^[[1m^[[94m117^[[0m ^[[1m^[[94m|^[[0m impl MemoryManagerAdapter {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1023650Z     ^[[1m^[[94m|^[[0m ^[[1m^[[94m-------------------------^[[0m ^[[1m^[[94mmethod in this implementation^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1024513Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1024818Z ^[[1m^[[94m710^[[0m ^[[1m^[[94m|^[[0m     fn mint_frame_id(&self) -> [u8; 16] {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1025182Z     ^[[1m^[[94m|^[[0m        ^[[1m^[[33m^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1025362Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1025582Z ^[[1m^[[33mwarning^[[0m^[[1m: associated function `now_ns` is never used^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1026036Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/principal.rs:51:8
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1026374Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1026649Z ^[[1m^[[94m37^[[0m ^[[1m^[[94m|^[[0m impl PrincipalNamespaceIndex {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1027175Z    ^[[1m^[[94m|^[[0m ^[[1m^[[94m----------------------------^[[0m ^[[1m^[[94massociated function in this implementation^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1027588Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1027837Z ^[[1m^[[94m51^[[0m ^[[1m^[[94m|^[[0m     fn now_ns() -> u64 {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1028142Z    ^[[1m^[[94m|^[[0m        ^[[1m^[[33m^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1028317Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1028480Z ^[[1m^[[33mwarning^[[0m^[[1m: field `kind` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1028873Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/private.rs:44:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1029191Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1029441Z ^[[1m^[[94m42^[[0m ^[[1m^[[94m|^[[0m struct DiskCandidate {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1060643Z    ^[[1m^[[94m|^[[0m        ^[[1m^[[94m-------------^[[0m ^[[1m^[[94mfield in this struct^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1061290Z ^[[1m^[[94m43^[[0m ^[[1m^[[94m|^[[0m     name: String,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1061622Z ^[[1m^[[94m44^[[0m ^[[1m^[[94m|^[[0m     kind: ValueKind,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1061925Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1062081Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1062275Z ^[[1m^[[33mwarning^[[0m^[[1m: field `iac_rt_metrics` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1062733Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1063080Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1063376Z ^[[1m^[[94m32^[[0m ^[[1m^[[94m|^[[0m pub struct SelfTelemetryAggregator {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1063883Z    ^[[1m^[[94m|^[[0m            ^[[1m^[[94m-----------------------^[[0m ^[[1m^[[94mfield in this struct^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1064443Z ^[[1m^[[94m33^[[0m ^[[1m^[[94m|^[[0m     iac_rt_metrics: Arc<IacRtMetrics>,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1064845Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1065027Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1065275Z ^[[1m^[[33mwarning^[[0m^[[1m: associated function `resolution_label` is never used^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1065776Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1066120Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1066395Z ^[[1m^[[94m38^[[0m ^[[1m^[[94m|^[[0m impl SelfTelemetryAggregator {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1066923Z    ^[[1m^[[94m|^[[0m ^[[1m^[[94m----------------------------^[[0m ^[[1m^[[94massociated function in this implementation^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1067339Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1067722Z ^[[1m^[[94m60^[[0m ^[[1m^[[94m|^[[0m     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1068174Z    ^[[1m^[[94m|^[[0m        ^[[1m^[[33m^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1068351Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1068576Z ^[[1m^[[33mwarning^[[0m^[[1m: associated function `kind_to_str` is never used^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1069028Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/memory/shared.rs:52:8
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1069354Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1069610Z ^[[1m^[[94m38^[[0m ^[[1m^[[94m|^[[0m impl SharedMemoryStore {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1070340Z    ^[[1m^[[94m|^[[0m ^[[1m^[[94m----------------------^[[0m ^[[1m^[[94massociated function in this implementation^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1070811Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1071143Z ^[[1m^[[94m52^[[0m ^[[1m^[[94m|^[[0m     fn kind_to_str(kind: ValueKind) -> &'static str {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1071528Z    ^[[1m^[[94m|^[[0m        ^[[1m^[[33m^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1071699Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1071905Z ^[[1m^[[33mwarning^[[0m^[[1m: method `build_kernel_ctx` is never used^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1072380Z    ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/scheduler/hook_dispatch.rs:139:8
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1073295Z     ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1073560Z ^[[1m^[[94m 68^[[0m ^[[1m^[[94m|^[[0m impl HookDispatcher {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1073998Z     ^[[1m^[[94m|^[[0m ^[[1m^[[94m-------------------^[[0m ^[[1m^[[94mmethod in this implementation^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1074359Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1074640Z ^[[1m^[[94m139^[[0m ^[[1m^[[94m|^[[0m     fn build_kernel_ctx<'a>(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1074980Z     ^[[1m^[[94m|^[[0m        ^[[1m^[[33m^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1075161Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1075348Z ^[[1m^[[33mwarning^[[0m^[[1m: field `attestation` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1075823Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1076198Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1076491Z ^[[1m^[[94m34^[[0m ^[[1m^[[94m|^[[0m pub struct VerifiedImageAttestation {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1076970Z    ^[[1m^[[94m|^[[0m            ^[[1m^[[94m------------------------^[[0m ^[[1m^[[94mfield in this struct^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1077438Z ^[[1m^[[94m35^[[0m ^[[1m^[[94m|^[[0m     attestation: T3ImageAttestation,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1077783Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1078040Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1078722Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1079491Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1079773Z ^[[1m^[[33mwarning^[[0m^[[1m: field `notification_dispatcher` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1080496Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1080932Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1081212Z ^[[1m^[[94m23^[[0m ^[[1m^[[94m|^[[0m pub struct ProgressWatchdog {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1081646Z    ^[[1m^[[94m|^[[0m            ^[[1m^[[94m----------------^[[0m ^[[1m^[[94mfield in this struct^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1081988Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1082629Z ^[[1m^[[94m27^[[0m ^[[1m^[[94m|^[[0m     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1083175Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1083359Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1083582Z ^[[1m^[[33mwarning^[[0m^[[1m: field `notification_dispatcher` is never read^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1084122Z   ^[[1m^[[94m--> ^[[0mcrates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1084515Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1084802Z ^[[1m^[[94m23^[[0m ^[[1m^[[94m|^[[0m pub struct SilentFailureDetector {
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1085260Z    ^[[1m^[[94m|^[[0m            ^[[1m^[[94m---------------------^[[0m ^[[1m^[[94mfield in this struct^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1085619Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1086159Z ^[[1m^[[94m27^[[0m ^[[1m^[[94m|^[[0m     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1086709Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^^^^^^^^^^^^^^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1086900Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1087354Z ^[[1m^[[33mwarning^[[0m: `maos-kernel-core` (lib) generated 44 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 25 suggestions)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:28.1088142Z ^[[1m^[[92m   Compiling^[[0m maos-wasm-host v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-wasm-host)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8082323Z ^[[1m^[[92m    Finished^[[0m `test` profile [unoptimized + debuginfo] target(s) in 14.88s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8278801Z ^[[1m^[[92m     Running^[[0m unittests src/lib.rs (target/debug/deps/maos_host-39bad2ba6aef08f1)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8291878Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8292027Z running 0 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8292331Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8292729Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8293056Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8294844Z ^[[1m^[[92m     Running^[[0m unittests src/lib.rs (target/debug/deps/maos_wasm_host-2339e0a6005df9eb)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8305449Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8306135Z running 10 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8310699Z test adapter::tests::resolve_fuel_parses_config_value ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8311405Z test adapter::tests::resolve_fuel_ignores_invalid_value ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8311862Z test codec::tests::cbor_roundtrip_map ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8312256Z test codec::tests::cbor_roundtrip_string ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8313087Z test recall_wire::tests::empty_page_and_all_error_cases_round_trip ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8328210Z test recall_wire::tests::partial_header_is_protocol_error_not_clean_eof ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8341759Z test recall_wire::tests::tags_discriminate_requests_replies_and_iac_frames ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8342617Z test recall_wire::tests::oversized_fetch_and_body_are_refused_at_bound_plus_one ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:42.8900745Z test recall_wire::tests::page_prefix_at_exact_expansion_budget_boundary ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0588714Z test recall_wire::tests::megabyte_payload_is_one_byte_string_not_a_sequence ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0589166Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0589924Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0590374Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0621039Z ^[[1m^[[92m     Running^[[0m unittests src/runner.rs (target/debug/deps/maos_wasm_runner-9eba8ad9f4d2a52e)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0632871Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0633550Z running 0 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0633674Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0633904Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0634224Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0635265Z ^[[1m^[[92m     Running^[[0m tests/codec_integration.rs (target/debug/deps/codec_integration-7d101f31392350e6)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0646257Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0646464Z running 10 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0661437Z test cbor_boundary_values ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0661758Z test cbor_boundary_255_256 ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0662008Z test cbor_canonical_map_key_ordering ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0663376Z test cbor_roundtrip_optional_some_null ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0680685Z test cbor_roundtrip_nested_structure ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0681400Z test cbor_roundtrip_optional_none ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0681690Z test nesting_and_trailing_items_are_refused ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0735887Z test valid_container_crosses_expansion_limit_below_wire_limit ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:43.0848689Z test encode_accepts_exactly_what_decode_accepts ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3666373Z test cbor_output_cap_rejects_oversized_guest_data ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3666702Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3666945Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.30s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3667270Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3684983Z ^[[1m^[[92m     Running^[[0m tests/e2e_roundtrip.rs (target/debug/deps/e2e_roundtrip-3945426edd1697f8)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3697379Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3697591Z running 8 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3744473Z test invalid_component_fails_closed_with_distinct_exit_code ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3781462Z test component_without_spirit_import_reaches_invalid_component_not_world_refusal ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3810910Z test resolve_launch_native_subprocess_is_identity ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3831209Z test resolve_launch_wasm_component_produces_runner_plan ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.3831925Z test v1_frames_world_is_refused_with_incompatible_world_exit ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:45.4209837Z test a_turn_with_one_unliftable_frame_emits_nothing ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8333889Z test real_runner_subprocess_adr032_roundtrip_through_guest ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8378953Z test peer_identity_rupture_round_trips_through_the_real_runner ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8379295Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8379520Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.47s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8379844Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8383818Z ^[[1m^[[92m     Running^[[0m tests/equiv_harness.rs (target/debug/deps/equiv_harness-c65fe2291c3f8361)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8797143Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8811296Z running 19 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8816480Z test absent_form_fails_loud ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8817004Z test capability_decision_observed_via_in_process_kernel ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8817498Z test cosmetic_threshold_bites_through_invariant_green ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8834302Z test all_invariant_fields_are_guarded_against_demotion ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8863883Z test duplicate_key_pairing_is_robust ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8869504Z test audit_observed_via_in_process_kernel ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.8919821Z test halt_observed_via_in_process_kernel ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9175697Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9188306Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9233759Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9297884Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9465049Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9630293Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9792782Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9842247Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9909073Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:47.9973145Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.0034756Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.0331507Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.0628487Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.0917954Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on package cache
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.1307235Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on build directory
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.1307770Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on build directory
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.1308237Z ^[[1m^[[92m    Blocking^[[0m waiting for file lock on build directory
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.1599316Z ^[[1m^[[92m   Compiling^[[0m proc-macro2 v1.0.106
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.1599901Z ^[[1m^[[92m   Compiling^[[0m quote v1.0.46
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.1600820Z ^[[1m^[[92m   Compiling^[[0m unicode-ident v1.0.24
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.1601488Z ^[[1m^[[92m   Compiling^[[0m serde_core v1.0.228
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.2171575Z ^[[1m^[[92m   Compiling^[[0m libc v0.2.186
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.3023552Z ^[[1m^[[92m   Compiling^[[0m serde v1.0.228
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.4475938Z ^[[1m^[[92m   Compiling^[[0m libm v0.2.16
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.8348529Z ^[[1m^[[92m   Compiling^[[0m version_check v0.9.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:48.8877561Z ^[[1m^[[92m   Compiling^[[0m syn v2.0.118
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:49.0195988Z ^[[1m^[[92m   Compiling^[[0m generic-array v0.14.7
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:49.1121624Z ^[[1m^[[92m   Compiling^[[0m cfg-if v1.0.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:49.1382450Z ^[[1m^[[92m   Compiling^[[0m foldhash v0.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:50.1017915Z ^[[1m^[[92m   Compiling^[[0m hashbrown v0.17.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:50.6122944Z ^[[1m^[[92m   Compiling^[[0m bitflags v2.13.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:50.6661609Z ^[[1m^[[92m   Compiling^[[0m anyhow v1.0.103
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:50.8400641Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-core v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:50.8672537Z ^[[1m^[[92m   Compiling^[[0m log v0.4.33
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:50.9636727Z ^[[1m^[[92m   Compiling^[[0m jobserver v0.1.34
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:51.1851528Z ^[[1m^[[92m   Compiling^[[0m semver v1.0.28
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:51.2891536Z ^[[1m^[[92m   Compiling^[[0m find-msvc-tools v0.1.9
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:51.3652483Z ^[[1m^[[92m   Compiling^[[0m typenum v1.20.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:51.4376135Z ^[[1m^[[92m   Compiling^[[0m memchr v2.8.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:51.6792652Z ^[[1m^[[92m   Compiling^[[0m shlex v2.0.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:51.7821549Z ^[[1m^[[92m   Compiling^[[0m equivalent v1.0.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:51.8184808Z ^[[1m^[[92m   Compiling^[[0m indexmap v2.14.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:52.0091333Z ^[[1m^[[92m   Compiling^[[0m cc v1.2.65
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:52.4111710Z ^[[1m^[[92m   Compiling^[[0m target-lexicon v0.13.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:52.6162442Z ^[[1m^[[92m   Compiling^[[0m serde_derive v1.0.228
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:52.6966990Z ^[[1m^[[92m   Compiling^[[0m thiserror-impl v2.0.18
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.1082481Z ^[[1m^[[92m   Compiling^[[0m thiserror v2.0.18
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.3086687Z ^[[1m^[[92m   Compiling^[[0m block-buffer v0.10.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.3971552Z ^[[1m^[[92m   Compiling^[[0m crypto-common v0.1.7
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.4541556Z ^[[1m^[[92m   Compiling^[[0m synstructure v0.13.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.5950849Z ^[[1m^[[92m   Compiling^[[0m zmij v1.0.21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.7821523Z ^[[1m^[[92m   Compiling^[[0m digest v0.10.7
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.9002694Z ^[[1m^[[92m   Compiling^[[0m cranelift-srcgen v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:53.9820071Z ^[[1m^[[92m   Compiling^[[0m heck v0.5.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:54.0921665Z ^[[1m^[[92m   Compiling^[[0m cranelift-assembler-x64-meta v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:54.2035872Z ^[[1m^[[92m   Compiling^[[0m zerofrom-derive v0.1.7
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:54.3608184Z ^[[1m^[[92m   Compiling^[[0m cpufeatures v0.2.17
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:54.4232981Z ^[[1m^[[92m   Compiling^[[0m serde_json v1.0.150
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:54.6631603Z ^[[1m^[[92m   Compiling^[[0m rustix v1.1.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:55.0431349Z ^[[1m^[[92m   Compiling^[[0m zerofrom v0.1.8
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:55.2400417Z ^[[1m^[[92m   Compiling^[[0m smallvec v1.15.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:55.4161562Z ^[[1m^[[92m   Compiling^[[0m wasmparser v0.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:55.7201651Z ^[[1m^[[92m   Compiling^[[0m cranelift-bitset v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:55.7461584Z ^[[1m^[[92m   Compiling^[[0m sha2 v0.10.9
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:55.9791796Z ^[[1m^[[92m   Compiling^[[0m yoke-derive v0.8.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.0801547Z ^[[1m^[[92m   Compiling^[[0m pulley-macros v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.3231903Z ^[[1m^[[92m   Compiling^[[0m hashbrown v0.16.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.5971573Z ^[[1m^[[92m   Compiling^[[0m allocator-api2 v0.2.21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.8421322Z ^[[1m^[[92m   Compiling^[[0m fnv v1.0.7
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.8783125Z ^[[1m^[[92m   Compiling^[[0m stable_deref_trait v1.2.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.8984914Z ^[[1m^[[92m   Compiling^[[0m linux-raw-sys v0.12.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.9062300Z ^[[1m^[[92m   Compiling^[[0m yoke v0.8.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:56.9079651Z ^[[1m^[[92m   Compiling^[[0m bumpalo v3.20.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:46:57.0201564Z ^[[1m^[[92m   Compiling^[[0m gimli v0.33.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:01.7791573Z ^[[1m^[[92m   Compiling^[[0m cranelift-entity v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:02.3121574Z ^[[1m^[[92m   Compiling^[[0m cobs v0.3.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:02.4776893Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-versioned-export-macros v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:02.7261488Z ^[[1m^[[92m   Compiling^[[0m crc32fast v1.5.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:02.8421739Z ^[[1m^[[92m   Compiling^[[0m leb128fmt v0.1.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:03.2417392Z ^[[1m^[[92m   Compiling^[[0m cranelift-isle v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:03.3551559Z ^[[1m^[[92m   Compiling^[[0m wasm-encoder v0.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:03.9151590Z ^[[1m^[[92m   Compiling^[[0m postcard v1.1.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:04.2001566Z ^[[1m^[[92m   Compiling^[[0m cranelift-bforest v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:04.4320650Z ^[[1m^[[92m   Compiling^[[0m pulley-interpreter v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:05.1424158Z ^[[1m^[[92m   Compiling^[[0m zerovec-derive v0.11.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:05.6041745Z ^[[1m^[[92m   Compiling^[[0m object v0.39.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:05.7361652Z ^[[1m^[[92m   Compiling^[[0m cranelift-codegen-shared v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:05.7711660Z ^[[1m^[[92m   Compiling^[[0m cranelift-codegen-meta v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:05.9036796Z ^[[1m^[[92m   Compiling^[[0m zerovec v0.11.6
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:07.3061644Z ^[[1m^[[92m   Compiling^[[0m cranelift-assembler-x64 v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:07.4511606Z ^[[1m^[[92m   Compiling^[[0m displaydoc v0.2.6
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:07.9067411Z ^[[1m^[[92m   Compiling^[[0m pkg-config v0.3.33
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:08.0221656Z ^[[1m^[[92m   Compiling^[[0m cpp_demangle v0.5.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:08.2331582Z ^[[1m^[[92m   Compiling^[[0m rustc-hash v2.1.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:08.2402156Z ^[[1m^[[92m   Compiling^[[0m zstd-sys v2.0.16+zstd.1.5.7
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:08.4391333Z ^[[1m^[[92m   Compiling^[[0m cranelift-codegen v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:08.4830580Z ^[[1m^[[92m   Compiling^[[0m crossbeam-utils v0.8.21
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:08.6291824Z ^[[1m^[[92m   Compiling^[[0m termcolor v1.4.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:08.9412077Z ^[[1m^[[92m   Compiling^[[0m arbitrary v1.4.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:09.7171683Z ^[[1m^[[92m   Compiling^[[0m cranelift-control v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:09.7571610Z ^[[1m^[[92m   Compiling^[[0m wasmprinter v0.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:21.0387001Z ^[[1m^[[92m   Compiling^[[0m regalloc2 v0.15.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:24.3499252Z ^[[1m^[[92m   Compiling^[[0m itoa v1.0.18
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:24.4374699Z ^[[1m^[[92m   Compiling^[[0m once_cell v1.21.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:24.4911742Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-component-util v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:24.5352700Z ^[[1m^[[92m   Compiling^[[0m rustc-demangle v0.1.27
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:25.3011640Z ^[[1m^[[92m   Compiling^[[0m wasmtime-environ v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:31.9399383Z ^[[1m^[[92m   Compiling^[[0m tinystr v0.8.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.0597731Z ^[[1m^[[92m   Compiling^[[0m litemap v0.8.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.1732276Z ^[[1m^[[92m   Compiling^[[0m pin-project-lite v0.2.17
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.3502443Z ^[[1m^[[92m   Compiling^[[0m id-arena v2.3.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.4121548Z ^[[1m^[[92m   Compiling^[[0m getrandom v0.4.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.5131262Z ^[[1m^[[92m   Compiling^[[0m writeable v0.6.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.6651807Z ^[[1m^[[92m   Compiling^[[0m zstd-safe v7.2.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.7431397Z ^[[1m^[[92m   Compiling^[[0m rand_core v0.10.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:32.8211654Z ^[[1m^[[92m   Compiling^[[0m icu_locale_core v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:35.0352088Z ^[[1m^[[92m   Compiling^[[0m wit-parser v0.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:40.6518374Z ^[[1m^[[92m   Compiling^[[0m crossbeam-epoch v0.9.18
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:40.9809523Z ^[[1m^[[92m   Compiling^[[0m wasm-metadata v0.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:41.2842267Z ^[[1m^[[92m   Compiling^[[0m zerotrie v0.2.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:41.5774325Z ^[[1m^[[92m   Compiling^[[0m potential_utf v0.1.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:41.6581614Z ^[[1m^[[92m   Compiling^[[0m winnow v1.0.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:41.9753990Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-unwinder v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.0921565Z ^[[1m^[[92m   Compiling^[[0m icu_normalizer_data v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.1834047Z ^[[1m^[[92m   Compiling^[[0m futures-sink v0.3.32
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.2244000Z ^[[1m^[[92m   Compiling^[[0m icu_properties_data v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.3065732Z ^[[1m^[[92m   Compiling^[[0m utf8_iter v1.0.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.3935480Z ^[[1m^[[92m   Compiling^[[0m rayon-core v1.13.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.4719351Z ^[[1m^[[92m   Compiling^[[0m either v1.16.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.6033981Z ^[[1m^[[92m   Compiling^[[0m futures-core v0.3.32
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.6691524Z ^[[1m^[[92m   Compiling^[[0m unicode-width v0.2.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:42.8352069Z ^[[1m^[[92m   Compiling^[[0m thiserror v1.0.69
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:43.1727979Z ^[[1m^[[92m   Compiling^[[0m wast v254.0.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:47.8831461Z test cosmetic_only_stays_green has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:47.8861034Z test divergent_spirit_causes_invariant_red has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:47.8881070Z test forged_consent_survives_both_forms_and_claim_mutation_is_red has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:47.8921079Z test identity_spirit_both_forms_100pct_invariant has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:48.8761733Z ^[[1m^[[92m   Compiling^[[0m futures-channel v0.3.32
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:49.0317740Z ^[[1m^[[92m   Compiling^[[0m icu_collections v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:49.5641588Z ^[[1m^[[92m   Compiling^[[0m toml_parser v1.1.2+spec-1.1.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:50.1844190Z ^[[1m^[[92m   Compiling^[[0m icu_provider v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:50.6061576Z ^[[1m^[[92m   Compiling^[[0m wit-component v0.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:50.7401753Z ^[[1m^[[92m   Compiling^[[0m crossbeam-deque v0.8.6
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:50.9881247Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-fiber v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:51.1408111Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-jit-debug v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:51.5641615Z ^[[1m^[[92m   Compiling^[[0m thiserror-impl v1.0.69
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:52.3971658Z ^[[1m^[[92m   Compiling^[[0m dirs-sys-next v0.1.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:52.7361711Z ^[[1m^[[92m   Compiling^[[0m toml_datetime v0.7.5+spec-1.1.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:52.9914735Z ^[[1m^[[92m   Compiling^[[0m serde_spanned v1.1.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.0851691Z ^[[1m^[[92m   Compiling^[[0m toml_writer v1.1.1+spec-1.1.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.2451504Z ^[[1m^[[92m   Compiling^[[0m futures-io v0.3.32
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.3431580Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-cache v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.4601540Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-component-macro v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.5402826Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-cranelift v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.6278519Z ^[[1m^[[92m   Compiling^[[0m slab v0.4.12
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.6473884Z ^[[1m^[[92m   Compiling^[[0m fixedbitset v0.4.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.7412798Z ^[[1m^[[92m   Compiling^[[0m winnow v0.7.15
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.8691657Z ^[[1m^[[92m   Compiling^[[0m futures-task v0.3.32
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:53.9461542Z ^[[1m^[[92m   Compiling^[[0m leb128 v0.2.7
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:54.0002739Z ^[[1m^[[92m   Compiling^[[0m uuid v1.23.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:54.4541563Z ^[[1m^[[92m   Compiling^[[0m debugid v0.8.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:54.6652071Z ^[[1m^[[92m   Compiling^[[0m wast v35.0.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:55.1511541Z ^[[1m^[[92m   Compiling^[[0m toml v0.9.12+spec-1.1.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:55.3981557Z ^[[1m^[[92m   Compiling^[[0m futures-util v0.3.32
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:57.5691630Z ^[[1m^[[92m   Compiling^[[0m petgraph v0.6.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:58.8790814Z ^[[1m^[[92m   Compiling^[[0m directories-next v2.0.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:47:59.0202266Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-wit-bindgen v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:00.5233585Z ^[[1m^[[92m   Compiling^[[0m zstd v0.13.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:00.8081428Z ^[[1m^[[92m   Compiling^[[0m wat v1.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:01.2221417Z ^[[1m^[[92m   Compiling^[[0m itertools v0.14.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:01.9502311Z ^[[1m^[[92m   Compiling^[[0m cranelift-frontend v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:02.5223816Z ^[[1m^[[92m   Compiling^[[0m cranelift-native v0.135.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:02.6033276Z ^[[1m^[[92m   Compiling^[[0m wasmtime v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:02.8841804Z ^[[1m^[[92m   Compiling^[[0m async-trait v0.1.89
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:03.5761643Z ^[[1m^[[92m   Compiling^[[0m rustc_version v0.4.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:04.7804093Z ^[[1m^[[92m   Compiling^[[0m base64 v0.22.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:05.1360706Z ^[[1m^[[92m   Compiling^[[0m io-lifetimes v3.0.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:05.3104960Z ^[[1m^[[92m   Compiling^[[0m fastrand v2.4.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:05.5581769Z ^[[1m^[[92m   Compiling^[[0m io-lifetimes v2.0.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:05.6781552Z ^[[1m^[[92m   Compiling^[[0m zerocopy v0.8.52
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:05.8783004Z ^[[1m^[[92m   Compiling^[[0m wasm-compose v0.254.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:10.0466751Z ^[[1m^[[92m   Compiling^[[0m tempfile v3.27.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:16.7541613Z ^[[1m^[[92m   Compiling^[[0m curve25519-dalek v4.1.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:17.7591550Z ^[[1m^[[92m   Compiling^[[0m icu_properties v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:19.0851532Z ^[[1m^[[92m   Compiling^[[0m icu_normalizer v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:20.0321503Z ^[[1m^[[92m   Compiling^[[0m rayon v1.12.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:22.4661586Z ^[[1m^[[92m   Compiling^[[0m witx v0.9.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:23.7871700Z ^[[1m^[[92m   Compiling^[[0m futures v0.3.32
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:23.8161684Z ^[[1m^[[92m   Compiling^[[0m fxprof-processed-profile v0.8.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:26.7172577Z ^[[1m^[[92m   Compiling^[[0m tracing-core v0.1.36
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:27.4252466Z ^[[1m^[[92m   Compiling^[[0m memfd v0.6.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:27.4621612Z ^[[1m^[[92m   Compiling^[[0m addr2line v0.26.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:27.6361750Z ^[[1m^[[92m   Compiling^[[0m wasmtime-internal-jit-icache-coherence v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:27.7011636Z ^[[1m^[[92m   Compiling^[[0m zerocopy-derive v0.8.52
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:27.7956912Z ^[[1m^[[92m   Compiling^[[0m tracing-attributes v0.1.31
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:28.7331650Z ^[[1m^[[92m   Compiling^[[0m encoding_rs v0.8.35
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:28.8102030Z ^[[1m^[[92m   Compiling^[[0m wiggle-macro v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:28.8979053Z ^[[1m^[[92m   Compiling^[[0m io-extras v0.19.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:32.2602431Z ^[[1m^[[92m   Compiling^[[0m tracing v0.1.44
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:32.4991520Z ^[[1m^[[92m   Compiling^[[0m wiggle-generate v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:33.5372863Z ^[[1m^[[92m   Compiling^[[0m idna_adapter v1.2.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:33.7301678Z ^[[1m^[[92m   Compiling^[[0m cap-primitives v4.0.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:33.8714333Z ^[[1m^[[92m   Compiling^[[0m subtle v2.6.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:33.9536242Z ^[[1m^[[92m   Compiling^[[0m bytes v1.12.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:34.6711644Z ^[[1m^[[92m   Compiling^[[0m signature v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:34.7371646Z ^[[1m^[[92m   Compiling^[[0m getrandom v0.3.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:34.8861784Z ^[[1m^[[92m   Compiling^[[0m percent-encoding v2.3.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:35.0442869Z ^[[1m^[[92m   Compiling^[[0m zeroize v1.9.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:37.1198558Z ^[[1m^[[92m   Compiling^[[0m form_urlencoded v1.2.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:37.2691302Z ^[[1m^[[92m   Compiling^[[0m ed25519 v2.2.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:37.4827701Z ^[[1m^[[92m   Compiling^[[0m fs-set-times v0.20.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:37.6602411Z ^[[1m^[[92m   Compiling^[[0m idna v1.1.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:39.7851325Z ^[[1m^[[92m   Compiling^[[0m half v2.7.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:40.0151320Z ^[[1m^[[92m   Compiling^[[0m chacha20 v0.10.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:40.1723739Z ^[[1m^[[92m   Compiling^[[0m rustix-linux-procfs v0.1.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:40.4012774Z ^[[1m^[[92m   Compiling^[[0m mio v1.2.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:40.9061567Z ^[[1m^[[92m   Compiling^[[0m socket2 v0.6.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:41.6491309Z ^[[1m^[[92m   Compiling^[[0m maybe-owned v0.3.4
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:41.7478755Z ^[[1m^[[92m   Compiling^[[0m ambient-authority v0.0.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:41.7761394Z ^[[1m^[[92m   Compiling^[[0m ipnet v2.12.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:41.7844838Z ^[[1m^[[92m   Compiling^[[0m ciborium-io v0.2.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:41.8223714Z ^[[1m^[[92m   Compiling^[[0m ciborium-ll v0.2.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:41.9712905Z ^[[1m^[[92m   Compiling^[[0m tokio v1.52.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:43.9671869Z ^[[1m^[[92m   Compiling^[[0m rand v0.10.1
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:44.5053879Z ^[[1m^[[92m   Compiling^[[0m url v2.5.8
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:46.4052076Z ^[[1m^[[92m   Compiling^[[0m ed25519-dalek v2.2.0
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:46.6501486Z ^[[1m^[[92m   Compiling^[[0m wiggle v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:46.8612415Z ^[[1m^[[92m   Compiling^[[0m wasmtime-wasi-io v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:47.9122617Z ^[[1m^[[92m   Compiling^[[0m maos-spirit-abi v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-spirit-abi)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:48.3412782Z ^[[1m^[[92m   Compiling^[[0m hex v0.4.3
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:48.5306554Z ^[[1m^[[92m   Compiling^[[0m maos-domain v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-domain)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:50.5462746Z ^[[1m^[[92m   Compiling^[[0m wasmtime-wasi v48.0.5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0169066Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0182450Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:44:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0201009Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0231261Z ^[[1m^[[94m44^[[0m ^[[1m^[[94m|^[[0m     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0261076Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0292911Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0321526Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0351100Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(async_fn_in_trait)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0381572Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0410923Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0441092Z ^[[1m^[[94m44^[[0m ^[[91m- ^[[0m    ^[[91masync ^[[0mfn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0471510Z ^[[1m^[[94m44^[[0m ^[[92m+ ^[[0m    fn deliver(&self, frame: IacFrame) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<LogBeforeDeliver<()>, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0500908Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0530522Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0561255Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0591162Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:58:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0620889Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0650915Z ^[[1m^[[94m58^[[0m ^[[1m^[[94m|^[[0m     async fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0680882Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0710896Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0741373Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0771490Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0800821Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0830833Z ^[[1m^[[94m58^[[0m ^[[92m~ ^[[0m    fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0860891Z ^[[1m^[[94m59^[[0m ^[[1m^[[94m|^[[0m         &self,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0890852Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0920969Z ^[[1m^[[94m62^[[0m ^[[1m^[[94m|^[[0m         retracting_spirit: &SpiritId,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0951344Z ^[[1m^[[94m63^[[0m ^[[92m~ ^[[0m    ) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<RetractOutcome, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.0980857Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:52.1010459Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:55.7391530Z ^[[1m^[[92m   Compiling^[[0m ciborium v0.2.2
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:56.0541473Z ^[[1m^[[33mwarning^[[0m: `maos-domain` (lib) generated 2 warnings
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:56.0571693Z ^[[1m^[[92m   Compiling^[[0m maos-host v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-host)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:56.1071788Z ^[[1m^[[92m   Compiling^[[0m maos-frame-codec v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-frame-codec)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:48:56.2051806Z ^[[1m^[[92m   Compiling^[[0m equiv-fixture-logic v0.1.0 (/home/runner/work/maos/maos/crates/maos-wasm-host/guests/equiv-fixture/logic)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:08.1902418Z ^[[1m^[[92m   Compiling^[[0m maos-wasm-host v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-wasm-host)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:15.4171656Z ^[[1m^[[92m   Compiling^[[0m equiv-native-twin v0.1.0 (/home/runner/work/maos/maos/crates/maos-wasm-host/guests/equiv-fixture/native-twin)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.5878468Z ^[[1m^[[92m    Finished^[[0m `release` profile [optimized] target(s) in 2m 32s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6128043Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6128876Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:44:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6129283Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6129756Z ^[[1m^[[94m44^[[0m ^[[1m^[[94m|^[[0m     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6130441Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6130685Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6131314Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6132031Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(async_fn_in_trait)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6132893Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6133580Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6134068Z ^[[1m^[[94m44^[[0m ^[[91m- ^[[0m    ^[[91masync ^[[0mfn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6135146Z ^[[1m^[[94m44^[[0m ^[[92m+ ^[[0m    fn deliver(&self, frame: IacFrame) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<LogBeforeDeliver<()>, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6135746Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6135845Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6136241Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6136898Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:58:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6137846Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6138106Z ^[[1m^[[94m58^[[0m ^[[1m^[[94m|^[[0m     async fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6138406Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6138645Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6139268Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6140611Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6141352Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6141579Z ^[[1m^[[94m58^[[0m ^[[92m~ ^[[0m    fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6141860Z ^[[1m^[[94m59^[[0m ^[[1m^[[94m|^[[0m         &self,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6142113Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6142398Z ^[[1m^[[94m62^[[0m ^[[1m^[[94m|^[[0m         retracting_spirit: &SpiritId,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6143091Z ^[[1m^[[94m63^[[0m ^[[92m~ ^[[0m    ) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<RetractOutcome, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6143574Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6143674Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6143858Z ^[[1m^[[33mwarning^[[0m: `maos-domain` (lib) generated 2 warnings
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6144644Z ^[[1m^[[92m    Finished^[[0m `release` profile [optimized] target(s) in 2m 32s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6355379Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6356645Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:44:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6357277Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6357921Z ^[[1m^[[94m44^[[0m ^[[1m^[[94m|^[[0m     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6358558Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6358935Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6359762Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6363047Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(async_fn_in_trait)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6364337Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6365387Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6366010Z ^[[1m^[[94m44^[[0m ^[[91m- ^[[0m    ^[[91masync ^[[0mfn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6367226Z ^[[1m^[[94m44^[[0m ^[[92m+ ^[[0m    fn deliver(&self, frame: IacFrame) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<LogBeforeDeliver<()>, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6367984Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6368218Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6368749Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6369531Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:58:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6370268Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6370718Z ^[[1m^[[94m58^[[0m ^[[1m^[[94m|^[[0m     async fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6371143Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6371537Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6372306Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6373620Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6374478Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6375297Z ^[[1m^[[94m58^[[0m ^[[92m~ ^[[0m    fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6375721Z ^[[1m^[[94m59^[[0m ^[[1m^[[94m|^[[0m         &self,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6376122Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6376557Z ^[[1m^[[94m62^[[0m ^[[1m^[[94m|^[[0m         retracting_spirit: &SpiritId,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6377419Z ^[[1m^[[94m63^[[0m ^[[92m~ ^[[0m    ) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<RetractOutcome, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6378036Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6378257Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6378602Z ^[[1m^[[33mwarning^[[0m: `maos-domain` (lib) generated 2 warnings
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6379169Z ^[[1m^[[92m    Finished^[[0m `release` profile [optimized] target(s) in 2m 32s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6698287Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6699496Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:44:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6700338Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6701121Z ^[[1m^[[94m44^[[0m ^[[1m^[[94m|^[[0m     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6701766Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6702175Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6702979Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6704481Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: `#[warn(async_fn_in_trait)]` on by default
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6705509Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6706355Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6707025Z ^[[1m^[[94m44^[[0m ^[[91m- ^[[0m    ^[[91masync ^[[0mfn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6708292Z ^[[1m^[[94m44^[[0m ^[[92m+ ^[[0m    fn deliver(&self, frame: IacFrame) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<LogBeforeDeliver<()>, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6709067Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6709305Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6709945Z ^[[1m^[[33mwarning^[[0m^[[1m: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6711093Z   ^[[1m^[[94m--> ^[[0m/home/runner/work/maos/maos/crates/maos-domain/src/ports/iac_bus.rs:58:5
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6711625Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6712022Z ^[[1m^[[94m58^[[0m ^[[1m^[[94m|^[[0m     async fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6712452Z    ^[[1m^[[94m|^[[0m     ^[[1m^[[33m^^^^^^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6712829Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6713589Z    ^[[1m^[[94m= ^[[0m^[[1mnote^[[0m: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6714868Z ^[[1m^[[96mhelp^[[0m: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6715703Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6716049Z ^[[1m^[[94m58^[[0m ^[[92m~ ^[[0m    fn retract(
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6716474Z ^[[1m^[[94m59^[[0m ^[[1m^[[94m|^[[0m         &self,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6716874Z ^[[1m^[[94m...^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6717317Z ^[[1m^[[94m62^[[0m ^[[1m^[[94m|^[[0m         retracting_spirit: &SpiritId,
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6718171Z ^[[1m^[[94m63^[[0m ^[[92m~ ^[[0m    ) -> ^[[92mimpl std::future::Future<Output = ^[[0mResult<RetractOutcome, IacBusError>^[[92m> + Send^[[0m;
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6718816Z    ^[[1m^[[94m|^[[0m
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6719051Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6719393Z ^[[1m^[[33mwarning^[[0m: `maos-domain` (lib) generated 2 warnings
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:20.6719966Z ^[[1m^[[92m    Finished^[[0m `release` profile [optimized] target(s) in 2m 32s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0144055Z test identity_spirit_both_forms_100pct_invariant ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0152158Z test kernel_audit_kinds_are_real ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0153485Z test mixed_form_stream_rejected ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0163076Z test normalize_preserves_every_former_f3_field ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0172159Z test region_pin_observed_via_in_process_kernel ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0202513Z test same_form_pair_rejected ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0231147Z test saturating_diverge_at_u64_max_ceiling_is_honest ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0261099Z test tier_demotion_causes_red ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0281322Z test zero_frames_fails_loud ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0726416Z test cosmetic_only_stays_green ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:23.0759546Z test divergent_spirit_causes_invariant_red ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3250684Z test forged_consent_survives_both_forms_and_claim_mutation_is_red ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3251073Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3251310Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 157.45s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3251670Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3262700Z ^[[1m^[[92m     Running^[[0m tests/frame_bridge_roundtrip.rs (target/debug/deps/frame_bridge_roundtrip-e537da51a30a59ac)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3274161Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3274285Z running 19 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3281176Z test all_15_frame_kinds_round_trip_through_lower_lift ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3282014Z test consent_recall_policy_is_elided_by_lowering_and_lifts_as_full ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3283124Z test consent_request_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3283598Z test consent_envelope_intent_and_lineage_are_byte_lossless ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3284130Z test decision_dispatch_digest_refs_are_byte_lossless ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3284583Z test decision_dispatch_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3284996Z test epistemic_halt_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3285451Z test consent_rupture_peer_identity_unverified_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3285952Z test fetched_origin_case_names_match_the_wit_contract ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3286470Z test guest_argv_prefix_hash_with_31_bytes_is_rejected ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3286929Z test guest_frame_id_with_15_bytes_is_rejected ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3287429Z test full_consent_envelope_cbor_is_byte_identical_to_pre_17_8_golden ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3288465Z test rate_limited_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3288757Z test retract_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3289262Z test task_assign_nested_fields_and_all_scope_variants_are_byte_lossless ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3289863Z test task_assign_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3290335Z test task_complete_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3290750Z test telemetry_event_payload_round_trips ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3459445Z test four_mib_guest_intent_lineage_lifts_without_panicking_or_truncation ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3459814Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3460045Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3460529Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3478815Z ^[[1m^[[92m     Running^[[0m tests/fuel_t2_matrix.rs (target/debug/deps/fuel_t2_matrix-b3068a2ead3ce501)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3496442Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3496964Z running 8 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3512993Z test component_model_engine_configuration ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3656675Z test benign_guest_completes_with_fuel ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3659972Z test invalid_wasm_bytes_fail_closed ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3691313Z test fuel_ordering_fuel_bound_strictly_less_than_t2 ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3692147Z test echo_guest_returns_input_identity ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3766376Z test spin_loop_exhausts_fuel_with_out_of_fuel_trap ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.3775125Z test mutator_guest_flips_output_red ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.4215499Z test fuel_disabled_spin_runs_without_out_of_fuel_trap ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.4215826Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.4216059Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.4217005Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.4217591Z ^[[1m^[[92m     Running^[[0m tests/recall_runner_17_3d.rs (target/debug/deps/recall_runner_17_3d-77e36e698b6ed704)
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.4230309Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:49:25.4230931Z running 11 tests
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:50:25.4251643Z test eof_outstanding_closes_client_but_finishes_export_and_exits_zero has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:50:25.4271412Z test frozen_2_0_echo_runs_under_t2_on_2_1_runner_byte_identically has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:50:25.4301166Z test oversized_reply_latches_broken_after_export has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:50:25.4331154Z test partial_reply_header_latches_broken_after_export has been running for over 60 seconds
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:26.8836757Z test frozen_2_0_echo_runs_under_t2_on_2_1_runner_byte_identically ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:26.9212902Z test partial_reply_header_latches_broken_after_export ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:26.9281467Z test oversized_reply_latches_broken_after_export ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:26.9331564Z test eof_outstanding_closes_client_but_finishes_export_and_exits_zero ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.0621369Z test recall_outside_handle_frame_is_unavailable_without_records ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.1053241Z test recall_probe_maps_filter_page_fetch_and_open_labels ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.1071173Z test reply_too_large_is_typed_and_does_not_break_following_call ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.1114001Z test undecodable_reply_latches_broken_after_export ... FAILED
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2403550Z test unknown_tag_reply_latches_broken_after_export ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2819009Z test wrong_reply_variant_is_protocol_desync ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2828209Z test untagged_reply_latches_broken_after_export ... ok
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2828494Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2828583Z failures:
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2828675Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2828833Z ---- undecodable_reply_latches_broken_after_export stdout ----
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2829073Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2829446Z thread 'undecodable_reply_latches_broken_after_export' (19184) panicked at crates/maos-wasm-host/tests/recall_runner_17_3d.rs:134:75:
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2830414Z called `Result::unwrap()` on an `Err` value: Os { code: 32, kind: BrokenPipe, message: "Broken pipe" }
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2830940Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2831237Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2831241Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2831304Z failures:
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2831502Z     undecodable_reply_latches_broken_after_export
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2831691Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2831940Z test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 181.86s
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2832275Z 
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2832797Z ^[[1m^[[91merror^[[0m: test failed, to rerun pass `-p maos-wasm-host --test recall_runner_17_3d`
+wasm-host-tests (ubuntu-26.04-arm)	Run maos-host + maos-wasm-host test suites	2026-10-21T11:52:27.2867023Z ##[error]Process completed with exit code 101.
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	﻿2026-10-21T11:52:27.2953025Z ##[group]Run actions/upload-artifact@v4
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2953416Z with:
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2953633Z   name: admitted-17-3c-ubuntu-26.04-arm
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2954037Z   path: spawned-17-3c.log
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	recall-17-3d.log
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	participant-17-8.log
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	17-3c-proof/
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	17-3c-proof.log
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2954445Z   if-no-files-found: error
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2954653Z   compression-level: 6
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2954840Z   overwrite: false
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2955022Z   include-hidden-files: false
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2955224Z env:
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2955382Z   CARGO_HOME: /home/runner/.cargo
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2955600Z   CARGO_INCREMENTAL: 0
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2955788Z   CARGO_TERM_COLOR: always
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2955987Z   CACHE_ON_FAILURE: false
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.2956178Z ##[endgroup]
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.4375302Z (node:19202) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.4376010Z (Use `node --trace-deprecation ...` to show where the warning was created)
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.4462782Z Multiple search paths detected. Calculating the least common ancestor of all paths
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.4464637Z The least common ancestor is /home/runner/work/maos/maos. This will be the root directory of the artifact
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	2026-10-21T11:52:27.4467216Z ##[error]No files were found with the provided path: spawned-17-3c.log
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	recall-17-3d.log
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	participant-17-8.log
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	17-3c-proof/
+wasm-host-tests (ubuntu-26.04-arm)	Run actions/upload-artifact@v4	17-3c-proof.log. No artifacts will be uploaded.

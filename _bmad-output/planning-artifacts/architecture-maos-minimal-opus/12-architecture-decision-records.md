@@ -481,6 +481,8 @@ Two ADR registries now exist and this note fixes their relationship:
 
 **What would force a revisit.** Partial-consent ruptures become common enough that the operator surface needs aggregation.
 
+**Implementation note — Story 17-8.** Grant-scoped rupture side rows, journaled atomically with the kind-22 rupture, withhold earlier envelope-bearing frames from a recorded recipient when granter (Spirit and host) and exact intent class match in this boot. Recall omits those frames and fetch returns `consent-withheld` with `log.fetch.refused:consent-withheld`; the sender retains access. Peer-identity ruptures carry no envelope and withhold nothing. This supplements quarantine; it does not turn every rupture into a conversation-wide revocation. **Production limits (AC3.6 / rule 11):** no `ConsentGate` is installed in production, no production granter sets `HeaderOnly`/`Withheld`, and envelope-bearing frames reach admitted local recipients only through A2A delegation intake. Native compiled-in bus sends remain attributed to pid 0 (non-goal). The daemon-only `ConsentEnvelope.recall` policy and its lossless-frame exception are ratified as `17-8-consent-recall-policy`; WIT is unchanged.
+
 ## ADR-035 — Observer scalar trajectory channel
 
 `Status: binding-v0.5` · `Gate: Observer subscribers see pre-halt scalar drift in real time` · `Decided: 2026-04-15` · `Revisits: §4.7, §6.5`

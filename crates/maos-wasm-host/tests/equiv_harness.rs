@@ -1661,6 +1661,7 @@ fn forged_consent_survives_both_forms_and_claim_mutation_is_red() {
         timestamp_ns: forged.timestamp_ns,
         intent_class: Some(A2AIntent::new("forged:escalation")),
         valid_until_ns: None,
+        recall: maos_domain::frame::ConsentRecall::Full,
     });
 
     assert_ne!(
@@ -1865,6 +1866,7 @@ fn normalize_preserves_every_former_f3_field() {
         timestamp_ns: consent.timestamp_ns,
         intent_class: Some(A2AIntent::new("review:consent")),
         valid_until_ns: Some(consent.timestamp_ns + 1),
+        recall: maos_domain::frame::ConsentRecall::Full,
     });
     assert_ne!(
         normalize(&base),
@@ -1966,6 +1968,7 @@ fn all_invariant_fields_are_guarded_against_demotion() {
         timestamp_ns: consent.timestamp_ns,
         intent_class: Some(A2AIntent::new("guard:consent")),
         valid_until_ns: None,
+        recall: maos_domain::frame::ConsentRecall::Full,
     });
     assert_red_on_single_divergence(&base, consent, "consent_envelope");
 

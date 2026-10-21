@@ -1,13 +1,13 @@
 use std::sync::{Arc, LazyLock, Mutex};
 
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_domain::log_recall::{LogRecallFilter, LogRecallPage};
+use maos_domain::log_recall::{EmitterScopeReason, LogRecallFilter, LogRecallPage};
 use maos_domain::ports::{
     CrossWallLogReadPort, CrossWallRecallConsentDecision, CrossWallRecallConsentError,
     CrossWallRecallConsentPort, LogRecallPort,
 };
 use maos_domain::team::TeamId;
-use maos_iac::adapter::log_recall::LogRecallAdapter;
+use maos_iac::adapter::log_recall::{LogRecallAdapter, PageScope};
 use maos_iac::adapter::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 
 use maos_bin::cross_wall_log_read::CrossWallLogReadAdapter;
@@ -237,9 +237,13 @@ fn single_connection_foreign_read_is_immune_to_an_artifact_swap_between_binding_
 
     // Query on the SAME held connection (what `read_remote` does after P2).
     let reader = TransparencyLogAdapter::from_read_only_connection(conn);
-    let page: LogRecallPage =
-        LogRecallAdapter::query_page(&reader, 42, None, LogRecallFilter::default())
-            .expect("query on held connection");
+    let page: LogRecallPage = LogRecallAdapter::query_page(
+        &reader,
+        42,
+        PageScope::Emitter(EmitterScopeReason::CrossWall),
+        LogRecallFilter::default(),
+    )
+    .expect("query on held connection");
 
     // Served rows are good.db's {good-1}, NOT swap.db's {swap-1}: the held
     // connection still points at good.db's inode. Two opens would return swap-1.

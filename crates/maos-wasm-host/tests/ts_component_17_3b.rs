@@ -139,6 +139,7 @@ fn full_frame() -> IacFrame {
             timestamp_ns: 17_003_001,
             intent_class: Some(A2AIntent::new("diagnosis-handoff:read-only-evidence")),
             valid_until_ns: Some(17_999_999),
+            recall: maos_domain::frame::ConsentRecall::Full,
         }),
         intent_lineage: lineage(&["operator", "typescript-component"]),
     }

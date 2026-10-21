@@ -1,0 +1,106 @@
+Source commit: 1241ce5238b9d60ff99806bb5c339b1a728a6480
+HEAD^{tree}: 36282e3d5a8f7d6f1af069a48f83c46f0ac36be9
+SHA256 of plant git diff: 8817c9580d31abff6a6cd8221e20d0e2adb787319cdca636fa0aea03cd247234
+node --version: v24.22.1
+Command: cd templates/spirit-ts && npm test
+
+=== PLANTED GIT DIFF (against source commit; includes uncommitted scaffold changes) ===
+diff --git a/templates/spirit-ts/src/index.ts b/templates/spirit-ts/src/index.ts
+index 385d4cd7..ff500e3b 100644
+--- a/templates/spirit-ts/src/index.ts
++++ b/templates/spirit-ts/src/index.ts
+@@ -18,12 +18,13 @@ export function handleFrame(frame: IacFrame): IacFrame[] {
+     halt("handleFrame called before onStart");
+   }
+ 
+-  // Recall is emitter-only in this daemon run, not participant-scoped yet.
++  // Recall lists frames this Spirit sent or received in this daemon run.
++  // Withheld frames are omitted; payload-available = false means header-only.
+   recall({ limit: 16 });
+   try {
+-    // The operator seed's emitter is pid 0, so fetching it is scope-violation.
+-    // Received frames become fetchable with
+-    // 17-8-participant-recall-and-consent-envelopes; success is normal too.
++    // The --once operator seed is received by this Spirit, so fetch succeeds.
++    // consent-withheld means the granter's consent no longer permits payload
++    // disclosure (including header-only recall); scope-violation is normal too.
+     fetch(frame.frameId);
+   } catch (error) {
+     // componentize-js wraps imported result errors in ComponentError.payload.
+@@ -31,7 +32,8 @@ export function handleFrame(frame: IacFrame): IacFrame[] {
+       typeof error !== "object" || error === null ||
+       !("payload" in error) ||
+       typeof error.payload !== "object" || error.payload === null ||
+-      !("tag" in error.payload) || error.payload.tag !== "scope-violation"
++      !("tag" in error.payload) ||
++      error.payload.tag !== "scope-violation"
+     ) {
+       throw error;
+     }
+
+=== ISOLATED PLANT (GREEN to RED) ===
+--- a/templates/spirit-ts/src/index.ts
++++ b/templates/spirit-ts/src/index.ts
+@@ -33,8 +33,7 @@
+       !("payload" in error) ||
+       typeof error.payload !== "object" || error.payload === null ||
+       !("tag" in error.payload) ||
+-      (error.payload.tag !== "scope-violation" &&
+-        error.payload.tag !== "consent-withheld")
++      error.payload.tag !== "scope-violation"
+     ) {
+       throw error;
+     }
+
+=== RED exit 1 ===
+
+> @local/{{project-name}}@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /home/lunarpulse/dev_ws/templates/spirit-ts
+
+ ❯ tests/spirit.test.ts  (8 tests | 1 failed) 6ms
+   ❯ tests/spirit.test.ts > WASM component guest > echoes when fetch reports consent-withheld
+     → component error
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/spirit.test.ts > WASM component guest > echoes when fetch reports consent-withheld
+Error: component error
+ ❯ componentError tests/spirit.test.ts:13:32
+     11| // Imported WIT result errors are wrapped by componentize-js in this s…
+     12| function componentError(tag: string): Error {
+     13|   return Object.defineProperty(new Error("component error"), "payload"…
+       |                                ^
+     14|     value: { tag }, enumerable: true,
+     15|   });
+ ❯ Proxy.<anonymous> tests/spirit.test.ts:54:55
+ ❯ Module.handleFrame src/index.ts:28:5
+ ❯ tests/spirit.test.ts:55:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { payload: { tag: 'consent-withheld' } }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  10:51:57
+   Duration  1.08s (transform 85ms, setup 0ms, collect 102ms, tests 6ms, environment 0ms, prepare 163ms)
+
+
+=== GREEN (exact restoration) exit 0 ===
+
+> @local/{{project-name}}@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /home/lunarpulse/dev_ws/templates/spirit-ts
+
+ ✓ tests/spirit.test.ts  (8 tests) 4ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  10:52:10
+   Duration  792ms (transform 73ms, setup 0ms, collect 77ms, tests 4ms, environment 0ms, prepare 96ms)
+

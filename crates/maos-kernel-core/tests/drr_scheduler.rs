@@ -136,9 +136,8 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
                             maos_kernel_core::iac::FrameKind::TaskAssign,
                             0,
                             "standard".into(),
-                            FrameOrigin::HumanAuthored,
-                            vec![],
                             None,
+                            Vec::new(),
                         )
                         .await;
                 }) as Pin<Box<dyn Future<Output = ()> + Send>>

@@ -58,9 +58,8 @@ fn rows_for_pid(log: &TransparencyLogAdapter, pid: u32) -> Vec<TransparencyLogEn
 }
 
 /// Deliver one tokened and one tokenless frame, retract with and without a
-/// token, and assert every row's `capability_token` column. Under DRR only the
-/// tokened retract runs: DRR journals every Retract row under the placeholder
-/// frame id `[0; 16]`, so a second DRR retract is a duplicate row (pre-existing).
+/// token, and assert every row's `capability_token` column. Story 17-8 CR-4:
+/// each retract mints its own id before either arm, so DRR journals both.
 async fn exercise(drr: bool) {
     init_monotonic_base();
     let log = Arc::new(TransparencyLogAdapter::open_in_memory(0));
@@ -95,13 +94,11 @@ async fn exercise(drr: bool) {
         .await
         .unwrap();
     assert!(matches!(outcome, RetractOutcome::Retracted { .. }));
-    if !drr {
-        let outcome = bus
-            .retract([2; 16], "superseded".into(), &guest, None)
-            .await
-            .unwrap();
-        assert!(matches!(outcome, RetractOutcome::Retracted { .. }));
-    }
+    let outcome = bus
+        .retract([2; 16], "superseded".into(), &guest, None)
+        .await
+        .unwrap();
+    assert!(matches!(outcome, RetractOutcome::Retracted { .. }));
 
     let retract_row = |pid| {
         rows_for_pid(&log, pid)
@@ -113,9 +110,7 @@ async fn exercise(drr: bool) {
         retract_row(41).capability_token,
         Some(capability_token_column(&retract_token))
     );
-    if !drr {
-        assert_eq!(retract_row(42).capability_token, None);
-    }
+    assert_eq!(retract_row(42).capability_token, None);
 }
 
 #[test]

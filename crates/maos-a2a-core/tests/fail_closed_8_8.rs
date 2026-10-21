@@ -102,6 +102,7 @@ fn frame(intent_class: Option<&str>) -> IacFrame {
             timestamp_ns: 0,
             intent_class: Some(A2AIntent::new(s)),
             valid_until_ns: None,
+            recall: maos_domain::frame::ConsentRecall::Full,
         }),
         intent_lineage: IntentLineage::default(),
     }

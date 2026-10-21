@@ -1,0 +1,16 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index a7037410..c3d7746b 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -2489,9 +2489,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     // Story 17-8 AC2.3 — the ONE recipient resolver is the admitted-incarnation
+     // map itself (no second map): every routed write records only addressees
+     // admission put here, and every rupture names only those incarnations.
+-    transparency_log
+-        .install_recipient_resolver(Arc::clone(&pid_by_spirit_id) as _)
+-        .map_err(|()| "transparency log recipient resolver installed twice")?;
++    // CI PLANT (ci/17-8-verify c2, D-17-8-05): recipient recording disabled —
++    // no resolver is installed, so no routed write records a recipient.
+     let digest_pid_map = Arc::clone(&pid_by_spirit_id);
+     let digest_memory: Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync> =
+         Arc::clone(&memory) as Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync>;

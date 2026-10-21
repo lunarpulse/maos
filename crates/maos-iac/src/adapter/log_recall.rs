@@ -2,9 +2,10 @@
 
 //! Log-recall adapter — implements `LogRecallPort` over the Transparency Log.
 //!
-//! Emitter-scoped, boot-incarnation-bound metadata recall and lazy payload fetch.
-//! Participant recall and persisted consent evaluation are owned by
-//! `17-8-participant-recall-and-consent-envelopes`.
+//! Participant-scoped (Story 17-8), boot-incarnation-bound metadata recall and
+//! lazy payload fetch: a Spirit recalls the frames it sent or was recorded as
+//! receiving in this boot, each received frame still under its granter's
+//! persisted consent. Cross-wall reads stay emitter-scoped (ADR-058 D2).
 
 use std::sync::Arc;
 
@@ -16,8 +17,9 @@ use parking_lot::Mutex;
 use maos_domain::invariants::i1::TokenId;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::log_recall::{
-    CrossWallRecallRefusal, FrameKindLabel as DomainFrameKindLabel, LogFetchResponse,
-    LogRecallCursor, LogRecallEntry, LogRecallError, LogRecallFilter, LogRecallPage,
+    CrossWallRecallRefusal, EmitterScopeReason, FrameKindLabel as DomainFrameKindLabel,
+    LogFetchResponse, LogRecallCursor, LogRecallEntry, LogRecallError, LogRecallFilter,
+    LogRecallPage, RecallScope,
 };
 use maos_domain::ports::{
     CrossWallLogReadPort, CrossWallRecallConsentDecision, CrossWallRecallConsentError,
@@ -26,8 +28,8 @@ use maos_domain::ports::{
 use maos_domain::team::TeamId;
 
 use super::transparency_log::{
-    capability_token_column, FrameFilter, FrameKind, TransparencyLogAdapter,
-    TransparencyLogMetadata,
+    capability_token_column, FrameFilter, FrameKind, ParticipantAccess, ParticipantScope,
+    TransparencyLogAdapter, TransparencyLogMetadata, SPIRIT_DISCLOSABLE_RAW_KINDS,
 };
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
@@ -41,10 +43,38 @@ pub const LOG_CROSS_WALL_RECALL_INTENT: &str = "log.recall.cross-wall";
 pub const LOG_FETCH_INTENT: &str = "log.fetch";
 
 /// Only bus frames and MCP invocations are Spirit-disclosable. Inspect the raw
-/// SQLite discriminant, never an audit reader's decoded fallback.
+/// SQLite discriminant, never an audit reader's decoded fallback. Same list as
+/// the SQL predicate ([`SPIRIT_DISCLOSABLE_RAW_KINDS`]).
 pub fn is_spirit_disclosable(raw_kind: i64) -> bool {
-    matches!(raw_kind, 0..=6 | 18)
+    SPIRIT_DISCLOSABLE_RAW_KINDS.contains(&raw_kind)
 }
+
+/// Story 17-8 AC2.5 / AC6.1 — which rows a page may be drawn from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageScope {
+    /// Local recall: this boot only; rows the caller sent or was recorded as
+    /// receiving, received rows judged against consent at `consent_now_ns`.
+    Participant {
+        boot_nonce: u64,
+        consent_now_ns: u64,
+    },
+    /// Rows the caller emitted, any boot, no side table read (a foreign
+    /// artifact may predate them). The page carries the emitter marker.
+    Emitter(EmitterScopeReason),
+}
+
+impl PageScope {
+    fn marker(self) -> RecallScope {
+        match self {
+            Self::Participant { .. } => RecallScope::Participant,
+            Self::Emitter(reason) => RecallScope::Emitter { reason },
+        }
+    }
+}
+
+/// Story 17-8 AC3.2 — the consent clock seam. Production reads
+/// [`maos_domain::frame::consent_wall_now_ns`]; tests pin and advance it.
+pub type ConsentClock = Arc<dyn Fn() -> u64 + Send + Sync>;
 
 /// A bounded fetch refuses an oversized stored payload before loading its blob.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +89,7 @@ pub enum BoundedFetch {
 /// an existing I9-sanctioned holder (same shape as `SelfTelemetryAggregator`).
 pub struct LogRecallAdapter {
     transparency_log: Arc<TransparencyLogAdapter>,
+    consent_clock: ConsentClock,
     cross_wall_consent: Option<Arc<dyn CrossWallRecallConsentPort>>,
     cross_wall_read: Option<Arc<dyn CrossWallLogReadPort>>,
     /// Story 4.4 — cross-Spirit isolation hook (Story 4.5 corpus).
@@ -72,11 +103,18 @@ impl LogRecallAdapter {
     pub fn new(transparency_log: Arc<TransparencyLogAdapter>) -> Self {
         Self {
             transparency_log,
+            consent_clock: Arc::new(maos_domain::frame::consent_wall_now_ns),
             cross_wall_consent: None,
             cross_wall_read: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
+    }
+
+    /// Story 17-8 AC3.2 — replace the consent clock (tests pin and advance it).
+    pub fn with_consent_clock(mut self, clock: ConsentClock) -> Self {
+        self.consent_clock = clock;
+        self
     }
 
     /// Attach the directional cross-wall consent decision seam. The builder is
@@ -269,29 +307,45 @@ impl LogRecallAdapter {
         Ok(())
     }
 
-    /// Query one emitter-scoped page without emitting a local audit row.
+    /// Query one page in `scope` without emitting a local audit row; every
+    /// predicate runs in SQL before `LIMIT`.
     ///
-    /// Composition-root remote readers reuse this mapping over a connection
-    /// that SQLite has already opened read-only.
+    /// Composition-root remote readers reuse this mapping (emitter scope) over a
+    /// connection that SQLite has already opened read-only.
     pub fn query_page(
         transparency_log: &TransparencyLogAdapter,
         spirit_pid: u32,
-        boot_nonce: Option<u64>,
+        scope: PageScope,
         filter: LogRecallFilter,
     ) -> Result<LogRecallPage, LogRecallError> {
         Self::validate_filter(&filter)?;
         let effective_limit = filter.limit.min(LogRecallFilter::MAX_LIMIT);
         if effective_limit == 0 {
-            return Ok(LogRecallPage::new(Vec::new(), None));
+            return Ok(LogRecallPage::new(Vec::new(), None, scope.marker()));
         }
         let kind = match filter.kind.as_ref().map(Self::to_kernel_kind) {
-            Some(None) => return Ok(LogRecallPage::new(Vec::new(), None)),
+            Some(None) => return Ok(LogRecallPage::new(Vec::new(), None, scope.marker())),
             Some(Some(kind)) => Some(kind),
             None => None,
         };
+        let (emitter, boot_nonce, participant) = match scope {
+            PageScope::Participant {
+                boot_nonce,
+                consent_now_ns,
+            } => (
+                None,
+                Some(boot_nonce),
+                Some(ParticipantScope {
+                    pid: spirit_pid,
+                    consent_now_ns,
+                }),
+            ),
+            PageScope::Emitter(_) => (Some(spirit_pid), None, None),
+        };
         let kernel_filter = FrameFilter {
-            spirit_pid: Some(spirit_pid),
+            spirit_pid: emitter,
             boot_nonce,
+            participant,
             disclosable_kinds_only: true,
             intent: filter.intent_filter,
             kind,
@@ -321,7 +375,14 @@ impl LogRecallAdapter {
             .into_iter()
             .map(Self::build_entry)
             .collect::<Result<_, _>>()?;
-        Ok(LogRecallPage::new(entries, next_cursor))
+        Ok(LogRecallPage::new(entries, next_cursor, scope.marker()))
+    }
+
+    fn participant(&self, spirit_pid: u32) -> ParticipantScope {
+        ParticipantScope {
+            pid: spirit_pid,
+            consent_now_ns: (self.consent_clock)(),
+        }
     }
 
     /// Convert kernel origin → domain origin.
@@ -390,7 +451,10 @@ impl LogRecallAdapter {
         Self::query_page(
             &self.transparency_log,
             spirit_pid,
-            Some(self.transparency_log.boot_nonce()),
+            PageScope::Participant {
+                boot_nonce: self.transparency_log.boot_nonce(),
+                consent_now_ns: (self.consent_clock)(),
+            },
             filter,
         )
     }
@@ -422,41 +486,47 @@ impl LogRecallAdapter {
             self.fire_isolation_hooks(&format!("log.fetch:{spirit_pid}:{hex_prefix}"), true);
         }
 
-        let metadata = self
+        // Story 17-8 AC2.6 — not found, then scope (foreign boot, undisclosable
+        // kind, non-participant: indistinguishable), then the granter's consent,
+        // and only then the byte bound — a withheld or header-only frame never
+        // reports `PayloadTooLarge` and its payload is never loaded.
+        let scope = self.participant(spirit_pid);
+        let access = self
             .transparency_log
-            .query_frame_metadata_by_id(frame_id)
+            .participant_access(frame_id, scope)
             .map_err(|error| LogRecallError::Storage(error.to_string()))?
             .ok_or(LogRecallError::FrameNotFound { frame_id })?;
-        let boot_nonce = self.transparency_log.boot_nonce();
-        if metadata.spirit_pid != spirit_pid
-            || metadata.boot_nonce != boot_nonce
-            || !is_spirit_disclosable(metadata.raw_kind)
-        {
-            return Err(LogRecallError::ScopeViolation {
-                frame_id,
-                requested_pid: spirit_pid,
-                owner_pid: metadata.spirit_pid,
-            });
+        let payload_len = match access {
+            ParticipantAccess::OutOfScope { owner_pid } => {
+                return Err(LogRecallError::ScopeViolation {
+                    frame_id,
+                    requested_pid: spirit_pid,
+                    owner_pid,
+                })
+            }
+            ParticipantAccess::Withheld => {
+                return Err(LogRecallError::ConsentWithheld { frame_id })
+            }
+            ParticipantAccess::Payload { payload_len } => payload_len,
+        };
+        if payload_len > max_payload_len {
+            return Ok(BoundedFetch::PayloadTooLarge { payload_len });
         }
-        if metadata.payload_len > max_payload_len {
-            return Ok(BoundedFetch::PayloadTooLarge {
-                payload_len: metadata.payload_len,
-            });
-        }
-        // Consent evaluation is owned by 17-8-participant-recall-and-consent-envelopes.
+        // The load re-applies the participant predicate at the same `now`, so a
+        // rupture journaled since the classification still withholds it.
         let entry = self
             .transparency_log
             .query_frames(FrameFilter {
                 frame_id: Some(frame_id),
-                spirit_pid: Some(spirit_pid),
-                boot_nonce: Some(boot_nonce),
+                boot_nonce: Some(self.transparency_log.boot_nonce()),
+                participant: Some(scope),
                 disclosable_kinds_only: true,
                 limit: Some(1),
                 ..Default::default()
             })
             .map_err(|error| LogRecallError::Storage(error.to_string()))?
             .pop()
-            .ok_or(LogRecallError::FrameNotFound { frame_id })?;
+            .ok_or(LogRecallError::ConsentWithheld { frame_id })?;
         Ok(BoundedFetch::Fetched(LogFetchResponse::new(
             entry.frame_id,
             entry.timestamp_ns,
@@ -832,7 +902,13 @@ mod tests {
             } else {
                 Vec::new()
             };
-            Ok(LogRecallPage::new(entries, None))
+            Ok(LogRecallPage::new(
+                entries,
+                None,
+                RecallScope::Emitter {
+                    reason: EmitterScopeReason::CrossWall,
+                },
+            ))
         }
     }
 

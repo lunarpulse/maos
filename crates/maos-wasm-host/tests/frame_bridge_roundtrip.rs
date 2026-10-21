@@ -477,9 +477,91 @@ fn consent_envelope_intent_and_lineage_are_byte_lossless() {
         timestamp_ns: 9_876_543,
         intent_class: Some(A2AIntent::new("diagnosis-handoff:read-only-evidence")),
         valid_until_ns: Some(9_999_999),
+        recall: maos_domain::frame::ConsentRecall::Full,
     });
     frame.intent_lineage = lineage(&["operator", "handoff"]);
     assert_canonical_round_trip(&frame);
+}
+
+/// Story 17-8 AC5.1 — the runner codec's CBOR of a `Full` envelope is
+/// byte-identical to the golden captured at `1241ce52`, before `recall` existed
+/// (`17-8-evidence/t0/golden-envelope-1241ce52.txt`).
+#[test]
+fn full_consent_envelope_cbor_is_byte_identical_to_pre_17_8_golden() {
+    let bounded = ConsentEnvelope {
+        consent_id: [7; 16],
+        granter: FrameAddress {
+            spirit_id: SpiritId("peer".into()),
+            host_id: Some(HostId("host-b".into())),
+            role: None,
+        },
+        timestamp_ns: 1_700_000_000_000_000_000,
+        intent_class: Some(A2AIntent::new("diagnosis-handoff:read-only-evidence")),
+        valid_until_ns: Some(u64::MAX),
+        recall: frame::ConsentRecall::Full,
+    };
+    let open = ConsentEnvelope {
+        consent_id: [0; 16],
+        granter: FrameAddress {
+            spirit_id: SpiritId("a".into()),
+            host_id: None,
+            role: None,
+        },
+        timestamp_ns: 0,
+        intent_class: None,
+        valid_until_ns: None,
+        recall: frame::ConsentRecall::Full,
+    };
+    for (envelope, golden) in [
+        (bounded, "a56a636f6e73656e745f69649007070707070707070707070707070707676772616e746572a3697370697269745f6964647065657267686f73745f696466686f73742d6264726f6c65f66c74696d657374616d705f6e731b17979cfe362a00006c696e74656e745f636c6173737824646961676e6f7369732d68616e646f66663a726561642d6f6e6c792d65766964656e63656e76616c69645f756e74696c5f6e731bffffffffffffffff"),
+        (open, "a56a636f6e73656e745f69649000000000000000000000000000000000676772616e746572a3697370697269745f6964616167686f73745f6964f664726f6c65f66c74696d657374616d705f6e73006c696e74656e745f636c617373f66e76616c69645f756e74696c5f6e73f6"),
+    ] {
+        let bytes = codec::encode_cbor(&envelope).expect("envelope encodes");
+        let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+        assert_eq!(hex, golden);
+        let decoded: ConsentEnvelope = codec::decode_cbor(&bytes).expect("golden decodes");
+        assert_eq!(decoded, envelope);
+    }
+}
+
+/// Story 17-8 AC5.3 (D-17-8-01 A) — the recall policy is daemon-side disclosure
+/// metadata, elided by lowering: a `HeaderOnly` envelope lowers to the same five
+/// WIT fields as its `Full` twin and lifts back as `Full`. The one ratified
+/// exception to this file's lossless contract (`17-8-consent-recall-policy`).
+#[test]
+fn consent_recall_policy_is_elided_by_lowering_and_lifts_as_full() {
+    let full = ConsentEnvelope {
+        consent_id: [0xC1; 16],
+        granter: address(None),
+        timestamp_ns: 7,
+        intent_class: Some(A2AIntent::new("diagnosis-handoff:read-only-evidence")),
+        valid_until_ns: Some(u64::MAX),
+        recall: frame::ConsentRecall::Full,
+    };
+    let mut oracle = task_assign_oracle_frame();
+    oracle.consent_envelope = Some(ConsentEnvelope {
+        recall: frame::ConsentRecall::HeaderOnly,
+        ..full.clone()
+    });
+    let header_only = lower(&oracle).expect("header-only envelope lowers");
+    oracle.consent_envelope = Some(full.clone());
+    let full_wire = lower(&oracle).expect("full envelope lowers");
+    let Some(wit::ConsentEnvelope {
+        consent_id: _,
+        granter: _,
+        timestamp_ns: _,
+        intent_class: _,
+        valid_until_ns: _,
+    }) = &header_only.consent_envelope
+    else {
+        panic!("the envelope must lower");
+    };
+    assert_eq!(
+        format!("{:?}", header_only.consent_envelope),
+        format!("{:?}", full_wire.consent_envelope)
+    );
+    let lifted = lift(header_only).expect("lowered envelope lifts");
+    assert_eq!(lifted.consent_envelope, Some(full));
 }
 
 #[test]

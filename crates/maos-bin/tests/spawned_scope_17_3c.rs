@@ -632,6 +632,7 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                             "forged:consent",
                         )),
                         valid_until_ns: None,
+                        recall: maos_domain::frame::ConsentRecall::Full,
                     }),
                     intent_lineage: maos_domain::invariants::i13::IntentLineage::new(vec![
                         maos_domain::invariants::i8::A2AIntent::new(

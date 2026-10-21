@@ -1358,6 +1358,7 @@ mod unit_tests {
                     })
                     .collect(),
                 next_cursor: None,
+                scope: maos_domain::log_recall::RecallScope::Participant,
             })
         }
         fn fetch(

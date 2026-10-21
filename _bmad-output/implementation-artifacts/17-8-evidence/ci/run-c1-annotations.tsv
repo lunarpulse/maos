@@ -1,0 +1,25 @@
+notice	Epic-17 exit line 2b (ubuntu-26.04)	LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+notice	Epic-17 exit line 2 (ubuntu-26.04)	rc=0
+notice	17-8 provenance (ubuntu-26.04)	sha=2345fa4dfa775632b88576d559741e9eb23eae40 tree=82045cbdd07b0de071fc84bfcfa4a52434087635 rustc=rustc_1.99.1_(58cf8f9c3_2026-10-13)
+notice	Epic-17 exit line 2b (ubuntu-24.04)	LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+notice	Epic-17 exit line 2 (ubuntu-24.04)	rc=0
+notice	17-8 provenance (ubuntu-24.04)	sha=2345fa4dfa775632b88576d559741e9eb23eae40 tree=82045cbdd07b0de071fc84bfcfa4a52434087635 rustc=rustc_1.99.1_(58cf8f9c3_2026-10-13)
+notice	17-8 participant recall (ubuntu-24.04)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.49s
+notice	17-3d recall (ubuntu-24.04)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.30s
+notice	17-8 participant recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.15s
+notice	17-3d recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.58s
+notice	17-8 participant recall (ubuntu-26.04)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.21s
+notice	17-3d recall (ubuntu-26.04)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.52s
+notice	17-3c proof (ubuntu-26.04-arm)	TS-ADMITTED-PROOF os=26.04 arch=aarch64 pid=1 child_pid=45173 cpu=10 memory_mib=768 audit=attributed terminal=clean
+notice	17-8 participant recall (ubuntu-26.04-arm)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.30s
+notice	17-3d recall (ubuntu-26.04-arm)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.03s
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=wasm-component case=unmediated trusted_pid=13 decisions=1 minted=0 guest_effects=0
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=wasm-component case=policy_mixed trusted_pid=12 decisions=2 minted=1 guest_effects=0
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=wasm-component case=enterprise_denied trusted_pid=11 decisions=0 minted=0 guest_effects=0
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=subprocess case=unmediated trusted_pid=10 decisions=1 minted=0 guest_effects=0
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=subprocess case=policy_mixed trusted_pid=9 decisions=2 minted=1 guest_effects=0
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=subprocess case=enterprise_denied trusted_pid=8 decisions=0 minted=0 guest_effects=0
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	RUNNER-SIGSYS forbidden=false admitted_pid=6 actual_blocks=0 consumer_anomalies=0 audit_view=ok
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	RUNNER-SIGSYS forbidden=true admitted_pid=5 actual_blocks=1 consumer_anomalies=1 audit_view=ok
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	HOSTILE-ONCE turns=0 result=error
+notice	17-3c admitted runtime (ubuntu-26.04-arm)	HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted

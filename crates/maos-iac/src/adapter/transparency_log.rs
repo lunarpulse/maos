@@ -38,6 +38,7 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use maos_domain::frame::{ConsentEnvelope, ConsentRecall};
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
@@ -251,10 +252,195 @@ pub struct FrameFilter {
     pub cursor_frame_id: Option<[u8; 16]>,
     /// Exclusive insertion-order cursor (`rowid > cursor_insertion_id`).
     pub cursor_insertion_id: Option<i64>,
+    /// Story 17-8 AC2.5 — participant scope: rows the caller sent or was
+    /// recorded as receiving, each received row still under its consent at
+    /// `consent_now_ns`. Reads the side tables, so never set on a foreign
+    /// (cross-wall) artifact.
+    pub participant: Option<ParticipantScope>,
+}
+
+/// Story 17-8 — a participant caller and the consent clock reading it is judged at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParticipantScope {
+    pub pid: u32,
+    pub consent_now_ns: u64,
+}
+
+/// Story 17-8 AC2.6 — how one stored frame discloses to a participant caller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParticipantAccess {
+    /// Foreign boot, non-disclosable kind, or neither sender nor recorded recipient.
+    OutOfScope { owner_pid: u32 },
+    /// A recorded recipient whose granter's consent withholds the payload
+    /// (expired, ruptured since delivery, `Withheld`, `HeaderOnly` or unknown).
+    Withheld,
+    /// The payload may be loaded; `payload_len` is its stored length.
+    Payload { payload_len: u64 },
+}
+
+/// Story 17-8 CR-1 — one recorded local recipient of a routed frame: an
+/// admitted incarnation resolved through the [`RecipientResolver`], never a
+/// pid taken from the frame, the wire or a guest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrameRecipient {
+    pub pid: u32,
+    pub spirit_id: String,
+    pub role: Option<maos_spirit_abi::identity::SpiritRole>,
+}
+
+/// Story 17-8 AC2.3 — resolves local addressees to admitted incarnations. The
+/// composition root installs exactly one, over `pid_by_spirit_id`.
+pub trait RecipientResolver: Send + Sync + std::fmt::Debug {
+    /// Resolve every id under ONE read of the admitted-incarnation map.
+    fn resolve(&self, spirit_ids: &[&str]) -> Vec<Option<u32>>;
+}
+
+/// The admitted-incarnation map itself (`pid_by_spirit_id`). A poisoned map
+/// resolves nobody: a received frame then stays undisclosable (fail-closed).
+impl RecipientResolver for std::sync::RwLock<std::collections::BTreeMap<String, u32>> {
+    fn resolve(&self, spirit_ids: &[&str]) -> Vec<Option<u32>> {
+        let Ok(map) = self.read() else {
+            return vec![None; spirit_ids.len()];
+        };
+        spirit_ids.iter().map(|id| map.get(*id).copied()).collect()
+    }
+}
+
+/// Story 17-8 AC3.1 — the one order-preserving, lossless `u64 → i64` key for
+/// consent timestamps and the bound `now` (`u64::MAX` and other values above
+/// `i64::MAX` are real: the fail-closed clock, saturating TTLs). Never clamp.
+pub fn consent_order_key(value: u64) -> i64 {
+    (value ^ (1 << 63)) as i64
+}
+
+/// Story 17-3d R17-159 — the raw kinds a Spirit may recall (bus frames and MCP
+/// invocations). The one list shared by the Rust check and the SQL predicate.
+pub const SPIRIT_DISCLOSABLE_RAW_KINDS: [i64; 8] = [0, 1, 2, 3, 4, 5, 6, 18];
+
+fn disclosable_kinds_sql(column: &str) -> String {
+    let kinds = SPIRIT_DISCLOSABLE_RAW_KINDS.map(|kind| kind.to_string());
+    format!("{column} IN ({})", kinds.join(","))
+}
+
+/// Story 17-8 AC2.5 / AC3.3 — `caller` is the one-row `(pid, now_key)` CTE.
+/// A received row needs a recipient record naming the caller; one with a
+/// consent record is withheld when its policy is not Full/HeaderOnly (unknown
+/// integers included), when expired at `now`, or when a rupture of the same
+/// granter and exact intent class naming the caller was journaled after it in
+/// this boot (insertion order, never wall time; `IS` is NULL-safe).
+///
+/// The recipient test is written as `frame_id IN (subquery)` rather than a
+/// correlated `EXISTS` so the planner can serve `sender OR recipient` as a
+/// `MULTI-INDEX OR` over `idx_tlog_boot_pid_ts` and `idx_tlog_recipient_pid`
+/// instead of scanning every row of the boot (code review 2026-10-21). Every
+/// `OR` term must stay indexable or the planner silently falls back to a scan.
+const RECIPIENT_PREDICATE: &str = "t.frame_id IN (SELECT r.frame_id \
+     FROM transparency_log_recipients r WHERE r.recipient_pid = caller.pid)";
+const CONSENT_PREDICATE: &str = "NOT EXISTS (SELECT 1 FROM transparency_log_consent c \
+     WHERE c.frame_id = t.frame_id AND (c.recall_policy NOT IN (0, 1) \
+     OR c.valid_until_key < caller.now_key \
+     OR EXISTS (SELECT 1 FROM transparency_log_consent_ruptures x \
+       JOIN transparency_log tr ON tr.frame_id = x.rupture_frame_id \
+       WHERE x.recipient_pid = caller.pid AND tr.boot_nonce = t.boot_nonce \
+       AND tr.rowid > t.rowid AND x.granter_spirit_id = c.granter_spirit_id \
+       AND x.granter_host_id IS c.granter_host_id AND x.intent_class IS c.intent_class)))";
+const HEADER_ONLY_PREDICATE: &str = "EXISTS (SELECT 1 FROM transparency_log_consent h \
+     WHERE h.frame_id = t.frame_id AND h.recall_policy = 1)";
+
+fn participant_predicate() -> String {
+    format!("(t.spirit_pid = caller.pid OR ({RECIPIENT_PREDICATE} AND {CONSENT_PREDICATE}))")
 }
 
 const FRAME_METADATA_PROJECTION: &str =
     "frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, length(payload_redacted)";
+
+/// Story 17-8 — rows that commit in their base row's transaction.
+enum SideRows<'a> {
+    /// AC2.2 — a routed frame's recorded recipients and its consent envelope.
+    Routed {
+        recipients: &'a [FrameRecipient],
+        consent: Option<&'a ConsentEnvelope>,
+    },
+    /// AC3.5 — a rupture of `envelope`'s grant naming each rejected recipient.
+    Rupture {
+        envelope: &'a ConsentEnvelope,
+        recipient_pids: &'a [u32],
+    },
+}
+
+impl SideRows<'_> {
+    fn write(self, conn: &Connection, frame_id: &[u8; 16]) -> rusqlite::Result<()> {
+        let role =
+            |role: Option<maos_spirit_abi::identity::SpiritRole>| role.map(|r| format!("{r:?}"));
+        match self {
+            Self::Routed {
+                recipients,
+                consent,
+            } => {
+                for recipient in recipients {
+                    conn.execute(
+                        "INSERT INTO transparency_log_recipients
+                            (frame_id, recipient_pid, recipient_spirit_id, recipient_role)
+                         VALUES (?1, ?2, ?3, ?4)",
+                        rusqlite::params![
+                            &frame_id[..],
+                            recipient.pid as i64,
+                            recipient.spirit_id,
+                            role(recipient.role),
+                        ],
+                    )?;
+                }
+                let Some(envelope) = consent else {
+                    return Ok(());
+                };
+                let policy: i64 = match envelope.recall {
+                    ConsentRecall::Full => 0,
+                    ConsentRecall::HeaderOnly => 1,
+                    ConsentRecall::Withheld => 2,
+                };
+                conn.execute(
+                    "INSERT INTO transparency_log_consent
+                        (frame_id, consent_id, granter_spirit_id, granter_host_id, granter_role,
+                         granted_at_key, intent_class, valid_until_key, recall_policy)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        &frame_id[..],
+                        &envelope.consent_id[..],
+                        envelope.granter.spirit_id.as_str(),
+                        envelope.granter.host_id.as_ref().map(|host| host.as_str()),
+                        role(envelope.granter.role),
+                        consent_order_key(envelope.timestamp_ns),
+                        envelope.intent_class.as_ref().map(|intent| intent.as_str()),
+                        envelope.valid_until_ns.map(consent_order_key),
+                        policy,
+                    ],
+                )?;
+                Ok(())
+            }
+            Self::Rupture {
+                envelope,
+                recipient_pids,
+            } => {
+                for pid in recipient_pids {
+                    conn.execute(
+                        "INSERT OR IGNORE INTO transparency_log_consent_ruptures
+                            (rupture_frame_id, recipient_pid, granter_spirit_id, granter_host_id,
+                             intent_class)
+                         VALUES (?1, ?2, ?3, ?4, ?5)",
+                        rusqlite::params![
+                            &frame_id[..],
+                            *pid as i64,
+                            envelope.granter.spirit_id.as_str(),
+                            envelope.granter.host_id.as_ref().map(|host| host.as_str()),
+                            envelope.intent_class.as_ref().map(|intent| intent.as_str()),
+                        ],
+                    )?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PersistedLegalHold {
@@ -343,6 +529,40 @@ CREATE TABLE IF NOT EXISTS transparency_log_retractions (
     retracted_at_ns     INTEGER NOT NULL
 );
 
+-- Story 17-8 — participant recall side tables, written in the routed frame's
+-- (or the kind-22 rupture row's) own transaction. `*_key` columns hold
+-- `consent_order_key(u64)`; NULL valid_until = open-ended.
+CREATE TABLE IF NOT EXISTS transparency_log_recipients (
+    frame_id            BLOB    NOT NULL,
+    recipient_pid       INTEGER NOT NULL,
+    recipient_spirit_id TEXT    NOT NULL,
+    recipient_role      TEXT,
+    PRIMARY KEY (frame_id, recipient_pid)
+);
+CREATE INDEX IF NOT EXISTS idx_tlog_recipient_pid
+    ON transparency_log_recipients(recipient_pid, frame_id);
+CREATE TABLE IF NOT EXISTS transparency_log_consent (
+    frame_id            BLOB    NOT NULL PRIMARY KEY,
+    consent_id          BLOB    NOT NULL,
+    granter_spirit_id   TEXT    NOT NULL,
+    granter_host_id     TEXT,
+    granter_role        TEXT,
+    granted_at_key      INTEGER NOT NULL,
+    intent_class        TEXT,
+    valid_until_key     INTEGER,
+    recall_policy       INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS transparency_log_consent_ruptures (
+    rupture_frame_id    BLOB    NOT NULL,
+    recipient_pid       INTEGER NOT NULL,
+    granter_spirit_id   TEXT    NOT NULL,
+    granter_host_id     TEXT,
+    intent_class        TEXT,
+    PRIMARY KEY (rupture_frame_id, recipient_pid)
+);
+CREATE INDEX IF NOT EXISTS idx_tlog_rupture_recipient
+    ON transparency_log_consent_ruptures(recipient_pid, granter_spirit_id);
+
 CREATE TABLE IF NOT EXISTS approval_decision_log (
     decision_id         INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp_ns        INTEGER NOT NULL,
@@ -398,6 +618,9 @@ pub struct TransparencyLogAdapter {
     inner: Mutex<TransparencyLogInner>,
     redaction: Box<dyn RedactionPolicy + Send + Sync>,
     mailbox: MailboxStub,
+    /// Story 17-8 AC2.3 — set-once; every routed and rupture writer resolves
+    /// recipients through it. Absent ⇒ no recipient rows (fail-closed).
+    recipient_resolver: std::sync::OnceLock<std::sync::Arc<dyn RecipientResolver>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -430,6 +653,31 @@ impl TransparencyLogAdapter {
             .lock()
             .expect("TransparencyLogAdapter inner poisoned")
             .last_frame_id
+    }
+
+    /// Story 17-8 AC2.3 — install the one recipient resolver (composition root,
+    /// over `pid_by_spirit_id`). Set-once: `Err` if one is already installed.
+    pub fn install_recipient_resolver(
+        &self,
+        resolver: std::sync::Arc<dyn RecipientResolver>,
+    ) -> Result<(), ()> {
+        self.recipient_resolver.set(resolver).map_err(drop)
+    }
+
+    /// The installed recipient resolver, if any.
+    pub fn recipient_resolver(&self) -> Option<&dyn RecipientResolver> {
+        self.recipient_resolver.get().map(|resolver| &**resolver)
+    }
+
+    /// Story 17-8 CR-4 — mint one kernel frame id ahead of a write, so every
+    /// row an operation produces (base, side rows, markers) names the same id.
+    pub fn mint_frame_id(&self) -> [u8; 16] {
+        Self::next_frame_id(
+            &mut self
+                .inner
+                .lock()
+                .expect("TransparencyLogAdapter inner poisoned"),
+        )
     }
     /// Open the per-Host SQLite file. Initializes both tables if not present.
     /// Panics if the file is opened with a schema version this kernel does
@@ -477,6 +725,7 @@ impl TransparencyLogAdapter {
             }),
             redaction: Box::new(CorpusBackedRedactionPolicy::new()),
             mailbox: MailboxStub::new(),
+            recipient_resolver: Default::default(),
         }
     }
 
@@ -569,6 +818,7 @@ impl TransparencyLogAdapter {
             }),
             redaction,
             mailbox: MailboxStub::new(),
+            recipient_resolver: Default::default(),
         })
     }
 
@@ -615,6 +865,7 @@ impl TransparencyLogAdapter {
             }),
             redaction,
             mailbox: MailboxStub::new(),
+            recipient_resolver: Default::default(),
         }
     }
 
@@ -699,6 +950,7 @@ impl TransparencyLogAdapter {
             intent,
             payload,
             origin,
+            None,
         ))
     }
 
@@ -855,7 +1107,85 @@ impl TransparencyLogAdapter {
             intent,
             payload,
             origin,
+            None,
         )
+    }
+
+    /// Story 17-8 AC2.2 — the one routed-frame writer (`deliver_typed` direct and
+    /// DRR, `retract` both arms): the base row, its recorded recipients (already
+    /// deduped by pid, CR-1) and its consent envelope commit in ONE transaction.
+    /// `Duplicate` writes and replaces nothing; any other failure rolls back and
+    /// halts (I2). The base row is unchanged: `to_spirit_id` = first addressee.
+    #[allow(clippy::too_many_arguments)]
+    pub fn insert_routed_frame(
+        &self,
+        frame: &maos_domain::frame::IacFrame,
+        kind: FrameKind,
+        spirit_pid: u32,
+        capability_token: Option<&[u8; 32]>,
+        intent: &str,
+        payload: &[u8],
+        recipients: &[FrameRecipient],
+    ) -> LogBeforeDeliver<FrameRowWrite> {
+        assert!(
+            kind != FrameKind::Distillate,
+            "MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows may only be \
+             inserted via DistillateWriter"
+        );
+        LogBeforeDeliver::new(self.insert_frame_row_with_correlation(
+            Some(frame.frame_id),
+            kind,
+            spirit_pid,
+            frame.from.spirit_id.as_str(),
+            frame.to.first().map_or("", |a| a.spirit_id.as_str()),
+            capability_token,
+            None,
+            intent,
+            payload,
+            frame.auto_marker,
+            Some(SideRows::Routed {
+                recipients,
+                consent: frame.consent_envelope.as_ref(),
+            }),
+        ))
+    }
+
+    /// Story 17-8 AC3.5 — journal a kind-22 rupture row at pid 0 and, given a
+    /// `grant`, one grant-scoped rupture row per rejected recipient pid, in ONE
+    /// transaction. A kernel-minted id (`None`) halts on a duplicate like
+    /// [`Self::insert_frame_event_with_sender`]; a supplied id returns the typed
+    /// outcome like [`Self::insert_frame_event_with_id`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn insert_consent_rupture(
+        &self,
+        frame_id: Option<[u8; 16]>,
+        from_spirit_id: &str,
+        to_spirit_id: &str,
+        intent: &str,
+        payload: &[u8],
+        origin: FrameOrigin,
+        grant: Option<(&ConsentEnvelope, &[u32])>,
+    ) -> LogBeforeDeliver<FrameRowWrite> {
+        let write = self.insert_frame_row_with_correlation(
+            frame_id,
+            FrameKind::ConsentRupture,
+            0,
+            from_spirit_id,
+            to_spirit_id,
+            None,
+            None,
+            intent,
+            payload,
+            origin,
+            grant.map(|(envelope, recipient_pids)| SideRows::Rupture {
+                envelope,
+                recipient_pids,
+            }),
+        );
+        if frame_id.is_none() {
+            let _ = Self::halt_on_duplicate(write);
+        }
+        LogBeforeDeliver::new(write)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -871,6 +1201,7 @@ impl TransparencyLogAdapter {
         intent: &str,
         payload: &[u8],
         origin: FrameOrigin,
+        sides: Option<SideRows<'_>>,
     ) -> FrameRowWrite {
         let redacted = self.redaction.redact(payload);
         let mut inner = self
@@ -881,32 +1212,65 @@ impl TransparencyLogAdapter {
         let timestamp_ns = wall_clock_now_ns();
 
         inner.last_frame_id = frame_id;
+        let conn = &inner.conn;
+        // Story 17-8 AC2.2 — side rows commit with their base row or not at all.
+        // IMMEDIATE takes the write lock at BEGIN (WAL multi-writer contract).
+        let transactional = sides.is_some();
+        let begun = if transactional {
+            conn.execute_batch("BEGIN IMMEDIATE;")
+        } else {
+            Ok(())
+        };
 
-        let result = inner.conn.execute(
-            "INSERT INTO transparency_log
+        let result = begun.and_then(|()| {
+            conn.execute(
+                "INSERT INTO transparency_log
                 (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
                  capability_token, kind, intent, correlation_id, payload_redacted, origin)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            rusqlite::params![
-                &frame_id[..],
-                timestamp_ns as i64,
-                spirit_pid as i64,
-                from_spirit_id,
-                to_spirit_id,
-                inner.boot_nonce as i64,
-                capability_token.map(|t| &t[..]),
-                kind as i64,
-                intent,
-                correlation_id,
-                &redacted[..],
-                origin as i64,
-            ],
-        );
+                rusqlite::params![
+                    &frame_id[..],
+                    timestamp_ns as i64,
+                    spirit_pid as i64,
+                    from_spirit_id,
+                    to_spirit_id,
+                    inner.boot_nonce as i64,
+                    capability_token.map(|t| &t[..]),
+                    kind as i64,
+                    intent,
+                    correlation_id,
+                    &redacted[..],
+                    origin as i64,
+                ],
+            )
+        });
+        // Only the BASE row's primary key can mean "already journaled"; a side
+        // row is deduped upstream, so its failure is never read as a duplicate.
+        let result = match result {
+            Ok(_) => sides
+                .map_or(Ok(()), |sides| sides.write(conn, &frame_id))
+                .map(|()| FrameRowWrite::Written),
+            Err(e) if Self::is_duplicate_primary_key(&e) => Ok(FrameRowWrite::Duplicate),
+            Err(e) => Err(e),
+        };
+        let result = match result {
+            Ok(write) if transactional => {
+                let end = if write == FrameRowWrite::Written {
+                    "COMMIT;"
+                } else {
+                    "ROLLBACK;"
+                };
+                conn.execute_batch(end).map(|()| write)
+            }
+            other => other,
+        };
 
         match result {
-            Ok(_) => FrameRowWrite::Written,
-            Err(e) if Self::is_duplicate_primary_key(&e) => FrameRowWrite::Duplicate,
+            Ok(write) => write,
             Err(e) => {
+                if transactional {
+                    let _ = conn.execute_batch("ROLLBACK;");
+                }
                 // j1-crosshost-2b AC3.2 — EVERY other write error still halts, and
                 // that is deliberate. This `panic!` IS the I2 log-before-deliver
                 // guarantee: converting it wholesale would trade a denial-of-service
@@ -1507,7 +1871,7 @@ impl TransparencyLogAdapter {
             .expect("TransparencyLogAdapter inner poisoned");
         let (sql, params) = Self::frame_query(
             filter,
-            "rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
+            "t.rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
              boot_nonce, capability_token, kind, intent, correlation_id, payload_redacted, origin",
         );
 
@@ -1578,7 +1942,17 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
-        let (sql, params) = Self::frame_query(filter, FRAME_METADATA_PROJECTION);
+        // Story 17-8 AC3.3 — a header-only row the caller only RECEIVED lists
+        // with stored length 0 (`payload_available = false`); no blob is read.
+        let projection = match filter.participant {
+            Some(_) => format!(
+                "frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, \
+                 CASE WHEN t.spirit_pid <> caller.pid AND {HEADER_ONLY_PREDICATE} \
+                 THEN 0 ELSE length(payload_redacted) END"
+            ),
+            None => FRAME_METADATA_PROJECTION.to_string(),
+        };
+        let (sql, params) = Self::frame_query(filter, &projection);
         let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
         let params_refs: Vec<&dyn rusqlite::types::ToSql> =
             params.iter().map(|p| p.as_ref()).collect();
@@ -1623,13 +1997,75 @@ impl TransparencyLogAdapter {
             .pop())
     }
 
+    /// Story 17-8 AC2.6 — classify one frame for a participant caller under the
+    /// shared predicate, in this adapter's boot, without loading its payload.
+    /// `None` = no such frame.
+    pub fn participant_access(
+        &self,
+        frame_id: [u8; 16],
+        scope: ParticipantScope,
+    ) -> Result<Option<ParticipantAccess>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let sql = format!(
+            "WITH caller(pid, now_key) AS (VALUES (?1, ?2)) \
+             SELECT t.spirit_pid, \
+               t.boot_nonce = ?3 AND {kinds} AND (t.spirit_pid = caller.pid OR {RECIPIENT_PREDICATE}), \
+               {participant} AND (t.spirit_pid = caller.pid OR NOT {HEADER_ONLY_PREDICATE}), \
+               length(t.payload_redacted) \
+             FROM transparency_log t, caller WHERE t.frame_id = ?4",
+            kinds = disclosable_kinds_sql("t.kind"),
+            participant = participant_predicate(),
+        );
+        inner
+            .conn
+            .query_row(
+                &sql,
+                rusqlite::params![
+                    scope.pid as i64,
+                    consent_order_key(scope.consent_now_ns),
+                    inner.boot_nonce as i64,
+                    &frame_id[..],
+                ],
+                |row| {
+                    let owner_pid = row.get::<_, i64>(0)? as u32;
+                    Ok(if !row.get::<_, bool>(1)? {
+                        ParticipantAccess::OutOfScope { owner_pid }
+                    } else if !row.get::<_, bool>(2)? {
+                        ParticipantAccess::Withheld
+                    } else {
+                        ParticipantAccess::Payload {
+                            payload_len: row.get::<_, i64>(3)? as u64,
+                        }
+                    })
+                },
+            )
+            .optional()
+            .map_err(AuditError::SqliteRead)
+    }
+
     fn frame_query(
         filter: FrameFilter,
         projection: &str,
     ) -> (String, Vec<Box<dyn rusqlite::types::ToSql>>) {
-        let mut sql = format!("SELECT {projection} FROM transparency_log");
         let mut where_clauses: Vec<String> = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+        // Story 17-8 AC2.5 — participant scope binds `(pid, now_key)` once in a
+        // one-row CTE and filters in SQL, before any ORDER BY / LIMIT.
+        let mut sql = match filter.participant {
+            Some(scope) => {
+                params.push(Box::new(scope.pid as i64));
+                params.push(Box::new(consent_order_key(scope.consent_now_ns)));
+                where_clauses.push(participant_predicate());
+                format!(
+                    "WITH caller(pid, now_key) AS (VALUES (?, ?)) \
+                     SELECT {projection} FROM transparency_log t, caller"
+                )
+            }
+            None => format!("SELECT {projection} FROM transparency_log t"),
+        };
 
         if let Some(boot_nonce) = filter.boot_nonce {
             where_clauses.push("boot_nonce = ?".to_string());
@@ -1644,7 +2080,7 @@ impl TransparencyLogAdapter {
             params.push(Box::new(fid.to_vec()));
         }
         if filter.disclosable_kinds_only {
-            where_clauses.push("kind IN (0,1,2,3,4,5,6,18)".to_string());
+            where_clauses.push(disclosable_kinds_sql("kind"));
         }
         if let Some(kind) = filter.kind {
             where_clauses.push("kind = ?".to_string());
@@ -1669,7 +2105,7 @@ impl TransparencyLogAdapter {
         if filter.order_by_insertion {
             if let Some(cursor_fid) = filter.cursor_frame_id {
                 where_clauses.push(
-                    "rowid > (SELECT rowid FROM transparency_log WHERE frame_id = ?)".to_string(),
+                    "t.rowid > (SELECT rowid FROM transparency_log WHERE frame_id = ?)".to_string(),
                 );
                 params.push(Box::new(cursor_fid.to_vec()));
             }
@@ -1681,7 +2117,7 @@ impl TransparencyLogAdapter {
             params.push(Box::new(cursor_fid.to_vec()));
         }
         if let Some(cursor) = filter.cursor_insertion_id {
-            where_clauses.push("rowid > ?".to_string());
+            where_clauses.push("t.rowid > ?".to_string());
             params.push(Box::new(cursor));
         }
         if !where_clauses.is_empty() {
@@ -1689,7 +2125,7 @@ impl TransparencyLogAdapter {
             sql.push_str(&where_clauses.join(" AND "));
         }
         let order_key = if filter.order_by_insertion {
-            "rowid"
+            "t.rowid"
         } else {
             "timestamp_ns, frame_id"
         };
@@ -2708,9 +3144,13 @@ mod tests {
                 // Story 9.4b AC-6 regression caught it.
                 "schema_lifecycle_registry",
                 "transparency_log",
+                // Story 17-8 — participant recall side tables.
+                "transparency_log_consent",
+                "transparency_log_consent_ruptures",
+                "transparency_log_recipients",
                 "transparency_log_retractions"
             ],
-            "expected exactly five tables"
+            "expected exactly eight tables"
         );
 
         // 2. No foreign keys on transparency_log

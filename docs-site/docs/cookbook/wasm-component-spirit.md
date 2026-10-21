@@ -71,7 +71,7 @@ time_cap_seconds = 60
 
 Declare `[capabilities.required.iac]` for bus emission: the kernel mediates each delivered frame with an `iac.send` capability token (`"spirit:peer"` for frames addressed to Spirits, `"broadcast"` for frames with no recipient), so the Spirit's deliveries appear in `maosctl audit query --spirit`. The schema v5 `[capabilities.required.log]` table independently grants recall and fetch; both booleans default to `false`, and unknown keys are refused. Below schema 5, the table is dropped with a degradation warning, like `[capabilities.required.iac]`. Do not add `[capabilities.required.provider]`: the WASM world imports no provider capability. Inside `[class]`, trust tiers use hyphenated values such as `org-internal`, `public-untrusted`, and `public-vetted`.
 
-## Recall your emitted frames
+## Recall frames you participated in
 
 The `maos:spirit@2.1.0` world imports `maos:spirit/recall@2.1.0`, which provides two functions:
 
@@ -84,24 +84,28 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 
 Both functions are available **only inside `handle-frame`** (`handleFrame` in TypeScript). Calls from `on-start`, `on-shutdown`, or elsewhere return `unavailable`. Recall uses the runner's existing stdio channel; it adds no descriptor, socket, or syscall.
 
-Scope is **emitter-only within this daemon run**: a Spirit can recall its own emitted bus frames (raw kinds 0–6) and MCP invocations (kind 18). Received frames, another emitter's frames, audit rows, and frames from earlier daemon runs are not disclosed. `recall` omits them; `fetch` of an existing out-of-scope row returns `scope-violation`. Earlier incarnations are not recallable by design; use memory tiers and distillates for persistence across restarts.
+Local scope is **participant-only within this daemon run**: a Spirit can recall disclosable bus frames (raw kinds 0–6) and MCP invocations (kind 18) that it sent **or for which it is a recorded recipient**. Routed delivery records only admitted local addressees (`host_id = None`) accepted by the consent gate, if installed, whose Spirit id resolves through the admitted-incarnation map. Resolution is snapshotted before journaling or enqueueing; a role never confers participation. Audit rows, non-participant rows, and earlier daemon runs are omitted; fetching them returns `scope-violation`. Earlier incarnations are not recallable by design; use memory tiers and distillates across restarts. Native and WASM Spirits use the same kernel-mediated `MediatedLogRecall`. Cross-wall recall stays emitter-scoped, not participant-scoped.
 
-An inbound consent-bearing frame is **withheld by emitter scope**, not by consent evaluation. Guest-asserted consent envelopes confer no recall permission. Participant recall (receiver or addressed-by-role), persisted consent envelopes, and consent evaluation for both native and WASM Spirits belong to `17-8-participant-recall-and-consent-envelopes`; this interface does not claim that behavior.
+Consent constrains a recorded recipient, not the sender. An expired envelope, a matching later grant-scoped rupture, or a `Withheld` policy omits the frame from `recall`; `fetch` returns `consent-withheld`. A `HeaderOnly` frame remains listed with `payload-available = false`, but fetching it also returns `consent-withheld`, never its payload. The daemon-side `ConsentEnvelope.recall` policy defaults to `Full`; unknown values fail closed as `Withheld`. It is **not in WIT**: guests see only its effect, and guest-asserted envelopes confer no authority. This deliberate exception to lossless frame transport is ratified as `17-8-consent-recall-policy`.
+
+**Production limits (Story 17-8, AC3.6 / rule 11):** at HEAD no production granter sets `HeaderOnly` or `Withheld`, and no `ConsentGate` is installed in production. Envelope-bearing frames reach admitted local recipients only through A2A delegation intake; peer-identity ruptures carry no envelope and withhold nothing. Native compiled-in Spirits' bus sends journal at pid 0; attribution is a non-goal of this story. Consent cases are exercised by suites delivering frames through `deliver_typed`, not claimed as active production policy.
 
 ### Errors and audit trail
 
 | `recall-error` case | When it occurs |
 |---|---|
-| `scope-violation` | Fetch names an existing row from another emitter or daemon run, or a non-disclosable kind such as an audit row. |
+| `scope-violation` | Fetch names an existing row for a non-participant, another daemon run, or a non-disclosable kind such as an audit row. |
 | `frame-not-found` | No row exists for the requested frame id. |
 | `invalid-request(string)` | Malformed cursor or id (ids must be 16 bytes), unknown kind label, or timestamp above `i64::MAX`. A valid but non-disclosable kind filter returns an empty page instead. |
 | `limit-exceeded(u32)` | Requested limit exceeds 1024; the error carries the maximum. |
 | `capability-denied` | The grant is absent, or per-call issuance is refused by policy, operator denial, or exhausted quota. Recall and fetch require separate grants. |
-| `consent-withheld` | Reserved for consent evaluation in story 17-8; emitter-only recall does not evaluate consent. |
+| `consent-withheld` | A recipient's fetch is blocked by expiry, a matching grant-scoped rupture, `Withheld` (including unknown policy), or `HeaderOnly`. |
 | `reply-too-large(u64)` | Even one page entry or the complete fetched payload cannot fit the frame-byte and codec-expansion budgets; the error carries the reply byte bound. Payloads are never truncated. |
 | `unavailable` | Called outside `handle-frame`, storage is unavailable, or the recall channel has closed or failed. Internal storage messages are not exposed. |
 
 The daemon binds the caller's admitted identity and boot nonce; the guest supplies neither identity nor token. Each validated, admitted call receives a freshly minted capability, writes a token-bearing invocation audit row before data is disclosed, and revokes the token afterward. Every refusal writes exactly one governance receipt, `log.recall.refused:<code>` or `log.fetch.refused:<code>`, where `<code>` is the WIT error case name. Validation and mint refusals write a receipt without an invocation row. Successful calls, including empty pages, add no refusal receipt. These audit rows are not themselves recallable.
+
+A consent refusal writes exactly one `log.fetch.refused:consent-withheld` receipt at the caller pid, without an owner pid. Omitting withheld rows from a successful recall page is not a refusal and adds no refusal receipt.
 
 An in-band protocol violation writes `recall.channel.closed:protocol-violation` and ends the session. An invalid reply makes the runner return `unavailable`, stop further recall I/O, finish the current export, and exit with a typed `recall protocol desync` error; EOF instead ends normally after the export.
 

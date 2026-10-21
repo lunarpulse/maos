@@ -20,9 +20,8 @@ use tokio::time::{interval, Instant};
 use maos_domain::frame::IacFrame;
 use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i2::LogBeforeDeliver;
-use maos_domain::invariants::i3::FrameOrigin;
 
-use super::transparency_log::{FrameKind, FrameRowWrite, TransparencyLogAdapter};
+use super::transparency_log::{FrameKind, FrameRecipient, FrameRowWrite, TransparencyLogAdapter};
 
 // ── constants ───────────────────────────────────────────────
 
@@ -51,11 +50,13 @@ struct Submission {
     payload_bytes: Vec<u8>,
     tl_kind: FrameKind,
     spirit_pid: u32,
+    /// Story 17-8 CR-3 — the coarse intent, written exactly like the direct path.
     intent_str: String,
-    auto_marker: FrameOrigin,
-    intent_lineage: Vec<u8>,
     /// Story 17-3c — `capability_token` column bytes (`None` ⇒ NULL).
     capability_token: Option<[u8; 32]>,
+    /// Story 17-8 AC2.4 — recipients resolved BEFORE enqueue (CR-1): a name
+    /// reused while the frame waits never captures it.
+    recipients: Vec<FrameRecipient>,
     /// j1-crosshost-2b AC3.2 — carries the typed row-write outcome so the
     /// duplicate-`frame_id` verdict survives the scheduler hop instead of being
     /// flattened back into `()` (which would re-hide the peer replay this repair
@@ -74,8 +75,10 @@ impl DrrScheduler {
         Self { tx }
     }
 
-    /// Submit a frame for logging.  Returns once the frame has been
-    /// persisted to the Transparency Log (I2 guarantee).
+    /// Submit a frame for logging.  Returns once the frame, its prepared
+    /// `recipients` and its consent envelope have been persisted to the
+    /// Transparency Log in one transaction (I2 guarantee).
+    #[allow(clippy::too_many_arguments)]
     pub async fn submit(
         &self,
         frame: IacFrame,
@@ -83,9 +86,8 @@ impl DrrScheduler {
         tl_kind: FrameKind,
         spirit_pid: u32,
         intent_str: String,
-        auto_marker: FrameOrigin,
-        intent_lineage: Vec<u8>,
         capability_token: Option<[u8; 32]>,
+        recipients: Vec<FrameRecipient>,
     ) -> Result<LogBeforeDeliver<FrameRowWrite>, IacBusError> {
         let (done_tx, done_rx) = oneshot::channel();
         let sub = Submission {
@@ -94,9 +96,8 @@ impl DrrScheduler {
             tl_kind,
             spirit_pid,
             intent_str,
-            auto_marker,
-            intent_lineage,
             capability_token,
+            recipients,
             done: done_tx,
         };
         self.tx
@@ -291,18 +292,15 @@ fn drain_drr(
 
 async fn flush_batch(tl: &Arc<TransparencyLogAdapter>, batch: &mut Vec<Submission>) {
     for sub in batch.drain(..) {
-        let to_spirit_id = sub.frame.to.first().map_or("", |a| a.spirit_id.as_str());
         let result = tokio::task::block_in_place(|| {
-            tl.insert_frame_event_with_id(
-                Some(sub.frame.frame_id),
+            tl.insert_routed_frame(
+                &sub.frame,
                 sub.tl_kind,
                 sub.spirit_pid,
-                sub.frame.from.spirit_id.as_str(),
-                to_spirit_id,
                 sub.capability_token.as_ref(),
-                std::str::from_utf8(&sub.intent_lineage).unwrap_or(""),
+                &sub.intent_str,
                 &sub.payload_bytes,
-                sub.auto_marker,
+                &sub.recipients,
             )
         });
         if let Err(_e) = sub.done.send(Ok(result)) {

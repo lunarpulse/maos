@@ -76,6 +76,7 @@ fn make_frame(host: &str) -> IacFrame {
             timestamp_ns: 0,
             intent_class: Some(A2AIntent::new("standard")),
             valid_until_ns: None,
+            recall: maos_domain::frame::ConsentRecall::Full,
         }),
         intent_lineage: IntentLineage::default(),
     }
@@ -246,6 +247,7 @@ async fn scenario_3_6_consent_envelope_expired() {
         timestamp_ns: 0,
         intent_class: Some(A2AIntent::new("standard")),
         valid_until_ns: Some(1_000_000_000), // 1s past epoch — far in the past
+        recall: maos_domain::frame::ConsentRecall::Full,
     };
 
     // Substrate assertion: the envelope's `valid_until_ns` is comparable to

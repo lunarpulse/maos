@@ -1,0 +1,479 @@
+# Story 17-8 — throwaway CI route (D-17-8-05 A, under D-17-3d-FW-10's exact
+# terms). Lives ONLY on `ci/17-8-*` branches; never lands on main. Read-only
+# permissions, no secrets. Jobs copy the shipped `discipline.yml` text verbatim:
+# exit lines 2 and 2b (`epic-17-exit`, trimmed to those lines), the TS scaffold
+# job that produces the component artifact (`example-spirit-ts-tests`, without
+# its unrelated `needs`), and the four-image delegated `wasm-host-tests` job
+# (17-3c gates, recall_17_3d at 15, participant_recall_17_8 at 8).
+name: ci-17-8-verify
+on:
+  push:
+    branches: ['ci/17-8-*']
+permissions:
+  contents: read
+jobs:
+  exit-line-2-2b:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ci-17-8-exit-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Keep build and image temporaries off /tmp
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Provenance
+        run: |
+          echo "::notice title=17-8 provenance (${{ matrix.image }})::sha=${GITHUB_SHA} tree=$(git rev-parse HEAD^{tree}) rustc=$(rustc --version | tr ' ' '_')"
+      - name: Componentize the TypeScript Spirit (line 2 prerequisite)
+        working-directory: examples/example-spirit-ts
+        run: npm ci && npm run build && npm run componentize
+      # The T2 WASM runner places itself in a delegated cgroup v2 subtree and
+      # refuses without one (17-3c; never a production fallback). Like podman
+      # for T3, this job originates that precondition: the verbatim launch runs
+      # inside the same dedicated Delegate=yes unit the 17-3c proof uses.
+      - name: Epic-17 exit line 2 — the TypeScript Spirit launch (Story 17-3c)
+        shell: bash
+        run: |
+          set +e
+          cargo build --release -p maos-bin -p maos-wasm-host --features maos-bin/wasm-host --bin maos --bin maos-wasm-runner &&
+            sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect \
+              --uid="$(id -u)" --gid="$(id -g)" \
+              --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes \
+              --property="WorkingDirectory=$PWD" \
+              "$PWD/scripts/run_17_3c_delegated.sh" target/release/maos run examples/example-spirit-ts/manifest.toml --once 2>&1 | tee line2.log
+          rc=${PIPESTATUS[0]}
+          if grep -q '^SKIP ' line2.log; then rc=1; echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::rc=${rc} $(tail -n 3 line2.log | paste -sd' ' -)"
+          else
+            echo "::notice title=Epic-17 exit line 2 (${{ matrix.image }})::rc=0"
+          fi
+          exit "$rc"
+      # Same audit store as line 2: its systemd unit runs with the passwd HOME
+      # and no MAOS_/XDG_DATA_HOME overrides, so the query is pinned to that
+      # environment. `--spirit` resolves the TS Spirit's
+      # latest (boot_nonce, spirit_pid) and renders FR4: a tokenless recall row
+      # exits non-zero. Story 17-8 AC1 re-states the line under participant
+      # scope: the --once seed is a frame the Spirit RECEIVED, so its fetch
+      # succeeds. The checker requires exactly R1 log.recall -> R2 log.fetch
+      # before the turn's 17-3c rows and no refusal or channel row.
+      - name: Epic-17 exit line 2b — the TypeScript Spirit's recall rows (Story 17-8 AC1)
+        shell: bash
+        run: |
+          set +e
+          env -u MAOS_HOME -u MAOS_AUDIT_DB -u XDG_DATA_HOME HOME="$(getent passwd "$(id -u)" | cut -d: -f6)" \
+            target/release/maos audit query --spirit example-spirit-ts --format plain > line2b.log 2> line2b.err
+          rc=$?
+          cat line2b.log line2b.err
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-17 exit line 2b (${{ matrix.image }})::maos audit query exited ${rc}: $(tail -n 2 line2b.err | paste -sd' ' -)"
+            exit "$rc"
+          fi
+          python3 scripts/epic_17_exit_line2b.py line2b.log | tee line2b.verdict
+          rc=${PIPESTATUS[0]}
+          while IFS= read -r line; do
+            if [ "$rc" -eq 0 ]; then echo "::notice title=Epic-17 exit line 2b (${{ matrix.image }})::${line}"
+            else echo "::error title=Epic-17 exit line 2b (${{ matrix.image }})::${line}"; fi
+          done < line2b.verdict
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-17-8-exit-${{ matrix.image }}
+          path: |
+            line2.log
+            line2b.log
+            line2b.err
+            line2b.verdict
+          if-no-files-found: warn
+
+  example-spirit-ts-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build, test, and componentize the TypeScript scaffold (Story 17-3b AC1)
+        shell: bash
+        run: |
+          set +e
+          (
+            cd examples/example-spirit-ts
+            npm ci &&
+              npm test &&
+              npm run build &&
+              npm run componentize
+          ) 2>&1 | tee example-spirit-ts.log
+          rc=${PIPESTATUS[0]}
+          vitest_verdict="$(
+            sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g' example-spirit-ts.log |
+              tr -d '\r' |
+              grep -E '^[[:space:]]*Tests[[:space:]]+' |
+              paste -sd';' -
+          )"
+          if [ "$rc" -eq 0 ] && [ -z "$vitest_verdict" ]; then
+            echo "::error title=TypeScript scaffold::rc=0 vitest=not reported"
+            exit 1
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=TypeScript scaffold::rc=0 vitest=$vitest_verdict"
+          else
+            echo "::error title=TypeScript scaffold::rc=$rc vitest=${vitest_verdict:-not run}"
+          fi
+          exit "$rc"
+      - name: Record TypeScript component outcome
+        shell: bash
+        run: |
+          component=examples/example-spirit-ts/dist/spirit.wasm
+          if [ ! -s "$component" ]; then
+            echo "::error title=TypeScript component artifact::missing or empty $component"
+            exit 1
+          fi
+          echo "::notice title=TypeScript component artifact::bytes=$(stat -c%s "$component") sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+      - name: Upload TypeScript component
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-spirit-ts-component
+          path: examples/example-spirit-ts/dist/spirit.wasm
+          if-no-files-found: error
+      - name: Build the release WASM runner
+        shell: bash
+        run: |
+          set +e
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner 2>&1 | tee runner-build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Release WASM runner build::rc=0"
+          else
+            echo "::error title=Release WASM runner build::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Drive the TypeScript component through the release runner
+        shell: bash
+        run: |
+          set +e
+          MAOS_TS_COMPONENT=$PWD/examples/example-spirit-ts/dist/spirit.wasm cargo test --locked --release -p maos-wasm-host --test ts_component_17_3b -- --ignored --nocapture 2>&1 | tee ts-component-driver.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=TypeScript component driver::rc=0 $(grep 'TS-COMPONENT-OUTCOME' ts-component-driver.log | paste -sd';' -)"
+          else
+            echo "::error title=TypeScript component driver::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Build maosctl for the admission door test
+        shell: bash
+        run: |
+          set +e
+          cargo build --locked -p maos-cli --bin maosctl 2>&1 | tee maosctl-build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=maosctl build::rc=0"
+          else
+            echo "::error title=maosctl build::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Assert default-build WASM admission refusal
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-bin --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-default.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Default WASM admission::rc=0 $(grep -E 'wasm_engine_off|test result' wasm-admission-default.log | paste -sd';' -)"
+          else
+            echo "::error title=Default WASM admission::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Assert WASM admission and unsupported in-process surface refusals
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=wasm-host WASM admission::rc=0 $(grep 'test result' wasm-admission-wasm-host.log | paste -sd';' -)"
+          else
+            echo "::error title=wasm-host WASM admission::rc=$rc"
+          fi
+          exit "$rc"
+
+  wasm-host-tests:
+    needs: [example-spirit-ts-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm-host-tests-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build current forbidden-syscall probes (T2 kill, auxv, Rust benign controls)
+        run: |
+          cargo build --locked --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+          cargo build --locked --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Epic-17 exit line 3 — T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture 2>&1 | tee t2.log
+          rc=${PIPESTATUS[0]}
+          grep -o 'T2-OUTCOME .*' t2.log | while IFS= read -r line; do
+            echo "::notice title=T2 exit line 3 (${{ matrix.image }})::${line#T2-OUTCOME }"
+          done
+          grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
+            echo "::error title=T2 exit line 3 (${{ matrix.image }})::${line}"
+          done
+          if grep -q '^SKIP ' t2.log; then
+            echo "::error title=T2 exit line 3 (${{ matrix.image }})::a SKIP line was printed — a T2 suite must run, never skip, in CI"
+            rc=1
+          fi
+          echo "::notice title=T2 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep '^test result' t2.log)"
+          exit "$rc"
+      - name: Kernel T2 suites — sandbox enforcement + the launch primitive's route (Story 17-6 AC5)
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux --test bridge_t2_route_17_6 -- --nocapture 2>&1 | tee kernel-t2.log
+          rc=${PIPESTATUS[0]}
+          route=$(grep -o 'BRIDGE-T2-ROUTE T[0-9]: [A-Za-z]*[^(]*' kernel-t2.log | sed 's/BRIDGE-T2-ROUTE //' | sort | paste -sd';' -)
+          echo "::notice title=Bridge T2 route (${{ matrix.image }})::${route}"
+          grep -E 'panicked at|rule 11' kernel-t2.log | head -3 | while IFS= read -r line; do
+            echo "::error title=Kernel T2 suites (${{ matrix.image }})::${line}"
+          done
+          if grep -q '^SKIP ' kernel-t2.log; then rc=1; echo "::error title=Kernel T2 suites (${{ matrix.image }})::a SKIP line was printed"; fi
+          echo "::notice title=Kernel T2 suites (${{ matrix.image }})::rc=${rc} $(grep '^test result' kernel-t2.log | paste -sd' ' -)"
+          exit "$rc"
+      - name: Escape-detector suite on a real T2 kill (Story 17-6 AC4)
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-escape-detector -- --nocapture 2>&1 | tee escape.log
+          rc=${PIPESTATUS[0]}
+          grep -E 'panicked at|rule 11' escape.log | head -3 | while IFS= read -r line; do
+            echo "::error title=Escape detector (${{ matrix.image }})::${line}"
+          done
+          echo "::notice title=Escape detector (${{ matrix.image }})::rc=${rc} $(grep -oE 'ESCAPE-[A-Z-]*MEASURED[^ ]*( [a-z_]+=[0-9.]+)*' escape.log | paste -sd';' -)"
+          exit "$rc"
+      # Guests are built at test time with `--offline` (17-3c fixtures, 17-3d
+      # recall-probe and the frozen @2.0 compat echo), so their locked
+      # dependencies are fetched before any suite that builds them.
+      - name: Fetch locked standalone fixture dependencies for offline process gates
+        run: |
+          for fixture in \
+            crates/maos-wasm-host/guests/echo-spirit \
+            crates/maos-wasm-host/guests/routed-relay \
+            crates/maos-wasm-host/guests/recall-probe \
+            crates/maos-wasm-host/guests/compat-echo-2-0 \
+            crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
+            cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
+          done
+      - name: Run maos-host + maos-wasm-host test suites
+        run: cargo test -p maos-host -p maos-wasm-host --locked
+      - name: Install the pinned component fixture assembler
+        run: cargo install --locked wasm-tools --version 1.259.0
+      - name: Standalone native-twin fixture tests (Story 17-3c)
+        run: cargo test --locked --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
+      - name: Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-host --timeout 2400 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee spawned-17-3c.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          fail=0
+          [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
+          grep -q '^test result: ok\. 22 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 22 passed;'"; fail=1; }
+          for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :6' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
+                      'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
+                      'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
+                      'HOSTILE-IAC-SEND :1'; do
+            prefix=${spec%:*}; want=${spec##*:}
+            got=$(grep -oF -- "$prefix" spawned-17-3c.log | wc -l)
+            [ "$got" -eq "$want" ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::marker '${prefix}' seen $got times, want $want"; fail=1; }
+          done
+          if grep -q '^SKIP ' spawned-17-3c.log; then
+            grep '^SKIP ' spawned-17-3c.log | while IFS= read -r line; do
+              echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
+            done
+            fail=1
+          fi
+          grep -E 'SCOPED-VERDICT |GOVERNED-ATOMIC |HOSTILE-|RUNNER-SIGSYS |REPEATED-MAILBOX ' spawned-17-3c.log | while IFS= read -r line; do
+            echo "::notice title=17-3c admitted runtime (${{ matrix.image }})::$line"
+          done
+          if [ "$fail" -ne 0 ]; then
+            grep -E 'panicked at' spawned-17-3c.log | while IFS= read -r line; do
+              echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
+            done
+          fi
+          echo "::notice title=17-3c process gates (${{ matrix.image }})::rc=$rc fail=$fail"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 22 spawned-17-3c.log || fail=1
+          exit "$fail"
+      # Story 17-3d — mediated in-band recall end to end: the real release
+      # runner under T2 in the same delegated envelope, exact pass count and
+      # every test name present (no SKIP, no zero-test pass). Story 17-8
+      # migrated it to participant scope: the seed and SSO vectors are R1 -> R2
+      # (the seed is a received frame), and its consent vector moved to the
+      # participant_recall_17_8 step below (V6-V10).
+      - name: In-band recall through the admitted session (Story 17-3d)
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-recall --timeout 2400 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test recall_17_3d -- --nocapture --test-threads=1 2>&1 | tee recall-17-3d.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          fail=0
+          [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
+          grep -q '^test result: ok\. 15 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 15 passed;'"; fail=1; }
+          required=()
+          for name in checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4 \
+                      configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted \
+                      cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation \
+                      empty_page_has_one_token_bearing_call_and_no_receipt \
+                      exhausted_quota_has_receipt_without_tokenless_fallback_call \
+                      junk_after_tag_closes_once_with_typed_protocol_end \
+                      operator_deny_overrides_manifest_and_has_receipt_only \
+                      oversized_fetch_reply_is_typed_and_next_call_same_turn_still_works \
+                      own_frame_second_turn_recalls_kernel_minted_id_kind_intent_and_fetches_stored_payload \
+                      own_receipt_and_authorization_ids_are_never_recalled_and_fetch_is_scope_violation \
+                      seed_fetch_succeeds_r1_r2_precede_authorization_without_receipt_and_fr4_succeeds \
+                      sixty_fifth_recall_closes_channel_once_with_typed_protocol_end \
+                      tagged_record_between_exports_closes_once_with_typed_protocol_end \
+                      ungranted_manifest_denies_with_receipt_only \
+                      unknown_tag_closes_once_with_typed_protocol_end; do
+            required+=(--required-test "$name")
+          done
+          if grep -q '^SKIP ' recall-17-3d.log; then
+            grep '^SKIP ' recall-17-3d.log | while IFS= read -r line; do
+              echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
+            done
+            fail=1
+          fi
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' recall-17-3d.log | head -5 | while IFS= read -r line; do
+            echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
+          done
+          echo "::notice title=17-3d recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' recall-17-3d.log)"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 15 "${required[@]}" recall-17-3d.log || fail=1
+          exit "$fail"
+      # Story 17-8 — participant recall and consent envelopes for BOTH forms
+      # (native Researcher through MediatedLogRecall, WASM recall-probe through
+      # the admitted session): AC1's table V1-V16 and AC4's same-frame
+      # V6 -> V7 / V6 -> V8 sequences, in their own delegated unit and log,
+      # exact pass count, every test name, no SKIP, no zero-test pass.
+      - name: Participant recall and consent envelopes, both forms (Story 17-8)
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-participant --timeout 2400 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test participant_recall_17_8 -- --nocapture --test-threads=1 2>&1 | tee participant-17-8.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          fail=0
+          [ "$rc" -eq 0 ] || { echo "::error title=17-8 participant recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
+          grep -q '^test result: ok\. 8 passed;' participant-17-8.log || { echo "::error title=17-8 participant recall (${{ matrix.image }})::missing 'test result: ok. 8 passed;'"; fail=1; }
+          required=()
+          for name in cross_wall_remote_artifact_is_identically_emitter_scoped_with_or_without_side_tables \
+                      direct_recipient_ids_roles_dedup_multiaddress_and_gate_rejection_both_forms \
+                      drr_addressed_and_nonfirst_recipients_both_forms \
+                      earlier_boot_same_pid_recipient_is_out_of_scope_both_forms \
+                      header_only_including_oversized_and_withheld_envelopes_both_forms \
+                      sender_owned_frames_ignore_received_consent_in_native_and_wasm \
+                      valid_consent_then_real_gate_rupture_withholds_same_frame_both_forms \
+                      valid_consent_then_same_frame_expires_between_report_barriers_both_forms; do
+            required+=(--required-test "$name")
+          done
+          if grep -q '^SKIP ' participant-17-8.log; then
+            grep '^SKIP ' participant-17-8.log | while IFS= read -r line; do
+              echo "::error title=17-8 participant recall (${{ matrix.image }})::${line}"
+            done
+            fail=1
+          fi
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' participant-17-8.log | head -5 | while IFS= read -r line; do
+            echo "::error title=17-8 participant recall (${{ matrix.image }})::${line}"
+          done
+          echo "::notice title=17-8 participant recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' participant-17-8.log | paste -sd' ' -)"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 8 "${required[@]}" participant-17-8.log || fail=1
+          exit "$fail"
+      - uses: actions/download-artifact@v4
+        with:
+          name: example-spirit-ts-component
+          path: examples/example-spirit-ts/dist
+      - name: Build the actual feature-enabled CLI and release runner
+        run: |
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p maos-cli --bin maosctl
+      - name: Actual CPU-capped TS CLI with delegated controllers and attributed receipts
+        shell: bash
+        run: |
+          version=${{ matrix.image }}
+          version=${version#ubuntu-}
+          version=${version%-arm}
+          arch=x86_64
+          if [[ '${{ matrix.image }}' == *-arm ]]; then arch=aarch64; fi
+          # The verdict is also a public annotation: job logs need a token the
+          # agent host does not have (17-3a T6 convention).
+          set +e
+          sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect \
+            --uid="$(id -u)" --gid="$(id -g)" \
+            --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes \
+            --property="WorkingDirectory=$PWD" \
+            "$PWD/scripts/run_17_3c_delegated.sh" /usr/bin/python3 -I \
+            "$PWD/scripts/prove_17_3c.py" --binary "$PWD/target/release/maos" \
+            --output "$PWD/17-3c-proof" --expected-os "$version" --expected-arch "$arch" \
+            2>&1 | tee 17-3c-proof.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=17-3c proof (${{ matrix.image }})::$(grep -m1 '^TS-ADMITTED-PROOF ' 17-3c-proof.log)"
+          else
+            msg=$(grep -m1 -A3 '17-3c proof FAILED' 17-3c-proof.log || tail -n 8 17-3c-proof.log)
+            msg=${msg:0:1500}; msg=${msg//'%'/'%25'}; msg=${msg//$'\r'/}; msg=${msg//$'\n'/'%0A'}
+            echo "::error title=17-3c proof (${{ matrix.image }}) rc=${rc}::${msg}"
+          fi
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admitted-17-3c-${{ matrix.image }}
+          path: |
+            spawned-17-3c.log
+            recall-17-3d.log
+            participant-17-8.log
+            17-3c-proof/
+            17-3c-proof.log
+          if-no-files-found: error
+
+  # RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
+  # job stood here (Story 10.3 AC-5, NFR-Ops-4). The gate ran its LIVE
+  # content-validating arm, not the absent-PASS arm, so its two `SECURITY.md`
+  # controls — no `<TO-BE-PUBLISHED>` GPG placeholder, and a real `1.0.x`
+  # supported-versions row — were re-homed into `check-security-md` with their
+  # own proven-red tests BEFORE the deletion. No control went dark.

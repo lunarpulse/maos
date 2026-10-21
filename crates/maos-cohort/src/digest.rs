@@ -32,7 +32,7 @@ use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
-use maos_iac::adapter::{FrameKind as TlFrameKind, TransparencyLogAdapter};
+use maos_iac::adapter::TransparencyLogAdapter;
 use maos_spirit_abi::identity::{FrameKind, HostId};
 use serde::{Deserialize, Serialize};
 
@@ -315,6 +315,13 @@ impl CohortDigestDistributor {
 /// `FrameKind::ConsentRupture` on the denier=target host, where the affected
 /// member queries it via `maosctl audit query --frame-kind ConsentRupture`.
 ///
+/// Story 17-8 AC3.5 (D-17-8-03 A) — when the denied frame's envelope was granted
+/// by its sender (the rupture's `to[0]`), the same transaction records the
+/// grant-scoped rupture naming each rejected local incarnation, which withholds
+/// that granter's earlier frames of the same intent class from it. The rejected
+/// address carries this host's id as the peer wrote it, so resolution reads the
+/// Spirit id only; the key's granter is the TLS-bound peer itself.
+///
 /// Non-rupture frames are ignored (defense-in-depth: only a genuine rupture is
 /// journaled here — the sink never hand-writes a row for anything else).
 pub fn journal_rupture_frame(log: &TransparencyLogAdapter, frame: &IacFrame) -> Result<(), String> {
@@ -329,6 +336,24 @@ pub fn journal_rupture_frame(log: &TransparencyLogAdapter, frame: &IacFrame) -> 
         .ok_or_else(|| "rupture frame is missing denied intent attribution".to_string())?;
     let payload_bytes = serde_json::to_vec(&frame.payload).map_err(|error| error.to_string())?;
     let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
+    let grant = frame.consent_envelope.as_ref().filter(|envelope| {
+        frame
+            .to
+            .first()
+            .is_some_and(|sender| envelope.granted_by(sender))
+    });
+    let rejected: Vec<&str> = match &frame.payload {
+        FramePayload::ConsentRupture(rupture) => rupture
+            .rejected
+            .iter()
+            .map(|rejection| rejection.address.spirit_id.as_str())
+            .collect(),
+        _ => Vec::new(),
+    };
+    let recipient_pids: Vec<u32> = match (grant, log.recipient_resolver()) {
+        (Some(_), Some(resolver)) => resolver.resolve(&rejected).into_iter().flatten().collect(),
+        _ => Vec::new(),
+    };
     // j1-crosshost-2b §A6 review P6 — the typed write verdict is CHECKED. This
     // sink's ids mix a peer frame-id half with a process-local counter, so a
     // post-restart collision is possible; pre-2b code HALTED there (the plain
@@ -337,16 +362,14 @@ pub fn journal_rupture_frame(log: &TransparencyLogAdapter, frame: &IacFrame) -> 
     // this ConsentRupture path was built to keep. Surface it as an error so the
     // rupture is never quietly missing from the TL.
     let write = log
-        .insert_frame_event_with_id(
+        .insert_consent_rupture(
             Some(frame.frame_id),
-            TlFrameKind::ConsentRupture,
-            0,
             frame.from.spirit_id.as_str(),
             to_spirit_id,
-            None,
             intent,
             &payload_bytes,
             frame.auto_marker,
+            grant.map(|envelope| (envelope, recipient_pids.as_slice())),
         )
         .into_inner();
     if write == maos_iac::FrameRowWrite::Duplicate {

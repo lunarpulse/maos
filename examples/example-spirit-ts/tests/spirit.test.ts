@@ -50,6 +50,12 @@ describe("WASM component guest", () => {
     expect(handleFrame(frame)).toEqual([frame]);
   });
 
+  it("echoes when fetch reports consent-withheld", () => {
+    vi.mocked(fetch).mockImplementation(() => { throw componentError("consent-withheld"); });
+    expect(handleFrame(frame)).toEqual([frame]);
+    expect(fetch).toHaveBeenCalledWith(frame.frameId);
+  });
+
   it("rethrows fetch capability-denied unchanged", () => {
     const error = componentError("capability-denied");
     vi.mocked(fetch).mockImplementation(() => { throw error; });

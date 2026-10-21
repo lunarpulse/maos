@@ -55,3 +55,11 @@ and cannot serve as an append watermark. Boot, emitter and disclosure
 predicates still apply; the metadata query does not load payloads. Cursor
 anchors must remain in the log. The WASM `@2.1.0` filter and its timestamp
 ordering are unchanged.
+
+## Implementation note — Story 17-8
+
+This note supersedes the 17-3d emitter-only implementation limit above. Local recall and fetch now use **participant scope**, incarnation-bound to this boot: the sender OR a recorded recipient may access disclosable raw kinds 0–6 and 18. Both native and WASM forms pass through one kernel-mediated `MediatedLogRecall`. Routed writes record only admitted local addressees resolved through the admitted-incarnation map and accepted by a consent gate if installed; resolution is snapshotted before journaling/enqueueing. A role never confers participation. Non-routed rows remain sender-only; audit rows and earlier boots remain excluded.
+
+Persisted consent binds a recipient other than the sender. Expired, matching grant-ruptured, and `Withheld` frames are omitted from recall; fetch returns `consent-withheld`. `HeaderOnly` lists metadata with `payload-available = false` and also refuses fetch. Each refused fetch writes one kind-28 `log.fetch.refused:consent-withheld` receipt at the caller pid, without an owner pid. The daemon-side `ConsentEnvelope.recall` defaults to `Full`; unknown values become `Withheld`. It is not in WIT: guests see only its effect. This lossless-frame exception is ratified as `17-8-consent-recall-policy`. Cross-wall recall remains emitter-scoped under ADR-058 D2 and marks every page `RecallScope::Emitter { reason: CrossWall }`.
+
+**Production limits (AC3.6 / rule 11):** at HEAD no production granter sets `HeaderOnly`/`Withheld`, no `ConsentGate` is installed in production, and envelope-bearing frames reach admitted local recipients only through A2A delegation intake. Peer-identity ruptures carry no envelope and withhold nothing. Native compiled-in Spirits' bus sends journal at pid 0 (non-goal). Consent vectors are suite-delivered through `deliver_typed`, not evidence of an active production granter policy.

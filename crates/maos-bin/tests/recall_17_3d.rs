@@ -108,6 +108,10 @@ impl World {
         let tl = Arc::new(
             TransparencyLogAdapter::open(&dir.join("transparency.sqlite"), NONCE).unwrap(),
         );
+        // Story 17-8: recipient scope uses the same trusted map as admission/session.
+        let lookup = Arc::new(RwLock::new(BTreeMap::<String, u32>::new()));
+        tl.install_recipient_resolver(Arc::clone(&lookup) as _)
+            .expect("install the sole admission/session recipient resolver");
         let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
         let policy = Arc::new(PolicyTable::new());
         let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
@@ -195,7 +199,7 @@ impl World {
             halt,
             supervisor,
             root,
-            lookup: Arc::new(RwLock::new(BTreeMap::new())),
+            lookup,
             audit_writer,
         }
     }
@@ -401,7 +405,8 @@ fn assert_row(row: &TransparencyLogEntry, pid: u32, kind: i64, intent: &str, tok
         "{intent}: actual minted-token column"
     );
     if let Some(token) = row.capability_token {
-        assert_ne!(token, [0; 32]);
+        assert_ne!(&token[..16], &[0; 16]);
+        assert_eq!(&token[16..], &[0; 16]);
     }
 }
 fn data(frame: &IacFrame) -> &str {
@@ -453,6 +458,32 @@ async fn once(world: &World, granted: bool, script: &str) -> Option<(u32, String
     let reports = claim_reports(world, pid);
     assert_eq!(reports.len(), 1);
     Some((pid, reports[0].clone()))
+}
+
+// Story 17-8: received seeds now succeed without a refusal receipt.
+fn assert_r1_r2(world: &World, pid: u32) {
+    let ops = operations(world, pid);
+    assert_eq!(ops.len(), 2);
+    assert_row(&ops[0], pid, 7, "log.recall", true);
+    assert_row(&ops[1], pid, 7, "log.fetch", true);
+    let all = rows(world, pid);
+    assert!(
+        all.iter().all(
+            |r| !(r.intent.starts_with("log.") && r.intent.contains(".refused:"))
+                && !r.intent.starts_with("recall.channel.closed:")
+        ),
+        "successful R1→R2 has no refusal or channel-close receipt"
+    );
+    let positions = [ops[0].frame_id, ops[1].frame_id]
+        .map(|id| all.iter().position(|r| r.frame_id == id).unwrap());
+    let authorization = all
+        .iter()
+        .position(|r| r.intent == "spirit.frame.authorization")
+        .unwrap();
+    assert!(
+        positions[0] < positions[1] && positions[1] < authorization,
+        "R1→R2 precede guest output authorization, allowing interleaved identity rows"
+    );
 }
 
 fn assert_r1_r2_r3(world: &World, pid: u32) {
@@ -525,25 +556,38 @@ fn t2_available() -> bool {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn seed_fetch_r1_r2_r3_precede_authorization_and_fr4_succeeds() {
+async fn seed_fetch_succeeds_r1_r2_precede_authorization_without_receipt_and_fr4_succeeds() {
     if !t2_available() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
     let world = World::new(dir.path());
-    if let Some((pid, report)) = once(&world, true, "recall\nfetch self").await {
-        assert_eq!(
-            report,
-            "recall ok 0 cursor=none\nfetch err scope-violation\n"
-        );
-        assert_r1_r2_r3(&world, pid);
+    // Story 17-8: compare live output, since audit claims redact hex ids/payloads.
+    let mut telemetry = world.iac.mailbox().subscribe_telemetry();
+    if let Some((pid, _)) = once(&world, true, "recall\nfetch self").await {
+        let emitted = next_report(&world, pid, &mut telemetry).await;
+        // Story 17-8: the seed is a received participant row, not emitter-only.
+        let seed = world
+            .tl
+            .query_frames(FrameFilter {
+                spirit_pid: Some(0),
+                kind: Some(JournalKind::TaskAssign),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(seed.len(), 1);
+        let seed = &seed[0];
+        assert_eq!(data(&emitted), format!(
+            "recall ok 1 cursor=none\nentry {} {} TaskAssign {} true\nfetch ok {} {} TaskAssign {} {} human-authored\n",
+            hex::encode(seed.frame_id), seed.timestamp_ns, hex::encode(seed.intent.as_bytes()),
+            hex::encode(seed.frame_id), seed.timestamp_ns, hex::encode(seed.intent.as_bytes()), hex::encode(&seed.payload_redacted)
+        ));
+        assert_r1_r2(&world, pid);
         let plain = fr4(dir.path(), pid);
         println!("FR4-SEED-BEGIN\n{plain}FR4-SEED-END");
-        for intent in [
-            "log.recall",
-            "log.fetch",
-            "log.fetch.refused:scope-violation",
-        ] {
+        assert!(!plain.contains(".refused:"), "{plain}");
+        assert!(!plain.contains("recall.channel.closed:"), "{plain}");
+        for intent in ["log.recall", "log.fetch"] {
             assert!(plain.contains(intent), "{plain}");
         }
     }
@@ -557,7 +601,8 @@ async fn empty_page_has_one_token_bearing_call_and_no_receipt() {
     }
     let dir = tempfile::tempdir().unwrap();
     let world = World::new(dir.path());
-    if let Some((pid, report)) = once(&world, true, "recall").await {
+    // Story 17-8: deliberately exclude the received TaskAssign seed.
+    if let Some((pid, report)) = once(&world, true, "recall kind=TelemetryEvent").await {
         assert_eq!(report, "recall ok 0 cursor=none\n");
         let ops = operations(&world, pid);
         assert_eq!(ops.len(), 1);
@@ -663,6 +708,8 @@ async fn cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation() {
     }
     let dir = tempfile::tempdir().unwrap();
     let world = World::new(dir.path());
+    // Story 17-8: live output preserves recalled ids that audit claims redact.
+    let mut telemetry = world.iac.mailbox().subscribe_telemetry();
     let _collector = world
         .iac
         .register_spirit_typed(&SpiritId::from("collector"))
@@ -684,20 +731,19 @@ async fn cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation() {
     );
     drop(old);
     let script = format!("recall\nfetch {}", hex::encode([0x33; 16]));
-    if t2_result(
-        run_admitted_session(
-            world.session(),
-            admitted,
-            core,
-            launch(input(&script), true),
-        )
-        .await,
-    )
-    .is_some()
+    let seed = input(&script);
+    let seed_id = seed.frame_id;
+    if t2_result(run_admitted_session(world.session(), admitted, core, launch(seed, true)).await)
+        .is_some()
     {
+        // Story 17-8: current-boot received seed is visible; old incarnation is not.
+        let seed = world.tl.query_frame_by_id(seed_id).unwrap().unwrap();
+        let emitted = next_report(&world, pid, &mut telemetry).await;
+        assert_eq!(claim_reports(&world, pid).len(), 1);
         assert_eq!(
-            claim_reports(&world, pid),
-            ["recall ok 0 cursor=none\nfetch err scope-violation\n"]
+            data(&emitted),
+            format!("recall ok 1 cursor=none\nentry {} {} TaskAssign {} true\nfetch err scope-violation\n",
+                hex::encode(seed.frame_id), seed.timestamp_ns, hex::encode(seed.intent.as_bytes()))
         );
         assert_r1_r2_r3(&world, pid);
     }
@@ -862,7 +908,8 @@ async fn own_frame_second_turn_recalls_kernel_minted_id_kind_intent_and_fetches_
     assert_eq!(stored.boot_nonce, NONCE);
     assert_eq!(stored.kind as i64, 4);
     assert_eq!(stored.intent, "standard");
-    let second_input = input("recall\nfetch last");
+    // Story 17-8: exclude both received TaskAssign inputs; recall only own output.
+    let second_input = input("recall kind=TelemetryEvent\nfetch last");
     world
         .iac
         .deliver_typed(second_input, 0, None)
@@ -893,11 +940,26 @@ async fn own_receipt_and_authorization_ids_are_never_recalled_and_fetch_is_scope
     let mut collector = world.iac.mailbox().subscribe_telemetry();
     let (core, admitted) = admit(&world, &manifest(true)).await;
     let pid = admitted.pid;
+    // Story 17-8: fetch-self now succeeds; bootstrap with a known kind-7 row.
+    let bootstrap_id = [0x58; 16];
+    world.tl.insert_frame_event_with_id(
+        Some(bootstrap_id),
+        JournalKind::CapabilityInvocation,
+        pid,
+        ID,
+        "",
+        None,
+        "receipt-isolation.bootstrap",
+        b"non-disclosable bootstrap",
+        FrameOrigin::Kernel,
+    );
+    let seed = input(&format!("fetch {}", hex::encode(bootstrap_id)));
+    let seed_id = seed.frame_id;
     let session = tokio::spawn(run_admitted_session(
         world.session(),
         admitted,
         core,
-        launch(input("fetch self"), false),
+        launch(seed, false),
     ));
     let stop = StopSession(world.supervisor.clone());
     let first = next_report(&world, pid, &mut collector).await;
@@ -916,20 +978,51 @@ async fn own_receipt_and_authorization_ids_are_never_recalled_and_fetch_is_scope
         hex::encode(receipt.frame_id),
         hex::encode(authorization.frame_id)
     );
-    world
-        .iac
-        .deliver_typed(input(&script), 0, None)
-        .await
-        .unwrap();
+    let command = input(&script);
+    let command_id = command.frame_id;
+    world.iac.deliver_typed(command, 0, None).await.unwrap();
     let second = next_report(&world, pid, &mut collector).await;
-    let stored = world.tl.query_frame_by_id(first.frame_id).unwrap().unwrap();
-    assert_eq!(data(&second), format!("recall ok 1 cursor=none\nentry {} {} TelemetryEvent {} true\nfetch err scope-violation\nfetch err scope-violation\n",
-        hex::encode(first.frame_id), stored.timestamp_ns, hex::encode(stored.intent.as_bytes())));
+    // Story 17-8: unfiltered recall includes both received commands and own output,
+    // but still excludes the bootstrap, refusal receipt and authorization.
+    let mut expected_rows = [
+        (
+            world.tl.query_frame_by_id(seed_id).unwrap().unwrap(),
+            "TaskAssign",
+        ),
+        (
+            world.tl.query_frame_by_id(first.frame_id).unwrap().unwrap(),
+            "TelemetryEvent",
+        ),
+        (
+            world.tl.query_frame_by_id(command_id).unwrap().unwrap(),
+            "TaskAssign",
+        ),
+    ];
+    expected_rows.sort_by_key(|(row, _)| (row.timestamp_ns, row.frame_id));
+    let entries = expected_rows
+        .iter()
+        .map(|(row, kind)| {
+            format!(
+                "entry {} {} {kind} {} true\n",
+                hex::encode(row.frame_id),
+                row.timestamp_ns,
+                hex::encode(row.intent.as_bytes())
+            )
+        })
+        .collect::<String>();
+    assert_eq!(
+        data(&second),
+        format!(
+        "recall ok 3 cursor=none\n{entries}fetch err scope-violation\nfetch err scope-violation\n"
+    )
+    );
     drop(stop);
     session.await.unwrap().unwrap_err();
     let ops = operations(&world, pid);
     assert_eq!(ops.len(), 7);
     for (row, intent, kind, token) in [
+        (&ops[0], "log.fetch", 7, true),
+        (&ops[1], "log.fetch.refused:scope-violation", 28, false),
         (&ops[2], "log.recall", 7, true),
         (&ops[3], "log.fetch", 7, true),
         (&ops[4], "log.fetch.refused:scope-violation", 28, false),
@@ -942,76 +1035,11 @@ async fn own_receipt_and_authorization_ids_are_never_recalled_and_fetch_is_scope
     world.drain().await;
 }
 
-/// Withheld by emitter scope; no consent evaluation exists yet. The guest's
-/// verbatim authorization claims prove lossless WIT ingress, not consent grant.
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn consent_past_and_future_withheld_by_emitter_scope_no_consent_evaluation_exists_yet() {
-    if !t2_available() {
-        return;
-    }
-    for expiry in [0, u64::MAX] {
-        let dir = tempfile::tempdir().unwrap();
-        let world = World::new(dir.path());
-        let mut collector = world.iac.mailbox().subscribe_telemetry();
-        let (core, admitted) = admit(&world, &manifest(true)).await;
-        let pid = admitted.pid;
-        let mut seed = input("recall\nfetch self");
-        let envelope = maos_domain::frame::ConsentEnvelope {
-            consent_id: [0x51; 16],
-            granter: FrameAddress {
-                spirit_id: SpiritId::from("peer-granter"),
-                host_id: None,
-                role: None,
-            },
-            timestamp_ns: 17,
-            intent_class: None,
-            valid_until_ns: Some(expiry),
-        };
-        seed.consent_envelope = Some(envelope.clone());
-        if t2_result(
-            run_admitted_session(world.session(), admitted, core, launch(seed, true)).await,
-        )
-        .is_some()
-        {
-            assert_eq!(
-                claim_reports(&world, pid),
-                ["recall ok 0 cursor=none\nfetch err scope-violation\n"]
-            );
-            assert_r1_r2_r3(&world, pid);
-            let authorization = rows(&world, pid)
-                .into_iter()
-                .find(|r| r.intent == "spirit.frame.authorization")
-                .unwrap();
-            let json: serde_json::Value =
-                serde_json::from_slice(&authorization.payload_redacted).unwrap();
-            let guest: IacFrame = serde_json::from_value(json["claims"].clone()).unwrap();
-            assert_eq!(guest.consent_envelope, Some(envelope));
-            let emitted = next_report(&world, pid, &mut collector).await;
-            assert_eq!(
-                emitted.consent_envelope, None,
-                "guest-asserted consent is never authority"
-            );
-            let stored = world
-                .tl
-                .query_frame_by_id(emitted.frame_id)
-                .unwrap()
-                .unwrap();
-            assert_eq!(stored.spirit_pid, pid);
-            assert!(
-                !String::from_utf8_lossy(&stored.payload_redacted).contains("consent"),
-                "stored payload carries no asserted envelope"
-            );
-        }
-        drop(collector);
-        world.drain().await;
-    }
-}
-
 #[path = "../../maos-sso/tests/fixtures.rs"]
 mod sso_fixtures;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted() {
+async fn configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted() {
     if !t2_available() {
         return;
     }
@@ -1021,7 +1049,7 @@ async fn configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asse
         let out = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted",
+                "configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted",
                 "--nocapture",
             ])
             .env(CHILD, "1")
@@ -1057,28 +1085,36 @@ async fn configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asse
     );
     let mut deps = world.session();
     deps.enterprise = Some(enterprise);
+    // Story 17-8: live output preserves recalled ids/payloads that claims redact.
+    let mut telemetry = world.iac.mailbox().subscribe_telemetry();
     let _collector = world
         .iac
         .register_spirit_typed(&SpiritId::from("collector"))
         .unwrap();
     let (core, admitted) = admit(&world, &manifest(true)).await;
     let pid = admitted.pid;
-    if t2_result(
-        run_admitted_session(
-            deps,
-            admitted,
-            core,
-            launch(input("recall\nfetch self"), true),
-        )
-        .await,
-    )
-    .is_some()
-    {
-        assert_eq!(
-            claim_reports(&world, pid),
-            ["recall ok 0 cursor=none\nfetch err scope-violation\n"]
+    let seed = input("recall\nfetch self");
+    let seed_id = seed.frame_id;
+    if t2_result(run_admitted_session(deps, admitted, core, launch(seed, true)).await).is_some() {
+        // Story 17-8: only the received seed is recalled, never identity.asserted.
+        let seed = world.tl.query_frame_by_id(seed_id).unwrap().unwrap();
+        let emitted = next_report(&world, pid, &mut telemetry).await;
+        assert_eq!(claim_reports(&world, pid).len(), 1);
+        assert_eq!(data(&emitted), format!(
+            "recall ok 1 cursor=none\nentry {} {} TaskAssign {} true\nfetch ok {} {} TaskAssign {} {} human-authored\n",
+            hex::encode(seed.frame_id), seed.timestamp_ns, hex::encode(seed.intent.as_bytes()),
+            hex::encode(seed.frame_id), seed.timestamp_ns, hex::encode(seed.intent.as_bytes()), hex::encode(&seed.payload_redacted)
+        ));
+        assert_r1_r2(&world, pid);
+        let all = rows(&world, pid);
+        let r1 = all.iter().position(|r| r.intent == "log.recall").unwrap();
+        let r2 = all.iter().position(|r| r.intent == "log.fetch").unwrap();
+        assert!(
+            all[r1 + 1..r2]
+                .iter()
+                .any(|r| r.intent == "identity.asserted"),
+            "identity.asserted interleaves R1→R2 without entering the recall page"
         );
-        assert_r1_r2_r3(&world, pid);
         let identity = maos_audit::query(
             &dir.path().join("transparency.sqlite"),
             maos_audit::AuditFilter {

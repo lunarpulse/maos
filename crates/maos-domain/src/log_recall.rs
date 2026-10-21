@@ -196,6 +196,24 @@ impl LogRecallCursor {
     }
 }
 
+/// Story 17-8 AC6.1 — which rows a recall page was drawn from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum RecallScope {
+    /// Local recall: frames the caller sent or was recorded as receiving in this
+    /// boot, each received frame still under its granter's consent.
+    Participant,
+    /// Frames the caller emitted, and only those (no recipient record is read).
+    Emitter { reason: EmitterScopeReason },
+}
+
+/// Why a page is emitter-scoped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum EmitterScopeReason {
+    /// A foreign team's artifact (ADR-058 D2): remote pids and boots are not
+    /// local incarnations, so participant scope never applies across the wall.
+    CrossWall,
+}
+
 /// A page of recall results.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LogRecallPage {
@@ -203,13 +221,20 @@ pub struct LogRecallPage {
     pub entries: Vec<LogRecallEntry>,
     #[doc = "Construct via [`LogRecallPage::new`] to enforce validation; struct literals bypass cursor-ordering / pid-range / limit-cap checks."]
     pub next_cursor: Option<LogRecallCursor>,
+    #[doc = "Construct via [`LogRecallPage::new`] to enforce validation; struct literals bypass cursor-ordering / pid-range / limit-cap checks."]
+    pub scope: RecallScope,
 }
 
 impl LogRecallPage {
-    pub fn new(entries: Vec<LogRecallEntry>, next_cursor: Option<LogRecallCursor>) -> Self {
+    pub fn new(
+        entries: Vec<LogRecallEntry>,
+        next_cursor: Option<LogRecallCursor>,
+        scope: RecallScope,
+    ) -> Self {
         Self {
             entries,
             next_cursor,
+            scope,
         }
     }
 }
@@ -347,13 +372,19 @@ pub enum LogRecallError {
         team: TeamId,
         reason: CrossWallRecallRefusal,
     },
-    /// Cross-Spirit fetch — the requesting Spirit is not the emitter.
+    /// The requesting Spirit neither emitted the frame nor is a recorded
+    /// recipient of it in this boot (or the kind is not Spirit-disclosable).
     #[error("E_SCOPE_VIOLATION — frame {frame_id:?} owned by pid {owner_pid}, requested by pid {requested_pid}")]
     ScopeViolation {
         frame_id: [u8; 16],
         requested_pid: u32,
         owner_pid: u32,
     },
+    /// Story 17-8 AC3.4 — the caller received the frame, but its granter's
+    /// consent (expired, ruptured, withheld or header-only) withholds the
+    /// payload. Deliberately carries no granter, pid, policy or length.
+    #[error("E_CONSENT_WITHHELD — frame {frame_id:?} is withheld by consent")]
+    ConsentWithheld { frame_id: [u8; 16] },
     /// Requested frame does not exist in the Transparency Log.
     #[error("frame {frame_id:?} not found")]
     FrameNotFound { frame_id: [u8; 16] },
@@ -410,6 +441,9 @@ mod tests {
                 true,
             )],
             Some(LogRecallCursor::new(100, [1u8; 16])),
+            RecallScope::Emitter {
+                reason: EmitterScopeReason::CrossWall,
+            },
         );
         let json = serde_json::to_string(&page).unwrap();
         let back: LogRecallPage = serde_json::from_str(&json).unwrap();

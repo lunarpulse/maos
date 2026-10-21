@@ -441,18 +441,89 @@ pub struct ConsentEnvelope {
     /// `A2AError::ConsentExpired` if `now > valid_until_ns`. `None` = open-ended.
     #[serde(default)]
     pub valid_until_ns: Option<u64>,
+    /// Story 17-8 (D-17-8-01 A) — the granter's recall policy for the frame
+    /// this envelope rides on. Daemon-side disclosure metadata: omitted from
+    /// the wire when `Full`, so every pre-17-8 envelope is byte-identical, and
+    /// elided from the WIT lowering (guests observe only its effect).
+    #[serde(default, skip_serializing_if = "ConsentRecall::is_full")]
+    pub recall: ConsentRecall,
+}
+
+/// Story 17-8 (D-17-8-01 A, D-17-8-02) — what a recipient may later recall of a
+/// frame it received under this envelope. `Full` is the default: consent to
+/// deliver includes the recipient's own later recall.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConsentRecall {
+    #[default]
+    Full,
+    /// Listed by recall without its payload; fetch is withheld.
+    HeaderOnly,
+    /// Neither listed nor fetchable by a recipient.
+    Withheld,
+}
+
+impl ConsentRecall {
+    pub fn is_full(&self) -> bool {
+        *self == Self::Full
+    }
+}
+
+/// An unknown policy (any value or shape a newer granter may send) decodes to
+/// `Withheld` — never an error, never `Full`. Explicit because serde documents
+/// `#[serde(other)]` only for internally/adjacently tagged enums.
+impl<'de> serde::Deserialize<'de> for ConsentRecall {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Name(String),
+            Other(serde::de::IgnoredAny),
+        }
+        Ok(match Raw::deserialize(deserializer)? {
+            Raw::Name(name) if name == "full" => Self::Full,
+            Raw::Name(name) if name == "header_only" => Self::HeaderOnly,
+            Raw::Name(_) | Raw::Other(_) => Self::Withheld,
+        })
+    }
+}
+
+/// Story 17-8 AC3.2 — the consent clock shared by A2A intake and recall: Unix
+/// wall nanoseconds. Fails CLOSED: an unreadable (pre-epoch) clock returns
+/// `u64::MAX`, so every bounded envelope reads as expired rather than admitted.
+pub fn consent_wall_now_ns() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(u64::MAX)
 }
 
 impl ConsentEnvelope {
+    /// Story 17-8 AC3.2 — the one expiry predicate: strictly `now > valid_until`;
+    /// equality is still valid and `None` never expires.
+    pub fn expired_at(&self, now_ns: u64) -> bool {
+        self.valid_until_ns
+            .is_some_and(|valid_until| now_ns > valid_until)
+    }
+
+    /// ADR-012 granter binding: the envelope was granted by `address`'s Spirit on
+    /// `address`'s Host (role is not part of the binding).
+    pub fn granted_by(&self, address: &FrameAddress) -> bool {
+        self.granter.spirit_id == address.spirit_id && self.granter.host_id == address.host_id
+    }
+
     /// Story 8.7 / AC2 — sender-side helper: build a per-frame consent envelope
     /// carrying an explicit ADR-012 fine-grained typed intent.
     ///
     /// Cross-Host send paths attach this to `IacFrame.consent_envelope` so the
     /// receiver matches the operator's fine-grained allowlist entry
     /// (`diagnosis-handoff:read-only-evidence`) instead of the coarse 3-band
-    /// projection. `consent_id` is unspecified (`[0u8; 16]`) and the envelope is
-    /// open-ended (`valid_until_ns = None`) at v0.5; callers that need a real
-    /// consent id / expiry construct the struct directly.
+    /// projection. `consent_id` comes from a process-local counter (unique in
+    /// this process, not across restarts); the envelope is open-ended
+    /// (`valid_until_ns = None`) with the default `Full` recall policy. Callers
+    /// that need a restart-unique id, an expiry or a narrower policy construct
+    /// the struct directly.
     pub fn with_fine_grained_intent(
         granter: FrameAddress,
         intent: crate::invariants::i8::A2AIntent,
@@ -470,6 +541,7 @@ impl ConsentEnvelope {
             timestamp_ns: 0,
             intent_class: Some(intent),
             valid_until_ns: None,
+            recall: ConsentRecall::Full,
         }
     }
 }

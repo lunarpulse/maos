@@ -91,6 +91,7 @@ fn emit(mode: &str, inbound: IacFrame) -> Vec<IacFrame> {
                 timestamp_ns: 1,
                 intent_class: Some(A2AIntent::new("forged:consent")),
                 valid_until_ns: None,
+                recall: maos_domain::frame::ConsentRecall::Full,
             });
             vec![forged]
         }

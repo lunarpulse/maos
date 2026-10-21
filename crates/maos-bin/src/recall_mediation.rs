@@ -193,6 +193,7 @@ fn refusal_code(error: &LogRecallError) -> &'static str {
     match error {
         LogRecallError::CapabilityDenied => "capability-denied",
         LogRecallError::ScopeViolation { .. } => "scope-violation",
+        LogRecallError::ConsentWithheld { .. } => "consent-withheld",
         LogRecallError::FrameNotFound { .. } => "frame-not-found",
         LogRecallError::InvalidCursor(_) => "invalid-request",
         LogRecallError::LimitExceeded { .. } => "limit-exceeded",
@@ -389,8 +390,8 @@ fn wire_filter(
 
 #[cfg(feature = "wasm-host")]
 fn kind_name(kind: maos_domain::log_recall::FrameKindLabel) -> String {
-    match serde_json::to_value(kind).expect("frame kind labels serialize as strings") {
-        serde_json::Value::String(name) => name,
+    match serde_json::to_value(kind) {
+        Ok(serde_json::Value::String(name)) => name,
         _ => unreachable!("frame kind labels serialize as strings"),
     }
 }
@@ -401,6 +402,7 @@ fn wire_error(error: &LogRecallError) -> maos_wasm_host::recall_wire::WireError 
     match refusal_code(error) {
         "capability-denied" => WireError::CapabilityDenied,
         "scope-violation" => WireError::ScopeViolation,
+        "consent-withheld" => WireError::ConsentWithheld,
         "frame-not-found" => WireError::FrameNotFound,
         "invalid-request" => WireError::InvalidRequest(match error {
             LogRecallError::InvalidCursor(detail) => detail.clone(),

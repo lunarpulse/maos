@@ -2020,10 +2020,11 @@ jobs:
       # and no MAOS_/XDG_DATA_HOME overrides, so the query is pinned to that
       # environment. `--spirit` resolves the TS Spirit's
       # latest (boot_nonce, spirit_pid) and renders FR4: a tokenless recall row
-      # exits non-zero. The checker requires exactly R1 log.recall -> R2
-      # log.fetch -> R3 log.fetch.refused:scope-violation before the turn's
-      # 17-3c rows and no other recall, refusal or channel row.
-      - name: Epic-17 exit line 2b — the TypeScript Spirit's recall rows (Story 17-3d)
+      # exits non-zero. Story 17-8 AC1 re-states the line under participant
+      # scope: the --once seed is a frame the Spirit RECEIVED, so its fetch
+      # succeeds. The checker requires exactly R1 log.recall -> R2 log.fetch
+      # before the turn's 17-3c rows and no refusal or channel row.
+      - name: Epic-17 exit line 2b — the TypeScript Spirit's recall rows (Story 17-8 AC1)
         shell: bash
         run: |
           set +e
@@ -3564,7 +3565,10 @@ jobs:
           exit "$fail"
       # Story 17-3d — mediated in-band recall end to end: the real release
       # runner under T2 in the same delegated envelope, exact pass count and
-      # every test name present (no SKIP, no zero-test pass).
+      # every test name present (no SKIP, no zero-test pass). Story 17-8
+      # migrated it to participant scope: the seed and SSO vectors are R1 -> R2
+      # (the seed is a received frame), and its consent vector moved to the
+      # participant_recall_17_8 step below (V6-V10).
       - name: In-band recall through the admitted session (Story 17-3d)
         shell: bash
         run: |
@@ -3575,11 +3579,10 @@ jobs:
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 16 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 16 passed;'"; fail=1; }
+          grep -q '^test result: ok\. 15 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 15 passed;'"; fail=1; }
           required=()
           for name in checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4 \
-                      configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted \
-                      consent_past_and_future_withheld_by_emitter_scope_no_consent_evaluation_exists_yet \
+                      configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted \
                       cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation \
                       empty_page_has_one_token_bearing_call_and_no_receipt \
                       exhausted_quota_has_receipt_without_tokenless_fallback_call \
@@ -3588,7 +3591,7 @@ jobs:
                       oversized_fetch_reply_is_typed_and_next_call_same_turn_still_works \
                       own_frame_second_turn_recalls_kernel_minted_id_kind_intent_and_fetches_stored_payload \
                       own_receipt_and_authorization_ids_are_never_recalled_and_fetch_is_scope_violation \
-                      seed_fetch_r1_r2_r3_precede_authorization_and_fr4_succeeds \
+                      seed_fetch_succeeds_r1_r2_precede_authorization_without_receipt_and_fr4_succeeds \
                       sixty_fifth_recall_closes_channel_once_with_typed_protocol_end \
                       tagged_record_between_exports_closes_once_with_typed_protocol_end \
                       ungranted_manifest_denies_with_receipt_only \
@@ -3605,7 +3608,46 @@ jobs:
             echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
           done
           echo "::notice title=17-3d recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' recall-17-3d.log)"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 16 "${required[@]}" recall-17-3d.log || fail=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 15 "${required[@]}" recall-17-3d.log || fail=1
+          exit "$fail"
+      # Story 17-8 — participant recall and consent envelopes for BOTH forms
+      # (native Researcher through MediatedLogRecall, WASM recall-probe through
+      # the admitted session): AC1's table V1-V16 and AC4's same-frame
+      # V6 -> V7 / V6 -> V8 sequences, in their own delegated unit and log,
+      # exact pass count, every test name, no SKIP, no zero-test pass.
+      - name: Participant recall and consent envelopes, both forms (Story 17-8)
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-participant --timeout 2400 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test participant_recall_17_8 -- --nocapture --test-threads=1 2>&1 | tee participant-17-8.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          fail=0
+          [ "$rc" -eq 0 ] || { echo "::error title=17-8 participant recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
+          grep -q '^test result: ok\. 8 passed;' participant-17-8.log || { echo "::error title=17-8 participant recall (${{ matrix.image }})::missing 'test result: ok. 8 passed;'"; fail=1; }
+          required=()
+          for name in cross_wall_remote_artifact_is_identically_emitter_scoped_with_or_without_side_tables \
+                      direct_recipient_ids_roles_dedup_multiaddress_and_gate_rejection_both_forms \
+                      drr_addressed_and_nonfirst_recipients_both_forms \
+                      earlier_boot_same_pid_recipient_is_out_of_scope_both_forms \
+                      header_only_including_oversized_and_withheld_envelopes_both_forms \
+                      sender_owned_frames_ignore_received_consent_in_native_and_wasm \
+                      valid_consent_then_real_gate_rupture_withholds_same_frame_both_forms \
+                      valid_consent_then_same_frame_expires_between_report_barriers_both_forms; do
+            required+=(--required-test "$name")
+          done
+          if grep -q '^SKIP ' participant-17-8.log; then
+            grep '^SKIP ' participant-17-8.log | while IFS= read -r line; do
+              echo "::error title=17-8 participant recall (${{ matrix.image }})::${line}"
+            done
+            fail=1
+          fi
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' participant-17-8.log | head -5 | while IFS= read -r line; do
+            echo "::error title=17-8 participant recall (${{ matrix.image }})::${line}"
+          done
+          echo "::notice title=17-8 participant recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' participant-17-8.log | paste -sd' ' -)"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 8 "${required[@]}" participant-17-8.log || fail=1
           exit "$fail"
       - uses: actions/download-artifact@v4
         with:
@@ -3652,6 +3694,7 @@ jobs:
           path: |
             spawned-17-3c.log
             recall-17-3d.log
+            participant-17-8.log
             17-3c-proof/
             17-3c-proof.log
           if-no-files-found: error

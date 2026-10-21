@@ -33,7 +33,7 @@ use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
 use super::channels::{channel_class_for, ChannelClass};
 use super::metrics::IacRtMetrics;
-use super::transparency_log::TransparencyLogAdapter;
+use super::transparency_log::{FrameRecipient, RecipientResolver, TransparencyLogAdapter};
 
 /// Story 6.5 — trait abstraction for updating Spirit activity timestamps
 /// without coupling the mailbox to kernel-core's `SpiritControlBlock`.
@@ -109,6 +109,26 @@ fn generate_rupture_id() -> [u8; 16] {
     out[6..14].copy_from_slice(&pid.to_be_bytes());
     out[14..].copy_from_slice(&(seq as u16).to_be_bytes());
     out
+}
+
+/// Story 17-8 AC2.4 — one prepared delivery, computed ONCE before the journal
+/// write: the consent-gate verdict per address and the resolved local recipient
+/// incarnations (one resolver read). The routed writer persists `recipients`;
+/// the mailbox consumes the verdicts instead of evaluating the gate again.
+#[derive(Debug, Clone, Default)]
+pub struct PreparedDelivery {
+    accepted: Vec<FrameAddress>,
+    rejected: Vec<RuptureRejection>,
+    recipients: Vec<FrameRecipient>,
+    rejected_pids: Vec<u32>,
+}
+
+impl PreparedDelivery {
+    /// Accepted local addressees that resolved to an admitted incarnation,
+    /// deduped by pid; each keeps the first non-`None` role in address order.
+    pub fn recipients(&self) -> &[FrameRecipient] {
+        &self.recipients
+    }
 }
 
 /// Per-Host Mailbox — the same-Host IAC router.
@@ -290,12 +310,99 @@ impl Mailbox {
             .retain(|(id, _), _| id.as_str() != spirit_id);
     }
 
+    /// Story 17-8 AC2.4 — prepare a routed frame's delivery once: gate verdicts
+    /// (telemetry, kernel-sent and depth ≥ 2 frames are exempt, as in delivery)
+    /// and recipients resolved under one `resolver` read. Only a local
+    /// (`host_id = None`) address the gate accepted can become a recipient;
+    /// `role` never confers anything. No resolver ⇒ no recipients (fail-closed).
+    pub fn prepare(
+        &self,
+        frame: &IacFrame,
+        resolver: Option<&dyn RecipientResolver>,
+    ) -> PreparedDelivery {
+        self.prepare_at(frame, 0, resolver)
+    }
+
+    fn prepare_at(
+        &self,
+        frame: &IacFrame,
+        rupture_depth: u8,
+        resolver: Option<&dyn RecipientResolver>,
+    ) -> PreparedDelivery {
+        // Phase 1.5 — Story 6.4 / ADR-034 binding-v0.9: per-recipient consent
+        // gate. The kernel-internal sender (KERNEL_SENDER_SPIRIT_ID) is exempt
+        // so ConsentRupture/RateLimited frames the kernel emits don't enter
+        // the gate (recursion floor). The gate is also bypassed at
+        // `rupture_depth ≥ 2` to prevent rupture-on-rupture cycles per
+        // Story 6.4 AC3 test 3.8. Telemetry is broadcast and never gated.
+        let is_kernel_sender = frame.from.spirit_id.as_str() == KERNEL_SENDER_SPIRIT_ID;
+        let gate_enabled =
+            frame.kind != FrameKind::TelemetryEvent && !is_kernel_sender && rupture_depth < 2;
+        let mut prepared = PreparedDelivery::default();
+        match (self.consent_gate.get(), gate_enabled) {
+            (Some(gate), true) => {
+                for addr in frame.to.iter() {
+                    match gate.evaluate(frame, addr) {
+                        Ok(()) => prepared.accepted.push(addr.clone()),
+                        Err(reason) => prepared.rejected.push(RuptureRejection {
+                            address: addr.clone(),
+                            reason,
+                        }),
+                    }
+                }
+            }
+            _ => prepared.accepted = frame.to.iter().cloned().collect(),
+        }
+        let Some(resolver) = resolver else {
+            return prepared;
+        };
+        let accepted = prepared.accepted.iter().filter(|a| a.host_id.is_none());
+        let rejected = prepared.rejected.iter().map(|r| &r.address);
+        let rejected = rejected.filter(|a| a.host_id.is_none());
+        let ids: Vec<&str> = accepted
+            .clone()
+            .chain(rejected)
+            .map(|a| a.spirit_id.as_str())
+            .collect();
+        let pids = resolver.resolve(&ids);
+        assert_eq!(pids.len(), ids.len(), "resolver: one Option per spirit id");
+        let accepted_count = accepted.clone().count();
+        for (addr, pid) in accepted.zip(&pids) {
+            let Some(pid) = *pid else { continue };
+            match prepared.recipients.iter_mut().find(|r| r.pid == pid) {
+                Some(recorded) => recorded.role = recorded.role.or(addr.role),
+                None => prepared.recipients.push(FrameRecipient {
+                    pid,
+                    spirit_id: addr.spirit_id.as_str().to_string(),
+                    role: addr.role,
+                }),
+            }
+        }
+        for pid in pids[accepted_count..].iter().flatten() {
+            if !prepared.rejected_pids.contains(pid) {
+                prepared.rejected_pids.push(*pid);
+            }
+        }
+        prepared
+    }
+
     /// Deliver a frame through the per-Spirit MPSC or broadcast sender.
     ///
     /// The I2 log-before-deliver guarantee is satisfied by the caller
-    /// (`IacBusAdapter::deliver_typed`) BEFORE calling this method.
+    /// (`IacBusAdapter::deliver_typed`) BEFORE calling this method. A
+    /// standalone call prepares its delivery internally, exactly as before.
     pub async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError> {
-        self.deliver_inner(frame, 0).await
+        self.deliver_inner(frame, 0, None).await
+    }
+
+    /// Story 17-8 AC2.4 — deliver a frame whose delivery was prepared (and
+    /// journaled) by the routed writer; the consent gate is not consulted again.
+    pub async fn deliver_prepared(
+        &self,
+        frame: IacFrame,
+        prepared: PreparedDelivery,
+    ) -> Result<LogBeforeDeliver<()>, IacBusError> {
+        self.deliver_inner(frame, 0, Some(prepared)).await
     }
 
     /// Recursive deliver entry point with rupture-depth tracking. ConsentRupture
@@ -306,6 +413,7 @@ impl Mailbox {
         &'a self,
         frame: IacFrame,
         rupture_depth: u8,
+        prepared: Option<PreparedDelivery>,
     ) -> std::pin::Pin<
         Box<
             dyn std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send + 'a,
@@ -339,36 +447,22 @@ impl Mailbox {
                 }
             }
 
-            // Phase 1.5 — Story 6.4 / ADR-034 binding-v0.9: per-recipient consent
-            // gate. The kernel-internal sender (KERNEL_SENDER_SPIRIT_ID) is exempt
-            // so ConsentRupture/RateLimited frames the kernel emits don't enter
-            // the gate (recursion floor). The gate is also bypassed at
-            // `rupture_depth ≥ 1` to prevent rupture-on-rupture cycles per
-            // Story 6.4 AC3 test 3.8.
-            let is_kernel_sender = frame.from.spirit_id.as_str() == KERNEL_SENDER_SPIRIT_ID;
-            let gate_enabled = !is_kernel_sender && rupture_depth < 2;
-            let (accepted_recipients, rejected_recipients): (
-                Vec<FrameAddress>,
-                Vec<RuptureRejection>,
-            ) = if let (Some(gate), true) = (self.consent_gate.get(), gate_enabled) {
-                let mut accept = Vec::new();
-                let mut reject: Vec<RuptureRejection> = Vec::new();
-                for addr in frame.to.iter() {
-                    match gate.evaluate(&frame, addr) {
-                        Ok(()) => accept.push(addr.clone()),
-                        Err(reason) => reject.push(RuptureRejection {
-                            address: addr.clone(),
-                            reason,
-                        }),
-                    }
-                }
-                (accept, reject)
-            } else {
-                (frame.to.iter().cloned().collect(), Vec::new())
-            };
+            let resolver = self
+                .transparency_log
+                .get()
+                .and_then(|tl| tl.recipient_resolver());
+            let PreparedDelivery {
+                accepted: accepted_recipients,
+                rejected: rejected_recipients,
+                rejected_pids,
+                ..
+            } = prepared.unwrap_or_else(|| self.prepare_at(&frame, rupture_depth, resolver));
 
             if !rejected_recipients.is_empty() {
                 // Quarantine TL row BEFORE rupture emission (I2 log-before-deliver).
+                // Story 17-8 AC3.5: when the frame's envelope was granted by its
+                // sender, the same transaction records the grant-scoped rupture
+                // naming each rejected local recipient incarnation.
                 if let Some(tl) = self.transparency_log.get() {
                     let payload = serde_json::json!({
                         "original_frame_id": frame.frame_id,
@@ -385,15 +479,19 @@ impl Mailbox {
                             .collect::<Vec<_>>(),
                         "ruptured_at_ns": maos_capability::cap_tokens::monotonic_now_ns(),
                     });
-                    let _ = tl.insert_frame_event_with_sender(
-                        super::transparency_log::FrameKind::ConsentRupture,
-                        0,
+                    let grant = frame
+                        .consent_envelope
+                        .as_ref()
+                        .filter(|envelope| envelope.granted_by(&frame.from))
+                        .map(|envelope| (envelope, rejected_pids.as_slice()));
+                    let _ = tl.insert_consent_rupture(
+                        None,
                         frame.from.spirit_id.as_str(),
                         "",
-                        None,
                         "consent.rupture.quarantine",
                         payload.to_string().as_bytes(),
                         FrameOrigin::Kernel,
+                        grant,
                     );
                 }
 
@@ -440,7 +538,9 @@ impl Mailbox {
                         frame.from.spirit_id.as_str().to_string(),
                         FrameKind::ConsentRupture,
                     )) {
-                        let _ = self.deliver_inner(rupture_frame, rupture_depth + 1).await;
+                        let _ = self
+                            .deliver_inner(rupture_frame, rupture_depth + 1, None)
+                            .await;
                     }
                 }
 
@@ -567,13 +667,17 @@ impl Mailbox {
     ///   3. If the original frame is still in the recipient's channel, it
     ///      will be delivered post-hoc; the recipient checks the TL retraction
     ///      marker and handles it appropriately (per ADR-022).
+    ///
+    /// Story 17-8 AC2.4 — the retract's delivery was prepared (and journaled)
+    /// by the routed writer; its gate verdicts are consumed, never re-evaluated.
     pub async fn deliver_with_overtake(
         &self,
         retract_frame: IacFrame,
         _original_frame_id: [u8; 16],
+        prepared: PreparedDelivery,
     ) -> Result<LogBeforeDeliver<()>, IacBusError> {
         // Deliver the retract frame normally
-        self.deliver(retract_frame).await
+        self.deliver_prepared(retract_frame, prepared).await
     }
 
     pub fn metrics(&self) -> &Arc<IacRtMetrics> {

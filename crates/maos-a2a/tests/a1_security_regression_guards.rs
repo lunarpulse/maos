@@ -141,6 +141,7 @@ async fn p2_handle_intake_rejects_expired_consent_envelope() {
         timestamp_ns: 0,
         intent_class: Some(A2AIntent::new("standard")),
         valid_until_ns: Some(0),
+        recall: maos_domain::frame::ConsentRecall::Full,
     });
     let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1);
     let resp = router.handle_intake(req).await;
@@ -311,6 +312,7 @@ async fn p6_zero_boot_nonce_is_unspecified_sentinel_and_admits() {
         timestamp_ns: 0,
         intent_class: Some(A2AIntent::new("standard")),
         valid_until_ns: None,
+        recall: maos_domain::frame::ConsentRecall::Full,
     });
     let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1); // boot_nonce = 0 by default
     let resp = router.handle_intake(req).await;

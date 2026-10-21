@@ -1,0 +1,14 @@
+notice	Epic-17 exit line 2b (ubuntu-24.04)	LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+notice	Epic-17 exit line 2 (ubuntu-24.04)	rc=0
+notice	17-8 provenance (ubuntu-24.04)	sha=12504614831ac8f4360dcc56e3e03021716f7240 tree=82045cbdd07b0de071fc84bfcfa4a52434087635 rustc=rustc_1.99.1_(58cf8f9c3_2026-10-13)
+notice	Epic-17 exit line 2b (ubuntu-26.04)	LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+notice	Epic-17 exit line 2 (ubuntu-26.04)	rc=0
+notice	17-8 provenance (ubuntu-26.04)	sha=12504614831ac8f4360dcc56e3e03021716f7240 tree=82045cbdd07b0de071fc84bfcfa4a52434087635 rustc=rustc_1.99.1_(58cf8f9c3_2026-10-13)
+notice	17-8 participant recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.40s
+notice	17-3d recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.08s
+notice	17-8 participant recall (ubuntu-24.04)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.53s
+notice	17-3d recall (ubuntu-24.04)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.47s
+notice	17-8 participant recall (ubuntu-26.04-arm)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.52s
+notice	17-3d recall (ubuntu-26.04-arm)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.05s
+notice	17-8 participant recall (ubuntu-26.04)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.05s
+notice	17-3d recall (ubuntu-26.04)	rc=0 fail=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.35s

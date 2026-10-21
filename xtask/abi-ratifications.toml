@@ -255,3 +255,11 @@ covered_changes = [
   "recall-error",
 ]
 ratified_at = "2026-10-18"
+
+[[ratification]]
+proposal_id = "17-8-consent-recall-policy"
+summary = "Domain-only ConsentEnvelope.recall {Full, HeaderOnly, Withheld}: default Full and omitted from JSON/CBOR when Full (pre-17-8 envelopes byte-identical); any unknown value decodes to Withheld, never an error and never Full; daemon-persisted and enforced at disclosure. Guests observe only its effect (recall-entry.payload-available = false, recall-error::consent-withheld); frame_bridge lowering elides it and lifting sets Full — a documented exception to 17-3b's lossless-frame contract. wit/spirit.wit and the pinned components are unchanged (D-17-8-01 A)"
+adr_ref = "ADR-012,ADR-013,ADR-034"
+status = "ratified"
+covered_changes = ["ConsentEnvelope.recall", "ConsentRecall"]
+ratified_at = "2026-10-20"

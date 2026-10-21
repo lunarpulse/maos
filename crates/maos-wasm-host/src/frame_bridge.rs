@@ -548,6 +548,10 @@ fn consent_from_wit(consent: wit::ConsentEnvelope) -> Result<domain::ConsentEnve
             .intent_class
             .map(maos_domain::invariants::i8::A2AIntent::new),
         valid_until_ns: consent.valid_until_ns,
+        // Story 17-8 D-17-8-01 A — the recall policy is daemon-side disclosure
+        // metadata elided from the WIT envelope (ratified exception to 17-3b's
+        // lossless frame contract); a lifted envelope carries the default.
+        recall: domain::ConsentRecall::Full,
     })
 }
 

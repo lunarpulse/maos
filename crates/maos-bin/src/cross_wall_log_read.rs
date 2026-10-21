@@ -1,7 +1,7 @@
-use maos_domain::log_recall::{LogRecallError, LogRecallFilter, LogRecallPage};
+use maos_domain::log_recall::{EmitterScopeReason, LogRecallError, LogRecallFilter, LogRecallPage};
 use maos_domain::ports::CrossWallLogReadPort;
 use maos_domain::team::TeamId;
-use maos_iac::adapter::log_recall::LogRecallAdapter;
+use maos_iac::adapter::log_recall::{LogRecallAdapter, PageScope};
 use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
 
 /// Composition-root adapter for consent-governed foreign-team audit reads.
@@ -64,7 +64,11 @@ impl CrossWallLogReadPort for CrossWallLogReadAdapter {
             ));
         }
 
+        // ADR-058 D2 / Story 17-8 D-17-8-04 A — a foreign artifact stays
+        // emitter-scoped and never reads the participant side tables, so shards
+        // with and without them both work; the page carries the marker.
         let reader = TransparencyLogAdapter::from_read_only_connection(conn);
-        LogRecallAdapter::query_page(&reader, spirit_pid, None, filter)
+        let scope = PageScope::Emitter(EmitterScopeReason::CrossWall);
+        LogRecallAdapter::query_page(&reader, spirit_pid, scope, filter)
     }
 }

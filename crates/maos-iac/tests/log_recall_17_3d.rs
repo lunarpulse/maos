@@ -3,9 +3,13 @@
 use std::sync::Arc;
 
 use maos_domain::invariants::{i1::TokenId, i3::FrameOrigin};
-use maos_domain::log_recall::{FrameKindLabel, LogRecallCursor, LogRecallError, LogRecallFilter};
+use maos_domain::log_recall::{
+    EmitterScopeReason, FrameKindLabel, LogRecallCursor, LogRecallError, LogRecallFilter,
+};
 use maos_domain::ports::LogRecallPort;
-use maos_iac::adapter::log_recall::{is_spirit_disclosable, BoundedFetch, LogRecallAdapter};
+use maos_iac::adapter::log_recall::{
+    is_spirit_disclosable, BoundedFetch, LogRecallAdapter, PageScope,
+};
 use maos_iac::adapter::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use rusqlite::{params, Connection};
 
@@ -382,7 +386,8 @@ fn maximum_metadata_page_over_megabyte_payloads_has_no_payload_projection() {
         .unwrap();
     assert_eq!(metadata.len(), 1024);
     assert!(metadata.iter().all(|entry| entry.payload_len == 1048576));
-    let page = LogRecallAdapter::query_page(&reader, 7, None, LogRecallFilter::default()).unwrap();
+    let scope = PageScope::Emitter(EmitterScopeReason::CrossWall);
+    let page = LogRecallAdapter::query_page(&reader, 7, scope, LogRecallFilter::default()).unwrap();
     assert_eq!(page.entries.len(), 1024);
     assert!(page.entries.iter().all(|entry| entry.payload_available));
     assert!(page.next_cursor.is_none());

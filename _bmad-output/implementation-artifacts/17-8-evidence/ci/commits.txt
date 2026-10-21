@@ -1,0 +1,3 @@
+12504614 12504614831ac8f4360dcc56e3e03021716f7240 tree=82045cbdd07b0de071fc84bfcfa4a52434087635 ci/17-8-verify c3: RESTORED — exact revert of the c2 plant (tree identical to c1)
+bdebbd4f bdebbd4f9e1e9b38e8090f1929a90528f03f0296 tree=622f0da7681f15fc1eedf6a3f63cc81808d7d935 ci/17-8-verify c2: PLANT — recipient recording disabled (exit line 2b must go red)
+2345fa4d 2345fa4dfa775632b88576d559741e9eb23eae40 tree=82045cbdd07b0de071fc84bfcfa4a52434087635 ci/17-8-verify c1: Story 17-8 candidate + throwaway verify workflow (D-17-8-05)

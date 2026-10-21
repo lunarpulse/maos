@@ -426,7 +426,13 @@ impl CrossWallLogReadPort for SucceedingCrossWallRead {
         _remote_team: &TeamId,
         _filter: LogRecallFilter,
     ) -> Result<LogRecallPage, LogRecallError> {
-        Ok(LogRecallPage::new(Vec::new(), None))
+        Ok(LogRecallPage::new(
+            Vec::new(),
+            None,
+            maos_domain::log_recall::RecallScope::Emitter {
+                reason: maos_domain::log_recall::EmitterScopeReason::CrossWall,
+            },
+        ))
     }
 }
 

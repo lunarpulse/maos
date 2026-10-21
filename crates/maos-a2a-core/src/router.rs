@@ -57,17 +57,15 @@ use std::sync::Arc;
 ///
 /// Fails CLOSED: if the system clock is unreadable (pre-epoch), returns
 /// `u64::MAX` so every bounded envelope is treated as expired rather than
-/// silently admitted.
+/// silently admitted. Story 17-8: the clock is the domain's
+/// [`consent_wall_now_ns`](maos_domain::frame::consent_wall_now_ns), shared with
+/// participant recall so intake and recall can never disagree on "expired".
 ///
 /// Determinism: tests that need a pinned "now" inject one via
 /// [`A2ARouterCore::with_pinned_consent_clock`]; this free fn is the production
 /// default (used only when no pin is set).
 fn wall_now_ns() -> u64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(u64::MAX)
+    maos_domain::frame::consent_wall_now_ns()
 }
 
 /// Internal A2A peer router trait — the loopback/cross-host routing surface.
@@ -1402,9 +1400,7 @@ impl A2ARouterCore {
             // (2a) Story 8.9 / AC2 (G1) — granter binding: the envelope's granter
             // MUST be the frame's own `from` (compare spirit_id AND host_id).
             // Closes stolen-envelope replay (granted by X, replayed from Y).
-            if envelope.granter.spirit_id != frame.from.spirit_id
-                || envelope.granter.host_id != frame.from.host_id
-            {
+            if !envelope.granted_by(&frame.from) {
                 let granter = format!(
                     "{}@{}",
                     envelope.granter.spirit_id.as_str(),
@@ -1439,7 +1435,7 @@ impl A2ARouterCore {
             // (2b) Expiry (G2 — the existing check, moved ahead of the allowlist).
             if let Some(valid_until_ns) = envelope.valid_until_ns {
                 let now_ns = self.consent_now_ns();
-                if now_ns > valid_until_ns {
+                if envelope.expired_at(now_ns) {
                     let data = serde_json::json!({
                         "expired_at_ns": valid_until_ns,
                         "now_ns": now_ns,
@@ -2247,6 +2243,7 @@ mod tests {
                 timestamp_ns: 0,
                 intent_class: Some(A2AIntent::new("standard")),
                 valid_until_ns: None,
+                recall: maos_domain::frame::ConsentRecall::Full,
             }),
             intent_lineage: IntentLineage::default(),
         }
@@ -2615,6 +2612,7 @@ mod tests {
             timestamp_ns: 0,
             intent_class: Some(A2AIntent::new("standard")),
             valid_until_ns: Some(valid_until_ns),
+            recall: maos_domain::frame::ConsentRecall::Full,
         });
         frame
     }

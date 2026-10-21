@@ -18,12 +18,13 @@ export function handleFrame(frame: IacFrame): IacFrame[] {
     halt("handleFrame called before onStart");
   }
 
-  // Recall is emitter-only in this daemon run, not participant-scoped yet.
+  // Recall lists frames this Spirit sent or received in this daemon run.
+  // Withheld frames are omitted; payload-available = false means header-only.
   recall({ limit: 16 });
   try {
-    // The operator seed's emitter is pid 0, so fetching it is scope-violation.
-    // Received frames become fetchable with
-    // 17-8-participant-recall-and-consent-envelopes; success is normal too.
+    // The --once operator seed is received by this Spirit, so fetch succeeds.
+    // consent-withheld means the granter's consent no longer permits payload
+    // disclosure (including header-only recall); scope-violation is normal too.
     fetch(frame.frameId);
   } catch (error) {
     // componentize-js wraps imported result errors in ComponentError.payload.
@@ -31,7 +32,9 @@ export function handleFrame(frame: IacFrame): IacFrame[] {
       typeof error !== "object" || error === null ||
       !("payload" in error) ||
       typeof error.payload !== "object" || error.payload === null ||
-      !("tag" in error.payload) || error.payload.tag !== "scope-violation"
+      !("tag" in error.payload) ||
+      (error.payload.tag !== "scope-violation" &&
+        error.payload.tag !== "consent-withheld")
     ) {
       throw error;
     }

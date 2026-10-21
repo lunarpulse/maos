@@ -67,10 +67,11 @@ and `fetch = true`. During `handleFrame`, the guest imports
 frame id before echoing the frame. These imports are available only during
 `handleFrame`, not lifecycle hooks.
 
-Recall is emitter-only within this daemon run today. The operator seed was
-emitted by pid 0, so its fetch returns `scope-violation`; this is an expected
-outcome, not a failed demo. Received frames become fetchable with
-`17-8-participant-recall-and-consent-envelopes`, so a successful fetch is also
-accepted. Imported result errors are thrown with the variant in `.payload`;
-only fetch's `scope-violation` is handled, while all recall errors and other
-fetch errors (including `capability-denied` and `unavailable`) propagate.
+Recall lists frames the Spirit sent or received in this daemon run, so fetching
+the received `--once` operator seed succeeds. Withheld frames are omitted from
+recall; `payload-available = false` means a header-only entry. A fetch returning
+`consent-withheld` means the granter's consent no longer permits payload disclosure
+(including header-only policy). Success, `scope-violation`, and `consent-withheld`
+are normal fetch outcomes. Imported result errors carry their variant in
+`.payload`; all recall errors and other fetch errors (including
+`capability-denied` and `unavailable`) propagate.

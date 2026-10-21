@@ -2486,6 +2486,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // pid — consistent with the rest of this composition root).
     let pid_by_spirit_id: Arc<std::sync::RwLock<std::collections::BTreeMap<String, u32>>> =
         Arc::new(std::sync::RwLock::new(std::collections::BTreeMap::new()));
+    // Story 17-8 AC2.3 — the ONE recipient resolver is the admitted-incarnation
+    // map itself (no second map): every routed write records only addressees
+    // admission put here, and every rupture names only those incarnations.
+    transparency_log
+        .install_recipient_resolver(Arc::clone(&pid_by_spirit_id) as _)
+        .map_err(|()| "transparency log recipient resolver installed twice")?;
     let digest_pid_map = Arc::clone(&pid_by_spirit_id);
     let digest_memory: Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync> =
         Arc::clone(&memory) as Arc<dyn maos_domain::ports::MemoryManagerPort + Send + Sync>;
@@ -12102,6 +12108,7 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         timestamp_ns: 0,
         intent_class: Some(A2AIntent::new("Diagnosis Handoff")), // spaces + caps
         valid_until_ns: None,
+        recall: maos_domain::frame::ConsentRecall::Full,
     };
     assert_accept_denied(
         &router,
@@ -12117,6 +12124,7 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         timestamp_ns: 0,
         intent_class: Some(A2AIntent::new("!invalid")),
         valid_until_ns: None,
+        recall: maos_domain::frame::ConsentRecall::Full,
     };
     match LocalRouter::route_outbound(
         &router,
@@ -12149,6 +12157,7 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         timestamp_ns: 0,
         intent_class: Some(A2AIntent::new(&oversized_intent)),
         valid_until_ns: None,
+        recall: maos_domain::frame::ConsentRecall::Full,
     };
     match LocalRouter::route_outbound(
         &router,

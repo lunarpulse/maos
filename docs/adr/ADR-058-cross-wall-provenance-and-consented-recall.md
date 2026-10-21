@@ -54,3 +54,9 @@ Distillation depth is explicitly **unbounded** at v2.2. The Spirit-side "halt-an
 - Story 13.6d closes success-side cross-wall disclosure and refusal journaling for this capability. It does not claim generic refusal journaling for unrelated capabilities.
 - Per-team TL isolation remains enforced on ordinary boot: a foreign `tenant_binding` is refused. Only the consent-governed read adapter may open the named foreign shard, and only read-only/NOFOLLOW.
 - No `maos-iac → maos-audit`, `maos-iac → maos-cohort`, or `maos-iac → maos-loom-lite` dependency edge is introduced. `TeamId`, the consent trait, and the remote-read port remain in `maos-domain`.
+
+## Implementation note — Story 17-8
+
+D2's cross-wall scope is unchanged: every remote page carries `RecallScope::Emitter { reason: CrossWall }`, including empty pages. The remote reader never reads participant or consent side tables, so shards with or without them remain readable. Local native and WASM recall now share participant scope through `MediatedLogRecall`; this does not map remote pids or boots to local admitted incarnations and does not widen cross-wall recall or fetch.
+
+Local `ConsentEnvelope.recall` is daemon-side (default `Full`, unknown → `Withheld`), not in WIT; guests observe only its effect. Expired/ruptured/withheld recipient frames are omitted, `HeaderOnly` lists `payload-available = false`, and fetch refuses both with `consent-withheld` and a `log.fetch.refused:consent-withheld` receipt. The lossless-frame exception is ratified as `17-8-consent-recall-policy`. **Production limits (AC3.6 / rule 11):** no production granter sets `HeaderOnly`/`Withheld`, no production `ConsentGate` is installed, envelope-bearing frames reach admitted local recipients only through A2A delegation intake, and peer-identity ruptures carry no envelope and withhold nothing. Native compiled-in bus sends journal at pid 0 (non-goal).
