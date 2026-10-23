@@ -614,4 +614,6 @@ Source: `../routing-audit-2026-10-22.md` — every row of the Recovery Coverage 
 | NFR-Onb-1/Test-8/J6 N=12 cohort | `ops-external-cohort-and-pen-test` (≥3) | unchanged — honest N recorded; N=12 is the GA clause |
 | FR47 for Workers | 17-1 | narrowed by ADR-061 (proxy is the Worker's sole egress); first-party Spirits stay on the Inference Port |
 | FR6 macOS/Windows caps; FR33 Python template | 17-2 / 17-3b | parked v1.5 (Windows = 10.5's phase; round-3 "Python later") |
-| FR48 crypto provider selection (PRD v0.5); FR64 cost dimensions (PRD v1.0); FR54 gateway contracts; NFR-Maint-1 ≤20 KLOC | later / v2.5 / 21-4 | **operator decision owed** (audit DECIDE-1..4) — the parking contradicts the PRD phase and has no DELTA |
+| FR48 crypto provider selection (PRD v0.5) + NFR-Sec-15 | later | **RULED 2026-10-23 (split):** `20-13-pluggable-crypto-provider-selection` (v1.0 — one operator selection point, every kernel FR48 surface through the selected provider, unknown provider refused at boot); FIPS 140-3 module → v1.5 (PRD DELTA-2026-10-23) |
+| NFR-Maint-1 ≤20 KLOC | 21-4 | **RULED 2026-10-23:** ADR-069 — `maos-kernel-core` ≤ 23,000 (alarm 22,000) through `v1.0.0` GA; 21-4 keeps the instrument/env-registry scope only |
+| FR64 cost dimensions (PRD v1.0); FR54 gateway contracts | later / v2.5 | **operator decision owed** (audit DECIDE-2/3) — the parking contradicts the PRD phase and has no DELTA |

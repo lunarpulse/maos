@@ -280,6 +280,59 @@ fn kernel_core_ceiling_has_not_moved_under_the_easing() {
     );
 }
 
+/// ADR-069 (operator-ratified 2026-10-23, routing-audit DECIDE-4): through
+/// `v1.0.0` GA the `maos-kernel-core` production-line ceiling may not exceed
+/// 23,000. Per-story FLAG-Winston grants still move the row (and the
+/// `RATIFIED_AT_EASING` figure above) one measured step at a time; this is the
+/// bound no grant may cross without a new operator decision.
+const ADR_069_ENVELOPE: i64 = 23_000;
+/// ADR-069 §3: the first grant above 22,000 acknowledges the alarm in the row.
+const ADR_069_ALARM: i64 = 22_000;
+
+fn kernel_core_row() -> (i64, String) {
+    let path = workspace_root().join("xtask/kloc.toml");
+    let text =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let line = text
+        .lines()
+        .find(|l| l.split('=').next().map(str::trim) == Some("maos-kernel-core"))
+        .expect("maos-kernel-core row in kloc.toml");
+    let (value, comment) = line
+        .split_once('=')
+        .map(|(_, rest)| rest.split_once('#').unwrap_or((rest, "")))
+        .expect("row has a value");
+    (
+        value
+            .trim()
+            .parse()
+            .expect("maos-kernel-core ceiling is an integer"),
+        comment.to_string(),
+    )
+}
+
+#[test]
+fn kernel_core_ceiling_stays_inside_the_adr_069_envelope() {
+    let (ceiling, _) = kernel_core_row();
+    assert!(
+        ceiling <= ADR_069_ENVELOPE,
+        "maos-kernel-core ceiling {ceiling} exceeds the ADR-069 envelope {ADR_069_ENVELOPE}. \
+         Beyond the envelope is a new operator decision (ADR-069 §4), not a FLAG-Winston grant."
+    );
+}
+
+#[test]
+fn crossing_the_adr_069_alarm_is_acknowledged_in_the_row() {
+    let (ceiling, comment) = kernel_core_row();
+    if ceiling > ADR_069_ALARM {
+        assert!(
+            comment.contains("ENVELOPE ALARM"),
+            "maos-kernel-core ceiling {ceiling} is above the ADR-069 alarm {ADR_069_ALARM}; the \
+             row's HISTORY text must carry `ENVELOPE ALARM` and the story's FLAG-Winston record \
+             must state the remaining envelope and the 21-5 promotion decision (ADR-069 §3)."
+        );
+    }
+}
+
 /// The lane is not sealed yet — and when it is, this test is the notice. Mirrors
 /// the D11 ratchet's tree-bound freeze so the seal cannot be missed.
 #[test]

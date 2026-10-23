@@ -65,10 +65,10 @@ Totals after ADD: E17 14 · E18 7 · E19 6 · E20 11 · E21 8 (remaining backlog
 
 ## 4. DECIDE — operator rulings needed (PRD phase vs. ratified parking)
 
-1. **FR48 operator-selectable crypto provider** — parked "later (post-v1.0)" (`requirements-inventory.md:564`); the PRD lists it in the v0.5 phase. Options: (a) ratify post-v1.0 as a DELTA in the PRD, (b) add `20-12-pluggable-crypto-selection`.
-2. **FR64 cost-attribution dimensions** — parked "later" (`:570`); PRD phase v1.0 (`functional-requirements.md:122`). Options: (a) DELTA to v1.5, (b) add `20-13-complete-cost-attribution`.
+1. **FR48 operator-selectable crypto provider** — parked "later (post-v1.0)" (`requirements-inventory.md:564`); the PRD lists it in the v0.5 phase. Options: (a) ratify post-v1.0 as a DELTA in the PRD, (b) add a pluggable-crypto story. **RULED 2026-10-23 (operator): split** — v1.0 = one operator selection point + every kernel FR48 surface routed through the selected provider (story `20-13-pluggable-crypto-provider-selection`); the FIPS 140-3 module (NFR-Sec-15's "validated default option") = v1.5 (PRD DELTA-2026-10-23).
+2. **FR64 cost-attribution dimensions** — parked "later" (`:570`); PRD phase v1.0 (`functional-requirements.md:122`). Options: (a) DELTA to v1.5, (b) add `20-14-complete-cost-attribution` (renumbered 2026-10-23: `20-13` is the FR48 story).
 3. **FR54 gateway connector contracts** — the v2.5 label parks kernel machinery (lifecycle + scope contracts for manifest gateways), not only ecosystem adoption. Options: (a) keep v2.5, (b) `21-9-gateway-submodule-contracts`.
-4. **NFR-Maint-1 / PRD ≤20 KLOC trusted core** — kernel-core is 20,538 with zero headroom; 17-11, 18-5, 18-6, 19-5, 20-8, 20-9, 21-6 are unpriced ◆ FLAG-Winston. Options: (a) ADR re-ratifying the ceiling (ADR-057 already moved the crate-set figure to ≤25K), (b) promote 21-5 negative extraction from optional to required before 21-6.
+4. **NFR-Maint-1 / PRD ≤20 KLOC trusted core** — kernel-core is 20,538 with zero headroom; 17-11, 18-5, 18-6, 19-5, 20-8, 20-9, 21-6 are unpriced ◆ FLAG-Winston. Options: (a) ADR re-ratifying the ceiling (ADR-057 already moved the crate-set figure to ≤25K), (b) promote 21-5 negative extraction from optional to required before 21-6. **RULED 2026-10-23 (operator): (a) increase** — `docs/adr/ADR-069-kernel-core-envelope-through-v1.md`: `maos-kernel-core` ≤ 23,000, alarm 22,000, through `v1.0.0` GA; zero headroom and per-story grants unchanged; enforced by `xtask/tests/recovery_lane_ceiling_rule.rs`; `21-5` stays optional until the alarm fires.
 5. **Journey reductions (J3/J4/Reza hermetic scenes)** — the lane defines them as fixture/nightly mechanism scenes with live runs on the operator lane. This is by design (confidence rule 2); it is recorded here so the v1.0-rc ledger says "mechanism-proven, live on operator lane", not "reproducible by an 8-person team".
 
 ## 5. Routing corrections applied to the inventory
@@ -125,7 +125,7 @@ See `epics/requirements-inventory.md` § "Routing audit corrections (2026-10-22)
 | FR36 | Authenticated install verifies signatures, trust floors, claims | 20-1 | PARTIAL: authenticated control-plane install | `epic-20:76,79` | widen `20-1` |
 | FR37 | Signed, journaled vetting promotion with revocation semantics | 20-1 | PARTIAL: lapse/revocation consequences tracker-only | `epic-20:77-78`; `sprint-status.yaml:289` | widen `20-1` |
 | FR59 | Yanks synchronize ≤5 min with operator policy | 20-1 | PARTIAL: bounded sync, vetter-origin propagation | `epic-20:78` | widen `20-1` |
-| FR48 | Operator-selectable crypto across three surfaces | later | PARKED; PRD v0.5 | `requirements-inventory.md:564`; `functional-requirements.md:116` | DECIDE-1 |
+| FR48 | Operator-selectable crypto across three surfaces | later | PARKED; PRD v0.5 | `requirements-inventory.md:564`; `functional-requirements.md:116` | DECIDE-1 → RULED split: `20-13` (v1.0 mechanism), FIPS module v1.5 |
 | FR54 | Gateway lifecycle and scope contracts | v2.5 | PARKED; parks kernel machinery | `requirements-inventory.md:565`; `functional-requirements.md:68,119` | DECIDE-3 |
 | FR64 | Cost attribution by Spirit/task/principal | later | PARKED; PRD v1.0 | `requirements-inventory.md:570`; `functional-requirements.md:122` | DECIDE-2 |
 | NFR-Sec-5 | 24 h manifest fuzz | 20-3a; 20-5 | OWNED | `20-3a-gate-honesty.md:92` | none |
@@ -135,7 +135,7 @@ See `epics/requirements-inventory.md` § "Routing audit corrections (2026-10-22)
 | NFR-Test-8 | Twelve externals ship ten signed Spirits | ops-external-cohort | PARTIAL | `non-functional-requirements.md:85` | widen ops row |
 | NFR-Sec-13 | 3-/10-host rotation loses no conversations | 21-3 | PARTIAL: no scale/percentile acceptance | `epic-21:73`; `14-2d…md:416-430` | widen `21-3` |
 | NFR-Rel-6 | Restart invalidates TOFU until re-pin | 21-3 | OWNED | `epic-21:72` | none |
-| NFR-Maint-1 | Trusted core ≤20 KLOC | 21-4 | PARTIAL: instrument, not bound | `epic-21:83-87`; `07-nfr-scout.md:7` | DECIDE-4 |
+| NFR-Maint-1 | Trusted core ≤20 KLOC | 21-4 | PARTIAL: instrument, not bound | `epic-21:83-87`; `07-nfr-scout.md:7` | DECIDE-4 → RULED: ADR-069 envelope ≤23,000 |
 | NFR-Ops-12 | Air-gapped substrate runs and journals | 20-2 | PARTIAL: witness runs `--version` only | `epic-20:84`; `tests/air-gap-netns-corroborate.sh:51-55` | widen `20-2` |
 | J3 | Eight-host digest and conflict halts | 21-2 | PARTIAL: fixture regeneration | `epic-21:64-65`; `user-journeys.md:205-225` | widen `21-2`; DECIDE-5 |
 | J4 | Cross-host diagnosis to deployed fix ≤90 min | 21-1 | PARTIAL: same-process; proposal = fix | `epic-21:54,56`; `user-journeys.md:169-195` | widen `21-1`; DECIDE-5 |
