@@ -1,0 +1,47 @@
+--- a/crates/maos-kernel-core/src/capability/cap_policy/mod.rs
++++ b/crates/maos-kernel-core/src/capability/cap_policy/mod.rs
+@@ -161,7 +161,7 @@
+         let scope_match = manifest
+             .scopes
+             .iter()
+-            .any(|s| std::mem::discriminant(s) == std::mem::discriminant(&capability.scope));
++            .any(|s| entitles(s, &capability.scope));
+         if !scope_match {
+             return PolicyDecision::Deny;
+         }
+@@ -374,6 +374,35 @@
+     }
+ }
+ 
++/// Story 17-11 — `true` when the *declared* `declared` scope entitles
++/// `requested` at issuance. `FsRead`/`FsWrite` admit the declared subtree or a
++/// path beneath it by lexical comparison (a `..` component on either side or an
++/// absolute/relative mismatch refuses; symlinks are never resolved here); every
++/// other variant matches only an equal scope, selectors included.
++fn entitles(declared: &Scope, requested: &Scope) -> bool {
++    match (declared, requested) {
++        (Scope::FsRead { subtree: d }, Scope::FsRead { subtree: r })
++        | (Scope::FsWrite { subtree: d }, Scope::FsWrite { subtree: r }) => {
++            subtree_contains(d, r)
++        }
++        _ => declared == requested,
++    }
++}
++
++/// Lexical, allocation-free subtree containment (Story 17-11).
++fn subtree_contains(declared: &str, requested: &str) -> bool {
++    fn parts(p: &str) -> impl Iterator<Item = &str> {
++        p.split('/').filter(|c| !c.is_empty() && *c != ".")
++    }
++    if declared.starts_with('/') != requested.starts_with('/')
++        || parts(declared).chain(parts(requested)).any(|c| c == "..")
++    {
++        return false;
++    }
++    let mut r = parts(requested);
++    parts(declared).all(|d| r.next() == Some(d))
++}
++
+ /// Strictest of three sandbox tiers.
+ pub fn strictest_of(a: SandboxTier, b: SandboxTier, c: SandboxTier) -> SandboxTier {
+     SandboxTier(a.0.max(b.0).max(c.0))

@@ -1,0 +1,14 @@
+{
+  "passed": false,
+  "actual-lines": 26361,
+  "pinned-lines": 26361,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 95,
+  "set-hash": "45b89741e6752f460a90346173f15823fdae42f2ef44b802fdc0fbd3436206d8",
+  "pinned-set-hash": "2588fa58f92cbbec2af3337d033eb7e94538b96e27bd0863fb7a167dafb284ec",
+  "changed": [
+    "capability/cap_policy/mod.rs"
+  ],
+  "added": [],
+  "removed": []
+}

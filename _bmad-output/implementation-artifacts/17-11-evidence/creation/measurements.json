@@ -1,0 +1,98 @@
+{
+  "story": "17-11-scope-selector-entitlement",
+  "measured": "2026-10-23",
+  "head": "8e93ffad",
+  "method": "in-place prototype (proof-contract.md:24-26), cargo fmt --all clean for src (only the prototype test file reformatted), tokei 14.0.0 via `cargo run -p xtask -- kloc-check --json`; physical via `check-kernel-baseline --json` / `--emit-pin`; prototype removed with `git checkout -- <files>` + rm of the prototype test; `git diff --quiet HEAD -- crates xtask spirits` exit 0",
+  "option_A": {
+    "diff": "prototype-A.diff",
+    "sha256": "2ff00dfc6c0e1509e67c49919b5b2d42ab6ff307e3b7410a2d67cbb407d3353d",
+    "files": [
+      "crates/maos-domain/src/invariants/i1.rs (+31: Scope::entitles + subtree_contains)",
+      "crates/maos-kernel-core/src/capability/cap_policy/mod.rs (comment 2 lines reworded; closure body changed; 670 -> 670 lines)",
+      "crates/maos-domain/tests/scope_entitles_17_11.rs (prototype vectors, tokei-excluded)"
+    ],
+    "kernel_physical": {
+      "before": 26361,
+      "after": 26361,
+      "delta": 0,
+      "file_set_entries": 95,
+      "cap_policy_digest_before": "6deb125b813c2f291cfa4519f299244889090f47ee5f08e352acd82222790acb",
+      "cap_policy_digest_after": "6276a69fff48fb56beb0ca7a28f28422145cbb0249ade07b0d5ba5356f9e2a37",
+      "set_hash_before": "2588fa58f92cbbec2af3337d033eb7e94538b96e27bd0863fb7a167dafb284ec",
+      "set_hash_after": "45b89741e6752f460a90346173f15823fdae42f2ef44b802fdc0fbd3436206d8"
+    },
+    "tokei": {
+      "maos-kernel-core": {
+        "before": 20594,
+        "after": 20594,
+        "delta": 0
+      },
+      "maos-domain": {
+        "before": 9713,
+        "after": 9736,
+        "delta": 23
+      },
+      "maos-capability": {
+        "before": 1347,
+        "after": 1347,
+        "delta": 0
+      },
+      "maos-bin": {
+        "before": 27614,
+        "after": 27614,
+        "delta": 0
+      },
+      "maos-manifest": {
+        "before": 4496,
+        "after": 4496,
+        "delta": 0
+      }
+    },
+    "aggregate": {
+      "before": 181231,
+      "after": 181254,
+      "hardfail_row": 181232
+    },
+    "kloc_over_budget_on_prototype": [
+      "aggregate 181254 >= 181232",
+      "maos-domain 9736 > 9713"
+    ],
+    "check_service_boundary": "PASSED (0 violations)"
+  },
+  "option_B": {
+    "diff": "option-B-sizing.diff",
+    "sha256": "c30f566914f497200ce5b46ab614dc6b7c3e683cf47f89c8d272cd40a69fe1ed",
+    "method": "same rule as private fns in cap_policy/mod.rs, sized offline with tokei on a copy (not built; not recommended)",
+    "cap_policy_physical": {
+      "before": 670,
+      "after": 699,
+      "delta": 29
+    },
+    "cap_policy_tokei": {
+      "before": 495,
+      "after": 516,
+      "delta": 21
+    },
+    "kernel_physical_after": 26390,
+    "kernel_tokei_after": 20615,
+    "maos_domain_delta": 0
+  },
+  "adr_069": {
+    "row": 20594,
+    "envelope": 23000,
+    "remaining": 2406,
+    "alarm": 22000,
+    "to_alarm": 1406
+  },
+  "suites_on_prototype_A": {
+    "nextest -p maos-domain -p maos-kernel-core -p maos-capability -p maos-pdp -p maos-manifest": "944 passed, 4 skipped (prototype-A-nextest-core.log)",
+    "cargo test -p maos-kernel-core --lib": "258 passed (prototype-A-kernel-lib.log)",
+    "nextest -p maos-bin --features network,wasm-host (MAOS_17_2_CGROUP_MODE=undelegated)": "560 run: 553 passed, 7 failed, 14 skipped (prototype-A-nextest-bin.log)",
+    "nextest -p maos-wasm-host -p maos-shell -p butler -p researcher -p maos-iac": "372 passed, 2 skipped (prototype-A-nextest-other.log)",
+    "nextest -p maos-journey-test -p maos-cli": "run 1: 199 passed, 2 failed (maos-cli door tests); rerun on the same prototype: 201 passed -> flakes, not regressions (prototype-A-nextest-journey*.log)"
+  },
+  "head_controls": {
+    "the 7 maos-bin reds at HEAD": "7 passed (head-8e93ffad-the-seven.log)",
+    "the 2 maos-cli reds at HEAD": "2 passed (head-8e93ffad-maos-cli-two.log); full -p maos-journey-test -p maos-cli 201 passed (head-8e93ffad-nextest-journey.log)"
+  }
+}

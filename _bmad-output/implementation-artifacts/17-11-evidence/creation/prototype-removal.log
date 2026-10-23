@@ -1,0 +1,8 @@
+2026-10-23 — prototype A removed after measurement and the regression runs (applied three times in place: measurement + suites,
+journey/cli rerun, check-service-boundary; removed after each):
+  git checkout -- crates/maos-domain/src/invariants/i1.rs crates/maos-kernel-core/src/capability/cap_policy/mod.rs
+  rm crates/maos-domain/tests/scope_entitles_17_11.rs
+  git checkout -- _bmad-output/implementation-artifacts/intent-lineage-coverage-report.md   # test-run append (17-9 Debug Log trap)
+  git diff --quiet HEAD -- crates xtask spirits   -> exit 0
+  git status --short -> only untracked evidence dirs (17-10-evidence/ belongs to the 17-10 creator, 17-11-evidence/ is this story's)
+The prototype is preserved only as `prototype-A.diff` (sizing instrument, not text to paste).

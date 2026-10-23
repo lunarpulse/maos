@@ -1,0 +1,134 @@
+diff --git a/crates/maos-domain/src/invariants/i1.rs b/crates/maos-domain/src/invariants/i1.rs
+index 2e3d8889..73be5f5d 100644
+--- a/crates/maos-domain/src/invariants/i1.rs
++++ b/crates/maos-domain/src/invariants/i1.rs
+@@ -130,6 +130,37 @@ pub enum Scope {
+     LoomScan,
+ }
+ 
++impl Scope {
++    /// Story 17-11 — `true` when this *declared* scope entitles `requested` at
++    /// issuance. `FsRead`/`FsWrite` admit the declared subtree or a path beneath
++    /// it by lexical comparison (a `..` component on either side or an
++    /// absolute/relative mismatch refuses; symlinks are never resolved here);
++    /// every other variant matches only an equal scope, selectors included.
++    pub fn entitles(&self, requested: &Scope) -> bool {
++        match (self, requested) {
++            (Scope::FsRead { subtree: d }, Scope::FsRead { subtree: r })
++            | (Scope::FsWrite { subtree: d }, Scope::FsWrite { subtree: r }) => {
++                subtree_contains(d, r)
++            }
++            _ => self == requested,
++        }
++    }
++}
++
++/// Lexical, allocation-free subtree containment (Story 17-11).
++fn subtree_contains(declared: &str, requested: &str) -> bool {
++    fn parts(p: &str) -> impl Iterator<Item = &str> {
++        p.split('/').filter(|c| !c.is_empty() && *c != ".")
++    }
++    if declared.starts_with('/') != requested.starts_with('/')
++        || parts(declared).chain(parts(requested)).any(|c| c == "..")
++    {
++        return false;
++    }
++    let mut r = parts(requested);
++    parts(declared).all(|d| r.next() == Some(d))
++}
++
+ /// Intent classification for approval policy.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+ pub enum IntentClass {
+diff --git a/crates/maos-kernel-core/src/capability/cap_policy/mod.rs b/crates/maos-kernel-core/src/capability/cap_policy/mod.rs
+index 3bfc8ad8..5ba56f8e 100644
+--- a/crates/maos-kernel-core/src/capability/cap_policy/mod.rs
++++ b/crates/maos-kernel-core/src/capability/cap_policy/mod.rs
+@@ -156,12 +156,12 @@ impl PolicyTable {
+             None => return PolicyDecision::Deny,
+         };
+ 
+-        // Scope-match check: the requested capability must be in the
+-        // Spirit's declared manifest scopes.
++        // Scope-match check (Story 17-11): a declared manifest scope must
++        // entitle the requested scope, selector included (`Scope::entitles`).
+         let scope_match = manifest
+             .scopes
+             .iter()
+-            .any(|s| std::mem::discriminant(s) == std::mem::discriminant(&capability.scope));
++            .any(|s| s.entitles(&capability.scope));
+         if !scope_match {
+             return PolicyDecision::Deny;
+         }
+diff --git a/crates/maos-domain/tests/scope_entitles_17_11.rs b/crates/maos-domain/tests/scope_entitles_17_11.rs
+new file mode 100644
+index 00000000..54309d43
+--- /dev/null
++++ b/crates/maos-domain/tests/scope_entitles_17_11.rs
+@@ -0,0 +1,66 @@
++//! Story 17-11 creation prototype — `Scope::entitles` vectors (removed after measurement).
++
++use maos_domain::invariants::i1::Scope;
++
++fn fs(s: &str) -> Scope {
++    Scope::FsRead { subtree: s.into() }
++}
++
++#[test]
++fn fs_subtree_containment() {
++    let d = fs("/data/project");
++    for ok in [
++        "/data/project",
++        "/data/project/",
++        "/data/project/a/b",
++        "/data//project/./a",
++    ] {
++        assert!(d.entitles(&fs(ok)), "{ok}");
++    }
++    for no in [
++        "/data/projectX",
++        "/data",
++        "/",
++        "/data/project/../secret",
++        "/data/project/a/../../x",
++        "data/project",
++        "/other",
++        "",
++    ] {
++        assert!(!d.entitles(&fs(no)), "{no}");
++    }
++    assert!(!fs("/data/../etc").entitles(&fs("/etc/passwd")));
++    assert!(fs("rel").entitles(&fs("rel/x")));
++    assert!(!fs("rel").entitles(&fs("/rel/x")));
++    assert!(!fs("/data").entitles(&Scope::FsWrite {
++        subtree: "/data".into()
++    }));
++}
++
++#[test]
++fn identifiers_are_exact() {
++    let m = |s: &str, t: &str| Scope::McpCall {
++        server: s.into(),
++        tool: t.into(),
++    };
++    assert!(m("fs", "read").entitles(&m("fs", "read")));
++    assert!(!m("fs", "read").entitles(&m("fs", "write")));
++    assert!(!m("fs", "read").entitles(&m("gh", "read")));
++    let n = |d: &str| Scope::NetHttps { domain: d.into() };
++    assert!(n("api.example.com").entitles(&n("api.example.com")));
++    assert!(!n("example.com").entitles(&n("api.example.com")));
++    assert!(!n("*.example.com").entitles(&n("api.example.com")));
++    let i = |p: &str| Scope::IacSend {
++        peer_class: p.into(),
++    };
++    assert!(!i("butler").entitles(&i("researcher")));
++    assert!(Scope::LoomRead.entitles(&Scope::LoomRead));
++    assert!(!Scope::LoomRead.entitles(&Scope::LoomWrite));
++    let c = |h: u8| Scope::CliSubprocessSpawn {
++        cli_binary_path: "/usr/bin/git".into(),
++        argv_prefix_hash: [h; 32],
++        output_shape_version: "1".into(),
++    };
++    assert!(c(1).entitles(&c(1)));
++    assert!(!c(1).entitles(&c(2)));
++}

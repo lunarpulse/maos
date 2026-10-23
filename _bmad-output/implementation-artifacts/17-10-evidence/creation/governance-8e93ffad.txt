@@ -1,0 +1,18 @@
+17-10 creation — governance measurements at HEAD 8e93ffad (2026-10-23). No cargo was run (one cargo session per host).
+
+$ tokei --version
+tokei 14.0.0 compiled with serialization support: json        # the CI pin (xtask/src/kloc_check.rs:282-292)
+
+# Same exclusion set as `kloc-check` (xtask/src/kloc_check.rs:294-318), per crate:
+$ tokei --output json --types Rust -e target -e tests -e benches -e examples -e fuzz -e spirits crates/maos-bin
+code 27614                                          # ceiling xtask/kloc.toml:517 = 27614 -> ZERO HEADROOM
+  crates/maos-bin/src/escape_detector_consumer.rs 59
+  crates/maos-bin/src/lib.rs 40
+
+$ tokei --output json --types Rust -e target -e tests -e benches -e examples -e fuzz -e spirits crates/maos-escape-detector
+code 284                                            # ceiling xtask/kloc.toml:671 = 376 -> headroom 92
+  crates/maos-escape-detector/src/lib.rs 265
+  crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/src/main.rs 19
+
+Kernel: 17-10 touches no file under crates/maos-kernel-core/src (kernel-Δ 0; ADR-069 envelope untouched).
+maos-bin: request measured at landing (RECOVERY-LANE CEILING RULE, xtask/kloc.toml:60-70, 86-95).
