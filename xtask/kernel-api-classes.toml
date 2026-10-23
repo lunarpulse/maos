@@ -131,9 +131,16 @@
 "maos_kernel_core::capability::cap_audit::Sender"                 = "data-movement"
 "maos_kernel_core::capability::cap_audit::CapAuditWriter"         = "supervision"
 
-# cap_quota sub-module
+# cap_quota sub-module (Story 17-9: per-window issuance quota)
 "maos_kernel_core::capability::cap_quota::CapQuotaTracker"        = "universal-arithmetic"
-"maos_kernel_core::capability::cap_quota::QuotaState"             = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::IssuanceQuota"          = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::DEFAULT_ISSUANCE_QUOTA" = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::QuotaClock"             = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::QuotaSignal"            = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::Charge"                 = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::Committed"              = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::Signals"                = "universal-arithmetic"
+"maos_kernel_core::capability::cap_quota::Exhausted"              = "universal-arithmetic"
 
 # Journal error type — supervision (audit log error)
 "maos_kernel_core::journal::JournalError"                         = "supervision"

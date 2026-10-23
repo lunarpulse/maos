@@ -1,0 +1,16 @@
+# 17-9 creation — prototype K applied to detached worktree of 3a7c4260; cargo test --offline --locked -p maos-audit -p maos-capability -p maos-kernel-core --no-fail-fast (stdout)
+# prototype-K.diff sha256 724029047026514bc6a4823386ef0b133d5dc6f93c6febce2d7f76843edb6f58; rustc 1.98.1 (48a229cea 2026-09-01)
+# suites ok: 127
+test result: FAILED. 16 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+# failing tests:
+thread 'every_writer_site_demanding_a_disposition_has_one' (579961) panicked at crates/maos-audit/tests/fr4_classifier_16_2.rs:867:9:
+thread 'native_child_is_placed_before_guest_and_resource_limits_bite' (582120) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:235:10:
+thread 'killed_leader_cleanup_kills_its_surviving_descendant' (582119) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:562:46:
+thread 'creation_limit_write_and_exec_failures_release_owned_leaves' (582118) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:343:6:
+thread '<unnamed>' (582123) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:297:14:
+thread '<unnamed>' (582124) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:301:14:
+thread 'same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves' (582121) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:303:26:
+thread 'verified_t3_applies_nonroot_namespace_and_argv_environment_custody' (583131) panicked at crates/maos-kernel-core/tests/../../../tests/harness/t3_substrate.rs:19:5:
+# Host-prerequisite failures (not K): cgroup_ceiling_smoke (cgroup2 not delegated on this host) and t3_substrate.rs:19 (MAOS_T3_RUNTIME unset) — same set as 17-8 Debug Log :405. New failure caused by K: fr4_classifier_16_2::every_writer_site_demanding_a_disposition_has_one (see fr4-doorbell-on-K.log).

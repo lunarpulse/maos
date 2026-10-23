@@ -19,7 +19,10 @@ use maos_kernel_core::security::SecurityManagerAdapter;
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::{
+    atomic::{AtomicU64, AtomicUsize, Ordering},
+    Arc, LazyLock, RwLock,
+};
 use std::time::Duration;
 const NONCE: u64 = 0x17_03_d;
 const ID: &str = "recall-probe";
@@ -89,6 +92,7 @@ struct World {
     root: maos_bin::supervision::RootSupervision,
     lookup: Arc<RwLock<BTreeMap<String, u32>>>,
     audit_writer: tokio::task::JoinHandle<()>,
+    _precharge: Option<maos_kernel_core::capability::cap_quota::Charge>,
 }
 
 impl World {
@@ -97,13 +101,30 @@ impl World {
     }
 
     fn with_quota(dir: &Path, exhausted: bool) -> Self {
+        use maos_kernel_core::capability::cap_quota::{CapQuotaTracker, IssuanceQuota};
+        let quota = if exhausted {
+            CapQuotaTracker::with_clock(
+                IssuanceQuota {
+                    budget_per_window: 1,
+                    window: Duration::from_secs(3600),
+                },
+                Arc::new(QuotaClock::default()),
+            )
+        } else {
+            CapQuotaTracker::new()
+        };
+        Self::with_tracker(dir, quota, exhausted)
+    }
+
+    fn with_tracker(
+        dir: &Path,
+        quota: maos_kernel_core::capability::cap_quota::CapQuotaTracker,
+        exhausted: bool,
+    ) -> Self {
         let seams = maos_bin::supervision::SupervisorSeams::default();
-        let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
-        if exhausted {
-            // Admission allocates pid 1 in a new scheduler. Charge below the
-            // exclusive exhaustion threshold; the next issuance must refuse.
-            quota.check_and_increment(1, 999_999, 1_000_000).unwrap();
-        }
+        // A fresh child process admits pid 1. Retain its sole reservation for
+        // the World's lifetime so the next issuance refuses before rollover.
+        let precharge = exhausted.then(|| quota.charge(1).unwrap());
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let tl = Arc::new(
             TransparencyLogAdapter::open(&dir.join("transparency.sqlite"), NONCE).unwrap(),
@@ -201,6 +222,7 @@ impl World {
             root,
             lookup,
             audit_writer,
+            _precharge: precharge,
         }
     }
 
@@ -248,6 +270,7 @@ impl World {
             lookup,
             audit_writer,
             root,
+            _precharge: _,
         } = self;
         root.stop_and_join().await;
         drop((
@@ -666,38 +689,75 @@ async fn exhausted_quota_has_receipt_without_tokenless_fallback_call() {
     if !t2_available() {
         return;
     }
-    // Scheduler pid allocation is process-global. A fresh test process makes
-    // the pre-construction quota charge target the first actual admitted pid.
+    // Scheduler pid allocation is process-global. Each operation gets its own
+    // fresh process, scheduler, registry, reservation and journal.
     const CHILD: &str = "MAOS_17_3D_QUOTA_CHILD";
-    if std::env::var_os(CHILD).is_none() {
-        let out = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "exhausted_quota_has_receipt_without_tokenless_fallback_call",
-                "--nocapture",
-            ])
-            .env(CHILD, "1")
-            .output()
-            .unwrap();
-        relay_child(&out);
-        assert!(out.status.success());
+    let Ok(op) = std::env::var(CHILD) else {
+        for op in ["recall", "fetch"] {
+            let out = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "exhausted_quota_has_receipt_without_tokenless_fallback_call",
+                    "--nocapture",
+                ])
+                .env(CHILD, op)
+                .output()
+                .unwrap();
+            relay_child(&out);
+            assert!(out.status.success(), "{op} exhaustion child");
+        }
         return;
-    }
+    };
     let dir = tempfile::tempdir().unwrap();
     let world = World::with_quota(dir.path(), true);
-    if let Some((pid, report)) = once(&world, true, "recall").await {
-        assert_eq!(pid, 1, "pre-charge the actual admitted pid");
-        assert_eq!(report, "recall err capability-denied\n");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut deps = world.session();
+    deps.log_recall = Arc::new(
+        maos_iac::adapter::log_recall::LogRecallAdapter::new(Arc::clone(&world.tl))
+            .with_consent_clock({
+                let calls = Arc::clone(&calls);
+                Arc::new(move || {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    maos_domain::frame::consent_wall_now_ns()
+                })
+            }),
+    );
+    let _collector = world
+        .iac
+        .register_spirit_typed(&SpiritId::from("collector"))
+        .unwrap();
+    let (core, admitted) = admit(&world, &manifest(true)).await;
+    let pid = admitted.pid;
+    assert_eq!(pid, 1, "pre-charge the actual admitted pid");
+    let script = if op == "fetch" {
+        "fetch self"
+    } else {
+        "recall"
+    };
+    if t2_result(run_admitted_session(deps, admitted, core, launch(input(script), true)).await)
+        .is_some()
+    {
+        assert_eq!(
+            claim_reports(&world, pid),
+            vec![format!("{op} err capability-denied\n")],
+            "guest-visible denial contains no pid, budget or window"
+        );
         let ops = operations(&world, pid);
         assert_eq!(ops.len(), 1);
         assert_row(
             &ops[0],
             pid,
             28,
-            "log.recall.refused:capability-denied",
+            &format!("log.{op}.refused:capability-denied"),
             false,
         );
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "exhaustion never invokes the adapter"
+        );
     }
+    drop(_collector);
     world.drain().await;
 }
 
@@ -1256,5 +1316,116 @@ async fn checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4(
     )
     .await
     .had_failures());
+    world.drain().await;
+}
+
+#[derive(Debug, Default)]
+struct QuotaClock(AtomicU64);
+
+impl maos_kernel_core::capability::cap_quota::QuotaClock for QuotaClock {
+    fn now_ns(&self) -> u64 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn kernel_quota_rows_and_mcp_refusals_never_cross_the_guest_recall_boundary() {
+    use maos_kernel_core::capability::cap_quota::{CapQuotaTracker, IssuanceQuota};
+    if !t2_available() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(QuotaClock::default());
+    let quota = CapQuotaTracker::with_clock(
+        IssuanceQuota {
+            budget_per_window: 8,
+            window: Duration::from_secs(1),
+        },
+        Arc::clone(&clock) as _,
+    );
+    let world = World::with_tracker(dir.path(), quota.clone(), false);
+    let mut telemetry = world.iac.mailbox().subscribe_telemetry();
+    let _collector = world
+        .iac
+        .register_spirit_typed(&SpiritId::from("collector"))
+        .unwrap();
+    let (core, admitted) = admit(&world, &manifest(true)).await;
+    let pid = admitted.pid;
+    let reservations: Vec<_> = (0..8).map(|_| quota.charge(pid).unwrap()).collect();
+    assert!(matches!(
+        world.capability.issue_with_mediation(pid, Scope::LogRecall, 60, [0; 32], IntentClass::Standard),
+        Err(maos_domain::ports::capability::CapError::IssuanceQuotaExhausted { spirit_id }) if spirit_id == pid
+    ));
+    assert!(matches!(
+        maos_bin::worker_spawn::issue_governed_mcp_capability(
+            &world.capability,
+            None,
+            None,
+            &world.tl,
+            pid,
+            ID,
+            "denied-server",
+            "denied-tool",
+            [0; 32],
+        ),
+        Err(maos_bin::worker_spawn::GovernedMintError::KernelPolicyDenied)
+    ));
+    // The persisted audit row is the synchronization barrier, not elapsed time.
+    let private = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let private: Vec<_> = rows(&world, pid)
+                .into_iter()
+                .filter(|row| {
+                    row.intent == "cap.quota:exhausted"
+                        || row.intent == "mcp.call.refused:capability-denied"
+                })
+                .collect();
+            if private.len() == 2 {
+                break private;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("real quota audit writer persists before the guest turn");
+    for row in &private {
+        assert_eq!(row.capability_token, None);
+        assert_eq!(row.origin, FrameOrigin::Kernel);
+    }
+    drop(reservations);
+    clock.0.store(1_000_000_000, Ordering::SeqCst);
+    let script = format!(
+        "recall\nfetch {}\nfetch {}",
+        hex::encode(private[0].frame_id),
+        hex::encode(private[1].frame_id)
+    );
+    let seed = input(&script);
+    let seed_id = seed.frame_id;
+    if t2_result(run_admitted_session(world.session(), admitted, core, launch(seed, true)).await)
+        .is_some()
+    {
+        let seed = world.tl.query_frame_by_id(seed_id).unwrap().unwrap();
+        let emitted = next_report(&world, pid, &mut telemetry).await;
+        assert_eq!(
+            data(&emitted),
+            format!("recall ok 1 cursor=none\nentry {} {} TaskAssign {} true\nfetch err scope-violation\nfetch err scope-violation\n",
+                hex::encode(seed.frame_id), seed.timestamp_ns, hex::encode(seed.intent.as_bytes())),
+            "neither operator-only metadata nor either payload reaches the guest"
+        );
+        let ops = operations(&world, pid);
+        assert_eq!(ops.len(), 5);
+        assert_row(&ops[0], pid, 7, "log.recall", true);
+        for pair in ops[1..].chunks_exact(2) {
+            assert_row(&pair[0], pid, 7, "log.fetch", true);
+            assert_row(
+                &pair[1],
+                pid,
+                28,
+                "log.fetch.refused:scope-violation",
+                false,
+            );
+        }
+    }
+    drop(_collector);
     world.drain().await;
 }

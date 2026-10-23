@@ -1,0 +1,16 @@
+capability rc=0 passed=46 failed=0 secs=1
+capability-introspection rc=0 passed=46 failed=0 secs=0
+ac1 rc=0 passed=6 failed=0 secs=4
+kernel-integration rc=0 passed=8 failed=0 secs=2
+kernel-lib-capability rc=0 passed=24 failed=0 secs=1
+watchdog rc=0 passed=14 failed=0 secs=3
+audit rc=0 passed=248 failed=0 secs=12
+bin-network rc=0 passed=27 failed=0 secs=15
+bin-live-mcp rc=0 passed=3 failed=0 secs=6
+bin-cli-quota rc=101 passed=1 failed=3 secs=2
+spawned-recall rc=0 passed=39 failed=0 secs=101
+spirits rc=0 passed=74 failed=0 secs=20
+equiv rc=0 passed=19 failed=0 secs=10
+domain rc=0 passed=1 failed=0 secs=1
+benches rc=0 passed=0 failed=0 secs=25
+DONE

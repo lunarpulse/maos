@@ -43,9 +43,9 @@ The participant and consent portion of the decision remains owned by
 participation, persisted consent envelopes, their evaluation, and header-only
 elision for both forms. `consent-withheld` is reserved in the
 `maos:spirit/recall@2.1.0` error variant for that implementation.
-The capability issuance quota window is owned by
-`17-9-capability-issuance-quota-window`; Story 17-3d reports exhaustion as
-`capability-denied` rather than changing quota-window policy.
+Story `17-9-capability-issuance-quota-window` implements the per-window
+capability issuance quota. Recall and fetch surface exhaustion as
+`capability-denied`; the Researcher's incremental walk resumes next window.
 
 Native incremental polling may set `LogRecallFilter.order_by_insertion`.
 Its cursor frame id resolves to the retained frame's SQLite rowid, and the
@@ -63,3 +63,45 @@ This note supersedes the 17-3d emitter-only implementation limit above. Local re
 Persisted consent binds a recipient other than the sender. Expired, matching grant-ruptured, and `Withheld` frames are omitted from recall; fetch returns `consent-withheld`. `HeaderOnly` lists metadata with `payload-available = false` and also refuses fetch. Each refused fetch writes one kind-28 `log.fetch.refused:consent-withheld` receipt at the caller pid, without an owner pid. The daemon-side `ConsentEnvelope.recall` defaults to `Full`; unknown values become `Withheld`. It is not in WIT: guests see only its effect. This lossless-frame exception is ratified as `17-8-consent-recall-policy`. Cross-wall recall remains emitter-scoped under ADR-058 D2 and marks every page `RecallScope::Emitter { reason: CrossWall }`.
 
 **Production limits (AC3.6 / rule 11):** at HEAD no production granter sets `HeaderOnly`/`Withheld`, no `ConsentGate` is installed in production, and envelope-bearing frames reach admitted local recipients only through A2A delegation intake. Peer-identity ruptures carry no envelope and withhold nothing. Native compiled-in Spirits' bus sends journal at pid 0 (non-goal). Consent vectors are suite-delivered through `deliver_typed`, not evidence of an active production granter policy.
+
+## Implementation note — Story 17-9
+
+The issuance quota is **60,000 issuances per 60 s tumbling window per admitted
+scheduler pid (one incarnation)**, from `DEFAULT_ISSUANCE_QUOTA` and a monotonic
+clock. Capacity is inclusive: exactly B issuances are admitted, with a possible
+≤ 2·B burst across one boundary. The order is **policy → quota → tokens**:
+policy refusals spend nothing, failed signing refunds its reservation, and
+successful issuance stays charged even after recall's per-call token revoke.
+Each refused recall/fetch writes its operation-specific
+`log.<op>.refused:capability-denied` receipt.
+
+The kernel returns `CapError::IssuanceQuotaExhausted`; the governed wrapper maps
+it to `GovernedMintError::QuotaExhausted`. Spawned-session `iac.send` records
+verdict `exhausted`; MCP refuses with a
+`mcp.call.refused:capability-denied` receipt. CLI-wrapper spawn refuses on both
+local and remote paths; D1's proceed posture remains only for an absent
+`proc.exec` grant, not exhaustion.
+
+Operator-only kind-7 audit rows `cap.quota:pressure` at ⌈80 %⌉,
+`cap.quota:limit` at ⌈95 %⌉, and `cap.quota:exhausted` at first refusal fire
+once per pid and window. Kind 7 is never Spirit-recallable. Delivery means at
+most one non-blocking enqueue attempt per signal/pid/window: written rows are
+durable, but audit saturation or writer closure can lose rows. Drops count under
+`AuditDropSite::Quota` and are never retried.
+
+**Limits (not controls):** hot swap keeps the window; cold swap, crash restart,
+unload/re-admission and every fresh Worker bind receive fresh capacity. There
+is no stable-Spirit, principal-wide or Worker-spawn-churn bound. Other governed
+callers surface `QuotaExhausted` in string errors; `ShellHost` stringifies the
+kernel error on the operator REPL. There is no operator- or manifest-configurable
+issuance budget and **no Spirit-facing issuance pre-warning**: each path's typed
+denial is how a Spirit learns exhaustion. `ScheduleWatchdog` consumes its rate
+bucket before minting; its narrowed tokens attest authority at fire time in
+the audit record, not in the hook ABI, which carries no token.
+
+These issuance signals are not ADR-016's Spirit-facing
+`ContextPressure`/`ContextLimit`/`EContextExhausted` context-token accounting.
+That accounting compares Spirit-self-reported context tokens with manifest
+`[budget].context_window_size`; it is not built by 17-9 and belongs to
+`18-5-context-token-budget-accounting`. The name `CapError::ContextExhausted`
+remains available for it.

@@ -63,7 +63,14 @@ fn make_adapter_with_writer() -> (CapabilityRegistryAdapter, tokio::task::JoinHa
         policy.update(inner);
     }
     let (audit_tx, audit_rx) = cap_audit::channel();
-    let quota = cap_quota::CapQuotaTracker::new();
+    // Story 17-9: this test saturates the audit channel with 100,000 issuances
+    // on one pid — more than DEFAULT_ISSUANCE_QUOTA admits per window. It
+    // measures audit back-pressure, not the issuance quota, so the budget is
+    // explicitly unbounded.
+    let quota = cap_quota::CapQuotaTracker::with_quota(cap_quota::IssuanceQuota {
+        budget_per_window: u64::MAX,
+        ..cap_quota::DEFAULT_ISSUANCE_QUOTA
+    });
 
     let tlog = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF));
     let writer = cap_audit::CapAuditWriter::spawn(audit_rx, tlog);

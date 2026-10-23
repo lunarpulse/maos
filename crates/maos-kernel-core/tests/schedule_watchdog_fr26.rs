@@ -2,7 +2,7 @@
 
 //! Story 6.4 / FR26 / ADR-025 — ScheduleWatchdog integration tests.
 //!
-//! Eight scenarios exercising the per-firing gate ordering:
+//! Eleven scenarios exercising the per-firing gate ordering:
 //!   1. lifecycle gate
 //!   2. principal-revocability (proxy at v0.5)
 //!   3. per-schedule rate-limit bucket
@@ -10,13 +10,20 @@
 //!   5. narrowed cap-token issue
 //!
 //! Plus cadence cross-entry independence + pause / resume continuity +
-//! lifecycle gate skip.
+//! lifecycle gate skip, and three registry-backed vectors (Story 17-9 PF-04):
+//! a refused fire mints nothing (FW-10), one narrowed token per scope per
+//! admitted fire (AC2.6), and a revoked principal never fires (AC2.4).
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 
-use maos_domain::invariants::i1::Scope;
+use maos_domain::invariants::i1::{IntentClass, Scope};
+use maos_domain::invariants::i9::SandboxTier;
+use maos_domain::ports::crypto::{CryptoError, CryptoProvider};
+use maos_kernel_core::capability::{
+    cap_audit, cap_policy, cap_quota, cap_tokens, CapabilityRegistryAdapter, WorkingMemoryStore,
+};
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::scheduler::{
     control_block::{make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle},
@@ -25,6 +32,7 @@ use maos_kernel_core::scheduler::{
 };
 use maos_kernel_core::security::manifest::{LifecycleSection, ScheduleEntry, SchedulesSection};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 /// Shared counter Spirit — every `on_schedule` call increments the counter
 /// and records the payload bytes for round-trip verification.
@@ -115,9 +123,13 @@ async fn run_watchdog_for(
     tl: Arc<TransparencyLogAdapter>,
     millis: u64,
 ) {
+    run_watchdog(ScheduleWatchdog::new(scbs, dispatcher, tl), millis).await;
+}
+
+async fn run_watchdog(watchdog: ScheduleWatchdog, millis: u64) {
     std::env::set_var("MAOS_SCHEDULE_FAST", "1");
     let cancel = tokio_util::sync::CancellationToken::new();
-    let watchdog = Arc::new(ScheduleWatchdog::new(scbs, dispatcher, tl));
+    let watchdog = Arc::new(watchdog);
     let handle = Arc::clone(&watchdog).spawn(cancel.child_token());
     tokio::time::sleep(tokio::time::Duration::from_millis(millis)).await;
     cancel.cancel();
@@ -126,6 +138,26 @@ async fn run_watchdog_for(
         timeout_res.is_ok() && timeout_res.unwrap().is_ok(),
         "watchdog must shut down cleanly within timeout"
     );
+}
+
+/// Wait on an admitted-fire journal row, not an assumed number of polls.
+async fn run_watchdog_until_fire(
+    watchdog: ScheduleWatchdog,
+    tl: &TransparencyLogAdapter,
+    pid: u32,
+) {
+    std::env::set_var("MAOS_SCHEDULE_FAST", "1");
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let handle = Arc::new(watchdog).spawn(cancel.child_token());
+    let observed = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while schedule_fire_rows(tl, pid) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+    cancel.cancel();
+    handle.await.expect("watchdog shuts down cleanly");
+    observed.expect("an admitted-fire journal row within the deadline");
 }
 
 /// AC2.1 — Single `[[schedule]]` entry fires within fast-mode poll window.
@@ -368,9 +400,317 @@ async fn schedule_cadence_respected_between_fires() {
     );
 }
 
-// AC2.4 and AC2.6 tests require a fully-wired CapabilityRegistryAdapter.
-// The production `is_principal_revoked` and `issue_narrowed_token` paths
-// are fixed; these integration tests are deferred to a follow-up that
-// builds the test registry helper correctly (Story 6.4 review patch
-// limitation — the test helper signature mismatch would need deeper
-// project knowledge to resolve without risk).
+// ── Registry-backed vectors (Story 17-9 PF-04; Story 6.4 AC2.4 / AC2.6) ──
+
+const BUDGET: usize = 1_000;
+
+#[derive(Debug)]
+struct FrozenClock;
+
+impl cap_quota::QuotaClock for FrozenClock {
+    fn now_ns(&self) -> u64 {
+        0
+    }
+}
+
+struct XorCrypto;
+
+impl CryptoProvider for XorCrypto {
+    fn verify_signature(&self, _pk: &[u8], _msg: &[u8], _sig: &[u8]) -> Result<(), CryptoError> {
+        Ok(())
+    }
+
+    fn seal_for_export(
+        &self,
+        _key: &[u8],
+        _nonce: &[u8],
+        _aad: &[u8],
+        plaintext: &[u8],
+    ) -> Result<Vec<u8>, CryptoError> {
+        Ok(plaintext.to_vec())
+    }
+
+    fn sign_capability_token(&self, _key: &[u8], bytes: &[u8]) -> Result<Vec<u8>, CryptoError> {
+        let mut signature = [0u8; 64];
+        for (index, byte) in bytes.iter().enumerate() {
+            signature[index % 64] ^= byte;
+        }
+        Ok(signature.to_vec())
+    }
+}
+
+/// A capability registry granting `pid` exactly `scopes`, with a retained
+/// clone of its issuance-quota tracker and the audit receiver.
+struct Registry {
+    adapter: Arc<CapabilityRegistryAdapter>,
+    quota: cap_quota::CapQuotaTracker,
+    audit: tokio::sync::mpsc::Receiver<cap_audit::CapAuditEvent>,
+}
+
+impl Registry {
+    fn new(pid: u32, scopes: Vec<Scope>) -> Self {
+        Self::with_budget(pid, scopes, BUDGET as u64)
+    }
+
+    fn with_budget(pid: u32, scopes: Vec<Scope>, budget: u64) -> Self {
+        let policy = cap_policy::PolicyTable::new();
+        let mut inner = cap_policy::PolicyTableInner::default();
+        inner.manifest_scopes.insert(
+            pid,
+            cap_policy::ManifestCapabilityScope {
+                scopes,
+                declared_tier: SandboxTier(0),
+                trust_tier: cap_policy::decision::TrustTier::Verified,
+            },
+        );
+        policy.update(inner);
+        let quota = cap_quota::CapQuotaTracker::with_clock(
+            cap_quota::IssuanceQuota {
+                budget_per_window: budget,
+                window: cap_quota::DEFAULT_ISSUANCE_QUOTA.window,
+            },
+            Arc::new(FrozenClock),
+        );
+        let (sender, audit) = cap_audit::channel();
+        let adapter = Arc::new(CapabilityRegistryAdapter::new(
+            Arc::new(XorCrypto),
+            cap_tokens::Ed25519SigningKey::new([0x64; 32]),
+            0x64,
+            Arc::new(policy),
+            sender,
+            quota.clone(),
+            Arc::new(WorkingMemoryStore::new()),
+            Arc::new(TelemetryStreamAdapter::default()),
+        ));
+        Self {
+            adapter,
+            quota,
+            audit,
+        }
+    }
+
+    /// The scopes of every token issued to `pid`, in issuance order.
+    fn issued_scopes(&mut self, pid: u32) -> Vec<Scope> {
+        let mut scopes = Vec::new();
+        while let Ok(event) = self.audit.try_recv() {
+            if let cap_audit::CapAuditEvent::Issue {
+                spirit_pid, scope, ..
+            } = event
+            {
+                if spirit_pid == pid {
+                    scopes.push(scope);
+                }
+            }
+        }
+        scopes
+    }
+
+    /// Issuance capacity left in the current window (consumes it).
+    fn remaining_capacity(&self, pid: u32) -> usize {
+        std::iter::from_fn(|| self.quota.charge(pid).ok()).count()
+    }
+}
+
+fn side_effect_scopes() -> Vec<Scope> {
+    vec![
+        Scope::FsRead {
+            subtree: "/srv/digest".into(),
+        },
+        Scope::NetHttps {
+            domain: "calendar.example".into(),
+        },
+    ]
+}
+
+fn schedule_fire_rows(tl: &TransparencyLogAdapter, pid: u32) -> usize {
+    tl.query_frames(FrameFilter {
+        spirit_pid: Some(pid),
+        kind: Some(FrameKind::CapabilityInvocation),
+        ..Default::default()
+    })
+    .expect("query_frames")
+    .iter()
+    .filter(|row| row.intent.starts_with("schedule.fire:"))
+    .count()
+}
+
+/// Story 17-9 FW-10 A (PF-04 a) — an admitted fire mints exactly one token
+/// per scope under a bounded journal-row wait. A refused poll is not observable
+/// without a source hook, so this vector does not prove one occurred.
+#[tokio::test]
+async fn schedule_17_9_refused_fire_mints_nothing() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let pid = 64;
+    let scopes = side_effect_scopes();
+    let mut registry = Registry::new(pid, scopes.clone());
+    let counter = Arc::new(AtomicU32::new(0));
+    // The rate bucket admits one fire. Non-revocable: no seed token.
+    let mut bounded = entry("bounded", 1, 1, scopes.clone());
+    bounded.principal_revocability = false;
+    let scb = make_scb(
+        pid,
+        "bounded",
+        vec!["on_schedule".into()],
+        vec![bounded],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
+        .with_capability(Arc::clone(&registry.adapter));
+    run_watchdog_until_fire(watchdog, &tl, pid).await;
+
+    let fires = counter.load(Ordering::SeqCst) as usize;
+    assert_eq!(fires, 1, "rate_limit_per_hour = 1 admits one fire");
+    assert_eq!(schedule_fire_rows(&tl, pid), fires);
+    let issued = registry.issued_scopes(pid);
+    assert_eq!(
+        issued.len(),
+        fires * scopes.len(),
+        "minted only for admitted fires"
+    );
+    assert_eq!(
+        registry.remaining_capacity(pid),
+        BUDGET - fires * scopes.len(),
+        "a refused fire is never charged"
+    );
+}
+
+/// Story 6.4 AC2.6 — one narrowed token per manifest side-effect scope per
+/// admitted fire, each carrying exactly that scope.
+#[tokio::test]
+async fn schedule_2_6_one_narrowed_token_per_scope_per_admitted_fire() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let pid = 65;
+    let scopes = side_effect_scopes();
+    let mut registry = Registry::new(pid, scopes.clone());
+    let counter = Arc::new(AtomicU32::new(0));
+    let mut narrowed = entry("narrowed", 10, 3600, scopes.clone());
+    narrowed.principal_revocability = false;
+    let scb = make_scb(
+        pid,
+        "narrowed",
+        vec!["on_schedule".into()],
+        vec![narrowed],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
+        .with_capability(Arc::clone(&registry.adapter));
+    run_watchdog(watchdog, 250).await;
+
+    let fires = counter.load(Ordering::SeqCst) as usize;
+    assert!(fires >= 1, "the schedule fired");
+    assert_eq!(schedule_fire_rows(&tl, pid), fires);
+    let expected: Vec<Scope> = (0..fires).flat_map(|_| scopes.clone()).collect();
+    assert_eq!(registry.issued_scopes(pid), expected);
+    assert_eq!(registry.remaining_capacity(pid), BUDGET - expected.len());
+}
+
+/// Story 6.4 AC2.4 — a principal-revocable entry of a pid whose tokens were
+/// all revoked never fires and mints nothing (v0.5 proxy: no active token).
+#[tokio::test]
+async fn schedule_2_4_revoked_principal_never_fires_or_mints() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let pid = 66;
+    let scopes = side_effect_scopes();
+    let mut registry = Registry::new(pid, scopes.clone());
+    registry
+        .adapter
+        .issue_with_mediation(pid, scopes[0].clone(), 60, [0u8; 32], IntentClass::Standard)
+        .expect("seed token");
+    assert_eq!(registry.adapter.revoke_all_for_pid(pid), 1);
+    let counter = Arc::new(AtomicU32::new(0));
+    let scb = make_scb(
+        pid,
+        "revoked",
+        vec!["on_schedule".into()],
+        vec![entry("revocable", 1, 3600, scopes.clone())],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
+        .with_capability(Arc::clone(&registry.adapter));
+    run_watchdog(watchdog, 250).await;
+
+    assert_eq!(
+        counter.load(Ordering::SeqCst),
+        0,
+        "a revoked principal never fires"
+    );
+    assert_eq!(schedule_fire_rows(&tl, pid), 0);
+    assert_eq!(
+        registry.issued_scopes(pid),
+        vec![scopes[0].clone()],
+        "seed only"
+    );
+    assert_eq!(registry.remaining_capacity(pid), BUDGET - 1);
+}
+
+/// An exhausted issuance quota refuses minting, but FW-10 still records and
+/// delivers the admitted fire with a zero side-effect token.
+#[tokio::test]
+async fn schedule_17_9_exhausted_quota_records_fire_without_minting() {
+    cap_tokens::init_monotonic_base();
+    let pid = 67;
+    let scopes = side_effect_scopes();
+    let mut registry = Registry::with_budget(pid, scopes.clone(), 1);
+    let spent = registry.quota.charge(pid).expect("spend the only slot");
+    registry.quota.commit(spent);
+    let counter = Arc::new(AtomicU32::new(0));
+    let mut due = entry("quota-exhausted", 1, 1, scopes);
+    due.principal_revocability = false;
+    let scb = make_scb(
+        pid,
+        "quota-exhausted",
+        vec!["on_schedule".into()],
+        vec![due],
+        Arc::clone(&counter),
+    );
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(pid, scb);
+    let (dispatcher, tl) = make_dispatcher();
+    let watchdog = ScheduleWatchdog::new(scbs, dispatcher, Arc::clone(&tl))
+        .with_capability(Arc::clone(&registry.adapter));
+    run_watchdog_until_fire(watchdog, &tl, pid).await;
+    assert_eq!(counter.load(Ordering::SeqCst), 1, "FW-10 delivers the fire");
+    let rows = tl
+        .query_frames(FrameFilter {
+            spirit_pid: Some(pid),
+            kind: Some(FrameKind::CapabilityInvocation),
+            ..Default::default()
+        })
+        .expect("fire rows");
+    let row = rows
+        .iter()
+        .find(|row| row.intent == "schedule.fire:quota-exhausted")
+        .expect("the admitted fire is journaled");
+    let record: maos_kernel_core::iac::payload::ScheduleFireRecord =
+        serde_json::from_slice(&row.payload_redacted).expect("fire record");
+    assert_eq!(
+        record.side_effect_token_id,
+        maos_domain::invariants::i1::TokenId::ZERO
+    );
+    let mut minted = 0;
+    let mut exhausted = 0;
+    while let Ok(event) = registry.audit.try_recv() {
+        match event {
+            cap_audit::CapAuditEvent::Issue { spirit_pid, .. } if spirit_pid == pid => minted += 1,
+            cap_audit::CapAuditEvent::Quota {
+                spirit_pid,
+                signal: cap_quota::QuotaSignal::Exhausted,
+                window: 0,
+                used: 1,
+                budget: 1,
+            } if spirit_pid == pid => exhausted += 1,
+            _ => {}
+        }
+    }
+    assert_eq!(minted, 0, "quota refusal precedes minting");
+    assert_eq!(exhausted, 1, "one exhaustion evidence row");
+}

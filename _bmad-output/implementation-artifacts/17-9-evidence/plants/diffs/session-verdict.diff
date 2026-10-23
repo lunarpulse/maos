@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/spirit_session.rs
++++ b/crates/maos-bin/src/spirit_session.rs
+@@ -743,7 +743,7 @@
+             // (SSO, PDP, mediation) never reached a kernel verdict.
+             kernel_verdict: match error {
+                 GovernedMintError::KernelPolicyDenied => Some("deny"),
+-                GovernedMintError::QuotaExhausted => Some("exhausted"),
++                GovernedMintError::QuotaExhausted => None,
+                 _ => None,
+             },
+             refusal: Some(error.to_string()),

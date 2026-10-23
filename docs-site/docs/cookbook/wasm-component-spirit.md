@@ -98,10 +98,22 @@ Consent constrains a recorded recipient, not the sender. An expired envelope, a 
 | `frame-not-found` | No row exists for the requested frame id. |
 | `invalid-request(string)` | Malformed cursor or id (ids must be 16 bytes), unknown kind label, or timestamp above `i64::MAX`. A valid but non-disclosable kind filter returns an empty page instead. |
 | `limit-exceeded(u32)` | Requested limit exceeds 1024; the error carries the maximum. |
-| `capability-denied` | The grant is absent, or per-call issuance is refused by policy, operator denial, or exhausted quota. Recall and fetch require separate grants. |
+| `capability-denied` | The grant is absent, or per-call issuance is refused by policy, operator denial, or the inclusive 60,000-issuance/60 s monotonic tumbling quota for this admitted scheduler pid/incarnation. Recall and fetch require separate grants; exhaustion can recover next window. |
 | `consent-withheld` | A recipient's fetch is blocked by expiry, a matching grant-scoped rupture, `Withheld` (including unknown policy), or `HeaderOnly`. |
 | `reply-too-large(u64)` | Even one page entry or the complete fetched payload cannot fit the frame-byte and codec-expansion budgets; the error carries the reply byte bound. Payloads are never truncated. |
 | `unavailable` | Called outside `handle-frame`, storage is unavailable, or the recall channel has closed or failed. Internal storage messages are not exposed. |
+
+Issuance follows **policy → quota → tokens**; failed signing refunds, but the
+per-call token revoke does not. There is no Spirit-facing issuance pre-warning.
+Operator-only kind-7 `cap.quota:pressure` / `cap.quota:limit` /
+`cap.quota:exhausted` rows are never Spirit-recallable and have qualified,
+non-blocking delivery, not guaranteed completeness. See the
+[issuance-quota reference](/manifest/v5#capability-issuance-quota) for thresholds,
+path-specific errors, delivery semantics and labelled limits (per-incarnation
+scope, fresh Worker capacity, non-configurable budget, string-only callers and
+audit-only schedule tokens). These are not ADR-016 context-token signals;
+context-token accounting is owned by `18-5-context-token-budget-accounting`,
+not implemented by 17-9.
 
 The daemon binds the caller's admitted identity and boot nonce; the guest supplies neither identity nor token. Each validated, admitted call receives a freshly minted capability, writes a token-bearing invocation audit row before data is disclosed, and revokes the token afterward. Every refusal writes exactly one governance receipt, `log.recall.refused:<code>` or `log.fetch.refused:<code>`, where `<code>` is the WIT error case name. Validation and mint refusals write a receipt without an invocation row. Successful calls, including empty pages, add no refusal receipt. These audit rows are not themselves recallable.
 

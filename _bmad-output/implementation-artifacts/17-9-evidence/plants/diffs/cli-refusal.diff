@@ -1,0 +1,18 @@
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -962,13 +962,8 @@
+             // is spent — proceeding would make exhaustion a tokenless fallback,
+             // so it refuses on BOTH paths, through the same guard.
+             match &e {
+-                GovernedMintError::QuotaExhausted => {
+-                    return Err(format!(
+-                        "maos run: cli_wrapper spawn REFUSED: {e}; a quota refusal never \
+-                         proceeds without a kernel token (Story 17-9 FW-06)"
+-                    )
+-                    .into());
+-                }
++                // PLANT: exhaustion treated like `Mediation` (D1 proceed).
++                GovernedMintError::QuotaExhausted => {}
+                 GovernedMintError::SsoAssertionMissing(_) | GovernedMintError::PdpDenied(_)
+                     if remote_requested =>
+                 {

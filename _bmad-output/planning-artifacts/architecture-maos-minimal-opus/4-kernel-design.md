@@ -38,7 +38,7 @@ maos/
 │   │   │   ├── cap-tokens/             #            Hot path: token issue/verify, lock-free (I9 whitelist)
 │   │   │   ├── cap-policy/             #            Consent rules + intent allowlist
 │   │   │   ├── cap-audit/              #            Audit/lineage writer (slow path, bounded mpsc)
-│   │   │   └── cap-quota/              #            Budget tracking + ContextPressure
+│   │   │   └── cap-quota/              #            Capability-issuance window + cap.quota:* audit signals
 │   │   ├── compliance/                 #          ComplianceClaim structural validator (~200 LOC, v0.1)
 │   │   ├── pipeline/                   #          Emit pipeline (IACFrame + ComplianceClaim co-located)
 │   │   ├── telemetry/                  #          Telemetry module + scalar.tap + IAC RT metrics (1b.4)
@@ -415,7 +415,7 @@ The two internal modules — I/O Subsystem (§4.4) and Telemetry Stream (§4.7) 
 
 ## 4.6 Capability Registry
 
-**Responsibility:** Mediate every external call. Issue, verify, and revoke capability tokens. Enforce manifest-declared capability surfaces. Validate I11/I12/I13 audit-chain fields on digest writes. Track per-Spirit budget (ADR-016 token-budget accounting).
+**Responsibility:** Mediate every external call. Issue, verify, and revoke capability tokens. Enforce manifest-declared capability surfaces. Validate I11/I12/I13 audit-chain fields on digest writes. Enforce the per-admitted-pid capability-issuance window (17-9). Separately, ADR-016's Spirit-self-reported context-token accounting against manifest `[budget].context_window_size` belongs to `18-5-context-token-budget-accounting`, not 17-9.
 
 **Decomposition (round-2 ADR-030).** The Capability Registry is internally split into four sub-services so the hot path does not serialize on the slow path:
 
@@ -424,9 +424,17 @@ The two internal modules — I/O Subsystem (§4.4) and Telemetry Stream (§4.7) 
 | `cap-tokens` | Token issue, verify, revoke | Sharded `Arc<[CapShard; 64]>` where each shard is `RwLock<HashMap<TokenId, AtomicCounters>>`. Verify path takes read-lock on one shard (hash(token) % 64), CAS on `AtomicU64` quota counters. No global lock. |
 | `cap-policy` | Consent rules, intent allowlists, posture-bound capability surfaces | Read-mostly; copy-on-write for policy updates |
 | `cap-audit` | Transparency Log writer, lineage validation (I11/I12/I13) | bounded MPSC `tokio::sync::mpsc::channel(8192)` to a single `audit_writer` task that batches into the journal |
-| `cap-quota` | Per-Spirit budget tracking, `ContextPressure`/`ContextLimit`/`EContextExhausted` typed frames | Per-Spirit atomic counters; soft threshold (80%) emits `ContextPressure`, hard (95%) emits `ContextLimit`, above 100% returns `EContextExhausted` on new tool calls |
+| `cap-quota` | Capability-issuance quota: 60,000 issuances per 60 s tumbling window per admitted scheduler pid (one incarnation), from `DEFAULT_ISSUANCE_QUOTA` and a monotonic clock | Inclusive capacity B; policy → quota → tokens, failed signing refunded; ≤ 2·B burst across one boundary. Once per pid/window, operator-only kind-7 `cap.quota:pressure` at ⌈80 %⌉, `cap.quota:limit` at ⌈95 %⌉, `cap.quota:exhausted` at first refusal; exhaustion is `CapError::IssuanceQuotaExhausted`. At most one non-blocking enqueue attempt per signal/pid/window; durable when written, not guaranteed under saturation or writer closure; drops count under `AuditDropSite::Quota`, never retried. Kind 7 is never Spirit-recallable. |
 
 The hot path (token verify on every IAC frame and every tool call) goes through `cap-tokens` only, with sharded atomic operations. The audit/lineage path is async (mpsc channel) so a slow Transparency Log write cannot block frame delivery.
+
+**Separate unit:** ADR-016's `ContextPressure`/`ContextLimit`/`EContextExhausted`
+concern Spirit-self-reported context tokens versus manifest
+`[budget].context_window_size`. They are not `cap-quota` issuance signals and
+are not built by 17-9; their owner is `18-5-context-token-budget-accounting`.
+`CapError::ContextExhausted` remains available for context-token exhaustion.
+See ADR-030's 17-9 implementation note for the per-incarnation and delivery
+limits; no Spirit-facing issuance pre-warning is provided.
 
 ### 4.6.1 Epistemic Halt mechanism
 

@@ -261,6 +261,16 @@ Two ADR registries now exist and this note fixes their relationship:
 
 **What would force a revisit.** Token-counting becomes provider-uniform and the kernel can take it on without violating I9.
 
+**Implementation note — Story 17-9:** this decision concerns **context tokens**:
+Spirit-self-reported usage compared with manifest `[budget].context_window_size`.
+It is **not implemented by 17-9**; the named owner is
+`18-5-context-token-budget-accounting`. Story 17-9 instead implements the
+capability-issuance quota window with operator-only kind-7 `cap.quota:pressure`,
+`cap.quota:limit` and `cap.quota:exhausted` audit rows, not this decision's
+Spirit-facing `ContextPressure`/`ContextLimit`/`EContextExhausted` typed signals.
+Issuance exhaustion uses `CapError::IssuanceQuotaExhausted`, leaving
+`CapError::ContextExhausted` available for this context-token accounting.
+
 ## ADR-017 — Hot-swap state-transfer wire format
 
 `Status: binding-v0.3` · `Gate: swap conformance corpus passes; auto-revert ≤30s on post-swap invariant violation` · `Decided: 2026-04-15` · `Revisits: §3.2 invariant I6; §4.1`

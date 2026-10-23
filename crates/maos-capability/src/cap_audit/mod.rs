@@ -13,6 +13,9 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use maos_domain::invariants::i1::{Scope, TokenId};
+
+use crate::cap_quota::QuotaSignal;
+
 /// Audit channel depth — load-bearing per ADR-030.
 pub const AUDIT_CHANNEL_DEPTH: usize = 8192;
 
@@ -28,10 +31,11 @@ pub enum AuditDropSite {
     Invocation,
     SandboxBlock,
     AcpNotification,
+    Quota,
 }
 
 impl AuditDropSite {
-    const COUNT: usize = 7;
+    const COUNT: usize = 8;
 }
 
 /// Why an audit event did not reach the writer.
@@ -165,6 +169,15 @@ pub enum CapAuditEvent {
         spirit_pid: u32,
         attempted_syscall: String,
         sandbox_tier: maos_domain::invariants::i9::SandboxTier,
+    },
+    /// An issuance-quota signal (Story 17-9): a Pressure/Limit crossing reached
+    /// by a committed issuance, or the first refused charge in a window.
+    Quota {
+        spirit_pid: u32,
+        signal: QuotaSignal,
+        window: u64,
+        used: u64,
+        budget: u64,
     },
 }
 

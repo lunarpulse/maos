@@ -520,9 +520,23 @@ pub struct RatificationFrame {
 
 /// Load ratification frames from the Transparency Log.
 ///
-/// Searches for `FrameKind::GovernanceEvent` frames whose payload is an
-/// `AbiExtensionProposal` with `status == Ratified`.
-/// Returns them sorted by ascending `seq`.
+/// Reads the production schema — `payload_redacted` in insertion (`rowid`)
+/// order, the rowid becoming [`RatificationFrame::seq`] — and classifies every
+/// `FrameKind::GovernanceEvent` (28) row before decoding it (Story 17-9 AC4.7):
+///
+/// - receipt and authorization rows, recognised by their intent grammar
+///   (see `is_kind28_receipt_intent`), are skipped;
+/// - every other row must decode as a typed [`GovernanceEventPayload`]; only
+///   `AbiExtension` proposals with `status == Ratified` are returned;
+/// - a row in neither class is an error naming its intent (fail-closed), so a
+///   malformed governance payload or a new untyped kind-28 producer stops the
+///   gate instead of being skipped.
+///
+/// ABI-extension proposals have no production Transparency-Log emitter
+/// (FR62(b)): the gate's documented input is a log in which they were
+/// journaled through the production adapter.
+///
+/// [`GovernanceEventPayload`]: maos_domain::governance::GovernanceEventPayload
 pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>, AuditError> {
     use maos_domain::governance::{
         GovernanceEventKind, GovernanceEventPayload, RatificationStatus,
@@ -541,22 +555,33 @@ pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>
     .map_err(AuditError::Open)?;
 
     let mut stmt = conn
-        .prepare("SELECT seq, payload FROM transparency_log WHERE kind = ? ORDER BY seq ASC")
+        .prepare(
+            "SELECT rowid, intent, payload_redacted FROM transparency_log \
+             WHERE kind = ?1 ORDER BY rowid ASC",
+        )
         .map_err(AuditError::Query)?;
 
     let rows = stmt
         .query_map([GOVERNANCE_EVENT_KIND], |row| {
             let seq: i64 = row.get(0)?;
-            let payload: Vec<u8> = row.get(1)?;
-            Ok((seq, payload))
+            let intent: String = row.get(1)?;
+            let payload: Vec<u8> = row.get(2)?;
+            Ok((seq, intent, payload))
         })
         .map_err(AuditError::Query)?;
 
     let mut frames = Vec::new();
     for row in rows {
-        let (seq, payload) = row.map_err(AuditError::Query)?;
-        let payload: GovernanceEventPayload = serde_json::from_slice(&payload)
-            .map_err(|e| AuditError::Row(format!("frame seq {seq}: {e}")))?;
+        let (seq, intent, payload) = row.map_err(AuditError::Query)?;
+        if is_kind28_receipt_intent(&intent) {
+            continue;
+        }
+        let payload: GovernanceEventPayload = serde_json::from_slice(&payload).map_err(|e| {
+            AuditError::Row(format!(
+                "kind-28 row {seq} (intent {intent:?}) is neither a listed receipt nor a \
+                 typed governance event: {e}"
+            ))
+        })?;
         if let GovernanceEventKind::AbiExtension(proposal) = payload.event {
             if proposal.status == RatificationStatus::Ratified {
                 frames.push(RatificationFrame {
@@ -567,6 +592,29 @@ pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>
         }
     }
     Ok(frames)
+}
+
+/// The closed table of untyped kind-28 intents: receipts and authorizations,
+/// never governance events. `spirit.frame.authorization` and
+/// `spirit.frame.undeliverable` (spirit sessions); `log.recall.refused:<code>`,
+/// `log.fetch.refused:<code>` and `recall.channel.closed:<code>` (mediated
+/// recall); `mcp.call.refused:<code>` (governed MCP mints, Story 17-9). A code
+/// is a non-empty lowercase-kebab word.
+fn is_kind28_receipt_intent(intent: &str) -> bool {
+    const EXACT: [&str; 2] = ["spirit.frame.authorization", "spirit.frame.undeliverable"];
+    const CODED: [&str; 4] = [
+        "log.recall.refused:",
+        "log.fetch.refused:",
+        "recall.channel.closed:",
+        "mcp.call.refused:",
+    ];
+    EXACT.contains(&intent)
+        || CODED.iter().any(|prefix| {
+            intent.strip_prefix(prefix).is_some_and(|code| {
+                code.split('-')
+                    .all(|w| !w.is_empty() && w.bytes().all(|b| b.is_ascii_lowercase()))
+            })
+        })
 }
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -200,11 +200,24 @@ impl ScheduleWatchdog {
                 continue;
             }
 
-            // Step 3 — issue narrowed cap-token (one per Scope at v0.5).
-            // Records the first issued token_id in the TL row.
-            // `None` is valid when side_effect_scopes is empty OR when the
-            // capability registry is not wired (test context); only skip
-            // firing when the registry is present but issuance fails.
+            // Step 3 — consume admission before minting or serializing the row.
+            // Serialization of this fixed record is not expected to fail.
+            let bucket_key = (scb.spirit_id.clone(), entry.id.clone());
+            let bucket = self
+                .rate_limits
+                .entry(bucket_key)
+                .or_insert_with(|| Arc::new(ScheduleBucket::new(entry.rate_limit_per_hour)))
+                .value()
+                .clone();
+            if !bucket.try_consume() {
+                continue;
+            }
+
+            // Step 4 — mint only after admission (one token per Scope at v0.5).
+            // The tokens attest authority at fire time and the TL row records
+            // the first issued token_id; the hook ABI carries no token. `None`
+            // when side_effect_scopes is empty, the registry is not wired, or
+            // every mint was refused — the fire proceeds either way (FW-10).
             let token_id = self.issue_narrowed_token(&scb, &entry);
             let fired_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
 
@@ -229,19 +242,6 @@ impl ScheduleWatchdog {
                     continue;
                 }
             };
-
-            // Step 4 — rate-limit consume (AFTER serialization succeeds so we
-            // don't deplete the bucket on a path that aborts).
-            let bucket_key = (scb.spirit_id.clone(), entry.id.clone());
-            let bucket = self
-                .rate_limits
-                .entry(bucket_key)
-                .or_insert_with(|| Arc::new(ScheduleBucket::new(entry.rate_limit_per_hour)))
-                .value()
-                .clone();
-            if !bucket.try_consume() {
-                continue;
-            }
 
             let intent_str = format!("schedule.fire:{}", entry.id);
             let _ = self.transparency_log.insert_frame_event(
@@ -329,11 +329,11 @@ impl ScheduleWatchdog {
                     }
                 }
                 Err(e) => {
-                    // Token issue failure: not a hard error at v0.5 — the
-                    // firing proceeds with empty side-effect token (the
-                    // hook will fail the in-Spirit capability check, which
-                    // is the correct posture). Keep the denial observable:
-                    // Story 11.4a CATCH-B forbids silent org-policy denies.
+                    // Token issue failure (policy denial or quota exhaustion):
+                    // the fire proceeds and its TL row attests the missing
+                    // authority (TokenId::ZERO when no scope minted). The hook
+                    // never receives a token, so nothing downstream enforces
+                    // it. Story 11.4a CATCH-B forbids silent org-policy denies.
                     eprintln!(
                         "schedule-watchdog: capability token issue denied for spirit {}: {e}",
                         scb.pid

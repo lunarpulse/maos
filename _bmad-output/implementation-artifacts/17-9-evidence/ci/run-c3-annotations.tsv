@@ -1,0 +1,32 @@
+aggregate	failure	failure		Process completed with exit code 1.
+aggregate	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+v1-0-ship-gate	failure	failure		Process completed with exit code 1.
+v1-0-ship-gate	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+v1-5-ship-gate	failure	failure		Process completed with exit code 1.
+v1-5-ship-gate	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+wasm-host-tests (ubuntu-24.04-arm)	success	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c proof (ubuntu-24.04-arm)	TS-ADMITTED-PROOF os=24.04 arch=aarch64 pid=1 child_pid=45149 cpu=10 memory_mib=768 audit=attributed terminal=clean
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-2 checked execution	log=participant-17-8.log exit=0 suites=[('ok', '8', '0', '0')]
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-8 participant recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.77s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-2 checked execution	log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3d recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.42s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=wasm-component case=unmediated trusted_pid=14 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=wasm-component case=policy_mixed trusted_pid=13 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=wasm-component case=enterprise_denied trusted_pid=12 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=subprocess case=unmediated trusted_pid=11 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=subprocess case=policy_mixed trusted_pid=10 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=subprocess case=enterprise_denied trusted_pid=9 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	RUNNER-SIGSYS forbidden=false admitted_pid=7 actual_blocks=0 consumer_anomalies=0 audit_view=ok
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	RUNNER-SIGSYS forbidden=true admitted_pid=6 actual_blocks=1 consumer_anomalies=1 audit_view=ok
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	HOSTILE-ONCE turns=0 result=error
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted exhausted=exhausted
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	Escape detector (ubuntu-24.04-arm)	rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	Kernel T2 suites (ubuntu-24.04-arm)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	Bridge T2 route (ubuntu-24.04-arm)	T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T4: SandboxRefused
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped); classified_violation_tier=T2
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2: exit status: 0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1; denied_file=/tmp/.tmpTCZOPM/secret.txt; cat_stderr="/bin/cat: /tmp/.tmpTCZOPM/secret.txt: Permission denied\n"
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	benign_process_survives_t2_under_same_spec: exit status: 0

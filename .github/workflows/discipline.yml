@@ -1915,6 +1915,47 @@ jobs:
           name: epic-17-terminal-${{ matrix.image }}
           path: worker-terminal-facts.log
           if-no-files-found: warn
+      # Story 17-9 (AC5.5, D-17-9-FW-06 A) — a CLI-wrapper spawn whose Worker
+      # pid's issuance window is exhausted REFUSES on the local and the remote
+      # path through the post-bind guard (never a tokenless proceed), while an
+      # absent `proc.exec` grant keeps D1's proceed posture. Same provisioned
+      # T3 substrate and delegated rootless unit as line 4; every test name and
+      # marker is required; SKIP, ignored and zero-test runs are refused.
+      - name: CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-cli-quota-17-9 --timeout 1800 --rootless-canary -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network --test cli_wrapper_exhaustion_17_9 -- --nocapture --test-threads=1 2>&1 | tee cli-wrapper-exhaustion.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          required_tests=()
+          for name in remote_exhaustion_refuses_before_workload \
+                      local_exhaustion_refuses_before_workload \
+                      absent_grant_keeps_d1_tokenless_proceed_posture \
+                      absent_grant_is_policy_denied_even_with_spent_quota; do
+            required_tests+=(--required-test "$name")
+          done
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 "${required_tests[@]}" cli-wrapper-exhaustion.log || rc=1
+          for marker in 'CLI-QUOTA-17-9 remote exhaustion refused before workload' \
+                        'CLI-QUOTA-17-9 local exhaustion refused before workload' \
+                        'CLI-QUOTA-17-9 absent grant D1 completed without token' \
+                        'CLI-QUOTA-17-9 absent grant policy denial precedes quota'; do
+            grep -qF -- "$marker" cli-wrapper-exhaustion.log || { rc=1; echo "::error title=17-9 CLI quota (${{ matrix.image }})::missing marker '${marker}'"; }
+          done
+          if grep -Eq 'SKIP|^test [^ ]+ \.\.\. ignored' cli-wrapper-exhaustion.log || grep -Eq '^test result:.*ignored: [1-9][0-9]*|^test result:.*0 passed' cli-wrapper-exhaustion.log; then
+            rc=1
+            echo "::error title=17-9 CLI quota (${{ matrix.image }})::SKIP, ignored, or zero tests"
+          fi
+          [ "$rc" -eq 0 ] || grep -E 'panicked at' cli-wrapper-exhaustion.log | head -5 | while IFS= read -r line; do
+            echo "::error title=17-9 CLI quota (${{ matrix.image }})::${line}"
+          done
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-17-cli-quota-${{ matrix.image }}
+          path: cli-wrapper-exhaustion.log
+          if-no-files-found: warn
       # Story 17-4 (CR-6) — exit line 5: Observer live beside Butler in one
       # root (AC1) and the 20-scenario activity corpus with its oracle (AC4).
       # `maosctl` is a sibling package's binary resolved beside `maos`, so it
@@ -3388,13 +3429,13 @@ jobs:
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 -- \
             bash -euo pipefail -c 'cargo test --locked -p maos-kernel-core --test cgroup_ceiling_smoke -- --nocapture --test-threads=1 2>&1 | tee cgroup-smoke.log; test ${PIPESTATUS[0]} -eq 0'
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 cgroup-smoke.log
-      - name: Real admitted session suite — 22 cases, serial
+      - name: Real admitted session suite — 23 cases, serial
         shell: bash
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 2400 -- \
             bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee spawned-17-3c.log; test ${PIPESTATUS[0]} -eq 0'
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 22 spawned-17-3c.log
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 spawned-17-3c.log
       - name: Build the actual Worker CLI fixture before the in-unit canary (x64)
         if: ${{ !endsWith(matrix.image, '-arm') }}
         run: cargo build --locked -p worker --bin worker-cli-fixture
@@ -3442,7 +3483,7 @@ jobs:
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode undelegated --unit maos-17-2-undelegated --timeout 1800 -- \
             bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee undelegated-session.log; test ${PIPESTATUS[0]} -eq 0'
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 22 undelegated-session.log
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 undelegated-session.log
 
   wasm-host-tests:
     needs: [example-spirit-ts-tests]
@@ -3537,11 +3578,11 @@ jobs:
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 22 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 22 passed;'"; fail=1; }
+          grep -q '^test result: ok\. 23 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 23 passed;'"; fail=1; }
           for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :6' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
                       'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
                       'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
-                      'HOSTILE-IAC-SEND :1'; do
+                      'HOSTILE-IAC-SEND :1' 'WASM-IAC-SEND :1'; do
             prefix=${spec%:*}; want=${spec##*:}
             got=$(grep -oF -- "$prefix" spawned-17-3c.log | wc -l)
             [ "$got" -eq "$want" ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::marker '${prefix}' seen $got times, want $want"; fail=1; }
@@ -3552,7 +3593,7 @@ jobs:
             done
             fail=1
           fi
-          grep -E 'SCOPED-VERDICT |GOVERNED-ATOMIC |HOSTILE-|RUNNER-SIGSYS |REPEATED-MAILBOX ' spawned-17-3c.log | while IFS= read -r line; do
+          grep -E 'SCOPED-VERDICT |GOVERNED-ATOMIC |HOSTILE-|WASM-IAC-SEND |RUNNER-SIGSYS |REPEATED-MAILBOX ' spawned-17-3c.log | while IFS= read -r line; do
             echo "::notice title=17-3c admitted runtime (${{ matrix.image }})::$line"
           done
           if [ "$fail" -ne 0 ]; then
@@ -3561,7 +3602,7 @@ jobs:
             done
           fi
           echo "::notice title=17-3c process gates (${{ matrix.image }})::rc=$rc fail=$fail"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 22 spawned-17-3c.log || fail=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 23 spawned-17-3c.log || fail=1
           exit "$fail"
       # Story 17-3d — mediated in-band recall end to end: the real release
       # runner under T2 in the same delegated envelope, exact pass count and
@@ -3579,7 +3620,7 @@ jobs:
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 15 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 15 passed;'"; fail=1; }
+          grep -q '^test result: ok\. 16 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 16 passed;'"; fail=1; }
           required=()
           for name in checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4 \
                       configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted \
@@ -3587,6 +3628,7 @@ jobs:
                       empty_page_has_one_token_bearing_call_and_no_receipt \
                       exhausted_quota_has_receipt_without_tokenless_fallback_call \
                       junk_after_tag_closes_once_with_typed_protocol_end \
+                      kernel_quota_rows_and_mcp_refusals_never_cross_the_guest_recall_boundary \
                       operator_deny_overrides_manifest_and_has_receipt_only \
                       oversized_fetch_reply_is_typed_and_next_call_same_turn_still_works \
                       own_frame_second_turn_recalls_kernel_minted_id_kind_intent_and_fetches_stored_payload \
@@ -3608,7 +3650,7 @@ jobs:
             echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
           done
           echo "::notice title=17-3d recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' recall-17-3d.log)"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 15 "${required[@]}" recall-17-3d.log || fail=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 16 "${required[@]}" recall-17-3d.log || fail=1
           exit "$fail"
       # Story 17-8 — participant recall and consent envelopes for BOTH forms
       # (native Researcher through MediatedLogRecall, WASM recall-probe through
@@ -5204,7 +5246,7 @@ jobs:
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser + fuzz_exec_deps_parse_elf) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
-          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host + native-twin fixture tests + 17-3c spawned_scope_17_3c gate (22 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (16 passed, every name present, no SKIP) |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host + native-twin fixture tests + 17-3c spawned_scope_17_3c gate (23 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (16 passed, every name present, no SKIP) |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"

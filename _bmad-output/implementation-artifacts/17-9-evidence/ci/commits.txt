@@ -1,0 +1,3 @@
+977e3a04 977e3a044f776d9ad925da171bad7e70344ce33b tree=4176bf6eebbcc7705266622ffdbff840e3e6dfc1 ci/17-9-verify c1: Story 17-9 candidate + branch-scoped discipline trigger (D-17-9-FW-07 A)
+29b6a773 29b6a773f56c06587811abdc742d41e6b339bb84 tree=3fbe68bc6a36c432e1b2aef6f6835f5ec2126b16 ci/17-9-verify c2: PLANTS — branch-only proven-red workflow, one leg per §Proven-red control (22); discipline trigger withdrawn
+b08b3cd5 b08b3cd56631c5f3e5e48d6a4806d4d23cea551d tree=4176bf6eebbcc7705266622ffdbff840e3e6dfc1 ci/17-9-verify c3: RESTORED — exact revert of the c2 plant workflow (tree identical to c1)

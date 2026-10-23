@@ -277,7 +277,7 @@
   │   │   │   ├── cap-tokens/         #           Hot path: token issue/verify, lock-free
   │   │   │   ├── cap-policy/         #           Consent rules + intent allowlist
   │   │   │   ├── cap-audit/          #           Audit/lineage writer (slow path)
-  │   │   │   └── cap-quota/          #           Budget tracking + ContextPressure
+  │   │   │   └── cap-quota/          #           Capability-issuance window + cap.quota:* audit signals
   │   │   ├── compliance/             #         ComplianceClaim structural validator (~200 LOC, v0.1)
   │   │   ├── pipeline/               #         Emit pipeline (IACFrame + ComplianceClaim co-located)
   │   │   ├── telemetry/              #         Telemetry module + scalar.tap — internal at v0.1
@@ -364,7 +364,7 @@
 - **[ARCH]** **Sandbox tiers (ADR-004, binding-v0.1):** T0 (no sandbox; trusted local-tier) → T1 (process isolation; UID separation) → T2 (Linux: Landlock+seccomp; macOS: Seatbelt with `.sbpl`; Windows: restricted-token, default for `public-untrusted`) → T3 (T2 + container, Docker/Podman) → T4 (WASM, v2.0 for tools at v1.0).
 - **[ARCH]** **Strictest-of-(manifest, trust-tier, operator-policy) floor.** Public-untrusted Spirit declaring T0 is forced to T2.
 - **[ARCH]** **Per-Spirit resource isolation (cgroups v2 / setrlimit / Job Object):** kernel sets at spawn, OS-enforced not Tokio-cooperation. Defaults declared in manifest `[resources]`; kernel applies strictest-of (manifest, operator policy).
-- **[ARCH]** **Capability Registry decomposition (ADR-030, binding-v0.1):** `cap-tokens` (sharded `Arc<[CapShard; 64]>` lock-free, hot path <5µs P99); `cap-policy` (read-mostly, copy-on-write); `cap-audit` (bounded `tokio::sync::mpsc::channel(8192)` to single audit-writer task; slow path); `cap-quota` (per-Spirit atomic counters; emits `ContextPressure` at 80%, `ContextLimit` at 95%, `EContextExhausted` above 100%).
+- **[ARCH]** **Capability Registry decomposition (ADR-030, binding-v0.1):** `cap-tokens` (sharded `Arc<[CapShard; 64]>` lock-free, hot path <5µs P99); `cap-policy` (read-mostly, copy-on-write); `cap-audit` (bounded `tokio::sync::mpsc::channel(8192)` to single audit-writer task; slow path); `cap-quota` (17-9: 60,000 capability issuances per 60 s monotonic tumbling window per admitted scheduler pid/incarnation, `DEFAULT_ISSUANCE_QUOTA`; inclusive capacity B, policy → quota → tokens, failed signing refunded, ≤ 2·B boundary burst). Once per pid/window, operator-only kind-7 `cap.quota:pressure` at ⌈80 %⌉, `cap.quota:limit` at ⌈95 %⌉ and `cap.quota:exhausted` at first refusal; kind 7 is never Spirit-recallable. At most one non-blocking enqueue attempt per signal/pid/window: durable when written, not guaranteed under saturation or writer closure; drops count under `AuditDropSite::Quota`, never retried. Exhaustion is `CapError::IssuanceQuotaExhausted`. ADR-016's Spirit-facing `ContextPressure`/`ContextLimit`/`EContextExhausted` instead concern Spirit-self-reported context tokens versus manifest `[budget].context_window_size`; not built by 17-9, owned by `18-5-context-token-budget-accounting`, with `CapError::ContextExhausted` available for that unit.
 - **[ARCH]** **Capability-token TTL ≤60s for high-privilege ops (ADR-023, binding-v0.1).** Tokens bound to (Spirit-PID + boot-nonce + expiry); ed25519-signed; non-transferable. TOCTOU re-validation at every use against current state.
 - **[ARCH]** **Pre-write secret-redaction filter at Transparency Log boundary** (universal to all logged frames). Floors per NFR-Sec-4 (10⁴ per-commit, 10⁵ quarterly, 1000-canary/month).
 - **[ARCH]** **Approval class taxonomy (6 classes):** `readonly_scoped`, `readonly_search`, `mutating`, `exec_capable`, `control_plane`, `interactive`. Default policies operator-overridable per Spirit.
@@ -378,7 +378,7 @@
 - **[ARCH]** **Memory Manager:** three tiers + namespace enforcement (I5); hot-swap and migration; principal namespace; kernel does not interpret memory contents.
 - **[ARCH]** **Security Manager:** sandbox tiers; secret materialization (just-in-time pass-through to OS keyring; Vault/cloud-KMS at v2.0); approval mediation; posture enforcement; Token Lifecycle Manager.
 - **[ARCH]** **IAC Bus:** same-Host frame routing (mailbox), cross-Host bilateral A2A, `retract` primitive, notification surface dispatch. Logged-before-deliver guarantee (I2). Partial-consent failure semantics (`ConsentRupture` event, ADR-034 binding-v0.9).
-- **[ARCH]** **Capability Registry:** mediate every external call (I1); issue/verify/revoke capability tokens; enforce manifest-declared capability surfaces; validate I11/I12/I13 audit-chain fields on digest writes; track per-Spirit budget (ADR-016).
+- **[ARCH]** **Capability Registry:** mediate every external call (I1); issue/verify/revoke capability tokens; enforce manifest-declared capability surfaces; validate I11/I12/I13 audit-chain fields on digest writes; enforce the per-admitted-pid capability-issuance window (17-9). Separate context-token accounting (ADR-016) is owned by `18-5-context-token-budget-accounting`, not implemented by 17-9.
 - **[ARCH]** **Telemetry Stream:** topic-based broadcast + filtered subscription; `scalar.tap` channel; OpenTelemetry export adapter; author-observability contract.
 - **[ARCH]** **Halt detection three-layer composition (§4.6.1):** (1) Spirit-self-invocation primary (`epistemic.halt(payload)` from `[epistemic_policy]` rules + four predicates); (2) Budget-based stall detection secondary (kernel emits `task.stalled` after `timeout_no_progress` default 30s); (3) Scalar trajectory tap tertiary (Observer Spirits subscribe to `scalar.tap`).
 - **[ARCH]** **Halt resolution kinds:** `provided_context`, `accepted_halt`, `authorized_override`. `authorized_override` adds mandatory `override_marker` to subsequent output for `output_shape` predicates.
@@ -541,7 +541,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR2 clean kernel uninstall (PARTIAL) | 16-4 |
 | FR3 providers + endpoint lock (PARTIAL: 3 of 6) | 20-4 (Gemini + pin); `later-bedrock-vertex-and-kms-backends` |
 | FR4/FR47 mediation incl. Worker subprocess (PARTIAL) | 17-1 |
-| FR5 sandbox enforcement (PARTIAL: computed, never applied) | **by form (ADR-060):** Workers 17-1/17-2; third-party WASM 17-3b (admission) + 17-3c (execution under T2); first-party in-proc trusted |
+| FR5 sandbox enforcement (PARTIAL: computed, never applied) | **by form (ADR-060):** Workers 17-1/17-2; third-party WASM 17-3b (admission) + 17-3c (execution under T2); first-party in-proc trusted. **Declared-scope confinement at issuance** ("cannot exfiltrate outside its declared capability scope"): policy matches manifest scopes by discriminant only, so any selector of a declared kind is issued (`cap_policy/mod.rs:161-166`) → `17-11-scope-selector-entitlement` (D-17-9-PF-R4d A, 2026-10-22). **NFR-Sec-3's production half** (SandboxBlock rows never surfaced as anomalies) → `17-10-live-sandbox-anomaly-consumer` (D-17-9-PF-R4b A) |
 | FR6 cgroups v2 caps (TEST-ONLY) | 17-2 |
 | FR7 telemetry opt-in (ABSENT: no emitter) | explicit non-goal until an emitter exists (recorded in 15-5) |
 | FR9/FR13/FR16/FR24/FR51 verbs reaching a running Spirit (CANNED/PARTIAL) | 16-1 — ⚠ **R10 (Story 16-6): except FR9's `load`, which is `16-6`.** 16-1 shipped four of FR9's five verbs; the fifth has no verb in the tree, and 16-1's own round-table (F-B) split it out |
@@ -553,13 +553,14 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR20 Orchestrator buffering against the daemon (PARTIAL) | 19-2 |
 | FR21/FR25/FR52 real Workers (PARTIAL) | 19-1, 19-3 |
 | FR23b clock skew, partition, revocation (PARTIAL) | 21-3 |
-| FR28 kernel quota enforcement (PARTIAL) | 21-4 |
+| FR28 kernel quota enforcement (PARTIAL: no memory-tier quota exists) | `21-6-memory-tier-quota-enforcement` (operator ruling D-17-9-PF-R3 A, 2026-10-22; was mis-routed to 21-4, the instrument/env-registry story). A different unit from the capability-issuance window (17-9) and context tokens (18-5) |
+| ARCH §4.6 `cap-quota` capability-issuance window + operator-only `cap.quota:*` signals (Story 1b.2 AC4; DELIVERED by 17-9: 60,000 issuances per 60 s per admitted pid/incarnation, inclusive capacity) | `17-9-capability-issuance-quota-window` (epic-17 §R18). ADR-016 context-token accounting (PRD `domain-specific-requirements.md:52`; Spirit-self-reported, typed `ContextPressure` frames) is a different unit, not built by 17-9 → `18-5-context-token-budget-accounting` (D-17-9-FW-09 A, R17-204) |
 | FR29 `log.recall` for native and non-Rust forms (DELIVERED: participant + consent clauses; production limits below) | 17-3d supplies in-band runner transport and shared kernel mediation; `17-8-participant-recall-and-consent-envelopes` delivers both native and WASM participant scope (sent OR recorded admitted local recipient, this boot; role never grants participation) and persisted consent evaluation, header-only metadata, and `consent-withheld` fetch receipts. Daemon-only `ConsentEnvelope.recall` (default Full; unknown → Withheld) is the ratified `17-8-consent-recall-policy` lossless-frame exception, not WIT. **Production limits (AC3.6 / rule 11):** no production granter sets HeaderOnly/Withheld, no production ConsentGate is installed, and envelope-bearing frames reach admitted local recipients only via A2A delegation intake; peer-identity ruptures carry no envelope and withhold nothing; native compiled-in bus sends journal at pid 0 (non-goal). Earlier incarnations remain non-recallable by design (ADR-013); cross-wall stays emitter-scoped (ADR-058 D2). |
 | FR33 per-language templates (PARTIAL: Rust + TS harness) | 17-3b (`templates/spirit-ts` → `wasm-component` via componentize-js); Python later via componentize-py |
 | FR35/FR36 publish to a real registry, verified install (PARTIAL) | 20-1 |
 | FR37 vetter-side issuance (PARTIAL: zero callers) | 20-1 |
 | FR39/FR57 skill.author.self + revision proposals (CANNED) | follow-on at Epic 18 preflight |
-| FR45 re-distillation trigger (PARTIAL) | 21-4 |
+| FR45 re-distillation trigger + cross-Spirit cascade (PARTIAL: no trigger; Shared tier and unindexed distillates escape forget) | `18-6-fr45-forget-redistillation-and-cascade-closure` (operator ruling D-17-9-PF-R5 A, 2026-10-22; was mis-routed to 21-4, the instrument/env-registry story; ADR-044's unnamed "follow-up") |
 | FR48 operator-selectable crypto provider (PARTIAL) | later (post-v1.0) |
 | FR54 gateway connectors (CANNED) | parked v2.5 |
 | FR55 hook firers (CLOSED for compiled-in Spirits) | 17-4 — done 2026-10-20: live telemetry and idle-quiescent consolidation callers, Observer activity corpus and reviewed shutdown ordering. Spawned forms remain explicitly outside this story. |
@@ -579,3 +580,38 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | NFR-Meta-3 coverage matrix generated | 20-3 |
 
 **Journeys:** J0 → 16-2 · J-Butler → 18-1/18-4 · J-Researcher → 18-3 · J1 → 19-4 · J3 → 21-2 · J4 → 21-1 · Reza → 21-2 · J6 (Diego) → 20-1 + `ops-external-cohort-and-pen-test`.
+
+## Routing audit corrections (2026-10-22)
+
+Source: `../routing-audit-2026-10-22.md` — every row of the Recovery Coverage Map above was checked clause-by-clause against the owner story's AC text (verdicts OWNED / PARTIAL / MISROUTED / PARKED / LIVE-VERIFIED / LIVE-UNVERIFIED; 109 rows). Rows below supersede the map above for the named requirement; unlisted rows stand. New story keys are tracker `backlog` rows; their §-sections are written at the owning epic's preflight (operator directive 2026-09-06).
+
+| Requirement | Was | Now |
+|---|---|---|
+| FR39/FR57 `skill.author.self` + revision proposals | "follow-on at Epic 18 preflight" | `18-7-live-skill-authoring-and-revisions` (after 18-1) |
+| FR10/FR11/FR49 upgrade parity, archived-predecessor rejection, cold swap | 16-1 (compiled Butler swap only; `ColdSwapUnsupported`) | `19-5-cross-form-upgrade-and-cold-swap` ◆ FLAG-Winston (after 19-3) |
+| FR12/FR50, NFR-Rel-1 crash → originator delivery, dispositions | 16-3 (journaled, never mailbox-delivered; production `NullReplicaResolver`) | `19-6-crash-originator-delivery-and-disposition` (after 19-1) |
+| FR8 manifest fields (`skills`, `explanation_shape`, `intent_promotion_set`, `swap_invariants`) + signed admission | "already LIVE" | `20-8-manifest-contract-completion` ◆ FLAG-Winston (after 20-1) |
+| FR55 lifecycle hooks for spawned forms | 17-4 (compiled-in only) | `20-9-spawned-form-lifecycle-hooks` ◆ FLAG-Winston (after 20-8) |
+| FR2 purge residue (containers, cgroups) | 16-4 (reported, not removed) | `20-10-purge-residue-removal` (after 20-2) |
+| FR65 erasure inventory (intent lineage, pending halts, schedules) | 16-4 (`main.rs:9290-9305` assumes lineage empty; schedules `CoverageGap`) | `20-11-erasure-inventory-closure` (after 20-3c) |
+| FR29 production consent granter + `ConsentGate`; native pid | 17-8 (rule-11 label: none in production) | `21-7-production-consent-granter-and-gate` (after 21-2) |
+| Success-criteria "three-protocol coherence" (ACP + MCP + A2A, one session) | none | `21-8-three-protocol-session-witness` (after 21-2) |
+| FR14 human task envelope, FR19 halt-policy schema/CLI, FR24 re-emission provenance | 19-1 (ACs are machine dispatch only) | 19-1 — ACs widened at the E19 preflight |
+| FR51(a)(d) bounded interruption, revocation; FR51(c) | 16-1 | 19-2 (with FR20) |
+| FR21 fan-out floors, FR25 persona skills, FR40 startup refusal, FR4 1000-call proof | 19-1/19-3, 17-1, "LIVE" | 19-3 — ACs widened |
+| FR17 digest floors, FR58 zero-config Butler response | 18-1/19-4 (19-4 disclaims floors), 16-2 | 18-1 — ACs widened |
+| FR15 per-class halt floors; NFR-Test-4 Researcher/Orchestrator classes | 16-2; 18-2 (Butler only) | 18-2 — ACs widened |
+| NFR-Aud-7 binding five thresholds; J-Researcher full survey | 18-3 (faithfulness/hedge "never a CI floor") | 18-3 — ACs widened |
+| FR31 principal-namespace persistence; J-Butler persistent learning | unmapped; 18-4 defers | 18-4 — ACs widened; FR31 witness in 20-3b |
+| FR13 quarantine isolation; FR36 authenticated install; FR37 lapse/revocation consequences; FR59 ≤5 min sync | 16-1/17-1; 20-1 (policy only) | 20-1 — ACs widened |
+| FR1 RPM/cargo; NFR-Ops-12 air-gap witness runs substrate activity | 20-2 (`--version` witness) | 20-2 — ACs widened |
+| FR31/FR34/FR53/FR63 (LIVE-UNVERIFIED); I1–I14 ledger (guaranteed/asserted per `success-criteria.md:38`); adversarial corpus per invariant | "already LIVE"; none | 20-3b — coverage generator emits the witnesses and the invariant ledger |
+| FR41 `--tag` filter; FR62(b) TL emitter; NFR-Ops-9 operational RPO/RTO | none; 17-3b; 20-3a | 20-3c — ACs widened |
+| FR3 Kimi + per-Spirit selection | 20-4 | 20-4 — ACs widened |
+| FR16 posture-shift latency; the six PRD hot-path budgets | 16-1; 20-7 (1 of 6) | 20-7 — ACs widened |
+| FR23b skew/partition/CRL; NFR-Sec-13 scale/percentile acceptance | 21-3 | 21-3 — ACs widened |
+| J3/Reza live loop; J4 cross-host deployed fix | 21-2 / 21-1 (fixture + nightly mechanism scenes) | unchanged — mechanism-proven in the hermetic exit, live runs on the operator lane; the v1.0-rc ledger says so (audit DECIDE-5) |
+| NFR-Onb-1/Test-8/J6 N=12 cohort | `ops-external-cohort-and-pen-test` (≥3) | unchanged — honest N recorded; N=12 is the GA clause |
+| FR47 for Workers | 17-1 | narrowed by ADR-061 (proxy is the Worker's sole egress); first-party Spirits stay on the Inference Port |
+| FR6 macOS/Windows caps; FR33 Python template | 17-2 / 17-3b | parked v1.5 (Windows = 10.5's phase; round-3 "Python later") |
+| FR48 crypto provider selection (PRD v0.5); FR64 cost dimensions (PRD v1.0); FR54 gateway contracts; NFR-Maint-1 ≤20 KLOC | later / v2.5 / 21-4 | **operator decision owed** (audit DECIDE-1..4) — the parking contradicts the PRD phase and has no DELTA |

@@ -1,0 +1,11 @@
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -315,7 +315,7 @@
+ 
+ /// Story 17-3d R17-159 — the raw kinds a Spirit may recall (bus frames and MCP
+ /// invocations). The one list shared by the Rust check and the SQL predicate.
+-pub const SPIRIT_DISCLOSABLE_RAW_KINDS: [i64; 8] = [0, 1, 2, 3, 4, 5, 6, 18];
++pub const SPIRIT_DISCLOSABLE_RAW_KINDS: [i64; 9] = [0, 1, 2, 3, 4, 5, 6, 7, 18];
+ 
+ fn disclosable_kinds_sql(column: &str) -> String {
+     let kinds = SPIRIT_DISCLOSABLE_RAW_KINDS.map(|kind| kind.to_string());

@@ -738,8 +738,14 @@ fn mint<'a>(
         }
         Err(error) => ScopeDecision {
             scope,
-            kernel_verdict: matches!(error, GovernedMintError::KernelPolicyDenied)
-                .then_some("deny"),
+            // Story 17-9: the kernel evaluated the scope and either denied it
+            // or refused it for a spent issuance window; any other refusal
+            // (SSO, PDP, mediation) never reached a kernel verdict.
+            kernel_verdict: match error {
+                GovernedMintError::KernelPolicyDenied => Some("deny"),
+                GovernedMintError::QuotaExhausted => Some("exhausted"),
+                _ => None,
+            },
             refusal: Some(error.to_string()),
         },
     }

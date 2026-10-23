@@ -1,0 +1,5 @@
+# Re-pin step 2 — kernel surface re-derived against docs/ci-baselines/kernel-surface-v0.1-beta.json (unchanged, byte-identical: git diff empty)
+$ cargo run -p xtask -- check-service-boundary --classes /tmp/empty-classes.toml   # [classes] empty: any ADDED item would be unclassified
+check-service-boundary: PASSED (0 violations)
+$ git diff --stat -- docs/ci-baselines/kernel-surface-v0.1-beta.json
+(empty = byte-identical; zero additions, zero removals — the walker does not traverse the maos-capability re-export, capability/mod.rs:18)

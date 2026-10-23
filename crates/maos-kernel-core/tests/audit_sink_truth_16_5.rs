@@ -1,4 +1,6 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
@@ -40,17 +42,40 @@ impl CryptoProvider for MockCryptoProvider {
     }
 }
 
-fn adapter_with_audit_sender(audit: cap_audit::Sender) -> CapabilityRegistryAdapter {
+/// Story 17-9: a quota small enough to cross every threshold in a few issuances.
+const QUOTA_PID: u32 = 9;
+const QUOTA: cap_quota::IssuanceQuota = cap_quota::IssuanceQuota {
+    budget_per_window: 3,
+    window: Duration::from_secs(1),
+};
+
+/// Both tests touch the process-global audit-health counters; they serialize.
+static AUDIT_HEALTH: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
+#[derive(Debug, Default)]
+struct ManualClock(AtomicU64);
+impl cap_quota::QuotaClock for ManualClock {
+    fn now_ns(&self) -> u64 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+fn adapter_with_audit_sender(
+    audit: cap_audit::Sender,
+    clock: Arc<ManualClock>,
+) -> CapabilityRegistryAdapter {
     let policy = cap_policy::PolicyTable::new();
     let mut inner = cap_policy::PolicyTableInner::default();
-    inner.manifest_scopes.insert(
-        7,
-        cap_policy::ManifestCapabilityScope {
-            scopes: vec![Scope::LoomWrite],
-            declared_tier: SandboxTier(0),
-            trust_tier: cap_policy::decision::TrustTier::Verified,
-        },
-    );
+    for (pid, scope) in [(7, Scope::LoomWrite), (QUOTA_PID, Scope::LoomRead)] {
+        inner.manifest_scopes.insert(
+            pid,
+            cap_policy::ManifestCapabilityScope {
+                scopes: vec![scope],
+                declared_tier: SandboxTier(0),
+                trust_tier: cap_policy::decision::TrustTier::Verified,
+            },
+        );
+    }
     policy.update(inner);
 
     CapabilityRegistryAdapter::new(
@@ -59,10 +84,36 @@ fn adapter_with_audit_sender(audit: cap_audit::Sender) -> CapabilityRegistryAdap
         0x16_05,
         Arc::new(policy),
         audit,
-        cap_quota::CapQuotaTracker::new(),
+        cap_quota::CapQuotaTracker::with_clock(QUOTA, clock),
         Arc::new(WorkingMemoryStore::new()),
         Arc::new(TelemetryStreamAdapter::default()),
     )
+}
+
+/// Issue for `QUOTA_PID` until the quota refuses twice; returns the successes.
+fn exhaust_quota_pid(adapter: &CapabilityRegistryAdapter) -> u64 {
+    let mut issued = 0;
+    for attempt in 0..QUOTA.budget_per_window + 2 {
+        match adapter.issue(
+            QUOTA_PID,
+            Scope::LoomRead,
+            60,
+            [4u8; 32],
+            IntentClass::Standard,
+        ) {
+            Ok(_) => issued += 1,
+            Err(error) => {
+                assert!(attempt >= QUOTA.budget_per_window, "refused early: {error}");
+                assert_eq!(
+                    error,
+                    CapError::IssuanceQuotaExhausted {
+                        spirit_id: QUOTA_PID
+                    }
+                );
+            }
+        }
+    }
+    issued
 }
 
 /// AC1 / E15-A6: one SEQUENTIAL test owns the process-global audit-health
@@ -76,9 +127,11 @@ fn adapter_with_audit_sender(audit: cap_audit::Sender) -> CapabilityRegistryAdap
 /// instrument and proceed.
 #[test]
 fn audit_sink_truth_lifecycle_healthy_then_closed() {
+    let _serial = AUDIT_HEALTH.lock();
     cap_tokens::init_monotonic_base();
     let (audit, mut receiver) = cap_audit::channel();
-    let adapter = adapter_with_audit_sender(audit);
+    let clock = Arc::new(ManualClock::default());
+    let adapter = adapter_with_audit_sender(audit, clock.clone());
     let token = adapter
         .issue(
             7,
@@ -103,6 +156,58 @@ fn audit_sink_truth_lifecycle_healthy_then_closed() {
         cap_audit::audit_health_snapshot(),
         healthy,
         "a healthy sink counts zero drops and latches nothing"
+    );
+
+    // ── Full sink (Story 17-9 AC4.5): quota sends drop as `Quota`, once each ──
+    let filler = cap_audit::CapAuditEvent::Revoke {
+        token_id: token.token_id,
+        reason: cap_tokens::RevokeReason::Operator,
+    };
+    let mut fillers = 0;
+    while adapter.audit_sender().try_send(filler.clone()).is_ok() {
+        fillers += 1;
+    }
+    assert_eq!(fillers, cap_audit::AUDIT_CHANNEL_DEPTH);
+    let before_full = cap_audit::audit_health_snapshot();
+    assert_eq!(
+        exhaust_quota_pid(&adapter),
+        QUOTA.budget_per_window,
+        "a full sink leaves issuance accounting unchanged"
+    );
+    let after_full = cap_audit::audit_health_snapshot();
+    // Pressure and Limit (both reached by the 3rd commit) and the first refusal.
+    assert_eq!(
+        after_full.count(cap_audit::AuditDropSite::Quota),
+        before_full.count(cap_audit::AuditDropSite::Quota) + 3
+    );
+    assert_eq!(
+        after_full.count(cap_audit::AuditDropSite::Issue),
+        before_full.count(cap_audit::AuditDropSite::Issue) + QUOTA.budget_per_window
+    );
+    assert_eq!(after_full.total_drops, before_full.total_drops + 6);
+    assert_eq!(
+        after_full.degraded, before_full.degraded,
+        "Full never latches"
+    );
+    for _ in 0..fillers {
+        assert_eq!(receiver.try_recv().unwrap(), filler);
+    }
+    // A dropped signal is never retried: the drained sink receives nothing
+    // for this window, even from a further refusal.
+    assert!(adapter
+        .issue(
+            QUOTA_PID,
+            Scope::LoomRead,
+            60,
+            [4u8; 32],
+            IntentClass::Standard
+        )
+        .is_err());
+    assert!(receiver.try_recv().is_err(), "no duplicate quota enqueue");
+    assert_eq!(
+        cap_audit::audit_health_snapshot(),
+        after_full,
+        "a non-first refusal sends nothing"
     );
 
     // ── Writer death: every audit send drops; record_invocation refuses ──
@@ -145,6 +250,24 @@ fn audit_sink_truth_lifecycle_healthy_then_closed() {
         final_health.degraded,
         "writer death is process-lifetime degradation"
     );
+
+    // ── Closed sink (AC4.5): the next window's quota sends drop as `Quota` ──
+    clock
+        .0
+        .store(QUOTA.window.as_nanos() as u64, Ordering::SeqCst);
+    let before_closed = cap_audit::audit_health_snapshot();
+    assert_eq!(
+        exhaust_quota_pid(&adapter),
+        QUOTA.budget_per_window,
+        "a closed sink leaves issuance accounting unchanged"
+    );
+    let after_closed = cap_audit::audit_health_snapshot();
+    assert_eq!(
+        after_closed.count(cap_audit::AuditDropSite::Quota),
+        before_closed.count(cap_audit::AuditDropSite::Quota) + 3
+    );
+    assert_eq!(after_closed.total_drops, before_closed.total_drops + 6);
+    assert!(after_closed.degraded);
 }
 
 /// AC1's class-wide counter wiring: every `AuditDropSite` variant increments
@@ -152,6 +275,7 @@ fn audit_sink_truth_lifecycle_healthy_then_closed() {
 /// site wired to the wrong variant (or not wired at all) cannot hide.
 #[test]
 fn every_audit_drop_site_counts_into_its_own_counter() {
+    let _serial = AUDIT_HEALTH.lock();
     cap_tokens::init_monotonic_base();
     let sites = [
         cap_audit::AuditDropSite::Issue,
@@ -161,6 +285,7 @@ fn every_audit_drop_site_counts_into_its_own_counter() {
         cap_audit::AuditDropSite::Verification,
         cap_audit::AuditDropSite::SandboxBlock,
         cap_audit::AuditDropSite::AcpNotification,
+        cap_audit::AuditDropSite::Quota,
     ];
     let before = cap_audit::audit_health_snapshot();
     for site in &sites {

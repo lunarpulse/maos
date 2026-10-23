@@ -1,0 +1,12 @@
+--- a/crates/maos-capability/src/cap_quota/mod.rs
++++ b/crates/maos-capability/src/cap_quota/mod.rs
+@@ -264,7 +264,9 @@
+             .max(slot.window)
+             .max(self.state.swept.load(Ordering::Acquire));
+         if window > slot.window {
++            let fired = slot.fired;
+             *slot = Slot::new(window);
++            slot.fired = fired;
+         }
+         if slot.reserved == self.state.quota.budget_per_window {
+             let first_in_window = !slot.exhausted;

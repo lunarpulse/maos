@@ -151,6 +151,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "capability.invocation",
             None,
+            "cap.quota:pressure",
+            r#"{"window":0,"used":48000,"budget":60000}"#,
+            1,
+            "cap quota ord5",
+        ),
+        (
+            "capability.invocation",
+            None,
             "lifecycle.admit",
             r#"{"spirit_id":"hello-spirit"}"#,
             1,

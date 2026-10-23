@@ -1,0 +1,11 @@
+--- a/crates/maos-kernel-core/src/capability/mod.rs
++++ b/crates/maos-kernel-core/src/capability/mod.rs
+@@ -241,7 +241,7 @@
+             used,
+             budget: self.quota.quota().budget_per_window,
+         }) {
+-            cap_audit::record_send_error(cap_audit::AuditDropSite::Quota, &error);
++            cap_audit::record_send_error(cap_audit::AuditDropSite::Issue, &error);
+         }
+     }
+ 

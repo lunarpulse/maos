@@ -1,0 +1,18 @@
+--- a/crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs
++++ b/crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs
+@@ -127,14 +127,7 @@
+                 "budget": budget,
+             })
+             .to_string();
+-            log.insert_frame_event(
+-                FrameKind::CapabilityInvocation,
+-                *spirit_pid,
+-                None,
+-                signal.intent(),
+-                payload.as_bytes(),
+-                FrameOrigin::Kernel,
+-            );
++            let _ = (spirit_pid, signal, payload);
+         }
+     }
+ }

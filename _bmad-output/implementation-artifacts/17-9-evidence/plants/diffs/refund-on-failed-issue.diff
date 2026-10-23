@@ -1,0 +1,11 @@
+--- a/crates/maos-kernel-core/src/capability/mod.rs
++++ b/crates/maos-kernel-core/src/capability/mod.rs
+@@ -222,7 +222,7 @@
+         {
+             Ok(token) => token,
+             Err(error) => {
+-                self.quota.refund(charge);
++                drop(charge);
+                 return Err(error);
+             }
+         };

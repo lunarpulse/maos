@@ -94,4 +94,16 @@ Resource ceilings are independent: `cpu_max_pct` is a positive percentage of one
 
 `[capabilities.required.log]` declares two independent boolean grants: `recall` for `Scope::LogRecall`, and `fetch` for `Scope::LogFetch`. Both default to `false`; unknown keys are rejected. The example opts into both. This table requires schema v5: below schema 5 it is dropped with a degradation warning, just like `[capabilities.required.iac]`, and grants no log scopes. Omission grants neither capability. Calls still undergo per-call policy mediation; a declaration alone does not bypass operator denial or issuance quota.
 
+The issuance budget is not a manifest or operator setting:
+`DEFAULT_ISSUANCE_QUOTA` is an inclusive 60,000 issuances per 60 s monotonic
+tumbling window per admitted scheduler pid/incarnation, with ≤ 2·B burst across
+one boundary. Policy precedes quota and token issuance; failed signing refunds.
+Exhausted recall/fetch return `capability-denied` and can resume next window.
+See the [issuance-quota reference](/manifest/v5#capability-issuance-quota) for
+operator-only `cap.quota:*` signals, qualified delivery, all path-specific
+denials and labelled limits. In particular, there is no Spirit-facing issuance
+pre-warning or stable-Spirit/principal-wide/Worker-spawn-churn bound. This does
+not configure or implement ADR-016 context-token accounting, owned by
+`18-5-context-token-budget-accounting`, not 17-9.
+
 See [Manifest Reference](/manifest/latest) for the complete field-level specification.

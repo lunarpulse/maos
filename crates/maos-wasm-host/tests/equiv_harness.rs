@@ -945,7 +945,7 @@ fn cap_error_kind(err: &CapError) -> &'static str {
         CapError::SpiritIdMismatch => "SpiritIdMismatch",
         CapError::SignatureMismatch => "SignatureMismatch",
         CapError::PostureMismatch => "PostureMismatch",
-        CapError::ContextExhausted { .. } => "ContextExhausted",
+        CapError::IssuanceQuotaExhausted { .. } => "IssuanceQuotaExhausted",
         CapError::PolicyDenied => "PolicyDenied",
         CapError::AuditSinkUnavailable => "AuditSinkUnavailable",
     }

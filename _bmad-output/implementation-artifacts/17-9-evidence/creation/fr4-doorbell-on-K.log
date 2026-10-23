@@ -1,0 +1,68 @@
+# 17-9 creation — FR4 writer-inventory doorbell against prototype K (applied to a detached worktree of 3a7c4260)
+# prototype-K.diff sha256: 724029047026514bc6a4823386ef0b133d5dc6f93c6febce2d7f76843edb6f58
+# rustc: rustc 1.98.1 (48a229cea 2026-09-01)
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-9-verify cargo test --offline --locked -p maos-audit --test fr4_classifier_16_2
+    Blocking waiting for file lock on build directory
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+58 ~     fn retract(
+...
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+help: use `'_` for type paths
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+note: but the private item here shadows it
+note: multiple earlier patterns match some of the same values
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 27.09s
+     Running tests/fr4_classifier_16_2.rs (/mnt/build/cargo-17-9-verify/debug/deps/fr4_classifier_16_2-298a187dd189ab2c)
+running 17 tests
+test a_call_shaped_writer_stays_a_violation_at_a_spirit_pid ... ok
+test attributed_and_tokenless_recall_fetch_rows_remain_calls ... ok
+test every_never_call_kind_is_a_non_call ... ok
+test cfg_test_items_are_skipped ... ok
+test lifecycle_bogus_is_a_violation_the_prefix_is_refused ... ok
+test lifecycle_load_without_spirit_id_is_a_violation ... ok
+test lifecycle_start_with_foreign_pid_is_a_violation ... ok
+test every_noncall_writer_shape_classifies_from_its_measured_payload ... ok
+test plain_fr4_renders_every_row_with_its_intent ... ok
+test ndjson_over_a_mixed_set_emits_exactly_the_call_rows ... ok
+test plain_table_gains_the_trailing_intent_column ... ok
+test scanner_inventories_optional_capability_tokens_not_only_literal_none ... ok
+test tokenless_inference_call_is_a_violation ... ok
+test the_scanner_reds_on_an_unlisted_scratch_site ... ok
+test tokenless_shell_turn_is_a_violation ... ok
+test shared_recall_fetch_writers_have_call_dispositions ... ok
+test every_writer_site_demanding_a_disposition_has_one ... FAILED
+failures:
+---- every_writer_site_demanding_a_disposition_has_one stdout ----
+thread 'every_writer_site_demanding_a_disposition_has_one' (579885) panicked at crates/maos-audit/tests/fr4_classifier_16_2.rs:867:9:
+writer site demanding a disposition (tokenless kind-7, variable-kind, or kind-1 TaskComplete) (writer_task.rs, write_to_transparency_log, ord 5) has NO disposition — classify it in WRITER_SHAPES (NonCall with its measured kind, token column and payload shape, or Call)
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: fr4_classifier_16_2::every_writer_site_demanding_a_disposition_has_one
+             at ./tests/fr4_classifier_16_2.rs:867:9
+   3: fr4_classifier_16_2::every_writer_site_demanding_a_disposition_has_one::{closure#0}
+             at ./tests/fr4_classifier_16_2.rs:826:55
+   4: <fr4_classifier_16_2::every_writer_site_demanding_a_disposition_has_one::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+failures:
+    every_writer_site_demanding_a_disposition_has_one
+test result: FAILED. 16 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+error: test failed, to rerun pass `-p maos-audit --test fr4_classifier_16_2`

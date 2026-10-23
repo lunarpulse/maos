@@ -1,0 +1,22 @@
+red atomicity	rc=101 red at the named assertion:  right: 1
+red charge-after-policy	rc=101 red at the named assertion:  right: Err(PolicyDenied)
+red cli-refusal	rc=101 red at the named assertion: [child local_exhaustion_refuses_before_workload] quota exhaustion must refuse before workload launch on remote=false: Ok(Completed { final_message: "worker: task complete" })
+red confidentiality	rc=101 red at the named assertion: thread 'quota_audit_and_mcp_receipts_are_operator_visible_but_never_spirit_disclosed' (10844) panicked at crates/maos-bin/tests/recall_mediation_17_3d.rs:975:5:
+red crossing-on-successful-issuance	rc=101 red at the named assertion:  right: [(Pressure, 16)]
+red drop-accounting	rc=101 red at the named assertion: test audit_sink_truth_lifecycle_healthy_then_closed ... FAILED
+red epoch-never-decreases	rc=101 red at the named assertion:  right: Err(IssuanceQuotaExhausted { spirit_id: 7 })
+red fr4-disposition	rc=101 red at the named assertion: test every_writer_site_demanding_a_disposition_has_one ... FAILED
+red inclusive-capacity	rc=101 red at the named assertion: issuance 60000 of 60000 for pid 7: Spirit 7 capability issuance quota exhausted
+red mcp-receipt	rc=101 red at the named assertion: assertion `left == right` failed: exactly one MCP refusal receipt
+red mint-after-bucket	rc=101 red at the named assertion: assertion `left == right` failed: minted only for admitted fires
+red once-per-window	rc=101 red at the named assertion:  right: 1
+red posture-delta	rc=101 red at the named assertion:  right: 2
+red quota-rows-reach-tl	rc=101 red at the named assertion:  right: 6
+red ratification-loader-decode-all	rc=101 red at the named assertion: every kind-28 row is classified: Row("kind-28 row 1 (intent \"spirit.frame.authorization\") is neither a listed receipt nor a typed governance event: missing field `recorded_at_ns` at line 1 column 21")
+red ratification-loader-payload	rc=101 red at the named assertion: every kind-28 row is classified: Query(SqlInputError { error: Error { code: Unknown, extended_code: 1 }, msg: "no such column: payload", sql: "SELECT rowid, intent, payload FROM transparency_log WHERE kind = ?1 ORDER BY rowid ASC", offset: 22 })
+red rearm-on-rollover	rc=101 red at the named assertion:  right: [(Pressure, 48000)]
+red recall-typed-denial	rc=101 red at the named assertion:  right: Err(CapabilityDenied)
+red refund-on-failed-issue	rc=101 red at the named assertion: issuance 4 of 4 for pid 7: Spirit 7 capability issuance quota exhausted
+red session-verdict	rc=101 red at the named assertion:  right: Some("exhausted")
+red strictly-older-sweep	rc=101 red at the named assertion: test cap_quota::tests::overlapping_sweeps_never_remove_a_slot_of_the_current_or_a_later_window ... FAILED
+red window-rollover	rc=101 red at the named assertion: issuance 1 of 60000 for pid 7: Spirit 7 capability issuance quota exhausted

@@ -441,4 +441,38 @@ fn butler_undeclared_tool_returns_capability_denied() {
         stderr.contains("token issuance failed for MCP call"),
         "expected capability scope mismatch or token issuance failure on calendar tool call. stderr was:\n{stderr}"
     );
+
+    let db = rusqlite::Connection::open(home.path.join("audit/transparency.sqlite")).unwrap();
+    let mut statement = db
+        .prepare(
+            "SELECT spirit_pid, from_spirit_id, payload_redacted FROM transparency_log \
+         WHERE kind = 28 AND intent = 'mcp.call.refused:capability-denied'",
+        )
+        .unwrap();
+    let rows: Vec<(u32, String, Vec<u8>)> = statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    let calendar: Vec<_> = rows
+        .iter()
+        .filter(|(_, _, payload)| {
+            let value: serde_json::Value = serde_json::from_slice(payload).unwrap();
+            value["server"] == "calendar" && value["tool"] == "list_events"
+        })
+        .collect();
+    assert_eq!(
+        calendar.len(),
+        1,
+        "one calendar policy-denial receipt; stderr:\n{stderr}"
+    );
+    let (pid, sender, payload) = calendar[0];
+    assert_ne!(
+        *pid, 0,
+        "receipt uses the admitted Butler pid, not its constructor placeholder"
+    );
+    assert_eq!(sender, "butler");
+    let value: serde_json::Value = serde_json::from_slice(payload).unwrap();
+    assert_eq!(value["op"], "mcp.call");
+    assert_eq!(value["code"], "capability-denied");
 }

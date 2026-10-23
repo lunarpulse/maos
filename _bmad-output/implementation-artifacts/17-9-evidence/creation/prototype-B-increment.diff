@@ -1,0 +1,359 @@
+diff --git a/crates/maos-bin/src/lib.rs b/crates/maos-bin/src/lib.rs
+index 8f5c75e..3f183f4 100644
+--- a/crates/maos-bin/src/lib.rs
++++ b/crates/maos-bin/src/lib.rs
+@@ -50,6 +50,8 @@ pub mod hook_pump;
+ /// integration tests execute the production lattice; an in-`src` test module
+ /// would be budget-charged and CI-invisible.
+ pub mod inference_mode;
++#[cfg(feature = "network")]
++pub mod mcp_mint;
+ /// Story 16-1 (D-16-1-N) — the operator door's port implementation over the
+ /// daemon's real kernel objects, plus the store lock set (D-16-1-D). In the
+ /// library, not `main.rs`, so `tests/operator_door_16_1.rs` drives the REAL
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index a703741..36324af 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -869,6 +869,8 @@ struct LiveButlerMcpPort {
+     posture_hash: [u8; 32],
+     mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
+     capability: Arc<CapabilityRegistryAdapter>,
++    journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
++    spirit_id: String,
+     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+     enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+ }
+@@ -881,6 +883,8 @@ impl LiveButlerMcpPort {
+         capability: Arc<CapabilityRegistryAdapter>,
+         enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+         enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
++        journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
++        spirit_id: String,
+     ) -> Self {
+         Self {
+             spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
+@@ -889,6 +893,8 @@ impl LiveButlerMcpPort {
+             capability,
+             enterprise_runtime,
+             enterprise_pdp_runtime,
++            journal,
++            spirit_id,
+         }
+     }
+     // Comment budget on Winston's request
+@@ -958,20 +964,17 @@ impl LiveButlerMcpPort {
+         tool: &str,
+         args: serde_json::Value,
+     ) -> Result<serde_json::Value, butler::ButlerMcpError> {
+-        let scope = Scope::McpCall {
+-            server: server.into(),
+-            tool: tool.into(),
+-        };
+-        let token = issue_enterprise_governed_capability(
++        let token = maos_bin::mcp_mint::mint_mcp_capability(
+             self.capability.as_ref(),
+             self.enterprise_runtime.as_deref(),
+             self.enterprise_pdp_runtime.as_ref(),
++            self.journal.as_ref(),
++            &self.spirit_id,
+             self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst),
+-            scope,
+-            60,
+-            // Pass [0u8; 32] because the kernel's McpClientAdapter is hardcoded to verify using [0u8; 32]
++            server,
++            tool,
++            // Match the kernel McpClientAdapter's verification posture.
+             [0u8; 32],
+-            IntentClass::Standard,
+         )
+         .map_err(|_| butler::ButlerMcpError::TokenIssuanceFailed)?;
+         let response = self
+@@ -1011,6 +1014,8 @@ struct LiveResearcherMcpPort {
+     posture_hash: [u8; 32],
+     mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
+     capability: Arc<CapabilityRegistryAdapter>,
++    journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
++    spirit_id: Arc<str>,
+     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+     enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+     handle: tokio::runtime::Handle,
+@@ -1025,6 +1030,8 @@ impl LiveResearcherMcpPort {
+         capability: Arc<CapabilityRegistryAdapter>,
+         enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+         enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
++        journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
++        spirit_id: String,
+     ) -> Self {
+         Self {
+             spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
+@@ -1033,6 +1040,8 @@ impl LiveResearcherMcpPort {
+             capability,
+             enterprise_runtime,
+             enterprise_pdp_runtime,
++            journal,
++            spirit_id: spirit_id.into(),
+             handle: tokio::runtime::Handle::current(),
+             sem: Arc::new(tokio::sync::Semaphore::new(
+                 researcher::RESEARCHER_PARALLELISM,
+@@ -1091,6 +1100,8 @@ impl LiveResearcherMcpPort {
+             let posture_hash = self.posture_hash;
+             let enterprise_runtime = self.enterprise_runtime.clone();
+             let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
++            let journal = Arc::clone(&self.journal);
++            let spirit_id = Arc::clone(&self.spirit_id);
+             set.spawn(async move {
+                 let _permit = sem.acquire().await.map_err(|e| {
+                     researcher::ResearcherMcpError::CallFailed {
+@@ -1100,19 +1111,16 @@ impl LiveResearcherMcpPort {
+                     }
+                 })?;
+                 let content = tokio::task::spawn_blocking(move || {
+-                    let scope = Scope::McpCall {
+-                        server: server.into(),
+-                        tool: tool.into(),
+-                    };
+-                    let token = issue_enterprise_governed_capability(
++                    let token = maos_bin::mcp_mint::mint_mcp_capability(
+                         capability.as_ref(),
+                         enterprise_runtime.as_deref(),
+                         enterprise_pdp_runtime.as_ref(),
++                        journal.as_ref(),
++                        &spirit_id,
+                         spirit_pid,
+-                        scope,
+-                        60,
++                        server,
++                        tool,
+                         posture_hash,
+-                        IntentClass::Standard,
+                     )
+                     .map_err(|e| {
+                         researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
+@@ -1194,6 +1202,8 @@ impl LiveResearcherMcpPort {
+             let posture_hash = self.posture_hash;
+             let enterprise_runtime = self.enterprise_runtime.clone();
+             let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
++            let journal = Arc::clone(&self.journal);
++            let spirit_id = Arc::clone(&self.spirit_id);
+             set.spawn(async move {
+                 let _permit = sem.acquire().await.map_err(|e| {
+                     researcher::ResearcherMcpError::CallFailed {
+@@ -1203,19 +1213,16 @@ impl LiveResearcherMcpPort {
+                     }
+                 })?;
+                 let claim = tokio::task::spawn_blocking(move || {
+-                    let scope = Scope::McpCall {
+-                        server: fetch_server.into(),
+-                        tool: fetch_tool.into(),
+-                    };
+-                    let token = issue_enterprise_governed_capability(
++                    let token = maos_bin::mcp_mint::mint_mcp_capability(
+                         capability.as_ref(),
+                         enterprise_runtime.as_deref(),
+                         enterprise_pdp_runtime.as_ref(),
++                        journal.as_ref(),
++                        &spirit_id,
+                         spirit_pid,
+-                        scope,
+-                        60,
++                        fetch_server,
++                        fetch_tool,
+                         posture_hash,
+-                        IntentClass::Standard,
+                     )
+                     .map_err(|e| {
+                         researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
+@@ -5203,6 +5210,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                                     Arc::clone(&capability),
+                                     enterprise_runtime.clone(),
+                                     enterprise_pdp_runtime.clone(),
++                                    Arc::clone(&transparency_log),
++                                    spirit_id.clone(),
+                                 ));
+                                 butler = butler.with_mcp_port(
+                                     Arc::clone(&live_mcp) as Arc<dyn butler::ButlerMcpPort>
+@@ -5396,6 +5405,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                                     Arc::clone(&capability),
+                                     enterprise_runtime.clone(),
+                                     enterprise_pdp_runtime.clone(),
++                                    Arc::clone(&transparency_log),
++                                    spirit_id.clone(),
+                                 ));
+                                 researcher = researcher
+                                     .with_mcp_port(Arc::clone(&live_mcp)
+@@ -13742,7 +13753,17 @@ mod tests {
+                 Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
+             ),
+         );
+-        let port = LiveButlerMcpPort::new(0, [0u8; 32], client, cap, None, None);
++        let journal = Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(1));
++        let port = LiveButlerMcpPort::new(
++            0,
++            [0u8; 32],
++            client,
++            cap,
++            None,
++            None,
++            journal,
++            "butler".into(),
++        );
+         assert_eq!(port.spirit_pid.load(std::sync::atomic::Ordering::SeqCst), 0);
+         assert_eq!(port.posture_hash, [0u8; 32]);
+     }
+diff --git a/crates/maos-bin/src/mcp_mint.rs b/crates/maos-bin/src/mcp_mint.rs
+new file mode 100644
+index 0000000..85a1d4c
+--- /dev/null
++++ b/crates/maos-bin/src/mcp_mint.rs
+@@ -0,0 +1,60 @@
++//! Governed MCP minting with a durable refusal before the caller returns.
++
++use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
++use maos_domain::invariants::i3::FrameOrigin;
++use maos_iac::adapter::transparency_log::{FrameKind, TransparencyLogAdapter};
++use maos_kernel_core::capability::CapabilityRegistryAdapter;
++
++use crate::enterprise_identity::EnterpriseRuntime;
++use crate::enterprise_pdp_runtime::EnterprisePdpRuntime;
++use crate::worker_spawn::{issue_enterprise_governed_capability, GovernedMintError};
++
++/// Mint for one MCP call, journaling exactly one capability-denied receipt on
++/// failure. The composition root supplies the trusted sender and current pid;
++/// no MCP request can choose either. The original typed mint error is preserved.
++#[allow(clippy::too_many_arguments)]
++pub fn mint_mcp_capability(
++    capability: &CapabilityRegistryAdapter,
++    enterprise: Option<&EnterpriseRuntime>,
++    pdp: Option<&EnterprisePdpRuntime>,
++    journal: &TransparencyLogAdapter,
++    spirit_id: &str,
++    spirit_pid: u32,
++    server: &str,
++    tool: &str,
++    posture_hash: [u8; 32],
++) -> Result<CapabilityToken, GovernedMintError> {
++    issue_enterprise_governed_capability(
++        capability,
++        enterprise,
++        pdp,
++        spirit_pid,
++        Scope::McpCall {
++            server: server.into(),
++            tool: tool.into(),
++        },
++        60,
++        posture_hash,
++        IntentClass::Standard,
++    )
++    .map_err(|error| {
++        #[derive(serde::Serialize)]
++        struct RefusalPayload<'a> {
++            server: &'a str,
++            tool: &'a str,
++        }
++        let payload = serde_json::to_vec(&RefusalPayload { server, tool })
++            .expect("MCP refusal receipt contains only serializable strings");
++        journal.insert_frame_event_with_sender(
++            FrameKind::GovernanceEvent,
++            spirit_pid,
++            spirit_id,
++            "",
++            None,
++            "mcp.call.refused:capability-denied",
++            &payload,
++            FrameOrigin::Kernel,
++        );
++        error
++    })
++}
+diff --git a/crates/maos-bin/src/spirit_session.rs b/crates/maos-bin/src/spirit_session.rs
+index a6b174f..cb45fe8 100644
+--- a/crates/maos-bin/src/spirit_session.rs
++++ b/crates/maos-bin/src/spirit_session.rs
+@@ -738,8 +738,11 @@ fn mint<'a>(
+         }
+         Err(error) => ScopeDecision {
+             scope,
+-            kernel_verdict: matches!(error, GovernedMintError::KernelPolicyDenied)
+-                .then_some("deny"),
++            kernel_verdict: match &error {
++                GovernedMintError::KernelPolicyDenied => Some("deny"),
++                GovernedMintError::QuotaExhausted => Some("exhausted"),
++                _ => None,
++            },
+             refusal: Some(error.to_string()),
+         },
+     }
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+index ce1cf1a..89c998b 100644
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -297,6 +297,7 @@ fn principal_attributes_for_pdp(
+ /// the AC5 host grant is the ratified stronger authority there). A denial is a
+ /// REFUSAL on the receiving path; a missing kernel policy grant is 2a's FORK B
+ /// loud-proceed on both paths.
++/// Quota exhaustion is a refusal on both paths; host grants cannot bypass it.
+ #[cfg(feature = "network")]
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub enum GovernedMintError {
+@@ -306,6 +307,8 @@ pub enum GovernedMintError {
+     PdpDenied(String),
+     /// The kernel policy evaluated the requested scope and denied issuance.
+     KernelPolicyDenied,
++    /// The kernel's capability issuance quota has no remaining capacity.
++    QuotaExhausted,
+     /// Other mediation or identity-persistence failure.
+     Mediation(String),
+ }
+@@ -315,6 +318,7 @@ impl std::fmt::Display for GovernedMintError {
+     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         match self {
+             Self::KernelPolicyDenied => write!(f, "kernel policy denied capability issuance"),
++            Self::QuotaExhausted => write!(f, "kernel capability issuance quota exhausted"),
+             Self::SsoAssertionMissing(m) | Self::PdpDenied(m) | Self::Mediation(m) => {
+                 write!(f, "{m}")
+             }
+@@ -379,6 +383,9 @@ pub fn issue_enterprise_governed_capability(
+             maos_domain::ports::capability::CapError::PolicyDenied => {
+                 GovernedMintError::KernelPolicyDenied
+             }
++            maos_domain::ports::capability::CapError::ContextExhausted { .. } => {
++                GovernedMintError::QuotaExhausted
++            }
+             _ => GovernedMintError::Mediation(format!("kernel capability mediation failed: {e}")),
+         })?;
+ 
+@@ -881,18 +888,21 @@ pub fn run_cli_wrapper_manifest(
+             // Story 16-3: this refusal is now AFTER `bind`, so it leaves
+             // through the guard — `lifecycle.unload`, a PlannedUnload receipt
+             // and the stop disposition, never a bound Worker with no process.
+-            if remote_requested {
+-                match &e {
+-                    GovernedMintError::SsoAssertionMissing(_) | GovernedMintError::PdpDenied(_) => {
+-                        return Err(format!(
+-                            "host B REFUSES the remote-requested spawn: governance denial ({e}). \
+-                             On the receiving path a PDP/SSO denial is a refusal, never a \
+-                             downgrade to host-grant authority (§A6 review D1)"
+-                        )
+-                        .into());
+-                    }
+-                    GovernedMintError::KernelPolicyDenied | GovernedMintError::Mediation(_) => {}
++            match &e {
++                GovernedMintError::QuotaExhausted => {
++                    return Err(format!("maos run: REFUSES the spawn: {e}").into());
++                }
++                GovernedMintError::SsoAssertionMissing(_) | GovernedMintError::PdpDenied(_)
++                    if remote_requested =>
++                {
++                    return Err(format!(
++                        "host B REFUSES the remote-requested spawn: governance denial ({e}). \
++                         On the receiving path a PDP/SSO denial is a refusal, never a \
++                         downgrade to host-grant authority (§A6 review D1)"
++                    )
++                    .into());
+                 }
++                _ => {}
+             }
+             eprintln!(
+                 "maos run: cli_wrapper cap-token mediation not granted ({e}); proceeding under \

@@ -1,0 +1,204 @@
+[
+  {
+    "id": "window-rollover",
+    "control": "Window rollover",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 one_pid_keeps_its_capabilities_across_three_windows",
+    "expect": [
+      "issuance 1 of 60000 for pid 7"
+    ]
+  },
+  {
+    "id": "inclusive-capacity",
+    "control": "Inclusive capacity",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 one_pid_keeps_its_capabilities_across_three_windows && cargo test --locked -p maos-capability --test issuance_quota_17_9 capacity_is_inclusive",
+    "expect": [
+      "issuance 60000 of 60000 for pid 7"
+    ]
+  },
+  {
+    "id": "charge-after-policy",
+    "control": "Charge after policy",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 policy_denials_and_approval_required_never_charge",
+    "expect": [
+      "right: Err(PolicyDenied)"
+    ]
+  },
+  {
+    "id": "refund-on-failed-issue",
+    "control": "Refund on failed issue",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 failed_or_late_signing_keeps_capacity_and_crossings_exact",
+    "expect": [
+      "issuance 4 of 4 for pid 7"
+    ]
+  },
+  {
+    "id": "crossing-on-successful-issuance",
+    "control": "Crossing on successful issuance",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 failed_or_late_signing_keeps_capacity_and_crossings_exact",
+    "expect": [
+      "right: [(Pressure, 16)]"
+    ]
+  },
+  {
+    "id": "once-per-window",
+    "control": "Once per window",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 pressure_limit_and_exhausted_fire_once_per_window",
+    "expect": [
+      "right: 1"
+    ]
+  },
+  {
+    "id": "rearm-on-rollover",
+    "control": "Re-arm on rollover",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 pressure_limit_and_exhausted_fire_once_per_window",
+    "expect": [
+      "right: [(Pressure, 48000)]"
+    ]
+  },
+  {
+    "id": "epoch-never-decreases",
+    "control": "Epoch never decreases",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 racing_issuers_never_exceed_or_restore_capacity",
+    "expect": [
+      "right: Err(IssuanceQuotaExhausted { spirit_id: 7 })"
+    ]
+  },
+  {
+    "id": "atomicity",
+    "control": "Atomicity",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 racing_issuers_never_exceed_or_restore_capacity",
+    "expect": [
+      "right: 1"
+    ]
+  },
+  {
+    "id": "strictly-older-sweep",
+    "control": "Strictly-older sweep",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-capability --lib cap_quota",
+    "expect": [
+      "overlapping_sweeps_never_remove_a_slot_of_the_current_or_a_later_window"
+    ]
+  },
+  {
+    "id": "quota-rows-reach-tl",
+    "control": "Quota rows reach the TL",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test issuance_quota_window_17_9 -- --nocapture --test-threads=1 quota_rows_reach_the_transparency_log",
+    "expect": [
+      "right: 6"
+    ]
+  },
+  {
+    "id": "drop-accounting",
+    "control": "Drop accounting",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --test audit_sink_truth_16_5",
+    "expect": [
+      "audit_sink_truth_lifecycle_healthy_then_closed"
+    ]
+  },
+  {
+    "id": "fr4-disposition",
+    "control": "FR4 disposition",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-audit --test fr4_classifier_16_2",
+    "expect": [
+      "every_writer_site_demanding_a_disposition_has_one"
+    ]
+  },
+  {
+    "id": "posture-delta",
+    "control": "Posture delta",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-audit --lib log_composition",
+    "expect": [
+      "right: 2"
+    ]
+  },
+  {
+    "id": "mint-after-bucket",
+    "control": "Mint after bucket (FW-10)",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-kernel-core --features fixture_replay --test schedule_watchdog_fr26 schedule_17_9",
+    "expect": [
+      "minted only for admitted fires"
+    ]
+  },
+  {
+    "id": "ratification-loader-payload",
+    "control": "Ratification loader (select payload)",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-audit --test ratification_loader_17_9",
+    "expect": [
+      "every kind-28 row is classified"
+    ]
+  },
+  {
+    "id": "ratification-loader-decode-all",
+    "control": "Ratification loader (decode every kind-28 row)",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-audit --test ratification_loader_17_9",
+    "expect": [
+      "every kind-28 row is classified"
+    ]
+  },
+  {
+    "id": "session-verdict",
+    "control": "Session verdict",
+    "kind": "wasm",
+    "cmd": "cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 a_delivery_needs_its_iac_send_grant wasm_delivery_is_refused_when_its_issuance_window_is_exhausted",
+    "expect": [
+      "right: Some(\"exhausted\")",
+      "left: Null"
+    ]
+  },
+  {
+    "id": "recall-typed-denial",
+    "control": "Recall/fetch typed denial",
+    "kind": "wasm",
+    "cmd": "cargo test --locked -p maos-bin --features network --test recall_mediation_17_3d; native=$?; MAOS_17_2_CGROUP_MODE=undelegated MAOS_17_3D_QUOTA_CHILD=recall cargo test --locked -p maos-bin --features network,wasm-host --test recall_17_3d exhausted_quota_has_receipt_without_tokenless_fallback_call -- --exact --nocapture --test-threads=1; wasm=$?; exit $(( native | wasm ))",
+    "expect": [
+      "right: Err(CapabilityDenied)",
+      "guest-visible denial contains no pid, budget or window"
+    ]
+  },
+  {
+    "id": "mcp-receipt",
+    "control": "MCP receipt",
+    "kind": "plain",
+    "cmd": "cargo test --locked -p maos-bin --features network --test mcp_mint_receipt_17_9; a=$?; cargo test --locked -p maos-bin --features network --bin maos live_mcp_; b=$?; exit $(( a | b ))",
+    "expect": [
+      "exactly one MCP refusal receipt",
+      "exactly one receipt for the one refused mint"
+    ]
+  },
+  {
+    "id": "cli-refusal",
+    "control": "CLI refusal",
+    "kind": "t3",
+    "cmd": "cargo test --locked -p maos-bin --features network --test cli_wrapper_exhaustion_17_9 exhaustion_refuses_before_workload -- --nocapture --test-threads=1",
+    "expect": [
+      "quota exhaustion must refuse before workload launch"
+    ]
+  },
+  {
+    "id": "confidentiality",
+    "control": "Confidentiality",
+    "kind": "wasm",
+    "cmd": "cargo test --locked -p maos-bin --features network --test recall_mediation_17_3d quota_audit_and_mcp_receipts_are_operator_visible_but_never_spirit_disclosed -- --exact; a=$?; MAOS_17_2_CGROUP_MODE=undelegated cargo test --locked -p maos-bin --features network,wasm-host --test recall_17_3d kernel_quota_rows_and_mcp_refusals_never_cross_the_guest_recall_boundary -- --exact --nocapture --test-threads=1; b=$?; exit $(( a | b ))",
+    "expect": [
+      "thread 'quota_audit_and_mcp_receipts_are_operator_visible_but_never_spirit_disclosed'",
+      "neither operator-only metadata nor either payload reaches the guest"
+    ]
+  }
+]

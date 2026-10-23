@@ -1,0 +1,174 @@
+aggregate	failure	failure		Process completed with exit code 1.
+aggregate	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+cgroup-ceiling-delegated (ubuntu-24.04)	success	notice	17-2 checked execution	log=worker-resource.log exit=0 suites=[('ok', '2', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-24.04)	success	notice	17-2 actual rootless canary	uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+cgroup-ceiling-delegated (ubuntu-24.04)	success	notice	17-2 checked execution	log=spawned-17-3c.log exit=0 suites=[('ok', '23', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-24.04)	success	notice	17-2 checked execution	log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-24.04)	success	notice	17-2 actual native FD refusal	within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0
+cgroup-ceiling-delegated (ubuntu-24.04)	success	notice	T3 test substrate	immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+cgroup-ceiling-delegated (ubuntu-24.04-arm)	success	notice	17-2 checked execution	log=spawned-17-3c.log exit=0 suites=[('ok', '23', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-24.04-arm)	success	notice	17-2 checked execution	log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-24.04-arm)	success	notice	17-2 actual native FD refusal	within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0
+cgroup-ceiling-delegated (ubuntu-26.04)	success	notice	17-2 checked execution	log=worker-resource.log exit=0 suites=[('ok', '2', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-26.04)	success	notice	17-2 actual rootless canary	uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+cgroup-ceiling-delegated (ubuntu-26.04)	success	notice	17-2 checked execution	log=spawned-17-3c.log exit=0 suites=[('ok', '23', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-26.04)	success	notice	17-2 checked execution	log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-26.04)	success	notice	17-2 actual native FD refusal	within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0
+cgroup-ceiling-delegated (ubuntu-26.04)	success	notice	T3 test substrate	immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+cgroup-ceiling-delegated (ubuntu-26.04-arm)	success	notice	17-2 checked execution	log=spawned-17-3c.log exit=0 suites=[('ok', '23', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-26.04-arm)	success	notice	17-2 checked execution	log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]
+cgroup-ceiling-delegated (ubuntu-26.04-arm)	success	notice	17-2 actual native FD refusal	within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0
+cgroup-ceiling-undelegated (ubuntu-24.04)	success	notice	17-2 checked execution	log=undelegated-session.log exit=0 suites=[('ok', '23', '0', '0')]
+cgroup-ceiling-undelegated (ubuntu-24.04-arm)	success	notice	17-2 checked execution	log=undelegated-session.log exit=0 suites=[('ok', '23', '0', '0')]
+cgroup-ceiling-undelegated (ubuntu-26.04)	success	notice	17-2 checked execution	log=undelegated-session.log exit=0 suites=[('ok', '23', '0', '0')]
+cgroup-ceiling-undelegated (ubuntu-26.04-arm)	success	notice	17-2 checked execution	log=undelegated-session.log exit=0 suites=[('ok', '23', '0', '0')]
+check-env-contract	failure	failure		Process completed with exit code 1.
+check-env-contract	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+check-multi-tenant-loom	failure	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+check-multi-tenant-loom	failure	failure		Process completed with exit code 1.
+check-multi-tenant-loom	failure	failure		check-multi-tenant-loom RED: maos-bin-whole-package-parallel-isolation [INDETERMINATE]: 
+check-multi-tenant-loom	failure	warning		## ⚠️ Multi-Tenant Loom Gate: 1 leg(s) ABSENT — WOULD HAVE BLOCKED SHIP Derived from THIS run's projection; there is no hand-maintained ABSENT_SUCCESSORS const any more (Story 13.6e AC5) — an entry disappears when a leg proves it, not when someone deletes a string. - kernel-collective-cause-distinguishable: the kernel collapses ALL EIGHT `TransportCause` variants into the single `CollectivePortError::Transport(_) => CollectiveErrorKind::Transport` (crates/maos-kernel-core/src/memory/mod.rs) — 8 → 1, not 8 → 5. On the Spirit path six of those eight are reachable and all arrive as the one word `
+check-multi-tenant-loom	failure	notice	T3 test substrate	immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+check-multi-tenant-loom	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+epic-17-exit (ubuntu-24.04)	success	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+epic-17-exit (ubuntu-24.04)	success	notice	Epic-17 exit line 2b (ubuntu-24.04)	LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+epic-17-exit (ubuntu-24.04)	success	notice	Epic-17 exit line 2 (ubuntu-24.04)	rc=0
+epic-17-exit (ubuntu-24.04)	success	notice	Epic-17 exit line 3 (ubuntu-24.04)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+epic-17-exit (ubuntu-24.04)	success	notice	Epic-17 exit lines 1/1b (ubuntu-24.04)	guest environment keys: HOME,HOSTNAME,MAOS_EGRESS_BASE_URL,MAOS_EGRESS_BEARER,MAOS_PROBE_HOST_CONTROL_PATH,PATH,container; no operator sentinel journaled
+epic-17-exit (ubuntu-24.04)	success	notice	Epic-17 exit lines 1/1b (ubuntu-24.04)	worker-2 pid 2: echo HTTP 200 through the proxy, 0 kind-8 rows
+epic-17-exit (ubuntu-24.04)	success	notice	Epic-17 exit lines 1/1b (ubuntu-24.04)	worker pid 1: 3 Kernel-origin kind-8 rows ['sandbox.block.container.escape.fs.control-json', 'sandbox.block.container.escape.fs.host-home-ssh', 'sandbox.block.egress.example.invalid:443']; direct dials errno 111/101; forwarded forbidden request HTTP 403
+epic-17-exit (ubuntu-24.04)	success	notice	Epic-17 exit line 5 (ubuntu-24.04)	aggregate | 5720 | 5720 | 0 | 0.00000000 | 5687/5687 | 1.00000000 | 1098
+epic-17-exit (ubuntu-24.04)	success	notice	17-2 checked execution	log=observer-17-4.log exit=0 suites=[('ok', '16', '0', '0'), ('ok', '3', '0', '0')]
+epic-17-exit (ubuntu-24.04)	success	notice	17-2 checked execution	log=cli-wrapper-exhaustion.log exit=0 suites=[('ok', '4', '0', '0')]
+epic-17-exit (ubuntu-24.04)	success	notice	17-2 actual rootless canary	uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+epic-17-exit (ubuntu-24.04)	success	notice	17-2 checked execution	log=worker-terminal-facts.log exit=0 suites=[('ok', '31', '0', '0')]
+epic-17-exit (ubuntu-24.04)	success	notice	17-2 actual rootless canary	uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+epic-17-exit (ubuntu-24.04)	success	notice	T3 test substrate	immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+epic-17-exit (ubuntu-26.04)	success	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+epic-17-exit (ubuntu-26.04)	success	notice	Epic-17 exit line 2b (ubuntu-26.04)	LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+epic-17-exit (ubuntu-26.04)	success	notice	Epic-17 exit line 2 (ubuntu-26.04)	rc=0
+epic-17-exit (ubuntu-26.04)	success	notice	Epic-17 exit line 3 (ubuntu-26.04)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+epic-17-exit (ubuntu-26.04)	success	notice	Epic-17 exit lines 1/1b (ubuntu-26.04)	guest environment keys: HOME,HOSTNAME,MAOS_EGRESS_BASE_URL,MAOS_EGRESS_BEARER,MAOS_PROBE_HOST_CONTROL_PATH,PATH,container; no operator sentinel journaled
+epic-17-exit (ubuntu-26.04)	success	notice	Epic-17 exit lines 1/1b (ubuntu-26.04)	worker-2 pid 2: echo HTTP 200 through the proxy, 0 kind-8 rows
+epic-17-exit (ubuntu-26.04)	success	notice	Epic-17 exit lines 1/1b (ubuntu-26.04)	worker pid 1: 3 Kernel-origin kind-8 rows ['sandbox.block.container.escape.fs.control-json', 'sandbox.block.container.escape.fs.host-home-ssh', 'sandbox.block.egress.example.invalid:443']; direct dials errno 111/101; forwarded forbidden request HTTP 403
+epic-17-exit (ubuntu-26.04)	success	notice	Epic-17 exit line 5 (ubuntu-26.04)	aggregate | 5720 | 5720 | 0 | 0.00000000 | 5687/5687 | 1.00000000 | 1098
+epic-17-exit (ubuntu-26.04)	success	notice	17-2 checked execution	log=observer-17-4.log exit=0 suites=[('ok', '16', '0', '0'), ('ok', '3', '0', '0')]
+epic-17-exit (ubuntu-26.04)	success	notice	17-2 checked execution	log=cli-wrapper-exhaustion.log exit=0 suites=[('ok', '4', '0', '0')]
+epic-17-exit (ubuntu-26.04)	success	notice	17-2 actual rootless canary	uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+epic-17-exit (ubuntu-26.04)	success	notice	17-2 checked execution	log=worker-terminal-facts.log exit=0 suites=[('ok', '31', '0', '0')]
+epic-17-exit (ubuntu-26.04)	success	notice	17-2 actual rootless canary	uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+epic-17-exit (ubuntu-26.04)	success	notice	T3 test substrate	immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+reproducible-build	failure	failure		Process completed with exit code 1.
+reproducible-build	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+v1-0-ship-gate	failure	failure		Process completed with exit code 1.
+v1-0-ship-gate	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+v1-5-ship-gate	failure	failure		Process completed with exit code 1.
+v1-5-ship-gate	failure	notice		"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+wasm-host-tests (ubuntu-24.04)	success	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c proof (ubuntu-24.04)	TS-ADMITTED-PROOF os=24.04 arch=x86_64 pid=1 child_pid=47932 cpu=10 memory_mib=768 audit=attributed terminal=clean
+wasm-host-tests (ubuntu-24.04)	success	notice	17-2 checked execution	log=participant-17-8.log exit=0 suites=[('ok', '8', '0', '0')]
+wasm-host-tests (ubuntu-24.04)	success	notice	17-8 participant recall (ubuntu-24.04)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.75s
+wasm-host-tests (ubuntu-24.04)	success	notice	17-2 checked execution	log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3d recall (ubuntu-24.04)	rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.81s
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	GOVERNED-ATOMIC form=wasm-component case=unmediated trusted_pid=14 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	GOVERNED-ATOMIC form=wasm-component case=policy_mixed trusted_pid=13 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	GOVERNED-ATOMIC form=wasm-component case=enterprise_denied trusted_pid=12 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	GOVERNED-ATOMIC form=subprocess case=unmediated trusted_pid=11 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	GOVERNED-ATOMIC form=subprocess case=policy_mixed trusted_pid=10 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	GOVERNED-ATOMIC form=subprocess case=enterprise_denied trusted_pid=9 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	RUNNER-SIGSYS forbidden=false admitted_pid=7 actual_blocks=0 consumer_anomalies=0 audit_view=ok
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	RUNNER-SIGSYS forbidden=true admitted_pid=6 actual_blocks=1 consumer_anomalies=1 audit_view=ok
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	HOSTILE-ONCE turns=0 result=error
+wasm-host-tests (ubuntu-24.04)	success	notice	17-3c admitted runtime (ubuntu-24.04)	HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted exhausted=exhausted
+wasm-host-tests (ubuntu-24.04)	success	notice	Escape detector (ubuntu-24.04)	rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+wasm-host-tests (ubuntu-24.04)	success	notice	Kernel T2 suites (ubuntu-24.04)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+wasm-host-tests (ubuntu-24.04)	success	notice	Bridge T2 route (ubuntu-24.04)	T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T4: SandboxRefused
+wasm-host-tests (ubuntu-24.04)	success	notice	T2 exit line 3 (ubuntu-24.04)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+wasm-host-tests (ubuntu-24.04)	success	notice	T2 exit line 3 (ubuntu-24.04)	forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped); classified_violation_tier=T2
+wasm-host-tests (ubuntu-24.04)	success	notice	T2 exit line 3 (ubuntu-24.04)	granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1; denied_file=/tmp/.tmpmVIDmQ/secret.txt; cat_stderr="/bin/cat: /tmp/.tmpmVIDmQ/secret.txt: Permission denied\n"
+wasm-host-tests (ubuntu-24.04)	success	notice	T2 exit line 3 (ubuntu-24.04)	pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2: exit status: 0
+wasm-host-tests (ubuntu-24.04)	success	notice	T2 exit line 3 (ubuntu-24.04)	granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+wasm-host-tests (ubuntu-24.04)	success	notice	T2 exit line 3 (ubuntu-24.04)	benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-24.04)	success	notice	T2 exit line 3 (ubuntu-24.04)	benign_process_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-24.04-arm)	success	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c proof (ubuntu-24.04-arm)	TS-ADMITTED-PROOF os=24.04 arch=aarch64 pid=1 child_pid=45157 cpu=10 memory_mib=768 audit=attributed terminal=clean
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-2 checked execution	log=participant-17-8.log exit=0 suites=[('ok', '8', '0', '0')]
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-8 participant recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.68s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-2 checked execution	log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3d recall (ubuntu-24.04-arm)	rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.67s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=wasm-component case=unmediated trusted_pid=14 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=wasm-component case=policy_mixed trusted_pid=13 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=wasm-component case=enterprise_denied trusted_pid=12 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=subprocess case=unmediated trusted_pid=11 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=subprocess case=policy_mixed trusted_pid=10 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	GOVERNED-ATOMIC form=subprocess case=enterprise_denied trusted_pid=9 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	RUNNER-SIGSYS forbidden=false admitted_pid=7 actual_blocks=0 consumer_anomalies=0 audit_view=ok
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	RUNNER-SIGSYS forbidden=true admitted_pid=6 actual_blocks=1 consumer_anomalies=1 audit_view=ok
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	HOSTILE-ONCE turns=0 result=error
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	17-3c admitted runtime (ubuntu-24.04-arm)	HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted exhausted=exhausted
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	Escape detector (ubuntu-24.04-arm)	rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	Kernel T2 suites (ubuntu-24.04-arm)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	Bridge T2 route (ubuntu-24.04-arm)	T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T4: SandboxRefused
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped); classified_violation_tier=T2
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1; denied_file=/tmp/.tmpIbjPJd/secret.txt; cat_stderr="/bin/cat: /tmp/.tmpIbjPJd/secret.txt: Permission denied\n"
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2: exit status: 0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-24.04-arm)	success	notice	T2 exit line 3 (ubuntu-24.04-arm)	benign_process_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-26.04)	success	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c proof (ubuntu-26.04)	TS-ADMITTED-PROOF os=26.04 arch=x86_64 pid=1 child_pid=48111 cpu=10 memory_mib=768 audit=attributed terminal=clean
+wasm-host-tests (ubuntu-26.04)	success	notice	17-2 checked execution	log=participant-17-8.log exit=0 suites=[('ok', '8', '0', '0')]
+wasm-host-tests (ubuntu-26.04)	success	notice	17-8 participant recall (ubuntu-26.04)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.12s
+wasm-host-tests (ubuntu-26.04)	success	notice	17-2 checked execution	log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3d recall (ubuntu-26.04)	rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.07s
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	GOVERNED-ATOMIC form=wasm-component case=unmediated trusted_pid=14 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	GOVERNED-ATOMIC form=wasm-component case=policy_mixed trusted_pid=13 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	GOVERNED-ATOMIC form=wasm-component case=enterprise_denied trusted_pid=12 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	GOVERNED-ATOMIC form=subprocess case=unmediated trusted_pid=11 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	GOVERNED-ATOMIC form=subprocess case=policy_mixed trusted_pid=10 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	GOVERNED-ATOMIC form=subprocess case=enterprise_denied trusted_pid=9 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	RUNNER-SIGSYS forbidden=false admitted_pid=7 actual_blocks=0 consumer_anomalies=0 audit_view=ok
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	RUNNER-SIGSYS forbidden=true admitted_pid=6 actual_blocks=1 consumer_anomalies=1 audit_view=ok
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	HOSTILE-ONCE turns=0 result=error
+wasm-host-tests (ubuntu-26.04)	success	notice	17-3c admitted runtime (ubuntu-26.04)	HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted exhausted=exhausted
+wasm-host-tests (ubuntu-26.04)	success	notice	Escape detector (ubuntu-26.04)	rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+wasm-host-tests (ubuntu-26.04)	success	notice	Kernel T2 suites (ubuntu-26.04)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+wasm-host-tests (ubuntu-26.04)	success	notice	Bridge T2 route (ubuntu-26.04)	T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T4: SandboxRefused
+wasm-host-tests (ubuntu-26.04)	success	notice	T2 exit line 3 (ubuntu-26.04)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+wasm-host-tests (ubuntu-26.04)	success	notice	T2 exit line 3 (ubuntu-26.04)	forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped); classified_violation_tier=T2
+wasm-host-tests (ubuntu-26.04)	success	notice	T2 exit line 3 (ubuntu-26.04)	granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1; denied_file=/tmp/.tmpasRbmv/secret.txt; cat_stderr="cat: /tmp/.tmpasRbmv/secret.txt: Permission denied\n"
+wasm-host-tests (ubuntu-26.04)	success	notice	T2 exit line 3 (ubuntu-26.04)	granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+wasm-host-tests (ubuntu-26.04)	success	notice	T2 exit line 3 (ubuntu-26.04)	pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2: exit status: 0
+wasm-host-tests (ubuntu-26.04)	success	notice	T2 exit line 3 (ubuntu-26.04)	benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-26.04)	success	notice	T2 exit line 3 (ubuntu-26.04)	benign_process_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-26.04-arm)	success	warning		Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c proof (ubuntu-26.04-arm)	TS-ADMITTED-PROOF os=26.04 arch=aarch64 pid=1 child_pid=45199 cpu=10 memory_mib=768 audit=attributed terminal=clean
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-2 checked execution	log=participant-17-8.log exit=0 suites=[('ok', '8', '0', '0')]
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-8 participant recall (ubuntu-26.04-arm)	rc=0 fail=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.72s
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-2 checked execution	log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3d recall (ubuntu-26.04-arm)	rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.14s
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=wasm-component case=unmediated trusted_pid=14 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=wasm-component case=policy_mixed trusted_pid=13 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=wasm-component case=enterprise_denied trusted_pid=12 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=subprocess case=unmediated trusted_pid=11 decisions=1 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=subprocess case=policy_mixed trusted_pid=10 decisions=2 minted=1 guest_effects=0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	GOVERNED-ATOMIC form=subprocess case=enterprise_denied trusted_pid=9 decisions=0 minted=0 guest_effects=0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	RUNNER-SIGSYS forbidden=false admitted_pid=7 actual_blocks=0 consumer_anomalies=0 audit_view=ok
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	RUNNER-SIGSYS forbidden=true admitted_pid=6 actual_blocks=1 consumer_anomalies=1 audit_view=ok
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	HOSTILE-ONCE turns=0 result=error
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	17-3c admitted runtime (ubuntu-26.04-arm)	HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted exhausted=exhausted
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	Escape detector (ubuntu-26.04-arm)	rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	Kernel T2 suites (ubuntu-26.04-arm)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	Bridge T2 route (ubuntu-26.04-arm)	T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T4: SandboxRefused
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	T2 exit line 3 (ubuntu-26.04-arm)	rc=0 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	T2 exit line 3 (ubuntu-26.04-arm)	forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped); classified_violation_tier=T2
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	T2 exit line 3 (ubuntu-26.04-arm)	granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1; denied_file=/tmp/.tmp2LMFSM/secret.txt; cat_stderr="cat: /tmp/.tmp2LMFSM/secret.txt: Permission denied\n"
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	T2 exit line 3 (ubuntu-26.04-arm)	granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	T2 exit line 3 (ubuntu-26.04-arm)	pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2: exit status: 0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	T2 exit line 3 (ubuntu-26.04-arm)	benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+wasm-host-tests (ubuntu-26.04-arm)	success	notice	T2 exit line 3 (ubuntu-26.04-arm)	benign_process_survives_t2_under_same_spec: exit status: 0
+workspace-test-suite	failure	failure		Process completed with exit code 101.
+workspace-test-suite	failure	failure	17-2 actual workspace failure	exit=101 pirit-abi/src/lifecycle.rs - lifecycle::Spirit (line 187) ... ok test crates/maos-spirit-abi/src/lifecycle.rs - lifecycle::kernel_invocation_allowed (line 507) ... ok  test result: ok. 44 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.98s  ^[[1m^[[92m   Doc-tests^[[0m maos_spirit_cli  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s  ^[[1m^[[92m   Doc-tests^[[0m maos_spirit_derive  running 0 tests  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s  ^[[1m^[[
+workspace-test-suite	failure	notice	17-2 actual rootless canary	uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+workspace-test-suite	failure	notice	T3 test substrate	immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified

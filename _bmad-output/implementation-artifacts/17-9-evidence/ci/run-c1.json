@@ -1,0 +1,1298 @@
+{
+ "run_id": "39786854742",
+ "head_sha": "977e3a044f776d9ad925da171bad7e70344ce33b",
+ "run_attempt": 1,
+ "conclusion": "failure",
+ "created_at": "2026-10-22T13:26:30Z",
+ "updated_at": "2026-10-22T15:01:17Z",
+ "jobs": [
+  {
+   "name": "a2a-loopback-corpus-v0",
+   "id": 119852249562,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:43:29Z",
+   "completed_at": "2026-10-22T13:44:24Z"
+  },
+  {
+   "name": "a2a-tcp-tests-8-6",
+   "id": 119852249373,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:48:29Z",
+   "completed_at": "2026-10-22T13:51:05Z"
+  },
+  {
+   "name": "abi-diff",
+   "id": 119852243531,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:30:30Z"
+  },
+  {
+   "name": "adr-034-consent-rupture-corpus",
+   "id": 119852249519,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:45:17Z",
+   "completed_at": "2026-10-22T13:46:26Z"
+  },
+  {
+   "name": "aggregate",
+   "id": 119899265083,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T14:58:29Z",
+   "completed_at": "2026-10-22T14:58:33Z"
+  },
+  {
+   "name": "air-gap-import-corpus",
+   "id": 119852252459,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:51:29Z",
+   "completed_at": "2026-10-22T13:53:00Z"
+  },
+  {
+   "name": "architect-tests",
+   "id": 119852244472,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:07Z",
+   "completed_at": "2026-10-22T13:30:12Z"
+  },
+  {
+   "name": "audit-query-fr4-smoke",
+   "id": 119852244141,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:29:49Z"
+  },
+  {
+   "name": "audit-spine-smoke",
+   "id": 119852244197,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:27:52Z"
+  },
+  {
+   "name": "bench-audit-query-latency",
+   "id": 119852249321,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:41:02Z",
+   "completed_at": "2026-10-22T13:43:30Z"
+  },
+  {
+   "name": "butler-tests",
+   "id": 119852245079,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:35:47Z",
+   "completed_at": "2026-10-22T13:37:59Z"
+  },
+  {
+   "name": "calibrate-per-commit",
+   "id": 119852245247,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:36:41Z",
+   "completed_at": "2026-10-22T13:39:09Z"
+  },
+  {
+   "name": "cap-registry-smoke",
+   "id": 119852244728,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:36:23Z",
+   "completed_at": "2026-10-22T13:39:06Z"
+  },
+  {
+   "name": "cap-token-verify-bench",
+   "id": 119852244256,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:28:54Z",
+   "completed_at": "2026-10-22T13:30:28Z"
+  },
+  {
+   "name": "ccac-n600-ship-gate",
+   "id": 119852252963,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:52:26Z",
+   "completed_at": "2026-10-22T13:53:11Z"
+  },
+  {
+   "name": "cgroup-ceiling-delegated (ubuntu-24.04)",
+   "id": 119852264209,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:39:07Z",
+   "completed_at": "2026-10-22T13:59:07Z"
+  },
+  {
+   "name": "cgroup-ceiling-delegated (ubuntu-24.04-arm)",
+   "id": 119852263790,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:07Z",
+   "completed_at": "2026-10-22T13:34:26Z"
+  },
+  {
+   "name": "cgroup-ceiling-delegated (ubuntu-26.04)",
+   "id": 119852263820,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:35:44Z",
+   "completed_at": "2026-10-22T13:51:27Z"
+  },
+  {
+   "name": "cgroup-ceiling-delegated (ubuntu-26.04-arm)",
+   "id": 119852264541,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:34:30Z",
+   "completed_at": "2026-10-22T13:47:46Z"
+  },
+  {
+   "name": "cgroup-ceiling-undelegated (ubuntu-24.04)",
+   "id": 119852264053,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:39:08Z",
+   "completed_at": "2026-10-22T13:55:04Z"
+  },
+  {
+   "name": "cgroup-ceiling-undelegated (ubuntu-24.04-arm)",
+   "id": 119852264222,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:31:24Z",
+   "completed_at": "2026-10-22T13:43:28Z"
+  },
+  {
+   "name": "cgroup-ceiling-undelegated (ubuntu-26.04)",
+   "id": 119852264122,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:03Z",
+   "completed_at": "2026-10-22T13:48:54Z"
+  },
+  {
+   "name": "cgroup-ceiling-undelegated (ubuntu-26.04-arm)",
+   "id": 119852263770,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:22Z",
+   "completed_at": "2026-10-22T13:45:11Z"
+  },
+  {
+   "name": "check-a2a-sender-completeness",
+   "id": 119852244608,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:33:39Z",
+   "completed_at": "2026-10-22T13:36:09Z"
+  },
+  {
+   "name": "check-bare-review-findings",
+   "id": 119852253102,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:57Z",
+   "completed_at": "2026-10-22T13:56:27Z"
+  },
+  {
+   "name": "check-breaking-md",
+   "id": 119852252520,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:51:09Z",
+   "completed_at": "2026-10-22T13:53:23Z"
+  },
+  {
+   "name": "check-cert-rotation-trigger",
+   "id": 119852244015,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:34Z",
+   "completed_at": "2026-10-22T13:31:54Z"
+  },
+  {
+   "name": "check-cohort-mesh",
+   "id": 119852263997,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:37Z",
+   "completed_at": "2026-10-22T14:05:12Z"
+  },
+  {
+   "name": "check-composition-root-completeness",
+   "id": 119852244103,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:27:36Z",
+   "completed_at": "2026-10-22T13:29:21Z"
+  },
+  {
+   "name": "check-corpus",
+   "id": 119852243775,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:29:02Z"
+  },
+  {
+   "name": "check-coverage-matrix-completeness",
+   "id": 119852252910,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:36Z",
+   "completed_at": "2026-10-22T13:55:29Z"
+  },
+  {
+   "name": "check-cross-form-equiv",
+   "id": 119852252342,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:49:58Z",
+   "completed_at": "2026-10-22T13:50:24Z"
+  },
+  {
+   "name": "check-cross-region-consensus",
+   "id": 119852264176,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:59:08Z",
+   "completed_at": "2026-10-22T14:01:45Z"
+  },
+  {
+   "name": "check-decision-register",
+   "id": 119852244570,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:31:23Z",
+   "completed_at": "2026-10-22T13:33:16Z"
+  },
+  {
+   "name": "check-dependency-closure",
+   "id": 119852263514,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:54:20Z",
+   "completed_at": "2026-10-22T13:56:30Z"
+  },
+  {
+   "name": "check-dev-model-tier",
+   "id": 119852252229,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:49:51Z",
+   "completed_at": "2026-10-22T13:52:24Z"
+  },
+  {
+   "name": "check-dev-model-used-populated",
+   "id": 119852250154,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:48:22Z",
+   "completed_at": "2026-10-22T13:50:37Z"
+  },
+  {
+   "name": "check-dev-record-completeness",
+   "id": 119852252721,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:52:22Z",
+   "completed_at": "2026-10-22T13:54:18Z"
+  },
+  {
+   "name": "check-empty-kernel",
+   "id": 119852243436,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:34Z",
+   "completed_at": "2026-10-22T13:27:34Z"
+  },
+  {
+   "name": "check-enterprise-identity",
+   "id": 119852263598,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:54:42Z",
+   "completed_at": "2026-10-22T14:00:30Z"
+  },
+  {
+   "name": "check-enterprise-pdp",
+   "id": 119852263624,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:55:05Z",
+   "completed_at": "2026-10-22T14:02:07Z"
+  },
+  {
+   "name": "check-env-contract",
+   "id": 119852244851,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:34:30Z",
+   "completed_at": "2026-10-22T13:37:32Z"
+  },
+  {
+   "name": "check-epic-close-coherence",
+   "id": 119852252819,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:01Z",
+   "completed_at": "2026-10-22T13:54:41Z"
+  },
+  {
+   "name": "check-epic-close-green",
+   "id": 119852252917,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:25Z",
+   "completed_at": "2026-10-22T13:55:38Z"
+  },
+  {
+   "name": "check-escape-detector",
+   "id": 119852263763,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:49Z",
+   "completed_at": "2026-10-22T14:03:10Z"
+  },
+  {
+   "name": "check-exit-commands",
+   "id": 119852244139,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:30Z",
+   "completed_at": "2026-10-22T13:38:12Z"
+  },
+  {
+   "name": "check-export-control",
+   "id": 119852252354,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:52:58Z",
+   "completed_at": "2026-10-22T13:55:31Z"
+  },
+  {
+   "name": "check-ff-j6",
+   "id": 119852263843,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:56:32Z",
+   "completed_at": "2026-10-22T13:58:35Z"
+  },
+  {
+   "name": "check-fkcs",
+   "id": 119852263777,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:56:31Z",
+   "completed_at": "2026-10-22T14:00:56Z"
+  },
+  {
+   "name": "check-fmt",
+   "id": 119852243636,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:27:08Z"
+  },
+  {
+   "name": "check-fr47",
+   "id": 119852243521,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:34Z",
+   "completed_at": "2026-10-22T13:28:39Z"
+  },
+  {
+   "name": "check-fuzz-targets",
+   "id": 119852263807,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:29Z",
+   "completed_at": "2026-10-22T14:01:02Z"
+  },
+  {
+   "name": "check-host-surface",
+   "id": 119852252654,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:51:06Z",
+   "completed_at": "2026-10-22T13:54:31Z"
+  },
+  {
+   "name": "check-j1-loopback-delegation",
+   "id": 119852252560,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:20Z",
+   "completed_at": "2026-10-22T13:58:43Z"
+  },
+  {
+   "name": "check-j1-two-host-signed-run",
+   "id": 119852252623,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:12Z",
+   "completed_at": "2026-10-22T13:58:30Z"
+  },
+  {
+   "name": "check-j4-latency",
+   "id": 119852263629,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:56:29Z",
+   "completed_at": "2026-10-22T13:57:44Z"
+  },
+  {
+   "name": "check-judge-config",
+   "id": 119852244584,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:54Z",
+   "completed_at": "2026-10-22T13:35:04Z"
+  },
+  {
+   "name": "check-kernel-baseline",
+   "id": 119852252620,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:50:38Z",
+   "completed_at": "2026-10-22T13:54:29Z"
+  },
+  {
+   "name": "check-ko-coverage",
+   "id": 119852263979,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:56:32Z",
+   "completed_at": "2026-10-22T13:58:04Z"
+  },
+  {
+   "name": "check-live-bilateral-consent",
+   "id": 119852264077,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:32Z",
+   "completed_at": "2026-10-22T13:59:25Z"
+  },
+  {
+   "name": "check-loom",
+   "id": 119852243321,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:28:34Z"
+  },
+  {
+   "name": "check-loom-substrate-drift",
+   "id": 119852263810,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:57:46Z",
+   "completed_at": "2026-10-22T14:00:14Z"
+  },
+  {
+   "name": "check-manifest-schema-version",
+   "id": 119852249243,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:41:49Z",
+   "completed_at": "2026-10-22T13:44:37Z"
+  },
+  {
+   "name": "check-migration-merkle",
+   "id": 119852252630,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:51:59Z",
+   "completed_at": "2026-10-22T13:56:29Z"
+  },
+  {
+   "name": "check-mobile-push-on-halt",
+   "id": 119852263923,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:57:49Z",
+   "completed_at": "2026-10-22T13:58:30Z"
+  },
+  {
+   "name": "check-mock-not-in-release",
+   "id": 119860888873,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:00:16Z",
+   "completed_at": "2026-10-22T14:08:13Z"
+  },
+  {
+   "name": "check-model-currency",
+   "id": 119852244276,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:29:18Z"
+  },
+  {
+   "name": "check-multi-region-slo",
+   "id": 119852263986,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:45Z",
+   "completed_at": "2026-10-22T14:03:11Z"
+  },
+  {
+   "name": "check-multi-tenant-loom",
+   "id": 119852263740,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:58:32Z",
+   "completed_at": "2026-10-22T14:07:13Z"
+  },
+  {
+   "name": "check-owasp-freeze-hash",
+   "id": 119852252685,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:51:56Z",
+   "completed_at": "2026-10-22T13:52:02Z"
+  },
+  {
+   "name": "check-pentest-gate",
+   "id": 119852252392,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:51:58Z",
+   "completed_at": "2026-10-22T13:54:00Z"
+  },
+  {
+   "name": "check-pub-field-constructors",
+   "id": 119852244335,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:28:36Z",
+   "completed_at": "2026-10-22T13:30:24Z"
+  },
+  {
+   "name": "check-red-team-gate",
+   "id": 119852252529,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:52:04Z",
+   "completed_at": "2026-10-22T13:54:40Z"
+  },
+  {
+   "name": "check-review-findings-resolved",
+   "id": 119852250035,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:47:22Z",
+   "completed_at": "2026-10-22T13:49:51Z"
+  },
+  {
+   "name": "check-reza-production-path",
+   "id": 119852263677,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:54:33Z",
+   "completed_at": "2026-10-22T14:04:23Z"
+  },
+  {
+   "name": "check-rotation-real-timing",
+   "id": 119852263396,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:54:32Z",
+   "completed_at": "2026-10-22T13:57:47Z"
+  },
+  {
+   "name": "check-scale-churn",
+   "id": 119852263900,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:55:53Z",
+   "completed_at": "2026-10-22T13:58:48Z"
+  },
+  {
+   "name": "check-security-md",
+   "id": 119852244064,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:27:53Z",
+   "completed_at": "2026-10-22T13:30:03Z"
+  },
+  {
+   "name": "check-serde-error-handling",
+   "id": 119852249628,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:46:34Z",
+   "completed_at": "2026-10-22T13:49:03Z"
+  },
+  {
+   "name": "check-service-boundary",
+   "id": 119852243716,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:29:05Z"
+  },
+  {
+   "name": "check-ship-gate-completeness",
+   "id": 119873282132,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:07:16Z",
+   "completed_at": "2026-10-22T14:09:36Z"
+  },
+  {
+   "name": "check-skill-conformance",
+   "id": 119852263760,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:55:35Z",
+   "completed_at": "2026-10-22T13:57:50Z"
+  },
+  {
+   "name": "check-skill-schema",
+   "id": 119852253028,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:51Z",
+   "completed_at": "2026-10-22T13:55:51Z"
+  },
+  {
+   "name": "check-stability-matrix",
+   "id": 119852252321,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:49:20Z",
+   "completed_at": "2026-10-22T13:51:56Z"
+  },
+  {
+   "name": "check-third-party-trial",
+   "id": 119852253003,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:54:02Z",
+   "completed_at": "2026-10-22T13:56:30Z"
+  },
+  {
+   "name": "check-trial-attestation",
+   "id": 119852263608,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:55:39Z",
+   "completed_at": "2026-10-22T13:58:44Z"
+  },
+  {
+   "name": "check-unsafe",
+   "id": 119852243519,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:29:01Z"
+  },
+  {
+   "name": "check-vetting-attestation",
+   "id": 119852263569,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:57:52Z",
+   "completed_at": "2026-10-22T14:00:41Z"
+  },
+  {
+   "name": "check-wasm-form-equiv",
+   "id": 119852263788,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:55:57Z",
+   "completed_at": "2026-10-22T14:05:10Z"
+  },
+  {
+   "name": "check-workspace-count",
+   "id": 119852244273,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:19Z",
+   "completed_at": "2026-10-22T13:31:13Z"
+  },
+  {
+   "name": "corpus-staleness",
+   "id": 119852244923,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:34:46Z",
+   "completed_at": "2026-10-22T13:37:25Z"
+  },
+  {
+   "name": "coverage-matrix",
+   "id": 119852244580,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:35Z",
+   "completed_at": "2026-10-22T13:31:20Z"
+  },
+  {
+   "name": "coverage-matrix-nfr-test-3",
+   "id": 119853527133,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:59:25Z",
+   "completed_at": "2026-10-22T14:01:13Z"
+  },
+  {
+   "name": "determinism-tests",
+   "id": 119852247574,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:37:26Z",
+   "completed_at": "2026-10-22T13:38:19Z"
+  },
+  {
+   "name": "epic-17-exit (ubuntu-24.04)",
+   "id": 119852250545,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:35:50Z",
+   "completed_at": "2026-10-22T13:53:19Z"
+  },
+  {
+   "name": "epic-17-exit (ubuntu-26.04)",
+   "id": 119852250870,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:27:40Z",
+   "completed_at": "2026-10-22T13:53:49Z"
+  },
+  {
+   "name": "example-spirit-drift",
+   "id": 119852244739,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:09Z",
+   "completed_at": "2026-10-22T13:31:21Z"
+  },
+  {
+   "name": "example-spirit-tests",
+   "id": 119852244783,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:31:14Z",
+   "completed_at": "2026-10-22T13:32:07Z"
+  },
+  {
+   "name": "example-spirit-ts-tests",
+   "id": 119860888644,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:59:27Z",
+   "completed_at": "2026-10-22T14:09:58Z"
+  },
+  {
+   "name": "founder-loop-bench",
+   "id": 119852244506,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:28:40Z",
+   "completed_at": "2026-10-22T13:31:08Z"
+  },
+  {
+   "name": "fr26-schedule-firing-corpus",
+   "id": 119852249445,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:45:14Z",
+   "completed_at": "2026-10-22T13:46:22Z"
+  },
+  {
+   "name": "fr4-1000-call-fixture",
+   "id": 119852244383,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:31:56Z",
+   "completed_at": "2026-10-22T13:32:52Z"
+  },
+  {
+   "name": "fr59-yank-propagation-5min",
+   "id": 119852252437,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:50:47Z",
+   "completed_at": "2026-10-22T13:51:29Z"
+  },
+  {
+   "name": "fuzz-build",
+   "id": 119852264078,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:54Z",
+   "completed_at": "2026-10-22T14:01:49Z"
+  },
+  {
+   "name": "gen-abi-docs",
+   "id": 119852243217,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:29:18Z"
+  },
+  {
+   "name": "hello-spirit-bench",
+   "id": 119852243978,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:34Z",
+   "completed_at": "2026-10-22T13:28:53Z"
+  },
+  {
+   "name": "hello-spirit-tests",
+   "id": 119852244520,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:14Z",
+   "completed_at": "2026-10-22T13:31:10Z"
+  },
+  {
+   "name": "intent-lineage-6-4-extension",
+   "id": 119852249901,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:48:34Z",
+   "completed_at": "2026-10-22T13:49:49Z"
+  },
+  {
+   "name": "intent-lineage-a2a-extension-6-3",
+   "id": 119852249467,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:47:21Z",
+   "completed_at": "2026-10-22T13:48:27Z"
+  },
+  {
+   "name": "invariant-lock",
+   "id": 119852244441,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:03Z",
+   "completed_at": "2026-10-22T13:30:56Z"
+  },
+  {
+   "name": "isolation-framework-tests",
+   "id": 119852245037,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:36:10Z",
+   "completed_at": "2026-10-22T13:36:49Z"
+  },
+  {
+   "name": "j0-scene",
+   "id": 119852263638,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:55:33Z",
+   "completed_at": "2026-10-22T13:58:53Z"
+  },
+  {
+   "name": "journey-hermetic-tier-1",
+   "id": 119852252929,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:55Z",
+   "completed_at": "2026-10-22T13:58:22Z"
+  },
+  {
+   "name": "kloc-check",
+   "id": 119852243542,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:30:02Z"
+  },
+  {
+   "name": "lcas-corpus-tests",
+   "id": 119852244583,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:23Z",
+   "completed_at": "2026-10-22T13:30:20Z"
+  },
+  {
+   "name": "macos-check",
+   "id": 119869428689,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:00:33Z",
+   "completed_at": "2026-10-22T14:07:55Z"
+  },
+  {
+   "name": "macos-scope",
+   "id": 119852263987,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:59:12Z",
+   "completed_at": "2026-10-22T13:59:18Z"
+  },
+  {
+   "name": "manifest-field-coverage",
+   "id": 119852244245,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:20Z",
+   "completed_at": "2026-10-22T13:30:13Z"
+  },
+  {
+   "name": "manifest-n-minus-1-test",
+   "id": 119852249479,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:43:33Z",
+   "completed_at": "2026-10-22T13:44:28Z"
+  },
+  {
+   "name": "maos-audit-read-only",
+   "id": 119852244491,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:19Z",
+   "completed_at": "2026-10-22T13:32:25Z"
+  },
+  {
+   "name": "maosctl-load-over-the-door",
+   "id": 119852264043,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:46Z",
+   "completed_at": "2026-10-22T14:02:19Z"
+  },
+  {
+   "name": "maosctl-smoke",
+   "id": 119852244529,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:41Z",
+   "completed_at": "2026-10-22T13:38:23Z"
+  },
+  {
+   "name": "mira-nash-bench",
+   "id": 119852244863,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:32Z",
+   "completed_at": "2026-10-22T13:35:42Z"
+  },
+  {
+   "name": "mira-tests",
+   "id": 119852244788,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:33:33Z",
+   "completed_at": "2026-10-22T13:34:28Z"
+  },
+  {
+   "name": "multi-provider-drift-tests",
+   "id": 119852250143,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:48:06Z",
+   "completed_at": "2026-10-22T13:51:07Z"
+  },
+  {
+   "name": "nash-tests",
+   "id": 119852244628,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:31:10Z",
+   "completed_at": "2026-10-22T13:32:01Z"
+  },
+  {
+   "name": "nfr-aud-14-intent-lineage-corpus",
+   "id": 119852249038,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:39:39Z",
+   "completed_at": "2026-10-22T13:40:56Z"
+  },
+  {
+   "name": "nfr-aud-7-distillate-five-metrics-floor",
+   "id": 119852244818,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:33:36Z",
+   "completed_at": "2026-10-22T13:34:44Z"
+  },
+  {
+   "name": "nfr-onb-1-gate",
+   "id": 119852252352,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:49:05Z",
+   "completed_at": "2026-10-22T13:52:21Z"
+  },
+  {
+   "name": "nfr-perf-1-iac-routing-budget",
+   "id": 119852249928,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:45:45Z",
+   "completed_at": "2026-10-22T13:48:20Z"
+  },
+  {
+   "name": "nfr-perf-8-orchestrator-fanout",
+   "id": 119852249244,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:40:56Z",
+   "completed_at": "2026-10-22T13:45:20Z"
+  },
+  {
+   "name": "nfr-perf-j4-latency",
+   "id": 119852249440,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:44:06Z",
+   "completed_at": "2026-10-22T13:46:32Z"
+  },
+  {
+   "name": "nfr-rel-1-crash-detection-2s",
+   "id": 119852244682,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:58Z",
+   "completed_at": "2026-10-22T13:39:12Z"
+  },
+  {
+   "name": "nfr-rel-10-cold-restart",
+   "id": 119852244812,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:26Z",
+   "completed_at": "2026-10-22T13:32:39Z"
+  },
+  {
+   "name": "nfr-rel-11-halt-receipt-999pct",
+   "id": 119852247709,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:38:21Z",
+   "completed_at": "2026-10-22T13:54:18Z"
+  },
+  {
+   "name": "nfr-rel-2-hang-detection-60s",
+   "id": 119852244647,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:14Z",
+   "completed_at": "2026-10-22T13:35:45Z"
+  },
+  {
+   "name": "nfr-rel-3-hsis-95pct",
+   "id": 119852244560,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:03Z",
+   "completed_at": "2026-10-22T13:30:03Z"
+  },
+  {
+   "name": "nfr-rel-4-silent-failure-detection",
+   "id": 119852244790,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:33:57Z",
+   "completed_at": "2026-10-22T13:36:21Z"
+  },
+  {
+   "name": "nfr-rel-9-revocation-5s-p99",
+   "id": 119852247829,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:38:00Z",
+   "completed_at": "2026-10-22T13:40:36Z"
+  },
+  {
+   "name": "nfr-scale-4-rate-limit-isolation",
+   "id": 119852249252,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:44:26Z",
+   "completed_at": "2026-10-22T13:45:12Z"
+  },
+  {
+   "name": "nfr-sec-1-t3-image-signature",
+   "id": 119852247771,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:38:35Z",
+   "completed_at": "2026-10-22T13:40:54Z"
+  },
+  {
+   "name": "nfr-sec-14-cross-spirit-isolation-200",
+   "id": 119852244843,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:31:08Z",
+   "completed_at": "2026-10-22T13:32:17Z"
+  },
+  {
+   "name": "observer-tests",
+   "id": 119852244973,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:36:44Z",
+   "completed_at": "2026-10-22T13:37:35Z"
+  },
+  {
+   "name": "onb-nfr2-timing",
+   "id": 119852244672,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:22Z",
+   "completed_at": "2026-10-22T13:36:37Z"
+  },
+  {
+   "name": "one-daemon-one-door",
+   "id": 119852263966,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:58:06Z",
+   "completed_at": "2026-10-22T14:01:27Z"
+  },
+  {
+   "name": "orchestrator-tests",
+   "id": 119852244702,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:04Z",
+   "completed_at": "2026-10-22T13:32:18Z"
+  },
+  {
+   "name": "release-dry-run (aarch64-unknown-linux-gnu)",
+   "id": 119852264010,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:55:31Z",
+   "completed_at": "2026-10-22T14:04:19Z"
+  },
+  {
+   "name": "release-dry-run (x86_64-unknown-linux-gnu)",
+   "id": 119852263897,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:54:42Z",
+   "completed_at": "2026-10-22T14:02:38Z"
+  },
+  {
+   "name": "reproducible-build",
+   "id": 119852242924,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:26:33Z",
+   "completed_at": "2026-10-22T13:43:15Z"
+  },
+  {
+   "name": "researcher-bench",
+   "id": 119852244663,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:05Z",
+   "completed_at": "2026-10-22T13:32:01Z"
+  },
+  {
+   "name": "researcher-tests",
+   "id": 119852244700,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:35:06Z",
+   "completed_at": "2026-10-22T13:36:40Z"
+  },
+  {
+   "name": "retract-corpus-tests",
+   "id": 119852250464,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:48:56Z",
+   "completed_at": "2026-10-22T13:49:56Z"
+  },
+  {
+   "name": "reviewer-tests",
+   "id": 119852244937,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:36:38Z",
+   "completed_at": "2026-10-22T13:37:22Z"
+  },
+  {
+   "name": "revocation-corpus",
+   "id": 119852247507,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:37:24Z",
+   "completed_at": "2026-10-22T13:38:50Z"
+  },
+  {
+   "name": "safety-critical-corpus-8-5",
+   "id": 119852244899,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:33:18Z",
+   "completed_at": "2026-10-22T13:35:48Z"
+  },
+  {
+   "name": "server-exit-drain",
+   "id": 119852244164,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:27:09Z",
+   "completed_at": "2026-10-22T13:33:37Z"
+  },
+  {
+   "name": "smoke-a2a-consent-vocab-8-7",
+   "id": 119852249927,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:45:41Z",
+   "completed_at": "2026-10-22T13:50:45Z"
+  },
+  {
+   "name": "smoke-a2a-fail-closed-8-8",
+   "id": 119852250178,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:48:57Z",
+   "completed_at": "2026-10-22T13:53:38Z"
+  },
+  {
+   "name": "smoke-a2a-loopback-6-3",
+   "id": 119852249124,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:40:23Z",
+   "completed_at": "2026-10-22T13:45:43Z"
+  },
+  {
+   "name": "smoke-a2a-tcp-8-6",
+   "id": 119852249926,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:44:39Z",
+   "completed_at": "2026-10-22T13:48:32Z"
+  },
+  {
+   "name": "smoke-abi-7-5a",
+   "id": 119852252375,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:49:53Z",
+   "completed_at": "2026-10-22T13:51:54Z"
+  },
+  {
+   "name": "smoke-compliance-7-3",
+   "id": 119852253073,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:53:40Z",
+   "completed_at": "2026-10-22T13:55:34Z"
+  },
+  {
+   "name": "smoke-discipline-7-1-5",
+   "id": 119867947727,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:00:43Z",
+   "completed_at": "2026-10-22T14:08:56Z"
+  },
+  {
+   "name": "smoke-onb-1-7-5b",
+   "id": 119852253174,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:54:20Z",
+   "completed_at": "2026-10-22T13:55:54Z"
+  },
+  {
+   "name": "smoke-orchestrator-fanout-6-2",
+   "id": 119852249096,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:39:11Z",
+   "completed_at": "2026-10-22T13:45:15Z"
+  },
+  {
+   "name": "smoke-registry-7-2",
+   "id": 119852252759,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:51:31Z",
+   "completed_at": "2026-10-22T13:53:34Z"
+  },
+  {
+   "name": "smoke-schedule-6-4",
+   "id": 119852249492,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:47:47Z",
+   "completed_at": "2026-10-22T13:53:56Z"
+  },
+  {
+   "name": "smoke-skill-7-4",
+   "id": 119852252288,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:50:26Z",
+   "completed_at": "2026-10-22T13:52:56Z"
+  },
+  {
+   "name": "spirit-test-tests",
+   "id": 119852244710,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:30:32Z",
+   "completed_at": "2026-10-22T13:31:07Z"
+  },
+  {
+   "name": "t3-escape-corpus (ubuntu-24.04)",
+   "id": 119852247590,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:02Z",
+   "completed_at": "2026-10-22T13:33:55Z"
+  },
+  {
+   "name": "t3-escape-corpus (ubuntu-26.04)",
+   "id": 119852247737,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:39Z",
+   "completed_at": "2026-10-22T13:29:33Z"
+  },
+  {
+   "name": "t3-smoke-busybox (ubuntu-24.04)",
+   "id": 119852247943,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:31:11Z",
+   "completed_at": "2026-10-22T13:33:32Z"
+  },
+  {
+   "name": "t3-smoke-busybox (ubuntu-26.04)",
+   "id": 119852247746,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:26:34Z",
+   "completed_at": "2026-10-22T13:29:07Z"
+  },
+  {
+   "name": "upgrade-policy-corpus",
+   "id": 119852247517,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:37:21Z",
+   "completed_at": "2026-10-22T13:39:06Z"
+  },
+  {
+   "name": "v01-evaluator-path",
+   "id": 119852244222,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:29:51Z",
+   "completed_at": "2026-10-22T13:37:20Z"
+  },
+  {
+   "name": "v1-0-ship-gate",
+   "id": 119894074616,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T14:58:22Z",
+   "completed_at": "2026-10-22T14:58:26Z"
+  },
+  {
+   "name": "v1-5-ship-gate",
+   "id": 119899264928,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T14:58:35Z",
+   "completed_at": "2026-10-22T14:58:38Z"
+  },
+  {
+   "name": "wasm-host-tests (ubuntu-24.04)",
+   "id": 119874550042,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:10:01Z",
+   "completed_at": "2026-10-22T14:44:28Z"
+  },
+  {
+   "name": "wasm-host-tests (ubuntu-24.04-arm)",
+   "id": 119874549867,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:10:03Z",
+   "completed_at": "2026-10-22T14:40:43Z"
+  },
+  {
+   "name": "wasm-host-tests (ubuntu-26.04)",
+   "id": 119874549978,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:10:00Z",
+   "completed_at": "2026-10-22T14:49:02Z"
+  },
+  {
+   "name": "wasm-host-tests (ubuntu-26.04-arm)",
+   "id": 119874549855,
+   "conclusion": "success",
+   "started_at": "2026-10-22T14:10:03Z",
+   "completed_at": "2026-10-22T14:41:06Z"
+  },
+  {
+   "name": "windows-check",
+   "id": 119852263759,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:09Z",
+   "completed_at": "2026-10-22T13:36:42Z"
+  },
+  {
+   "name": "worker-tests",
+   "id": 119852244800,
+   "conclusion": "success",
+   "started_at": "2026-10-22T13:32:27Z",
+   "completed_at": "2026-10-22T13:33:35Z"
+  },
+  {
+   "name": "workspace-test-suite",
+   "id": 119852263554,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:36:50Z",
+   "completed_at": "2026-10-22T13:59:10Z"
+  }
+ ]
+}

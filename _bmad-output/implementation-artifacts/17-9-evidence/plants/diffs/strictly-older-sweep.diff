@@ -1,0 +1,11 @@
+--- a/crates/maos-capability/src/cap_quota/mod.rs
++++ b/crates/maos-capability/src/cap_quota/mod.rs
+@@ -323,7 +323,7 @@
+                 Ordering::Acquire,
+             ) {
+                 Ok(_) => {
+-                    self.state.slots.retain(|_, slot| slot.window >= window);
++                    self.state.slots.retain(|_, slot| slot.window == window);
+                     break;
+                 }
+                 Err(observed) => previous = observed,

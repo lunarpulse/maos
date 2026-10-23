@@ -1,0 +1,33 @@
+--- a/crates/maos-capability/src/cap_quota/mod.rs
++++ b/crates/maos-capability/src/cap_quota/mod.rs
+@@ -102,6 +102,7 @@
+ pub struct Charge {
+     spirit_pid: u32,
+     window: u64,
++    owns: u8,
+ }
+ impl Charge {
+     /// The admission window this charge belongs to.
+@@ -276,7 +277,11 @@
+             });
+         }
+         slot.reserved += 1;
+-        Ok(Charge { spirit_pid, window })
++        // PLANT: the reservation that reaches a threshold owns its crossing.
++        let mut owns = 0;
++        if slot.reserved == self.state.pressure_at { owns |= PRESSURE_BIT; }
++        if slot.reserved == self.state.limit_at { owns |= LIMIT_BIT; }
++        Ok(Charge { spirit_pid, window, owns })
+     }
+     /// Count a successfully issued token; returns the thresholds it newly reached.
+     pub fn commit(&self, charge: Charge) -> Committed {
+@@ -293,7 +298,8 @@
+                     (self.state.pressure_at, PRESSURE_BIT, QuotaSignal::Pressure),
+                     (self.state.limit_at, LIMIT_BIT, QuotaSignal::Limit),
+                 ] {
+-                    if slot.issued >= threshold && slot.fired & bit == 0 {
++                    let _ = threshold;
++                    if charge.owns & bit != 0 && slot.fired & bit == 0 {
+                         slot.fired |= bit;
+                         committed.signals.push(signal);
+                     }

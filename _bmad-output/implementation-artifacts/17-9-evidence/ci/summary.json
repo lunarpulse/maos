@@ -1,0 +1,70 @@
+{
+ "c1": {
+  "run": "39786854742",
+  "sha": "977e3a044f776d9ad925da171bad7e70344ce33b",
+  "attempt": 1,
+  "jobs": {
+   "success": 177,
+   "failure": 7
+  },
+  "failed": [
+   "aggregate",
+   "check-env-contract",
+   "check-multi-tenant-loom",
+   "reproducible-build",
+   "v1-0-ship-gate",
+   "v1-5-ship-gate",
+   "workspace-test-suite"
+  ]
+ },
+ "c2": {
+  "run": "39786988187",
+  "sha": "29b6a773f56c06587811abdc742d41e6b339bb84",
+  "attempt": 1,
+  "jobs": {
+   "failure": 22
+  },
+  "failed": [
+   "red atomicity",
+   "red charge-after-policy",
+   "red cli-refusal",
+   "red confidentiality",
+   "red crossing-on-successful-issuance",
+   "red drop-accounting",
+   "red epoch-never-decreases",
+   "red fr4-disposition",
+   "red inclusive-capacity",
+   "red mcp-receipt",
+   "red mint-after-bucket",
+   "red once-per-window",
+   "red posture-delta",
+   "red quota-rows-reach-tl",
+   "red ratification-loader-decode-all",
+   "red ratification-loader-payload",
+   "red rearm-on-rollover",
+   "red recall-typed-denial",
+   "red refund-on-failed-issue",
+   "red session-verdict",
+   "red strictly-older-sweep",
+   "red window-rollover"
+  ]
+ },
+ "c3": {
+  "run": "39795073681",
+  "sha": "b08b3cd56631c5f3e5e48d6a4806d4d23cea551d",
+  "attempt": 2,
+  "jobs": {
+   "success": 177,
+   "failure": 6,
+   "skipped": 1
+  },
+  "failed": [
+   "aggregate",
+   "check-env-contract",
+   "reproducible-build",
+   "v1-0-ship-gate",
+   "v1-5-ship-gate",
+   "workspace-test-suite"
+  ]
+ }
+}

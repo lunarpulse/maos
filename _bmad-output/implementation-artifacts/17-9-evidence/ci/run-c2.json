@@ -1,0 +1,164 @@
+{
+ "run_id": "39786988187",
+ "head_sha": "29b6a773f56c06587811abdc742d41e6b339bb84",
+ "run_attempt": 1,
+ "conclusion": "failure",
+ "created_at": "2026-10-22T13:27:25Z",
+ "updated_at": "2026-10-22T13:53:54Z",
+ "jobs": [
+  {
+   "name": "red atomicity",
+   "id": 119852710578,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:38:24Z",
+   "completed_at": "2026-10-22T13:39:41Z"
+  },
+  {
+   "name": "red charge-after-policy",
+   "id": 119852710877,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:45:12Z",
+   "completed_at": "2026-10-22T13:46:16Z"
+  },
+  {
+   "name": "red cli-refusal",
+   "id": 119852710731,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:38:14Z",
+   "completed_at": "2026-10-22T13:44:05Z"
+  },
+  {
+   "name": "red confidentiality",
+   "id": 119852710863,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:41:35Z",
+   "completed_at": "2026-10-22T13:49:18Z"
+  },
+  {
+   "name": "red crossing-on-successful-issuance",
+   "id": 119852710629,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:38:27Z",
+   "completed_at": "2026-10-22T13:39:37Z"
+  },
+  {
+   "name": "red drop-accounting",
+   "id": 119852710587,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:39:42Z",
+   "completed_at": "2026-10-22T13:41:00Z"
+  },
+  {
+   "name": "red epoch-never-decreases",
+   "id": 119852710870,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:43:17Z",
+   "completed_at": "2026-10-22T13:44:24Z"
+  },
+  {
+   "name": "red fr4-disposition",
+   "id": 119852710903,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:46:18Z",
+   "completed_at": "2026-10-22T13:47:19Z"
+  },
+  {
+   "name": "red inclusive-capacity",
+   "id": 119852710812,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:44:29Z",
+   "completed_at": "2026-10-22T13:45:39Z"
+  },
+  {
+   "name": "red mcp-receipt",
+   "id": 119852711139,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:46:27Z",
+   "completed_at": "2026-10-22T13:48:56Z"
+  },
+  {
+   "name": "red mint-after-bucket",
+   "id": 119852710879,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:46:24Z",
+   "completed_at": "2026-10-22T13:47:17Z"
+  },
+  {
+   "name": "red once-per-window",
+   "id": 119852710615,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:37:37Z",
+   "completed_at": "2026-10-22T13:38:26Z"
+  },
+  {
+   "name": "red posture-delta",
+   "id": 119852710803,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:38:52Z",
+   "completed_at": "2026-10-22T13:39:53Z"
+  },
+  {
+   "name": "red quota-rows-reach-tl",
+   "id": 119852710757,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:40:37Z",
+   "completed_at": "2026-10-22T13:41:47Z"
+  },
+  {
+   "name": "red ratification-loader-decode-all",
+   "id": 119852710715,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:46:18Z",
+   "completed_at": "2026-10-22T13:47:20Z"
+  },
+  {
+   "name": "red ratification-loader-payload",
+   "id": 119852711130,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:47:19Z",
+   "completed_at": "2026-10-22T13:48:04Z"
+  },
+  {
+   "name": "red rearm-on-rollover",
+   "id": 119852710782,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:39:14Z",
+   "completed_at": "2026-10-22T13:40:21Z"
+  },
+  {
+   "name": "red recall-typed-denial",
+   "id": 119852711051,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:44:25Z",
+   "completed_at": "2026-10-22T13:51:57Z"
+  },
+  {
+   "name": "red refund-on-failed-issue",
+   "id": 119852710264,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:37:33Z",
+   "completed_at": "2026-10-22T13:38:33Z"
+  },
+  {
+   "name": "red session-verdict",
+   "id": 119852710978,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:39:56Z",
+   "completed_at": "2026-10-22T13:53:53Z"
+  },
+  {
+   "name": "red strictly-older-sweep",
+   "id": 119852710640,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:40:57Z",
+   "completed_at": "2026-10-22T13:41:33Z"
+  },
+  {
+   "name": "red window-rollover",
+   "id": 119852710953,
+   "conclusion": "failure",
+   "started_at": "2026-10-22T13:45:21Z",
+   "completed_at": "2026-10-22T13:46:16Z"
+  }
+ ]
+}

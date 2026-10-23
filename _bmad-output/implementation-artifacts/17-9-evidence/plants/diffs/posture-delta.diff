@@ -1,0 +1,11 @@
+--- a/crates/maos-audit/src/log_composition.rs
++++ b/crates/maos-audit/src/log_composition.rs
+@@ -425,7 +425,7 @@
+                 intent,
+                 payload_redacted: _,
+             } => {
+-                if frame_kind == "capability.invocation" && intent.starts_with("cap.issue.") {
++                if frame_kind == "capability.invocation" {
+                     let approval = approvals_by_capability.get(intent).cloned();
+                     events.push(PostureDeltaEntry {
+                         timestamp_ns: entry.timestamp_ns,

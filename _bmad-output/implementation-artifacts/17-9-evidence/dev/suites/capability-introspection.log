@@ -1,0 +1,119 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: `maos-capability` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_capability-1b7b63e7f25c0358)
+
+running 28 tests
+test cap_audit::tests::channel_creation ... ok
+test cap_audit::tests::drop_instrument_names_site_and_latches_closed_writer ... ok
+test cap_quota::tests::a_slot_created_after_a_sweep_never_starts_below_the_swept_window ... ok
+test cap_quota::tests::a_refund_or_commit_never_recreates_a_swept_slot ... ok
+test cap_quota::tests::overlapping_sweeps_never_remove_a_slot_of_the_current_or_a_later_window ... ok
+test cap_tokens::shard::tests::hash_token_id_different_ids_different_shards_usually ... ok
+test cap_tokens::shard::tests::hash_token_id_is_in_range ... ok
+test cap_tokens::tests::high_privilege_ttl_capped_at_60s ... ok
+test cap_tokens::tests::cli_subprocess_exit_revoke ... ok
+test cap_tokens::tests::issue_and_verify_round_trip ... ok
+test cap_tokens::tests::issue_survives_closed_sink_and_counts_the_drop ... ok
+test cap_tokens::tests::verify_rejects_cross_spirit_replay ... ok
+test working_memory::store::tests::get_scalar_reads_back ... ok
+test cap_tokens::tests::revoke_makes_verify_fail ... ok
+test working_memory::store::tests::get_scalar_returns_none_for_unwritten_tag ... ok
+test cap_tokens::tests::verify_rejects_wrong_posture ... ok
+test working_memory::store::tests::set_scalar_happy_path ... ok
+test working_memory::store::tests::set_scalar_rejects_empty_tag ... ok
+test working_memory::store::tests::set_scalar_rejects_empty_derived_from ... ok
+test working_memory::store::tests::set_scalar_overwrites_same_tag ... ok
+test working_memory::store::tests::set_scalar_rejects_nan_value ... ok
+test working_memory::tests::working_memory_slot_new_well_formed ... ok
+test working_memory::store::tests::set_scalar_scoped_per_spirit_per_tag ... ok
+test working_memory::tests::working_memory_slot_rejects_empty_derived_from ... ok
+test working_memory::tests::working_memory_slot_rejects_empty_tag ... ok
+test working_memory::tests::working_memory_slot_rejects_infinite_value ... ok
+test working_memory::tests::working_memory_slot_rejects_nan ... ok
+test cap_quota::tests::ten_thousand_idle_pids_are_swept_by_one_charge_after_rollover ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/issuance_quota_17_9.rs (/mnt/build/cargo/debug/deps/issuance_quota_17_9-6d816e0affa7b218)
+
+running 12 tests
+test a_rolled_charge_neither_commits_nor_refunds_into_the_new_window ... ok
+test a_refund_within_the_window_frees_the_slot_without_counting_or_signalling ... ok
+test a_refund_never_touches_issued_fired_signals_or_the_exhaustion_latch ... ok
+test the_default_is_the_one_named_budget_source ... ok
+test capacity_is_inclusive_at_small_and_medium_budgets ... ok
+test the_widest_budget_and_windows_beyond_u64_nanoseconds_never_overflow ... ok
+test the_window_rolls_at_exactly_window_ns_and_rearms_everything ... ok
+test thresholds_are_the_ceilings_of_eighty_and_ninety_five_percent ... ok
+test without_a_later_charge_a_late_finalization_belongs_to_its_admission_window ... ok
+test concurrent_charges_cannot_oversubscribe_or_duplicate_signals ... ok
+test a_zero_budget_is_refused - should panic ... ok
+test a_zero_window_is_refused - should panic ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/operator_re_revoke_16_1.rs (/mnt/build/cargo/debug/deps/operator_re_revoke_16_1-aa35c73e3c9511ae)
+
+running 3 tests
+test absent_token_id_stays_unknown_token_and_writes_no_row ... ok
+test operator_re_revoke_is_typed_revoked_and_writes_no_second_audit_row ... ok
+test cli_subprocess_exit_re_revoke_stays_ok_and_keeps_its_audit_row ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/scalar_seq_17_4.rs (/mnt/build/cargo/debug/deps/scalar_seq_17_4-6266126260555301)
+
+running 3 tests
+test a_refused_write_consumes_no_seq ... ok
+test separate_stores_number_independently ... ok
+test seq_is_unique_and_gap_free_under_concurrent_writers ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests maos_capability
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

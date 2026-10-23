@@ -1,0 +1,41 @@
+--- a/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
++++ b/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
+@@ -200,19 +200,6 @@
+                 continue;
+             }
+ 
+-            // Step 3 — consume admission before minting or serializing the row.
+-            // Serialization of this fixed record is not expected to fail.
+-            let bucket_key = (scb.spirit_id.clone(), entry.id.clone());
+-            let bucket = self
+-                .rate_limits
+-                .entry(bucket_key)
+-                .or_insert_with(|| Arc::new(ScheduleBucket::new(entry.rate_limit_per_hour)))
+-                .value()
+-                .clone();
+-            if !bucket.try_consume() {
+-                continue;
+-            }
+-
+             // Step 4 — mint only after admission (one token per Scope at v0.5).
+             // The tokens attest authority at fire time and the TL row records
+             // the first issued token_id; the hook ABI carries no token. `None`
+@@ -242,6 +229,18 @@
+                     continue;
+                 }
+             };
++
++            // PLANT: rate-limit consume AFTER minting (pre-FW-10 order).
++            let bucket_key = (scb.spirit_id.clone(), entry.id.clone());
++            let bucket = self
++                .rate_limits
++                .entry(bucket_key)
++                .or_insert_with(|| Arc::new(ScheduleBucket::new(entry.rate_limit_per_hour)))
++                .value()
++                .clone();
++            if !bucket.try_consume() {
++                continue;
++            }
+ 
+             let intent_str = format!("schedule.fire:{}", entry.id);
+             let _ = self.transparency_log.insert_frame_event(

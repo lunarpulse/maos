@@ -1,0 +1,1454 @@
+diff --git a/crates/maos-audit/src/fr4_classifier.rs b/crates/maos-audit/src/fr4_classifier.rs
+index 4286d4b..3c643de 100644
+--- a/crates/maos-audit/src/fr4_classifier.rs
++++ b/crates/maos-audit/src/fr4_classifier.rs
+@@ -186,6 +186,17 @@ impl WriterShapeEntry {
+ /// `unload` carry `spirit_pid`, not `spirit_id` (validation round 1).
+ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
+     // ── maos-kernel-core — NonCall ─────────────────────────────────────────
++    WriterShapeEntry {
++        site: ("writer_task.rs", "write_to_transparency_log", 5),
++        kind: 7,
++        token: TokenColumn::Absent,
++        intent: WriterIntent::Prefix("cap.quota:"),
++        shape: Some(&[
++            ("window", PayloadType::Num),
++            ("used", PayloadType::Num),
++            ("budget", PayloadType::Num),
++        ]),
++    },
+     WriterShapeEntry {
+         // Story 16-6 — `load` split into a type-erased `load_obj` primitive
+         // so ONE extracted admission function can serve the operator door
+diff --git a/crates/maos-audit/src/log_composition.rs b/crates/maos-audit/src/log_composition.rs
+index 454470d..57616af 100644
+--- a/crates/maos-audit/src/log_composition.rs
++++ b/crates/maos-audit/src/log_composition.rs
+@@ -370,7 +370,7 @@ pub struct PostureDeltaReport {
+ /// for authoritative approval-chain attribution (AC3.2).
+ ///
+ /// Classification rules:
+-/// - `Frame` with `frame_kind` `capability.invocation` → `CapabilityIssued`
++/// - `Frame` with `frame_kind` `capability.invocation` and intent prefix `cap.issue.` → `CapabilityIssued`
+ /// - `Frame` with `frame_kind` `spirit.revoked` → `CapabilityRevoked`
+ /// - `Lifecycle` with a per-Spirit `sandbox_tier` change → `SandboxTierChange`
+ /// - `Frame` with `frame_kind` `consent.rupture` → `ConsentRupture`
+@@ -425,7 +425,7 @@ pub fn posture_delta(
+                 intent,
+                 payload_redacted: _,
+             } => {
+-                if frame_kind == "capability.invocation" {
++                if frame_kind == "capability.invocation" && intent.starts_with("cap.issue.") {
+                     let approval = approvals_by_capability.get(intent).cloned();
+                     events.push(PostureDeltaEntry {
+                         timestamp_ns: entry.timestamp_ns,
+@@ -741,8 +741,8 @@ mod tests {
+         for (id, timestamp, pid, boot, kind, intent) in [
+             (1u8, 10i64, 7i64, 1i64, 19i64, "target-spirit"),
+             (2, 20, 8, 2, 19, "target-spirit"),
+-            (3, 100, 7, 1, 7, "target-action"),
+-            (4, 110, 8, 2, 7, "target-action"),
++            (3, 100, 7, 1, 7, "cap.issue.target"),
++            (4, 110, 8, 2, 7, "cap.issue.target"),
+             (5, 120, 9, 2, 7, "other-action"),
+             (6, 30, 7, 3, 19, "other-spirit"),
+             (7, 140, 7, 3, 7, "reused-pid-action"),
+@@ -784,7 +784,7 @@ mod tests {
+             .filter(|entry| {
+                 matches!(
+                     &entry.payload,
+-                    ComposedPayload::Frame { intent, .. } if intent == "target-action"
++                    ComposedPayload::Frame { intent, .. } if intent == "cap.issue.target"
+                 )
+             })
+             .count();
+@@ -870,12 +870,12 @@ mod tests {
+             );",
+         )
+         .unwrap();
+-        // CapabilityInvocation (kind=7) — canonical capability-grant frame.
++        // Only the cap-audit issuance intent on kind 7 is a capability grant.
+         conn.execute(
+             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
+              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+             rusqlite::params![
+-                &[1u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "delegate", b"x" as &[u8], 0i64,
++                &[1u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "cap.issue.Discriminant(0)", b"x" as &[u8], 0i64,
+             ],
+         )
+         .unwrap();
+@@ -888,6 +888,27 @@ mod tests {
+             ],
+         )
+         .unwrap();
++        // Kind 7 also carries quota signals, checks, revocations and calls.
++        // Neither those rows nor an issuance intent on another kind is a grant.
++        for (id, kind, intent) in [
++            (3u8, 7i64, "cap.quota:pressure"),
++            (4, 7, "cap.quota:limit"),
++            (5, 7, "cap.quota:exhausted"),
++            (6, 7, "cap.verify.ok"),
++            (7, 7, "cap.verify.fail"),
++            (8, 7, "cap.revoke"),
++            (9, 7, "delegate"),
++            (10, 7, "cap.issue"),
++            (11, 7, "cap.issuer.other"),
++            (12, 2, "cap.issue.Discriminant(0)"),
++        ] {
++            conn.execute(
++                "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
++                 VALUES (?1, 300, 0, 1, ?2, ?3, ?4, 0)",
++                rusqlite::params![&[id; 16] as &[u8], kind, intent, b"x" as &[u8]],
++            )
++            .unwrap();
++        }
+         drop(conn);
+ 
+         let range = LogRange {
+@@ -895,6 +916,7 @@ mod tests {
+             until_ns: i64::MAX as u64,
+         };
+         let report = posture_delta(&db_path, &journal_path, range, None).unwrap();
++        assert_eq!(report.summary.total_events, 2);
+ 
+         let issued: Vec<&PostureDeltaEntry> = report
+             .events
+@@ -921,10 +943,10 @@ mod tests {
+         assert!(
+             issued[0].change
+                 == PostureChange::CapabilityIssued {
+-                    intent: "delegate".to_string(),
++                    intent: "cap.issue.Discriminant(0)".to_string(),
+                     capability_detail: None,
+                 },
+-            "CapabilityIssued should carry the invocation intent"
++            "CapabilityIssued should carry the issuance intent"
+         );
+         assert!(
+             revoked[0].change
+@@ -1107,7 +1129,7 @@ mod tests {
+             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
+              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+             rusqlite::params![
+-                &[4u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "delegate", b"x" as &[u8], 0i64,
++                &[4u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "cap.issue.Discriminant(0)", b"x" as &[u8], 0i64,
+             ],
+         )
+         .unwrap();
+@@ -1116,7 +1138,7 @@ mod tests {
+         // intent value for the authoritative join to succeed.
+         conn.execute(
+             "INSERT INTO approval_decision_log (timestamp_ns, actor, target, capability, intent, decision, reasoning)
+-             VALUES (100, 'director', 'hello-spirit', 'delegate', 'delegate', 1, 'approved by operator')",
++             VALUES (100, 'director', 'hello-spirit', 'cap.issue.Discriminant(0)', 'delegate', 1, 'approved by operator')",
+             [],
+         )
+         .unwrap();
+@@ -1176,12 +1198,12 @@ mod tests {
+             );",
+         )
+         .unwrap();
+-        // 2 capability changes (CapabilityInvocation + SpiritRevoked).
++        // 2 capability changes (cap.issue. invocation + SpiritRevoked).
+         conn.execute(
+             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
+              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+             rusqlite::params![
+-                &[10u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "delegate", b"x" as &[u8], 0i64,
++                &[10u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "cap.issue.Discriminant(0)", b"x" as &[u8], 0i64,
+             ],
+         )
+         .unwrap();
+diff --git a/crates/maos-audit/tests/fr4_classifier_16_2.rs b/crates/maos-audit/tests/fr4_classifier_16_2.rs
+index 2c9ea58..23b767b 100644
+--- a/crates/maos-audit/tests/fr4_classifier_16_2.rs
++++ b/crates/maos-audit/tests/fr4_classifier_16_2.rs
+@@ -148,6 +148,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
+     // order. Kind 7 / tokenless is the historical default; the kind-1 FR50
+     // dispositions (D-16-3-J (4)) pin their own kind and token column.
+     let measured: &[(&str, Option<&str>, &str, &str, u32, &str)] = &[
++        (
++            "capability.invocation",
++            None,
++            "cap.quota:pressure",
++            r#"{"window":0,"used":48000,"budget":60000}"#,
++            1,
++            "cap quota ord5",
++        ),
+         (
+             "capability.invocation",
+             None,
+diff --git a/crates/maos-capability/src/cap_quota/mod.rs b/crates/maos-capability/src/cap_quota/mod.rs
+old mode 100644
+new mode 100755
+index 342eda4..8b7cac4
+--- a/crates/maos-capability/src/cap_quota/mod.rs
++++ b/crates/maos-capability/src/cap_quota/mod.rs
+@@ -1,33 +1,24 @@
+ #![forbid(unsafe_code)]
+ 
+-//! Per-Spirit capability issuance reservations in tumbling time windows.
+-//!
+-//! A successful charge reserves one issuance. Keep it after token issuance, or
+-//! refund it if issuance fails. Threshold signals belong to that reservation;
+-//! callers publish them only after issuance succeeds. This module emits no
+-//! audit events or IAC frames itself. Stale per-Spirit slots are swept on the
+-//! first charge in each new window.
++//! Per-Spirit reservations and committed issuances in tumbling windows.
++//! Charges hold no map guard; successful issuances must be committed, failures refunded.
+ 
++use dashmap::DashMap;
+ use std::sync::atomic::{AtomicU64, Ordering};
+ use std::sync::Arc;
+ use std::time::{Duration, Instant};
+ 
+-use dashmap::DashMap;
+-
+-/// Capability issuance capacity for each Spirit in a tumbling window.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub struct IssuanceQuota {
+     pub budget_per_window: u64,
+     pub window: Duration,
+ }
+ 
+-/// The one named issuance budget source; the v0.1-beta window is 60 seconds.
+ pub const DEFAULT_ISSUANCE_QUOTA: IssuanceQuota = IssuanceQuota {
+     budget_per_window: 60_000,
+     window: Duration::from_secs(60),
+ };
+ 
+-/// Monotonic nanoseconds used to identify quota windows.
+ pub trait QuotaClock: Send + Sync + std::fmt::Debug {
+     fn now_ns(&self) -> u64;
+ }
+@@ -36,57 +27,82 @@ pub trait QuotaClock: Send + Sync + std::fmt::Debug {
+ struct ProductionClock {
+     origin: Instant,
+ }
+-
+ impl QuotaClock for ProductionClock {
+     fn now_ns(&self) -> u64 {
+         self.origin.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64
+     }
+ }
+ 
+-/// One-shot signals associated with a Spirit's current quota window.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub enum QuotaSignal {
+     Pressure,
+     Limit,
+     Exhausted,
+ }
++impl QuotaSignal {
++    pub fn intent(self) -> &'static str {
++        match self {
++            Self::Pressure => "cap.quota:pressure",
++            Self::Limit => "cap.quota:limit",
++            Self::Exhausted => "cap.quota:exhausted",
++        }
++    }
++}
++const PRESSURE_BIT: u8 = 1;
++const LIMIT_BIT: u8 = 2;
+ 
+-const PRESSURE_BIT: u8 = 0b01;
+-const LIMIT_BIT: u8 = 0b10;
+-
+-/// One reserved issuance; consuming it with `refund` undoes a failed issuance.
+-/// Dropping it without a refund commits the reservation.
++/// One admission, consumed by `commit` or `refund`; holds no entry guard.
+ #[derive(Debug)]
+ #[must_use]
+ pub struct Charge {
+     spirit_pid: u32,
+     window: u64,
+-    fired: u8,
+-    used: u64,
+ }
+-
+ impl Charge {
+     pub fn window(&self) -> u64 {
+         self.window
+     }
++}
+ 
+-    /// Usage immediately after this reservation, including pending issuances.
+-    pub fn used(&self) -> u64 {
+-        self.used
+-    }
++/// The committed count and newly crossed thresholds, pressure before limit.
++#[derive(Debug)]
++pub struct Committed {
++    pub window: u64,
++    pub issued: u64,
++    pub signals: Signals,
++}
+ 
+-    /// Only signals newly fired by this charge, pressure before limit.
+-    pub fn signals(&self) -> impl Iterator<Item = QuotaSignal> + '_ {
+-        [
+-            (PRESSURE_BIT, QuotaSignal::Pressure),
+-            (LIMIT_BIT, QuotaSignal::Limit),
+-        ]
+-        .into_iter()
+-        .filter_map(move |(bit, signal)| (self.fired & bit != 0).then_some(signal))
++/// At most two threshold signals, stored inline without allocation.
++#[derive(Debug, Default)]
++pub struct Signals {
++    values: [Option<QuotaSignal>; 2],
++}
++impl Signals {
++    pub fn is_empty(&self) -> bool {
++        self.values[0].is_none()
++    }
++    fn push(&mut self, signal: QuotaSignal) {
++        let index = usize::from(self.values[0].is_some());
++        self.values[index] = Some(signal);
++    }
++}
++impl IntoIterator for Signals {
++    type Item = QuotaSignal;
++    type IntoIter = std::iter::Flatten<std::array::IntoIter<Option<QuotaSignal>, 2>>;
++    fn into_iter(self) -> Self::IntoIter {
++        self.values.into_iter().flatten()
++    }
++}
++impl<T: AsRef<[QuotaSignal]>> PartialEq<T> for Signals {
++    fn eq(&self, other: &T) -> bool {
++        self.values
++            .iter()
++            .flatten()
++            .copied()
++            .eq(other.as_ref().iter().copied())
+     }
+ }
+ 
+-/// A refused reservation; exhaustion is signalled once per Spirit per window.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub struct Exhausted {
+     pub spirit_pid: u32,
+@@ -97,42 +113,45 @@ pub struct Exhausted {
+ #[derive(Debug)]
+ struct Slot {
+     window: u64,
+-    used: u64,
++    reserved: u64,
++    issued: u64,
+     fired: u8,
+-    exhausted_fired: bool,
++    exhausted: bool,
+ }
+-
+ impl Slot {
+     fn new(window: u64) -> Self {
+         Self {
+             window,
+-            used: 0,
++            reserved: 0,
++            issued: 0,
+             fired: 0,
+-            exhausted_fired: false,
++            exhausted: false,
+         }
+     }
+ }
+ 
+-/// Per-Spirit reservations, synchronized under each DashMap entry's write lock.
+ #[derive(Debug)]
+ #[maos_attrs::i9_exempt(
+     reason = "per-Spirit issuance reservations; stale window slots swept once per window, bounded structural-state caching per I9"
+ )]
+-pub struct CapQuotaTracker {
+-    inner: DashMap<u32, Slot>,
++struct State {
++    slots: DashMap<u32, Slot>,
+     quota: IssuanceQuota,
+     clock: Arc<dyn QuotaClock>,
+     window_ns: u128,
+     pressure_at: u64,
+     limit_at: u64,
+-    last_swept: AtomicU64,
++    swept: AtomicU64,
+ }
+ 
++#[derive(Debug, Clone)]
++pub struct CapQuotaTracker {
++    state: Arc<State>,
++}
+ impl CapQuotaTracker {
+     pub fn new() -> Self {
+         Self::with_quota(DEFAULT_ISSUANCE_QUOTA)
+     }
+-
+     pub fn with_quota(quota: IssuanceQuota) -> Self {
+         Self::with_clock(
+             quota,
+@@ -141,89 +160,98 @@ impl CapQuotaTracker {
+             }),
+         )
+     }
+-
+     pub fn with_clock(quota: IssuanceQuota, clock: Arc<dyn QuotaClock>) -> Self {
+         assert!(
+             quota.budget_per_window >= 1,
+             "IssuanceQuota budget_per_window must be at least 1"
+         );
+         assert!(
+-            quota.window >= Duration::from_nanos(1),
++            quota.window > Duration::ZERO,
+             "IssuanceQuota window must be at least 1 ns"
+         );
+         let budget = u128::from(quota.budget_per_window);
+         Self {
+-            inner: DashMap::new(),
+-            quota,
+-            clock,
+-            window_ns: quota.window.as_nanos(),
+-            pressure_at: (budget * 80).div_ceil(100) as u64,
+-            limit_at: (budget * 95).div_ceil(100) as u64,
+-            last_swept: AtomicU64::new(0),
++            state: Arc::new(State {
++                slots: DashMap::new(),
++                quota,
++                clock,
++                window_ns: quota.window.as_nanos(),
++                pressure_at: (budget * 80).div_ceil(100) as u64,
++                limit_at: (budget * 95).div_ceil(100) as u64,
++                swept: AtomicU64::new(0),
++            }),
+         }
+     }
+-
+     pub fn quota(&self) -> IssuanceQuota {
+-        self.quota
++        self.state.quota
++    }
++    fn window(&self) -> u64 {
++        (u128::from(self.state.clock.now_ns()) / self.state.window_ns) as u64
+     }
+-
+     pub fn charge(&self, spirit_pid: u32) -> Result<Charge, Exhausted> {
+-        let window = (u128::from(self.clock.now_ns()) / self.window_ns) as u64;
+-        self.sweep(window);
++        self.sweep(self.window());
+         let mut slot = self
+-            .inner
++            .state
++            .slots
+             .entry(spirit_pid)
+-            .or_insert_with(|| Slot::new(window));
+-        if slot.window != window {
++            .or_insert_with(|| Slot::new(0));
++        let window = self.window().max(slot.window);
++        if window > slot.window {
+             *slot = Slot::new(window);
+         }
+-        if slot.used >= self.quota.budget_per_window {
+-            let first_in_window = !slot.exhausted_fired;
+-            slot.exhausted_fired = true;
++        if slot.reserved == self.state.quota.budget_per_window {
++            let first_in_window = !slot.exhausted;
++            slot.exhausted = true;
+             return Err(Exhausted {
+                 spirit_pid,
+                 window,
+                 first_in_window,
+             });
+         }
+-        slot.used += 1;
+-        let mut fired = 0;
+-        if slot.used >= self.pressure_at && slot.fired & PRESSURE_BIT == 0 {
+-            fired |= PRESSURE_BIT;
+-        }
+-        if slot.used >= self.limit_at && slot.fired & LIMIT_BIT == 0 {
+-            fired |= LIMIT_BIT;
++        slot.reserved += 1;
++        Ok(Charge { spirit_pid, window })
++    }
++    pub fn commit(&self, charge: Charge) -> Committed {
++        let mut committed = Committed {
++            window: charge.window,
++            issued: 0,
++            signals: Signals::default(),
++        };
++        if let Some(mut slot) = self.state.slots.get_mut(&charge.spirit_pid) {
++            if slot.window == charge.window {
++                slot.issued += 1;
++                committed.issued = slot.issued;
++                for (threshold, bit, signal) in [
++                    (self.state.pressure_at, PRESSURE_BIT, QuotaSignal::Pressure),
++                    (self.state.limit_at, LIMIT_BIT, QuotaSignal::Limit),
++                ] {
++                    if slot.issued >= threshold && slot.fired & bit == 0 {
++                        slot.fired |= bit;
++                        committed.signals.push(signal);
++                    }
++                }
++            }
+         }
+-        slot.fired |= fired;
+-        Ok(Charge {
+-            spirit_pid,
+-            window,
+-            fired,
+-            used: slot.used,
+-        })
++        committed
+     }
+-
+-    /// Refund only the original window, including the crossings this charge set.
+     pub fn refund(&self, charge: Charge) {
+-        if let Some(mut slot) = self.inner.get_mut(&charge.spirit_pid) {
++        if let Some(mut slot) = self.state.slots.get_mut(&charge.spirit_pid) {
+             if slot.window == charge.window {
+-                slot.used = slot.used.saturating_sub(1);
+-                slot.fired &= !charge.fired;
++                slot.reserved = slot.reserved.saturating_sub(1);
+             }
+         }
+     }
+-
+     fn sweep(&self, window: u64) {
+-        let mut previous = self.last_swept.load(Ordering::Relaxed);
++        let mut previous = self.state.swept.load(Ordering::Relaxed);
+         while window > previous {
+-            match self.last_swept.compare_exchange_weak(
++            match self.state.swept.compare_exchange_weak(
+                 previous,
+                 window,
+                 Ordering::Relaxed,
+                 Ordering::Relaxed,
+             ) {
+                 Ok(_) => {
+-                    self.inner.retain(|_, slot| slot.window == window);
++                    self.state.slots.retain(|_, slot| slot.window >= window);
+                     break;
+                 }
+                 Err(observed) => previous = observed,
+@@ -231,7 +259,6 @@ impl CapQuotaTracker {
+         }
+     }
+ }
+-
+ impl Default for CapQuotaTracker {
+     fn default() -> Self {
+         Self::new()
+@@ -241,360 +268,37 @@ impl Default for CapQuotaTracker {
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+-    use std::sync::Barrier;
+-
+     #[derive(Debug, Default)]
+-    struct ManualClock(AtomicU64);
+-
+-    impl ManualClock {
+-        fn set(&self, now_ns: u64) {
+-            self.0.store(now_ns, Ordering::Relaxed);
+-        }
+-    }
+-
+-    impl QuotaClock for ManualClock {
++    struct Clock(AtomicU64);
++    impl QuotaClock for Clock {
+         fn now_ns(&self) -> u64 {
+             self.0.load(Ordering::Relaxed)
+         }
+     }
+-
+-    fn tracker(budget_per_window: u64) -> (Arc<ManualClock>, CapQuotaTracker) {
+-        let clock = Arc::new(ManualClock::default());
+-        let tracker = CapQuotaTracker::with_clock(
+-            IssuanceQuota {
+-                budget_per_window,
+-                window: Duration::from_nanos(10),
+-            },
+-            clock.clone(),
+-        );
+-        (clock, tracker)
+-    }
+-
+-    fn fill(tracker: &CapQuotaTracker, spirit_pid: u32, count: u64) {
+-        for _ in 0..count {
+-            let _ = tracker.charge(spirit_pid).unwrap();
+-        }
+-    }
+-
+-    #[test]
+-    fn constructors_keep_the_named_default_and_explicit_quota() {
+-        assert_eq!(DEFAULT_ISSUANCE_QUOTA.budget_per_window, 60_000);
+-        assert_eq!(DEFAULT_ISSUANCE_QUOTA.window, Duration::from_secs(60));
+-        assert_eq!(CapQuotaTracker::new().quota(), DEFAULT_ISSUANCE_QUOTA);
+-        assert_eq!(CapQuotaTracker::default().quota(), DEFAULT_ISSUANCE_QUOTA);
+-        let quota = IssuanceQuota {
+-            budget_per_window: 7,
+-            window: Duration::from_secs(3),
+-        };
+-        assert_eq!(CapQuotaTracker::with_quota(quota).quota(), quota);
+-    }
+-
+-    #[test]
+-    #[should_panic(expected = "IssuanceQuota budget_per_window must be at least 1")]
+-    fn zero_budget_is_rejected() {
+-        let _ = tracker(0);
+-    }
+-
+-    #[test]
+-    #[should_panic(expected = "IssuanceQuota window must be at least 1 ns")]
+-    fn zero_window_is_rejected() {
+-        let _ = CapQuotaTracker::with_quota(IssuanceQuota {
+-            budget_per_window: 1,
+-            window: Duration::ZERO,
+-        });
+-    }
+-
+     #[test]
+-    fn one_nanosecond_windows_are_valid() {
+-        let clock = Arc::new(ManualClock::default());
++    fn rollover_sweeps_inactive_spirits_once_per_window() {
++        let clock = Arc::new(Clock::default());
+         let tracker = CapQuotaTracker::with_clock(
+             IssuanceQuota {
+-                budget_per_window: 1,
+-                window: Duration::from_nanos(1),
++                budget_per_window: 10,
++                window: Duration::from_nanos(10),
+             },
+             clock.clone(),
+         );
+-        assert_eq!(tracker.charge(7).unwrap().window(), 0);
+-        clock.set(1);
+-        assert_eq!(tracker.charge(7).unwrap().window(), 1);
+-    }
+-
+-    #[test]
+-    fn thresholds_use_ceil_and_do_not_overflow_at_max_budget() {
+-        let (_, small) = tracker(7);
+-        assert_eq!((small.pressure_at, small.limit_at), (6, 7));
+-        let (_, large) = tracker(u64::MAX);
+-        assert_eq!(large.pressure_at, 14_757_395_258_967_641_292);
+-        assert_eq!(large.limit_at, 17_524_406_870_024_074_035);
+-    }
+-
+-    #[test]
+-    fn capacity_is_inclusive_and_crossings_fire_once() {
+-        let (_, tracker) = tracker(100);
+-        for used in 1..=100 {
+-            let charge = tracker.charge(7).unwrap();
+-            assert_eq!((charge.window(), charge.used()), (0, used));
+-            let expected = match used {
+-                80 => vec![QuotaSignal::Pressure],
+-                95 => vec![QuotaSignal::Limit],
+-                _ => vec![],
+-            };
+-            assert_eq!(charge.signals().collect::<Vec<_>>(), expected);
+-        }
+-        assert_eq!(
+-            tracker.charge(7).unwrap_err(),
+-            Exhausted {
+-                spirit_pid: 7,
+-                window: 0,
+-                first_in_window: true,
+-            }
+-        );
+-        assert!(!tracker.charge(7).unwrap_err().first_in_window);
+-        assert_eq!(tracker.charge(8).unwrap().used(), 1);
+-    }
+-
+-    #[test]
+-    fn small_budgets_can_fire_both_signals_in_order() {
+-        for budget in [1, 2, 3] {
+-            let (_, tracker) = tracker(budget);
+-            fill(&tracker, 7, budget - 1);
+-            let charge = tracker.charge(7).unwrap();
+-            assert_eq!(
+-                charge.signals().collect::<Vec<_>>(),
+-                [QuotaSignal::Pressure, QuotaSignal::Limit]
+-            );
+-            assert!(tracker.charge(7).is_err());
+-        }
+-    }
+-
+-    #[test]
+-    fn windows_tumble_on_exact_boundaries_and_skips_reset_state() {
+-        let (clock, tracker) = tracker(2);
+-        clock.set(9);
+-        assert_eq!(tracker.charge(7).unwrap().window(), 0);
+-        clock.set(10);
+-        let charge = tracker.charge(7).unwrap();
+-        assert_eq!((charge.window(), charge.used()), (1, 1));
+-        clock.set(19);
+-        assert_eq!(tracker.charge(7).unwrap().used(), 2);
+-        assert!(tracker.charge(7).unwrap_err().first_in_window);
+-        clock.set(100);
+-        let charge = tracker.charge(7).unwrap();
+-        assert_eq!((charge.window(), charge.used()), (10, 1));
+-    }
+-
+-    #[test]
+-    fn rollover_rearms_both_thresholds_and_first_exhaustion() {
+-        let (clock, tracker) = tracker(1);
+-        for window in 0..3 {
+-            clock.set(window * 10);
+-            let charge = tracker.charge(7).unwrap();
+-            assert_eq!((charge.window(), charge.used()), (window, 1));
+-            assert_eq!(
+-                charge.signals().collect::<Vec<_>>(),
+-                [QuotaSignal::Pressure, QuotaSignal::Limit]
+-            );
+-            let exhausted = tracker.charge(7).unwrap_err();
+-            assert_eq!(exhausted.window, window);
+-            assert!(exhausted.first_in_window);
+-            assert!(!tracker.charge(7).unwrap_err().first_in_window);
+-        }
+-    }
+-
+-    #[test]
+-    fn refund_restores_capacity_and_rearms_only_its_crossings() {
+-        let (_, tracker) = tracker(20);
+-        fill(&tracker, 7, 15);
+-        let pressure = tracker.charge(7).unwrap();
+-        assert_eq!(
+-            pressure.signals().collect::<Vec<_>>(),
+-            [QuotaSignal::Pressure]
+-        );
+-        tracker.refund(pressure);
+-        let pressure = tracker.charge(7).unwrap();
+-        assert_eq!(pressure.used(), 16);
+-        assert_eq!(
+-            pressure.signals().collect::<Vec<_>>(),
+-            [QuotaSignal::Pressure]
+-        );
+-        fill(&tracker, 7, 2);
+-        let limit = tracker.charge(7).unwrap();
+-        assert_eq!(limit.signals().collect::<Vec<_>>(), [QuotaSignal::Limit]);
+-        tracker.refund(limit);
+-        let limit = tracker.charge(7).unwrap();
+-        assert_eq!(limit.used(), 19);
+-        assert_eq!(limit.signals().collect::<Vec<_>>(), [QuotaSignal::Limit]);
+-        assert!(tracker.charge(7).unwrap().signals().next().is_none());
+-    }
+-
+-    #[test]
+-    fn non_crossing_refund_preserves_previously_fired_bits() {
+-        let (_, tracker) = tracker(20);
+-        let early = tracker.charge(7).unwrap();
+-        fill(&tracker, 7, 15);
+-        tracker.refund(early);
+-        let replacement = tracker.charge(7).unwrap();
+-        assert_eq!(replacement.used(), 16);
+-        assert!(replacement.signals().next().is_none());
+-    }
+-
+-    #[test]
+-    fn out_of_order_refund_rearms_the_crossing_it_owned() {
+-        let (_, tracker) = tracker(20);
+-        fill(&tracker, 7, 15);
+-        let crossing = tracker.charge(7).unwrap();
+-        let _later = tracker.charge(7).unwrap();
+-        tracker.refund(crossing);
+-        let replacement = tracker.charge(7).unwrap();
+-        assert_eq!(replacement.used(), 17);
+-        assert_eq!(
+-            replacement.signals().collect::<Vec<_>>(),
+-            [QuotaSignal::Pressure]
+-        );
+-    }
+-
+-    #[test]
+-    fn refund_rearms_both_bits_but_not_the_exhaustion_notification() {
+-        let (_, tracker) = tracker(1);
+-        let charge = tracker.charge(7).unwrap();
+-        assert!(tracker.charge(7).unwrap_err().first_in_window);
+-        tracker.refund(charge);
+-        let replacement = tracker.charge(7).unwrap();
+-        assert_eq!(replacement.used(), 1);
+-        assert_eq!(
+-            replacement.signals().collect::<Vec<_>>(),
+-            [QuotaSignal::Pressure, QuotaSignal::Limit]
+-        );
+-        assert!(!tracker.charge(7).unwrap_err().first_in_window);
+-    }
+-
+-    #[test]
+-    fn refund_after_rollover_does_not_reduce_the_new_window() {
+-        let (clock, tracker) = tracker(2);
+-        let old = tracker.charge(7).unwrap();
+-        clock.set(10);
+-        assert_eq!(tracker.charge(7).unwrap().used(), 1);
+-        tracker.refund(old);
+-        assert_eq!(tracker.charge(7).unwrap().used(), 2);
+-        assert!(tracker.charge(7).is_err());
+-    }
+-
+-    #[test]
+-    fn refund_of_a_swept_slot_does_not_reinsert_it() {
+-        let (clock, tracker) = tracker(1);
+-        let old = tracker.charge(7).unwrap();
+-        clock.set(10);
+-        let _current = tracker.charge(8).unwrap();
+-        assert_eq!(tracker.inner.len(), 1);
+-        tracker.refund(old);
+-        assert_eq!(tracker.inner.len(), 1);
+-        assert_eq!(tracker.charge(7).unwrap().used(), 1);
+-    }
+-
+-    #[test]
+-    fn rollover_sweeps_inactive_spirits_once_per_window() {
+-        let (clock, tracker) = tracker(10);
+         for pid in 0..100 {
+             let _ = tracker.charge(pid).unwrap();
+         }
+-        assert_eq!(tracker.inner.len(), 100);
+-        clock.set(10);
++        assert_eq!(tracker.state.slots.len(), 100);
++        clock.0.store(10, Ordering::Relaxed);
+         let _ = tracker.charge(100).unwrap();
+-        assert_eq!(tracker.inner.len(), 1);
+-        // A stale charge that reached its entry after the sweep must not cause
+-        // every subsequent charge in this same window to sweep again.
+-        tracker.inner.entry(101).or_insert_with(|| Slot::new(0));
++        assert_eq!(tracker.state.slots.len(), 1);
++        tracker.state.slots.insert(101, Slot::new(0));
++        tracker.state.slots.insert(103, Slot::new(3));
+         let _ = tracker.charge(100).unwrap();
+-        assert_eq!(tracker.inner.len(), 2);
+-        clock.set(20);
++        assert_eq!(tracker.state.slots.len(), 3);
++        clock.0.store(20, Ordering::Relaxed);
+         let _ = tracker.charge(102).unwrap();
+-        assert_eq!(tracker.inner.len(), 1);
+-        assert_eq!(tracker.last_swept.load(Ordering::Relaxed), 2);
+-    }
+-
+-    #[test]
+-    fn stale_slot_is_reset_under_its_entry_lock() {
+-        let (clock, tracker) = tracker(1);
+-        clock.set(10);
+-        let _ = tracker.charge(8).unwrap();
+-        let mut stale = Slot::new(0);
+-        stale.used = 1;
+-        stale.fired = PRESSURE_BIT | LIMIT_BIT;
+-        stale.exhausted_fired = true;
+-        tracker.inner.entry(7).or_insert(stale);
+-        let charge = tracker.charge(7).unwrap();
+-        assert_eq!((charge.window(), charge.used()), (1, 1));
+-        assert_eq!(
+-            charge.signals().collect::<Vec<_>>(),
+-            [QuotaSignal::Pressure, QuotaSignal::Limit]
+-        );
+-        assert!(tracker.charge(7).unwrap_err().first_in_window);
+-    }
+-
+-    #[test]
+-    fn concurrent_charges_cannot_oversubscribe_or_duplicate_signals() {
+-        let (_, tracker) = tracker(1_000);
+-        let barrier = Barrier::new(12);
+-        let totals = std::thread::scope(|scope| {
+-            let mut workers = Vec::new();
+-            for _ in 0..12 {
+-                workers.push(scope.spawn(|| {
+-                    let mut counts = [0_u64; 4];
+-                    barrier.wait();
+-                    for _ in 0..200 {
+-                        match tracker.charge(7) {
+-                            Ok(charge) => {
+-                                counts[0] += 1;
+-                                for signal in charge.signals() {
+-                                    match signal {
+-                                        QuotaSignal::Pressure => counts[1] += 1,
+-                                        QuotaSignal::Limit => counts[2] += 1,
+-                                        QuotaSignal::Exhausted => {
+-                                            panic!("charge emitted exhaustion")
+-                                        }
+-                                    }
+-                                }
+-                            }
+-                            Err(exhausted) => counts[3] += u64::from(exhausted.first_in_window),
+-                        }
+-                    }
+-                    counts
+-                }));
+-            }
+-            let mut total = [0_u64; 4];
+-            for worker in workers {
+-                for (sum, count) in total.iter_mut().zip(worker.join().unwrap()) {
+-                    *sum += count;
+-                }
+-            }
+-            total
+-        });
+-        assert_eq!(totals, [1_000, 1, 1, 1]);
+-        assert_eq!(tracker.inner.get_mut(&7).unwrap().used, 1_000);
+-    }
+-
+-    #[test]
+-    fn concurrent_refunds_restore_all_reservations() {
+-        let (_, tracker) = tracker(8);
+-        let barrier = Barrier::new(16);
+-        std::thread::scope(|scope| {
+-            for _ in 0..16 {
+-                let tracker = &tracker;
+-                let barrier = &barrier;
+-                scope.spawn(move || {
+-                    barrier.wait();
+-                    for _ in 0..100 {
+-                        if let Ok(charge) = tracker.charge(7) {
+-                            tracker.refund(charge);
+-                        }
+-                    }
+-                });
+-            }
+-        });
+-        assert_eq!(tracker.inner.get_mut(&7).unwrap().used, 0);
+-        for used in 1..=8 {
+-            assert_eq!(tracker.charge(7).unwrap().used(), used);
+-        }
+-        assert!(tracker.charge(7).is_err());
++        assert_eq!(tracker.state.slots.len(), 2);
++        assert_eq!(tracker.state.swept.load(Ordering::Relaxed), 2);
+     }
+ }
+diff --git a/crates/maos-capability/tests/issuance_quota_17_9.rs b/crates/maos-capability/tests/issuance_quota_17_9.rs
+new file mode 100644
+index 0000000..ec9f912
+--- /dev/null
++++ b/crates/maos-capability/tests/issuance_quota_17_9.rs
+@@ -0,0 +1,329 @@
++//! Story 17-9 tracker behavior, using only the public reservation/commit API.
++use maos_capability::cap_quota::*;
++use std::sync::atomic::{AtomicU64, Ordering};
++use std::sync::{Arc, Barrier};
++use std::time::Duration;
++#[derive(Debug, Default)]
++struct ManualClock(AtomicU64);
++impl ManualClock {
++    fn set(&self, ns: u64) {
++        self.0.store(ns, Ordering::SeqCst);
++    }
++}
++impl QuotaClock for ManualClock {
++    fn now_ns(&self) -> u64 {
++        self.0.load(Ordering::SeqCst)
++    }
++}
++fn tracker(budget: u64) -> (Arc<ManualClock>, CapQuotaTracker) {
++    let clock = Arc::new(ManualClock::default());
++    let tracker = CapQuotaTracker::with_clock(
++        IssuanceQuota {
++            budget_per_window: budget,
++            window: Duration::from_nanos(10),
++        },
++        clock.clone(),
++    );
++    (clock, tracker)
++}
++fn fill(t: &CapQuotaTracker, pid: u32, count: u64) {
++    for _ in 0..count {
++        t.commit(t.charge(pid).unwrap());
++    }
++}
++#[test]
++fn constructors_keep_the_named_default_and_explicit_quota() {
++    assert_eq!(
++        DEFAULT_ISSUANCE_QUOTA,
++        IssuanceQuota {
++            budget_per_window: 60_000,
++            window: Duration::from_secs(60)
++        }
++    );
++    assert_eq!(CapQuotaTracker::new().quota(), DEFAULT_ISSUANCE_QUOTA);
++    assert_eq!(CapQuotaTracker::default().quota(), DEFAULT_ISSUANCE_QUOTA);
++    let quota = IssuanceQuota {
++        budget_per_window: 7,
++        window: Duration::from_secs(3),
++    };
++    assert_eq!(CapQuotaTracker::with_quota(quota).quota(), quota);
++}
++#[test]
++#[should_panic(expected = "IssuanceQuota budget_per_window must be at least 1")]
++fn zero_budget_is_rejected() {
++    let _ = tracker(0);
++}
++#[test]
++#[should_panic(expected = "IssuanceQuota window must be at least 1 ns")]
++fn zero_window_is_rejected() {
++    CapQuotaTracker::with_quota(IssuanceQuota {
++        budget_per_window: 1,
++        window: Duration::ZERO,
++    });
++}
++#[test]
++fn one_nanosecond_windows_are_valid() {
++    let clock = Arc::new(ManualClock::default());
++    let t = CapQuotaTracker::with_clock(
++        IssuanceQuota {
++            budget_per_window: 1,
++            window: Duration::from_nanos(1),
++        },
++        clock.clone(),
++    );
++    assert_eq!(t.charge(7).unwrap().window(), 0);
++    clock.set(1);
++    assert_eq!(t.charge(7).unwrap().window(), 1);
++}
++#[test]
++fn thresholds_use_ceil_and_do_not_overflow_at_max_budget() {
++    let (_, t) = tracker(7);
++    for issued in 1..=7 {
++        let c = t.commit(t.charge(7).unwrap());
++        assert_eq!(
++            c.signals,
++            match issued {
++                6 => vec![QuotaSignal::Pressure],
++                7 => vec![QuotaSignal::Limit],
++                _ => vec![],
++            }
++        );
++    }
++    // Construction exercises the u128 threshold arithmetic without requiring
++    // u64::MAX issuances; small initial usage must not spuriously cross either.
++    let (_, t) = tracker(u64::MAX);
++    assert!(t.commit(t.charge(7).unwrap()).signals.is_empty());
++}
++#[test]
++fn capacity_is_inclusive_and_crossings_fire_once() {
++    let (_, t) = tracker(100);
++    for issued in 1..=100 {
++        let c = t.commit(t.charge(7).unwrap());
++        assert_eq!((c.window, c.issued), (0, issued));
++        assert_eq!(
++            c.signals,
++            match issued {
++                80 => vec![QuotaSignal::Pressure],
++                95 => vec![QuotaSignal::Limit],
++                _ => vec![],
++            }
++        );
++    }
++    assert_eq!(
++        t.charge(7).unwrap_err(),
++        Exhausted {
++            spirit_pid: 7,
++            window: 0,
++            first_in_window: true
++        }
++    );
++    assert!(!t.charge(7).unwrap_err().first_in_window);
++    assert_eq!(t.commit(t.charge(8).unwrap()).issued, 1);
++}
++#[test]
++fn small_budgets_can_fire_both_signals_in_order() {
++    for budget in [1, 2, 3] {
++        let (_, t) = tracker(budget);
++        fill(&t, 7, budget - 1);
++        assert_eq!(
++            t.commit(t.charge(7).unwrap()).signals,
++            [QuotaSignal::Pressure, QuotaSignal::Limit]
++        );
++        assert!(t.charge(7).is_err());
++    }
++}
++#[test]
++fn windows_tumble_on_exact_boundaries_and_skips_reset_state() {
++    let (clock, t) = tracker(2);
++    clock.set(9);
++    assert_eq!(t.charge(7).unwrap().window(), 0);
++    clock.set(10);
++    assert_eq!(t.commit(t.charge(7).unwrap()).issued, 1);
++    clock.set(19);
++    assert_eq!(t.commit(t.charge(7).unwrap()).issued, 2);
++    assert!(t.charge(7).unwrap_err().first_in_window);
++    clock.set(100);
++    let c = t.commit(t.charge(7).unwrap());
++    assert_eq!((c.window, c.issued), (10, 1));
++}
++#[test]
++fn rollover_rearms_both_thresholds_and_first_exhaustion() {
++    let (clock, t) = tracker(1);
++    for window in 0..3 {
++        clock.set(window * 10);
++        let c = t.commit(t.charge(7).unwrap());
++        assert_eq!((c.window, c.issued), (window, 1));
++        assert_eq!(c.signals, [QuotaSignal::Pressure, QuotaSignal::Limit]);
++        assert!(t.charge(7).unwrap_err().first_in_window);
++        assert!(!t.charge(7).unwrap_err().first_in_window);
++    }
++}
++#[test]
++fn refund_restores_capacity_without_counting_failed_crossings() {
++    let (_, t) = tracker(20);
++    fill(&t, 7, 15);
++    t.refund(t.charge(7).unwrap());
++    let c = t.commit(t.charge(7).unwrap());
++    assert_eq!(c.issued, 16);
++    assert_eq!(c.signals, [QuotaSignal::Pressure]);
++    fill(&t, 7, 2);
++    t.refund(t.charge(7).unwrap());
++    let c = t.commit(t.charge(7).unwrap());
++    assert_eq!(c.issued, 19);
++    assert_eq!(c.signals, [QuotaSignal::Limit]);
++    assert!(t.commit(t.charge(7).unwrap()).signals.is_empty());
++}
++#[test]
++fn non_crossing_refund_preserves_previously_fired_bits() {
++    let (_, t) = tracker(20);
++    let early = t.charge(7).unwrap();
++    fill(&t, 7, 16);
++    t.refund(early);
++    let c = t.commit(t.charge(7).unwrap());
++    assert_eq!(c.issued, 17);
++    assert!(c.signals.is_empty());
++}
++#[test]
++fn out_of_order_refund_does_not_rearm_a_committed_crossing() {
++    let (_, t) = tracker(20);
++    fill(&t, 7, 15);
++    let failed = t.charge(7).unwrap();
++    let later = t.charge(7).unwrap();
++    assert_eq!(t.commit(later).signals, [QuotaSignal::Pressure]);
++    t.refund(failed);
++    let c = t.commit(t.charge(7).unwrap());
++    assert_eq!(c.issued, 17);
++    assert!(c.signals.is_empty());
++}
++#[test]
++fn refund_preserves_the_exhaustion_notification_latch() {
++    let (_, t) = tracker(1);
++    let failed = t.charge(7).unwrap();
++    assert!(t.charge(7).unwrap_err().first_in_window);
++    t.refund(failed);
++    assert_eq!(
++        t.commit(t.charge(7).unwrap()).signals,
++        [QuotaSignal::Pressure, QuotaSignal::Limit]
++    );
++    assert!(!t.charge(7).unwrap_err().first_in_window);
++}
++#[test]
++fn refund_after_rollover_does_not_reduce_the_new_window() {
++    let (clock, t) = tracker(2);
++    let old = t.charge(7).unwrap();
++    clock.set(10);
++    fill(&t, 7, 1);
++    t.refund(old);
++    fill(&t, 7, 1);
++    assert!(t.charge(7).is_err());
++}
++#[test]
++fn refund_of_a_swept_slot_does_not_reinsert_it() {
++    let (clock, t) = tracker(1);
++    let old = t.charge(7).unwrap();
++    clock.set(10);
++    fill(&t, 8, 1);
++    t.refund(old);
++    assert_eq!(t.commit(t.charge(7).unwrap()).issued, 1);
++}
++#[test]
++fn stale_slot_is_reset_under_its_entry_lock() {
++    let (clock, t) = tracker(1);
++    fill(&t, 7, 1);
++    assert!(t.charge(7).unwrap_err().first_in_window);
++    clock.set(10);
++    let c = t.commit(t.charge(7).unwrap());
++    assert_eq!((c.window, c.issued), (1, 1));
++    assert_eq!(c.signals, [QuotaSignal::Pressure, QuotaSignal::Limit]);
++    assert!(t.charge(7).unwrap_err().first_in_window);
++}
++#[test]
++fn commit_after_rollover_is_a_noop() {
++    let (clock, t) = tracker(1);
++    let old = t.charge(7).unwrap();
++    clock.set(10);
++    let current = t.charge(7).unwrap();
++    let c = t.commit(old);
++    assert_eq!((c.window, c.issued), (0, 0));
++    assert!(c.signals.is_empty());
++    assert_eq!(t.commit(current).issued, 1);
++}
++#[test]
++fn concurrent_charges_cannot_oversubscribe_or_duplicate_signals() {
++    let (_, t) = tracker(1_000);
++    let barrier = Barrier::new(12);
++    let totals = std::thread::scope(|scope| {
++        let mut workers = Vec::new();
++        for _ in 0..12 {
++            let t = t.clone();
++            let barrier = &barrier;
++            workers.push(scope.spawn(move || {
++                let mut counts = [0u64; 4];
++                barrier.wait();
++                for _ in 0..200 {
++                    match t.charge(7) {
++                        Ok(charge) => {
++                            counts[0] += 1;
++                            for signal in t.commit(charge).signals {
++                                match signal {
++                                    QuotaSignal::Pressure => counts[1] += 1,
++                                    QuotaSignal::Limit => counts[2] += 1,
++                                    QuotaSignal::Exhausted => panic!("commit emitted exhaustion"),
++                                }
++                            }
++                        }
++                        Err(e) => counts[3] += u64::from(e.first_in_window),
++                    }
++                }
++                counts
++            }));
++        }
++        let mut total = [0; 4];
++        for worker in workers {
++            for (sum, count) in total.iter_mut().zip(worker.join().unwrap()) {
++                *sum += count;
++            }
++        }
++        total
++    });
++    assert_eq!(totals, [1_000, 1, 1, 1]);
++    assert!(t.charge(7).is_err());
++}
++#[test]
++fn concurrent_refunds_restore_all_reservations() {
++    let (_, t) = tracker(8);
++    let barrier = Barrier::new(16);
++    std::thread::scope(|scope| {
++        for _ in 0..16 {
++            let t = &t;
++            let barrier = &barrier;
++            scope.spawn(move || {
++                barrier.wait();
++                for _ in 0..100 {
++                    if let Ok(c) = t.charge(7) {
++                        t.refund(c);
++                    }
++                }
++            });
++        }
++    });
++    for issued in 1..=8 {
++        assert_eq!(t.commit(t.charge(7).unwrap()).issued, issued);
++    }
++    assert!(t.charge(7).is_err());
++}
++#[test]
++fn wide_duration_and_signal_intents_are_supported() {
++    let clock = Arc::new(ManualClock(AtomicU64::new(u64::MAX)));
++    let t = CapQuotaTracker::with_clock(
++        IssuanceQuota {
++            budget_per_window: 1,
++            window: Duration::from_secs(u64::MAX),
++        },
++        clock,
++    );
++    assert_eq!(t.charge(7).unwrap().window(), 0);
++    assert_eq!(QuotaSignal::Pressure.intent(), "cap.quota:pressure");
++    assert_eq!(QuotaSignal::Limit.intent(), "cap.quota:limit");
++    assert_eq!(QuotaSignal::Exhausted.intent(), "cap.quota:exhausted");
++}
+diff --git a/crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs b/crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs
+index 67af5e9..89c35a0 100644
+--- a/crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs
++++ b/crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs
+@@ -7,7 +7,6 @@ use std::sync::Arc;
+ use tokio::sync::mpsc::Receiver;
+ 
+ use super::{CapAuditEvent, VerifyOutcome};
+-use crate::capability::cap_quota::QuotaSignal;
+ use crate::iac::transparency_log::{capability_token_column, FrameKind, TransparencyLogAdapter};
+ use maos_domain::invariants::i3::FrameOrigin;
+ 
+@@ -122,22 +121,18 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
+             used,
+             budget,
+         } => {
+-            let intent = match signal {
+-                QuotaSignal::Pressure => "cap.quota.pressure",
+-                QuotaSignal::Limit => "cap.quota.limit",
+-                QuotaSignal::Exhausted => "cap.quota.exhausted",
+-            };
+             let payload = serde_json::json!({
+                 "window": window,
+                 "used": used,
+                 "budget": budget,
+-            });
++            })
++            .to_string();
+             log.insert_frame_event(
+                 FrameKind::CapabilityInvocation,
+                 *spirit_pid,
+                 None,
+-                intent,
+-                payload.to_string().as_bytes(),
++                signal.intent(),
++                payload.as_bytes(),
+                 FrameOrigin::Kernel,
+             );
+         }
+diff --git a/crates/maos-kernel-core/src/capability/mod.rs b/crates/maos-kernel-core/src/capability/mod.rs
+index 46a13db..983a83c 100644
+--- a/crates/maos-kernel-core/src/capability/mod.rs
++++ b/crates/maos-kernel-core/src/capability/mod.rs
+@@ -207,15 +207,7 @@ impl CapabilityRegistryAdapter {
+             Ok(charge) => charge,
+             Err(exhausted) => {
+                 if exhausted.first_in_window {
+-                    if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Quota {
+-                        spirit_pid,
+-                        signal: QuotaSignal::Exhausted,
+-                        window: exhausted.window,
+-                        used: budget,
+-                        budget,
+-                    }) {
+-                        cap_audit::record_send_error(cap_audit::AuditDropSite::Quota, &error);
+-                    }
++                    self.audit_quota(spirit_pid, QuotaSignal::Exhausted, exhausted.window, budget);
+                 }
+                 return Err(CapError::ContextExhausted {
+                     spirit_id: spirit_pid,
+@@ -223,7 +215,7 @@ impl CapabilityRegistryAdapter {
+             }
+         };
+ 
+-        // 3. A failed token issue refunds the reservation and its threshold crossings.
++        // 3. Refund failed issuance; commit only successfully issued tokens.
+         let token = match self
+             .tokens
+             .issue(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
+@@ -234,20 +226,25 @@ impl CapabilityRegistryAdapter {
+                 return Err(error);
+             }
+         };
+-        for signal in charge.signals() {
+-            if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Quota {
+-                spirit_pid,
+-                signal,
+-                window: charge.window(),
+-                used: charge.used(),
+-                budget,
+-            }) {
+-                cap_audit::record_send_error(cap_audit::AuditDropSite::Quota, &error);
+-            }
++        let committed = self.quota.commit(charge);
++        for signal in committed.signals {
++            self.audit_quota(spirit_pid, signal, committed.window, committed.issued);
+         }
+         Ok(token)
+     }
+ 
++    fn audit_quota(&self, spirit_pid: u32, signal: QuotaSignal, window: u64, used: u64) {
++        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Quota {
++            spirit_pid,
++            signal,
++            window,
++            used,
++            budget: self.quota.quota().budget_per_window,
++        }) {
++            cap_audit::record_send_error(cap_audit::AuditDropSite::Quota, &error);
++        }
++    }
++
+     /// Look up the scope for a token ID without full verification.
+     pub fn get_token_scope(&self, token_id: &TokenId) -> Option<Scope> {
+         self.tokens.get_scope(token_id)
+diff --git a/crates/maos-kernel-core/tests/issuance_quota_window_17_9.rs b/crates/maos-kernel-core/tests/issuance_quota_window_17_9.rs
+index ed903e7..f07d9a5 100644
+--- a/crates/maos-kernel-core/tests/issuance_quota_window_17_9.rs
++++ b/crates/maos-kernel-core/tests/issuance_quota_window_17_9.rs
+@@ -228,12 +228,12 @@ async fn ac1_default_capacity_refunds_and_tokenless_quota_audit_in_two_windows()
+         .expect("read the in-memory TL");
+     assert_eq!(rows.len(), 6);
+     let expected_intents = [
+-        "cap.quota.pressure",
+-        "cap.quota.limit",
+-        "cap.quota.exhausted",
+-        "cap.quota.pressure",
+-        "cap.quota.limit",
+-        "cap.quota.exhausted",
++        "cap.quota:pressure",
++        "cap.quota:limit",
++        "cap.quota:exhausted",
++        "cap.quota:pressure",
++        "cap.quota:limit",
++        "cap.quota:exhausted",
+     ];
+     for (row, expected_intent) in rows.iter().zip(expected_intents) {
+         assert_eq!(row.intent, expected_intent);
+@@ -250,3 +250,79 @@ async fn ac1_default_capacity_refunds_and_tokenless_quota_audit_in_two_windows()
+         started.elapsed()
+     );
+ }
++
++#[test]
++fn barrier_probe_stale_clock_cannot_restore_filled_next_window() {
++    use maos_kernel_core::capability::cap_quota::IssuanceQuota;
++    use std::sync::Barrier;
++    use std::time::Duration;
++    let clock = Arc::new(ManualClock::default());
++    let tracker = CapQuotaTracker::with_clock(
++        IssuanceQuota {
++            budget_per_window: 2,
++            window: Duration::from_nanos(10),
++        },
++        clock.clone(),
++    );
++    tracker.commit(tracker.charge(PID).unwrap());
++    let barrier = Barrier::new(2);
++    std::thread::scope(|scope| {
++        let tracker = &tracker;
++        let clock = &clock;
++        let barrier = &barrier;
++        let delayed = scope.spawn(move || {
++            barrier.wait();
++            // This racing clock sample is older than the already-filled epoch.
++            clock.0.store(0, Ordering::SeqCst);
++            let exhausted = tracker.charge(PID).unwrap_err();
++            assert_eq!(exhausted.window, 1);
++        });
++        clock.0.store(10, Ordering::SeqCst);
++        for _ in 0..2 {
++            tracker.commit(tracker.charge(PID).unwrap());
++        }
++        barrier.wait();
++        delayed.join().unwrap();
++    });
++    assert!(tracker.charge(PID).is_err());
++}
++
++#[test]
++fn barrier_probe_out_of_order_commit_refund_pressure_once() {
++    use maos_kernel_core::capability::cap_quota::IssuanceQuota;
++    use std::sync::Barrier;
++    use std::time::Duration;
++    let tracker = CapQuotaTracker::with_clock(
++        IssuanceQuota {
++            budget_per_window: 20,
++            window: Duration::from_nanos(10),
++        },
++        Arc::new(ManualClock::default()),
++    );
++    for _ in 0..15 {
++        tracker.commit(tracker.charge(PID).unwrap());
++    }
++    let failed = tracker.charge(PID).unwrap();
++    let earlier = tracker.charge(PID).unwrap();
++    let later = tracker.charge(PID).unwrap();
++    let barrier = Barrier::new(2);
++    std::thread::scope(|scope| {
++        let tracker = &tracker;
++        let barrier = &barrier;
++        let worker = scope.spawn(move || {
++            let committed = tracker.commit(later);
++            assert_eq!(committed.issued, 16);
++            assert_eq!(committed.signals, [QuotaSignal::Pressure]);
++            barrier.wait();
++        });
++        barrier.wait();
++        tracker.refund(failed);
++        let committed = tracker.commit(earlier);
++        assert_eq!(committed.issued, 17);
++        assert!(committed.signals.is_empty());
++        worker.join().unwrap();
++    });
++    let committed = tracker.commit(tracker.charge(PID).unwrap());
++    assert_eq!(committed.issued, 18);
++    assert!(committed.signals.is_empty());
++}

@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::Duration;
 
@@ -12,7 +13,12 @@ use maos_bin::supervision::{unload_all_loaded, WorkerSupervisor};
 use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskAssignPayload};
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_kernel_core::capability::{cap_audit, cap_policy::PolicyTable, CapabilityRegistryAdapter};
+use maos_kernel_core::capability::{
+    cap_audit,
+    cap_policy::PolicyTable,
+    cap_quota::{CapQuotaTracker, Charge, QuotaClock, DEFAULT_ISSUANCE_QUOTA},
+    CapabilityRegistryAdapter,
+};
 use maos_kernel_core::iac::{IacBusAdapter, TransparencyLogAdapter};
 use maos_kernel_core::memory::MemoryManagerAdapter;
 use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
@@ -109,9 +115,19 @@ static FIXTURES: LazyLock<()> = LazyLock::new(|| {
     );
 });
 
+#[derive(Debug, Default)]
+struct ManualQuotaClock(AtomicU64);
+
+impl QuotaClock for ManualQuotaClock {
+    fn now_ns(&self) -> u64 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
 struct World {
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<CapabilityRegistryAdapter>,
+    quota: CapQuotaTracker,
     policy: Arc<PolicyTable>,
     security: Arc<SecurityManagerAdapter>,
     memory: Arc<MemoryManagerAdapter>,
@@ -139,13 +155,17 @@ impl World {
         let policy = Arc::new(PolicyTable::new());
         let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
         let (audit_tx, audit_rx) = cap_audit::channel();
+        let quota = CapQuotaTracker::with_clock(
+            DEFAULT_ISSUANCE_QUOTA,
+            Arc::new(ManualQuotaClock::default()),
+        );
         let capability = Arc::new(CapabilityRegistryAdapter::new(
             Arc::new(maos_kernel_core::api::RingCryptoProvider),
             maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0x17; 32]),
             NONCE,
             Arc::clone(&policy),
             audit_tx,
-            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            quota.clone(),
             Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
             Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
         ));
@@ -213,6 +233,7 @@ impl World {
         Self {
             tl,
             capability,
+            quota,
             policy,
             security,
             memory,
@@ -225,6 +246,15 @@ impl World {
             lookup: Arc::new(RwLock::new(BTreeMap::new())),
             audit_writer,
         }
+    }
+
+    fn exhaust_issuance(&self, pid: u32) -> Vec<Charge> {
+        let mut charges = Vec::new();
+        while let Ok(charge) = self.quota.charge(pid) {
+            charges.push(charge);
+        }
+        assert!(!charges.is_empty(), "the admitted pid starts with capacity");
+        charges
     }
 
     fn admission(&self) -> AdmissionDeps<'_> {
@@ -275,6 +305,7 @@ impl World {
         let Self {
             tl,
             capability,
+            quota: _,
             policy: _,
             security,
             memory,
@@ -840,6 +871,15 @@ async fn run_hostile_twin_with(
     turn_budget: Duration,
     sends: Option<&[&str]>,
 ) -> HostileRun {
+    run_hostile_twin_with_quota(mode, turn_budget, sends, false).await
+}
+
+async fn run_hostile_twin_with_quota(
+    mode: &str,
+    turn_budget: Duration,
+    sends: Option<&[&str]>,
+    exhaust_issuance: bool,
+) -> HostileRun {
     LazyLock::force(&FIXTURES);
     let dir = tempfile::tempdir().unwrap();
     let world = World::new(dir.path());
@@ -864,6 +904,9 @@ async fn run_hostile_twin_with(
     .await
     .unwrap();
     let pid = admitted.pid;
+    // Reserve all remaining slots after admission, before the first guest turn.
+    // Keep the charges alive until this session has finished.
+    let _charges = exhaust_issuance.then(|| world.exhaust_issuance(pid));
     let mut receiver = world
         .iac
         .register_spirit_typed(&SpiritId::from("scope-receiver"))
@@ -1047,9 +1090,23 @@ async fn a_delivery_needs_its_iac_send_grant() {
     // Only broadcast granted: an addressed frame's peer class is not covered.
     let broadcast_only =
         run_hostile_twin_with("provenance", Duration::from_secs(30), Some(&["broadcast"])).await;
+    // A granted send still needs capacity in this admitted pid's issuance window.
+    let exhausted = run_hostile_twin_with_quota(
+        "provenance",
+        Duration::from_secs(30),
+        Some(&["spirit:peer"]),
+        true,
+    )
+    .await;
+    assert_eq!(
+        exhausted.report().turns,
+        1,
+        "a refused send completes its turn"
+    );
     for (run, verdict, refusal) in [
         (&ungranted, Some("deny"), None),
         (&broadcast_only, None, Some("iac_peer_class_not_granted")),
+        (&exhausted, Some("exhausted"), None),
     ] {
         let report = run.report();
         assert_eq!((report.delivered_frames, report.denied_frames), (0, 1));
@@ -1065,7 +1122,89 @@ async fn a_delivery_needs_its_iac_send_grant() {
             "a refused send leaves the FR4 view green"
         );
     }
-    println!("HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted");
+    println!("HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted exhausted=exhausted");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn wasm_delivery_is_refused_when_its_issuance_window_is_exhausted() {
+    LazyLock::force(&FIXTURES);
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let id = "scope-wasm";
+    let gated = gate_manifest(&manifest(id, "wasm-component", false), &|_| false).unwrap();
+    let (core, obj) = world
+        .supervisor
+        .prepare_spawned(id, &gated.bundle())
+        .unwrap();
+    let admitted = load_admit_start(
+        &world.admission(),
+        &gated,
+        obj,
+        NONCE,
+        StartPolicy::StartNow,
+        &mut |pid| core.bind_scheduler_pid(pid),
+    )
+    .await
+    .unwrap();
+    let pid = admitted.pid;
+    let _charges = world.exhaust_issuance(pid);
+    let mut receiver = world
+        .iac
+        .register_spirit_typed(&SpiritId::from("scope-receiver"))
+        .unwrap();
+    let mut launch = echo_launch(id);
+    let seed = launch.initial_frame.as_mut().unwrap();
+    seed.to.push(FrameAddress {
+        spirit_id: SpiritId::from("scope-receiver"),
+        host_id: None,
+        role: None,
+    });
+    let seed_id = seed.frame_id;
+    let report = run_admitted_session(world.session(), admitted, core, launch)
+        .await
+        .expect("the exhausted send does not terminate the WASM session");
+    assert_eq!(report.turns, 1, "a refused send completes its turn");
+    assert_eq!((report.delivered_frames, report.denied_frames), (0, 1));
+    let authorizations = world
+        .tl
+        .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+            spirit_pid: Some(pid),
+            ..Default::default()
+        })
+        .unwrap()
+        .into_iter()
+        .filter(|row| row.intent == "spirit.frame.authorization")
+        .map(|row| serde_json::from_slice::<serde_json::Value>(&row.payload_redacted).unwrap())
+        .collect::<Vec<_>>();
+    let [authorization] = authorizations.as_slice() else {
+        panic!("one WASM send authorization: {authorizations:?}")
+    };
+    assert_eq!(authorization["allowed"], false);
+    assert_eq!(authorization["send"]["kernel_verdict"], "exhausted");
+    let (_, seed) = receiver
+        .try_recv()
+        .unwrap()
+        .expect("the operator seed arrives");
+    assert_eq!(seed.frame_id, seed_id);
+    assert_eq!(seed.from.spirit_id.as_str(), "operator");
+    assert!(
+        receiver.try_recv().unwrap().is_none(),
+        "only the operator seed arrives"
+    );
+    assert!(
+        world.scheduler.resolve_pid(id).is_none(),
+        "the completed session unloads its SCB"
+    );
+    drop(receiver);
+    world.drain().await;
+    let audit = operator_audit_view(dir.path(), id);
+    assert!(
+        audit.status.success(),
+        "a refused WASM send leaves the FR4 view green: {}{}",
+        String::from_utf8_lossy(&audit.stdout),
+        String::from_utf8_lossy(&audit.stderr)
+    );
+    println!("WASM-IAC-SEND exhausted=exhausted denied_frames=1 delivered_frames=0 turns=1 seed_only=true fr4_view=ok");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

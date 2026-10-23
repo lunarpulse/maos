@@ -59,8 +59,8 @@ use maos_bin::enterprise_pdp_runtime;
 use maos_bin::inference_mode::{InferenceModeError, ResolvedInferenceMode};
 #[cfg(feature = "network")]
 use maos_bin::worker_spawn::{
-    issue_enterprise_governed_capability, parse_run_args, resolve_cli_binary,
-    run_cli_wrapper_manifest,
+    issue_enterprise_governed_capability, issue_governed_mcp_capability, parse_run_args,
+    resolve_cli_binary, run_cli_wrapper_manifest,
 };
 
 use std::sync::Arc;
@@ -871,9 +871,13 @@ struct LiveButlerMcpPort {
     capability: Arc<CapabilityRegistryAdapter>,
     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    /// Story 17-9 — where a refused mint's receipt goes, and whose it is.
+    journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    spirit_id: String,
 }
 #[cfg(feature = "network")]
 impl LiveButlerMcpPort {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         spirit_pid: u32,
         posture_hash: [u8; 32],
@@ -881,6 +885,8 @@ impl LiveButlerMcpPort {
         capability: Arc<CapabilityRegistryAdapter>,
         enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
         enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+        journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+        spirit_id: &str,
     ) -> Self {
         Self {
             spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
@@ -889,6 +895,8 @@ impl LiveButlerMcpPort {
             capability,
             enterprise_runtime,
             enterprise_pdp_runtime,
+            journal,
+            spirit_id: spirit_id.to_owned(),
         }
     }
     // Comment budget on Winston's request
@@ -958,20 +966,17 @@ impl LiveButlerMcpPort {
         tool: &str,
         args: serde_json::Value,
     ) -> Result<serde_json::Value, butler::ButlerMcpError> {
-        let scope = Scope::McpCall {
-            server: server.into(),
-            tool: tool.into(),
-        };
-        let token = issue_enterprise_governed_capability(
+        let token = issue_governed_mcp_capability(
             self.capability.as_ref(),
             self.enterprise_runtime.as_deref(),
             self.enterprise_pdp_runtime.as_ref(),
+            &self.journal,
             self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst),
-            scope,
-            60,
+            &self.spirit_id,
+            server,
+            tool,
             // Pass [0u8; 32] because the kernel's McpClientAdapter is hardcoded to verify using [0u8; 32]
             [0u8; 32],
-            IntentClass::Standard,
         )
         .map_err(|_| butler::ButlerMcpError::TokenIssuanceFailed)?;
         let response = self
@@ -1015,9 +1020,13 @@ struct LiveResearcherMcpPort {
     enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
     handle: tokio::runtime::Handle,
     sem: Arc<tokio::sync::Semaphore>,
+    /// Story 17-9 — where a refused mint's receipt goes, and whose it is.
+    journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    spirit_id: Arc<str>,
 }
 #[cfg(feature = "network")]
 impl LiveResearcherMcpPort {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         spirit_pid: u32,
         posture_hash: [u8; 32],
@@ -1025,6 +1034,8 @@ impl LiveResearcherMcpPort {
         capability: Arc<CapabilityRegistryAdapter>,
         enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
         enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+        journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+        spirit_id: &str,
     ) -> Self {
         Self {
             spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
@@ -1037,6 +1048,8 @@ impl LiveResearcherMcpPort {
             sem: Arc::new(tokio::sync::Semaphore::new(
                 researcher::RESEARCHER_PARALLELISM,
             )),
+            journal,
+            spirit_id: spirit_id.into(),
         }
     }
 }
@@ -1091,6 +1104,7 @@ impl LiveResearcherMcpPort {
             let posture_hash = self.posture_hash;
             let enterprise_runtime = self.enterprise_runtime.clone();
             let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
+            let (journal, spirit_id) = (Arc::clone(&self.journal), Arc::clone(&self.spirit_id));
             set.spawn(async move {
                 let _permit = sem.acquire().await.map_err(|e| {
                     researcher::ResearcherMcpError::CallFailed {
@@ -1100,19 +1114,16 @@ impl LiveResearcherMcpPort {
                     }
                 })?;
                 let content = tokio::task::spawn_blocking(move || {
-                    let scope = Scope::McpCall {
-                        server: server.into(),
-                        tool: tool.into(),
-                    };
-                    let token = issue_enterprise_governed_capability(
+                    let token = issue_governed_mcp_capability(
                         capability.as_ref(),
                         enterprise_runtime.as_deref(),
                         enterprise_pdp_runtime.as_ref(),
+                        &journal,
                         spirit_pid,
-                        scope,
-                        60,
+                        &spirit_id,
+                        server,
+                        tool,
                         posture_hash,
-                        IntentClass::Standard,
                     )
                     .map_err(|e| {
                         researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
@@ -1194,6 +1205,7 @@ impl LiveResearcherMcpPort {
             let posture_hash = self.posture_hash;
             let enterprise_runtime = self.enterprise_runtime.clone();
             let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
+            let (journal, spirit_id) = (Arc::clone(&self.journal), Arc::clone(&self.spirit_id));
             set.spawn(async move {
                 let _permit = sem.acquire().await.map_err(|e| {
                     researcher::ResearcherMcpError::CallFailed {
@@ -1203,19 +1215,16 @@ impl LiveResearcherMcpPort {
                     }
                 })?;
                 let claim = tokio::task::spawn_blocking(move || {
-                    let scope = Scope::McpCall {
-                        server: fetch_server.into(),
-                        tool: fetch_tool.into(),
-                    };
-                    let token = issue_enterprise_governed_capability(
+                    let token = issue_governed_mcp_capability(
                         capability.as_ref(),
                         enterprise_runtime.as_deref(),
                         enterprise_pdp_runtime.as_ref(),
+                        &journal,
                         spirit_pid,
-                        scope,
-                        60,
+                        &spirit_id,
+                        fetch_server,
+                        fetch_tool,
                         posture_hash,
-                        IntentClass::Standard,
                     )
                     .map_err(|e| {
                         researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
@@ -5203,6 +5212,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     Arc::clone(&capability),
                                     enterprise_runtime.clone(),
                                     enterprise_pdp_runtime.clone(),
+                                    Arc::clone(&transparency_log),
+                                    &spirit_id,
                                 ));
                                 butler = butler.with_mcp_port(
                                     Arc::clone(&live_mcp) as Arc<dyn butler::ButlerMcpPort>
@@ -5396,6 +5407,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     Arc::clone(&capability),
                                     enterprise_runtime.clone(),
                                     enterprise_pdp_runtime.clone(),
+                                    Arc::clone(&transparency_log),
+                                    &spirit_id,
                                 ));
                                 researcher = researcher
                                     .with_mcp_port(Arc::clone(&live_mcp)
@@ -13711,40 +13724,252 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_live_butler_mcp_port_new() {
-        struct MockMcpClientPort;
-        impl maos_domain::ports::mcp::McpClientPort for MockMcpClientPort {
-            fn call(
-                &self,
-                _token: &maos_domain::invariants::i1::CapabilityToken,
-                _server: &str,
-                _tool: &str,
-                _args: serde_json::Value,
-            ) -> Result<maos_domain::ports::mcp::McpResponse, maos_domain::ports::mcp::McpError>
-            {
-                Err(maos_domain::ports::mcp::McpError::Unconfigured)
-            }
+    #[derive(Default)]
+    struct CountingMcpClient(parking_lot::Mutex<Vec<(String, String)>>);
+
+    impl maos_domain::ports::mcp::McpClientPort for CountingMcpClient {
+        fn call(
+            &self,
+            _: &maos_domain::invariants::i1::CapabilityToken,
+            server: &str,
+            tool: &str,
+            _: serde_json::Value,
+        ) -> Result<maos_domain::ports::mcp::McpResponse, maos_domain::ports::mcp::McpError>
+        {
+            self.0.lock().push((server.into(), tool.into()));
+            let content = if server == "web" && tool == "search" {
+                serde_json::json!({"results":[{"url":"https://example.test/paper"}]})
+            } else {
+                serde_json::json!({})
+            };
+            Ok(maos_domain::ports::mcp::McpResponse::new(
+                content,
+                false,
+                maos_domain::ports::mcp::McpAttribution::new(
+                    server.into(),
+                    maos_domain::ports::mcp::McpTransportId::Stdio,
+                    tool.into(),
+                ),
+            ))
         }
-        let client = Arc::new(MockMcpClientPort);
-        let (audit_tx, _) = maos_kernel_core::capability::cap_audit::channel();
-        // p1-allow: smoke-arm mock provider — isolated root, not the supervised owner
-        let cap = Arc::new(
-            // p1-allow: unit-test mock root — isolated from the supervised composition owner
-            maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-                Arc::new(maos_kernel_core::api::RingCryptoProvider),
-                maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
-                1, // BOOT_NONCE
-                Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-                audit_tx,
-                maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-                Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-                Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
-            ),
+    }
+
+    fn live_mcp_fixture(
+        budget: u64,
+    ) -> (
+        Arc<CapabilityRegistryAdapter>,
+        maos_kernel_core::capability::cap_quota::CapQuotaTracker,
+        Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    ) {
+        use maos_kernel_core::capability::cap_quota::{CapQuotaTracker, IssuanceQuota};
+        use maos_kernel_core::security::manifest::{
+            CapabilitiesRequired, ClassSection, PostureSection, ResourceCaps, SandboxConfig,
+        };
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
+        // The pid's MCP grants come from production admission of its declared
+        // `[capabilities.required.mcp]` — main.rs never seeds a policy table.
+        let declared = LIVE_MCP_TOOLS
+            .map(|(s, t)| format!("[[mcp.servers]]\nname = \"{s}\"\nallowed_tools = [\"{t}\"]\n"))
+            .concat();
+        let dir = tempfile::tempdir().unwrap();
+        let journal =
+            maos_kernel_core::journal::JournalAdapter::open(&dir.path().join("j")).unwrap();
+        let class = ClassSection::from_toml_str(&format!(
+            "name = \"trusted-live-spirit\"\nversion = \"0.1.0\"\nabi = \"1.0\"\nmanifest_schema_version = {}\nmin_substrate_version = \"{}\"\nforms = [\"rust-inproc\"]\ntrust_tier = \"local\"\ndescription = \"17-9\"",
+            maos_spirit_abi::MANIFEST_SCHEMA_VERSION,
+            env!("CARGO_PKG_VERSION")
+        ))
+        .unwrap();
+        // p1-allow: unit-test mock root — isolated from the supervised composition owner
+        maos_kernel_core::security::SecurityManagerAdapter::new(Arc::clone(&policy))
+            .admit_spirit(
+                179,
+                "trusted-live-spirit",
+                &SandboxConfig {
+                    tier: maos_domain::invariants::i9::SandboxTier::T0,
+                    image_pin: None,
+                },
+                &ResourceCaps::default(),
+                &CapabilitiesRequired::from_toml_str(&declared).unwrap(),
+                None,
+                &journal,
+                &PostureSection::from_toml_str(
+                    "default = \"assistive\"\nallowed_max = \"assistive\"",
+                )
+                .unwrap(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(&class),
+            )
+            .unwrap();
+        // A 60 s window from construction: every refusal below is a spent budget.
+        let quota = CapQuotaTracker::with_quota(IssuanceQuota {
+            budget_per_window: budget,
+            window: std::time::Duration::from_secs(60),
+        });
+        let (tx, _) = maos_kernel_core::capability::cap_audit::channel();
+        // p1-allow: unit-test mock root — isolated from the supervised composition owner
+        let cap = Arc::new(CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([17; 32]),
+            179,
+            policy,
+            tx,
+            quota.clone(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+        ));
+        (
+            cap,
+            quota,
+            Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(179)),
+        )
+    }
+
+    /// Every MCP pair the live-port tests mint for.
+    const LIVE_MCP_TOOLS: [(&str, &str); 6] = [
+        ("calendar", "list_events"),
+        ("web", "search"),
+        ("arxiv", "search"),
+        ("github", "search_code"),
+        ("citation-graph", "traverse"),
+        ("web", "fetch"),
+    ];
+
+    /// Every row is one exact refusal receipt for the trusted Spirit; returns
+    /// the refused `(server, tool)` pairs in journal order.
+    fn live_mcp_receipts(
+        log: &maos_kernel_core::iac::TransparencyLogAdapter,
+    ) -> Vec<(String, String)> {
+        let rows = log.query_frames(Default::default()).unwrap();
+        rows.iter()
+            .map(|row| {
+                assert_eq!(row.kind as i64, 28);
+                assert_eq!(row.spirit_pid, 179);
+                assert_eq!(row.from_spirit_id, "trusted-live-spirit");
+                assert_eq!(row.intent, "mcp.call.refused:capability-denied");
+                let payload = String::from_utf8_lossy(&row.payload_redacted);
+                let (server, tool) = LIVE_MCP_TOOLS
+                    .into_iter()
+                    .find(|(server, tool)| {
+                        payload
+                            == format!(
+                                r#"{{"op":"mcp.call","code":"capability-denied","server":"{server}","tool":"{tool}","boot_nonce":179}}"#
+                            )
+                    })
+                    .unwrap_or_else(|| panic!("not an exact MCP refusal receipt: {payload}"));
+                (server.to_owned(), tool.to_owned())
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn live_mcp_butler_refused_mint_preserves_error_and_never_calls_client() {
+        use butler::ButlerMcpPort;
+        let (cap, quota, log) = live_mcp_fixture(1);
+        let _reserved = quota.charge(179).unwrap();
+        let client = Arc::new(CountingMcpClient::default());
+        let port = LiveButlerMcpPort::new(
+            179,
+            [0; 32],
+            client.clone(),
+            cap,
+            None,
+            None,
+            log.clone(),
+            "trusted-live-spirit",
         );
-        let port = LiveButlerMcpPort::new(0, [0u8; 32], client, cap, None, None);
-        assert_eq!(port.spirit_pid.load(std::sync::atomic::Ordering::SeqCst), 0);
-        assert_eq!(port.posture_hash, [0u8; 32]);
+        assert!(matches!(
+            port.calendar_events().await,
+            Err(butler::ButlerMcpError::TokenIssuanceFailed)
+        ));
+        assert!(client.0.lock().is_empty());
+        assert_eq!(
+            live_mcp_receipts(&log),
+            [("calendar".to_owned(), "list_events".to_owned())],
+            "exactly one receipt for the one refused mint"
+        );
+    }
+
+    #[test]
+    fn live_mcp_researcher_search_refused_mint_preserves_error_and_never_calls_client() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let (cap, quota, log) = live_mcp_fixture(1);
+        let _reserved = quota.charge(179).unwrap();
+        let client = Arc::new(CountingMcpClient::default());
+        runtime.block_on(async {
+            let port = LiveResearcherMcpPort::new(
+                179,
+                [0; 32],
+                client.clone(),
+                cap,
+                None,
+                None,
+                log.clone(),
+                "trusted-live-spirit",
+            );
+            assert!(matches!(port.survey_literature_impl("quota").await,
+                Err(researcher::ResearcherMcpError::TokenIssuanceFailed(message)) if message == "kernel capability issuance quota exhausted"));
+        });
+        // JoinSet cancels siblings on its first error; runtime teardown joins
+        // the blocking mints that already started. Each started search mint
+        // was refused and left exactly one receipt naming its own tool.
+        drop(runtime);
+        let mut refused = live_mcp_receipts(&log);
+        let attempted = refused.len();
+        refused.sort();
+        refused.dedup();
+        assert_eq!(refused.len(), attempted, "one receipt per refused mint");
+        assert!((1..=4).contains(&attempted));
+        assert!(refused.iter().all(|(server, tool)| matches!(
+            (server.as_str(), tool.as_str()),
+            ("web", "search")
+                | ("arxiv", "search")
+                | ("github", "search_code")
+                | ("citation-graph", "traverse")
+        )));
+        assert!(client.0.lock().is_empty());
+    }
+
+    #[tokio::test]
+    async fn live_mcp_researcher_fetch_refused_mint_preserves_error_and_never_calls_fetch() {
+        let (cap, quota, log) = live_mcp_fixture(4);
+        let retained = quota.clone();
+        let client = Arc::new(CountingMcpClient::default());
+        let port = LiveResearcherMcpPort::new(
+            179,
+            [0; 32],
+            client.clone(),
+            cap,
+            None,
+            None,
+            log.clone(),
+            "trusted-live-spirit",
+        );
+        assert!(matches!(port.survey_literature_impl("quota").await,
+            Err(researcher::ResearcherMcpError::TokenIssuanceFailed(message)) if message == "kernel capability issuance quota exhausted"));
+        let calls = client.0.lock();
+        assert_eq!(calls.len(), 4, "all four search mints succeed");
+        assert!(
+            calls
+                .iter()
+                .all(|(_, tool)| matches!(tool.as_str(), "search" | "search_code" | "traverse")),
+            "no fetch client call after refused fetch mint"
+        );
+        assert!(
+            retained.charge(179).is_err(),
+            "search consumed exactly the window budget"
+        );
+        assert_eq!(
+            live_mcp_receipts(&log),
+            [("web".to_owned(), "fetch".to_owned())],
+            "exactly one receipt for the one refused fetch mint"
+        );
     }
 
     // ── Patch 9: requires_epistemic_halt_port unit tests ──

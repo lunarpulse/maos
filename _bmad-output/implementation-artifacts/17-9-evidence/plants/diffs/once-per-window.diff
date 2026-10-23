@@ -1,0 +1,11 @@
+--- a/crates/maos-capability/src/cap_quota/mod.rs
++++ b/crates/maos-capability/src/cap_quota/mod.rs
+@@ -293,7 +293,7 @@
+                     (self.state.pressure_at, PRESSURE_BIT, QuotaSignal::Pressure),
+                     (self.state.limit_at, LIMIT_BIT, QuotaSignal::Limit),
+                 ] {
+-                    if slot.issued >= threshold && slot.fired & bit == 0 {
++                    if slot.issued >= threshold {
+                         slot.fired |= bit;
+                         committed.signals.push(signal);
+                     }

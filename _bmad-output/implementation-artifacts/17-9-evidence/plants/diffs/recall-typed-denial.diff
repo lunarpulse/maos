@@ -1,0 +1,37 @@
+--- a/crates/maos-bin/src/recall_mediation.rs
++++ b/crates/maos-bin/src/recall_mediation.rs
+@@ -129,9 +129,17 @@
+         filter: LogRecallFilter,
+     ) -> Result<LogRecallPage, LogRecallError> {
+         Self::validate(&filter)?;
+-        self.governed(pid, Scope::LogRecall, |token| {
++        match self.governed(pid, Scope::LogRecall, |token| {
+             self.adapter.recall_attributed(pid, filter, token)
+-        })
++        }) {
++            // PLANT: a refused mint becomes an empty page.
++            Err(LogRecallError::CapabilityDenied) => Ok(LogRecallPage {
++                entries: Vec::new(),
++                next_cursor: None,
++                scope: maos_domain::log_recall::RecallScope::Participant,
++            }),
++            other => other,
++        }
+     }
+ 
+     fn receipt(
+@@ -213,6 +221,14 @@
+         let result = self.governed(pid, Scope::LogFetch, |token| {
+             self.adapter.fetch_attributed(pid, id, token)
+         });
++        // PLANT: a refused mint becomes an empty fetch.
++        let result = match result {
++            Err(LogRecallError::CapabilityDenied) => Ok(LogFetchResponse::new(
++                id, 0, maos_domain::log_recall::FrameKindLabel::TaskAssign,
++                String::new(), Vec::new(), None, FrameOrigin::Kernel,
++            )),
++            other => other,
++        };
+         self.finish(pid, "fetch", Some(id), result)
+     }
+ }

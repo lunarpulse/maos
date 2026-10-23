@@ -370,7 +370,7 @@ pub struct PostureDeltaReport {
 /// for authoritative approval-chain attribution (AC3.2).
 ///
 /// Classification rules:
-/// - `Frame` with `frame_kind` `capability.invocation` → `CapabilityIssued`
+/// - `Frame` with `frame_kind` `capability.invocation` and intent prefix `cap.issue.` → `CapabilityIssued`
 /// - `Frame` with `frame_kind` `spirit.revoked` → `CapabilityRevoked`
 /// - `Lifecycle` with a per-Spirit `sandbox_tier` change → `SandboxTierChange`
 /// - `Frame` with `frame_kind` `consent.rupture` → `ConsentRupture`
@@ -425,7 +425,7 @@ pub fn posture_delta(
                 intent,
                 payload_redacted: _,
             } => {
-                if frame_kind == "capability.invocation" {
+                if frame_kind == "capability.invocation" && intent.starts_with("cap.issue.") {
                     let approval = approvals_by_capability.get(intent).cloned();
                     events.push(PostureDeltaEntry {
                         timestamp_ns: entry.timestamp_ns,
@@ -741,8 +741,8 @@ mod tests {
         for (id, timestamp, pid, boot, kind, intent) in [
             (1u8, 10i64, 7i64, 1i64, 19i64, "target-spirit"),
             (2, 20, 8, 2, 19, "target-spirit"),
-            (3, 100, 7, 1, 7, "target-action"),
-            (4, 110, 8, 2, 7, "target-action"),
+            (3, 100, 7, 1, 7, "cap.issue.target"),
+            (4, 110, 8, 2, 7, "cap.issue.target"),
             (5, 120, 9, 2, 7, "other-action"),
             (6, 30, 7, 3, 19, "other-spirit"),
             (7, 140, 7, 3, 7, "reused-pid-action"),
@@ -784,7 +784,7 @@ mod tests {
             .filter(|entry| {
                 matches!(
                     &entry.payload,
-                    ComposedPayload::Frame { intent, .. } if intent == "target-action"
+                    ComposedPayload::Frame { intent, .. } if intent == "cap.issue.target"
                 )
             })
             .count();
@@ -870,12 +870,12 @@ mod tests {
             );",
         )
         .unwrap();
-        // CapabilityInvocation (kind=7) — canonical capability-grant frame.
+        // Only the cap-audit issuance intent on kind 7 is a capability grant.
         conn.execute(
             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
-                &[1u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "delegate", b"x" as &[u8], 0i64,
+                &[1u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "cap.issue.Discriminant(0)", b"x" as &[u8], 0i64,
             ],
         )
         .unwrap();
@@ -888,6 +888,29 @@ mod tests {
             ],
         )
         .unwrap();
+        // Story 17-9 CR-9: kind 7 also carries quota signals, checks,
+        // revocations, lifecycle rows and calls. Neither those rows nor an
+        // issuance intent on another kind is a grant.
+        for (id, kind, intent) in [
+            (3u8, 7i64, "cap.quota:pressure"),
+            (4, 7, "cap.quota:limit"),
+            (5, 7, "cap.quota:exhausted"),
+            (6, 7, "cap.verify.ok"),
+            (7, 7, "cap.verify.fail"),
+            (8, 7, "cap.revoke"),
+            (9, 7, "delegate"),
+            (10, 7, "cap.issue"),
+            (11, 7, "cap.issuer.other"),
+            (12, 2, "cap.issue.Discriminant(0)"),
+            (13, 7, "lifecycle.unload"),
+        ] {
+            conn.execute(
+                "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
+                 VALUES (?1, 300, 0, 1, ?2, ?3, ?4, 0)",
+                rusqlite::params![&[id; 16] as &[u8], kind, intent, b"x" as &[u8]],
+            )
+            .unwrap();
+        }
         drop(conn);
 
         let range = LogRange {
@@ -895,6 +918,7 @@ mod tests {
             until_ns: i64::MAX as u64,
         };
         let report = posture_delta(&db_path, &journal_path, range, None).unwrap();
+        assert_eq!(report.summary.total_events, 2);
 
         let issued: Vec<&PostureDeltaEntry> = report
             .events
@@ -921,10 +945,10 @@ mod tests {
         assert!(
             issued[0].change
                 == PostureChange::CapabilityIssued {
-                    intent: "delegate".to_string(),
+                    intent: "cap.issue.Discriminant(0)".to_string(),
                     capability_detail: None,
                 },
-            "CapabilityIssued should carry the invocation intent"
+            "CapabilityIssued should carry the issuance intent"
         );
         assert!(
             revoked[0].change
@@ -1107,7 +1131,7 @@ mod tests {
             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
-                &[4u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "delegate", b"x" as &[u8], 0i64,
+                &[4u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "cap.issue.Discriminant(0)", b"x" as &[u8], 0i64,
             ],
         )
         .unwrap();
@@ -1116,7 +1140,7 @@ mod tests {
         // intent value for the authoritative join to succeed.
         conn.execute(
             "INSERT INTO approval_decision_log (timestamp_ns, actor, target, capability, intent, decision, reasoning)
-             VALUES (100, 'director', 'hello-spirit', 'delegate', 'delegate', 1, 'approved by operator')",
+             VALUES (100, 'director', 'hello-spirit', 'cap.issue.Discriminant(0)', 'delegate', 1, 'approved by operator')",
             [],
         )
         .unwrap();
@@ -1176,12 +1200,12 @@ mod tests {
             );",
         )
         .unwrap();
-        // 2 capability changes (CapabilityInvocation + SpiritRevoked).
+        // 2 capability changes (cap.issue. invocation + SpiritRevoked).
         conn.execute(
             "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             rusqlite::params![
-                &[10u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "delegate", b"x" as &[u8], 0i64,
+                &[10u8; 16] as &[u8], 100i64, 0i64, 1i64, 7i64, "cap.issue.Discriminant(0)", b"x" as &[u8], 0i64,
             ],
         )
         .unwrap();

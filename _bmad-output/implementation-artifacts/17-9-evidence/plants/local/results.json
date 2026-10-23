@@ -1,0 +1,112 @@
+[
+  {
+    "id": "window-rollover",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "inclusive-capacity",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "charge-after-policy",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "refund-on-failed-issue",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "crossing-on-successful-issuance",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "once-per-window",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "rearm-on-rollover",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "epoch-never-decreases",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "atomicity",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "strictly-older-sweep",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "quota-rows-reach-tl",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "drop-accounting",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "fr4-disposition",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "posture-delta",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "mint-after-bucket",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "ratification-loader-payload",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "ratification-loader-decode-all",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "session-verdict",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "recall-typed-denial",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "mcp-receipt",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "cli-refusal",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  },
+  {
+    "id": "confidentiality",
+    "rc": 101,
+    "verdict": "RED-AT-NAMED"
+  }
+]

@@ -16,11 +16,15 @@ Each entry must include a one-paragraph rationale signed by ≥2 maintainers.
 key=spirit_id, no parameter drift. The `Arc<ArcSwap<PolicyTableInner>>` pattern
 enables read-mostly copy-on-write updates without blocking hot-path readers.
 
-### `CapQuotaTracker` — `crates/maos-kernel-core/src/capability/cap_quota/mod.rs`
+### `CapQuotaTracker` — `crates/maos-capability/src/cap_quota/mod.rs`
 
-**Reason:** per-Spirit budget counter; structural-state caching per I9 — bounded
-by Spirit lifetime, key=spirit_id, no parameter drift. The `DashMap<SpiritId, AtomicU64>`
-shards concurrent access with negligible contention at v0.1-β's small Spirit counts.
+**Reason:** the `State` behind `CapQuotaTracker` caches capability-issuance window
+accounting per admitted scheduler pid (allocated monotonically by a wrapping
+`AtomicU32`, so not recycled short of wrap-around), not stable Spirit
+identity. The bound is a lazy, activity-driven sweep: the first charge
+observing a newer window removes every slot from a strictly older window.
+Idle stale slots persist until another charge; this is not a fixed-cardinality
+bound or a bound by Spirit lifetime. Slots in the retained window are preserved.
 
 ### `CapTokensShardRing` — `crates/maos-kernel-core/src/capability/cap_tokens/mod.rs`
 

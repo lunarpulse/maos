@@ -1,0 +1,44 @@
+--- a/crates/maos-kernel-core/src/capability/mod.rs
++++ b/crates/maos-kernel-core/src/capability/mod.rs
+@@ -185,6 +185,20 @@
+         posture_hash: [u8; 32],
+         intent_class: IntentClass,
+     ) -> Result<CapabilityToken, CapError> {
++        // 2. Reserve quota only after policy allows the scope.
++        let budget = self.quota.quota().budget_per_window;
++        let charge = match self.quota.charge(spirit_pid) {
++            Ok(charge) => charge,
++            Err(exhausted) => {
++                if exhausted.first_in_window {
++                    self.audit_quota(spirit_pid, QuotaSignal::Exhausted, exhausted.window, budget);
++                }
++                return Err(CapError::IssuanceQuotaExhausted {
++                    spirit_id: spirit_pid,
++                });
++            }
++        };
++
+         // 1. Policy check: derive Intent from the actual scope
+         let intent = scope_to_intent(&scope)?;
+         let cap = cap_policy::decision::Capability {
+@@ -200,20 +214,6 @@
+                 return Err(CapError::PolicyDenied);
+             }
+         }
+-
+-        // 2. Reserve quota only after policy allows the scope.
+-        let budget = self.quota.quota().budget_per_window;
+-        let charge = match self.quota.charge(spirit_pid) {
+-            Ok(charge) => charge,
+-            Err(exhausted) => {
+-                if exhausted.first_in_window {
+-                    self.audit_quota(spirit_pid, QuotaSignal::Exhausted, exhausted.window, budget);
+-                }
+-                return Err(CapError::IssuanceQuotaExhausted {
+-                    spirit_id: spirit_pid,
+-                });
+-            }
+-        };
+ 
+         // 3. Refund failed issuance; commit only successfully issued tokens.
+         let token = match self

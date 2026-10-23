@@ -50,7 +50,7 @@ use maos_domain::ports::crypto::CryptoProvider;
 use crate::telemetry::TelemetryStreamAdapter;
 use cap_audit::{Sender, VerifyOutcome};
 use cap_policy::PolicyTable;
-use cap_quota::CapQuotaTracker;
+use cap_quota::{CapQuotaTracker, QuotaSignal};
 use cap_tokens::CapTokensShardRing;
 use maos_domain::ports::TelemetryStreamPort;
 
@@ -176,7 +176,7 @@ impl CapabilityRegistryAdapter {
         &self.audit
     }
 
-    /// Issue a capability token with full mediation: quota → policy → tokens.
+    /// Issue a capability token with full mediation: policy → quota → tokens.
     pub fn issue_with_mediation(
         &self,
         spirit_pid: u32,
@@ -185,11 +185,7 @@ impl CapabilityRegistryAdapter {
         posture_hash: [u8; 32],
         intent_class: IntentClass,
     ) -> Result<CapabilityToken, CapError> {
-        // 1. Quota check
-        let budget = 1_000_000u64;
-        let _quota_state = self.quota.check_and_increment(spirit_pid, 1, budget)?;
-
-        // 2. Policy check: derive Intent from the actual scope
+        // 1. Policy check: derive Intent from the actual scope
         let intent = scope_to_intent(&scope)?;
         let cap = cap_policy::decision::Capability {
             scope: scope.clone(),
@@ -205,9 +201,48 @@ impl CapabilityRegistryAdapter {
             }
         }
 
-        // 3. Token issue
-        self.tokens
+        // 2. Reserve quota only after policy allows the scope.
+        let budget = self.quota.quota().budget_per_window;
+        let charge = match self.quota.charge(spirit_pid) {
+            Ok(charge) => charge,
+            Err(exhausted) => {
+                if exhausted.first_in_window {
+                    self.audit_quota(spirit_pid, QuotaSignal::Exhausted, exhausted.window, budget);
+                }
+                return Err(CapError::IssuanceQuotaExhausted {
+                    spirit_id: spirit_pid,
+                });
+            }
+        };
+
+        // 3. Refund failed issuance; commit only successfully issued tokens.
+        let token = match self
+            .tokens
             .issue(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
+        {
+            Ok(token) => token,
+            Err(error) => {
+                self.quota.refund(charge);
+                return Err(error);
+            }
+        };
+        let committed = self.quota.commit(charge);
+        for signal in committed.signals {
+            self.audit_quota(spirit_pid, signal, committed.window, committed.issued);
+        }
+        Ok(token)
+    }
+
+    fn audit_quota(&self, spirit_pid: u32, signal: QuotaSignal, window: u64, used: u64) {
+        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Quota {
+            spirit_pid,
+            signal,
+            window,
+            used,
+            budget: self.quota.quota().budget_per_window,
+        }) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::Quota, &error);
+        }
     }
 
     /// Look up the scope for a token ID without full verification.

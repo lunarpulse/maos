@@ -1,0 +1,27 @@
+--- a/crates/maos-capability/src/cap_quota/mod.rs
++++ b/crates/maos-capability/src/cap_quota/mod.rs
+@@ -252,6 +252,15 @@
+         result
+     }
+     fn reserve(&self, spirit_pid: u32) -> Result<Charge, Exhausted> {
++        // PLANT: capacity read outside the entry guard; the racing pair
++        // rendezvous between the read and the write.
++        let free = self.state.slots.get(&spirit_pid).map_or(true, |s| {
++            s.reserved < self.state.quota.budget_per_window
++        });
++        if matches!(std::thread::current().name(), Some("17-9-holder" | "17-9-contender")) {
++            static PLANT_RENDEZVOUS: std::sync::Barrier = std::sync::Barrier::new(2);
++            PLANT_RENDEZVOUS.wait();
++        }
+         let mut slot = self
+             .state
+             .slots
+@@ -266,7 +275,7 @@
+         if window > slot.window {
+             *slot = Slot::new(window);
+         }
+-        if slot.reserved == self.state.quota.budget_per_window {
++        if !free {
+             let first_in_window = !slot.exhausted;
+             slot.exhausted = true;
+             return Err(Exhausted {

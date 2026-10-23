@@ -94,4 +94,16 @@ on_confidence_below = 0.6
 
 `[capabilities.required.log]`는 서로 독립적인 두 boolean 권한을 선언합니다. `recall`은 `Scope::LogRecall`, `fetch`는 `Scope::LogFetch`에 해당합니다. 두 값의 기본값은 모두 `false`이며 알 수 없는 key는 거부됩니다. 예제는 두 권한을 모두 요청합니다. 이 table은 스키마 v5가 필요합니다. 스키마 5 미만에서는 `[capabilities.required.iac]`와 마찬가지로 기능 저하 경고와 함께 제거되며 log scope를 부여하지 않습니다. 생략하면 어느 권한도 부여되지 않습니다. 호출마다 정책 중재를 거치므로 선언만으로 운영자 거부나 발급 할당량을 우회할 수 없습니다.
 
+발급 예산은 manifest나 운영자 설정이 아닙니다. `DEFAULT_ISSUANCE_QUOTA`는
+승인된 scheduler pid/incarnation마다 경계를 포함해 60 s monotonic tumbling
+window당 60,000회 발급을 허용하며, 한 경계를 가로지르는 burst는 ≤ 2·B입니다.
+정책을 먼저 평가하고 할당량을 차감한 뒤 token을 발급하며, 서명 실패는 환불합니다.
+소진된 recall/fetch는 `capability-denied`를 반환하고 다음 window에 재개할 수 있습니다.
+운영자 전용 `cap.quota:*` 신호, 전달 한계, 모든 경로별 거부 및 명시된 한계는
+[발급 할당량 참조](/manifest/v5#capability-issuance-quota)를 확인하세요.
+특히 Spirit 대상 발급 사전 경고가 없고 stable-Spirit, principal 전체 또는
+Worker spawn churn을 제한하지 않습니다. 이는 ADR-016의 context-token 회계를
+설정하거나 구현하지 않습니다. 해당 회계는 17-9가 아닌
+`18-5-context-token-budget-accounting`이 담당합니다.
+
 전체 필드 수준 명세는 [Manifest 참조](/manifest/latest)를 참조하세요.

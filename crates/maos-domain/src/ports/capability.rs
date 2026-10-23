@@ -15,7 +15,7 @@ use thiserror::Error;
 /// `InferencePortAdapter::capability_registry()` so callers outside
 /// the kernel cannot access the full registry surface.
 pub trait TokenIssuer {
-    /// Issue a capability token with full mediation: quota → policy → tokens.
+    /// Issue a capability token with full mediation: policy → quota → tokens.
     fn issue_with_mediation(
         &self,
         spirit_pid: u32,
@@ -132,9 +132,9 @@ pub enum CapError {
     /// Current posture differs from token-issued posture — TOCTOU rejection.
     #[error("current posture differs from token-issued posture — TOCTOU rejection")]
     PostureMismatch,
-    /// Spirit quota exhausted.
-    #[error("Spirit {spirit_id} quota exhausted")]
-    ContextExhausted { spirit_id: u32 },
+    /// The Spirit's capability issuance quota for the current window is exhausted.
+    #[error("Spirit {spirit_id} capability issuance quota exhausted")]
+    IssuanceQuotaExhausted { spirit_id: u32 },
     /// Policy denied capability.
     #[error("policy denied capability")]
     PolicyDenied,
@@ -151,8 +151,8 @@ mod tests {
     fn cap_error_distinguishes_variants() {
         assert_ne!(CapError::UnknownToken, CapError::Expired);
         assert_ne!(
-            CapError::ContextExhausted { spirit_id: 1 },
-            CapError::ContextExhausted { spirit_id: 2 }
+            CapError::IssuanceQuotaExhausted { spirit_id: 1 },
+            CapError::IssuanceQuotaExhausted { spirit_id: 2 }
         );
     }
 }

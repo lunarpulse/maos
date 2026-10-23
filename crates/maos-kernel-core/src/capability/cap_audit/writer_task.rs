@@ -114,5 +114,27 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
                 FrameOrigin::Kernel,
             );
         }
+        CapAuditEvent::Quota {
+            spirit_pid,
+            signal,
+            window,
+            used,
+            budget,
+        } => {
+            let payload = serde_json::json!({
+                "window": window,
+                "used": used,
+                "budget": budget,
+            })
+            .to_string();
+            log.insert_frame_event(
+                FrameKind::CapabilityInvocation,
+                *spirit_pid,
+                None,
+                signal.intent(),
+                payload.as_bytes(),
+                FrameOrigin::Kernel,
+            );
+        }
     }
 }

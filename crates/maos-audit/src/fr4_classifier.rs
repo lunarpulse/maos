@@ -187,6 +187,19 @@ impl WriterShapeEntry {
 pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     // ── maos-kernel-core — NonCall ─────────────────────────────────────────
     WriterShapeEntry {
+        // Story 17-9 — the cap-audit writer's tokenless issuance-quota signals
+        // (`cap.quota:pressure` / `:limit` / `:exhausted`), operator-facing.
+        site: ("writer_task.rs", "write_to_transparency_log", 5),
+        kind: 7,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Prefix("cap.quota:"),
+        shape: Some(&[
+            ("window", PayloadType::Num),
+            ("used", PayloadType::Num),
+            ("budget", PayloadType::Num),
+        ]),
+    },
+    WriterShapeEntry {
         // Story 16-6 — `load` split into a type-erased `load_obj` primitive
         // so ONE extracted admission function can serve the operator door
         // and both `maos run` file-manifest arms. The rows are unchanged;

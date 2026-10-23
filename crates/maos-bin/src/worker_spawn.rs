@@ -306,6 +306,9 @@ pub enum GovernedMintError {
     PdpDenied(String),
     /// The kernel policy evaluated the requested scope and denied issuance.
     KernelPolicyDenied,
+    /// Story 17-9 — the Spirit's capability issuance quota for the current
+    /// window is exhausted (`CapError::IssuanceQuotaExhausted`).
+    QuotaExhausted,
     /// Other mediation or identity-persistence failure.
     Mediation(String),
 }
@@ -315,6 +318,7 @@ impl std::fmt::Display for GovernedMintError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::KernelPolicyDenied => write!(f, "kernel policy denied capability issuance"),
+            Self::QuotaExhausted => write!(f, "kernel capability issuance quota exhausted"),
             Self::SsoAssertionMissing(m) | Self::PdpDenied(m) | Self::Mediation(m) => {
                 write!(f, "{m}")
             }
@@ -379,6 +383,9 @@ pub fn issue_enterprise_governed_capability(
             maos_domain::ports::capability::CapError::PolicyDenied => {
                 GovernedMintError::KernelPolicyDenied
             }
+            maos_domain::ports::capability::CapError::IssuanceQuotaExhausted { .. } => {
+                GovernedMintError::QuotaExhausted
+            }
             _ => GovernedMintError::Mediation(format!("kernel capability mediation failed: {e}")),
         })?;
 
@@ -400,6 +407,73 @@ pub fn issue_enterprise_governed_capability(
     }
 
     Ok(token)
+}
+
+/// Field order is part of the operator-only MCP refusal receipt format.
+#[cfg(feature = "network")]
+#[derive(serde::Serialize)]
+struct McpRefusalPayload<'a> {
+    op: &'static str,
+    code: &'static str,
+    server: &'a str,
+    tool: &'a str,
+    boot_nonce: u64,
+}
+
+/// Story 17-9 CR-5 — the governed mint of one `McpCall` token for a Spirit's
+/// MCP call. On ANY governed refusal (SSO, PDP, kernel policy, issuance-quota
+/// exhaustion, identity-persistence rollback) it writes exactly one kind-28
+/// `mcp.call.refused:capability-denied` receipt at the Spirit's pid and
+/// trusted id before returning the typed error; a success writes no receipt.
+/// Callers return before `McpClientPort::call` on `Err`. Receipts are kind 28,
+/// outside the Spirit-disclosable raw kinds, so a Spirit never recalls them.
+#[cfg(feature = "network")]
+#[allow(clippy::too_many_arguments)]
+pub fn issue_governed_mcp_capability(
+    capability: &CapabilityRegistryAdapter,
+    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    journal: &maos_kernel_core::iac::transparency_log::TransparencyLogAdapter,
+    spirit_pid: u32,
+    spirit_id: &str,
+    server: &str,
+    tool: &str,
+    posture_hash: [u8; 32],
+) -> Result<CapabilityToken, GovernedMintError> {
+    let result = issue_enterprise_governed_capability(
+        capability,
+        enterprise_runtime,
+        enterprise_pdp_runtime,
+        spirit_pid,
+        Scope::McpCall {
+            server: server.into(),
+            tool: tool.into(),
+        },
+        60,
+        posture_hash,
+        IntentClass::Standard,
+    );
+    if result.is_err() {
+        let payload = serde_json::to_vec(&McpRefusalPayload {
+            op: "mcp.call",
+            code: "capability-denied",
+            server,
+            tool,
+            boot_nonce: journal.boot_nonce(),
+        })
+        .expect("MCP refusal receipt contains only serializable scalar fields");
+        let _ = journal.insert_frame_event_with_sender(
+            maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
+            spirit_pid,
+            spirit_id,
+            "",
+            None,
+            "mcp.call.refused:capability-denied",
+            &payload,
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+    }
+    result
 }
 
 #[cfg(feature = "network")]
@@ -872,27 +946,43 @@ pub fn run_cli_wrapper_manifest(
             // would make host B the weaker endpoint exactly at the trust
             // boundary the enterprise threading exists to guard. The inbound
             // frame is already journaled (I2), so the refusal is durable
-            // evidence, not a silent drop. A `Mediation` failure — the kernel
-            // `proc.exec` policy grant not existing yet — keeps 2a's posture on
-            // BOTH paths: the AC5 host grant is the ratified stronger authority
-            // there (Epic 9 surface), and hermetic deployments legitimately run
-            // without a policy table.
+            // evidence, not a silent drop. A `KernelPolicyDenied`/`Mediation`
+            // failure — the kernel `proc.exec` policy grant not existing yet —
+            // keeps 2a's posture on BOTH paths: the AC5 host grant is the
+            // ratified stronger authority there (Epic 9 surface), and hermetic
+            // deployments legitimately run without a policy table.
             //
             // Story 16-3: this refusal is now AFTER `bind`, so it leaves
             // through the guard — `lifecycle.unload`, a PlannedUnload receipt
             // and the stop disposition, never a bound Worker with no process.
-            if remote_requested {
-                match &e {
-                    GovernedMintError::SsoAssertionMissing(_) | GovernedMintError::PdpDenied(_) => {
-                        return Err(format!(
-                            "host B REFUSES the remote-requested spawn: governance denial ({e}). \
-                             On the receiving path a PDP/SSO denial is a refusal, never a \
-                             downgrade to host-grant authority (§A6 review D1)"
-                        )
-                        .into());
-                    }
-                    GovernedMintError::KernelPolicyDenied | GovernedMintError::Mediation(_) => {}
+            //
+            // Story 17-9 (D-17-9-FW-06 A): D1's proceed posture is for the
+            // ABSENT `proc.exec` grant only. `QuotaExhausted` means the kernel
+            // evaluated and allowed the scope but this Worker's issuance window
+            // is spent — proceeding would make exhaustion a tokenless fallback,
+            // so it refuses on BOTH paths, through the same guard.
+            match &e {
+                GovernedMintError::QuotaExhausted => {
+                    return Err(format!(
+                        "maos run: cli_wrapper spawn REFUSED: {e}; a quota refusal never \
+                         proceeds without a kernel token (Story 17-9 FW-06)"
+                    )
+                    .into());
                 }
+                GovernedMintError::SsoAssertionMissing(_) | GovernedMintError::PdpDenied(_)
+                    if remote_requested =>
+                {
+                    return Err(format!(
+                        "host B REFUSES the remote-requested spawn: governance denial ({e}). \
+                         On the receiving path a PDP/SSO denial is a refusal, never a \
+                         downgrade to host-grant authority (§A6 review D1)"
+                    )
+                    .into());
+                }
+                GovernedMintError::SsoAssertionMissing(_)
+                | GovernedMintError::PdpDenied(_)
+                | GovernedMintError::KernelPolicyDenied
+                | GovernedMintError::Mediation(_) => {}
             }
             eprintln!(
                 "maos run: cli_wrapper cap-token mediation not granted ({e}); proceeding under \

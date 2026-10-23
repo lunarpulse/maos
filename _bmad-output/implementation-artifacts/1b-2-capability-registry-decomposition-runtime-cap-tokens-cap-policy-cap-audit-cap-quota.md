@@ -1256,6 +1256,8 @@ impl CapabilityRegistryAdapter {
 }
 ```
 
+> **Superseded 2026-10-22 by `17-9-capability-issuance-quota-window` (operator rulings D-17-9-FW-05 A and D-17-9-PF-R1 A).** This sketch was never built. Under 17-9 the issuance quota charges **after** policy (`deferred-work.md:1076`); its pressure / limit / exhaustion signals are operator-facing kind-7 `cap.quota:*` audit rows, not a Spirit-facing IAC frame; Spirit-facing issuance pre-warnings are an explicit non-goal (a Spirit learns exhaustion from each path's typed denial); and 17-9 renames the error `CapError::IssuanceQuotaExhausted`. The `ContextPressure` / `ContextLimit` / `EContextExhausted` names belong to ADR-016's context-token accounting, a different unit owned by `18-5-context-token-budget-accounting`.
+
 **Sanity check (forbidden patterns):**
 
 ```rust

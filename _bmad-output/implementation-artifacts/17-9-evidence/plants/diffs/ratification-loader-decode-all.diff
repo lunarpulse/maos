@@ -1,0 +1,12 @@
+--- a/crates/maos-audit/src/lib.rs
++++ b/crates/maos-audit/src/lib.rs
+@@ -573,9 +573,6 @@
+     let mut frames = Vec::new();
+     for row in rows {
+         let (seq, intent, payload) = row.map_err(AuditError::Query)?;
+-        if is_kind28_receipt_intent(&intent) {
+-            continue;
+-        }
+         let payload: GovernanceEventPayload = serde_json::from_slice(&payload).map_err(|e| {
+             AuditError::Row(format!(
+                 "kind-28 row {seq} (intent {intent:?}) is neither a listed receipt nor a \

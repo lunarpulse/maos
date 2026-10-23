@@ -1,0 +1,11 @@
+--- a/crates/maos-capability/src/cap_quota/mod.rs
++++ b/crates/maos-capability/src/cap_quota/mod.rs
+@@ -266,7 +266,7 @@
+         if window > slot.window {
+             *slot = Slot::new(window);
+         }
+-        if slot.reserved == self.state.quota.budget_per_window {
++        if slot.reserved + 1 >= self.state.quota.budget_per_window {
+             let first_in_window = !slot.exhausted;
+             slot.exhausted = true;
+             return Err(Exhausted {

@@ -1,0 +1,11 @@
+--- a/crates/maos-audit/src/lib.rs
++++ b/crates/maos-audit/src/lib.rs
+@@ -556,7 +556,7 @@
+ 
+     let mut stmt = conn
+         .prepare(
+-            "SELECT rowid, intent, payload_redacted FROM transparency_log \
++            "SELECT rowid, intent, payload FROM transparency_log \
+              WHERE kind = ?1 ORDER BY rowid ASC",
+         )
+         .map_err(AuditError::Query)?;

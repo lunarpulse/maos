@@ -99,10 +99,21 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 | `frame-not-found` | 요청한 frame id에 해당하는 행이 없습니다. |
 | `invalid-request(string)` | cursor나 id가 잘못되었거나(id는 16바이트여야 함), kind label이 알려져 있지 않거나, timestamp가 `i64::MAX`를 초과합니다. 유효하지만 공개되지 않는 kind 필터는 대신 빈 페이지를 반환합니다. |
 | `limit-exceeded(u32)` | 요청한 limit이 1024를 초과합니다. 오류에는 최댓값이 포함됩니다. |
-| `capability-denied` | 권한 선언이 없거나, 정책·운영자 거부·할당량 소진으로 호출별 발급이 거부됩니다. recall과 fetch에는 별도 권한이 필요합니다. |
+| `capability-denied` | 권한 선언이 없거나, 정책·운영자 거부·이 승인된 scheduler pid/incarnation의 경계를 포함한 60,000회 발급/60 s monotonic tumbling 할당량 소진으로 호출별 발급이 거부됩니다. recall과 fetch에는 별도 권한이 필요하며, 소진은 다음 window에 해소될 수 있습니다. |
 | `consent-withheld` | 만료, 일치하는 grant 범위 rupture, `Withheld`(알 수 없는 정책 포함) 또는 `HeaderOnly` 때문에 수신자의 fetch가 차단됩니다. |
 | `reply-too-large(u64)` | 페이지 항목 하나 또는 전체 fetch payload조차 frame 바이트 제한과 codec 확장 제한을 충족하지 못합니다. 오류에는 응답 바이트 상한이 포함됩니다. payload는 절대 잘리지 않습니다. |
 | `unavailable` | `handle-frame` 밖에서 호출했거나, 저장소를 사용할 수 없거나, recall 채널이 닫히거나 실패했습니다. 내부 저장소 메시지는 노출되지 않습니다. |
+
+발급 순서는 **정책 → 할당량 → token**입니다. 서명 실패는 환불하지만 호출별
+token 폐기는 환불하지 않습니다. Spirit 대상 발급 사전 경고는 없습니다.
+운영자 전용 kind-7 `cap.quota:pressure` / `cap.quota:limit` /
+`cap.quota:exhausted` 행은 Spirit이 회상할 수 없으며, non-blocking 전달에는
+한계가 있어 완전성을 보장하지 않습니다.
+[발급 할당량 참조](/manifest/v5#capability-issuance-quota)에서 임계값,
+경로별 오류, 전달 의미와 명시된 한계(incarnation 범위, 새 Worker 용량,
+설정 불가능한 예산, 문자열 오류만 제공하는 호출자, 감사 전용 schedule token)를
+확인하세요. 이는 ADR-016의 context-token 신호가 아닙니다. context-token 회계는
+17-9에서 구현하지 않으며 `18-5-context-token-budget-accounting`이 담당합니다.
 
 데몬은 승인된 호출자 identity와 boot nonce를 사용합니다. guest는 identity나 token을 제공하지 않습니다. 검증을 통과하고 허용된 호출마다 새 capability를 발급하고, 데이터를 공개하기 전에 token이 포함된 invocation 감사 행을 기록한 뒤 token을 폐기합니다. 모든 거부는 정확히 하나의 governance receipt인 `log.recall.refused:<code>` 또는 `log.fetch.refused:<code>`를 기록하며, `<code>`는 WIT 오류 case 이름입니다. 검증이나 발급 단계의 거부는 invocation 행 없이 receipt만 기록합니다. 빈 페이지를 포함한 성공 호출에는 거부 receipt가 추가되지 않습니다. 이 감사 행 자체는 회상할 수 없습니다.
 
