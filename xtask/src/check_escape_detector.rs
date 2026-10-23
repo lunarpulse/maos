@@ -51,9 +51,10 @@
 //! does not fail the aggregate); blocking at v2.0 (AC5 / F6).
 
 use crate::gate_common::{
-    dev_enforced_red_blocks, emit_command, is_blocking_at, BindingClass, CURRENT_PHASE,
+    dev_enforced_red_blocks, is_blocking_at, write_command, BindingClass, CURRENT_PHASE,
 };
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -96,8 +97,9 @@ fn seccomp_kernel_filtering() -> bool {
 /// Did the harness observe that this host GENUINELY cannot sandbox?
 ///
 /// `maos-escape-detector`'s `tests/common::skip_if_sandbox_unavailable` prints
-/// `SKIP <test>: sandbox unavailable on this host` or `SKIP <test>: sandbox
-/// spawn refused by host (…)` for `SandboxUnavailable` / `EPERM` / `ENOSYS`
+/// `SKIP: <test>: sandbox unavailable on this host` or `SKIP: <test>: sandbox
+/// spawn refused by host (…)` (the legacy `SKIP <test>` form is also accepted)
+/// for `SandboxUnavailable` / `EPERM` / `ENOSYS`
 /// only; every other error panics. That line is therefore an authoritative
 /// substrate verdict backed by a REAL spawn attempt against the real kernel —
 /// the most real probe available, and strictly stronger than a config read.
@@ -114,7 +116,7 @@ fn seccomp_kernel_filtering() -> bool {
 fn observed_substrate_skip(output: &str) -> bool {
     output.lines().any(|line| {
         let trimmed = line.trim();
-        trimmed.starts_with("SKIP ")
+        (trimmed.starts_with("SKIP ") || trimmed.starts_with("SKIP:"))
             && (trimmed.contains("sandbox unavailable")
                 || trimmed.contains("sandbox spawn refused"))
     })
@@ -140,7 +142,7 @@ fn write_step_summary(text: &str) {
 /// (F3; the shape is `check_multi_region_slo`'s `RawLeg`), because a RED leg on
 /// a host that cannot sandbox and a RED leg on a host that can are different
 /// events and only one of them is a regression.
-struct LegResult {
+pub struct LegResult {
     label: &'static str,
     class: BindingClass,
     substrate_present: bool,
@@ -168,7 +170,7 @@ impl LegResult {
     }
 
     /// A hermetic leg whose oracle is a single boolean rather than a test count.
-    fn hermetic_bool(label: &'static str, green: bool) -> Self {
+    pub fn hermetic_bool(label: &'static str, green: bool) -> Self {
         Self::hermetic(label, u32::from(green), u32::from(!green), true, green)
     }
 
@@ -663,7 +665,48 @@ fn legs_json(legs: &[LegResult]) -> serde_json::Value {
     )
 }
 
+/// Everything the gate observed — the legs plus the context its verdict needs.
+///
+/// Story 20-12 T1: `run()` = [`collect_legs`] (the nine nested oracle
+/// invocations) → `Report` → [`emit`] (the verdict and every byte of output).
+/// The split lets the JSON writer be proven over a stub `Report` in
+/// milliseconds; before it, proving "stdout parses" meant running every leg —
+/// 1,259 s of the 1,871 s workspace suite (`kernel_pin_content_hash_16_0`).
+pub struct Report {
+    disposition: HashMap<String, String>,
+    blocking_now: bool,
+    seccomp_kernel_filtering: bool,
+    legs: Vec<LegResult>,
+}
+
+impl Report {
+    pub fn new(
+        disposition: HashMap<String, String>,
+        blocking_now: bool,
+        seccomp_kernel_filtering: bool,
+        legs: Vec<LegResult>,
+    ) -> Self {
+        Report {
+            disposition,
+            blocking_now,
+            seccomp_kernel_filtering,
+            legs,
+        }
+    }
+}
+
 pub fn run(json: bool) -> Result<(), String> {
+    let report = collect_legs()?;
+    emit(
+        &report,
+        json,
+        &mut std::io::stdout(),
+        &mut std::io::stderr(),
+    )
+}
+
+/// Read the registry disposition and run every leg. Writes nothing to stdout.
+pub fn collect_legs() -> Result<Report, String> {
     // 1. Read + validate the phase disposition from the registry.
     let disposition = read_disposition()?;
     if !matches!(
@@ -689,6 +732,27 @@ pub fn run(json: bool) -> Result<(), String> {
         run_producer_wired_proven_red_leg(),
         run_detection_quality_live_leg(),
     ];
+    Ok(Report::new(
+        disposition,
+        blocking_now,
+        seccomp_kernel_filtering(),
+        legs,
+    ))
+}
+
+/// Decide the verdict over a collected [`Report`] and write it. `out` is the
+/// gate's stdout: in JSON mode it carries exactly one JSON document; human
+/// lines go to `err`; workflow commands follow [`write_command`].
+pub fn emit(
+    report: &Report,
+    json: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), String> {
+    let legs = report.legs.as_slice();
+    let disposition = &report.disposition;
+    let blocking_now = report.blocking_now;
+    let seccomp_kernel_filtering = report.seccomp_kernel_filtering;
 
     // 3. Vacuous-green guard: a leg that was ATTEMPTED but compiled to ZERO
     //    tests / never reported results is a re-stubbed harness — hard-fail at
@@ -700,7 +764,7 @@ pub fn run(json: bool) -> Result<(), String> {
             || label == "kernel-abi-diff"
             || label == "release-graph-absence"
     };
-    for leg in &legs {
+    for leg in legs {
         if !exempt(leg.label) && leg.attempted && (!leg.ran || (leg.passed == 0 && leg.failed == 0))
         {
             let msg = format!(
@@ -709,7 +773,7 @@ pub fn run(json: bool) -> Result<(), String> {
                  (anti-canned guard).",
                 leg.label, leg.ran, leg.passed, leg.failed
             );
-            emit_command(json, "error", &msg);
+            write_command(json, "error", &msg, out, err);
             return Err(msg);
         }
     }
@@ -734,7 +798,8 @@ pub fn run(json: bool) -> Result<(), String> {
 
     if oracle_green {
         if json {
-            println!(
+            let _ = writeln!(
+                out,
                 "{}",
                 serde_json::json!({
                     "gate": GATE_NAME,
@@ -744,11 +809,12 @@ pub fn run(json: bool) -> Result<(), String> {
                     "blocking_now": blocking_now,
                     "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
-                    "legs": legs_json(&legs),
+                    "legs": legs_json(legs),
                 })
             );
         } else {
-            eprintln!(
+            let _ = writeln!(
+                err,
                 "{GATE_NAME}: PASSED — oracle green ({} legs); {} at {}",
                 legs.len(),
                 if blocking_now { "BLOCKING" } else { "advisory" },
@@ -760,7 +826,7 @@ pub fn run(json: bool) -> Result<(), String> {
 
     // Oracle RED — the verdict is the legs' binding classes, not the phase.
     let mut detail = String::new();
-    for leg in &legs {
+    for leg in legs {
         detail.push_str(&format!(
             "- {} leg: {} passed, {} failed (ran={}, attempted={}, green={}, \
              substrate_present={}, blocks={}, status={})\n",
@@ -783,9 +849,10 @@ pub fn run(json: bool) -> Result<(), String> {
             blocking_legs.len(),
             labels.join(", ")
         );
-        emit_command(json, "error", &msg);
+        write_command(json, "error", &msg, out, err);
         if json {
-            println!(
+            let _ = writeln!(
+                out,
                 "{}",
                 serde_json::json!({
                     "gate": GATE_NAME,
@@ -795,14 +862,14 @@ pub fn run(json: bool) -> Result<(), String> {
                     "advisory": false,
                     "blocking_now": blocking_now,
                     "blocking_legs": labels,
-                    "seccomp_kernel_filtering": seccomp_kernel_filtering(),
+                    "seccomp_kernel_filtering": seccomp_kernel_filtering,
                     "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
-                    "legs": legs_json(&legs),
+                    "legs": legs_json(legs),
                 })
             );
         } else {
-            eprintln!("{msg}");
+            let _ = writeln!(err, "{msg}");
         }
         return Err(format!(
             "{GATE_NAME}: BLOCKING — {} RED leg(s) enforce at HEAD ({})",
@@ -820,17 +887,19 @@ pub fn run(json: bool) -> Result<(), String> {
            genuine unavailability, so the RED is environment-unavailable rather \
            than a regression. On a host that CAN sandbox these legs BLOCK at \
            HEAD — dev-time enforcement is the binding class, not the ship phase \
-           (kernel seccomp filtering present: {}).\n",
-        seccomp_kernel_filtering()
+           (kernel seccomp filtering present: {seccomp_kernel_filtering}).\n"
     );
-    emit_command(
+    write_command(
         json,
         "warning",
         "Escape-detector oracle RED with substrate absent — would block on a seccomp-capable host",
+        out,
+        err,
     );
     write_step_summary(&banner);
     if json {
-        println!(
+        let _ = writeln!(
+            out,
             "{}",
             serde_json::json!({
                 "gate": GATE_NAME,
@@ -840,14 +909,15 @@ pub fn run(json: bool) -> Result<(), String> {
                 "advisory": true,
                 "blocking_now": false,
                 "substrate_absent": true,
-                "seccomp_kernel_filtering": seccomp_kernel_filtering(),
+                "seccomp_kernel_filtering": seccomp_kernel_filtering,
                 "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
-                "legs": legs_json(&legs),
+                "legs": legs_json(legs),
             })
         );
     } else {
-        eprintln!(
+        let _ = writeln!(
+            err,
             "{GATE_NAME}: INDETERMINATE (advisory — RED legs' substrate absent, would block on a \
              seccomp-capable host); {}",
             legs.iter()

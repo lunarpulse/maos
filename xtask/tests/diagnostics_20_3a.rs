@@ -183,6 +183,7 @@ fn wasm_zero_tests_is_vacuous_but_missing_summary_is_not() {
 }
 
 fn witness(tree: &Path) {
+    // expensive: nested cargo test on the witness crate
     let real_cargo = std::env::var_os("CARGO").expect("cargo supplies CARGO");
     let witness = tree.join("witness");
     fs::create_dir_all(witness.join("src")).unwrap();
@@ -260,26 +261,32 @@ fn composite_case(gate: &str, infrastructure_error: bool) {
 }
 
 #[test]
+#[ignore = "expensive: nested cargo test on the witness crate"]
 fn cohort_mismatch_emits_json() {
     composite_case("check-cohort-mesh", false);
 }
 #[test]
+#[ignore = "expensive: nested cargo test on the witness crate"]
 fn cohort_pin_read_error_emits_json() {
     composite_case("check-cohort-mesh", true);
 }
 #[test]
+#[ignore = "expensive: nested cargo test on the witness crate"]
 fn loom_mismatch_emits_json() {
     composite_case("check-multi-tenant-loom", false);
 }
 #[test]
+#[ignore = "expensive: nested cargo test on the witness crate"]
 fn loom_pin_read_error_emits_json() {
     composite_case("check-multi-tenant-loom", true);
 }
 #[test]
+#[ignore = "expensive: nested cargo test on the witness crate"]
 fn epic_mismatch_emits_json() {
     composite_case("check-epic-close-coherence", false);
 }
 #[test]
+#[ignore = "expensive: nested cargo test on the witness crate"]
 fn epic_pin_read_error_emits_json() {
     composite_case("check-epic-close-coherence", true);
 }

@@ -123,6 +123,7 @@ async fn hook_fires_within_budget() {
 
 #[tokio::test]
 async fn hook_exceeds_budget_and_returns_budget_exceeded() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let (mut dispatcher, mut mailbox) = make_dispatcher_with_mailbox("slow-hook");
     // Set a very short time cap so the hook always exceeds.
     dispatcher.time_cap_seconds = 1; // 1 second cap

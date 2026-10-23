@@ -1,9 +1,7 @@
 use std::process::Command;
 
 fn xtask() -> Command {
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "xtask", "--"]);
-    cmd
+    Command::new(env!("CARGO_BIN_EXE_xtask"))
 }
 
 #[test]

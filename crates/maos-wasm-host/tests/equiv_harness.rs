@@ -65,6 +65,9 @@ use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
+
 use maos_domain::frame::{
     ConsentEnvelope, FrameAddress, FramePayload, IacFrame, TaskAssignPayload,
 };
@@ -625,59 +628,14 @@ fn require_binary(name: &str) -> PathBuf {
     path
 }
 
-/// Resolve the `equiv-native-twin` binary wherever it actually lives and
-/// build it on demand if absent.
+/// Resolve the `equiv-native-twin` binary from the prebuilt fixture manifest.
 ///
 /// The native twin is a STANDALONE `[workspace]` (crypto-free, dev-only per
-/// D11), so `cargo test -p maos-wasm-host` does NOT build it. It is produced
-/// by `cargo build [--release] --manifest-path .../native-twin/Cargo.toml`,
-/// which emits `native-twin/target/<profile>/equiv-native-twin`. This helper
-/// discovers that location (release, then debug), falls back to a legacy
-/// main-workspace `target/<profile>/` copy, and finally builds on demand — so
-/// the twin is always reachable from the test regardless of which build path
-/// staged it.
+/// D11), so `cargo test -p maos-wasm-host` does NOT build it. Story 20-12: no
+/// test compiles the tree — `cargo run -p xtask -- build-test-fixtures` builds
+/// it once and the manifest names its location.
 fn ensure_native_twin_binary() -> PathBuf {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let twin_dir = format!("{manifest_dir}/guests/equiv-fixture/native-twin");
-
-    // 1. Standalone-workspace builds (where the manifest-path build emits it).
-    let release = PathBuf::from(format!("{twin_dir}/target/release/equiv-native-twin"));
-    if release.exists() {
-        return release;
-    }
-    let debug = PathBuf::from(format!("{twin_dir}/target/debug/equiv-native-twin"));
-    if debug.exists() {
-        return debug;
-    }
-
-    // 2. Legacy: main-workspace target (present in some local setups).
-    let main_target = target_binary("equiv-native-twin");
-    if main_target.exists() {
-        return main_target;
-    }
-
-    // 3. Build on demand into the standalone workspace (release profile to
-    //    match the CI contract). `--target-dir` is explicit: a global
-    //    `CARGO_TARGET_DIR` (or `build.target-dir`) would otherwise emit the
-    //    binary outside `twin_dir/target` and step 1 would never find it.
-    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-    let manifest = format!("{twin_dir}/Cargo.toml");
-    let target_dir = format!("{twin_dir}/target");
-    let status = Command::new(&cargo)
-        .args(["build", "--release", "--manifest-path", &manifest])
-        .args(["--target-dir", &target_dir])
-        .status()
-        .unwrap_or_else(|e| panic!("failed to invoke {cargo} to build equiv-native-twin: {e}"));
-    assert!(
-        status.success(),
-        "on-demand build of equiv-native-twin failed (status {status}); \
-         run `cargo build --release --manifest-path {manifest}` manually"
-    );
-    assert!(
-        release.exists(),
-        "on-demand build reported success but did not produce {release:?}"
-    );
-    release
+    fixtures::fixture("equiv-native-twin")
 }
 
 /// Resolve the committed WASM component fixture for an equivalence scenario

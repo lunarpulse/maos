@@ -1,0 +1,4358 @@
+{
+ "label": "t8-after",
+ "junit": "/mnt/build/cargo/nextest/ci/junit.xml",
+ "binaries": 502,
+ "tests": 4715,
+ "failed": 1,
+ "sum_test_time_s": 650.541,
+ "run_wall_s": 36.366,
+ "binaries_over_30s": [
+  "maos-bin::worker_terminal_facts_17_7",
+  "maos-control::post_surface_16_1",
+  "maos-iac::participant_recall_17_8",
+  "xtask::bin/xtask"
+ ],
+ "binaries_over_5s": 28,
+ "top25": [
+  {
+   "binary": "maos-bin::worker_terminal_facts_17_7",
+   "tests": 31,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 79.951,
+   "max_s": 15.184,
+   "slowest": "supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault"
+  },
+  {
+   "binary": "maos-control::post_surface_16_1",
+   "tests": 36,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 64.306,
+   "max_s": 22.065,
+   "slowest": "a_command_that_overruns_its_budget_is_503_with_the_ports_operation_id"
+  },
+  {
+   "binary": "maos-iac::participant_recall_17_8",
+   "tests": 29,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 40.659,
+   "max_s": 27.537,
+   "slowest": "consent_is_filtered_before_limit_in_both_orderings"
+  },
+  {
+   "binary": "xtask::bin/xtask",
+   "tests": 524,
+   "failed": 1,
+   "skipped": 0,
+   "sum_s": 31.112,
+   "max_s": 16.96,
+   "slowest": "check_rto::tests::full_drill_synthetic_passes"
+  },
+  {
+   "binary": "maos-bin::hook_pump_17_4",
+   "tests": 16,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 20.182,
+   "max_s": 6.63,
+   "slowest": "shutdown_joins_an_in_flight_consolidation_instead_of_detaching_it"
+  },
+  {
+   "binary": "maos-bin::worker_supervision_16_3",
+   "tests": 23,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 18.906,
+   "max_s": 10.138,
+   "slowest": "failed_cid_kill_is_not_counted_as_a_successful_container_stop"
+  },
+  {
+   "binary": "maos-bin::maos_uninstall_16_4",
+   "tests": 23,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 18.419,
+   "max_s": 5.844,
+   "slowest": "purge_keep_log_discloses_and_preserves_a_queryable_checkpointed_log"
+  },
+  {
+   "binary": "maos-bin::one_daemon_one_door_16_1",
+   "tests": 15,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 13.534,
+   "max_s": 5.593,
+   "slowest": "ac2_a_one_shot_child_does_not_bind_the_door"
+  },
+  {
+   "binary": "butler::hallucination",
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 12.753,
+   "max_s": 6.41,
+   "slowest": "ac6_zero_hallucinations_and_open_halt_inclusion"
+  },
+  {
+   "binary": "xtask::model_currency_gate",
+   "tests": 20,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 12.571,
+   "max_s": 4.577,
+   "slowest": "each_retired_or_unknown_pin_reds_naming_its_file_and_line"
+  },
+  {
+   "binary": "maos-bin::observer_activity_corpus_17_4",
+   "tests": 16,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 12.493,
+   "max_s": 11.09,
+   "slowest": "observer_activity_corpus_production_path"
+  },
+  {
+   "binary": "maos-bin::two_host_delegation_2b",
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 11.479,
+   "max_s": 11.049,
+   "slowest": "sink_uninstalled_acks_but_does_not_admit_or_serve_the_frame"
+  },
+  {
+   "binary": "xtask::macos_compile_guard_20_6",
+   "tests": 27,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 10.617,
+   "max_s": 2.003,
+   "slowest": "rust_source_with_platform_conditional_code_starts_the_guard"
+  },
+  {
+   "binary": "maos-bin::maosctl_load_16_6",
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 10.157,
+   "max_s": 2.19,
+   "slowest": "every_refusal_vector_is_typed_and_leaves_nothing_behind"
+  },
+  {
+   "binary": "researcher::incremental_recall",
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.805,
+   "max_s": 9.273,
+   "slowest": "on_idle_recall_and_fetch_scale_with_new_rows_across_ticks"
+  },
+  {
+   "binary": "maos-wasm-host::equiv_harness",
+   "tests": 19,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.756,
+   "max_s": 3.833,
+   "slowest": "forged_consent_survives_both_forms_and_claim_mutation_is_red"
+  },
+  {
+   "binary": "xtask::diagnostics_20_3a",
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.643,
+   "max_s": 2.358,
+   "slowest": "loom_mismatch_emits_json"
+  },
+  {
+   "binary": "maos-bin::cert_rotation_trigger_14_2a",
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.069,
+   "max_s": 5.518,
+   "slowest": "t_14_2a_the_installed_production_closer_closes_the_window_and_journals_the_close"
+  },
+  {
+   "binary": "maos-kernel-core::private_spill_supersession_13_5j",
+   "tests": 18,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 8.227,
+   "max_s": 0.78,
+   "slowest": "concurrent_same_key_spills_leave_one_complete_durable_value"
+  },
+  {
+   "binary": "maos-bin::shell_host_16_2",
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.659,
+   "max_s": 3.108,
+   "slowest": "repl_clarification_resolves_with_no_control_json"
+  },
+  {
+   "binary": "maos-bin::erasure_uninstall_13_5b",
+   "tests": 18,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.422,
+   "max_s": 0.602,
+   "slowest": "mixed_held_uninstall_writes_partial_proof"
+  },
+  {
+   "binary": "xtask::ledger_collectors_20_3a",
+   "tests": 13,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.366,
+   "max_s": 1.207,
+   "slowest": "concurrent_collectors_refetch_and_preserve_both_records_exactly_once"
+  },
+  {
+   "binary": "maos-audit::gdpr_cascade_corpus_test",
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.287,
+   "max_s": 3.823,
+   "slowest": "gdpr_cascade_probe_v0_leakage_check"
+  },
+  {
+   "binary": "maos-kernel-core::budget_seam_8_11",
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.018,
+   "max_s": 3.007,
+   "slowest": "slow_hook_emits_budget_warning_then_exceeded_at_manifest_cap"
+  },
+  {
+   "binary": "maos-audit",
+   "tests": 157,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 6.869,
+   "max_s": 0.682,
+   "slowest": "log_composition::tests::posture_delta_classifies_capability_changes"
+  }
+ ],
+ "per_binary": {
+  "maos-bin::worker_terminal_facts_17_7": {
+   "tests": 31,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 79.951,
+   "max_s": 15.184,
+   "slowest": "supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault"
+  },
+  "maos-control::post_surface_16_1": {
+   "tests": 36,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 64.306,
+   "max_s": 22.065,
+   "slowest": "a_command_that_overruns_its_budget_is_503_with_the_ports_operation_id"
+  },
+  "maos-iac::participant_recall_17_8": {
+   "tests": 29,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 40.659,
+   "max_s": 27.537,
+   "slowest": "consent_is_filtered_before_limit_in_both_orderings"
+  },
+  "xtask::bin/xtask": {
+   "tests": 524,
+   "failed": 1,
+   "skipped": 0,
+   "sum_s": 31.112,
+   "max_s": 16.96,
+   "slowest": "check_rto::tests::full_drill_synthetic_passes"
+  },
+  "maos-bin::hook_pump_17_4": {
+   "tests": 16,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 20.182,
+   "max_s": 6.63,
+   "slowest": "shutdown_joins_an_in_flight_consolidation_instead_of_detaching_it"
+  },
+  "maos-bin::worker_supervision_16_3": {
+   "tests": 23,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 18.906,
+   "max_s": 10.138,
+   "slowest": "failed_cid_kill_is_not_counted_as_a_successful_container_stop"
+  },
+  "maos-bin::maos_uninstall_16_4": {
+   "tests": 23,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 18.419,
+   "max_s": 5.844,
+   "slowest": "purge_keep_log_discloses_and_preserves_a_queryable_checkpointed_log"
+  },
+  "maos-bin::one_daemon_one_door_16_1": {
+   "tests": 15,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 13.534,
+   "max_s": 5.593,
+   "slowest": "ac2_a_one_shot_child_does_not_bind_the_door"
+  },
+  "butler::hallucination": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 12.753,
+   "max_s": 6.41,
+   "slowest": "ac6_zero_hallucinations_and_open_halt_inclusion"
+  },
+  "xtask::model_currency_gate": {
+   "tests": 20,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 12.571,
+   "max_s": 4.577,
+   "slowest": "each_retired_or_unknown_pin_reds_naming_its_file_and_line"
+  },
+  "maos-bin::observer_activity_corpus_17_4": {
+   "tests": 16,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 12.493,
+   "max_s": 11.09,
+   "slowest": "observer_activity_corpus_production_path"
+  },
+  "maos-bin::two_host_delegation_2b": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 11.479,
+   "max_s": 11.049,
+   "slowest": "sink_uninstalled_acks_but_does_not_admit_or_serve_the_frame"
+  },
+  "xtask::macos_compile_guard_20_6": {
+   "tests": 27,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 10.617,
+   "max_s": 2.003,
+   "slowest": "rust_source_with_platform_conditional_code_starts_the_guard"
+  },
+  "maos-bin::maosctl_load_16_6": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 10.157,
+   "max_s": 2.19,
+   "slowest": "every_refusal_vector_is_typed_and_leaves_nothing_behind"
+  },
+  "researcher::incremental_recall": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.805,
+   "max_s": 9.273,
+   "slowest": "on_idle_recall_and_fetch_scale_with_new_rows_across_ticks"
+  },
+  "maos-wasm-host::equiv_harness": {
+   "tests": 19,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.756,
+   "max_s": 3.833,
+   "slowest": "forged_consent_survives_both_forms_and_claim_mutation_is_red"
+  },
+  "xtask::diagnostics_20_3a": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.643,
+   "max_s": 2.358,
+   "slowest": "loom_mismatch_emits_json"
+  },
+  "maos-bin::cert_rotation_trigger_14_2a": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 9.069,
+   "max_s": 5.518,
+   "slowest": "t_14_2a_the_installed_production_closer_closes_the_window_and_journals_the_close"
+  },
+  "maos-kernel-core::private_spill_supersession_13_5j": {
+   "tests": 18,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 8.227,
+   "max_s": 0.78,
+   "slowest": "concurrent_same_key_spills_leave_one_complete_durable_value"
+  },
+  "maos-bin::shell_host_16_2": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.659,
+   "max_s": 3.108,
+   "slowest": "repl_clarification_resolves_with_no_control_json"
+  },
+  "maos-bin::erasure_uninstall_13_5b": {
+   "tests": 18,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.422,
+   "max_s": 0.602,
+   "slowest": "mixed_held_uninstall_writes_partial_proof"
+  },
+  "xtask::ledger_collectors_20_3a": {
+   "tests": 13,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.366,
+   "max_s": 1.207,
+   "slowest": "concurrent_collectors_refetch_and_preserve_both_records_exactly_once"
+  },
+  "maos-audit::gdpr_cascade_corpus_test": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.287,
+   "max_s": 3.823,
+   "slowest": "gdpr_cascade_probe_v0_leakage_check"
+  },
+  "maos-kernel-core::budget_seam_8_11": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 7.018,
+   "max_s": 3.007,
+   "slowest": "slow_hook_emits_budget_warning_then_exceeded_at_manifest_cap"
+  },
+  "maos-audit": {
+   "tests": 157,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 6.869,
+   "max_s": 0.682,
+   "slowest": "log_composition::tests::posture_delta_classifies_capability_changes"
+  },
+  "maos-shell::shell_halt_repl_16_2": {
+   "tests": 13,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 6.139,
+   "max_s": 5.042,
+   "slowest": "context_never_arriving_renders_not_delivered_and_never_proceeds"
+  },
+  "xtask::error_catalog_20_3a": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 5.503,
+   "max_s": 2.497,
+   "slowest": "generations_preserve_all_metadata_and_match_committed_bytes"
+  },
+  "maos-bin::one_shot_hello": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 5.41,
+   "max_s": 5.41,
+   "slowest": "one_shot_hello_spirit_produces_valid_json"
+  },
+  "maos-audit::log_completeness_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 4.719,
+   "max_s": 4.719,
+   "slowest": "log_completeness_corpus_round_trip"
+  },
+  "xtask::kernel_pin_content_hash_16_0": {
+   "tests": 24,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 4.524,
+   "max_s": 2.582,
+   "slowest": "every_one_of_the_pinned_files_reds_a_line_neutral_mutation"
+  },
+  "xtask::check_judge_config_integration": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 4.168,
+   "max_s": 2.107,
+   "slowest": "clean_judge_config_passes"
+  },
+  "maos-kernel-core::frame_bridge_poll_17_3c": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 4.035,
+   "max_s": 3.009,
+   "slowest": "stdout_eof_closes_the_bridge_even_while_stderr_stays_open"
+  },
+  "maos-wasm-host::e2e_roundtrip": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 4.022,
+   "max_s": 2.018,
+   "slowest": "peer_identity_rupture_round_trips_through_the_real_runner"
+  },
+  "maos-bin::observer_live_17_4": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 3.92,
+   "max_s": 1.453,
+   "slowest": "a_door_loaded_observer_reports_like_the_root_one"
+  },
+  "xtask::j1_crosshost_2c_proven_red": {
+   "tests": 43,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 3.781,
+   "max_s": 0.884,
+   "slowest": "a_missing_governed_file_is_a_finding_not_a_skip"
+  },
+  "xtask::story_10_4a_ac1_proven_red": {
+   "tests": 22,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 3.653,
+   "max_s": 0.758,
+   "slowest": "story_10_4a_ac1_weekly_backup_green"
+  },
+  "maos-kernel-core::private_forget_restart_13_5i": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 3.371,
+   "max_s": 0.56,
+   "slowest": "forget_preserves_bystander_and_default_namespace_content"
+  },
+  "maos-kernel-core::hook_dispatch_budget_envelope": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.981,
+   "max_s": 2.005,
+   "slowest": "hook_exceeds_budget_and_returns_budget_exceeded"
+  },
+  "maos-journey-test::journey_j0": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.896,
+   "max_s": 1.171,
+   "slowest": "j0_halt_resolved_over_the_door"
+  },
+  "maos-kernel-core::schedule_watchdog_fr26": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.829,
+   "max_s": 0.406,
+   "slowest": "schedule_2_3_rate_limit_caps_firing"
+  },
+  "xtask::decision_adrs_and_provisioning": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.654,
+   "max_s": 2.371,
+   "slowest": "every_clause_and_denominator_has_a_planted_red"
+  },
+  "maos-kernel-core::issuance_quota_window_17_9": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.607,
+   "max_s": 1.164,
+   "slowest": "one_pid_keeps_its_capabilities_across_three_windows"
+  },
+  "maos-bin::butler_8_14b": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.589,
+   "max_s": 0.605,
+   "slowest": "butler_8_14b_mcp_drivers"
+  },
+  "maos-bin::cohort_daemon_smoke_13_5c": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.579,
+   "max_s": 0.483,
+   "slowest": "daemon_boot_rows_prove_per_boot_nonce_variance"
+  },
+  "maos-journey-test::journey_butler": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.543,
+   "max_s": 0.619,
+   "slowest": "jb6_capability_denied"
+  },
+  "maos-bin::inference_mode_15_6": {
+   "tests": 13,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.466,
+   "max_s": 1.43,
+   "slowest": "invalid_mode_inputs_are_refused_before_any_inference_consumer_is_wired"
+  },
+  "maos-bin::bin/maos": {
+   "tests": 24,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.351,
+   "max_s": 1.495,
+   "slowest": "story_13_5a_enterprise_daemon_seam::story_13_5a_daemon_governance_is_dead_wired_unwired_and_fails_closed_when_denied"
+  },
+  "maos-audit::ratification_loader_17_9": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.33,
+   "max_s": 1.171,
+   "slowest": "receipt_codes_require_nonempty_lowercase_kebab_words"
+  },
+  "maos-bin::researcher_8_14c": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.237,
+   "max_s": 1.23,
+   "slowest": "researcher_8_14c_mcp_fanout"
+  },
+  "xtask::service_boundary_integration": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.201,
+   "max_s": 1.624,
+   "slowest": "shipped_baseline_matches_live_kernel_surface"
+  },
+  "maos-bin::wasm_form_admission_17_3b": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.192,
+   "max_s": 0.775,
+   "slowest": "maos_run_refuses_wasm_component_manifests_by_named_engine_state"
+  },
+  "maos-journey-test::journey_j3": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.141,
+   "max_s": 1.424,
+   "slowest": "j3_anti_canned_blinded_raw_input_moves_rendered_line"
+  },
+  "maos-bin::cross_wall_log_read_13_6d": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.137,
+   "max_s": 0.691,
+   "slowest": "single_connection_foreign_read_is_immune_to_an_artifact_swap_between_binding_and_query"
+  },
+  "maos-kernel-core::t3_terminal_helpers_17_7": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 2.078,
+   "max_s": 1.208,
+   "slowest": "teardown_join_honors_its_remaining_deadline_without_removing_during_snapshot"
+  },
+  "maos-wasm-host::recall_runner_17_3d": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.996,
+   "max_s": 0.206,
+   "slowest": "eof_outstanding_closes_client_but_finishes_export_and_exits_zero"
+  },
+  "maos-audit::replay_schema_test": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.99,
+   "max_s": 0.35,
+   "slowest": "replay_one_byte_tamper_diverges"
+  },
+  "maos-journey-test::journey_researcher": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.93,
+   "max_s": 0.91,
+   "slowest": "jr2_live_mcp_fan_out_via_pty"
+  },
+  "maos-cli::skill_queue_reconcile_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.911,
+   "max_s": 0.375,
+   "slowest": "reconcile_pending_proven_red_set_equality"
+  },
+  "maos-bin::shell_8_14a": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.847,
+   "max_s": 0.594,
+   "slowest": "audit_query_returns_shell_turn_rows"
+  },
+  "maos-iac::log_recall_17_3d": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.846,
+   "max_s": 0.586,
+   "slowest": "audit_receipts_identity_and_unknown_kinds_never_starve_pages_or_disclose"
+  },
+  "maos-bench": {
+   "tests": 34,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.837,
+   "max_s": 1.714,
+   "slowest": "harness::j_researcher::tests::budget_overrun_emits_a_budget_warning_frame"
+  },
+  "maos-bin::f4_pairing": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.829,
+   "max_s": 1.407,
+   "slowest": "pairing_hold_times_out_and_refuses_to_dial"
+  },
+  "maos-escape-detector::source_identity_blind": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.752,
+   "max_s": 0.686,
+   "slowest": "blind_one_source_moves_the_count"
+  },
+  "xtask::story_10_4a_proven_red": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.747,
+   "max_s": 0.477,
+   "slowest": "vector_4_rollback_detects_source_drift_red"
+  },
+  "maos-cli::two_host_reconcile_2c": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.676,
+   "max_s": 0.299,
+   "slowest": "two_hosts_with_independent_roots_reconcile_on_the_shared_frame_id"
+  },
+  "maos-bench::t_11_2b_halt_presence": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.657,
+   "max_s": 0.863,
+   "slowest": "halt_presence_per_region_green"
+  },
+  "maos-cli::skill_queue_integration_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.643,
+   "max_s": 0.365,
+   "slowest": "discovered_skill_is_approvable_end_to_end"
+  },
+  "maos-bin::worker_completion_2a": {
+   "tests": 45,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.557,
+   "max_s": 0.41,
+   "slowest": "planted_refusal::a_manifest_missing_the_oracles_argv_flag_refuses_before_the_spawn"
+  },
+  "maos-cli": {
+   "tests": 49,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.485,
+   "max_s": 0.672,
+   "slowest": "backup::tests::tenant_backup_round_trip_rejects_wrong_team"
+  },
+  "maos-kernel-core::halt_invoke_test": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.483,
+   "max_s": 0.307,
+   "slowest": "kernel_resolver_rejects_empty_payload_without_transitioning_halt_state"
+  },
+  "xtask::workflow_honesty_20_3a": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.445,
+   "max_s": 0.825,
+   "slowest": "cargo_tree_failure_and_default_fault_feature_are_blocking"
+  },
+  "maos-bin::tenant_audit_phase_a_13_5g": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.318,
+   "max_s": 0.523,
+   "slowest": "boot_writes_binding_after_open_for_a_legacy_shard"
+  },
+  "maos-wasm-host::codec_integration": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.315,
+   "max_s": 1.247,
+   "slowest": "cbor_output_cap_rejects_oversized_guest_data"
+  },
+  "maos-iac": {
+   "tests": 99,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.29,
+   "max_s": 0.433,
+   "slowest": "adapter::transparency_log::tests::team_shard_keeps_legal_holds_in_global_database"
+  },
+  "maos-iac::legal_hold_authority_13_5b": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.29,
+   "max_s": 0.651,
+   "slowest": "attached_shard_lists_and_releases_host_global_hold"
+  },
+  "maos-kernel-core::distillation_i11_audit_chain": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.281,
+   "max_s": 0.403,
+   "slowest": "cycle_detection"
+  },
+  "xtask::j1_crosshost_1b_proven_red": {
+   "tests": 29,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.261,
+   "max_s": 0.074,
+   "slowest": "collapsing_minus_32001_into_minus_32009_must_red"
+  },
+  "maos-audit::erasure_smoke_test": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.25,
+   "max_s": 0.476,
+   "slowest": "headline_erasure_demo_produces_verifiable_proof"
+  },
+  "maos-cli::audit_no_color_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.238,
+   "max_s": 0.223,
+   "slowest": "plain_with_no_color_emits_zero_ansi_bytes"
+  },
+  "maos-kernel-core::on_idle_substrate": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.223,
+   "max_s": 0.408,
+   "slowest": "idle_watchdog_skips_manifest_disabled_hook"
+  },
+  "xtask::story_10_2_proven_red": {
+   "tests": 39,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.212,
+   "max_s": 0.058,
+   "slowest": "trial_gate_small_consistent_cohort_is_preliminary"
+  },
+  "maos-audit::gdpr_cascade_test": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.195,
+   "max_s": 0.458,
+   "slowest": "forget_removes_principal_and_marks_distillate"
+  },
+  "maos-bin::tl_readers_side_tables_17_8": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.119,
+   "max_s": 1.119,
+   "slowest": "independent_readers_return_identical_base_rows_with_populated_side_tables"
+  },
+  "xtask::trial_attestation_proven_red": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.103,
+   "max_s": 0.559,
+   "slowest": "producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition"
+  },
+  "butler::corpus_halt": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.078,
+   "max_s": 0.51,
+   "slowest": "ac3_ac4_corpus_scores_above_floors_and_closes_the_seam"
+  },
+  "maos-audit::trajectory_redaction_test": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.051,
+   "max_s": 0.346,
+   "slowest": "query_with_redaction_populates_redaction_meta_for_redacted_rows"
+  },
+  "maos-escape-detector::detection_quality": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.05,
+   "max_s": 0.696,
+   "slowest": "detection_quality_meets_floor_and_ceiling_on_real_seccomp"
+  },
+  "maos-journey-test::pty_drop_order": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.016,
+   "max_s": 0.509,
+   "slowest": "drop_while_child_streaming"
+  },
+  "maos-domain": {
+   "tests": 279,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 1.001,
+   "max_s": 0.008,
+   "slowest": "hot_swap::tests::hot_swap_result_new_rejects_pid_zero"
+  },
+  "maos-kernel-core::journal_fsync_assertion": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.968,
+   "max_s": 0.968,
+   "slowest": "journal_append_p99_measurement"
+  },
+  "maos-egress::proxy_edges_17_1": {
+   "tests": 24,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.965,
+   "max_s": 0.218,
+   "slowest": "upstream_response_header_deadline_is_absolute_under_continuous_dripping"
+  },
+  "maos-siem::forward_count_derive": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.933,
+   "max_s": 0.32,
+   "slowest": "forwarded_count_derives_from_two_real_tl_rows"
+  },
+  "xtask::ship_gate_binding_20_3a": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.922,
+   "max_s": 0.187,
+   "slowest": "removing_aggregate_ship_edge_reds"
+  },
+  "maos-kernel-core::halt_receipt_production_rate": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.901,
+   "max_s": 0.901,
+   "slowest": "test_halt_receipt_production_rate"
+  },
+  "maos-cli::credential_posture_2c": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.883,
+   "max_s": 0.164,
+   "slowest": "a_correctly_redacted_log_reports_no_escape"
+  },
+  "xtask::gate_honesty_20_3a": {
+   "tests": 14,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.842,
+   "max_s": 0.136,
+   "slowest": "absent_inputs_never_pass"
+  },
+  "maos-bin::maos_run_boot_loud_8_11": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.838,
+   "max_s": 0.461,
+   "slowest": "deterministic_posture_spirit_without_port_boots_clean"
+  },
+  "maos-bin::cross_team_consent_13_3": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.787,
+   "max_s": 0.372,
+   "slowest": "cross_wall_recall_live_path_uses_verified_state_and_home_team"
+  },
+  "maos-corpus-gen::determinism_integration": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.772,
+   "max_s": 0.43,
+   "slowest": "secret_redaction_byte_identical_across_runs"
+  },
+  "maos-bin": {
+   "tests": 22,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.74,
+   "max_s": 0.333,
+   "slowest": "escape_detector_consumer::tests::consumer_reports_anomaly_for_unanticipated_kill_only"
+  },
+  "maos-kernel-core::scheduler_five_verb_lifecycle": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.73,
+   "max_s": 0.125,
+   "slowest": "five_verb_lifecycle_routes_through_scheduler"
+  },
+  "maos-notify-push": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.723,
+   "max_s": 0.507,
+   "slowest": "tests::dispatch_does_not_follow_redirects"
+  },
+  "xtask::fkcs_oracle": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.694,
+   "max_s": 0.325,
+   "slowest": "frozen_snapshot_and_current_kernel_baselines_are_independently_valid"
+  },
+  "maos-audit::query_schema_test": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.693,
+   "max_s": 0.177,
+   "slowest": "query_returns_all_three_seeded_rows_in_timestamp_order"
+  },
+  "butler::digest": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.686,
+   "max_s": 0.364,
+   "slowest": "ac5_morning_digest_composes_cites_and_persists_within_budget"
+  },
+  "xtask::d11_xtask_ceiling_ratchet": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.673,
+   "max_s": 0.551,
+   "slowest": "planted_current_row_raises_cannot_borrow_historical_or_done_grants"
+  },
+  "maos-cli::signing_identity_2c": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.655,
+   "max_s": 0.098,
+   "slowest": "verify_bundle_derives_the_region_key_from_a_base_seed"
+  },
+  "maos-kernel-core::cap_audit_backpressure": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.651,
+   "max_s": 0.651,
+   "slowest": "hot_path_never_blocks_under_audit_saturation"
+  },
+  "maos-audit::multi_backend_erasure_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.648,
+   "max_s": 0.648,
+   "slowest": "multi_backend_erasure_partition_invariant"
+  },
+  "maos-siem::file_sink": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.644,
+   "max_s": 0.323,
+   "slowest": "forward_to_file_surfaces_io_error_instead_of_silently_dropping"
+  },
+  "maos-journey-test::journey_j4": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.638,
+   "max_s": 0.638,
+   "slowest": "j4_mira_nash_topology_run_once"
+  },
+  "maos-siem::redaction_before_forward": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.631,
+   "max_s": 0.318,
+   "slowest": "export_routes_through_query_with_redaction_not_plain_query"
+  },
+  "maos-bin::smoke_mira_nash_tcp_8_13": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.627,
+   "max_s": 0.627,
+   "slowest": "smoke_mira_nash_tcp_8_13_runs_with_isolated_xdg"
+  },
+  "maos-bin::root_shutdown_unload_16_3": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.61,
+   "max_s": 0.377,
+   "slowest": "ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15"
+  },
+  "maos-cli::pause_resume_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.607,
+   "max_s": 0.224,
+   "slowest": "resume_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "maos-manifest": {
+   "tests": 178,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.59,
+   "max_s": 0.008,
+   "slowest": "manifest::gateway_tests::gateway_empty_allowlist_parses"
+  },
+  "maos-a2a-tcp::t_2c_fault_windows": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.573,
+   "max_s": 0.263,
+   "slowest": "t_2c_window_a_silent_peer_is_a_typed_partition_before_the_ack"
+  },
+  "butler::on_idle_halt_8_10": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.557,
+   "max_s": 0.292,
+   "slowest": "on_idle_fires_the_real_halt_through_the_scalar_port"
+  },
+  "maos-a2a-core": {
+   "tests": 85,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.555,
+   "max_s": 0.016,
+   "slowest": "config::tests::allowlist_admission_via_config"
+  },
+  "maos-cli::spirit_upgrade_test": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.553,
+   "max_s": 0.251,
+   "slowest": "upgrade_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "xtask::j1_crosshost_1a_proven_red": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.547,
+   "max_s": 0.073,
+   "slowest": "baseline_fixture_tree_is_green"
+  },
+  "worker::cli_wrapper_admission": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.543,
+   "max_s": 0.311,
+   "slowest": "resumption_gate_no_silent_restart_then_corrected_config_admits"
+  },
+  "maos-bin::smoke_run_8_11": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.529,
+   "max_s": 0.529,
+   "slowest": "maos_run_butler_once_fires_epistemic_halt_through_production_wiring"
+  },
+  "maos-kernel-core::cli_wrapper_shape_mismatch_journal_7_4": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.525,
+   "max_s": 0.311,
+   "slowest": "resumption_gate_no_silent_restart_then_corrected_config_admits"
+  },
+  "maos-a2a-tcp::t_10_4b_live_bilateral": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.511,
+   "max_s": 0.21,
+   "slowest": "t_10_4b_coarse_roundtrip_real_measurement"
+  },
+  "xtask::j1_crosshost_2a_proven_red": {
+   "tests": 15,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.508,
+   "max_s": 0.055,
+   "slowest": "each_real_adapter_must_keep_its_own_structured_oracle"
+  },
+  "maos-kernel-core::loaded_spirit_exit_16_6": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.488,
+   "max_s": 0.178,
+   "slowest": "panicking_unload_orphans_in_flight_tasks_with_the_audit_payload_shape"
+  },
+  "maos-kernel-core::memory_three_tier_smoke": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.485,
+   "max_s": 0.131,
+   "slowest": "write_read_shared"
+  },
+  "maos-bin::inference_provider_polarity_8_11": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.481,
+   "max_s": 0.481,
+   "slowest": "ci_default_uses_zero_network_deterministic_path"
+  },
+  "maos-bin::recall_mediation_17_3d": {
+   "tests": 14,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.476,
+   "max_s": 0.39,
+   "slowest": "quota_audit_and_mcp_receipts_are_operator_visible_but_never_spirit_disclosed"
+  },
+  "maos-journey-test::journey_j1": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.476,
+   "max_s": 0.47,
+   "slowest": "j1_founder_class_standalone_load_succeeds"
+  },
+  "maos-kernel-core::crash_detector_in_process_panic": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.475,
+   "max_s": 0.475,
+   "slowest": "panic_hook_triggers_crash_detector"
+  },
+  "maos-journey-test::jb3_self_tuning_halt": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.473,
+   "max_s": 0.473,
+   "slowest": "jb3_self_tunes_via_belief_variance_halt"
+  },
+  "maos-cohort::cert_rotation_14_2a": {
+   "tests": 25,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.46,
+   "max_s": 0.322,
+   "slowest": "every_rotation_variant_round_trips_through_the_real_transparency_log"
+  },
+  "maos-a2a-tcp::trust_binding_8_9": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.444,
+   "max_s": 0.273,
+   "slowest": "g6_intake_processing_and_write_bounded"
+  },
+  "maos-bin::smoke_cli_wrapper_8_12": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.437,
+   "max_s": 0.427,
+   "slowest": "ci_local_split_refuses_a_granted_real_agent_without_the_live_flag"
+  },
+  "maos-cli::orchestrator_queue_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.429,
+   "max_s": 0.229,
+   "slowest": "queue_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "maos-kernel-core::progress_watchdog_smoke": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.429,
+   "max_s": 0.429,
+   "slowest": "progress_watchdog_emits_task_stalled"
+  },
+  "maos-cli::halt_resolve_test": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.428,
+   "max_s": 0.211,
+   "slowest": "resolve_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "maos-escape-detector::producer_wired_e2e": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.423,
+   "max_s": 0.423,
+   "slowest": "real_seccomp_kill_produces_real_tl_row_and_detector_anomaly"
+  },
+  "maos-kernel-core::cli_wrapper_admission": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.423,
+   "max_s": 0.104,
+   "slowest": "ac5_scenario_5_2_minor_bump_mismatch_fires_eoutput_shape_adapter_mismatch"
+  },
+  "maos-kernel-core::silent_failure_detector_smoke": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.415,
+   "max_s": 0.415,
+   "slowest": "silent_failure_detector_emits_suspect"
+  },
+  "maos-cli::revoke_token_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.41,
+   "max_s": 0.214,
+   "slowest": "revoke_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "maos-cli::posture_shift_test": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.401,
+   "max_s": 0.224,
+   "slowest": "posture_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "maos-cli::revocations_import_test": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.396,
+   "max_s": 0.235,
+   "slowest": "import_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "maos-spirit-sdk::spirit_macro_errors": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.387,
+   "max_s": 0.387,
+   "slowest": "spirit_macro_compile_errors"
+  },
+  "maos-bin::jetbrains_acp_server": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.384,
+   "max_s": 0.384,
+   "slowest": "jetbrains_acp_server_binary_routes_real_resolvers"
+  },
+  "maos-kernel-core::bridge_t2_route_17_6": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.371,
+   "max_s": 0.241,
+   "slowest": "t2_sigsys_block_is_audited_or_journaled_never_dropped"
+  },
+  "maos-kernel-core::memory_md_opaque_write": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.369,
+   "max_s": 0.186,
+   "slowest": "operator_hand_edit_survives_on_next_read"
+  },
+  "maos-escape-detector::concurrent_read": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.349,
+   "max_s": 0.349,
+   "slowest": "read_only_reader_isolates_uncommitted_writer_transaction"
+  },
+  "maos-cli::load_test": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.348,
+   "max_s": 0.211,
+   "slowest": "load_maps_typed_responses_to_d16_1_p_exits"
+  },
+  "maos-bin::identity_asserted_write": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.347,
+   "max_s": 0.148,
+   "slowest": "append_identity_asserted_two_writes_have_distinct_frame_ids"
+  },
+  "maos-cohort": {
+   "tests": 80,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.345,
+   "max_s": 0.027,
+   "slowest": "manifest::tests::tenant_manifest_option_a_plus_gate_matrix"
+  },
+  "xtask::d19_story_file_governance": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.323,
+   "max_s": 0.095,
+   "slowest": "an_active_declared_story_with_no_file_reds_every_walker"
+  },
+  "maos-loom-lite": {
+   "tests": 88,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.322,
+   "max_s": 0.009,
+   "slowest": "replication::router::tests::test_region_identity_rejects_self"
+  },
+  "maos-a2a-tcp::t7_t10_liveness": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.316,
+   "max_s": 0.264,
+   "slowest": "t7_slow_loris_bounded_no_hang"
+  },
+  "maos-iac::iac_send_token_17_3c": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.316,
+   "max_s": 0.306,
+   "slowest": "drr_scheduler_journals_the_iac_send_token"
+  },
+  "maos-audit::spirit_resolution": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.311,
+   "max_s": 0.176,
+   "slowest": "payload_identity_overrides_legacy_intent_and_incarnations_are_deduplicated"
+  },
+  "maos-kernel-core::revocation_applier_pipeline": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.304,
+   "max_s": 0.157,
+   "slowest": "signed_crl_propagates_to_token_denial_and_lifecycle_evidence"
+  },
+  "xtask::check_test_cost_proven_red": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.292,
+   "max_s": 0.231,
+   "slowest": "the_real_tree_is_green"
+  },
+  "maos-telemetry::otel_gates": {
+   "tests": 21,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.282,
+   "max_s": 0.187,
+   "slowest": "airgap_failure_causes_are_not_skips"
+  },
+  "maos-audit::i12_decision_audit_test": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.272,
+   "max_s": 0.095,
+   "slowest": "decision_dispatch_payload_preserves_working_memory_digest_refs"
+  },
+  "maos-kernel-core::journal_append_16_5": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.264,
+   "max_s": 0.221,
+   "slowest": "concurrent_same_spirit_live_index_matches_reopened_persisted_index"
+  },
+  "maos-journey-test::run_bounded_full_pipe": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.255,
+   "max_s": 0.183,
+   "slowest": "child_output_is_drained_but_capture_is_capped"
+  },
+  "maos-kernel-core::memory_i5_isolation": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.253,
+   "max_s": 0.129,
+   "slowest": "spirit_a_private_not_readable_by_spirit_b"
+  },
+  "maos-kernel-core::i12_real_digest_provider_8_10": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.25,
+   "max_s": 0.133,
+   "slowest": "real_provider_empty_when_spirit_has_no_digests"
+  },
+  "maos-shell::init_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.247,
+   "max_s": 0.06,
+   "slowest": "init_mints_control_json_on_an_already_initialised_home"
+  },
+  "maos-kernel-core::halt_durability_16_5": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.237,
+   "max_s": 0.124,
+   "slowest": "journal_failure_rolls_back_and_retry_succeeds"
+  },
+  "maos-wasm-host": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.236,
+   "max_s": 0.108,
+   "slowest": "recall_wire::tests::page_prefix_at_exact_expansion_budget_boundary"
+  },
+  "maos-kernel-core::drr_scheduler": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.231,
+   "max_s": 0.212,
+   "slowest": "drr_basic_two_spirits_fair"
+  },
+  "maos-skill::admission_store_test": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.223,
+   "max_s": 0.053,
+   "slowest": "store_to_queue_to_store_round_trip"
+  },
+  "maos-bin::cross_team_crossing_13_6b": {
+   "tests": 21,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.208,
+   "max_s": 0.048,
+   "slowest": "crossing_has_a_production_initiator_at_both_endpoints"
+  },
+  "xtask::j1_crosshost_2b_proven_red": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.208,
+   "max_s": 0.043,
+   "slowest": "fewer_than_three_registered_identity_tests_reds"
+  },
+  "maos-registry": {
+   "tests": 56,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.207,
+   "max_s": 0.006,
+   "slowest": "admission::tests::vetted_promotion_preserves_compliance_envelope_verification"
+  },
+  "maos-kernel-core::principal_namespace_lifecycle": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.193,
+   "max_s": 0.193,
+   "slowest": "principal_namespace_full_lifecycle"
+  },
+  "maos-wasm-host::t2_sandbox_kill": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.193,
+   "max_s": 0.157,
+   "slowest": "forbidden_syscall_killed_by_t2_with_sigsys"
+  },
+  "maos-wasm-host::wit_corpus": {
+   "tests": 22,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.192,
+   "max_s": 0.058,
+   "slowest": "corpus_covers_all_record_types"
+  },
+  "xtask::epic17_exit_workflow_17_7": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.19,
+   "max_s": 0.19,
+   "slowest": "aggregate_workflow_executes_non_success_handling_and_failure_step"
+  },
+  "maos-kernel-core::abi_stability_admit": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.188,
+   "max_s": 0.025,
+   "slowest": "kernel_at_declared_min_admits"
+  },
+  "maos-wasm-host::fuel_t2_matrix": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.188,
+   "max_s": 0.078,
+   "slowest": "fuel_disabled_spin_runs_without_out_of_fuel_trap"
+  },
+  "maos-compliance": {
+   "tests": 41,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.187,
+   "max_s": 0.009,
+   "slowest": "vetting::terminal::tests::each_cause_classifies_in_isolation"
+  },
+  "maos-kernel-core::upgrade_orchestrator_three_policies": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.186,
+   "max_s": 0.186,
+   "slowest": "orchestrator_executes_hot_cold_and_migrator_with_fresh_successors"
+  },
+  "maos-kernel-core::redaction_canary": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.185,
+   "max_s": 0.182,
+   "slowest": "redaction_filter_zero_leak_against_10k_canary"
+  },
+  "xtask::check_exit_commands_gate": {
+   "tests": 32,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.184,
+   "max_s": 0.009,
+   "slowest": "a_non_done_epic_with_no_exit_block_reds"
+  },
+  "maos-compliance::evaluator_latency_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.179,
+   "max_s": 0.179,
+   "slowest": "evaluator_p99_under_10ms"
+  },
+  "mira::halt_bilateral": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.179,
+   "max_s": 0.17,
+   "slowest": "halt_on_mira_routes_to_mobile_push_and_resolves_via_three_tap"
+  },
+  "maos-compliance::ccac_ship_gate_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.178,
+   "max_s": 0.178,
+   "slowest": "ccac_n600_ship_gate"
+  },
+  "maos-eval": {
+   "tests": 50,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.176,
+   "max_s": 0.007,
+   "slowest": "distillate_corpus::tests::load_synthetic_v0_corpus"
+  },
+  "xtask::story_10_5_proven_red": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.175,
+   "max_s": 0.029,
+   "slowest": "skill_conformance_fails_on_false_abi_unchanged"
+  },
+  "maos-cli::legal_hold_cli_13_5b": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.171,
+   "max_s": 0.122,
+   "slowest": "unix::list_reads_the_real_holds_table_in_process_and_spawns_nothing"
+  },
+  "xtask::owner_assertion_epic_key_rejected": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.17,
+   "max_s": 0.032,
+   "slowest": "an_epic_retrospective_owner_keeps_its_existing_deferred_disposition"
+  },
+  "maos-corpus-gen::secret_redaction_integration": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.169,
+   "max_s": 0.151,
+   "slowest": "coverage_binary_fails_on_floor_violation"
+  },
+  "maos-kernel-core::capability_invocation_audit": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.168,
+   "max_s": 0.158,
+   "slowest": "write_distillate_emits_capability_invocation"
+  },
+  "maos-a2a-tcp::t3_t6_security": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.162,
+   "max_s": 0.052,
+   "slowest": "t5_expired_cert_retries_then_fails"
+  },
+  "xtask": {
+   "tests": 21,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.16,
+   "max_s": 0.059,
+   "slowest": "gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field"
+  },
+  "maos-kernel-core::upgrade_migrator_cross_major": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.159,
+   "max_s": 0.159,
+   "slowest": "migrator_policy_executes_successor_migration_and_commits_on_stable_scb"
+  },
+  "maos-spirit-sdk::spirit_test_v05_macros": {
+   "tests": 17,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.159,
+   "max_s": 0.022,
+   "slowest": "assert_panics_message_contains_file_line_and_suggested_fix"
+  },
+  "maos-kernel-core::on_revocation_three_actions": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.158,
+   "max_s": 0.158,
+   "slowest": "applier_executes_terminate_drain_and_quarantine_actions"
+  },
+  "maos-bin::audit_refusal_16_5": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.157,
+   "max_s": 0.157,
+   "slowest": "closed_audit_sink_refuses_collective_write_without_touching_the_store"
+  },
+  "maos-kernel-core::self_telemetry_scope": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.157,
+   "max_s": 0.137,
+   "slowest": "self_telemetry_counts_distillate_frames_precisely"
+  },
+  "maos-kernel-core::halt_resolution_writes_memory": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.155,
+   "max_s": 0.155,
+   "slowest": "provided_context_writes_memory_and_scalar_marker"
+  },
+  "xtask::decision_register_gate": {
+   "tests": 30,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.155,
+   "max_s": 0.008,
+   "slowest": "a_status_outside_the_vocabulary_is_not_silently_accepted"
+  },
+  "maos-exec-deps::resolver_17_6": {
+   "tests": 19,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.147,
+   "max_s": 0.071,
+   "slowest": "transitive_dependency_closure_is_bounded"
+  },
+  "maos-mcp": {
+   "tests": 27,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.147,
+   "max_s": 0.009,
+   "slowest": "drivers::researcher::tests::extract_content_error_yields_decode"
+  },
+  "maos-audit::fr4_worker_rows_16_3": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.141,
+   "max_s": 0.102,
+   "slowest": "a_real_kind15_task_stalled_row_read_back_through_query_is_a_non_call"
+  },
+  "xtask::kernel_pin_ci_wiring_20_3a": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.139,
+   "max_s": 0.055,
+   "slowest": "each_required_kernel_pin_wiring_deletion_reds"
+  },
+  "maos-kernel-core::hot_swap_cross_major_migration": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.134,
+   "max_s": 0.055,
+   "slowest": "snapshot_panic_returns_snapshot_specific_error"
+  },
+  "maos-kernel-core::sandbox_admission": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.134,
+   "max_s": 0.031,
+   "slowest": "t3_effective_tier_admitted"
+  },
+  "maos-kernel-core::hot_swap_same_major_lifecycle": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.13,
+   "max_s": 0.13,
+   "slowest": "same_major_swap_happy_path"
+  },
+  "maos-kernel-core::upgrade_cold_swap_with_inflight_tasks": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.13,
+   "max_s": 0.13,
+   "slowest": "cold_upgrade_factory_failure_preserves_scb_runtime_and_inflight_tasks"
+  },
+  "maos-kernel-core::kernel_ctx_round_trip": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.124,
+   "max_s": 0.115,
+   "slowest": "kernel_ctx_builder_wires_all_adapters"
+  },
+  "maos-kernel-core::operator_posture_ceiling_16_6": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.121,
+   "max_s": 0.026,
+   "slowest": "a_default_above_the_ceiling_is_clamped_too_never_left_inverted"
+  },
+  "maos-bin::t_14_2c_local_leaf_declaration": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.117,
+   "max_s": 0.077,
+   "slowest": "production_source_reports_unconfirmable_before_rotation_installs"
+  },
+  "maos-a2a-tcp::h_guards": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.116,
+   "max_s": 0.044,
+   "slowest": "unreadable_fd_limits_are_not_ci_passes"
+  },
+  "maos-eval::t3_escape_workflow": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.116,
+   "max_s": 0.091,
+   "slowest": "real_t3_job_rejects_missing_duplicate_skipped_and_failed_runs"
+  },
+  "xtask::recovery_lane_ceiling_rule": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.114,
+   "max_s": 0.037,
+   "slowest": "the_lane_is_not_sealed_while_a_numbered_epic_is_open"
+  },
+  "maos-control::submit_and_wait_16_2": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.112,
+   "max_s": 0.053,
+   "slowest": "queued_at_deadline_is_spirit_busy"
+  },
+  "maos-bin::topology_delegation_1a": {
+   "tests": 14,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.108,
+   "max_s": 0.067,
+   "slowest": "crosshost_1a_maos_worker_task_is_gone_from_live_code"
+  },
+  "researcher": {
+   "tests": 15,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.105,
+   "max_s": 0.011,
+   "slowest": "unit_tests::collective_readiness_failure_is_observable"
+  },
+  "xtask::cgroup_ceiling_workflow_17_2": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.105,
+   "max_s": 0.105,
+   "slowest": "aggregate_reports_every_required_job_non_success_as_failure"
+  },
+  "maos-bin::verb_table_15_3": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.103,
+   "max_s": 0.038,
+   "slowest": "help_output_is_exactly_the_frozen_table"
+  },
+  "maos-kernel-core::intent_lineage_corpus_v0": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.103,
+   "max_s": 0.103,
+   "slowest": "nfr_aud_14_intent_lineage_corpus_100_percent_coverage"
+  },
+  "maos-capability": {
+   "tests": 28,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.102,
+   "max_s": 0.016,
+   "slowest": "cap_quota::tests::ten_thousand_idle_pids_are_swept_by_one_charge_after_rollover"
+  },
+  "maos-providers": {
+   "tests": 31,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.102,
+   "max_s": 0.013,
+   "slowest": "fixture_replay::tests::empty_ring_panics"
+  },
+  "xtask::pentest_gate_tests": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.1,
+   "max_s": 0.019,
+   "slowest": "pentest_gate_fails_on_p0_only"
+  },
+  "observer": {
+   "tests": 22,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.096,
+   "max_s": 0.008,
+   "slowest": "unit_tests::structural_suspect_fires_above_floor"
+  },
+  "maos-wasm-host::frame_bridge_roundtrip": {
+   "tests": 19,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.091,
+   "max_s": 0.025,
+   "slowest": "four_mib_guest_intent_lineage_lifts_without_panicking_or_truncation"
+  },
+  "xtask::check_release_precondition_gate": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.091,
+   "max_s": 0.016,
+   "slowest": "a_similarly_named_check_run_is_not_the_aggregate"
+  },
+  "maos-audit::fr4_classifier_16_2": {
+   "tests": 17,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.09,
+   "max_s": 0.041,
+   "slowest": "every_writer_site_demanding_a_disposition_has_one"
+  },
+  "maos-a2a-core::cross_host_consent_v1_5": {
+   "tests": 16,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.089,
+   "max_s": 0.007,
+   "slowest": "case_insensitive_matching_for_fine_grained_intents"
+  },
+  "maos-audit::identity_asserted_kind_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.089,
+   "max_s": 0.089,
+   "slowest": "identity_asserted_discriminator_30_renders_as_identity_dot_asserted"
+  },
+  "maos-kernel-core::cli_wrapper_t3_boundary_17_1": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.083,
+   "max_s": 0.058,
+   "slowest": "newline_frames_accept_the_limit_and_refuse_one_byte_over"
+  },
+  "maos-a2a-tcp::t_14_2a_connection_panic_supervision": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.082,
+   "max_s": 0.061,
+   "slowest": "t_14_2a_a_panicking_audit_write_is_caught_by_the_supervised_boundary"
+  },
+  "orchestrator::distillate_dispatch": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.08,
+   "max_s": 0.023,
+   "slowest": "scenario_2_1_first_dispatch_none_accepted"
+  },
+  "maos-capability::issuance_quota_17_9": {
+   "tests": 13,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.078,
+   "max_s": 0.021,
+   "slowest": "a_zero_window_is_refused"
+  },
+  "maos-a2a-tcp::t11_t12_chaos_absence": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.077,
+   "max_s": 0.066,
+   "slowest": "t11_real_socket_rotation_chaos_3_host"
+  },
+  "maos-bin::team_identity_13_6a": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.077,
+   "max_s": 0.013,
+   "slowest": "derostered_crossing_is_refused_on_both_seams"
+  },
+  "xtask::retro_action_items": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.077,
+   "max_s": 0.026,
+   "slowest": "every_closed_retrospective_in_this_repository_has_its_actions_in_the_tracker"
+  },
+  "maos-a2a-core::fail_closed_8_8": {
+   "tests": 14,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.076,
+   "max_s": 0.007,
+   "slowest": "classified_allowlisted_admitted"
+  },
+  "maos-cli::accessibility_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.076,
+   "max_s": 0.028,
+   "slowest": "door_error_output_is_ansi_free"
+  },
+  "maos-kernel-core::audit_spine_integration": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.076,
+   "max_s": 0.037,
+   "slowest": "audit_spine_end_to_end"
+  },
+  "maos-audit::release_pubkey_parse": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.075,
+   "max_s": 0.024,
+   "slowest": "rejects_128_hex_chars_instead_of_truncating_them"
+  },
+  "maos-iac::mailbox_reload_pid_17_3c": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.074,
+   "max_s": 0.056,
+   "slowest": "unregister_racing_a_blocked_multi_recipient_delivery_neither_panics_nor_deadlocks"
+  },
+  "observer::activity_hooks_17_4": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.072,
+   "max_s": 0.022,
+   "slowest": "concurrent_writes_and_closes_never_lose_or_split_a_count"
+  },
+  "maos-spirit-abi": {
+   "tests": 24,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.071,
+   "max_s": 0.003,
+   "slowest": "cancellation::tests::never_cancel_is_always_false"
+  },
+  "xtask::example_spirit_regen_integration": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.071,
+   "max_s": 0.028,
+   "slowest": "regen_mode_overwrites_files"
+  },
+  "butler": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.067,
+   "max_s": 0.007,
+   "slowest": "mcp_port_tests::handle_option_a_calls_linear_write"
+  },
+  "maos-director-surface": {
+   "tests": 17,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.067,
+   "max_s": 0.007,
+   "slowest": "halt_ui::tests::submit_provided_context_calls_resolver_with_text"
+  },
+  "maos-secrets::at_rest_seal": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.066,
+   "max_s": 0.044,
+   "slowest": "encrypted_file_store_round_trips_ciphertext_and_deletes"
+  },
+  "xtask::empty_kernel_integration": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.066,
+   "max_s": 0.018,
+   "slowest": "clean_i9_passes"
+  },
+  "xtask::release_dry_run_gate": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.064,
+   "max_s": 0.015,
+   "slowest": "zero_length_declared_artifact_is_refused"
+  },
+  "xtask::release_workflow_15_4": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.064,
+   "max_s": 0.055,
+   "slowest": "discipline_runs_both_linux_release_targets_in_the_aggregate_only"
+  },
+  "maos-compliance::evaluator_test": {
+   "tests": 19,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.063,
+   "max_s": 0.004,
+   "slowest": "capability_scope_drift_names_capability_scope"
+  },
+  "mira": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.063,
+   "max_s": 0.01,
+   "slowest": "unit_tests::zero_baseline_does_not_panic"
+  },
+  "maos-kernel-core::scalar_predicate_to_halt_integration": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.062,
+   "max_s": 0.017,
+   "slowest": "set_scalar_flag_action_does_not_halt"
+  },
+  "maos-bin::tenant_map_13_1": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.061,
+   "max_s": 0.011,
+   "slowest": "tenant_map_13_1_gate_matrix"
+  },
+  "maos-a2a-tcp::t_11_3_scale_churn": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.06,
+   "max_s": 0.06,
+   "slowest": "t_14_1_blast_recovery_rto_n5_smoke"
+  },
+  "maos-bin::operator_door_16_1": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.06,
+   "max_s": 0.055,
+   "slowest": "production_spirit_locks_serialize_one_spirit_without_blocking_another"
+  },
+  "maos-eval::t3_network_escape_executor": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.06,
+   "max_s": 0.043,
+   "slowest": "dispatch_accounting_rejects_removed_arm_retained_in_comment"
+  },
+  "maos-kernel-core::consent_rupture_adr_034": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.058,
+   "max_s": 0.007,
+   "slowest": "rupture_3_7_recipient_unloaded"
+  },
+  "maos-kernel-core::cli_wrapper_bridge_8_12": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.055,
+   "max_s": 0.011,
+   "slowest": "crash_matrix_exit_codes_and_signals"
+  },
+  "maos-eval::distillate_five_metrics_floor": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.054,
+   "max_s": 0.038,
+   "slowest": "test_distillate_corpus_quarterly_audit_shape"
+  },
+  "maos-acp": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.052,
+   "max_s": 0.008,
+   "slowest": "frame::tests::session_ready_outbound"
+  },
+  "maos-bin::worker_manifests_2a": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.051,
+   "max_s": 0.013,
+   "slowest": "crosshost_2a_founder_loop_topologies_are_routable_end_to_end"
+  },
+  "maos-kernel-core::scalar_policy_runtime_test": {
+   "tests": 14,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.05,
+   "max_s": 0.004,
+   "slowest": "on_value_above_verbalize_only_returns_verbalize"
+  },
+  "orchestrator": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.049,
+   "max_s": 0.007,
+   "slowest": "unit_tests::followup_dispatch_always_carries_a_distillate_ref"
+  },
+  "maos-a2a-tcp::t_14_2_rotation_scene": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.048,
+   "max_s": 0.048,
+   "slowest": "t_14_2_rotation_watchable_scene_n3"
+  },
+  "maos-bin::researcher_log_grant_17_3d": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.047,
+   "max_s": 0.03,
+   "slowest": "researcher_schema_four_degradation_drops_log_but_preserves_existing_capabilities"
+  },
+  "worker::fixture_modes_16_3": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.047,
+   "max_s": 0.016,
+   "slowest": "unknown_fixture_mode_exits_2"
+  },
+  "maos-a2a-tcp::t_2c_pin_journal": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.046,
+   "max_s": 0.017,
+   "slowest": "t_2c_a_healthy_handshake_journals_no_identity_refusal"
+  },
+  "maos-corpus-gen::red_team_integration": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.043,
+   "max_s": 0.021,
+   "slowest": "coverage_binary_passes_for_canonical"
+  },
+  "nash": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.043,
+   "max_s": 0.005,
+   "slowest": "unit_tests::architecture_is_deterministic"
+  },
+  "maos-registry::vetting_attestation_gate": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.042,
+   "max_s": 0.009,
+   "slowest": "leg1_round_trip_issue_promote_revoke"
+  },
+  "mira::a2a_pairing": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.042,
+   "max_s": 0.011,
+   "slowest": "send_side_denial_carries_eintentdenied"
+  },
+  "maos-a2a-tcp::t_14_1_churn_scene": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.041,
+   "max_s": 0.041,
+   "slowest": "t_14_1_churn_watchable_scene_n5"
+  },
+  "maos-bin::root_spawn_home_isolation_16_1": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.041,
+   "max_s": 0.036,
+   "slowest": "every_root_spawning_test_names_a_home"
+  },
+  "maos-pdp::real_evaluation": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.041,
+   "max_s": 0.009,
+   "slowest": "derive_and_reconcile_count_vs_request_cardinality"
+  },
+  "xtask::check_multi_provider_drift_integration": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.041,
+   "max_s": 0.018,
+   "slowest": "with_outlier_strict_mode_returns_nonzero_exit"
+  },
+  "maos-audit::two_host_bundle_2c": {
+   "tests": 12,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.04,
+   "max_s": 0.004,
+   "slowest": "a_blank_host_claim_is_refused_as_no_claim"
+  },
+  "maos-bin::mcp_mint_receipt_17_9": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.04,
+   "max_s": 0.011,
+   "slowest": "pdp_refusal_has_typed_error_and_one_receipt"
+  },
+  "maos-kernel-core::log_recall_scope": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.04,
+   "max_s": 0.012,
+   "slowest": "fetch_scope_violation"
+  },
+  "maos-a2a::cross_host_consent_v1": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.039,
+   "max_s": 0.006,
+   "slowest": "scenario_3_4_lamport_recv_advance"
+  },
+  "maos-egress::proxy_17_1": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.039,
+   "max_s": 0.035,
+   "slowest": "forbidden_destination_waits_for_confirmed_audit_before_any_response_byte"
+  },
+  "maos-kernel-core::retract_corpus_v0": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.039,
+   "max_s": 0.039,
+   "slowest": "retract_corpus_fixtures"
+  },
+  "maos-spirit-cli": {
+   "tests": 13,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.039,
+   "max_s": 0.003,
+   "slowest": "publish::tests::parse_tier_accepts_public_vetted"
+  },
+  "xtask::coverage_matrix_integration": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.039,
+   "max_s": 0.011,
+   "slowest": "clean_coverage_matrix_passes"
+  },
+  "xtask::calibrate_integration": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.038,
+   "max_s": 0.013,
+   "slowest": "calibrate_fails_on_mismatch_at_p_0_99"
+  },
+  "xtask::check_test_budget_proven_red": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.038,
+   "max_s": 0.007,
+   "slowest": "the_span_is_first_start_to_last_end_not_the_sum"
+  },
+  "maos-capability::scalar_seq_17_4": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.037,
+   "max_s": 0.026,
+   "slowest": "seq_is_unique_and_gap_free_under_concurrent_writers"
+  },
+  "researcher::spirit_smoke": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.037,
+   "max_s": 0.011,
+   "slowest": "manifest_sections_parse_with_authoritative_validators"
+  },
+  "maos-cli::cohort_sign_2e": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.036,
+   "max_s": 0.014,
+   "slowest": "cohort_sign_happy_path_and_validate_before_write"
+  },
+  "maos-spirit-sdk::deprecation_warnings_smoke": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.036,
+   "max_s": 0.015,
+   "slowest": "assert_no_deprecations_panics_when_warnings_present"
+  },
+  "maos-spirit-sdk::lcas_smoke": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.036,
+   "max_s": 0.009,
+   "slowest": "lcas_corpus_sorted_by_id"
+  },
+  "maos-iac::iac_bus_intent_lineage": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.035,
+   "max_s": 0.01,
+   "slowest": "re_emission_preserves_lineage"
+  },
+  "maos-kernel-core::cap_token_verify_assertion": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.035,
+   "max_s": 0.019,
+   "slowest": "cap_token_verify_p99_under_5us_hot_path"
+  },
+  "maos-pdp::fail_closed": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.035,
+   "max_s": 0.006,
+   "slowest": "evaluate_never_returns_silent_allow_on_error"
+  },
+  "orchestrator::spirit_smoke": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.035,
+   "max_s": 0.016,
+   "slowest": "manifest_self_check_is_well_formed"
+  },
+  "researcher::distillation_i11": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.035,
+   "max_s": 0.009,
+   "slowest": "digest_of_digest_flattens_to_original_raw_frames"
+  },
+  "researcher::recall_walker": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.035,
+   "max_s": 0.016,
+   "slowest": "walker_is_participant_scoped_and_paginates"
+  },
+  "xtask::coverage_matrix_completeness_tests": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.035,
+   "max_s": 0.013,
+   "slowest": "advisory_until_engagement_counts_as_non_empty"
+  },
+  "maos-a2a::a1_security_regression_guards": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.034,
+   "max_s": 0.006,
+   "slowest": "p2_handle_intake_rejects_expired_consent_envelope"
+  },
+  "maos-bin::cohort_halt_receipt_12_3": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.034,
+   "max_s": 0.034,
+   "slowest": "real_halt_receipt_ships_and_observes_with_provenance"
+  },
+  "maos-eval::intent_lineage_corpus_load": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.034,
+   "max_s": 0.01,
+   "slowest": "story_6_3_a2a_scenarios_use_existing_class_for_additive_compat"
+  },
+  "maos-pdp": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.034,
+   "max_s": 0.012,
+   "slowest": "reconcile::tests::empty_policy_denies_all_governed_cedar_default_deny"
+  },
+  "maos-registry::import_air_gap_test": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.034,
+   "max_s": 0.005,
+   "slowest": "publish_with_origin_persists_origin_file"
+  },
+  "maos-skill::schema_test": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.034,
+   "max_s": 0.004,
+   "slowest": "empty_body_is_rejected"
+  },
+  "maos-bin::bounded_postures_2b": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.033,
+   "max_s": 0.005,
+   "slowest": "explicit_granter_expiry_survives_outbound_preparation"
+  },
+  "maos-domain::container_terminal_facts_17_7": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.033,
+   "max_s": 0.003,
+   "slowest": "completion_requires_available_exited_payload"
+  },
+  "maos-eval::trial_attestation": {
+   "tests": 11,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.033,
+   "max_s": 0.003,
+   "slowest": "dirty_environment_invalidates_the_full_success_conjunction"
+  },
+  "maos-kernel-core::gateway_dispatcher_fr54": {
+   "tests": 10,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.032,
+   "max_s": 0.004,
+   "slowest": "gateway_dispatcher_admit_multiple_gateways"
+  },
+  "mira::spirit_smoke": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.032,
+   "max_s": 0.011,
+   "slowest": "manifest_sections_parse_with_authoritative_validators"
+  },
+  "maos-digest": {
+   "tests": 9,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.031,
+   "max_s": 0.006,
+   "slowest": "tests::real_writer_accepts_owned_evidence_and_rejects_peer_private_evidence"
+  },
+  "maos-kernel-core::orchestrator_distillate_dispatch": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.031,
+   "max_s": 0.009,
+   "slowest": "ac2_scenario_2_2_follow_up_with_distillate_ref_accepted"
+  },
+  "xtask::check_unsafe_integration": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.031,
+   "max_s": 0.016,
+   "slowest": "with_unsafe_fails"
+  },
+  "maos-a2a::restart_invalidates_pin_nfr_rel_6": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.03,
+   "max_s": 0.005,
+   "slowest": "scenario_4_5_operator_timeout"
+  },
+  "maos-frame-codec::bounds": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.03,
+   "max_s": 0.009,
+   "slowest": "body_buffer_accepts_exactly_the_cap_and_refuses_one_more"
+  },
+  "maos-manifest::manifest_n_minus_1_compat": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.03,
+   "max_s": 0.006,
+   "slowest": "n_minus_1_load_covers_every_class_field"
+  },
+  "xtask::corpus_staleness_integration": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.03,
+   "max_s": 0.015,
+   "slowest": "clean_staleness_passes"
+  },
+  "maos-bin::delegation_leg_1a": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.029,
+   "max_s": 0.009,
+   "slowest": "routed_frame_produces_exactly_one_local_delivery_and_no_reemit"
+  },
+  "maos-a2a-tcp::t_14_2a_post_grace_journal": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.028,
+   "max_s": 0.017,
+   "slowest": "t_14_2a_a_current_generation_handshake_journals_no_post_grace_row"
+  },
+  "researcher::five_metric_self_verify": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.028,
+   "max_s": 0.009,
+   "slowest": "researcher_distillate_is_100pct_traceable"
+  },
+  "maos-cli::forget_reason_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.027,
+   "max_s": 0.027,
+   "slowest": "forget_reason_is_preserved_in_the_live_door_body"
+  },
+  "maos-kernel-core::journal_resource_downgrade_replay_17_2": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.027,
+   "max_s": 0.027,
+   "slowest": "legacy_lifecycle_and_typed_resource_downgrade_replay_from_journal"
+  },
+  "butler::spirit_smoke": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.026,
+   "max_s": 0.01,
+   "slowest": "manifest_sections_parse_with_authoritative_validators"
+  },
+  "maos-bin::consent_refusal_1b": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.026,
+   "max_s": 0.004,
+   "slowest": "allowlisted_delegation_intent_is_admitted_and_its_intent_class_delivered"
+  },
+  "maos-kernel-core::cold_restart_recover_in_flight": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.026,
+   "max_s": 0.026,
+   "slowest": "in_flight_entry_survives_journal_reopen"
+  },
+  "maos-kernel-core::nfr_perf_4_pause_resume_latency": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.026,
+   "max_s": 0.026,
+   "slowest": "nfr_perf_4_1000_pause_resume_corpus"
+  },
+  "maos-providers::rate_limit_isolation_nfr_scale_4": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.026,
+   "max_s": 0.005,
+   "slowest": "rate_4_5_concurrent_cas_correctness"
+  },
+  "maos-bin::egress_daemon_17_1": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.025,
+   "max_s": 0.007,
+   "slowest": "state_fallback_ignores_another_users_shared_parent"
+  },
+  "maos-kernel-core::lifecycle_all_hooks_hot_swap_17_4": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.025,
+   "max_s": 0.025,
+   "slowest": "validated_all_fourteen_hooks_hot_swap_and_invoke_snapshot"
+  },
+  "observer::spirit_smoke": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.025,
+   "max_s": 0.007,
+   "slowest": "manifest_sections_parse_with_authoritative_validators"
+  },
+  "researcher::five_metric_live_8_11": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.025,
+   "max_s": 0.011,
+   "slowest": "traceability_and_leakage_hard_gate_pass_on_both_fixture_and_live_paths"
+  },
+  "reviewer": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.025,
+   "max_s": 0.005,
+   "slowest": "unit_tests::missing_interface_coverage_draws_low_severity"
+  },
+  "architect": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.006,
+   "slowest": "unit_tests::propose_flags_shared_state_risks"
+  },
+  "maos-a2a-core::cohort_consent_router_12_2": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.006,
+   "slowest": "outbound_populates_manifest_bound_role_and_version"
+  },
+  "maos-audit::fr4_full_mediation_test": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.016,
+   "slowest": "fixture_is_byte_deterministic"
+  },
+  "maos-corpus-gen": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.004,
+   "slowest": "lcas::tests::adversarially_misleading_items_are_all_halt"
+  },
+  "maos-eval::upgrade_policy_corpus": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.014,
+   "slowest": "upgrade_policy_corpus_opens_and_parses_every_manifest_pair"
+  },
+  "maos-fkcs::fkcs_contract": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.003,
+   "slowest": "always_admit_blind_harness_proves_the_rejection_is_not_canned"
+  },
+  "maos-kernel-core::t3_argv_custody_17_1": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.005,
+   "slowest": "cpu_percentage_is_a_fractional_core_not_a_core_count"
+  },
+  "maos-siem": {
+   "tests": 8,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.024,
+   "max_s": 0.003,
+   "slowest": "tests::cef_escape_neutralises_nul_control_bytes_and_spaces_in_payload"
+  },
+  "maos-a2a-core::t_14_2a_rotation_reload": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.023,
+   "max_s": 0.005,
+   "slowest": "a_conditional_close_promotes_only_the_generation_it_opened"
+  },
+  "maos-eval::hsis_runner": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.023,
+   "max_s": 0.011,
+   "slowest": "hsis_per_class_pass_rate_at_least_95pct"
+  },
+  "maos-kernel-core::scalar_slot_set_and_tap": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.023,
+   "max_s": 0.004,
+   "slowest": "set_scalar_happy_path_returns_tap_event"
+  },
+  "maos-pdp::issue_path_deny": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.023,
+   "max_s": 0.009,
+   "slowest": "cedar_deny_key_matches_kernel_stable_action_keying"
+  },
+  "maos-registry::form_admission_17_3b": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.023,
+   "max_s": 0.008,
+   "slowest": "wasm_component_uses_t2_at_each_admission_tier"
+  },
+  "maos-spirit-sdk::spirit_test_smoke": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.023,
+   "max_s": 0.005,
+   "slowest": "manifest_self_check_rejects_whitespace_in_required_field"
+  },
+  "maos-audit::erasure_sla_test": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.022,
+   "max_s": 0.006,
+   "slowest": "backwards_clock_is_clamped_not_wrapped"
+  },
+  "maos-kernel-core::gateway_uninstall_fr65_v05": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.022,
+   "max_s": 0.005,
+   "slowest": "gateway_uninstall_record_has_spirit_pid"
+  },
+  "maos-skill": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.022,
+   "max_s": 0.004,
+   "slowest": "anthropic_adapter::tests::parse_real_fixture"
+  },
+  "maos-skill::admission_queue_test": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.022,
+   "max_s": 0.004,
+   "slowest": "approve_transitions_pending_to_admitted_and_journals"
+  },
+  "maos-egress::bearer_edges_17_1": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.021,
+   "max_s": 0.005,
+   "slowest": "a_nonzero_lifetime_expires_without_an_explicit_revoke"
+  },
+  "maos-kernel-core::halt_continuity_test": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.021,
+   "max_s": 0.005,
+   "slowest": "validate_halt_set_empty_predecessor_succeeds_regardless_of_successor"
+  },
+  "maos-kernel-core::nfr_perf_4_posture_shift_propagation": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.021,
+   "max_s": 0.021,
+   "slowest": "nfr_perf_4_1000_shift_propagation_corpus"
+  },
+  "maos-kernel-core::policy_per_capability_deny": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.021,
+   "max_s": 0.003,
+   "slowest": "baseline_manifest_grants_fsread"
+  },
+  "maos-kernel-core::sandbox_t3_image_verify": {
+   "tests": 7,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.021,
+   "max_s": 0.003,
+   "slowest": "parse_signed_attestation_rejects_unsupported_schema_from_bytes"
+  },
+  "maos-loom-lite::read_path_chokepoint": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.021,
+   "max_s": 0.005,
+   "slowest": "team_guard_covers_all_public_store_entry_points"
+  },
+  "researcher::scalar_tap": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.021,
+   "max_s": 0.013,
+   "slowest": "researcher_distillate_is_consumable_in_the_fr17_digest_pattern"
+  },
+  "maos-bin::cli_wrapper_exhaustion_17_9": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.006,
+   "slowest": "local_exhaustion_refuses_before_workload"
+  },
+  "maos-bin::cookbook_manifests_17_3b": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.007,
+   "slowest": "cookbook_whole_manifests_pass_structural_gates_before_class_admission"
+  },
+  "maos-kernel-core::manifest_field_coverage": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.007,
+   "slowest": "test_nfr_test_13_three_cases_per_field"
+  },
+  "maos-kernel-core::posture_shift_journaled": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.004,
+   "slowest": "posture_shift_e2e_journaled"
+  },
+  "maos-kernel-core::sandbox_enforcement_linux": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.006,
+   "slowest": "t2_benign_process_not_killed_by_seccomp"
+  },
+  "maos-registry::runtime_drift_test": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.004,
+   "slowest": "crypto_provider_drift_rejects_naming_field"
+  },
+  "maos-skill::discovery_test": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.006,
+   "slowest": "discovery_is_deterministic_sorted_by_path"
+  },
+  "xtask::check_corpus_integration": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.02,
+   "max_s": 0.009,
+   "slowest": "clean_corpus_passes"
+  },
+  "maos-a2a-core::fault_typing_2c": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.019,
+   "max_s": 0.005,
+   "slowest": "the_remaining_four_codes_stay_in_the_catch_all"
+  },
+  "maos-kernel-core::cgroup_ceiling_smoke": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.019,
+   "max_s": 0.006,
+   "slowest": "same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves"
+  },
+  "maos-a2a-core::digest_reply_durability_2c": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.006,
+   "slowest": "a_full_intake_channel_also_leaves_the_reply_retryable"
+  },
+  "maos-cohort::migration_chain": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.003,
+   "slowest": "permits_fan_in_and_reports_no_path_only_for_a_well_formed_set"
+  },
+  "maos-domain::operator_door_control": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.018,
+   "slowest": "concurrent_initializers_publish_one_complete_control_file"
+  },
+  "maos-eval::revocation_corpus": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.008,
+   "slowest": "revocation_corpus_executes_real_signature_parser_for_every_asset"
+  },
+  "maos-journey-test::fixture_roundtrip": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.003,
+   "slowest": "butler_calendar_events_fixture_parses"
+  },
+  "maos-skill::proposal_test": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.003,
+   "slowest": "build_proposal_rejects_empty_diff"
+  },
+  "maos-spirit-hello": {
+   "tests": 6,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.003,
+   "slowest": "tests::inference_error_propagated"
+  },
+  "xtask::loom_integration": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.018,
+   "max_s": 0.01,
+   "slowest": "violation_loom_fails"
+  },
+  "maos-kernel-core::cap_registry_integration": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.017,
+   "max_s": 0.006,
+   "slowest": "integration_issue_verify_revoke"
+  },
+  "maos-bin::host_grants_2b": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.016,
+   "max_s": 0.004,
+   "slowest": "malformed_grants_file_errors_never_silently_admits"
+  },
+  "maos-kernel-core::cli_subprocess_invocation_fr52": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.016,
+   "max_s": 0.004,
+   "slowest": "ac6_scenario_6_1_cli_subprocess_output_surface_typed_variants_present"
+  },
+  "maos-kernel-core::scalar_tap_subscriber": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.016,
+   "max_s": 0.004,
+   "slowest": "subscribe_different_spirit_same_topic_returns_true"
+  },
+  "nash::spirit_smoke": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.016,
+   "max_s": 0.005,
+   "slowest": "manifest_sections_parse_with_authoritative_validators"
+  },
+  "maos-a2a": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.005,
+   "slowest": "adapter::tests::outbound_send_admitted_intent_succeeds"
+  },
+  "architect::code_review_loop": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.015,
+   "slowest": "architect_to_reviewer_loop_is_fr21_clean_end_to_end"
+  },
+  "maos-a2a-core::crossing_wire_13_6b": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.006,
+   "slowest": "crossing_source_team_unbound_survives_the_wire_under_its_own_code"
+  },
+  "maos-escape-detector": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.003,
+   "slowest": "tests::anticipated_real_kill_is_no_anomaly"
+  },
+  "maos-frame-codec": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.009,
+   "slowest": "tests::limits_refuse_before_body_or_header_can_escape"
+  },
+  "maos-kernel-core::nfr_rel_9_revoke_latency": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.015,
+   "slowest": "nfr_rel_9_1000_token_revoke_latency_v03_scaffold"
+  },
+  "maos-loom-lite::transport_failure": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.004,
+   "slowest": "broken_connection_does_not_hang"
+  },
+  "maos-mcp::stdio_transport_test": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.006,
+   "slowest": "stdio_transport_spawn_and_exchange"
+  },
+  "maos-spirit-sdk::spirit_macro_smoke": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.003,
+   "slowest": "test_all_undeclared_hooks_are_noops"
+  },
+  "maos-sso::claims_failclosed": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.003,
+   "slowest": "malformed_assertion_is_rejected_not_panicked"
+  },
+  "orchestrator::orchestrator_buffer": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.006,
+   "slowest": "instruction_enqueued_while_in_flight_is_not_processed_until_completion"
+  },
+  "researcher::inference_seam_8_11": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.006,
+   "slowest": "deterministic_path_is_byte_identical_to_v05_survey"
+  },
+  "worker": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.015,
+   "max_s": 0.004,
+   "slowest": "unit_tests::both_class_and_cli_wrapper_is_a_conflict"
+  },
+  "maos-a2a-tcp::t_14_2a_post_grace_token": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.014,
+   "slowest": "t_14_2a_a_promoted_generation_makes_the_retired_leaf_a_queryable_refusal"
+  },
+  "maos-bin::enterprise_identity_wiring": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.005,
+   "slowest": "zero_config_reports_no_subsystems_and_is_a_byte_identical_noop"
+  },
+  "maos-domain::consent_recall_17_8": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.003,
+   "slowest": "consent_expiry_is_strict_and_open_ended_never_expires"
+  },
+  "maos-journey-test::guards_meta": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.004,
+   "slowest": "jb7_journey_j1_no_wallclock"
+  },
+  "maos-kernel-core::hook_dispatch_swap_hooks": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.005,
+   "slowest": "default_migrate_returns_not_implemented"
+  },
+  "maos-kernel-core::provider_switched_journal": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.004,
+   "slowest": "first_admit_emits_no_switch_event"
+  },
+  "maos-kernel-core::scalar_predicate_truth_table": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.004,
+   "slowest": "truth_table_on_value_above"
+  },
+  "maos-kernel-core::telemetry_firehose_17_4": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.005,
+   "slowest": "one_emitter_alternating_tags_arrive_in_program_order_on_subscribe_all"
+  },
+  "maos-pdp::deny_fault_inject": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.007,
+   "slowest": "permit_returns_allow_contrast_with_forbid"
+  },
+  "maos-spirit-abi::manifest_n_minus_1_test": {
+   "tests": 5,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.003,
+   "slowest": "manifest_schema_version_pinned_at_epic_6_addition_count"
+  },
+  "observer::drift_watchdog": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.008,
+   "slowest": "drift_scenarios_warn_before_halt_via_the_real_dispatcher"
+  },
+  "observer::scalar_tap_subscribe": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.014,
+   "max_s": 0.008,
+   "slowest": "fr31_client_side_filter_drops_out_of_namespace_emitters"
+  },
+  "butler::corpus_pin": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.007,
+   "slowest": "digest_corpus_sha_is_pinned"
+  },
+  "maos-a2a::cert_rotation_chaos_3_host": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.005,
+   "slowest": "scenario_5_5_retry_policy_correctness"
+  },
+  "maos-a2a-tcp::t1_live_roundtrip": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.013,
+   "slowest": "t1_live_mtls_roundtrip_happy_path"
+  },
+  "maos-cli::uninstall_exit_codes_13_5b": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.013,
+   "slowest": "uninstall_forwards_erased_held_not_found_and_failed_codes"
+  },
+  "maos-kernel-core::cli_wrapper_egress_admission_17_1": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.004,
+   "slowest": "journaled_admission_rejects_egress_before_executing_the_probe"
+  },
+  "maos-kernel-core::drr_priority_weighted_dispatch": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.004,
+   "slowest": "drr_equal_weights_rotate"
+  },
+  "maos-kernel-core::hot_swap_halt_continuity_corpus_integration": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.007,
+   "slowest": "halt_signal_observation_corpus_exercises_swap_continuity_wrapper"
+  },
+  "maos-manifest::cli_wrapper_egress_17_1": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.004,
+   "slowest": "destination_grammar_is_strict_at_the_manifest_boundary"
+  },
+  "maos-manifest::iac_send_capability_17_3c": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.004,
+   "slowest": "each_closed_set_entry_parses_and_maps_to_iac_send_scope"
+  },
+  "maos-manifest::log_capability_17_3d": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.004,
+   "slowest": "schema_five_retains_both_log_grants"
+  },
+  "maos-registry::fr59_yank_propagation_within_5min_test": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.004,
+   "slowest": "fr59_301s_violates"
+  },
+  "worker::spirit_smoke": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.013,
+   "max_s": 0.005,
+   "slowest": "cli_wrapper_section_parses_with_authoritative_validator"
+  },
+  "architect::spirit_smoke": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.006,
+   "slowest": "on_idle_fires_once_within_budget"
+  },
+  "maos-bin::enterprise_daemon_seam_13_5a": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.012,
+   "slowest": "story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime"
+  },
+  "maos-domain::egress_destination_17_1": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.003,
+   "slowest": "dns_label_and_total_lengths_are_bounded"
+  },
+  "maos-egress::bearer_17_1": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.003,
+   "slowest": "expiry_and_revocation_are_fail_closed"
+  },
+  "maos-escape-detector::no_verdict_invariant": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.007,
+   "slowest": "sandbox_block_carries_no_verdict_field"
+  },
+  "maos-eval::t3_escape_corpus": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.003,
+   "slowest": "t3_escape_corpus_all_scenarios_unique_ids"
+  },
+  "maos-iac::mailbox_a2a_router_installer_1a": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.004,
+   "slowest": "absent_router_fails_closed_and_delivers_nothing_locally"
+  },
+  "maos-shell::shell_test": {
+   "tests": 4,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.012,
+   "max_s": 0.003,
+   "slowest": "dispatch_directive_ambiguous_halt"
+  },
+  "maos-a2a-tcp::t_12_3_cohort_halt_receipt": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.011,
+   "max_s": 0.011,
+   "slowest": "broadcast_attempts_members_after_a_middle_peer_failure"
+  },
+  "maos-capability::operator_re_revoke_16_1": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.011,
+   "max_s": 0.004,
+   "slowest": "cli_subprocess_exit_re_revoke_stays_ok_and_keeps_its_audit_row"
+  },
+  "maos-journey-test::cassette_provenance_15_6": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.011,
+   "max_s": 0.004,
+   "slowest": "checked_in_cassettes_have_legal_provenance"
+  },
+  "maos-kernel-core::audit_sink_truth_16_5": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.011,
+   "max_s": 0.007,
+   "slowest": "audit_sink_truth_lifecycle_healthy_then_closed"
+  },
+  "maos-kernel-core::fr4_1000_call_fixture": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.011,
+   "max_s": 0.011,
+   "slowest": "fr4_1000_call_mediation"
+  },
+  "maos-kernel-core::halt_resolution_journaled": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.011,
+   "max_s": 0.007,
+   "slowest": "failing_resolver_prevents_journal_write"
+  },
+  "maos-eval::safety_critical_corpus_8_5": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.01,
+   "max_s": 0.004,
+   "slowest": "corpus_meets_ac5_floors_and_attests"
+  },
+  "maos-iac::iac_log_before_deliver_invariant": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.01,
+   "max_s": 0.005,
+   "slowest": "i2_log_before_deliver_invariant_delivery_panics_before_receiver_sees_frame"
+  },
+  "maos-kernel-core::cap_policy_decision": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.01,
+   "max_s": 0.004,
+   "slowest": "log_recall_policy_decision_is_allow"
+  },
+  "maos-providers::openai_round_trip_test": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.01,
+   "max_s": 0.004,
+   "slowest": "openai_round_trip_with_error_fixture"
+  },
+  "maos-sso::principal_governs": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.01,
+   "max_s": 0.005,
+   "slowest": "govern_authorization_rejects_unverified_assertion_fail_closed"
+  },
+  "worker::bin/worker-probe-fixture": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.01,
+   "max_s": 0.005,
+   "slowest": "tests::declared_body_length_still_rejects_truncation_and_extra_bytes"
+  },
+  "xtask::check_mock_not_in_release_smoke": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.01,
+   "max_s": 0.005,
+   "slowest": "gate_json_output_serializes"
+  },
+  "architect::fixtures_pin": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.005,
+   "slowest": "design_spec_fixtures_drive_deterministic_propose"
+  },
+  "maos-a2a-core::cohort_manifest_chokepoint_12_1": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.009,
+   "slowest": "manifest_currentness_is_not_a_second_router_read"
+  },
+  "maos-a2a-core::cohort_halt_receipt_chokepoint_12_3": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.009,
+   "slowest": "halt_receipt_observed_at_one_site_with_no_arbitration_sink"
+  },
+  "maos-cli::door_response_framing": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.005,
+   "slowest": "response_larger_than_the_client_cap_is_refused"
+  },
+  "maos-eval::retract_corpus": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "retract_corpus_categories_are_well_formed"
+  },
+  "maos-iac::audit_truth_16_5": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.005,
+   "slowest": "kernel_event_insertion_preserves_caller_supplied_kind_and_token"
+  },
+  "maos-iac::transparency_duplicate_discrimination_2b": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "check_foreign_key_and_non_sqlite_errors_are_not_duplicates"
+  },
+  "maos-loom-lite::cross_region_live": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "topology_fraud_control_reds_on_a_collapsed_region_axis"
+  },
+  "maos-providers::ollama_round_trip_test": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "ollama_round_trip_with_error_fixture"
+  },
+  "maos-spirit-cli::publish_tier_validation_test": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "accepts_public_vetted_via_parse_tier"
+  },
+  "maos-spirit-sdk::local_runner_smoke": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "frames_fire_per_entry"
+  },
+  "maos-spirit-sdk::no_std_smoke": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "no_std_spirit_abi_version_accessible"
+  },
+  "maos-sso::alg_negatives": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "alg_none_token_is_rejected"
+  },
+  "maos-sso::oidc_verify": {
+   "tests": 3,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.003,
+   "slowest": "good_rs256_token_verifies_and_yields_principal"
+  },
+  "observer::structural_anomaly": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.005,
+   "slowest": "fixture_discriminator_is_bound_to_the_real_abi"
+  },
+  "reviewer::fixtures_pin": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.005,
+   "slowest": "review_case_fixtures_drive_deterministic_review"
+  },
+  "reviewer::spirit_smoke": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.009,
+   "max_s": 0.005,
+   "slowest": "manifest_self_check_is_well_formed"
+  },
+  "maos-a2a-core::cohort_consent_chokepoint_12_2": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.008,
+   "max_s": 0.008,
+   "slowest": "cohort_consent_has_one_port_call_and_two_route_uses"
+  },
+  "maos-kernel-core::approval_prompt_e2e": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.008,
+   "max_s": 0.004,
+   "slowest": "approval_prompt_e2e_dispatches_and_logs"
+  },
+  "maos-registry::search_lock_contention_test": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.008,
+   "max_s": 0.005,
+   "slowest": "yank_visibility_preserved_after_contention_fix"
+  },
+  "maos-spirit-hello::frame_roundtrip": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.008,
+   "max_s": 0.004,
+   "slowest": "frame_roundtrip_single_frame"
+  },
+  "mira::fixtures_pin": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.008,
+   "max_s": 0.008,
+   "slowest": "mira_fixtures_are_sha_pinned"
+  },
+  "orchestrator::fixtures_pin": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.008,
+   "max_s": 0.004,
+   "slowest": "orchestrator_fixtures_are_sha_pinned"
+  },
+  "worker::fixtures_pin": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.008,
+   "max_s": 0.004,
+   "slowest": "fixture_is_the_source_of_truth_for_the_fixture_cli"
+  },
+  "maos-eval::distillate_corpus_quarterly_pin": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.007,
+   "max_s": 0.007,
+   "slowest": "quarterly_corpus_sha_is_pinned"
+  },
+  "maos-journey-test::recording_source_15_6": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.007,
+   "max_s": 0.007,
+   "slowest": "record_mode_routes_stub_output_to_the_source_cassette"
+  },
+  "maos-kernel-core::nfr_sec_14_cross_spirit_isolation": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.007,
+   "max_s": 0.007,
+   "slowest": "nfr_sec_14_200_scenarios_zero_leaks"
+  },
+  "maos-loom-lite::cross_team_apply_13_3": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.007,
+   "max_s": 0.004,
+   "slowest": "destination_and_consent_refusals_are_typed_before_store_access"
+  },
+  "maos-bin::worker_resource_limits_17_2": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.003,
+   "slowest": "fd_request_above_inherited_hard_limit_refuses_before_worker_payload"
+  },
+  "maos-cli::import_rust_inproc_refusal_17_3b": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.006,
+   "slowest": "import_refuses_rust_inproc_form_through_the_real_binary"
+  },
+  "maos-cli::release_pubkey": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.006,
+   "slowest": "release_pubkey_prints_exact_lowercase_embedded_key"
+  },
+  "maos-cohort::rupture_grant_17_8": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.006,
+   "slowest": "router_rupture_withholds_only_its_own_granters_same_intent_frames"
+  },
+  "maos-kernel-core::spirit_boundary_invariants": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.006,
+   "slowest": "spirit_boundary_invariants"
+  },
+  "maos-manifest::resources_pid_17_2": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.006,
+   "slowest": "pid_cap_resolution_is_independent_from_fd_and_uses_strictest_of"
+  },
+  "maos-secrets::default_plaintext_preserved": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.003,
+   "slowest": "configured_kms_seals_to_ciphertext_not_passthrough"
+  },
+  "maos-spirit-sdk": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.003,
+   "slowest": "cancellation::tests::tokio_signal_detects_cancellation"
+  },
+  "maos-spirit-sdk::isolation_smoke": {
+   "tests": 2,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.003,
+   "slowest": "all_8_categories_constructible"
+  },
+  "observer::fixtures_pin": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.006,
+   "max_s": 0.006,
+   "slowest": "observer_fixtures_are_sha_pinned"
+  },
+  "example-spirit::spirit_smoke": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.005,
+   "max_s": 0.005,
+   "slowest": "on_idle_fires_once"
+  },
+  "maos-a2a-tcp::t_12_1_cohort_mesh": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.005,
+   "max_s": 0.005,
+   "slowest": "t_12_1_pair_counts_derived_from_n"
+  },
+  "maos-eval::onb_1_self_trial": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.005,
+   "max_s": 0.005,
+   "slowest": "smoke_onb_1_self_trial_seam_closed_butler_nonprovisional"
+  },
+  "maos-wasm-host::wit_copies_17_3b": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.005,
+   "max_s": 0.005,
+   "slowest": "root_template_and_example_wit_are_byte_identical"
+  },
+  "maos-acp::jetbrains_bridge_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.004,
+   "max_s": 0.004,
+   "slowest": "jetbrains_acp_bridge_scripted_ndjson"
+  },
+  "maos-audit::private_tier_count_16_5": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.004,
+   "max_s": 0.004,
+   "slowest": "private_tier_count_finds_principal_data_when_shared_tier_is_empty"
+  },
+  "maos-bench::t_10_4c_j4_latency_gate": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.004,
+   "max_s": 0.004,
+   "slowest": "j4_latency_producer_inner"
+  },
+  "maos-eval::halt_recall_floor": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.004,
+   "max_s": 0.004,
+   "slowest": "test_halt_recall_floor"
+  },
+  "maos-kernel-core::hot_swap_saga_compensation": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.004,
+   "max_s": 0.004,
+   "slowest": "swap_in_failure_restores_the_predecessor_runtime_on_the_same_control_block"
+  },
+  "maos-notify-push::t_10_4b_mobile_push_halt": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.004,
+   "max_s": 0.004,
+   "slowest": "t_10_4b_mobile_push_fires_on_mira_halt_over_real_transport"
+  },
+  "maos-bench::t_10_4c_j4_gate_integrity": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "j4_gate1_producer_inner"
+  },
+  "maos-bench::t_11_2b_cross_region_slo": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "paired_delta_oracle_requires_the_injection_on_a_majority_of_pairs"
+  },
+  "maos-bin::drain_once_audit_writer": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "founder_loop_once_drains_capability_audit_writer"
+  },
+  "maos-cli::halt_record_16_5": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "serde_failure_termination_receipt_is_not_reported_as_raised"
+  },
+  "maos-kernel-core::hot_swap_halt_continuity_test": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "halt_continuity_corpus_loads"
+  },
+  "maos-kernel-core::resource_caps_linux": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "explicit_pids_cap_is_applied_or_spawn_is_refused"
+  },
+  "maos-kernel-core::revocation_verify_denial": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "issued_token_is_denied_by_the_real_post_revocation_verify_path"
+  },
+  "maos-kernel-core::sandbox_t3_spawn_linux": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "verified_t3_applies_nonroot_namespace_and_argv_environment_custody"
+  },
+  "maos-loom-lite::tenant_wall_live": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "schema_initialization_wraps_ddl_in_advisory_lock"
+  },
+  "maos-manifest::lifecycle_hook_parity_17_4": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "manifest_accepts_every_abi_hook_and_rejects_a_non_hook"
+  },
+  "maos-secrets": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "tests::keyring_namespace_hashes_native_non_utf8_home_bytes"
+  },
+  "maos-spirit-hello::hello_spirit_16_2": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "hello_spirit_is_a_scheduler_loadable_spirit"
+  },
+  "maos-sso::identity_provenance": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "govern_authorization_emits_identity_asserted_provenance_reconciling_to_one"
+  },
+  "maos-sso::identity_source_blind": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "synthetic_record_does_not_inflate_reconciled_count"
+  },
+  "nash::fixtures_pin": {
+   "tests": 1,
+   "failed": 0,
+   "skipped": 0,
+   "sum_s": 0.003,
+   "max_s": 0.003,
+   "slowest": "nash_fixtures_are_sha_pinned"
+  }
+ },
+ "span_sum_s": 291.7,
+ "top_spans": [
+  [
+   "maos-iac::participant_recall_17_8",
+   27.54
+  ],
+  [
+   "maos-control::post_surface_16_1",
+   22.07
+  ],
+  [
+   "xtask::bin/xtask",
+   17.3
+  ],
+  [
+   "maos-bin::worker_terminal_facts_17_7",
+   15.33
+  ],
+  [
+   "maos-bin::observer_activity_corpus_17_4",
+   11.1
+  ],
+  [
+   "maos-bin::two_host_delegation_2b",
+   11.05
+  ],
+  [
+   "maos-bin::worker_supervision_16_3",
+   10.35
+  ],
+  [
+   "researcher::incremental_recall",
+   9.27
+  ],
+  [
+   "maos-bin::hook_pump_17_4",
+   6.99
+  ],
+  [
+   "butler::hallucination",
+   6.41
+  ],
+  [
+   "maos-bin::maos_uninstall_16_4",
+   6.2
+  ],
+  [
+   "maos-bin::one_daemon_one_door_16_1",
+   5.63
+  ],
+  [
+   "maos-bin::cert_rotation_trigger_14_2a",
+   5.52
+  ],
+  [
+   "maos-bin::one_shot_hello",
+   5.41
+  ],
+  [
+   "maos-shell::shell_halt_repl_16_2",
+   5.04
+  ]
+ ],
+ "before_after": {
+  "libtest_reference_17_8_s": 1871,
+  "t0_sum_test_time_s": 3924.332,
+  "t0_span_sum_s": 1340.2,
+  "t0_test_phase_wall_s": 226.462,
+  "t0_failed": 27,
+  "after_sum_test_time_s": 650.541,
+  "after_span_sum_s": 291.7,
+  "after_test_phase_wall_s": 36.366,
+  "after_failed": 1,
+  "kernel_pin_content_hash_16_0": {
+   "t0_s": 143.6,
+   "diagnosis_s": 1259,
+   "after": {
+    "tests": 24,
+    "failed": 0,
+    "skipped": 0,
+    "sum_s": 4.524,
+    "max_s": 2.582,
+    "slowest": "every_one_of_the_pinned_files_reds_a_line_neutral_mutation"
+   }
+  },
+  "check_test_budget": "PASS 502 binaries, 291.7 s span total, budget 300 s"
+ },
+ "conditions": {
+  "date": "2026-10-23T10:35Z",
+  "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --no-fail-fast --profile ci (fixtures from `cargo run -p xtask -- build-test-fixtures`)",
+  "nextest": "0.9.149",
+  "host": "load1 ~20, 32 cores",
+  "default_filter": "not (package(maos-kernel-core) & kind(lib)) \u2014 those run under libtest (`cargo test -p maos-kernel-core --lib`, as in CI)",
+  "after_failures": "kloc_check_runs_on_workspace only (expected until the T8 re-pin). An earlier warm run 10:31Z also hit t3_terminal_helpers_17_7 pidfd_reports_non_child_exit_status_signals_and_live_absence (ESRCH under load; 5/5 green isolated). A run right after the profile.dev change spent 57 s cold-rebuilding trybuild (spirit_macro_errors, 0.5 s warm)."
+ },
+ "ci_job_hours": "not measurable locally \u2014 no push from this session; the integrator records this story's CI run (AC6) under the AC4 contract",
+ "review_wall_clock": "pending \u2014 this story's review start/end are recorded by bmad-code-review in the Dev Agent Record/Review Findings"
+}

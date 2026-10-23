@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 //! Story 20-3a AC4 — ship-gate enrolment and binding drift:
-//! 1. The 44 expected names and required-binding registry rows are one set.
+//! 1. The 46 expected names and required-binding registry rows are one set.
 //! 2. Each name resolves exactly once: a per-commit `v1-0-ship-gate.needs`
 //!    entry or an explicitly mapped cadence job key.
 //! 3. `aggregate.needs` reaches `v1-0-ship-gate` directly.
@@ -118,6 +118,11 @@ const EXPECTED_GATES: &[&str] = &[
     // Story 17-5 — model-pin currency. Enrolled LAST, after the discipline job
     // and both registry rows landed, for the 15-3 reason above.
     "check-model-currency",
+    // Story 20-12 — test cost. Enrolled LAST of the three self-policing sites
+    // (15-3 reason above): the discipline jobs and both registry rows landed in
+    // the same change, so this const can only red on a real absence.
+    "check-test-cost",
+    "check-test-budget",
 ];
 
 /// Explicit cadence enrolments: (registry name, workflow filename, job key).
@@ -549,7 +554,7 @@ jobs:
     /// Real-tree reconciliation includes the formerly exempt infrastructure
     /// gates and the previously registry-only fuzz gates, with no legacy list.
     #[test]
-    fn expected_gates_and_registry_are_one_set_of_44() {
+    fn expected_gates_and_registry_are_one_set_of_46() {
         // Unit tests run with CWD = the crate root, not the workspace root.
         let registry_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml");
         let registry: crate::corpus_types::ShipGateRegistry =
@@ -560,9 +565,9 @@ jobs:
             .map(|e| e.name.as_str())
             .collect();
         let expected: std::collections::HashSet<&str> = EXPECTED_GATES.iter().copied().collect();
-        assert_eq!(EXPECTED_GATES.len(), 44);
-        assert_eq!(expected.len(), 44, "duplicate expected gate");
-        assert_eq!(registry.ship_gates.len(), 44, "duplicate registry gate");
+        assert_eq!(EXPECTED_GATES.len(), 46);
+        assert_eq!(expected.len(), 46, "duplicate expected gate");
+        assert_eq!(registry.ship_gates.len(), 46, "duplicate registry gate");
         assert_eq!(names, expected);
     }
 }

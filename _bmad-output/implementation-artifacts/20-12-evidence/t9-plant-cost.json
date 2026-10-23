@@ -1,0 +1,28 @@
+{
+  "story": "20-12-test-cost-budget-and-review-execution-contract",
+  "task": "T9 (AC7) — one in-place plant + relink of maos-capability tests/issuance_quota_17_9.rs",
+  "method": "append a new #[test] fn (a real code change, not a comment: rustc incremental makes a comment-only edit nearly free) to the real file, `env -u CI -u GITHUB_ACTIONS cargo test -p maos-capability --test issuance_quota_17_9 --no-run`, wall-clock via date +%s%N, restore with `git checkout -- <file>`; 5 runs each; load1 and vmstat wa sampled before each run",
+  "reference_figure": {"seconds": 638, "date": "2026-10-23", "condition": "loaded host (story AC7)"},
+  "host_observation": "At 09:58Z the host load average was 305/377/331 (1/5/15 min; another tenant), and a 5-run plant probe did not finish one rebuild in 1,200 s (job killed). The 638 s figure is a host-load figure, not a linker figure.",
+  "before": {
+    "config": "no .cargo/config.toml; profile.dev full DWARF; linker = rustc 1.98.1 default (bundled rust-lld: `.comment` reads `Linker: LLD 22.1.8`)",
+    "binary_bytes": 20241848,
+    "runs_ms": [74952, 614, 337, 346, 292, 375],
+    "notes": "run 1 rebuilt state left by the killed probe job (75 s); warm runs 0.29-0.61 s; load1 17.5-30.5, wa 1-2 %"
+  },
+  "after_debuginfo_only": {
+    "config": "profile.dev debug=line-tables-only, split-debuginfo=unpacked; linker still rust-lld (the wrapper's -fuse-ld=mold was overridden by rustc's later -fuse-ld=lld)",
+    "cold_rebuild_s": 10.5,
+    "binary_bytes": 10407520,
+    "runs_ms": [338, 304, 315, 338, 333],
+    "load1": "17.0-17.6", "wa_pct": "0-1"
+  },
+  "after": {
+    "config": ".cargo/config.toml linker = scripts/cargo-linker.sh (swaps rustc's -fuse-ld=lld for -fuse-ld=mold where ld.mold exists; pass-through elsewhere) + profile.dev line-tables-only/unpacked",
+    "linker_verified": "`.comment` reads `mold 2.37.1 (compatible with GNU ld)`",
+    "binary_bytes": 10559872,
+    "runs_ms": [534, 379, 416, 491, 329],
+    "load1": "13.6-14.3", "wa_pct": "0-5"
+  },
+  "finding": "On a quiet host one plant relink costs ~0.3-0.5 s before and after. rustc >= 1.90 already links x86_64-linux with rust-lld, so mold adds no measurable gain here (within noise); line-tables-only halves the test binary (20.2 MB -> 10.5 MB). The 638 s plant cost came from host contention (load 300+, swap), which the in-place protocol + one cargo session per host addresses, not from the linker."
+}

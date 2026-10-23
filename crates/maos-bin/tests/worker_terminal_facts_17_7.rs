@@ -20,13 +20,9 @@ mod t3_substrate;
 
 const CID: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
+/// `require_t3` prints the one `SKIP:` line when the substrate is absent.
 fn scene(name: &str) -> bool {
-    if t3_substrate::require_t3(name) {
-        true
-    } else {
-        eprintln!("SKIP TERMINAL-FACTS {name}: real OCI runtime unavailable");
-        false
-    }
+    t3_substrate::require_t3(name)
 }
 
 fn scratch(label: &str) -> PathBuf {

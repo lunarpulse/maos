@@ -1443,7 +1443,7 @@ fn assert_clean_blast_recovery_contract(
 /// derived 2 against a ceiling of 5 on every run ever — is dead; its
 /// RED-at-HEAD demonstration is in the story's Debug Log).
 #[tokio::test]
-#[ignore = "Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
 async fn t_11_3_blast_recovery_rto_drill() {
     let (report, offered) =
         run_consent_reachability_drill(COMPRESSED_HOST_COUNT, DrillFaults::default()).await;
@@ -1456,7 +1456,7 @@ async fn t_11_3_blast_recovery_rto_drill() {
 /// adversary is offered 99 peers, reaches what it delivered before the first
 /// denial, and the floors must hold on a mesh where they can genuinely fail.
 #[tokio::test]
-#[ignore = "Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
 async fn t_14_1_blast_recovery_rto_n100() {
     let (report, offered) =
         run_consent_reachability_drill(FULL_ENVELOPE_HOST_COUNT, DrillFaults::default()).await;
@@ -1508,49 +1508,49 @@ async fn t_14_1_blast_recovery_rto_n5_smoke() {
 // ─────────────────────── wrappers — thin per-N (AC2.1) ───────────────────────
 
 #[tokio::test]
-#[ignore = "Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
 async fn t_11_3_mesh_identity_reconcile_30_host() {
     mesh_identity_reconcile_drill(COMPRESSED_HOST_COUNT, "identity-reconcile-30-host").await;
 }
 
 #[tokio::test]
-#[ignore = "Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
 async fn t_14_1_mesh_identity_reconcile_n100() {
     mesh_identity_reconcile_drill(FULL_ENVELOPE_HOST_COUNT, "identity-reconcile-100-host").await;
 }
 
 #[tokio::test]
-#[ignore = "Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
 async fn t_11_3_duplicate_identity_negative_control_hard_fails() {
     duplicate_identity_control(COMPRESSED_HOST_COUNT).await;
 }
 
 #[tokio::test]
-#[ignore = "Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
 async fn t_14_1_duplicate_identity_negative_control_n100() {
     duplicate_identity_control(FULL_ENVELOPE_HOST_COUNT).await;
 }
 
 #[tokio::test]
-#[ignore = "Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 11.3 — real N=30 mesh; gate-controlled via check-scale-churn"]
 async fn t_11_3_scale_churn_30_host_drill() {
     scale_churn_envelope_drill(COMPRESSED_HOST_COUNT).await;
 }
 
 #[tokio::test]
-#[ignore = "Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 14.1 — real N=100 mesh; gate-controlled via check-scale-churn"]
 async fn t_14_1_scale_churn_n100_drill() {
     scale_churn_envelope_drill(FULL_ENVELOPE_HOST_COUNT).await;
 }
 
 #[tokio::test]
-#[ignore = "Story 11.3 — real detection mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 11.3 — real detection mesh; gate-controlled via check-scale-churn"]
 async fn t_11_3_detection_latency_drill() {
     detection_latency_drill(COMPRESSED_HOST_COUNT).await;
 }
 
 #[tokio::test]
-#[ignore = "Story 14.1 — real N=100 detection mesh; gate-controlled via check-scale-churn"]
+#[ignore = "expensive: Story 14.1 — real N=100 detection mesh; gate-controlled via check-scale-churn"]
 async fn t_14_1_detection_latency_n100() {
     detection_latency_drill(FULL_ENVELOPE_HOST_COUNT).await;
 }

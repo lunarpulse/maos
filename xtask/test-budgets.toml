@@ -1,0 +1,69 @@
+# Story 20-12 AC1/AC2 — the test-cost register.
+#
+# `check-test-budget --junit <nextest junit>` reds any test binary whose time
+# (Σ of its tests' junit `time` — review 2026-10-23; the first-start ->
+# last-end span is reported only, it includes queue time) exceeds its budget,
+# and the suite whose Σ over every binary exceeds `total_seconds`. Advisory at
+# v1_0 until one CI run calibrates `total_seconds`. Before this file the
+# workspace suite cost 1,871 s (17-8 log, libtest `finished in`), 67 % of it
+# one test that ran a whole gate.
+#
+# A binary that legitimately needs longer gets an [[exception]] with a reason
+# and an owner; an [[exception]] whose binary is absent from the junit is a
+# finding (stale row). Every budget is finite and positive. Making the binary
+# cheaper is always preferred to a row here.
+#
+# [[expensive]] registers every test binary holding `#[ignore = "expensive: …"]`
+# tests (`check-test-cost` enforces both directions). `job` is the CI job that
+# runs them and must run ignored tests: `expensive-tests` runs exactly the rows
+# naming it (filter from `cargo run -p xtask -- check-test-cost
+# --expensive-filter`); other rows name the dedicated job that provisions their
+# substrate. Tests that only run `cargo tree`/`metadata`/`locate-project`/
+# `pkgid` are `// cargo-query:` instead and need no row.
+
+default_seconds = 30
+total_seconds = 300
+
+# --- Expensive tests (ignored in the default run) ---------------------------
+
+[[expensive]]
+binary = "xtask::abi_diff_integration"
+job = "expensive-tests"
+reason = "cargo public-api builds rustdoc JSON with a nightly toolchain (5 tests, 590 s Σ under the T0 nextest run)"
+owner = "20-12-test-cost-budget-and-review-execution-contract"
+
+[[expensive]]
+binary = "xtask::diagnostics_20_3a"
+job = "expensive-tests"
+reason = "6 composite-gate report tests run a nested `cargo test` on a witness crate (via the CARGO shim)"
+owner = "20-12-test-cost-budget-and-review-execution-contract"
+
+[[expensive]]
+binary = "maos-spirit-sdk::spirit_macro_errors"
+job = "expensive-tests"
+reason = "trybuild compiles every tests/ui compile-fail case"
+owner = "20-12-test-cost-budget-and-review-execution-contract"
+
+[[expensive]]
+binary = "maos-kernel-core::cgroup_ceiling_smoke"
+job = "cgroup-ceiling-delegated"
+reason = "rustc compiles the native cgroup fixture; needs a delegated cgroup-v2 substrate the job provisions"
+owner = "20-12-test-cost-budget-and-review-execution-contract"
+
+[[expensive]]
+binary = "maos-bin::worker_crash_corpus_16_3"
+job = "nfr-rel-1-crash-detection-2s"
+reason = "100 SIGKILLed live Workers, half holding a grandchild (NFR-Rel-1 corpus, release profile)"
+owner = "16-3-subprocess-crash-to-handle-crash"
+
+[[expensive]]
+binary = "maos-bin::worker_hang_corpus_16_3"
+job = "nfr-rel-2-hang-detection-60s"
+reason = "60 live Workers for ~75 s (NFR-Rel-2 hang corpus, release profile)"
+owner = "16-3-subprocess-crash-to-handle-crash"
+
+[[expensive]]
+binary = "maos-a2a-tcp::t_11_3_scale_churn"
+job = "check-scale-churn"
+reason = "real N=30 / N=100 meshes (Stories 11.3 / 14.1); the gate provisions and runs them"
+owner = "11-3-scale-envelope-25-30-host-churn"

@@ -901,36 +901,167 @@ fn the_digests_are_distinct_per_file() {
 
 #[test]
 fn a_composite_gates_json_stdout_is_machine_clean() {
-    // `deferred-work.md:637`, closed here. The obvious fix was NOT the fix: this
-    // gate's own `--json` was already clean, because `check_kernel_baseline::run`
-    // prints the human PASSED line only in the non-json `else if` branch. The
-    // pollution came from SIX composite legs that called `run(false)` — which
-    // prints that line to STDOUT on the green path — from inside their own
-    // `--json` payload. They now call `check()` (`check_fkcs.rs:95-97` shape).
+    // `deferred-work.md:637`, closed by 16-0: six composite legs called a sibling
+    // gate's `run(false)`, which prints the human PASSED line to STDOUT, from
+    // inside their own `--json` payload. They now call `check()`.
     //
-    // Exit status is deliberately not asserted: the contract being proven is
-    // that stdout PARSES, whether the gate is green or red.
-    let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .current_dir(workspace_root())
-        .args(["check-escape-detector", "--json"])
-        .output()
-        .expect("xtask runs");
-    let stdout = String::from_utf8(output.stdout).expect("stdout is UTF-8");
-    assert!(
-        !stdout.trim().is_empty(),
-        "check-escape-detector produced an EMPTY report (exit {:?}) — its own startup \
-         failure, not this suite's; stderr: {}",
-        output.status.code(),
-        String::from_utf8_lossy(&output.stderr).trim()
-    );
-    serde_json::from_str::<serde_json::Value>(&stdout).unwrap_or_else(|e| {
-        panic!(
-            "check-escape-detector --json stdout does not parse ({e}). A leg is printing a \
-             human line to stdout inside the JSON payload:\n{stdout}"
-        )
+    // Story 20-12 T1: this vector used to run the whole gate as a subprocess —
+    // nine nested `cargo test`/`cargo build --release` legs, 1,259 s of the
+    // 1,871 s workspace suite — to prove that stdout PARSES. The gate is now
+    // `collect_legs() -> Report` and `emit(Report) -> stdout`, so the writer is
+    // proven over a stub `Report` (one green leg, one red leg), and the legs'
+    // half of the contract (they never write to stdout) is proven on the source.
+    use xtask::check_escape_detector::{emit, LegResult, Report as GateReport};
+
+    let stub = || {
+        let disposition = [("v1_0", "advisory"), ("v2_0", "blocking")]
+            .into_iter()
+            .map(|(phase, value)| (phase.to_owned(), value.to_owned()))
+            .collect();
+        let legs = vec![
+            LegResult::hermetic_bool("kernel-abi-diff", true),
+            LegResult::hermetic_bool("release-graph-absence", false),
+        ];
+        GateReport::new(disposition, false, true, legs)
+    };
+
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let verdict = emit(&stub(), true, &mut out, &mut err);
+    let stdout = String::from_utf8(out).expect("stdout is UTF-8");
+    let payload: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!("check-escape-detector --json stdout does not parse ({e}):\n{stdout}")
     });
+    assert!(verdict.is_err(), "a red Blocking leg must red the gate");
+    assert_eq!(payload["passed"], false);
+    assert_eq!(payload["blocking_legs"][0], "release-graph-absence");
+    assert_eq!(payload["legs"].as_array().map(Vec::len), Some(2));
+    let stderr = String::from_utf8(err).expect("stderr is UTF-8");
     assert!(
-        !stdout.contains("check-kernel-baseline: PASSED"),
-        "the kernel gate's human PASSED line leaked into a composite gate's JSON payload"
+        stderr.starts_with("::error::check-escape-detector: BLOCKING"),
+        "in --json mode the workflow command goes to stderr, not stdout: {stderr:?}"
     );
+
+    // The contrast: the human emitter puts the workflow command on stdout,
+    // which is therefore NOT a JSON document.
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    assert!(emit(&stub(), false, &mut out, &mut err).is_err());
+    let human = String::from_utf8(out).expect("stdout is UTF-8");
+    assert!(
+        serde_json::from_str::<serde_json::Value>(&human).is_err(),
+        "the non-JSON emitter must not produce a JSON document: {human:?}"
+    );
+    assert!(human.starts_with("::error::check-escape-detector: BLOCKING"));
+
+    // The legs' half: nothing in the gate writes stdout except `emit`'s `out`
+    // (`eprintln!` is fine; a bare `println!`/`print!`, a `stdout()` handle, an
+    // inherited child stdio or a `.status()` child is not), and no leg calls a
+    // sibling gate's printing `run(..)`. `run` itself hands `emit` the real
+    // stdout and is the one exempt body.
+    let source =
+        std::fs::read_to_string(workspace_root().join("xtask/src/check_escape_detector.rs"))
+            .expect("read the gate source");
+    let legs = source.replacen(fn_body(&source, "run"), "", 1);
+    assert_no_stdout_writer("check_escape_detector.rs", &legs);
+}
+
+/// The body of `fn <name>(` in `source` (brace-matched from its first `{`).
+fn fn_body<'a>(source: &'a str, name: &str) -> &'a str {
+    let start = source
+        .find(&format!("fn {name}("))
+        .unwrap_or_else(|| panic!("no `fn {name}(` in the gate source"));
+    let open = start + source[start..].find('{').expect("function body opens");
+    let mut depth = 0usize;
+    for (offset, byte) in source[open..].bytes().enumerate() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &source[start..=open + offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("`fn {name}` body never closes")
+}
+
+/// The stdout-writing tokens a leg must never reach (`eprint!` is fine).
+fn assert_no_stdout_writer(scope: &str, text: &str) {
+    for forbidden in [
+        "println!",
+        "print!(",
+        "::run(",
+        "stdout()",
+        "Stdio::inherit",
+        ".status()",
+    ] {
+        let hit = text
+            .match_indices(forbidden)
+            .find(|(at, _)| !forbidden.starts_with("print") || !text[..*at].ends_with('e'));
+        assert!(
+            hit.is_none(),
+            "{scope} contains `{forbidden}` — a leg can pollute --json stdout"
+        );
+    }
+}
+
+#[test]
+fn the_real_kernel_leg_emits_a_parseable_json_stdout() {
+    // Story 20-12 review — the cross-module guard the stub alone lost: the
+    // deleted `!stdout.contains("check-kernel-baseline: PASSED")` caught a
+    // `println!` in `check_kernel_baseline` reached from inside a `--json`
+    // payload. The kernel leg here comes from the REAL `check_at` on a tempdir
+    // copy, the payload from the real `emit`, and every `check_kernel_baseline`
+    // function that leg reaches is scanned for a stdout writer.
+    use xtask::check_escape_detector::{emit, LegResult, Report as GateReport};
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let tree = temp.path().join("src");
+    copy_tree(&kernel_src(), &tree);
+    let baseline = baseline_with(temp.path(), &pin_block(&tree).expect("mint pristine pin"));
+    let kernel = checked(&tree, &baseline);
+    assert!(kernel.passed, "{}", failure_detail(&kernel));
+
+    let disposition = [("v1_0", "advisory"), ("v2_0", "blocking")]
+        .into_iter()
+        .map(|(phase, value)| (phase.to_owned(), value.to_owned()))
+        .collect();
+    let legs = vec![
+        LegResult::hermetic_bool("kernel-abi-diff", kernel.passed),
+        LegResult::hermetic_bool("release-graph-absence", false),
+    ];
+    let report = GateReport::new(disposition, false, true, legs);
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    assert!(emit(&report, true, &mut out, &mut err).is_err());
+    let stdout = String::from_utf8(out).expect("stdout is UTF-8");
+    let payload: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!("--json stdout with a real kernel leg does not parse ({e}):\n{stdout}")
+    });
+    assert_eq!(
+        payload["blocking_legs"],
+        serde_json::json!(["release-graph-absence"]),
+        "the real green kernel leg must not red: {payload}"
+    );
+
+    let kernel_source =
+        std::fs::read_to_string(workspace_root().join("xtask/src/check_kernel_baseline.rs"))
+            .expect("read the kernel baseline source");
+    for name in [
+        "check",
+        "check_at",
+        "failure_detail",
+        "read_pinned",
+        "load_kernel_src",
+        "collect_files",
+        "file_digest",
+        "set_hash",
+        "workspace_root",
+        "count_rs_lines",
+    ] {
+        assert_no_stdout_writer(
+            &format!("check_kernel_baseline::{name}"),
+            fn_body(&kernel_source, name),
+        );
+    }
 }

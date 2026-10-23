@@ -17,11 +17,41 @@
 //! `verify-bundle` is a self-check; the premise of this story is a claim a
 //! stranger can check.
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rusqlite::Connection;
 use tempfile::TempDir;
+
+const PYTHON_ED25519: &str =
+    "Python Ed25519 backend for tools/verify-audit-bundle/verify.py (pip install cryptography)";
+
+/// Story 20-12 AC3 — mirrors `verify.py::_verify_ed25519`'s backend detection
+/// exactly: any one of PyNaCl, `ed25519` or `cryptography` importable.
+fn python_ed25519_present() -> bool {
+    const PROBE: &str = "\
+import importlib, sys
+for imports in (
+    ('nacl.signing', 'nacl.exceptions'),
+    ('ed25519',),
+    ('cryptography.hazmat.primitives.asymmetric.ed25519', 'cryptography.exceptions'),
+):
+    try:
+        for name in imports:
+            importlib.import_module(name)
+    except ImportError:
+        continue
+    sys.exit(0)
+sys.exit(1)
+";
+    Command::new("python3")
+        .args(["-c", PROBE])
+        .output()
+        .is_ok_and(|out| out.status.success())
+}
 
 const SCHEMA_SQL: &str = "
 CREATE TABLE IF NOT EXISTS transparency_log (
@@ -487,6 +517,9 @@ fn the_two_host_receipt_is_written_and_verifies_under_the_operator_key() {
 /// host field had broken the canonical surface, this is where it shows.
 #[test]
 fn the_python_twin_verifies_a_host_stamped_bundle() {
+    if ci::skip_unless(PYTHON_ED25519, python_ed25519_present()) {
+        return;
+    }
     let a = Host::new("host-a", [0xA1; 32], &[frame(0x11), frame(0x22)]);
     a.export(true);
 
@@ -565,6 +598,10 @@ fn the_python_twin_verifies_a_host_stamped_bundle() {
 #[test]
 fn the_python_twin_verifies_the_committed_non_ascii_tier2_bundle() {
     const T6_PUBKEY: &str = "61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766";
+
+    if ci::skip_unless(PYTHON_ED25519, python_ed25519_present()) {
+        return;
+    }
 
     let root = repo_root();
     let verify_py = root.join("tools/verify-audit-bundle/verify.py");

@@ -240,10 +240,41 @@ fn unreadable_fd_limits_are_not_ci_passes() {
         !output.status.success(),
         "unreadable limits were silently accepted"
     );
+    // Declared CI never takes the local `SKIP: ` early return; the fail-closed
+    // assertion names the probe and the unreadable path, byte-identical to 20-3a.
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        String::from_utf8_lossy(&output.stderr).contains("SKIP (assert_fd_headroom): cannot read"),
+        !stderr.contains("SKIP: readable fd limits file")
+            && stderr.contains("SKIP (assert_fd_headroom): cannot read"),
         "{output:?}"
     );
+}
+
+/// Story 20-12 AC3 "proven both ways" — the local half of the control above:
+/// the same child with CI capability undeclared returns early, exits 0, and
+/// prints exactly one `SKIP: ` line.
+#[cfg(target_os = "linux")]
+#[test]
+fn unreadable_fd_limits_skip_once_off_ci() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "unreadable_fd_limits_child", "--nocapture"])
+        .env_remove("CI")
+        .env_remove("GITHUB_ACTIONS")
+        .env("MAOS_FD_REFUSAL_CHILD", "1")
+        .output()
+        .expect("run actual fd probe with CI undeclared");
+    assert!(output.status.success(), "{output:?}");
+    let skips = [&output.stdout, &output.stderr]
+        .into_iter()
+        .flat_map(|stream| {
+            String::from_utf8_lossy(stream)
+                .lines()
+                .filter(|line| line.starts_with("SKIP: "))
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(skips.len(), 1, "{skips:?} in {output:?}");
 }
 
 #[cfg(target_os = "linux")]

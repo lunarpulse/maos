@@ -2,9 +2,7 @@ use std::process::Command;
 static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn xtask() -> Command {
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "xtask", "--"]);
-    cmd
+    Command::new(env!("CARGO_BIN_EXE_xtask"))
 }
 
 fn workspace_root() -> std::path::PathBuf {

@@ -164,11 +164,10 @@ fn network_syscalls(binary: &Path, args: &[&str]) -> Result<Vec<String>, TraceFa
 fn airgap_syscalls(test: &str, binary: &Path, args: &[&str]) -> Option<Vec<String>> {
     match network_syscalls(binary, args) {
         Ok(syscalls) => Some(syscalls),
-        Err(TraceFailure::ToolUnavailable(reason)) if !ci::declared_ci() => {
-            eprintln!("SKIP ({test}): {reason}");
-            None
-        }
         Err(TraceFailure::ToolUnavailable(reason)) => {
+            if ci::skip_unless(&format!("strace network tracing ({test}): {reason}"), false) {
+                return None;
+            }
             panic!("{test}: tool unavailable on declared CI: {reason}")
         }
         Err(TraceFailure::TargetFailed(reason)) => panic!("{test}: traced target failed: {reason}"),
@@ -498,6 +497,7 @@ async fn gate_otel_zero_when_off_counting_double_asserts_on() {
 
 #[test]
 fn gate_otel_zero_when_off_kernel_core_tree_has_no_otel() {
+    // cargo-query: cargo tree resolves the dependency graph (no compile)
     let output = Command::new("cargo")
         .arg("tree")
         .arg("-p")
@@ -621,7 +621,7 @@ fn airgap_failure_causes_are_not_skips() {
             );
             assert!(
                 stderr.contains(if local_tool_skip {
-                    "SKIP (gate_otel_airgap_default_off_no_connects)"
+                    "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects)"
                 } else {
                     diagnostic
                 }),

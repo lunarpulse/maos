@@ -86,6 +86,9 @@ mod check_manifest_schema_version;
 mod check_migration_merkle;
 pub mod check_mock_not_in_release;
 mod check_model_currency;
+// Story 20-12 — test-cost budget: the gates, the budget register and the
+// fixture builder that lets no test compile the tree.
+mod build_test_fixtures;
 mod check_multi_provider_drift;
 mod check_pentest_gate;
 mod check_pub_field_constructors;
@@ -94,6 +97,8 @@ mod check_release_precondition;
 mod check_review_findings_resolved;
 mod check_security_md;
 mod check_ship_gate_completeness;
+mod check_test_budget;
+mod check_test_cost;
 mod check_third_party_trial;
 // Story 10.3 — v1.0 compliance ship-gates (export-control, fuzz-targets).
 // `check_cna_registration` was RETIRED 2026-09-07 by Story 15-3 per ADR-065:
@@ -434,6 +439,45 @@ enum Commands {
     /// `xtask/model-currency.toml`. Offline; names `file:line` for each violation.
     #[command(name = "check-model-currency")]
     CheckModelCurrency {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 20-12 AC2 — no test compiles the tree: every cargo/rustc/trybuild
+    /// spawn under a workspace member's tests dir carries `// expensive: <reason>`
+    /// (tests `#[ignore = "expensive: …"]`, registered in
+    /// `xtask/test-budgets.toml [[expensive]]` under a job that runs ignored
+    /// tests) or, for cargo tree/metadata/locate-project/pkgid,
+    /// `// cargo-query: <reason>`.
+    #[command(name = "check-test-cost")]
+    CheckTestCost {
+        #[arg(long)]
+        json: bool,
+        /// Print the nextest filterset the `expensive-tests` CI job runs.
+        #[arg(long)]
+        expensive_filter: bool,
+    },
+    /// Story 20-12 AC1 — every test binary in a nextest junit report keeps its
+    /// Σ per-test time under its `xtask/test-budgets.toml` budget, and the suite
+    /// under its total; stale `[[exception]]` rows red.
+    #[command(name = "check-test-budget")]
+    CheckTestBudget {
+        #[arg(long)]
+        junit: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 20-12 AC2 — build every fixture binary/WASM artefact tests resolve
+    /// (worker fixtures, maosctl, runners, guests, probes) and write
+    /// `<target>/maos-fixtures/manifest.json` (or an absolute `$MAOS_FIXTURE_DIR`)
+    /// recording each artefact's `built_at` and source inputs.
+    #[command(name = "build-test-fixtures")]
+    BuildTestFixtures {
+        /// Build the profile-coupled workspace binaries in release.
+        #[arg(long)]
+        release: bool,
+        /// Build only these fixtures (comma-separated names).
+        #[arg(long, value_delimiter = ',')]
+        only: Vec<String>,
         #[arg(long)]
         json: bool,
     },
@@ -1351,6 +1395,16 @@ fn main() {
         Commands::CheckEpicCloseCoherence { json } => check_epic_close_coherence::run(json),
         Commands::CheckExitCommands { json } => check_exit_commands::run(json),
         Commands::CheckModelCurrency { json } => check_model_currency::run(json),
+        Commands::CheckTestCost {
+            json,
+            expensive_filter,
+        } => check_test_cost::run(json, expensive_filter),
+        Commands::CheckTestBudget { junit, json } => check_test_budget::run(&junit, json),
+        Commands::BuildTestFixtures {
+            release,
+            only,
+            json,
+        } => build_test_fixtures::run(release, &only, json),
         Commands::StabilityMatrix { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             stability_matrix::run(&workspace_root, check, json)

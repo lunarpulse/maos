@@ -92,17 +92,8 @@ fn clean_small_fixture_validates_all_items() {
 #[test]
 fn coverage_binary_fails_on_floor_violation() {
     // Use the main binary. The clean fixture's coverage report must pass.
-    let output = std::process::Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "maos-corpus-gen",
-            "--",
-            "coverage",
-            "--corpus",
-            "secret-redaction-1e4",
-            "--json",
-        ])
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_maos-corpus-gen"))
+        .args(["coverage", "--corpus", "secret-redaction-1e4", "--json"])
         .output()
         .unwrap();
 
@@ -113,16 +104,8 @@ fn coverage_binary_fails_on_floor_violation() {
     );
 
     // Also test unknown corpus name
-    let unknown = std::process::Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "maos-corpus-gen",
-            "--",
-            "coverage",
-            "--corpus",
-            "nonexistent-corpus",
-        ])
+    let unknown = std::process::Command::new(env!("CARGO_BIN_EXE_maos-corpus-gen"))
+        .args(["coverage", "--corpus", "nonexistent-corpus"])
         .output()
         .unwrap();
 

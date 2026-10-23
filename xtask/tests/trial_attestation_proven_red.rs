@@ -242,6 +242,7 @@ fn release_graph_excludes_trial_attestation_feature_and_maos_fkcs() {
         .parent()
         .expect("workspace root")
         .to_path_buf();
+    // cargo-query: cargo tree -e features resolves the dependency graph (no compile)
     let out = std::process::Command::new("cargo")
         .args(["tree", "-p", "maos-bin", "-e", "features"])
         .current_dir(&workspace_root)
@@ -316,6 +317,7 @@ fn ship_gate_completeness_enrolls_check_trial_attestation() {
 /// against a real workspace crate and confirm it returns a non-empty closure.
 #[test]
 fn recompute_cargo_tree_locked_runs_the_real_cargo_tree_subprocess() {
+    // cargo-query: cargo tree via maos_eval::recompute_cargo_tree_locked
     let tree = recompute_cargo_tree_locked("maos-eval")
         .expect("cargo tree --locked -p maos-eval must succeed in the workspace");
     assert!(

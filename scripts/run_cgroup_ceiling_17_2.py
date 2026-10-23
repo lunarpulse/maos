@@ -276,6 +276,9 @@ def _environment(mode):
     }
     names.update(("RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
     names.update(("CI", "GITHUB_ACTIONS", "MAOS_SECRETS_BACKEND"))
+    # 20-12: tests inside the envelope resolve prebuilt fixtures from the same
+    # manifest the caller's `build-test-fixtures` wrote (absolute path).
+    names.add("MAOS_FIXTURE_DIR")
     # 20-3a CI follow-up: check-multi-tenant-loom runs its whole-package maos-bin
     # leg inside this delegated envelope. Outside it the 17-2/17-7 live-T3 tests
     # fail deterministically: run 38985809156 (bin-plain red 6/6 variants)

@@ -26,12 +26,10 @@ use std::sync::{
 use std::time::Duration;
 const NONCE: u64 = 0x17_03_d;
 const ID: &str = "recall-probe";
-/// The cargo target directory this test binary was built into
-/// (`<target>/debug/deps/recall_17_3d-*`), wherever `CARGO_TARGET_DIR` points.
-fn target_root() -> PathBuf {
-    let exe = std::env::current_exe().unwrap();
-    exe.ancestors().nth(3).unwrap().to_owned()
-}
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 /// Relay a re-executed child test's output without letting its own libtest
 /// `test ... ok` / `test result:` lines read as this suite's (CI counts them).
 fn relay_child(out: &std::process::Output) {
@@ -42,41 +40,21 @@ fn relay_child(out: &std::process::Output) {
     }
 }
 fn artifact() -> PathBuf {
-    target_root().join("recall-probe-guest/wasm32-wasip2/release/recall_probe.wasm")
+    FIXTURES.1.clone()
 }
 // Recall's larger import/link surface needs more address space than echo.
 // The manifest declares 1 GiB for the undelegated lane's RLIMIT_AS fallback;
 // this remains a real T2 child, with Landlock and seccomp unchanged.
-static FIXTURES: LazyLock<()> = LazyLock::new(|| {
+/// Prebuilt release `maos-wasm-runner` and `recall_probe.wasm` (manifest).
+static FIXTURES: LazyLock<(PathBuf, PathBuf)> = LazyLock::new(|| {
     match std::env::var("MAOS_17_2_CGROUP_MODE").as_deref() {
         Ok("delegated" | "undelegated") => {}
         other => panic!("MAOS_17_2_CGROUP_MODE must be delegated or undelegated: {other:?}"),
     }
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for guest in [true, false] {
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.current_dir(&workspace)
-            .env("CARGO_TARGET_DIR", target_root())
-            .args(["build", "--locked", "--release"]);
-        if guest {
-            cmd.args([
-                "--manifest-path",
-                "crates/maos-wasm-host/guests/recall-probe/Cargo.toml",
-                "--target",
-                "wasm32-wasip2",
-                "--target-dir",
-            ])
-            .arg(target_root().join("recall-probe-guest"));
-        } else {
-            cmd.args(["-p", "maos-wasm-host", "--bin", "maos-wasm-runner"]);
-        }
-        let out = cmd.output().expect("build real recall fixture");
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-    }
+    (
+        fixtures::fixture("maos-wasm-runner"),
+        fixtures::fixture("recall_probe.wasm"),
+    )
 });
 struct World {
     tl: Arc<TransparencyLogAdapter>,
@@ -376,10 +354,7 @@ fn launch(frame: IacFrame, once: bool) -> SessionLaunch {
     LazyLock::force(&FIXTURES);
     SessionLaunch {
         plan: maos_host::SpiritLaunchPlan {
-            program: target_root()
-                .join("release/maos-wasm-runner")
-                .to_string_lossy()
-                .into_owned(),
+            program: FIXTURES.0.to_string_lossy().into_owned(),
             argv: vec![
                 "--component".into(),
                 artifact().to_string_lossy().into_owned(),
@@ -454,12 +429,9 @@ fn claim_reports(world: &World, pid: u32) -> Vec<String> {
 fn t2_result<T>(result: Result<T, SessionError>) -> Option<T> {
     match result {
         Err(SessionError::Bridge(error)) if error.to_lowercase().contains("permission denied") => {
-            let reason = format!("SKIP recall_17_3d: real T2 unavailable: {error}");
-            assert!(
-                std::env::var_os("CI").is_none() && std::env::var_os("GITHUB_ACTIONS").is_none(),
-                "{reason}"
-            );
-            eprintln!("{reason}");
+            if !ci::skip_unless(&format!("real T2 permitted by this host ({error})"), false) {
+                panic!("recall_17_3d: real T2 unavailable on runner declared capable (rule 11(b)): {error}");
+            }
             None
         }
         other => Some(other.unwrap_or_else(|e| panic!("real admitted T2 session failed: {e:?}"))),
@@ -547,6 +519,17 @@ fn fr4(dir: &Path, pid: u32) -> String {
 }
 
 fn t2_available() -> bool {
+    // Story 20-12 AC3 — off CI an undeclared 17-2 lane is one `SKIP:` line; a
+    // declared-CI host runs on and `FIXTURES` fails closed on the unset lane.
+    if ci::skip_unless(
+        "MAOS_17_2_CGROUP_MODE=delegated|undelegated (scripts/run_cgroup_ceiling_17_2.py)",
+        matches!(
+            std::env::var("MAOS_17_2_CGROUP_MODE").as_deref(),
+            Ok("delegated" | "undelegated")
+        ),
+    ) {
+        return false;
+    }
     static AVAILABLE: LazyLock<bool> = LazyLock::new(|| {
         use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec, SpawnError};
         let spec = SandboxSpec {
@@ -563,8 +546,7 @@ fn t2_available() -> bool {
             }
             Err(SpawnError::Io(error)) if error.kind() == std::io::ErrorKind::PermissionDenied => {
                 assert!(
-                    std::env::var_os("CI").is_none()
-                        && std::env::var_os("GITHUB_ACTIONS").is_none(),
+                    !ci::declared_ci(),
                     "real T2 unavailable on runner declared capable (rule 11(b)): {error}"
                 );
                 false
@@ -572,10 +554,7 @@ fn t2_available() -> bool {
             Err(error) => panic!("T2 availability probe failed: {error:?}"),
         }
     });
-    if !*AVAILABLE {
-        eprintln!("SKIP recall_17_3d: host refuses real T2 (rule 11(b))");
-    }
-    *AVAILABLE
+    !ci::skip_unless("real T2 permitted by this host (rule 11(b))", *AVAILABLE)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

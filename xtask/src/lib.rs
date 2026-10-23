@@ -9,6 +9,10 @@ pub mod check_decision_register;
 // over planted corpora, because a vector that exercised a parallel copy of the
 // tokeniser would prove nothing about the gate CI runs (F11).
 pub mod check_exit_commands;
+// Story 20-12 T1 — the escape-detector gate's `Report` → `emit` writer, exposed
+// so `kernel_pin_content_hash_16_0` proves its JSON stdout over a stub `Report`
+// instead of running all nine nested legs (1,259 s of the 1,871 s suite).
+pub mod check_escape_detector;
 pub mod check_fkcs;
 pub mod check_host_surface;
 pub mod check_kernel_baseline;
@@ -16,6 +20,10 @@ pub mod check_mock_not_in_release;
 // Story 17-5 — the model-pin currency gate's audit, exposed so `xtask/tests/` drive
 // the REAL `audit()` over planted trees (a parallel copy would prove nothing).
 pub mod check_model_currency;
+// Story 20-12 — the test-cost gates, exposed so their proven-red vectors in
+// `xtask/tests/` drive the REAL `audit` over planted trees and junit reports.
+pub mod check_test_budget;
+pub mod check_test_cost;
 pub mod check_trial_attestation;
 pub mod release_dry_run;
 // corpus_types + gate_common exposed so the lib-compiled gate modules

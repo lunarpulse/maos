@@ -22,6 +22,8 @@ use maos_kernel_core::iac::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_spirit_abi::identity::SpiritRole;
 use orchestrator::{Orchestrator, DELEGATION_CONSENT_INTENT};
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -291,46 +293,14 @@ fn target_debug_path() -> std::ffi::OsString {
     std::env::join_paths(paths).expect("valid PATH entries")
 }
 
-/// Cargo does not build sibling workspace binaries for a package-scoped test.
-static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
-    let mut command = Command::new("cargo");
-    if let Some(target_dir) = std::env::var_os("CARGO_TARGET_DIR") {
-        command.env("CARGO_TARGET_DIR", target_dir);
-    }
-    let executable = std::env::current_exe().expect("test executable path");
-    let profile = executable
-        .parent()
-        .and_then(Path::parent)
-        .and_then(Path::file_name)
-        .and_then(|name| name.to_str())
-        .expect("Cargo profile name");
-    let profile = match profile {
-        "debug" => "dev",
-        name => name,
-    };
-    let output = command
-        .args([
-            "build",
-            "-q",
-            "-p",
-            "worker",
-            "--bin",
-            "worker-cli-fixture",
-            "--profile",
-            profile,
-        ])
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
-        .output()
-        .expect("run cargo build for worker fixture");
-    assert!(
-        output.status.success(),
-        "build worker-cli-fixture: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+/// `maos` resolves `worker-cli-fixture` beside its own executable; the
+/// prebuilt fixture must already sit in this test's profile directory.
+static WORKER_FIXTURE_PRESENT: LazyLock<()> = LazyLock::new(|| {
+    fixtures::profile_binary("worker-cli-fixture");
 });
 
 fn ensure_fixture_binary() {
-    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    LazyLock::force(&WORKER_FIXTURE_PRESENT);
 }
 
 fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {

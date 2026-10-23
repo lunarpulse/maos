@@ -86,7 +86,7 @@ def run(command, environment, log, timeout):
         output.write(f'\n$ {" ".join(map(str, command))}\nrc={result.returncode}\n')
         output.write(f'--- stdout\n{result.stdout}--- stderr\n{result.stderr}')
     for stream in (result.stdout, result.stderr):
-        if any(line.startswith('SKIP ') for line in stream.splitlines()):
+        if any(line.startswith(('SKIP ', 'SKIP:')) for line in stream.splitlines()):
             raise Failure(f'{command[1]} printed a SKIP line on a declared-capable runner')
     if result.returncode != 0:
         raise Failure(f'{" ".join(map(str, command[1:]))} exited {result.returncode}; see {log.name}')

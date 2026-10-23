@@ -134,8 +134,8 @@ fn absent_grant_is_policy_denied_even_with_spent_quota() {
 /// Require the child's marker AND exactly one executed test (no green zero-test
 /// process). Pass markers are emitted only after all case assertions succeed.
 fn in_fresh_child(name: &str, marker: &str) -> bool {
+    // `require_t3` prints the one `SKIP:` line when the substrate is absent.
     if !t3_substrate::require_t3(name) {
-        eprintln!("SKIP CLI-QUOTA-17-9 {name}: real OCI runtime unavailable");
         return false;
     }
     if let Some(child) = std::env::var_os(CHILD) {

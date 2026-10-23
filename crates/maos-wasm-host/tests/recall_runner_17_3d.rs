@@ -16,74 +16,14 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{mpsc, LazyLock};
 use std::time::Duration;
 
-fn crate_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-fn target_root() -> PathBuf {
-    std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf()
-}
-static RUNNER: LazyLock<PathBuf> = LazyLock::new(|| {
-    let target = target_root();
-    let output = Command::new("cargo")
-        .args([
-            "build",
-            "--locked",
-            "--offline",
-            "--release",
-            "-p",
-            "maos-wasm-host",
-            "--bin",
-            "maos-wasm-runner",
-            "--target-dir",
-        ])
-        .arg(&target)
-        .env("CARGO_TARGET_DIR", &target)
-        .current_dir(crate_root())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "release runner build: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    target.join("release/maos-wasm-runner")
-});
-fn guest(name: &str, artifact: &str) -> PathBuf {
-    // Separate target per guest: shared targets once corrupted fixture provenance.
-    let target = target_root().with_file_name(format!("cargo-17-3d-guest-{name}"));
-    let output = Command::new("cargo")
-        .args([
-            "build",
-            "--locked",
-            "--offline",
-            "--release",
-            "--target",
-            "wasm32-wasip2",
-            "--manifest-path",
-        ])
-        .arg(crate_root().join(format!("guests/{name}/Cargo.toml")))
-        .arg("--target-dir")
-        .arg(&target)
-        .env("CARGO_TARGET_DIR", &target)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{name} build: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    target.join(format!("wasm32-wasip2/release/{artifact}.wasm"))
-}
-static PROBE: LazyLock<PathBuf> = LazyLock::new(|| guest("recall-probe", "recall_probe"));
-static COMPAT: LazyLock<PathBuf> = LazyLock::new(|| guest("compat-echo-2-0", "compat_echo_2_0"));
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
+
+static RUNNER: LazyLock<PathBuf> = LazyLock::new(|| fixtures::fixture("maos-wasm-runner"));
+static PROBE: LazyLock<PathBuf> = LazyLock::new(|| fixtures::fixture("recall_probe.wasm"));
+static COMPAT: LazyLock<PathBuf> = LazyLock::new(|| fixtures::fixture("compat_echo_2_0.wasm"));
 fn command(component: &Path) -> Command {
     let mut cmd = Command::new(&*RUNNER);
     cmd.arg("--component")
@@ -384,10 +324,12 @@ fn frozen_2_0_echo_runs_under_t2_on_2_1_runner_byte_identically() {
     let mut child = match spawn_sandboxed(&spec, &mut command(&COMPAT)) {
         Ok(child) => child,
         Err(SpawnError::Io(error)) if error.kind() == io::ErrorKind::PermissionDenied => {
-            if std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some() {
+            if !ci::skip_unless(
+                "T2 sandbox setup permitted by this host (CAP_SYS_ADMIN / no_new_privs)",
+                false,
+            ) {
                 panic!("compat_2_0: T2 spawn refused on a runner declared capable (rule 11(b)): {error}");
             }
-            eprintln!("SKIP compat_2_0: sandbox setup requires CAP_SYS_ADMIN / no_new_privs");
             return;
         }
         Err(error) => panic!("compat_2_0 spawn failed: {error:?}"),

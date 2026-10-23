@@ -77,17 +77,8 @@ fn clean_small_fixture_meets_per_seed_minimum() {
 /// Coverage binary exits non-zero for canonical corpus (passing case).
 #[test]
 fn coverage_binary_passes_for_canonical() {
-    let output = std::process::Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "maos-corpus-gen",
-            "--",
-            "coverage",
-            "--corpus",
-            "red-team-640",
-            "--json",
-        ])
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_maos-corpus-gen"))
+        .args(["coverage", "--corpus", "red-team-640", "--json"])
         .output()
         .unwrap();
 
@@ -105,12 +96,8 @@ fn coverage_binary_fails_on_missing_class_fixture() {
         "{}/tests/fixtures/violation-red-team-missing-class/seeds-fixture.toml",
         env!("CARGO_MANIFEST_DIR")
     );
-    let output = std::process::Command::new("cargo")
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_maos-corpus-gen"))
         .args([
-            "run",
-            "-p",
-            "maos-corpus-gen",
-            "--",
             "coverage",
             "--corpus",
             "red-team-640",

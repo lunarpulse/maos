@@ -301,10 +301,16 @@ fn forget_fails_closed_when_pid_directory_is_unreadable() {
         if std::fs::read_dir(&pid_dir).is_ok() {
             std::fs::set_permissions(&pid_dir, std::fs::Permissions::from_mode(0o700))
                 .expect("restore pid directory permissions");
+            if ci::skip_unless(
+                "forget_fails_closed_when_pid_directory_is_unreadable: a user without \
+                 CAP_DAC_OVERRIDE (permission control unobservable under it)",
+                false,
+            ) {
+                return;
+            }
             let reason = "SKIP (forget_fails_closed_when_pid_directory_is_unreadable): running with CAP_DAC_OVERRIDE — permission control unobservable";
             eprintln!("{reason}");
-            assert!(!ci::declared_ci(), "{reason}");
-            return;
+            panic!("{reason}");
         }
 
         let result = fixture.fresh_private().forget_principal(PRINCIPAL);

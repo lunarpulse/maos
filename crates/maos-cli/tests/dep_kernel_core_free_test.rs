@@ -7,6 +7,7 @@
 
 #[test]
 fn maos_cli_dep_tree_excludes_kernel_core() {
+    // cargo-query: cargo tree resolves the dependency graph (no compile)
     let output = std::process::Command::new("cargo")
         .args(["tree", "-p", "maos-cli", "--prefix", "none"])
         .output()

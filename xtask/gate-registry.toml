@@ -175,6 +175,14 @@ gates = [
     # manifest, the price book or a `main.rs` provider constructor is checked
     # against `xtask/model-currency.toml`. Offline; names `file:line`.
     "check-model-currency",
+    # Story 20-12 AC2 — no test compiles the tree: every `Command::new("cargo")`
+    # / `env!("CARGO")` under a test dir is `// expensive:`-marked, its tests
+    # `#[ignore = "expensive: …"]` and registered in `xtask/test-budgets.toml`.
+    "check-test-cost",
+    # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
+    # finishes under its `xtask/test-budgets.toml` budget (default 30 s; total
+    # 300 s). Before: 1,871 s, 67 % of it one test that ran a whole gate.
+    "check-test-budget",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -406,6 +414,27 @@ binding = "blocking"
 [[ship_gate]]
 name = "check-model-currency"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
+
+# Story 20-12 AC2 — `check-test-cost`. Hermetic (reads committed test sources
+# and `xtask/test-budgets.toml`), so `BindingClass::Blocking` at every phase,
+# like the other repo-local structural gates: there is no phase at which a test
+# that silently compiles the tree should pass. `EvidenceState` is the plain
+# passed/failed of a source scan (no substrate leg, no signature).
+[[ship_gate]]
+name = "check-test-cost"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
+
+# Story 20-12 AC1 — `check-test-budget`, over the junit `workspace-test-suite`
+# uploads. ADVISORY at v1_0 by operator ruling 2026-10-23 (review of 20-12):
+# the budgeted metric is Σ per-test junit `time` and `total_seconds` has not yet
+# been calibrated on one CI run; it flips to blocking (the 15-1
+# `workspace-test-suite` precedent) once that calibration lands — flip owner
+# `epic-17-retrospective`. Blocking from v1_5.
+[[ship_gate]]
+name = "check-test-budget"
+disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 
 # Story 20-3a — J4 budget advisory at v1.5; binding gate = 20-7 / ADR-068 stable runner.

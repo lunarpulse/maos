@@ -57,6 +57,8 @@
 //! `#[ignore]`d by design: the NFR job runs it with `-- --ignored` and fails
 //! unless libtest reports exactly `1 passed` (a zero-test run is red).
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 #[path = "support/t0_worker.rs"]
 mod t0_worker;
 use std::collections::{HashMap, HashSet};
@@ -107,25 +109,10 @@ const GRANDCHILD_MODE_ARG: &[u8] = b"--maos-fixture-mode=hang-with-grandchild";
 /// into `worker-cli-fixture` (before exec, cmdline is this test binary's).
 const FIXTURE_MODE_PREFIX: &[u8] = b"--maos-fixture-mode=";
 
-static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
-    // The test binary's own profile decides where `resolve_cli_binary` looks
-    // (`target/debug` vs `target/release` next to `current_exe`), so the
-    // fixture must be built in the SAME profile the corpus runs in.
-    let mut command = std::process::Command::new("cargo");
-    command
-        .args(["build", "-q", "-p", "worker", "--bin", "worker-cli-fixture"])
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    if !cfg!(debug_assertions) {
-        command.arg("--release");
-    }
-    let output = command
-        .output()
-        .expect("run cargo build for worker fixture");
-    assert!(
-        output.status.success(),
-        "build worker-cli-fixture: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+static WORKER_FIXTURE_PRESENT: LazyLock<()> = LazyLock::new(|| {
+    // `resolve_cli_binary` looks beside `current_exe`, so the prebuilt
+    // fixture must sit in the SAME profile directory the corpus runs in.
+    fixtures::profile_binary("worker-cli-fixture");
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -523,10 +510,10 @@ fn print_floor(name: &str, floor: Duration, observed: &[Duration], total: usize)
 // with `-- --ignored` and fails unless libtest reports exactly `1 passed`.
 // ────────────────────────────────────────────────────────────────────────────
 
-#[ignore]
+#[ignore = "expensive: 100 SIGKILLed live Workers; run in the nfr-rel-1 CI job with `-- --ignored`"]
 #[tokio::test(flavor = "multi_thread")]
 async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() {
-    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    LazyLock::force(&WORKER_FIXTURE_PRESENT);
     let dir = scratch_dir("corpus");
     let world = KernelWorld::new(&dir);
     let supervisor = Arc::clone(&world.supervisor);

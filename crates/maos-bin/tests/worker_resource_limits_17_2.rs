@@ -4,6 +4,8 @@
 //! Story 17-2 T3 proof: real `maos run`, signed rootless image, live OCI
 //! inspection, and evidence from the actual `/maos/spirit` payload process.
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
 
@@ -172,16 +174,7 @@ impl Drop for Root {
 }
 
 fn build_fixture() {
-    let output = Command::new("cargo")
-        .args(["build", "-q", "-p", "worker", "--bin", "worker-cli-fixture"])
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
-        .output()
-        .expect("build actual Worker fixture binary");
-    assert!(
-        output.status.success(),
-        "build Worker fixture: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    fixtures::profile_binary("worker-cli-fixture");
 }
 
 struct OwnedChild(Option<Child>);
@@ -358,9 +351,9 @@ fn cgroup_limit(proc: &PathBuf, pid: u32, file: &str) -> Option<String> {
 
 #[test]
 fn real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion() {
-    assert!(t3_substrate::require_t3(
-        "17-2 live Worker resource enforcement"
-    ));
+    if !t3_substrate::require_t3("17-2 live Worker resource enforcement") {
+        return;
+    }
     build_fixture();
     let root = Root::new("applied", 64);
     let before = runtime_ids(&root);
@@ -665,9 +658,9 @@ exit $rc"#;
 
 #[test]
 fn fd_request_above_inherited_hard_limit_refuses_before_worker_payload() {
-    assert!(t3_substrate::require_t3(
-        "17-2 Worker FD hard-limit refusal"
-    ));
+    if !t3_substrate::require_t3("17-2 Worker FD hard-limit refusal") {
+        return;
+    }
     build_fixture();
     let root = Root::new("hard-limit", 65);
     verify_actual_runtime_fd_boundary(&root);

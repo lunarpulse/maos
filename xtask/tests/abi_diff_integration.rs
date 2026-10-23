@@ -15,6 +15,7 @@ fn fixtures_root() -> PathBuf {
 }
 
 fn run_public_api(manifest_path: &str) -> String {
+    // expensive: cargo public-api builds rustdoc JSON on nightly
     let output = Command::new("cargo")
         .args(["public-api", "-sss", "--manifest-path", manifest_path])
         .output()
@@ -77,6 +78,7 @@ fn assert_differs_across_variants(fixture: &str, var_a: &str, var_b: &str) {
 // cargo-public-api canonical output should be IDENTICAL (no false positive).
 
 #[test]
+#[ignore = "expensive: cargo public-api builds rustdoc JSON on nightly"]
 fn quote_whitespace_no_false_positive() {
     assert_identical_across_variants("quote-whitespace", "baseline", "modified");
     assert_matches_expected("quote-whitespace", "baseline");
@@ -87,6 +89,7 @@ fn quote_whitespace_no_false_positive() {
 // Function moved behind a pub use reexport should still appear in output.
 
 #[test]
+#[ignore = "expensive: cargo public-api builds rustdoc JSON on nightly"]
 fn pub_use_reexport_preserved() {
     // Baseline (fn in lib.rs) and modified (fn behind pub use) should be identical.
     assert_identical_across_variants("pub-use-reexport", "baseline", "modified");
@@ -94,6 +97,7 @@ fn pub_use_reexport_preserved() {
 }
 
 #[test]
+#[ignore = "expensive: cargo public-api builds rustdoc JSON on nightly"]
 fn pub_use_reexport_removal_detected() {
     // Removing the pub use (keeping fn private) should produce different output.
     assert_differs_across_variants("pub-use-reexport", "baseline", "modified-removed");
@@ -112,6 +116,7 @@ fn pub_use_reexport_removal_detected() {
 // Bound order IS represented in the output (faithful, not false-positive).
 
 #[test]
+#[ignore = "expensive: cargo public-api builds rustdoc JSON on nightly"]
 fn generic_bound_reorder_deterministic() {
     // Each variant produces deterministic output matching its EXPECTED.txt.
     assert_matches_expected("generic-bound-reorder", "baseline");
@@ -125,6 +130,7 @@ fn generic_bound_reorder_deterministic() {
 // Both inline-mod forms should produce the same public API surface.
 
 #[test]
+#[ignore = "expensive: cargo public-api builds rustdoc JSON on nightly"]
 fn inline_mod_items_visible() {
     assert_identical_across_variants("inline-mod-items", "baseline", "modified");
     assert_matches_expected("inline-mod-items", "baseline");

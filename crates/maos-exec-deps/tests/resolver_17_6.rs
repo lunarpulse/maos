@@ -10,6 +10,9 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
+
 use maos_exec_deps::{parse_elf, resolve, Elf};
 
 const ELF_HEADER: usize = 64;
@@ -613,23 +616,10 @@ fn transitive_dependency_closure_is_bounded() {
     );
 }
 
+/// Prebuilt by `cargo run -p xtask -- build-test-fixtures` (Story 20-12: no
+/// test compiles the tree).
 fn dynamic_probe() -> PathBuf {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../maos-wasm-host/test-fixtures/forbidden-syscall-probe");
-    let probe = fixture.join("target/release/forbidden-syscall-probe");
-    if !probe.exists() {
-        let status = Command::new("cargo")
-            .args(["build", "--release", "--locked", "--target-dir", "target"])
-            .current_dir(fixture)
-            .env_remove("CARGO_TARGET_DIR")
-            .status()
-            .expect("start forbidden-syscall-probe release build");
-        assert!(
-            status.success(),
-            "forbidden-syscall-probe release build failed"
-        );
-    }
-    probe
+    fixtures::fixture("forbidden-syscall-probe")
 }
 
 #[test]

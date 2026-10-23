@@ -8,12 +8,20 @@ mod ci;
 
 pub fn require_t3(subject: &str) -> bool {
     if !cfg!(target_os = "linux") {
-        eprintln!("SKIP T3 {subject}: OCI Worker execution is Linux-only");
+        eprintln!("SKIP: T3 {subject}: OCI Worker execution is Linux-only");
         return false;
     }
-    let configured = std::env::var("MAOS_T3_RUNTIME").ok();
-    if configured.is_none() && !ci::declared_ci() {
-        eprintln!("SKIP T3 {subject}: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env");
+    // An empty or whitespace-only value is unset (Story 20-12 review).
+    let configured = std::env::var("MAOS_T3_RUNTIME")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    if ci::skip_unless(
+        &format!(
+            "T3 {subject}: signed test substrate not provisioned; run \
+             scripts/provision_t3_tests.py and source its t3.env"
+        ),
+        configured.is_some(),
+    ) {
         return false;
     }
     assert!(

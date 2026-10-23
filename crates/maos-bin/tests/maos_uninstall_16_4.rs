@@ -1421,10 +1421,16 @@ fn purge_refuses_an_unopenable_store_directory_as_lock_unavailable() {
     if std::fs::File::open(&memory).is_ok() {
         std::fs::set_permissions(&memory, std::fs::Permissions::from_mode(0o700))
             .expect("restore store directory");
+        if ci::skip_unless(
+            "purge_refuses_an_unopenable_store_directory_as_lock_unavailable: a user without \
+             CAP_DAC_OVERRIDE (permission control unobservable under it)",
+            false,
+        ) {
+            return;
+        }
         let reason = "SKIP (purge_refuses_an_unopenable_store_directory_as_lock_unavailable): running with CAP_DAC_OVERRIDE — permission control unobservable";
         eprintln!("{reason}");
-        assert!(!ci::declared_ci(), "{reason}");
-        return;
+        panic!("{reason}");
     }
 
     let refused = maos_command(root)
@@ -1666,10 +1672,16 @@ fn purge_failure_mid_deletion_leaves_an_in_progress_receipt() {
         let _ = std::fs::remove_file(locked_dir.join(".probe"));
         std::fs::set_permissions(&locked_dir, std::fs::Permissions::from_mode(0o0700))
             .expect("restore subdirectory");
+        if ci::skip_unless(
+            "purge_failure_mid_deletion_leaves_an_in_progress_receipt: a user without \
+             CAP_DAC_OVERRIDE (permission control unobservable under it)",
+            false,
+        ) {
+            return;
+        }
         let reason = "SKIP (purge_failure_mid_deletion_leaves_an_in_progress_receipt): running with CAP_DAC_OVERRIDE — permission control unobservable";
         eprintln!("{reason}");
-        assert!(!ci::declared_ci(), "{reason}");
-        return;
+        panic!("{reason}");
     }
 
     let receipt = root.join("mid-deletion-receipt.json");

@@ -1,9 +1,7 @@
 use std::process::Command;
 
 fn xtask() -> Command {
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "xtask", "--"]);
-    cmd
+    Command::new(env!("CARGO_BIN_EXE_xtask"))
 }
 
 #[test]
@@ -365,9 +363,48 @@ fn shipped_baseline_symbol_absent_from_surface_reds() {
         stderr.contains("maos_kernel_core::"),
         "expected a real shipped-baseline path in the violation, got:\n{stderr}"
     );
+    // Story 20-12: this assertion used to be satisfied by `cargo run`'s own
+    // "Running `… --baseline docs/ci-baselines/kernel-surface-v0.1-beta.json`"
+    // echo on stderr, not by the gate. The gate names the diff source in each
+    // violation's `file` field, which only the JSON report carries.
+    let json = xtask()
+        .args([
+            "check-service-boundary",
+            "--path",
+            "xtask/tests/fixtures/clean-service-boundary",
+            "--baseline",
+            "docs/ci-baselines/kernel-surface-v0.1-beta.json",
+            "--classes",
+            "xtask/kernel-api-classes.toml",
+            "--json",
+        ])
+        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
+        .output()
+        .expect("xtask should run");
     assert!(
-        stderr.contains("kernel-surface-v0.1-beta.json"),
-        "expected the shipped baseline to be the diff source, got:\n{stderr}"
+        !json.status.success(),
+        "--json must red on the removed shipped-baseline symbols"
+    );
+    let report: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap_or_else(|e| {
+        panic!(
+            "--json stdout does not parse ({e}):\n{}",
+            String::from_utf8_lossy(&json.stdout)
+        )
+    });
+    let violations = report["violations"]
+        .as_array()
+        .expect("the report carries a violations array");
+    assert!(
+        violations.iter().any(|v| {
+            v["file"] == "docs/ci-baselines/kernel-surface-v0.1-beta.json"
+                && v["path"]
+                    .as_str()
+                    .is_some_and(|path| path.starts_with("maos_kernel_core::"))
+                && v["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("removed public kernel symbol"))
+        }),
+        "expected a removed-symbol violation sourced from the shipped baseline, got:\n{report:#}"
     );
 }
 

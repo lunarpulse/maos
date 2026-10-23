@@ -825,6 +825,17 @@ pub fn assert_fd_headroom_at(required: u64, path: &std::path::Path) {
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
         Err(error) => {
+            // Non-Linux hosts have no /proc limits file: `present` there, so the
+            // original named-skip path below runs unchanged even on CI.
+            if ci::skip_unless(
+                &format!(
+                    "readable fd limits file for assert_fd_headroom ({}: {error})",
+                    path.display()
+                ),
+                !cfg!(target_os = "linux"),
+            ) {
+                return;
+            }
             let reason = format!(
                 "SKIP (assert_fd_headroom): cannot read {}: {error}",
                 path.display()

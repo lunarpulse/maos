@@ -42,6 +42,8 @@
 //! thread holding ONE keyset cursor over all new rows — never per-pid queries,
 //! because the log has one mutex shared with the writes being measured.
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 #[path = "support/t0_worker.rs"]
 mod t0_worker;
 use std::collections::HashMap;
@@ -93,26 +95,10 @@ const SPAWN_BUDGET: Duration = Duration::from_secs(30);
 /// absorbs scheduler noise on a loaded box for all 60 at once.
 const CRASH_WINDOW: Duration = Duration::from_secs(10);
 
-/// The fixture binary is a workspace package, not a test fixture: build it
-/// once, lazily, exactly as the sibling 16-3 suites do.
-static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
-    // `resolve_cli_binary` searches beside the running test executable, so
-    // the fixture must use the same debug/release profile as this corpus.
-    let mut command = std::process::Command::new("cargo");
-    command
-        .args(["build", "-q", "-p", "worker", "--bin", "worker-cli-fixture"])
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    if !cfg!(debug_assertions) {
-        command.arg("--release");
-    }
-    let output = command
-        .output()
-        .expect("run cargo build for worker fixture");
-    assert!(
-        output.status.success(),
-        "build worker-cli-fixture: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+/// The fixture binary is a workspace package, prebuilt beside the running
+/// test executable (where `resolve_cli_binary` searches).
+static WORKER_FIXTURE_PRESENT: LazyLock<()> = LazyLock::new(|| {
+    fixtures::profile_binary("worker-cli-fixture");
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -411,9 +397,9 @@ fn median(sorted: &[u64]) -> u64 {
 // ────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-#[ignore = "NFR-Rel-2 hang corpus: 60 live fixture Workers for ~75 s; run with `-- --ignored`"]
+#[ignore = "expensive: 60 live Workers for ~75 s; run in the nfr-rel-2 CI job with `-- --ignored`"]
 async fn sixty_workers_stall_by_silence_and_crash_by_signal() {
-    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    LazyLock::force(&WORKER_FIXTURE_PRESENT);
     let dir = scratch_dir("corpus");
     let world = World::new(&dir);
     // `arm` spawns BOTH the ProgressWatchdog and the progress stamper — the

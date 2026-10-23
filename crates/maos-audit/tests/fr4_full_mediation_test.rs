@@ -96,24 +96,13 @@ fn fixture_is_byte_deterministic() {
     let tmp = tempfile::TempDir::new().unwrap();
     let regen_path = tmp.path().join("regen.jsonl");
 
-    // Run the gen_fixture binary via cargo. We use cargo so the build graph
-    // re-uses any cached artifacts and the test does not need to know the
-    // exact `target/` layout.
-    let output = Command::new("cargo")
+    // Run the gen_fixture binary cargo already built for this package's
+    // integration tests (Story 20-12: no test compiles the tree).
+    let output = Command::new(env!("CARGO_BIN_EXE_gen_fixture"))
         .current_dir(&workspace_root)
-        .args([
-            "run",
-            "--quiet",
-            "-p",
-            "maos-audit",
-            "--bin",
-            "gen_fixture",
-            "--locked",
-            "--",
-        ])
         .arg(&regen_path)
         .output()
-        .expect("invoke gen_fixture via cargo");
+        .expect("invoke gen_fixture");
 
     assert!(
         output.status.success(),

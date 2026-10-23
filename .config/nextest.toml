@@ -1,0 +1,64 @@
+# Story 20-12 AC1 (D-20-12-A) — nextest is the workspace runner: one process per
+# test, a slow-timeout, and a junit report that `check-test-budget` reads.
+#
+#   cargo nextest run --workspace --locked --no-fail-fast            # local
+#   cargo nextest run --workspace --locked --no-fail-fast --profile ci
+#   cargo run -p xtask -- check-test-budget --junit target/nextest/ci/junit.xml
+
+[profile.default]
+# 30 s is the per-binary budget default (`xtask/test-budgets.toml`); a single
+# test that runs 4 periods (120 s) is killed rather than holding the suite.
+slow-timeout = { period = "30s", terminate-after = 4 }
+# maos-kernel-core's lib unit tests share a process-global monotonic clock base
+# that a sibling test initialises (`maos-capability` `cap_tokens::monotonic_now_ns`
+# debug-asserts `init_monotonic_base()` ran). Under nextest's process-per-test
+# model 18 of them panic; libtest runs them in one process. kernel-core `src/`
+# is frozen (kernel-Δ 0), so they run under libtest in the same CI job:
+# `cargo test -p maos-kernel-core --lib` (see `workspace-test-suite`).
+default-filter = "not (package(maos-kernel-core) & kind(lib))"
+
+[profile.default.junit]
+path = "junit.xml"
+
+# Story 20-12 review (finding 66) — nextest runs each test in its own process, so
+# an in-process `static Mutex`/`TEST_LOCK` serialises nothing. These binaries'
+# tests share host state (a tracked source file, fixed ports, a global cgroup or
+# store path) and run one at a time. `ci`/`expensive` inherit these overrides.
+[test-groups]
+serial = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = """
+binary_id(xtask::example_spirit_regen_integration)
+| binary_id(xtask::diagnostics_20_3a)
+| binary_id(maos-bin::cohort_daemon_smoke_13_5c)
+| binary_id(maos-loom-lite::migration_live)
+| binary_id(maos-loom-lite::cross_region_live)
+| binary_id(maos-loom-lite::tenant_wall_live)
+| binary_id(maos-kernel-core::audit_sink_truth_16_5)
+| binary_id(maos-bin::mcp_mint_receipt_17_9)
+| binary_id(maos-bench::t_11_2b_cross_region_slo)
+| binary_id(maos-bin::cross_team_crossing_13_6b)
+| binary_id(maos-bin::host_grants_2b)
+| binary_id(maos-bin::cross_team_consent_13_3)
+| binary_id(maos-registry::fr59_yank_propagation_within_5min_test)
+"""
+test-group = "serial"
+
+[profile.ci]
+fail-fast = false
+
+[profile.ci.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
+
+# The `expensive-tests` job: real workloads and cargo-spawning tests, opted in
+# with `--run-ignored ignored-only` and the filter from
+# `cargo run -p xtask -- check-test-cost --expensive-filter`.
+[profile.expensive]
+fail-fast = false
+slow-timeout = { period = "120s", terminate-after = 10 }
+
+[profile.expensive.junit]
+path = "junit.xml"

@@ -72,7 +72,7 @@ fn red(output: Output, reason: &str) {
 }
 
 #[test]
-fn real_tree_has_44_bound_and_enrolled_gates() {
+fn real_tree_has_46_bound_and_enrolled_gates() {
     let copy = tree();
     let output = run(copy.path());
     assert!(
@@ -82,7 +82,7 @@ fn real_tree_has_44_bound_and_enrolled_gates() {
     );
     let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["passed"], true);
-    assert_eq!(report["expected_count"], 44);
+    assert_eq!(report["expected_count"], 46);
 }
 
 #[test]

@@ -16,11 +16,17 @@ use maos_kernel_core::security::sandbox::{
     classify_exit, spawn_sandboxed, SandboxSpec, SpawnError,
 };
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
 fn skip_if_perm_denied<T>(result: Result<T, SpawnError>, test_name: &str) -> Option<T> {
     match result {
         Ok(v) => Some(v),
         Err(SpawnError::Io(e)) if e.kind() == io::ErrorKind::PermissionDenied => {
-            if std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some() {
+            if !ci::skip_unless(
+                "T2 sandbox setup permitted by this host (CAP_SYS_ADMIN / no_new_privs)",
+                false,
+            ) {
                 panic!(
                     "{test_name}: T2 spawn refused on a runner declared capable (rule 11(b)): \
                      {:?}: {e} — CI/GITHUB_ACTIONS declares this runner capable; a job that \
@@ -29,7 +35,6 @@ fn skip_if_perm_denied<T>(result: Result<T, SpawnError>, test_name: &str) -> Opt
                     e.kind()
                 );
             }
-            eprintln!("SKIP {test_name}: sandbox setup requires CAP_SYS_ADMIN / no_new_privs");
             None
         }
         Err(e) => panic!("{test_name}: spawn_sandboxed failed: {e:?}"),

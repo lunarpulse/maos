@@ -43,16 +43,26 @@ const NONCE: u64 = 0x17_08;
 const ID: &str = "recall-probe";
 const INTENT: &str = "diagnosis-handoff:read-only-evidence";
 
-fn target_root() -> PathBuf {
-    std::env::current_exe()
-        .unwrap()
-        .ancestors()
-        .nth(3)
-        .unwrap()
-        .to_owned()
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
+
+/// Story 20-12 AC3 — the WASM form runs only under the 17-2 cgroup runner,
+/// which declares its lane. Off CI an unset lane is one `SKIP:` line; on a
+/// declared-CI host the test runs on and `FIXTURES` fails closed.
+fn cgroup_lane_skip() -> bool {
+    ci::skip_unless(
+        "MAOS_17_2_CGROUP_MODE=delegated|undelegated (scripts/run_cgroup_ceiling_17_2.py)",
+        matches!(
+            std::env::var("MAOS_17_2_CGROUP_MODE").as_deref(),
+            Ok("delegated" | "undelegated")
+        ),
+    )
 }
+
 fn artifact() -> PathBuf {
-    target_root().join("recall-probe-guest/wasm32-wasip2/release/recall_probe.wasm")
+    FIXTURES.1.clone()
 }
 fn relay_child(out: &std::process::Output) {
     for stream in [&out.stdout, &out.stderr] {
@@ -61,36 +71,16 @@ fn relay_child(out: &std::process::Output) {
         }
     }
 }
-static FIXTURES: LazyLock<()> = LazyLock::new(|| {
+/// Prebuilt release `maos-wasm-runner` and `recall_probe.wasm` (manifest).
+static FIXTURES: LazyLock<(PathBuf, PathBuf)> = LazyLock::new(|| {
     assert!(matches!(
         std::env::var("MAOS_17_2_CGROUP_MODE").as_deref(),
         Ok("delegated" | "undelegated")
     ));
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for guest in [true, false] {
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.current_dir(&workspace)
-            .env("CARGO_TARGET_DIR", target_root())
-            .args(["build", "--locked", "--release"]);
-        if guest {
-            cmd.args([
-                "--manifest-path",
-                "crates/maos-wasm-host/guests/recall-probe/Cargo.toml",
-                "--target",
-                "wasm32-wasip2",
-                "--target-dir",
-            ])
-            .arg(target_root().join("recall-probe-guest"));
-        } else {
-            cmd.args(["-p", "maos-wasm-host", "--bin", "maos-wasm-runner"]);
-        }
-        let out = cmd.output().expect("build real release recall fixture");
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-    }
+    (
+        fixtures::fixture("maos-wasm-runner"),
+        fixtures::fixture("recall_probe.wasm"),
+    )
 });
 
 #[derive(Default)]
@@ -423,10 +413,7 @@ fn launch(frame: IacFrame) -> SessionLaunch {
     LazyLock::force(&FIXTURES);
     SessionLaunch {
         plan: maos_host::SpiritLaunchPlan {
-            program: target_root()
-                .join("release/maos-wasm-runner")
-                .to_string_lossy()
-                .into_owned(),
+            program: FIXTURES.0.to_string_lossy().into_owned(),
             argv: vec![
                 "--component".into(),
                 artifact().to_string_lossy().into_owned(),
@@ -873,6 +860,9 @@ impl Caller {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sender_owned_frames_ignore_received_consent_in_native_and_wasm() {
+    if cgroup_lane_skip() {
+        return;
+    }
     for form in [Form::Native, Form::Wasm] {
         let dir = tempfile::tempdir().unwrap();
         let mut world = World::new(dir.path(), false);
@@ -1024,10 +1014,16 @@ async fn addressed_vectors(drr: bool) {
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn direct_recipient_ids_roles_dedup_multiaddress_and_gate_rejection_both_forms() {
+    if cgroup_lane_skip() {
+        return;
+    }
     addressed_vectors(false).await;
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn drr_addressed_and_nonfirst_recipients_both_forms() {
+    if cgroup_lane_skip() {
+        return;
+    }
     addressed_vectors(true).await;
 }
 
@@ -1077,14 +1073,23 @@ async fn consent_transition(rupture: bool) {
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn valid_consent_then_same_frame_expires_between_report_barriers_both_forms() {
+    if cgroup_lane_skip() {
+        return;
+    }
     consent_transition(false).await;
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn valid_consent_then_real_gate_rupture_withholds_same_frame_both_forms() {
+    if cgroup_lane_skip() {
+        return;
+    }
     consent_transition(true).await;
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn header_only_including_oversized_and_withheld_envelopes_both_forms() {
+    if cgroup_lane_skip() {
+        return;
+    }
     for form in [Form::Native, Form::Wasm] {
         let dir = tempfile::tempdir().unwrap();
         let mut world = World::new(dir.path(), false);
@@ -1128,6 +1133,9 @@ async fn header_only_including_oversized_and_withheld_envelopes_both_forms() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn earlier_boot_same_pid_recipient_is_out_of_scope_both_forms() {
+    if cgroup_lane_skip() {
+        return;
+    }
     const CHILD: &str = "MAOS_17_8_PRIOR_BOOT_FORM";
     let form = match std::env::var(CHILD).as_deref() {
         Ok("native") => Form::Native,

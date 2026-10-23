@@ -5,16 +5,7 @@ fn fixture(path: &str) -> String {
 }
 
 fn xtask() -> Command {
-    let mut cmd = Command::new("cargo");
-    cmd.args([
-        "run",
-        "--manifest-path",
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../Cargo.toml"),
-        "-p",
-        "xtask",
-        "--",
-    ]);
-    cmd
+    Command::new(env!("CARGO_BIN_EXE_xtask"))
 }
 
 #[test]

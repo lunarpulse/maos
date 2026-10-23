@@ -19,6 +19,11 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::LazyLock;
 
+#[path = "../../../../tests/harness/ci.rs"]
+mod ci;
+#[path = "../../../../tests/harness/fixtures.rs"]
+mod fixtures;
+
 use maos_domain::invariants::i9::SandboxTier;
 use maos_kernel_core::capability::cap_audit::{CapAuditEvent, CapAuditWriter};
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
@@ -98,33 +103,13 @@ pub fn t2_spec(spirit_id: &str) -> SandboxSpec {
     }
 }
 
-/// Path to the `forbidden-syscall-probe` binary, building it on first use (the
-/// fixture is its own `[workspace]`, so a plain `cargo build --release` in its
-/// dir compiles it without touching the main workspace). Cached per test binary
-/// via `LazyLock` so parallel tests within one binary don't race the build.
+/// Path to the `forbidden-syscall-probe` binary, prebuilt by
+/// `cargo run -p xtask -- build-test-fixtures` (Story 20-12: no test compiles
+/// the tree) and resolved from the fixture manifest once per test binary.
 pub fn probe_binary_path() -> PathBuf {
-    static PROBE: LazyLock<PathBuf> = LazyLock::new(build_probe);
+    static PROBE: LazyLock<PathBuf> =
+        LazyLock::new(|| fixtures::fixture("escape-forbidden-syscall-probe"));
     PROBE.clone()
-}
-
-fn build_probe() -> PathBuf {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let fixture_dir = format!("{manifest_dir}/test-fixtures/forbidden-syscall-probe");
-    let binary = format!("{fixture_dir}/target/release/forbidden-syscall-probe");
-    if !std::path::Path::new(&binary).exists() {
-        let status = Command::new("cargo")
-            .args(["build", "--release"])
-            .current_dir(&fixture_dir)
-            .status();
-        match status {
-            Ok(s) if s.success() => {}
-            _ => panic!(
-                "failed to build forbidden-syscall-probe in {fixture_dir} — \
-                 run `cargo build --release` there manually"
-            ),
-        }
-    }
-    PathBuf::from(binary)
 }
 
 /// Open a fresh on-disk Transparency Log in a temp dir (boot_nonce=1).
@@ -151,10 +136,13 @@ pub fn fresh_temp_tl() -> (
 /// second filter's `prctl`/`seccomp` → `PermissionDenied`) skipping every T2
 /// suite. So in CI (`CI`/`GITHUB_ACTIONS` set — a runner declared capable,
 /// rule 11(b); Story 17-6 AC4) the same refusal PANICS with a named reason that
-/// never begins with `SKIP `, and no `SKIP` line reaches the gate.
+/// never begins with `SKIP`, and no `SKIP` line reaches the gate. Off CI the one
+/// line is `SKIP: <test>: sandbox unavailable on this host` or `SKIP: <test>:
+/// sandbox spawn refused by host (<kind>)` — the phrases `check-escape-detector`
+/// reads as the substrate verdict.
 pub fn skip_if_sandbox_unavailable<T>(result: Result<T, SpawnError>, test_name: &str) -> Option<T> {
-    let refused_on_capable_runner = |kind: &str, err: &dyn std::fmt::Display| {
-        if std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some() {
+    let skip_or_panic = |kind: &str, err: &dyn std::fmt::Display, prereq: String| {
+        if !ci::skip_unless(&prereq, false) {
             panic!(
                 "{test_name}: T2 spawn refused on a runner declared capable (rule 11(b)): \
                  {kind}: {err} — CI/GITHUB_ACTIONS declares this runner capable; a job that \
@@ -166,8 +154,11 @@ pub fn skip_if_sandbox_unavailable<T>(result: Result<T, SpawnError>, test_name: 
     match result {
         Ok(v) => Some(v),
         Err(SpawnError::SandboxUnavailable { reason }) => {
-            refused_on_capable_runner("SandboxUnavailable", &reason);
-            eprintln!("SKIP {test_name}: sandbox unavailable on this host");
+            skip_or_panic(
+                "SandboxUnavailable",
+                &reason,
+                format!("{test_name}: sandbox unavailable on this host"),
+            );
             None
         }
         Err(SpawnError::Io(e))
@@ -176,11 +167,9 @@ pub fn skip_if_sandbox_unavailable<T>(result: Result<T, SpawnError>, test_name: 
                 std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::Unsupported
             ) =>
         {
-            refused_on_capable_runner(&format!("{:?}", e.kind()), &e);
-            eprintln!(
-                "SKIP {test_name}: sandbox spawn refused by host ({:?})",
-                e.kind()
-            );
+            let kind = format!("{:?}", e.kind());
+            let prereq = format!("{test_name}: sandbox spawn refused by host ({kind})");
+            skip_or_panic(&kind, &e, prereq);
             None
         }
         Err(e) => panic!(

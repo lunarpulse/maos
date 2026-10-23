@@ -24,6 +24,8 @@
 //!
 //! Linux-gated: the pidfd exit observer is the subject.
 
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 #[path = "support/t0_worker.rs"]
 mod t0_worker;
 #[path = "../../../tests/harness/t3_substrate.rs"]
@@ -42,17 +44,10 @@ use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
 
 const NONCE: u64 = 0x16_03;
 
+/// `resolve_cli_binary` looks beside `current_exe`; the prebuilt fixture must
+/// sit in this test's profile directory.
 static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
-    let output = std::process::Command::new("cargo")
-        .args(["build", "-q", "-p", "worker", "--bin", "worker-cli-fixture"])
-        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
-        .output()
-        .expect("run cargo build for worker fixture");
-    assert!(
-        output.status.success(),
-        "build worker-cli-fixture: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    fixtures::profile_binary("worker-cli-fixture");
 });
 
 // ────────────────────────────────────────────────────────────────────────────

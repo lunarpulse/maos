@@ -93,3 +93,15 @@ opt-level = 3
 
 [profile.dev.package.sha2]
 opt-level = 3
+
+# Story 20-12 AC7 — test binaries were 22–100 MB of full DWARF and every
+# in-place proven-red plant relinks one (638 s measured on a loaded host,
+# 2026-10-23). Line tables keep file:line in panics and backtraces; unpacked
+# split debuginfo leaves the DWARF in the object files instead of copying it
+# into every linked binary (measured 20.2 -> 10.6 MB). This is the whole AC7
+# build change: the default linker (rust-lld) is unchanged — the mold wrapper
+# was removed at review (operator ruling 2026-10-23: no measured gain, and it
+# changed release linking too). `test` inherits `dev`; release is untouched.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"

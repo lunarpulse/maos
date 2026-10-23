@@ -15,16 +15,20 @@
 //! Proven red (Story 17-6, recorded in the Dev Agent Record): delete the
 //! bridge's T2 arm and the T2 row reads `Exited { code: 0 }`.
 //!
-//! The probe is the wasm-host fixture, built with `cargo build --release` in
-//! its own directory (CI builds it before this suite); a missing binary is a
+//! The probe is the wasm-host fixture, prebuilt by
+//! `cargo run -p xtask -- build-test-fixtures` (Story 20-12); a missing binary is a
 //! failure, never a skip. A T2 row the host refuses follows rule 11(b): in CI
 //! (`CI`/`GITHUB_ACTIONS` set — a runner declared capable) it FAILS; off CI a
 //! `PermissionDenied` refusal prints a named `SKIP` line.
 #![cfg(target_os = "linux")]
 
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use std::sync::LazyLock;
+
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
 
 use maos_domain::invariants::i9::SandboxTier;
 use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
@@ -34,59 +38,12 @@ use maos_kernel_core::lifecycle::cli_wrapper::{
 use maos_kernel_core::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
 use maos_kernel_core::security::sandbox::SandboxSpec;
 
-/// CI prebuilds the fixture and its freshness is checked here; locally Cargo
-/// confirms the release probe is current on first use. Concurrent test binaries
-/// serialize a rebuild through the fixture target directory lock.
-static PROBE: LazyLock<PathBuf> = LazyLock::new(build_probe);
+/// Resolved once from the prebuilt fixture manifest (Story 20-12: no test
+/// compiles the tree).
+static PROBE: LazyLock<PathBuf> = LazyLock::new(|| fixtures::fixture("forbidden-syscall-probe"));
 
 fn probe() -> PathBuf {
     PROBE.clone()
-}
-
-fn build_probe() -> PathBuf {
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../maos-wasm-host/test-fixtures/forbidden-syscall-probe");
-    let binary = fixture.join("target/release/forbidden-syscall-probe");
-    if !ci_has_prebuilt_probe() || fixture_needs_rebuild(&fixture, &binary) {
-        let status = Command::new("cargo")
-            .args(["build", "--locked", "--release", "--manifest-path"])
-            .arg(fixture.join("Cargo.toml"))
-            .arg("--target-dir")
-            .arg(fixture.join("target"))
-            .env_remove("CARGO_TARGET_DIR")
-            .status()
-            .expect("start current forbidden-syscall-probe release build");
-        assert!(
-            status.success(),
-            "forbidden-syscall-probe release build failed in {}",
-            fixture.display()
-        );
-    }
-    assert!(
-        binary.is_file(),
-        "the bridge route proof requires the forbidden-syscall-probe at {}",
-        binary.display()
-    );
-    binary
-}
-
-fn fixture_needs_rebuild(fixture: &Path, binary: &Path) -> bool {
-    let Ok(binary_modified) = binary.metadata().and_then(|metadata| metadata.modified()) else {
-        return true;
-    };
-    ["Cargo.toml", "Cargo.lock", "src/main.rs"]
-        .iter()
-        .any(|input| {
-            fixture
-                .join(input)
-                .metadata()
-                .and_then(|metadata| metadata.modified())
-                .map_or(true, |modified| modified > binary_modified)
-        })
-}
-
-fn ci_has_prebuilt_probe() -> bool {
-    std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some()
 }
 
 fn spec(tier: SandboxTier) -> BridgeSpawnSpec {
@@ -146,17 +103,19 @@ fn t2_probe_dies_of_sigsys_at_the_launch_primitive() {
             "a T2 bridge child calling ptrace must die of SIGSYS (observed {cause:?})"
         ),
         Err(BridgeError::SandboxRefused(msg)) => {
-            let capable =
-                std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some();
             let permission_denied = msg.contains("IO error during spawn")
                 && (msg.contains("(os error 1)") || msg.contains("(os error 13)"));
-            if capable || !permission_denied {
+            if !permission_denied
+                || !ci::skip_unless(
+                    "T2 sandbox setup permitted by this host (CAP_SYS_ADMIN / no_new_privs)",
+                    false,
+                )
+            {
                 panic!(
                     "t2_bridge_route: T2 spawn refused on a runner declared capable \
                      (rule 11(b)): SandboxRefused: {msg}"
                 );
             }
-            eprintln!("SKIP t2_bridge_route: sandbox setup requires CAP_SYS_ADMIN / no_new_privs");
         }
         Err(e) => panic!("t2_bridge_route: spawn_and_bridge failed: {e:?}"),
     }
@@ -197,8 +156,14 @@ fn t2_sigsys_block_is_audited_or_journaled_never_dropped() {
         let journal = TransparencyLogAdapter::open_in_memory(0);
         let mut bridge = match spawn_and_bridge(spec(SandboxTier::T2)) {
             Ok(bridge) => bridge,
-            Err(BridgeError::SandboxRefused(msg)) if !ci_has_prebuilt_probe() => {
-                eprintln!("SKIP t2_sigsys_block: sandbox setup refused off CI: {msg}");
+            Err(BridgeError::SandboxRefused(msg))
+                if msg.contains("IO error during spawn")
+                    && (msg.contains("(os error 1)") || msg.contains("(os error 13)"))
+                    && ci::skip_unless(
+                        &format!("T2 sandbox setup permitted by this host ({msg})"),
+                        false,
+                    ) =>
+            {
                 return;
             }
             Err(error) => panic!("T2 spawn failed: {error:?}"),

@@ -90,6 +90,7 @@ fn operator_hand_edit_survives_on_next_read() {
 #[test]
 fn no_markdown_parser_in_kernel_core_deps() {
     // Run cargo tree to assert no markdown/YAML parser crates.
+    // cargo-query: cargo tree resolves the dependency graph (no compile)
     let output = std::process::Command::new("cargo")
         .args(["tree", "-p", "maos-kernel-core"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))

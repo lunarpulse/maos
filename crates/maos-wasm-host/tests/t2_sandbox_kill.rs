@@ -23,9 +23,15 @@
 
 use std::io::{self, Read};
 use std::os::unix::process::ExitStatusExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::LazyLock;
+
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
+
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
 
 use maos_domain::invariants::i9::SandboxTier;
 use maos_kernel_core::security::sandbox::{
@@ -39,7 +45,10 @@ fn skip_if_perm_denied<T>(result: Result<T, SpawnError>, test_name: &str) -> Opt
     match result {
         Ok(v) => Some(v),
         Err(SpawnError::Io(e)) if e.kind() == io::ErrorKind::PermissionDenied => {
-            if std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some() {
+            if !ci::skip_unless(
+                "T2 sandbox setup permitted by this host (CAP_SYS_ADMIN / no_new_privs)",
+                false,
+            ) {
                 panic!(
                     "{test_name}: T2 spawn refused on a runner declared capable (rule 11(b)): \
                      {:?}: {e} — CI/GITHUB_ACTIONS declares this runner capable; a job that \
@@ -48,7 +57,6 @@ fn skip_if_perm_denied<T>(result: Result<T, SpawnError>, test_name: &str) -> Opt
                     e.kind()
                 );
             }
-            eprintln!("SKIP {test_name}: sandbox setup requires CAP_SYS_ADMIN / no_new_privs");
             None
         }
         Err(e) => panic!("{test_name}: spawn_sandboxed failed: {e:?}"),
@@ -65,59 +73,13 @@ fn t2_spec(spirit_id: &str) -> SandboxSpec {
     }
 }
 
-/// CI prebuilds this fixture and its freshness is checked here; locally Cargo
-/// confirms the release probe is current on first use. Concurrent test binaries
-/// may race the check, but Cargo's target directory lock serializes a rebuild.
-static PROBE_BINARY: LazyLock<PathBuf> = LazyLock::new(build_probe_binary);
+/// Prebuilt by `cargo run -p xtask -- build-test-fixtures` (Story 20-12: no
+/// test compiles the tree); resolved once from the fixture manifest.
+static PROBE_BINARY: LazyLock<PathBuf> =
+    LazyLock::new(|| fixtures::fixture("forbidden-syscall-probe"));
 
 fn probe_binary_path() -> PathBuf {
     PROBE_BINARY.clone()
-}
-
-fn build_probe_binary() -> PathBuf {
-    let fixture =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-fixtures/forbidden-syscall-probe");
-    let binary = fixture.join("target/release/forbidden-syscall-probe");
-    if !ci_has_prebuilt_probe() || fixture_needs_rebuild(&fixture, &binary) {
-        let status = Command::new("cargo")
-            .args(["build", "--locked", "--release", "--manifest-path"])
-            .arg(fixture.join("Cargo.toml"))
-            .arg("--target-dir")
-            .arg(fixture.join("target"))
-            .env_remove("CARGO_TARGET_DIR")
-            .status()
-            .expect("start current forbidden-syscall-probe release build");
-        assert!(
-            status.success(),
-            "forbidden-syscall-probe release build failed in {}",
-            fixture.display()
-        );
-    }
-    assert!(
-        binary.is_file(),
-        "AC4's T2 proof requires the forbidden-syscall-probe binary at {}",
-        binary.display()
-    );
-    binary
-}
-
-fn fixture_needs_rebuild(fixture: &Path, binary: &Path) -> bool {
-    let Ok(binary_modified) = binary.metadata().and_then(|metadata| metadata.modified()) else {
-        return true;
-    };
-    ["Cargo.toml", "Cargo.lock", "src/main.rs"]
-        .iter()
-        .any(|input| {
-            fixture
-                .join(input)
-                .metadata()
-                .and_then(|metadata| metadata.modified())
-                .map_or(true, |modified| modified > binary_modified)
-        })
-}
-
-fn ci_has_prebuilt_probe() -> bool {
-    std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some()
 }
 
 /// One observable line per test, printed with `--nocapture`, that the CI step

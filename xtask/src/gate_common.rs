@@ -1063,15 +1063,28 @@ pub fn validate_dates(
 /// programmatic consumers assert on the JSON, not stderr. In non-JSON mode
 /// (production CI), commands go to stdout where Actions parses them.
 pub fn emit_command(json: bool, level: &str, msg: &str) {
-    if json {
-        // #33: in JSON mode, workflow commands go to stderr so stdout stays clean
-        // for JSON parsing. The structured warning/error is ALSO in the JSON payload
-        // (callers add `advisory: true` / `failures: [...]` fields), so programmatic
-        // consumers don't need to parse stderr. Actions only parses stdout commands
-        // in non-JSON mode (production CI), which uses the else branch below.
-        eprintln!("::{level}::{msg}");
+    write_command(
+        json,
+        level,
+        msg,
+        &mut std::io::stdout(),
+        &mut std::io::stderr(),
+    );
+}
+
+/// [`emit_command`] over explicit streams, so a gate's emitter can be asserted
+/// in-process (Story 20-12 T1). JSON mode → `err` (stdout stays parseable);
+/// non-JSON → `out`, where GitHub Actions parses workflow commands.
+pub fn write_command(
+    json: bool,
+    level: &str,
+    msg: &str,
+    out: &mut dyn std::io::Write,
+    err: &mut dyn std::io::Write,
+) {
+    let _ = if json {
+        writeln!(err, "::{level}::{msg}")
     } else {
-        // Production (non-JSON): stdout, where GitHub Actions parses workflow commands.
-        println!("::{level}::{msg}");
-    }
+        writeln!(out, "::{level}::{msg}")
+    };
 }

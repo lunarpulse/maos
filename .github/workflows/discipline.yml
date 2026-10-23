@@ -531,6 +531,92 @@ jobs:
       - name: Run the 17-5 proven-red vectors
         run: cargo test -p xtask --test model_currency_gate
 
+  # Story 20-12 AC2 — no test compiles the tree. A cargo spawn
+  # (`Command::new("cargo")`, `env!`/`var`/`var_os("CARGO")`), `rustc` or
+  # `trybuild` under any workspace member's tests dir reds here unless the line
+  # above says `// expensive: <reason>`, its tests are `#[ignore = "expensive: …"]`
+  # and the binary is registered in `xtask/test-budgets.toml [[expensive]]`
+  # under a job that runs ignored tests — or, for a cargo tree/metadata/
+  # locate-project/pkgid query, `// cargo-query: <reason>` (stays in the default
+  # run). Hermetic: it reads committed sources only. Proven-red vectors run in
+  # the same job.
+  check-test-cost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-test-cost
+        run: cargo run -p xtask -- check-test-cost --json
+      - name: Run the 20-12 AC2 proven-red vectors
+        run: cargo test -p xtask --test check_test_cost_proven_red
+
+  # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
+  # keeps its Σ per-test time under its `xtask/test-budgets.toml` budget
+  # (default 30 s, total 300 s). Reads the junit `workspace-test-suite`
+  # uploads; runs even when the suite went red (a red suite still has a cost to
+  # judge) but not when it was cancelled. In `aggregate.needs` (AC4) and
+  # `v1-0-ship-gate.needs`; ADVISORY at v1_0 in `gate-registry.toml` until one
+  # CI calibration (operator ruling 2026-10-23, flip owner epic-17-retrospective).
+  check-test-budget:
+    needs: [workspace-test-suite]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: workspace-test-suite-junit
+          path: workspace-junit
+      - name: Run check-test-budget on the workspace junit
+        run: cargo run -p xtask -- check-test-budget --junit workspace-junit/junit.xml --json
+      - name: Run the 20-12 AC1 proven-red vectors
+        run: cargo test -p xtask --test check_test_budget_proven_red
+
+  # Story 20-12 AC2 — the ONE job that runs the registered expensive tests:
+  # exactly the `xtask/test-budgets.toml [[expensive]]` rows whose `job` is
+  # `expensive-tests`, restricted to their `#[ignore = "expensive: …"]` tests
+  # (filter derived by `check-test-cost --expensive-filter`, so the job cannot
+  # drift from the register). Rows naming a dedicated job (the 16-3 corpora,
+  # the 11.3 meshes) run there, where their substrate is provisioned.
+  # One image: none of these tests has the image as its subject.
+  expensive-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: expensive-tests-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Install nightly toolchain and cargo-public-api (abi_diff_integration)
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
+      - name: Run the registered expensive tests
+        run: |
+          set -euo pipefail
+          filter="$(cargo run -q -p xtask -- check-test-cost --expensive-filter)"
+          echo "expensive filter: $filter"
+          cargo nextest run --workspace --locked --profile expensive --run-ignored ignored-only -E "$filter"
+
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
@@ -1437,8 +1523,8 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run crash detector in-process panic test
         run: cargo test -p maos-kernel-core --test crash_detector_in_process_panic --release
-      - name: Build worker CLI fixture
-        run: cargo build --release -p worker --bin worker-cli-fixture
+      - name: Build worker CLI fixture (xtask build-test-fixtures, Story 20-12)
+        run: cargo run -p xtask -- build-test-fixtures --release --only worker-cli-fixture
       - name: Run crash corpus (exactly one passing test)
         run: |
           run_corpus() {
@@ -1474,8 +1560,8 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run progress watchdog smoke test
         run: cargo test -p maos-kernel-core --test progress_watchdog_smoke --release
-      - name: Build worker CLI fixture
-        run: cargo build --release -p worker --bin worker-cli-fixture
+      - name: Build worker CLI fixture (xtask build-test-fixtures, Story 20-12)
+        run: cargo run -p xtask -- build-test-fixtures --release --only worker-cli-fixture
       - name: Run hang corpus (exactly one passing test)
         run: |
           run_corpus() {
@@ -1718,6 +1804,7 @@ jobs:
   t3-escape-corpus:
     strategy:
       fail-fast: false
+      # 20-12 AC4 — KEPT at both x64 T3 images: containment is each image's kernel + OCI runtime (the subject).
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04]
     runs-on: ${{ matrix.image }}
@@ -1756,7 +1843,7 @@ jobs:
               raise SystemExit(f"T3 accounting failed: executable+withdrawn must equal the {len(declared)} declared v0 scenarios")
           if set(counts) != expected or any(n != 1 for n in counts.values()):
               raise SystemExit(f"T3 accounting failed: executed={len(executed)}/{len(expected)} missing={sorted(expected-set(counts))} extra={sorted(set(counts)-expected)} duplicates={dict(counts)}")
-          if re.search(r"^SKIP |^T3-ESCAPE-UNEXECUTED ", log, re.M):
+          if re.search(r"^SKIP[: ]|^T3-ESCAPE-UNEXECUTED ", log, re.M):
               raise SystemExit("T3 capable runner printed SKIP or an unexecuted scenario")
           if "T3-NETWORK-MATRIX socket0600=refused socket0666=reachable" not in log:
               raise SystemExit("T3 socket custody matrix did not execute")
@@ -1786,6 +1873,7 @@ jobs:
   t3-smoke-busybox:
     strategy:
       fail-fast: false
+      # 20-12 AC4 — KEPT at both x64 T3 images: the live T3 boundary (uid/gid, netns) is each image's runtime.
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04]
     runs-on: ${{ matrix.image }}
@@ -1808,7 +1896,7 @@ jobs:
           grep -E 'panicked at' t3-smoke.log | head -3 | while IFS= read -r line; do
             echo "::error title=T3 smoke (${{ matrix.image }})::${line}"
           done
-          if grep -q '^SKIP ' t3-smoke.log; then rc=1; echo "::error title=T3 smoke (${{ matrix.image }})::a SKIP line was printed"; fi
+          if grep -q '^SKIP[: ]' t3-smoke.log; then rc=1; echo "::error title=T3 smoke (${{ matrix.image }})::a SKIP line was printed"; fi
           echo "::notice title=T3 smoke (${{ matrix.image }})::rc=${rc} $(grep '^test result' t3-smoke.log)"
           exit "$rc"
 
@@ -1822,6 +1910,7 @@ jobs:
   epic-17-exit:
     strategy:
       fail-fast: false
+      # 20-12 AC4 — KEPT at both x64 T3 images: the Epic-17 exit lines are product claims per shipped T3 image.
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04]
     runs-on: ${{ matrix.image }}
@@ -2010,16 +2099,14 @@ jobs:
             --probe target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture \
             --output epic-17-exit-line1 --image ${{ matrix.image }} 2>&1 | tee line1.out
           rc=${PIPESTATUS[0]}
-          if grep -q '^SKIP ' line1.out; then rc=1; echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if grep -q '^SKIP[: ]' line1.out; then rc=1; echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::a SKIP line was printed"; fi
           if [ "$rc" -eq 0 ] && ! grep -q '^::notice title=Epic-17 exit lines 1/1b .*3 Kernel-origin kind-8 rows' line1.out; then
             rc=1
             echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::the runner exited 0 without its verified kind-8 verdict"
           fi
           exit "$rc"
-      - name: Build the forbidden-syscall probes (line 3 prerequisite)
-        run: |
-          cargo build --locked --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
-          cargo build --locked --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Build the forbidden-syscall probes (line 3 prerequisite; xtask build-test-fixtures, Story 20-12)
+        run: cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe
       - name: Epic-17 exit line 3 — T2 kill (Story 17-6)
         shell: bash
         run: |
@@ -2029,7 +2116,7 @@ jobs:
           grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
             echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::${line}"
           done
-          if grep -q '^SKIP ' t2.log; then rc=1; echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if grep -q '^SKIP[: ]' t2.log; then rc=1; echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::a SKIP line was printed"; fi
           echo "::notice title=Epic-17 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep '^test result' t2.log)"
           exit "$rc"
       - name: Componentize the TypeScript Spirit (line 2 prerequisite)
@@ -2050,7 +2137,7 @@ jobs:
               --property="WorkingDirectory=$PWD" \
               "$PWD/scripts/run_17_3c_delegated.sh" target/release/maos run examples/example-spirit-ts/manifest.toml --once 2>&1 | tee line2.log
           rc=${PIPESTATUS[0]}
-          if grep -q '^SKIP ' line2.log; then rc=1; echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if grep -q '^SKIP[: ]' line2.log; then rc=1; echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::a SKIP line was printed"; fi
           if [ "$rc" -ne 0 ]; then
             echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::rc=${rc} $(tail -n 3 line2.log | paste -sd' ' -)"
           else
@@ -2673,6 +2760,8 @@ jobs:
         run: cargo test -p xtask --test j1_crosshost_2a_proven_red -- --test-threads=1
       - name: Run j1-crosshost-1b proven-red vectors (AC2.4)
         run: cargo test -p xtask --test j1_crosshost_1b_proven_red -- --test-threads=1
+      - name: Build the worker CLI fixture (xtask build-test-fixtures, Story 20-12)
+        run: cargo run -p xtask -- build-test-fixtures --only worker-cli-fixture
       - name: Run cross-host delegation controls (2b AC2.3, AC4.3)
         run: |
           cargo test -p maos-bin --test two_host_delegation_2b -- --test-threads=1
@@ -3394,6 +3483,7 @@ jobs:
   cgroup-ceiling-delegated:
     strategy:
       fail-fast: false
+      # 20-12 AC4 — KEPT at four images: cgroup v2 delegation is the image's systemd + kernel (the subject).
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.image }}
@@ -3420,6 +3510,8 @@ jobs:
             crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
             cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
           done
+      - name: Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,equiv-native-twin,maosctl
       - name: Exercise helper boundary regressions
         run: python3 -m unittest scripts.tests.test_cgroup_ceiling_17_2
       - name: Native cgroup-v2 smoke — four real cases
@@ -3427,7 +3519,7 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-kernel-core --test cgroup_ceiling_smoke -- --nocapture --test-threads=1 2>&1 | tee cgroup-smoke.log; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo test --locked -p maos-kernel-core --test cgroup_ceiling_smoke -- --include-ignored --nocapture --test-threads=1 2>&1 | tee cgroup-smoke.log; test ${PIPESTATUS[0]} -eq 0'
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 cgroup-smoke.log
       - name: Real admitted session suite — 23 cases, serial
         shell: bash
@@ -3438,7 +3530,7 @@ jobs:
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 spawned-17-3c.log
       - name: Build the actual Worker CLI fixture before the in-unit canary (x64)
         if: ${{ !endsWith(matrix.image, '-arm') }}
-        run: cargo build --locked -p worker --bin worker-cli-fixture
+        run: cargo run --locked -p xtask -- build-test-fixtures --only worker-cli-fixture
       - name: Rootless T3 Worker resource enforcement (x64)
         if: ${{ !endsWith(matrix.image, '-arm') }}
         shell: bash
@@ -3451,6 +3543,7 @@ jobs:
   cgroup-ceiling-undelegated:
     strategy:
       fail-fast: false
+      # 20-12 AC4 — KEPT at four images: the Delegate=no fallback is enforced by each image's systemd (the subject).
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.image }}
@@ -3475,6 +3568,8 @@ jobs:
             crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
             cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
           done
+      - name: Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,equiv-native-twin,maosctl
       - name: Exercise helper boundary regressions
         run: python3 -m unittest scripts.tests.test_cgroup_ceiling_17_2
       - name: Full undelegated session suite — live fallback, strict refusal, persistence and ordering
@@ -3489,6 +3584,7 @@ jobs:
     needs: [example-spirit-ts-tests]
     strategy:
       fail-fast: false
+      # 20-12 AC4 — KEPT at four images: T2 seccomp and the WASM runtime are per kernel/arch (R17-50, exit line 3).
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.image }}
@@ -3502,10 +3598,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: wasm-host-tests-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build current forbidden-syscall probes (T2 kill, auxv, Rust benign controls)
-        run: |
-          cargo build --locked --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
-          cargo build --locked --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Build the T2/WASM fixtures — probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)
+        run: cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin,maosctl
       - name: Epic-17 exit line 3 — T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)
         shell: bash
         run: |
@@ -3518,7 +3612,7 @@ jobs:
           grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
             echo "::error title=T2 exit line 3 (${{ matrix.image }})::${line}"
           done
-          if grep -q '^SKIP ' t2.log; then
+          if grep -q '^SKIP[: ]' t2.log; then
             echo "::error title=T2 exit line 3 (${{ matrix.image }})::a SKIP line was printed — a T2 suite must run, never skip, in CI"
             rc=1
           fi
@@ -3535,7 +3629,7 @@ jobs:
           grep -E 'panicked at|rule 11' kernel-t2.log | head -3 | while IFS= read -r line; do
             echo "::error title=Kernel T2 suites (${{ matrix.image }})::${line}"
           done
-          if grep -q '^SKIP ' kernel-t2.log; then rc=1; echo "::error title=Kernel T2 suites (${{ matrix.image }})::a SKIP line was printed"; fi
+          if grep -q '^SKIP[: ]' kernel-t2.log; then rc=1; echo "::error title=Kernel T2 suites (${{ matrix.image }})::a SKIP line was printed"; fi
           echo "::notice title=Kernel T2 suites (${{ matrix.image }})::rc=${rc} $(grep '^test result' kernel-t2.log | paste -sd' ' -)"
           exit "$rc"
       - name: Escape-detector suite on a real T2 kill (Story 17-6 AC4)
@@ -3587,8 +3681,8 @@ jobs:
             got=$(grep -oF -- "$prefix" spawned-17-3c.log | wc -l)
             [ "$got" -eq "$want" ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::marker '${prefix}' seen $got times, want $want"; fail=1; }
           done
-          if grep -q '^SKIP ' spawned-17-3c.log; then
-            grep '^SKIP ' spawned-17-3c.log | while IFS= read -r line; do
+          if grep -q '^SKIP[: ]' spawned-17-3c.log; then
+            grep '^SKIP[: ]' spawned-17-3c.log | while IFS= read -r line; do
               echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
             done
             fail=1
@@ -3640,8 +3734,8 @@ jobs:
                       unknown_tag_closes_once_with_typed_protocol_end; do
             required+=(--required-test "$name")
           done
-          if grep -q '^SKIP ' recall-17-3d.log; then
-            grep '^SKIP ' recall-17-3d.log | while IFS= read -r line; do
+          if grep -q '^SKIP[: ]' recall-17-3d.log; then
+            grep '^SKIP[: ]' recall-17-3d.log | while IFS= read -r line; do
               echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
             done
             fail=1
@@ -3679,8 +3773,8 @@ jobs:
                       valid_consent_then_same_frame_expires_between_report_barriers_both_forms; do
             required+=(--required-test "$name")
           done
-          if grep -q '^SKIP ' participant-17-8.log; then
-            grep '^SKIP ' participant-17-8.log | while IFS= read -r line; do
+          if grep -q '^SKIP[: ]' participant-17-8.log; then
+            grep '^SKIP[: ]' participant-17-8.log | while IFS= read -r line; do
               echo "::error title=17-8 participant recall (${{ matrix.image }})::${line}"
             done
             fail=1
@@ -4079,12 +4173,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-wasm-form-equiv-${{ hashFiles('**/Cargo.lock') }}
-      # Finding #5: build the native twin in its OWN standalone workspace. It
-      # emits native-twin/target/release/equiv-native-twin, which the harness
-      # resolves directly (require_binary probes the standalone target dir, with
-      # a build-on-demand fallback). No copy to the main target/ is needed.
-      - name: Build equiv-fixture native twin
-        run: cargo build --release --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
+      # Finding #5 / Story 20-12 AC2: the native twin (its OWN standalone
+      # workspace) is built by the fixture builder and resolved by the harness
+      # through the fixture manifest (`fixtures::fixture("equiv-native-twin")`);
+      # the harness no longer builds on demand.
+      - name: Build equiv-fixture native twin (xtask build-test-fixtures)
+        run: cargo run -p xtask -- build-test-fixtures --only equiv-native-twin
       # Finding #3: the xtask invokes the live oracle as `cargo test` (BOTH the
       # base tiered-oracle leg and the equiv-fault-inject anti-canned leg) and
       # parses `test result:` lines — it is not an unconditional-pass stub. Its
@@ -4647,8 +4741,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-escape-detector-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build forbidden-syscall-probe fixture (real seccomp substrate)
-        run: cargo build --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Build forbidden-syscall-probe fixture (real seccomp substrate; xtask build-test-fixtures, Story 20-12)
+        run: cargo run -p xtask -- build-test-fixtures --only escape-forbidden-syscall-probe
       - name: Run check-escape-detector gate
         run: |
           set -o pipefail
@@ -4962,7 +5056,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+          # Story 20-12: the fixture builder compiles the WASM guests tests resolve.
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
+      # Story 20-12 AC1 (D-20-12-A) — nextest: one process per test, the
+      # `.config/nextest.toml` slow-timeout, and the junit `check-test-budget`
+      # reads. Pinned to the version the 20-12 baseline was measured with.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
       - uses: ./.github/actions/provision-t3-test-substrate
       - name: Install nightly toolchain for cargo-public-api integration tests
         run: rustup toolchain install nightly --profile minimal
@@ -5000,17 +5102,15 @@ jobs:
       #   forbidden-syscall-probe    -> t2_sandbox_kill (real seccomp SIGSYS)
       #   python `cryptography`      -> two_host_reconcile_2c (Ed25519)
       #
-      # Each mirrors the build its dedicated job already performs; none is new
-      # machinery. `cargo-public-api` and `tokei` are installed above for the
-      # same reason.
-      - name: Build the fixture binaries every workspace suite resolves by path
+      # Story 20-12 AC2: every fixture binary/WASM artefact a test resolves is
+      # built HERE by ONE command (`xtask/src/build_test_fixtures.rs` holds the
+      # table) and listed in `target/maos-fixtures/manifest.json`; no test runs
+      # `cargo build` inside itself any more, so this step is no longer a
+      # mirror of per-job builds but the single source.
+      - name: Build every test fixture (xtask build-test-fixtures)
         run: |
           cargo fetch --locked
-          cargo build --locked -p worker --bin worker-cli-fixture --bin worker-probe-fixture
-          cargo build --locked -p maos-cli --bin maosctl
-          cargo build --release --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
-          cargo build --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
-          RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked --release --target x86_64-unknown-linux-gnu --manifest-path crates/maos-eval/test-fixtures/t3-network-escape-probe/Cargo.toml
+          cargo run --locked -p xtask -- build-test-fixtures
       - name: Install python Ed25519 for the two-host reconcile suite
         run: python3 -c "import cryptography" || python3 -m pip install --user cryptography
       - name: Install tokei
@@ -5065,13 +5165,28 @@ jobs:
               sys.exit(0)
           print(f"decoy door holding {host}:{port} (pid {pid})")
           PY
-      - name: Run the full workspace test suite
+      - name: Run the full workspace test suite (nextest)
         run: |
           set +e
-          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-workspace --timeout 5400 --rootless-canary -- cargo test --workspace --locked --no-fail-fast 2>&1 | tee workspace-test-suite.log
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-workspace --timeout 5400 --rootless-canary -- cargo nextest run --workspace --locked --no-fail-fast --profile ci 2>&1 | tee workspace-test-suite.log
           pipeline=("${PIPESTATUS[@]}")
           result=${pipeline[0]}
           if [ "$result" -eq 0 ]; then result=${pipeline[1]}; fi
+          # `.config/nextest.toml` default-filter leaves maos-kernel-core's lib
+          # unit tests to libtest (they share a process-global clock base a
+          # sibling test initialises; kernel src is frozen). Run them here.
+          cargo test --locked -p maos-kernel-core --lib 2>&1 | tee -a workspace-test-suite.log
+          lib=${PIPESTATUS[0]}
+          if [ "$result" -eq 0 ]; then result=$lib; fi
+          # nextest never runs doctests (20-12 review 2026-10-23): ~61 runnable
+          # doctests incl. the `compile_fail` invariant proofs in
+          # `maos-domain/src/invariants/i*.rs`. Timed here, outside the junit
+          # budget; its exit is part of this job's result.
+          doc_start=$(date +%s)
+          cargo test --locked --workspace --doc 2>&1 | tee -a workspace-test-suite.log
+          doc=${PIPESTATUS[0]}
+          echo "workspace doctests: exit=${doc} wall=$(( $(date +%s) - doc_start ))s" | tee -a workspace-test-suite.log
+          if [ "$result" -eq 0 ]; then result=$doc; fi
           WORKSPACE_EXIT="$result" python3 - <<'PY'
           import os
           status = int(os.environ["WORKSPACE_EXIT"])
@@ -5083,11 +5198,18 @@ jobs:
               excerpt = excerpt.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
               print(f"::error title=17-2 actual workspace failure::exit={status} {excerpt}", flush=True)
           else:
-              print("::notice title=17-2 actual workspace execution::command=cargo test --workspace --locked --no-fail-fast exit=0", flush=True)
+              print("::notice title=17-2 actual workspace execution::command=cargo nextest run --workspace --locked --no-fail-fast --profile ci (+ cargo test -p maos-kernel-core --lib, + cargo test --workspace --doc) exit=0", flush=True)
           PY
           report=$?
           if [ "$result" -eq 0 ]; then result=$report; fi
           exit "$result"
+      - name: Upload the nextest junit (check-test-budget reads it)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-test-suite-junit
+          path: target/nextest/ci/junit.xml
+          if-no-files-found: error
 
   # Story 16-1 / AC1 — exit lines 5-6 of the J0 block, named in their own step
   # so a failure says "the door does not work" rather than being one red line
@@ -5219,6 +5341,8 @@ jobs:
       - check-exit-commands
       - check-model-currency
       - workspace-test-suite
+      - check-test-cost
+      - check-test-budget
       - one-daemon-one-door
       - j0-scene
       - maosctl-load-over-the-door
@@ -5263,7 +5387,9 @@ jobs:
           echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
           echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
           echo "| check-model-currency | ${{ needs.check-model-currency.result }} | cargo run -p xtask -- check-model-currency |"
-          echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo test --workspace --locked --no-fail-fast |"
+          echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo nextest run --workspace --locked --no-fail-fast --profile ci |"
+          echo "| check-test-cost | ${{ needs.check-test-cost.result }} | cargo run -p xtask -- check-test-cost |"
+          echo "| check-test-budget | ${{ needs.check-test-budget.result }} | cargo run -p xtask -- check-test-budget --junit <workspace junit> |"
           echo "| one-daemon-one-door | ${{ needs.one-daemon-one-door.result }} | cargo test -p maos-bin --test one_daemon_one_door_16_1 |"
           echo "| j0-scene | ${{ needs.j0-scene.result }} | cargo test -p maos-journey-test --test journey_j0 |"
           echo "| maosctl-load-over-the-door | ${{ needs.maosctl-load-over-the-door.result }} | cargo test -p maos-bin --test maosctl_load_16_6 |"
@@ -5304,6 +5430,8 @@ jobs:
           echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
           echo "  check-model-currency: ${{ needs.check-model-currency.result }}"
           echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
+          echo "  check-test-cost: ${{ needs.check-test-cost.result }}"
+          echo "  check-test-budget: ${{ needs.check-test-budget.result }}"
           echo "  one-daemon-one-door: ${{ needs.one-daemon-one-door.result }}"
           echo "  j0-scene: ${{ needs.j0-scene.result }}"
           exit 1
@@ -5437,6 +5565,10 @@ jobs:
       - check-red-team-gate
       - check-migration-merkle
       - workspace-test-suite
+      # Story 20-12 AC4 — the budget gate over the workspace junit, and the one
+      # job that runs the registered expensive tests.
+      - check-test-budget
+      - expensive-tests
       - release-dry-run
       - macos-scope
       - macos-check

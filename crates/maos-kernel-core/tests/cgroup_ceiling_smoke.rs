@@ -21,6 +21,54 @@ use maos_kernel_core::security::manifest::{
 };
 use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec, SpawnError};
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
+const DELEGATED_CGROUP: &str = "delegated cgroup v2 (cpu, memory, pids) writable by this user";
+
+/// Story 20-12 AC3 — the substrate these smokes need, probed the way the kernel
+/// uses it (`security::sandbox::linux::setup_cgroup`): the FIRST ancestor whose
+/// `cgroup.subtree_control` delegates every requested controller, its
+/// `cgroup.procs` openable for writing (placement migration), and its
+/// `maos.slice` creatable with a writable `cgroup.subtree_control`.
+fn delegated_cgroup_present(caps: &ResolvedCaps) -> bool {
+    let Ok(membership) = std::fs::read_to_string("/proc/self/cgroup") else {
+        return false;
+    };
+    let Some(relative) = membership.lines().find_map(|line| line.strip_prefix("0::")) else {
+        return false;
+    };
+    let mount = Path::new("/sys/fs/cgroup");
+    let own = mount.join(relative.trim_start_matches('/'));
+    let writable = |path: &Path| std::fs::OpenOptions::new().write(true).open(path).is_ok();
+    for ancestor in own
+        .ancestors()
+        .take_while(|ancestor| ancestor.starts_with(mount))
+    {
+        let Ok(controllers) = std::fs::read_to_string(ancestor.join("cgroup.subtree_control"))
+        else {
+            continue;
+        };
+        let enabled = |name| {
+            controllers
+                .split_ascii_whitespace()
+                .any(|value| value == name)
+        };
+        if caps.cpu_max_pct.is_some() && !enabled("cpu")
+            || caps.memory_max_mb.is_some() && !enabled("memory")
+            || caps.pids_max.is_some() && !enabled("pids")
+        {
+            continue;
+        }
+        // The kernel stops at the first matching ancestor; so does the probe.
+        let slice = ancestor.join("maos.slice");
+        return writable(&ancestor.join("cgroup.procs"))
+            && std::fs::create_dir_all(&slice).is_ok()
+            && writable(&slice.join("cgroup.subtree_control"));
+    }
+    false
+}
+
 static FIXTURE: LazyLock<PathBuf> = LazyLock::new(build_fixture);
 
 /// Build into Cargo's per-target scratch directory (statics are never dropped,
@@ -33,6 +81,7 @@ fn build_fixture() -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR"));
     let binary = dir.join("cgroup-ceiling-fixture");
     let staging = dir.join(format!("cgroup-ceiling-fixture.{}", std::process::id()));
+    // expensive: rustc fixture compile
     let status = Command::new("rustc")
         .args(["--edition=2021", "-C", "opt-level=1", "--crate-name"])
         .arg("cgroup_ceiling_fixture")
@@ -230,7 +279,15 @@ fn collect_until_exit(bridge: &mut SpawnedBridge) -> ExitCause {
 }
 
 #[test]
+#[ignore = "expensive: rustc fixture compile (runs in cgroup-ceiling-delegated)"]
 fn native_child_is_placed_before_guest_and_resource_limits_bite() {
+    // The probe creates `maos.slice`; a declared-CI host never runs it here.
+    if ci::skip_unless(
+        DELEGATED_CGROUP,
+        ci::declared_ci() || delegated_cgroup_present(&caps()),
+    ) {
+        return;
+    }
     let mut bridge = spawn_and_bridge(spec("ceiling-smoke", &FIXTURE, caps()))
         .expect("delegated native T2 spawn must succeed");
     assert_eq!(bridge.take_resource_downgrade(), None);
@@ -291,7 +348,14 @@ fn native_child_is_placed_before_guest_and_resource_limits_bite() {
 }
 
 #[test]
+#[ignore = "expensive: rustc fixture compile (runs in cgroup-ceiling-delegated)"]
 fn same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves() {
+    if ci::skip_unless(
+        DELEGATED_CGROUP,
+        ci::declared_ci() || delegated_cgroup_present(&caps()),
+    ) {
+        return;
+    }
     let a = std::thread::spawn(|| {
         spawn_and_bridge(spec("same-spirit", &FIXTURE, caps()))
             .expect("first delegated same-Spirit spawn")
@@ -325,9 +389,18 @@ fn same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves() {
 }
 
 #[test]
+#[ignore = "expensive: rustc fixture compile (runs in cgroup-ceiling-delegated)"]
 fn creation_limit_write_and_exec_failures_release_owned_leaves() {
     if let Some(program) = std::env::var_os("MAOS_17_2_NATIVE_FD_PROBE") {
         assert_native_fd_refusal(Path::new(&program));
+        return;
+    }
+    // After the re-entry branch: the isolated FD worker is only reached once
+    // the parent has proven the substrate, and must never print a SKIP itself.
+    if ci::skip_unless(
+        DELEGATED_CGROUP,
+        ci::declared_ci() || delegated_cgroup_present(&caps()),
+    ) {
         return;
     }
     let id = format!("path-limit-{}", "N".repeat(4096));
@@ -465,6 +538,7 @@ fn creation_limit_write_and_exec_failures_release_owned_leaves() {
         .args([
             "creation_limit_write_and_exec_failures_release_owned_leaves",
             "--exact",
+            "--include-ignored",
             "--nocapture",
             "--test-threads=1",
         ])
@@ -542,7 +616,14 @@ fn assert_native_fd_refusal(program: &Path) {
 }
 
 #[test]
+#[ignore = "expensive: rustc fixture compile (runs in cgroup-ceiling-delegated)"]
 fn killed_leader_cleanup_kills_its_surviving_descendant() {
+    if ci::skip_unless(
+        DELEGATED_CGROUP,
+        ci::declared_ci() || delegated_cgroup_present(&caps()),
+    ) {
+        return;
+    }
     for resolved in [
         caps(),
         ResolvedCaps::default(),

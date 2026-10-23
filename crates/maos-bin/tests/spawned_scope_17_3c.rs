@@ -27,92 +27,30 @@ use maos_spirit_abi::identity::{FrameKind, SpiritId, SpiritRole};
 
 const NONCE: u64 = 0x17_03_c;
 
-fn target_root() -> PathBuf {
-    std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_owned()
+#[path = "../../../tests/harness/fixtures.rs"]
+mod fixtures;
+
+/// Prebuilt transport fixtures (echo-spirit, routed-relay, native twins) and the
+/// actual contained release runner, resolved once from the fixture manifest;
+/// every launch site runs exactly these paths (Story 20-12 review), and the
+/// operator CLI (`maosctl audit query`, read by the FR4 gates) is validated.
+struct Fixtures {
+    echo: PathBuf,
+    relay: PathBuf,
+    native_twin: PathBuf,
+    hostile_twin: PathBuf,
+    runner: PathBuf,
 }
 
-static FIXTURES: LazyLock<()> = LazyLock::new(|| {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for (manifest, wasm) in [
-        ("crates/maos-wasm-host/guests/echo-spirit/Cargo.toml", true),
-        ("crates/maos-wasm-host/guests/routed-relay/Cargo.toml", true),
-        (
-            "crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml",
-            false,
-        ),
-    ] {
-        let mut command = std::process::Command::new("cargo");
-        command
-            .args([
-                "build",
-                "--offline",
-                "--locked",
-                "--release",
-                "--manifest-path",
-            ])
-            .arg(workspace.join(manifest))
-            .arg("--target-dir")
-            .arg(target_root());
-        if wasm {
-            command.args(["--target", "wasm32-wasip2"]);
-        }
-        let output = command.output().expect("build real transport fixture");
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+static FIXTURES: LazyLock<Fixtures> = LazyLock::new(|| {
+    fixtures::profile_binary("maosctl");
+    Fixtures {
+        echo: fixtures::fixture("echo_spirit.wasm"),
+        relay: fixtures::fixture("routed_relay.wasm"),
+        native_twin: fixtures::fixture("equiv-native-twin"),
+        hostile_twin: fixtures::fixture("hostile-twin"),
+        runner: fixtures::fixture("maos-wasm-runner"),
     }
-    let output = std::process::Command::new("cargo")
-        .args([
-            "build",
-            "--offline",
-            "--locked",
-            "--release",
-            "-p",
-            "maos-wasm-host",
-            "--bin",
-            "maos-wasm-runner",
-        ])
-        .arg("--target-dir")
-        .arg(target_root())
-        .current_dir(&workspace)
-        .output()
-        .expect("build the actual contained runner");
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    // The operator's audit surface (`maosctl audit query`), read by the FR4 gates.
-    let output = std::process::Command::new("cargo")
-        .args([
-            "build",
-            "--offline",
-            "--locked",
-            "-p",
-            "maos-cli",
-            "--bin",
-            "maosctl",
-        ])
-        .arg("--target-dir")
-        .arg(target_root())
-        .current_dir(workspace)
-        .output()
-        .expect("build the actual operator CLI");
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 });
 
 #[derive(Debug, Default)]
@@ -388,7 +326,7 @@ async fn admit_t2(
 }
 
 fn echo_launch(spirit_id: &str) -> SessionLaunch {
-    let artifact = target_root().join("wasm32-wasip2/release/echo_spirit.wasm");
+    let artifact = FIXTURES.echo.clone();
     let address = |name: &str| FrameAddress {
         spirit_id: SpiritId::from(name),
         host_id: None,
@@ -396,10 +334,7 @@ fn echo_launch(spirit_id: &str) -> SessionLaunch {
     };
     SessionLaunch {
         plan: maos_host::SpiritLaunchPlan {
-            program: target_root()
-                .join("release/maos-wasm-runner")
-                .to_string_lossy()
-                .into_owned(),
+            program: FIXTURES.runner.to_string_lossy().into_owned(),
             argv: vec![
                 "--component".into(),
                 artifact.to_string_lossy().into_owned(),
@@ -671,16 +606,15 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                         ),
                     ]),
                 };
-                let artifact = target_root().join("wasm32-wasip2/release/echo_spirit.wasm");
+                let artifact = FIXTURES.echo.clone();
                 let plan = maos_host::SpiritLaunchPlan {
-                    program: target_root()
-                        .join(if wasm {
-                            "release/maos-wasm-runner"
-                        } else {
-                            "release/equiv-native-twin"
-                        })
-                        .to_string_lossy()
-                        .into_owned(),
+                    program: if wasm {
+                        &FIXTURES.runner
+                    } else {
+                        &FIXTURES.native_twin
+                    }
+                    .to_string_lossy()
+                    .into_owned(),
                     argv: if wasm {
                         vec![
                             "--component".into(),
@@ -938,10 +872,7 @@ async fn run_hostile_twin_with_quota(
         ]),
     };
     let plan = maos_host::SpiritLaunchPlan {
-        program: target_root()
-            .join("release/hostile-twin")
-            .to_string_lossy()
-            .into_owned(),
+        program: FIXTURES.hostile_twin.to_string_lossy().into_owned(),
         argv: vec!["--mode".into(), mode.into()],
         env: Vec::new(),
         wire: maos_host::WireShape::ContentLengthCbor,
@@ -1005,7 +936,7 @@ fn operator_audit_view(dir: &Path, id: &str) -> std::process::Output {
             .unwrap();
         }
     }
-    std::process::Command::new(target_root().join("debug/maosctl"))
+    std::process::Command::new(fixtures::profile_binary("maosctl"))
         .args(["audit", "query", "--spirit", id, "--format", "plain"])
         .env("MAOS_HOME", dir.join("home"))
         .env("NO_COLOR", "1")
@@ -1541,10 +1472,7 @@ async fn assert_hostile_lifting(aliases: bool, count: usize, exhausts: bool) {
         intent_lineage: Default::default(),
     };
     let plan = maos_host::SpiritLaunchPlan {
-        program: target_root()
-            .join("release/maos-wasm-runner")
-            .to_string_lossy()
-            .into_owned(),
+        program: FIXTURES.runner.to_string_lossy().into_owned(),
         argv: vec![
             "--component".into(),
             artifact.to_string_lossy().into_owned(),
@@ -1639,28 +1567,7 @@ async fn one_aliased_string_under_the_hostcall_budget_clears_the_canonical_call(
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not() {
     LazyLock::force(&FIXTURES);
-    let build = std::process::Command::new("cargo")
-        .args([
-            "build",
-            "--offline",
-            "--locked",
-            "-p",
-            "maos-wasm-host",
-            "--features",
-            "runner-fault-inject",
-            "--bin",
-            "maos-wasm-runner",
-        ])
-        .arg("--target-dir")
-        .arg(target_root())
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .output()
-        .unwrap();
-    assert!(
-        build.status.success(),
-        "{}",
-        String::from_utf8_lossy(&build.stderr)
-    );
+    let fault_runner = fixtures::fixture("maos-wasm-runner-fault-inject");
     for forbidden in [true, false] {
         let dir = tempfile::tempdir().unwrap();
         let world = World::new(dir.path());
@@ -1685,7 +1592,7 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
         .await
         .unwrap();
         let pid = admitted.pid;
-        let artifact = target_root().join("wasm32-wasip2/release/echo_spirit.wasm");
+        let artifact = FIXTURES.echo.clone();
         let mut argv = vec![
             "--component".into(),
             artifact.to_string_lossy().into_owned(),
@@ -1694,10 +1601,7 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
             argv.push("--test-forbidden-syscall-after-ready".into());
         }
         let plan = maos_host::SpiritLaunchPlan {
-            program: target_root()
-                .join("debug/maos-wasm-runner")
-                .to_string_lossy()
-                .into_owned(),
+            program: fault_runner.to_string_lossy().into_owned(),
             argv,
             env: Vec::new(),
             wire: maos_host::WireShape::ContentLengthCbor,
@@ -1785,8 +1689,8 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
     }
     // Same component, release runner: without the flag it reaches Ready (and
     // exits cleanly on stdin EOF); with it the parser refuses the unknown flag.
-    let release = target_root().join("release/maos-wasm-runner");
-    let artifact = target_root().join("wasm32-wasip2/release/echo_spirit.wasm");
+    let release = FIXTURES.runner.clone();
+    let artifact = FIXTURES.echo.clone();
     let control = std::process::Command::new(&release)
         .arg("--component")
         .arg(&artifact)
@@ -1882,12 +1786,9 @@ async fn repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall()
             maos_domain::invariants::i8::A2AIntent::new("operator:mailbox-turn"),
         ]),
     };
-    let artifact = target_root().join("wasm32-wasip2/release/routed_relay.wasm");
+    let artifact = FIXTURES.relay.clone();
     let plan = maos_host::SpiritLaunchPlan {
-        program: target_root()
-            .join("release/maos-wasm-runner")
-            .to_string_lossy()
-            .into_owned(),
+        program: FIXTURES.runner.to_string_lossy().into_owned(),
         argv: vec![
             "--component".into(),
             artifact.to_string_lossy().into_owned(),
@@ -2122,16 +2023,15 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                 .iac
                 .register_spirit_typed(&SpiritId::from("scope-receiver"))
                 .unwrap();
-            let artifact = target_root().join("wasm32-wasip2/release/echo_spirit.wasm");
+            let artifact = FIXTURES.echo.clone();
             let plan = maos_host::SpiritLaunchPlan {
-                program: target_root()
-                    .join(if wasm {
-                        "release/maos-wasm-runner"
-                    } else {
-                        "release/equiv-native-twin"
-                    })
-                    .to_string_lossy()
-                    .into_owned(),
+                program: if wasm {
+                    &FIXTURES.runner
+                } else {
+                    &FIXTURES.native_twin
+                }
+                .to_string_lossy()
+                .into_owned(),
                 argv: if wasm {
                     vec![
                         "--component".into(),
