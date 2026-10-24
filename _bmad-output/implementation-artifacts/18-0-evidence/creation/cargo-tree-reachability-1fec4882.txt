@@ -1,0 +1,405 @@
+# 18-0 creation — dependency reachability at HEAD 1fec4882 (2026-10-24). cargo-query only; nothing compiled.
+
+$ cargo tree --workspace --target all -e normal,build,dev -i rustls-webpki --depth 4
+rustls-webpki v0.103.15
+├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp)
+│   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+│       └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+│       [dev-dependencies]
+│       └── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+└── rustls v0.23.46
+    ├── maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+    │   ├── maos-a2a v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   │   [dev-dependencies]
+    │   │   └── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira)
+    │   │       [dev-dependencies]
+    │   ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+    │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   └── maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+    │       ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │       ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+    │       └── maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+    │       [dev-dependencies]
+    │       └── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+    │   [dev-dependencies]
+    │   └── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+    ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+    ├── maos-egress v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-egress)
+    │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   └── worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+    │       └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+    │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+    │   [dev-dependencies]
+    │   ├── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler)
+    │   │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+    │   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   │   ├── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+    │   │   └── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell) (*)
+    │   ├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit)
+    │   │   ├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler) (*)
+    │   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   │   ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli) (*)
+    │   │   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+    │   │   │   [dev-dependencies]
+    │   │   ├── maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite)
+    │   │   │   [dev-dependencies]
+    │   │   ├── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell) (*)
+    │   │   ├── maos-siem v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-siem)
+    │   │   └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+    │   │   [dev-dependencies]
+    │   │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+    │   │   └── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+    │   ├── maos-escape-detector v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-escape-detector)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval) (*)
+    │   ├── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+    │   ├── maos-pdp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-pdp)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── maos-siem v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-siem) (*)
+    │   ├── maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello)
+    │   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   │   └── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell) (*)
+    │   │   [dev-dependencies]
+    │   │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+    │   │   └── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+    │   ├── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+    │   ├── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira) (*)
+    │   ├── observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   ├── orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   │   [dev-dependencies]
+    │   │   └── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect) (*)
+    │   ├── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+    │   │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+    │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    │   └── worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker) (*)
+    ├── tokio-rustls v0.26.4
+    │   └── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+    │   [dev-dependencies]
+    │   ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+    │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    └── ureq v2.12.1
+        ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+        └── maos-notify-push v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-notify-push)
+            └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    [dev-dependencies]
+    ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+    └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i webpki-roots@1.0.7 --depth 4
+webpki-roots v1.0.7
+└── webpki-roots v0.26.11
+    ├── maos-egress v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-egress)
+    │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    │   │   └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+    │   │   [dev-dependencies]
+    │   │   └── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+    │   └── worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+    │       └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+    └── ureq v2.12.1
+        ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+        │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+        │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+        │   ├── maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+        │   ├── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+        │   └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+        │   [dev-dependencies]
+        │   ├── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect)
+        │   ├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler)
+        │   ├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit)
+        │   │   [dev-dependencies]
+        │   ├── maos-escape-detector v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-escape-detector)
+        │   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+        │   │   [dev-dependencies]
+        │   ├── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+        │   ├── maos-pdp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-pdp)
+        │   ├── maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+        │   ├── maos-siem v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-siem)
+        │   ├── maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello)
+        │   │   [dev-dependencies]
+        │   ├── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+        │   ├── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira)
+        │   │   [dev-dependencies]
+        │   ├── observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer)
+        │   ├── orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator)
+        │   │   [dev-dependencies]
+        │   ├── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+        │   └── worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker) (*)
+        └── maos-notify-push v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-notify-push)
+            └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i ctutils --depth 4
+ctutils v0.4.2
+└── digest v0.11.3
+    ├── hmac v0.13.0
+    │   ├── hkdf v0.13.0
+    │   │   └── secret-service v5.2.0
+    │   └── postgres-protocol v0.6.12
+    │       ├── postgres-types v0.2.14
+    │       └── tokio-postgres v0.7.18
+    │           [dev-dependencies]
+    ├── md-5 v0.11.0
+    │   └── postgres-protocol v0.6.12 (*)
+    └── sha2 v0.11.0
+        ├── postgres-protocol v0.6.12 (*)
+        └── secret-service v5.2.0 (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i tokio --depth 4
+tokio v1.52.3
+├── deadpool v0.12.3
+│   └── deadpool-postgres v0.14.1
+│       └── maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite)
+│           ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+│           │   [dev-dependencies]
+│           ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+│           └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+│           [dev-dependencies]
+│           └── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+├── deadpool-postgres v0.14.1 (*)
+├── deadpool-runtime v0.1.4
+│   └── deadpool v0.12.3 (*)
+├── maos-a2a v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a)
+│   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   [dev-dependencies]
+│   └── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira)
+│       └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│       [dev-dependencies]
+│       └── maos-notify-push v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-notify-push)
+│           └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+├── maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+│   ├── maos-a2a v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a) (*)
+│   ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp)
+│   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   └── maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+│       ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│       ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli) (*)
+│       └── maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+│           ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│           └── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+│       [dev-dependencies]
+│       └── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+│   [dev-dependencies]
+│   └── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+├── maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+│   ├── maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core) (*)
+│   ├── maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+│   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   └── maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+│   │       ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │       ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+│   │       │   [dev-dependencies]
+│   │       ├── maos-notify-push v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-notify-push) (*)
+│   │       └── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+│   │       [dev-dependencies]
+│   │       ├── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira) (*)
+│   │       └── observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer)
+│   ├── maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+│   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli) (*)
+│   │   ├── maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort) (*)
+│   │   ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   │   └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+│   │   [dev-dependencies]
+│   │   ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+│   │   ├── maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest) (*)
+│   │   └── maos-telemetry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-telemetry)
+│   └── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   [dev-dependencies]
+│   └── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli) (*)
+├── maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface) (*)
+├── maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac) (*)
+├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+├── maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite) (*)
+├── maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+│   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli) (*)
+│   ├── maos-fkcs v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-fkcs)
+│   │   └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+│   └── maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+│       └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+├── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell) (*)
+├── maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli) (*)
+├── maos-telemetry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-telemetry)
+├── opentelemetry_sdk v0.32.1
+│   └── maos-telemetry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-telemetry)
+├── tokio-postgres v0.7.18
+│   ├── deadpool-postgres v0.14.1 (*)
+│   ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli) (*)
+│   └── maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite) (*)
+│   [dev-dependencies]
+│   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+│   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+├── tokio-rustls v0.26.4
+│   └── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+│   [dev-dependencies]
+│   ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+│   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+├── tokio-stream v0.1.18
+│   └── opentelemetry_sdk v0.32.1 (*)
+├── tokio-util v0.7.18
+│   ├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+│   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk)
+│   │   ├── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect)
+│   │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   ├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler)
+│   │   │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+│   │   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   │   ├── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+│   │   │   └── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell) (*)
+│   │   ├── example-spirit v0.1.0 (/home/lunarpulse/dev_ws/examples/example-spirit)
+│   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   ├── maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest) (*)
+│   │   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+│   │   │   ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   │   │   └── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+│   │   │   [dev-dependencies]
+│   │   │   ├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler) (*)
+│   │   │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+│   │   │   └── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+│   │   ├── maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello)
+│   │   │   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   │   └── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell) (*)
+│   │   │   [dev-dependencies]
+│   │   │   ├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+│   │   │   └── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   │   ├── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira) (*)
+│   │   ├── nash v1.5.0 (/home/lunarpulse/dev_ws/spirits/nash)
+│   │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   │   [dev-dependencies]
+│   │   │   └── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira) (*)
+│   │   ├── observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer) (*)
+│   │   ├── orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator)
+│   │   │   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │   │   [dev-dependencies]
+│   │   │   └── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect) (*)
+│   │   ├── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher) (*)
+│   │   └── reviewer v0.1.0 (/home/lunarpulse/dev_ws/spirits/reviewer)
+│   │       └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   │       [dev-dependencies]
+│   │       └── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect) (*)
+│   │   [dev-dependencies]
+│   │   ├── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect) (*)
+│   │   ├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler) (*)
+│   │   ├── example-spirit v0.1.0 (/home/lunarpulse/dev_ws/examples/example-spirit)
+│   │   ├── maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest) (*)
+│   │   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval) (*)
+│   │   ├── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira) (*)
+│   │   ├── nash v1.5.0 (/home/lunarpulse/dev_ws/spirits/nash) (*)
+│   │   ├── observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer) (*)
+│   │   ├── orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator) (*)
+│   │   ├── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher) (*)
+│   │   └── reviewer v0.1.0 (/home/lunarpulse/dev_ws/spirits/reviewer) (*)
+│   └── tokio-postgres v0.7.18 (*)
+│   [dev-dependencies]
+│   └── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+├── wasmtime-wasi v48.0.6
+│   └── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+└── xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+[dev-dependencies]
+├── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect) (*)
+├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler) (*)
+├── maos-a2a v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a) (*)
+├── maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core) (*)
+├── maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp) (*)
+├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench) (*)
+├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+├── maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest) (*)
+├── maos-escape-detector v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-escape-detector)
+│   └── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+├── maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac) (*)
+├── maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+├── maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite) (*)
+├── maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+│   ├── maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin) (*)
+│   ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   └── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell) (*)
+├── maos-telemetry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-telemetry)
+├── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+├── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira) (*)
+├── observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer) (*)
+├── orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator) (*)
+└── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher) (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i zvariant --depth 4
+zvariant v5.15.0
+├── zbus v5.19.0
+│   ├── secret-service v5.2.0
+│   │   └── zbus-secret-service-keyring-store v1.0.1
+│   │       └── keyring v4.2.0
+│   └── zbus-secret-service-keyring-store v1.0.1 (*)
+├── zbus_macros v5.19.0 (proc-macro)
+│   └── zbus v5.19.0 (*)
+└── zbus_names v4.3.4
+    ├── zbus v5.19.0 (*)
+    └── zbus_macros v5.19.0 (proc-macro) (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i zbus_names --depth 4
+zbus_names v4.3.4
+├── zbus v5.19.0
+│   ├── secret-service v5.2.0
+│   │   └── zbus-secret-service-keyring-store v1.0.1
+│   │       └── keyring v4.2.0
+│   └── zbus-secret-service-keyring-store v1.0.1 (*)
+└── zbus_macros v5.19.0 (proc-macro)
+    └── zbus v5.19.0 (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i zvariant_derive --depth 4
+zvariant_derive v5.15.0 (proc-macro)
+└── zvariant v5.15.0
+    ├── zbus v5.19.0
+    │   ├── secret-service v5.2.0
+    │   │   └── zbus-secret-service-keyring-store v1.0.1
+    │   └── zbus-secret-service-keyring-store v1.0.1 (*)
+    ├── zbus_macros v5.19.0 (proc-macro)
+    │   └── zbus v5.19.0 (*)
+    └── zbus_names v4.3.4
+        ├── zbus v5.19.0 (*)
+        └── zbus_macros v5.19.0 (proc-macro) (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i wasmtime --depth 4
+wasmtime v48.0.6
+├── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+├── wasmtime-wasi v48.0.6
+│   └── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+├── wasmtime-wasi-io v48.0.6
+│   └── wasmtime-wasi v48.0.6 (*)
+└── wiggle v48.0.6
+    └── wasmtime-wasi v48.0.6 (*)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i wasmtime-wasi --depth 4
+wasmtime-wasi v48.0.6
+└── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+
+$ cargo tree --workspace --target all -e normal,build,dev -i chacha20 --depth 4
+chacha20 v0.10.0
+└── rand v0.10.1
+    ├── postgres-protocol v0.6.12
+    │   ├── postgres-types v0.2.14
+    │   │   ├── pgvector v0.4.2
+    │   │   └── tokio-postgres v0.7.18
+    │   │       [dev-dependencies]
+    │   └── tokio-postgres v0.7.18 (*)
+    ├── tokio-postgres v0.7.18 (*)
+    └── wasmtime-wasi v48.0.6
+        └── maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)

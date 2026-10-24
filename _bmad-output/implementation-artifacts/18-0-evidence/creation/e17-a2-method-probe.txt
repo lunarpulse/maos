@@ -1,0 +1,18 @@
+18-0 creation — E17-A2 method probe (compile vs test wall from EXISTING CI logs; no new CI job). Run 40080259088 @ 69224639.
+
+Job buckets (Σ job wall over matrix legs, from `gh api repos/lunarpulse/maos/actions/runs/40080259088/jobs`; run total 12.87 job-hours):
+  wasm-host-tests (4 legs)              112.9 min
+  cgroup-ceiling-undelegated (4)         60.1 min
+  cgroup-ceiling-delegated (4)           56.9 min
+  epic-17-exit (2)                       46.3 min
+  workspace-test-suite (1)               19.5 min
+  -- next: release-dry-run (2) 18.6, nfr-rel-11-halt-receipt-999pct 14.1, nfr-rel-2-hang-detection-60s 10.6
+  (same top five as 20-12-evidence/ci-after.json `per_job_bucket_minutes_*` after cf2fc355)
+
+Probe — one leg, job 120852040437 `wasm-host-tests (ubuntu-24.04)`, log via `gh run view --job 120852040437 --log` (11,282 lines):
+  job wall 2221 s; 24 cargo `Finished … in <t>` lines; Σ <t> = 1762 s (≈ 79 % of the job wall is compilation).
+  Step timings (`gh api …/jobs/120852040437 --jq .steps`): step 5 fixture build 692 s, step 18 feature-enabled CLI + release runner
+  build 589 s; the test steps carry their own compile (e.g. step 13 215 s, of which `Finished … in 51.36s` is the test-profile build).
+Method the story fixes (AC10): per job, compile_s = Σ `Finished … in <t>` (ANSI escapes appear literally as `^[[…m` in the
+downloaded log); setup_s = checkout/toolchain/cache/install steps; test_s = job wall − compile_s − setup_s. Logs need the repo token
+(`gh`); public step timings alone cannot split a step that both builds and tests.

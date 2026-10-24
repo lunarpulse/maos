@@ -1,0 +1,34 @@
+18-0 creation — governance and gate measurements at HEAD 1fec4882 (2026-10-24). Tree clean before and after.
+One cargo process on the host; CARGO_TARGET_DIR=/mnt/build/cargo; local runs `env -u CI -u GITHUB_ACTIONS`.
+
+$ /mnt/build/cargo/debug/xtask kloc-check --json        # tokei 14.0.0, exit 0
+passed=true alarm=true aggregate=181558 over_budget=[]   # _aggregate_hardfail 181559 (xtask/kloc.toml:718) -> headroom 1
+
+Charged crates 18-0 may touch (measured = per_crate; ceiling = xtask/kloc.toml row):
+  maos-bin          27804 / 27804  (:517)  ZERO   AC3 env_contract.rs entry (+5 physical, ~+5 code); + main.rs only if D-18-0-12 = C
+  maos-shell          606 /   606  (:691)  ZERO   AC8 `maos init` mkdir (crates/maos-shell/src/lib.rs:64-67)
+  maos-a2a-core      4933 /  4933  (:470)  ZERO   AC7 rupture-id mint (router.rs:431-439) if D-18-0-11 = C or B
+  maos-a2a-tcp       1442 /  1621  (:475)  179    AC7 only if D-18-0-11 = B (boot-nonce wiring, transport.rs:389)
+  maos-cohort        5873 /  5873  (:661)  ZERO   AC7 only if D-18-0-11 = A (digest.rs:364-374)
+  maos-domain        9743 /  9743  (:425)  ZERO   not touched by any listed option
+  maos-capability    1347 /  1347  (:265)  ZERO   AC4(a) only if D-18-0-07 = B (init_monotonic_base at origin)
+  maos-wasm-host     2255 /  2255  (:703)  ZERO   no src change (wasmtime 48.0.7 is lock-only; tests uncharged)
+  xtask             46363 / 46363  (:339)  ZERO   no src change expected (budget rows are TOML; workflow-shape tests live in xtask/tests, uncharged); src only if D-18-0-10 = B (EXPECTED_GATES)
+  maos-kernel-core  20594 / 20594  (:264)  ZERO   NOT TOUCHED (kernel-Δ 0) — pin 26361 physical (xtask/kernel-core-baseline.toml:505); only D-18-0-12 = B would touch it (FLAG-Winston)
+Rule: every request is measured at landing after `cargo fmt --all` (RECOVERY-LANE CEILING RULE, xtask/kloc.toml:60-70,86-95); `_aggregate_hardfail` = measured + 1.
+
+$ /mnt/build/cargo/debug/xtask check-env-contract       # HEAD
+  VIOLATION: crates/maos-bin/src/hook_pump.rs:653: env::var_os("MAOS_IDLE_FAST") not in env_contract.rs registry
+check-env-contract: FAIL — 1 unregistered maos-bin/src MAOS_* env reads   (exit 1)
+PROTOTYPE (reverted): one `EnvVar { name: "MAOS_IDLE_FAST", stability: EnvStability::HarnessOnly }` after MAOS_TEST_BOOT_NONCE (env_contract.rs:129-133)
+check-env-contract: PASS (98 maos-bin/src MAOS_* vars registered, 0 violations)   (exit 0)
+
+$ /mnt/build/cargo/debug/xtask check-test-budget --junit <run 40080259088 junit> --json   # HEAD: FAIL, 4 findings (see test-budget-calibration.txt)
+
+Wasmtime component pins (no change needed for a host-only upgrade):
+  tests/fixtures/wasm/equiv-fixtures.provenance.toml:14-65 — 4 components, wasm_sha256 + source_sha256 over raw source bytes incl. wit/spirit.wit
+  native twin guest lock: crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.lock:1901-1904 (wasmtime 48.0.5), :2137-2140 (wasmtime-wasi 48.0.5);
+  built `--locked --release --manifest-path` by xtask/src/build_test_fixtures.rs:195-212.
+
+$ cargo update --dry-run --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml -p wasmtime -p wasmtime-wasi
+     Locking 33 packages to latest compatible versions   # wasmtime family only: wasmtime/-environ/-wasi/-wasi-io 48.0.5 -> 48.0.7 + cranelift/wasmtime-internal/wiggle/pulley; nothing else (dry run, lock untouched)

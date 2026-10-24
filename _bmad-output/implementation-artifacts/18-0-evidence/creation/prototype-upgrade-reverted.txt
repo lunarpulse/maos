@@ -1,0 +1,244 @@
+# 18-0 creation — THROWAWAY prototype at HEAD 1fec4882, fully reverted (git checkout -- Cargo.lock deny.toml xtask/test-budgets.toml crates/maos-bin/src/env_contract.rs; tree clean after).
+# cargo-deny 0.19.4 (release binary, the CI pin discipline.yml:30); advisory-db 21d909e4 (2026-10-24T10:30:13+02:00).
+
+## Lock updates applied
+$ cargo update -p wasmtime -p wasmtime-wasi
+    Updating crates.io index
+     Locking 33 packages to latest compatible versions
+    Updating cranelift-assembler-x64 v0.135.6 -> v0.135.7
+    Updating cranelift-assembler-x64-meta v0.135.6 -> v0.135.7
+    Updating cranelift-bforest v0.135.6 -> v0.135.7
+    Updating cranelift-bitset v0.135.6 -> v0.135.7
+    Updating cranelift-codegen v0.135.6 -> v0.135.7
+    Updating cranelift-codegen-meta v0.135.6 -> v0.135.7
+    Updating cranelift-codegen-shared v0.135.6 -> v0.135.7
+    Updating cranelift-control v0.135.6 -> v0.135.7
+    Updating cranelift-entity v0.135.6 -> v0.135.7
+    Updating cranelift-frontend v0.135.6 -> v0.135.7
+    Updating cranelift-isle v0.135.6 -> v0.135.7
+    Updating cranelift-native v0.135.6 -> v0.135.7
+    Updating cranelift-srcgen v0.135.6 -> v0.135.7
+    Updating pulley-interpreter v48.0.6 -> v48.0.7
+    Updating pulley-macros v48.0.6 -> v48.0.7
+    Updating wasmtime v48.0.6 -> v48.0.7 (available: v50.0.0)
+    Updating wasmtime-environ v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-cache v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-component-macro v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-component-util v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-core v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-cranelift v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-fiber v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-jit-debug v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-jit-icache-coherence v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-unwinder v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-versioned-export-macros v48.0.6 -> v48.0.7
+    Updating wasmtime-internal-wit-bindgen v48.0.6 -> v48.0.7
+    Updating wasmtime-wasi v48.0.6 -> v48.0.7 (available: v50.0.0)
+    Updating wasmtime-wasi-io v48.0.6 -> v48.0.7
+    Updating wiggle v48.0.6 -> v48.0.7
+    Updating wiggle-generate v48.0.6 -> v48.0.7
+    Updating wiggle-macro v48.0.6 -> v48.0.7
+note: pass `--verbose` to see 201 unchanged dependencies behind latest
+$ cargo update -p rustls-webpki -p webpki-roots@1.0.7 -p ctutils -p chacha20
+    Updating crates.io index
+     Locking 4 packages to latest compatible versions
+    Updating chacha20 v0.10.0 -> v0.10.2
+    Updating ctutils v0.4.2 -> v0.4.5
+    Updating rustls-webpki v0.103.15 -> v0.103.16
+    Updating webpki-roots v1.0.7 -> v1.0.11
+note: pass `--verbose` to see 199 unchanged dependencies behind latest
+$ cargo update -p tokio --precise 1.53.3
+    Updating crates.io index
+    Updating tokio v1.52.3 -> v1.53.3
+note: pass `--verbose` to see 198 unchanged dependencies behind latest
+
+## cargo deny check after lock updates only
+error[unmaintained]: `zbus_names` is unmaintained
+515 │ zbus_names 4.3.4 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0371
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0371
+error[unmaintained]: `zvariant` is unmaintained
+529 │ zvariant 5.15.0 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0370
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0370
+error[unmaintained]: `zvariant_derive` is unmaintained
+530 │ zvariant_derive 5.15.0 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0372
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0372
+advisories FAILED, bans ok, licenses ok, sources ok
+
+## cargo deny check after lock updates + deny.toml ignore of RUSTSEC-2026-0370/0371/0372 (prototype only)
+advisories ok, bans ok, licenses ok, sources ok
+
+## maos-wasm-host on wasmtime 48.0.7, ZERO source change: cargo nextest run --locked -p maos-wasm-host --no-fail-fast (real 1m04.9s incl. compile)
+   Compiling wasmtime v48.0.7
+   Compiling cranelift-codegen v0.135.7
+   Compiling maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 00s
+     Summary [   2.827s] 113 tests run: 113 passed, 1 skipped
+exit=0
+
+## cargo check --workspace --all-targets --locked on the prototype lock (real 1m48.4s)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 46s
+exit=0
+(300 pre-existing warnings, 0 errors)
+
+## git diff --stat of the prototype (before revert)
+ Cargo.lock                          | 164 ++++++++++++++++++------------------
+ crates/maos-bin/src/env_contract.rs |   5 ++
+ deny.toml                           |   4 +
+ xtask/test-budgets.toml             |  27 +++++-
+ 4 files changed, 117 insertions(+), 83 deletions(-)
+
+## Cargo.lock version lines changed
+-version = "0.10.0"
++version = "0.10.2"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.135.6"
++version = "0.135.7"
+-version = "0.4.2"
++version = "0.4.5"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "0.103.15"
++version = "0.103.16"
+-version = "1.52.3"
++version = "1.53.3"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "1.0.7"
++version = "1.0.11"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+-version = "48.0.6"
++version = "48.0.7"
+
+## non-lock prototype diff (deny.toml, test-budgets.toml, env_contract.rs)
+diff --git a/crates/maos-bin/src/env_contract.rs b/crates/maos-bin/src/env_contract.rs
+index 79153e2d..ec344a24 100644
+--- a/crates/maos-bin/src/env_contract.rs
++++ b/crates/maos-bin/src/env_contract.rs
+@@ -131,6 +131,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+         purpose: "Debug-build-only deterministic process boot nonce for real multi-daemon integration tests",
+         stability: EnvStability::HarnessOnly,
+     },
++    EnvVar {
++        name: "MAOS_IDLE_FAST",
++        purpose: "PROTOTYPE",
++        stability: EnvStability::HarnessOnly,
++    },
+     EnvVar {
+         name: "MAOS_SPIRIT_ID",
+         purpose: "Spirit identifier for one-shot lifecycle verbs",
+diff --git a/deny.toml b/deny.toml
+index 47febb90..53f74ea4 100644
+--- a/deny.toml
++++ b/deny.toml
+@@ -38,6 +38,10 @@ ignore = [
+     # vulnerability advisory. Migration = move both crates to a maintained YAML
+     # parser; tracked in deferred-work.md, not done as a CI-green patch.
+     "RUSTSEC-2024-0449",
++    # PROTOTYPE (18-0 creation, reverted): zbus 5 stack unmaintained, no safe upgrade
++    "RUSTSEC-2026-0370",
++    "RUSTSEC-2026-0371",
++    "RUSTSEC-2026-0372",
+ ]
+ 
+ [licenses]
+diff --git a/xtask/test-budgets.toml b/xtask/test-budgets.toml
+index 4cd24298..f5fae362 100644
+--- a/xtask/test-budgets.toml
++++ b/xtask/test-budgets.toml
+@@ -22,7 +22,7 @@
+ # `pkgid` are `// cargo-query:` instead and need no row.
+ 
+ default_seconds = 30
+-total_seconds = 300
++total_seconds = 800
+ 
+ # --- Expensive tests (ignored in the default run) ---------------------------
+ 
+@@ -67,3 +67,28 @@ binary = "maos-a2a-tcp::t_11_3_scale_churn"
+ job = "check-scale-churn"
+ reason = "real N=30 / N=100 meshes (Stories 11.3 / 14.1); the gate provisions and runs them"
+ owner = "11-3-scale-envelope-25-30-host-churn"
++
++# PROTOTYPE (18-0 creation, reverted)
++[[exception]]
++binary = "maos-bin::worker_terminal_facts_17_7"
++seconds = 153
++reason = "prototype"
++owner = "18-0-green-main-ci-baseline"
++
++[[exception]]
++binary = "maos-control::post_surface_16_1"
++seconds = 81
++reason = "prototype"
++owner = "18-0-green-main-ci-baseline"
++
++[[exception]]
++binary = "maos-bin::worker_supervision_16_3"
++seconds = 46
++reason = "prototype"
++owner = "18-0-green-main-ci-baseline"
++
++[[exception]]
++binary = "maos-eval::t3_network_escape_executor"
++seconds = 40
++reason = "prototype"
++owner = "18-0-green-main-ci-baseline"

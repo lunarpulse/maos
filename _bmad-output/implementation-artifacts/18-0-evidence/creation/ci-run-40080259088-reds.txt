@@ -1,0 +1,268 @@
+# 18-0 creation — discipline run 40080259088 @ 69224639 (2026-10-24), the last main run before creation. Source: gh api repos/lunarpulse/maos/actions/runs/40080259088/jobs; gh run view 40080259088 --log-failed.
+# 187 jobs; non-success (excl. skipped):
+120832151944	reproducible-build	failure	2026-10-24T09:45:01Z	2026-10-24T09:54:10Z
+120832152172	check-env-contract	failure	2026-10-24T09:46:11Z	2026-10-24T09:47:39Z
+120832157350	workspace-test-suite	failure	2026-10-24T09:46:12Z	2026-10-24T10:05:42Z
+120832157653	check-multi-tenant-loom	failure	2026-10-24T10:31:44Z	2026-10-24T10:38:18Z
+120844657699	check-test-budget	failure	2026-10-24T10:34:56Z	2026-10-24T10:36:49Z
+120852040367	wasm-host-tests (ubuntu-26.04-arm)	failure	2026-10-24T10:43:48Z	2026-10-24T10:53:26Z
+120859373200	v1-0-ship-gate	failure	2026-10-24T11:21:44Z	2026-10-24T11:21:47Z
+120859392092	v1-5-ship-gate	failure	2026-10-24T11:21:50Z	2026-10-24T11:21:53Z
+120859392119	aggregate	failure	2026-10-24T11:21:49Z	2026-10-24T11:21:52Z
+
+# reproducible-build has job-level continue-on-error: true (discipline.yml:75) -> aggregate's needs JSON reports it as result=success:
+aggregate	UNKNOWN STEP	  "reproducible-build": {
+aggregate	UNKNOWN STEP	    "result": "success",
+
+## reproducible-build
+error[vulnerability]: Non-constant-time mask generation and `u128` comparisons
+95 │ ctutils 0.4.2 registry+https://github.com/rust-lang/crates.io-index
+   ├ ID: RUSTSEC-2026-0385
+error[vulnerability]: Certificate verification may accept distrusted intermediates
+362 │ rustls-webpki 0.103.15 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0382
+error[unsound]: `AsyncFd::new` and related constructors violate I/O safety
+424 │ tokio 1.52.3 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0386
+error[vulnerability]: Panic lowering a host-created component model stream into a guest that expects a different payload type
+477 │ wasmtime 48.0.6 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0378
+error[vulnerability]: Cranelift backend on aarch64 can jump to incorrect target on large Wasm `br_table` instruction
+477 │ wasmtime 48.0.6 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0379
+error[vulnerability]: Bundled root certificates allow trust in distrusted emSign intermediates
+496 │ webpki-roots 1.0.7 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0381
+error[unmaintained]: `zbus_names` is unmaintained
+515 │ zbus_names 4.3.4 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0371
+error[unmaintained]: `zvariant` is unmaintained
+529 │ zvariant 5.15.0 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0370
+error[unmaintained]: `zvariant_derive` is unmaintained
+530 │ zvariant_derive 5.15.0 registry+https://github.com/rust-lang/crates.io-index
+    ├ ID: RUSTSEC-2026-0372
+warning[yanked]: detected yanked crate (try `cargo update -p chacha20`)
+54 │ chacha20 0.10.0 registry+https://github.com/rust-lang/crates.io-index
+advisories FAILED, bans ok, licenses ok, sources ok
+
+## check-env-contract
+  VIOLATION: crates/maos-bin/src/hook_pump.rs:653: env::var_os("MAOS_IDLE_FAST") not in env_contract.rs registry
+check-env-contract: FAIL — 1 unregistered maos-bin/src MAOS_* env reads (workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)
+
+## check-multi-tenant-loom
+##[error]check-multi-tenant-loom RED: maos-bin-whole-package-parallel-isolation [INDETERMINATE]: 
+thread 'consolidation_repeats_every_quiescent_window_and_only_while_running' (19459) panicked at crates/maos-bin/tests/hook_pump_17_4.rs:700:5:
+
+## workspace-test-suite
+    thread 'ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan' (50560) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:348:9:
+    thread 'pidfd_reports_non_child_exit_status_signals_and_live_absence' (72451) panicked at crates/maos-kernel-core/tests/t3_terminal_helpers_17_7.rs:478:69:
+
+## check-test-budget
+- workspace-test-suite-junit (ID: 12556891016, Size: 119259, Expected Digest: sha256:fb3b65e38e825ba0dd584ee06465088cc4b0fac746dd0f8227adcaea45531e66)
+##[error]check-test-budget: FAIL — 4 finding(s):
+- maos-bin::worker_supervision_16_3 took 30.385 s (Σ per-test time) over 23 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::worker_terminal_facts_17_7 took 117.273 s (Σ per-test time) over 31 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-control::post_surface_16_1 took 64.464 s (Σ per-test time) over 36 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- suite test time 579.881 s (Σ per-test time) exceeds total_seconds 300.000
+{"gate":"check-test-budget","passed":false,"junit":"workspace-junit/junit.xml","binaries":504,"total_span_seconds":335.40701031684875,"total_sum_seconds":579.8809999999992,"findings":["maos-bin::worker_supervision_16_3 took 30.385 s (Σ per-test time) over 23 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml","maos-bin::worker_terminal_facts_17_7 took 117.273 s (Σ per-test time) over 31 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml","maos-control::post_surface_16_1 took 64.464 s (Σ per-test time) over 36 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml","suite test time 579.881 s (Σ per-test time) exceeds total_seconds 300.000"]}
+check-test-budget: FAIL — 4 finding(s):
+- maos-bin::worker_supervision_16_3 took 30.385 s (Σ per-test time) over 23 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::worker_terminal_facts_17_7 took 117.273 s (Σ per-test time) over 31 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-control::post_surface_16_1 took 64.464 s (Σ per-test time) over 36 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- suite test time 579.881 s (Σ per-test time) exceeds total_seconds 300.000
+
+## wasm-host-tests (ubuntu-26.04-arm)
+grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
+grep -E 'panicked at|rule 11' kernel-t2.log | head -3 | while IFS= read -r line; do
+grep -E 'panicked at|rule 11' escape.log | head -3 | while IFS= read -r line; do
+thread 'undecodable_reply_latches_broken_after_export' (21985) panicked at crates/maos-wasm-host/tests/recall_runner_17_3d.rs:74:75:
+
+## job durations (all 187): id, name, conclusion, started, completed
+120832151737	kloc-check	success	2026-10-24T09:41:35Z	2026-10-24T09:44:46Z
+120832151842	check-service-boundary	success	2026-10-24T09:40:01Z	2026-10-24T09:42:05Z
+120832151844	gen-abi-docs	success	2026-10-24T09:41:02Z	2026-10-24T09:43:42Z
+120832151845	v01-evaluator-path	success	2026-10-24T09:41:00Z	2026-10-24T09:48:58Z
+120832151851	check-test-cost	success	2026-10-24T09:41:24Z	2026-10-24T09:44:02Z
+120832151855	manifest-field-coverage	success	2026-10-24T09:41:24Z	2026-10-24T09:42:15Z
+120832151863	check-composition-root-completeness	success	2026-10-24T09:39:20Z	2026-10-24T09:41:39Z
+120832151865	check-unsafe	success	2026-10-24T09:41:52Z	2026-10-24T09:43:56Z
+120832151867	audit-spine-smoke	success	2026-10-24T09:41:41Z	2026-10-24T09:43:18Z
+120832151880	check-decision-register	success	2026-10-24T09:41:40Z	2026-10-24T09:43:17Z
+120832151885	check-fmt	success	2026-10-24T09:43:13Z	2026-10-24T09:43:47Z
+120832151894	abi-diff	success	2026-10-24T09:42:07Z	2026-10-24T09:45:52Z
+120832151919	check-workspace-count	success	2026-10-24T09:42:21Z	2026-10-24T09:43:54Z
+120832151944	reproducible-build	failure	2026-10-24T09:45:01Z	2026-10-24T09:54:10Z
+120832151946	check-security-md	success	2026-10-24T09:43:58Z	2026-10-24T09:46:33Z
+120832151966	check-loom	success	2026-10-24T09:43:19Z	2026-10-24T09:45:38Z
+120832151974	maos-audit-read-only	success	2026-10-24T09:43:06Z	2026-10-24T09:43:14Z
+120832151997	check-pub-field-constructors	success	2026-10-24T09:43:15Z	2026-10-24T09:44:51Z
+120832151998	check-exit-commands	success	2026-10-24T09:42:16Z	2026-10-24T09:49:18Z
+120832152014	check-fr47	success	2026-10-24T09:46:47Z	2026-10-24T09:48:32Z
+120832152019	cap-registry-smoke	success	2026-10-24T09:43:49Z	2026-10-24T09:46:09Z
+120832152048	worker-tests	success	2026-10-24T09:43:19Z	2026-10-24T09:44:20Z
+120832152064	check-judge-config	success	2026-10-24T09:43:44Z	2026-10-24T09:46:11Z
+120832152092	mira-tests	success	2026-10-24T09:43:55Z	2026-10-24T09:44:59Z
+120832152118	safety-critical-corpus-8-5	success	2026-10-24T09:45:48Z	2026-10-24T09:46:38Z
+120832152129	nfr-rel-1-crash-detection-2s	success	2026-10-24T09:44:50Z	2026-10-24T09:54:35Z
+120832152130	check-corpus	success	2026-10-24T09:50:38Z	2026-10-24T09:52:57Z
+120832152133	server-exit-drain	success	2026-10-24T09:44:48Z	2026-10-24T09:50:49Z
+120832152147	check-cert-rotation-trigger	success	2026-10-24T09:44:04Z	2026-10-24T09:48:09Z
+120832152153	lcas-corpus-tests	success	2026-10-24T09:45:53Z	2026-10-24T09:46:23Z
+120832152157	check-a2a-sender-completeness	success	2026-10-24T09:47:09Z	2026-10-24T09:49:31Z
+120832152159	coverage-matrix	success	2026-10-24T09:50:51Z	2026-10-24T09:53:17Z
+120832152164	calibrate-per-commit	success	2026-10-24T09:44:17Z	2026-10-24T09:46:34Z
+120832152168	maosctl-smoke	success	2026-10-24T09:46:25Z	2026-10-24T09:51:46Z
+120832152172	check-env-contract	failure	2026-10-24T09:46:11Z	2026-10-24T09:47:39Z
+120832152176	expensive-tests	success	2026-10-24T09:23:10Z	2026-10-24T09:31:59Z
+120832152177	invariant-lock	success	2026-10-24T09:44:53Z	2026-10-24T09:47:23Z
+120832152178	researcher-tests	success	2026-10-24T09:45:05Z	2026-10-24T09:46:45Z
+120832152183	check-model-currency	success	2026-10-24T09:48:10Z	2026-10-24T09:50:36Z
+120832152187	isolation-framework-tests	success	2026-10-24T09:52:59Z	2026-10-24T09:53:37Z
+120832152193	check-empty-kernel	success	2026-10-24T09:51:29Z	2026-10-24T09:53:49Z
+120832152210	cap-token-verify-bench	success	2026-10-24T09:47:24Z	2026-10-24T09:49:13Z
+120832152212	audit-query-fr4-smoke	success	2026-10-24T09:48:33Z	2026-10-24T09:55:50Z
+120832152217	example-spirit-drift	success	2026-10-24T09:49:00Z	2026-10-24T09:51:33Z
+120832152218	nfr-aud-7-distillate-five-metrics-floor	success	2026-10-24T09:49:20Z	2026-10-24T09:50:28Z
+120832152220	mira-nash-bench	success	2026-10-24T09:49:49Z	2026-10-24T09:52:20Z
+120832152223	example-spirit-tests	success	2026-10-24T09:51:45Z	2026-10-24T09:52:26Z
+120832152231	onb-nfr2-timing	success	2026-10-24T09:51:35Z	2026-10-24T09:55:34Z
+120832152242	fr4-1000-call-fixture	success	2026-10-24T09:54:40Z	2026-10-24T09:55:50Z
+120832152243	nfr-rel-3-hsis-95pct	success	2026-10-24T09:47:41Z	2026-10-24T09:48:43Z
+120832152258	researcher-bench	success	2026-10-24T09:49:14Z	2026-10-24T09:51:43Z
+120832152260	corpus-staleness	success	2026-10-24T09:49:32Z	2026-10-24T09:51:27Z
+120832152268	hello-spirit-tests	success	2026-10-24T09:48:44Z	2026-10-24T09:49:46Z
+120832152269	architect-tests	success	2026-10-24T09:55:36Z	2026-10-24T09:56:49Z
+120832152273	orchestrator-tests	success	2026-10-24T09:53:51Z	2026-10-24T09:54:38Z
+120832152276	reviewer-tests	success	2026-10-24T09:51:47Z	2026-10-24T09:52:30Z
+120832152278	nash-tests	success	2026-10-24T09:54:52Z	2026-10-24T09:55:36Z
+120832152290	nfr-rel-2-hang-detection-60s	success	2026-10-24T09:55:14Z	2026-10-24T10:05:48Z
+120832152295	nfr-sec-14-cross-spirit-isolation-200	success	2026-10-24T09:54:12Z	2026-10-24T09:55:13Z
+120832152303	founder-loop-bench	success	2026-10-24T09:52:22Z	2026-10-24T09:54:12Z
+120832152304	hello-spirit-bench	success	2026-10-24T09:55:51Z	2026-10-24T09:57:24Z
+120832152329	butler-tests	success	2026-10-24T09:55:51Z	2026-10-24T09:57:01Z
+120832152330	spirit-test-tests	success	2026-10-24T09:54:13Z	2026-10-24T09:54:50Z
+120832152341	observer-tests	success	2026-10-24T09:56:51Z	2026-10-24T09:57:46Z
+120832154588	check-bare-review-findings	success	2026-10-24T09:57:25Z	2026-10-24T09:59:40Z
+120832154591	nfr-perf-1-iac-routing-budget	success	2026-10-24T10:05:44Z	2026-10-24T10:07:51Z
+120832154598	nfr-sec-1-t3-image-signature	success	2026-10-24T09:57:47Z	2026-10-24T10:00:02Z
+120832154608	a2a-loopback-corpus-v0	success	2026-10-24T10:15:17Z	2026-10-24T10:16:09Z
+120832154624	smoke-a2a-consent-vocab-8-7	success	2026-10-24T10:10:22Z	2026-10-24T10:16:13Z
+120832154652	smoke-a2a-loopback-6-3	success	2026-10-24T10:16:10Z	2026-10-24T10:20:48Z
+120832154667	revocation-corpus	success	2026-10-24T10:10:03Z	2026-10-24T10:11:38Z
+120832154668	t3-smoke-busybox (ubuntu-26.04)	success	2026-10-24T09:33:42Z	2026-10-24T09:35:59Z
+120832154680	bench-audit-query-latency	success	2026-10-24T10:02:22Z	2026-10-24T10:04:30Z
+120832154687	check-dev-record-completeness	success	2026-10-24T10:10:26Z	2026-10-24T10:12:51Z
+120832154691	check-review-findings-resolved	success	2026-10-24T10:14:01Z	2026-10-24T10:15:57Z
+120832154702	t3-smoke-busybox (ubuntu-24.04)	success	2026-10-24T09:34:03Z	2026-10-24T09:35:51Z
+120832154711	a2a-tcp-tests-8-6	success	2026-10-24T10:06:52Z	2026-10-24T10:09:33Z
+120832154714	nfr-perf-j4-latency	success	2026-10-24T10:07:53Z	2026-10-24T10:10:25Z
+120832154718	upgrade-policy-corpus	success	2026-10-24T10:12:52Z	2026-10-24T10:14:42Z
+120832154721	smoke-schedule-6-4	success	2026-10-24T10:13:46Z	2026-10-24T10:19:43Z
+120832154742	adr-034-consent-rupture-corpus	success	2026-10-24T09:59:16Z	2026-10-24T10:00:26Z
+120832154747	fr26-schedule-firing-corpus	success	2026-10-24T10:11:40Z	2026-10-24T10:12:51Z
+120832154752	smoke-a2a-fail-closed-8-8	success	2026-10-24T10:18:22Z	2026-10-24T10:24:17Z
+120832154761	intent-lineage-a2a-extension-6-3	success	2026-10-24T10:14:43Z	2026-10-24T10:15:31Z
+120832154769	multi-provider-drift-tests	success	2026-10-24T10:16:14Z	2026-10-24T10:18:52Z
+120832154774	smoke-orchestrator-fanout-6-2	success	2026-10-24T10:12:39Z	2026-10-24T10:16:25Z
+120832154786	intent-lineage-6-4-extension	success	2026-10-24T10:12:53Z	2026-10-24T10:14:00Z
+120832154795	smoke-a2a-tcp-8-6	success	2026-10-24T10:13:46Z	2026-10-24T10:18:16Z
+120832154799	t3-escape-corpus (ubuntu-26.04)	success	2026-10-24T09:44:22Z	2026-10-24T09:47:08Z
+120832154819	determinism-tests	success	2026-10-24T10:13:05Z	2026-10-24T10:13:45Z
+120832154838	t3-escape-corpus (ubuntu-24.04)	success	2026-10-24T09:36:34Z	2026-10-24T09:39:19Z
+120832154843	nfr-rel-9-revocation-5s-p99	success	2026-10-24T10:16:26Z	2026-10-24T10:18:50Z
+120832154852	manifest-n-minus-1-test	success	2026-10-24T10:15:33Z	2026-10-24T10:16:17Z
+120832154871	nfr-perf-8-orchestrator-fanout	success	2026-10-24T10:17:57Z	2026-10-24T10:22:31Z
+120832154890	nfr-rel-4-silent-failure-detection	success	2026-10-24T10:16:19Z	2026-10-24T10:18:40Z
+120832154896	check-manifest-schema-version	success	2026-10-24T10:15:58Z	2026-10-24T10:18:20Z
+120832154949	nfr-rel-10-cold-restart	success	2026-10-24T10:18:41Z	2026-10-24T10:20:52Z
+120832154982	check-dev-model-used-populated	success	2026-10-24T10:18:54Z	2026-10-24T10:21:13Z
+120832154985	nfr-rel-11-halt-receipt-999pct	success	2026-10-24T10:18:25Z	2026-10-24T10:32:33Z
+120832155001	retract-corpus-tests	success	2026-10-24T10:18:52Z	2026-10-24T10:19:49Z
+120832155002	nfr-scale-4-rate-limit-isolation	success	2026-10-24T10:18:17Z	2026-10-24T10:19:00Z
+120832155028	nfr-aud-14-intent-lineage-corpus	success	2026-10-24T10:19:02Z	2026-10-24T10:20:00Z
+120832155035	check-dev-model-tier	success	2026-10-24T10:19:45Z	2026-10-24T10:21:42Z
+120832155044	epic-17-exit (ubuntu-24.04)	success	2026-10-24T09:39:54Z	2026-10-24T10:05:06Z
+120832155069	check-serde-error-handling	success	2026-10-24T10:19:51Z	2026-10-24T10:21:32Z
+120832155152	epic-17-exit (ubuntu-26.04)	success	2026-10-24T09:46:35Z	2026-10-24T10:07:40Z
+120832155424	check-red-team-gate	success	2026-10-24T10:22:35Z	2026-10-24T10:24:54Z
+120832155435	check-owasp-freeze-hash	success	2026-10-24T10:20:50Z	2026-10-24T10:20:55Z
+120832155436	smoke-abi-7-5a	success	2026-10-24T10:20:50Z	2026-10-24T10:22:35Z
+120832155437	journey-hermetic-tier-1	success	2026-10-24T10:20:30Z	2026-10-24T10:24:30Z
+120832155441	ccac-n600-ship-gate	success	2026-10-24T10:20:02Z	2026-10-24T10:20:48Z
+120832155445	smoke-skill-7-4	success	2026-10-24T10:21:15Z	2026-10-24T10:23:05Z
+120832155459	fr59-yank-propagation-5min	success	2026-10-24T10:21:34Z	2026-10-24T10:22:22Z
+120832155462	check-epic-close-coherence	success	2026-10-24T10:20:54Z	2026-10-24T10:23:17Z
+120832155470	check-j1-loopback-delegation	success	2026-10-24T10:23:30Z	2026-10-24T10:28:33Z
+120832155472	check-breaking-md	success	2026-10-24T10:22:49Z	2026-10-24T10:25:09Z
+120832155475	air-gap-import-corpus	success	2026-10-24T10:22:36Z	2026-10-24T10:24:00Z
+120832155479	check-coverage-matrix-completeness	success	2026-10-24T10:22:23Z	2026-10-24T10:24:37Z
+120832155480	check-third-party-trial	success	2026-10-24T10:21:45Z	2026-10-24T10:24:00Z
+120832155483	check-epic-close-green	success	2026-10-24T10:23:13Z	2026-10-24T10:25:12Z
+120832155487	check-stability-matrix	success	2026-10-24T10:20:57Z	2026-10-24T10:22:32Z
+120832155494	check-pentest-gate	success	2026-10-24T10:23:19Z	2026-10-24T10:25:35Z
+120832155512	check-j1-two-host-signed-run	success	2026-10-24T10:23:28Z	2026-10-24T10:26:56Z
+120832155514	smoke-onb-1-7-5b	success	2026-10-24T10:22:35Z	2026-10-24T10:23:29Z
+120832155528	check-skill-schema	success	2026-10-24T10:24:32Z	2026-10-24T10:26:56Z
+120832155530	check-migration-merkle	success	2026-10-24T10:23:07Z	2026-10-24T10:27:35Z
+120832155532	smoke-registry-7-2	success	2026-10-24T10:24:02Z	2026-10-24T10:26:05Z
+120832155536	check-kernel-baseline	success	2026-10-24T10:24:19Z	2026-10-24T10:26:41Z
+120832155546	nfr-onb-1-gate	success	2026-10-24T10:24:02Z	2026-10-24T10:26:20Z
+120832155590	check-cross-form-equiv	success	2026-10-24T10:24:39Z	2026-10-24T10:25:04Z
+120832155694	smoke-compliance-7-3	success	2026-10-24T10:24:56Z	2026-10-24T10:27:08Z
+120832157350	workspace-test-suite	failure	2026-10-24T09:46:12Z	2026-10-24T10:05:42Z
+120832157353	check-trial-attestation	success	2026-10-24T10:26:23Z	2026-10-24T10:29:19Z
+120832157361	check-reza-production-path	success	2026-10-24T10:25:14Z	2026-10-24T10:30:50Z
+120832157366	cgroup-ceiling-undelegated (ubuntu-24.04-arm)	success	2026-10-24T09:46:37Z	2026-10-24T09:59:15Z
+120832157367	check-fkcs	success	2026-10-24T10:25:36Z	2026-10-24T10:29:32Z
+120832157373	cgroup-ceiling-undelegated (ubuntu-26.04-arm)	success	2026-10-24T09:46:42Z	2026-10-24T09:59:32Z
+120832157378	macos-scope	success	2026-10-24T10:25:01Z	2026-10-24T10:25:07Z
+120832157379	check-vetting-attestation	success	2026-10-24T10:25:11Z	2026-10-24T10:27:00Z
+120832157397	check-ff-j6	success	2026-10-24T10:27:02Z	2026-10-24T10:29:22Z
+120832157409	check-export-control	success	2026-10-24T10:29:20Z	2026-10-24T10:31:40Z
+120832157410	check-ko-coverage	success	2026-10-24T10:26:24Z	2026-10-24T10:27:45Z
+120832157416	cgroup-ceiling-undelegated (ubuntu-24.04)	success	2026-10-24T09:45:40Z	2026-10-24T10:02:21Z
+120832157433	cgroup-ceiling-undelegated (ubuntu-26.04)	success	2026-10-24T09:50:30Z	2026-10-24T10:08:28Z
+120832157436	check-live-bilateral-consent	success	2026-10-24T10:28:43Z	2026-10-24T10:29:32Z
+120832157437	check-loom-substrate-drift	success	2026-10-24T10:25:08Z	2026-10-24T10:26:59Z
+120832157439	check-rotation-real-timing	success	2026-10-24T10:26:06Z	2026-10-24T10:29:59Z
+120832157475	check-cross-region-consensus	success	2026-10-24T10:27:37Z	2026-10-24T10:30:26Z
+120832157478	check-enterprise-identity	success	2026-10-24T10:26:57Z	2026-10-24T10:32:02Z
+120832157485	check-dependency-closure	success	2026-10-24T10:32:18Z	2026-10-24T10:34:43Z
+120832157488	check-wasm-form-equiv	success	2026-10-24T10:27:09Z	2026-10-24T10:35:06Z
+120832157495	check-scale-churn	success	2026-10-24T10:26:43Z	2026-10-24T10:28:41Z
+120832157497	check-escape-detector	success	2026-10-24T10:28:34Z	2026-10-24T10:32:17Z
+120832157504	check-cohort-mesh	success	2026-10-24T10:29:33Z	2026-10-24T10:34:49Z
+120832157511	check-enterprise-pdp	success	2026-10-24T10:26:57Z	2026-10-24T10:32:28Z
+120832157539	check-j4-latency	success	2026-10-24T10:30:00Z	2026-10-24T10:31:21Z
+120832157540	one-daemon-one-door	success	2026-10-24T10:30:52Z	2026-10-24T10:34:00Z
+120832157547	maosctl-load-over-the-door	success	2026-10-24T10:30:27Z	2026-10-24T10:32:27Z
+120832157580	release-dry-run (x86_64-unknown-linux-gnu)	success	2026-10-24T10:29:23Z	2026-10-24T10:38:21Z
+120832157589	fuzz-build	success	2026-10-24T10:27:46Z	2026-10-24T10:30:02Z
+120832157601	cgroup-ceiling-delegated (ubuntu-26.04)	success	2026-10-24T09:53:19Z	2026-10-24T10:06:50Z
+120832157610	check-host-surface	success	2026-10-24T10:31:23Z	2026-10-24T10:35:18Z
+120832157612	check-skill-conformance	success	2026-10-24T10:30:03Z	2026-10-24T10:31:42Z
+120832157615	cgroup-ceiling-delegated (ubuntu-26.04-arm)	success	2026-10-24T09:53:41Z	2026-10-24T10:07:29Z
+120832157633	cgroup-ceiling-delegated (ubuntu-24.04)	success	2026-10-24T09:52:32Z	2026-10-24T10:08:05Z
+120832157649	cgroup-ceiling-delegated (ubuntu-24.04-arm)	success	2026-10-24T09:52:30Z	2026-10-24T10:06:29Z
+120832157650	check-multi-region-slo	success	2026-10-24T10:32:29Z	2026-10-24T10:35:32Z
+120832157652	windows-check	success	2026-10-24T09:54:37Z	2026-10-24T10:05:07Z
+120832157653	check-multi-tenant-loom	failure	2026-10-24T10:31:44Z	2026-10-24T10:38:18Z
+120832157663	j0-scene	success	2026-10-24T10:31:42Z	2026-10-24T10:35:15Z
+120832157677	release-dry-run (aarch64-unknown-linux-gnu)	success	2026-10-24T10:29:33Z	2026-10-24T10:39:09Z
+120832157679	check-fuzz-targets	success	2026-10-24T10:32:06Z	2026-10-24T10:34:34Z
+120832157707	check-mobile-push-on-halt	success	2026-10-24T10:32:04Z	2026-10-24T10:32:56Z
+120842252171	coverage-matrix-nfr-test-3	success	2026-10-24T10:34:36Z	2026-10-24T10:36:14Z
+120842480396	example-spirit-ts-tests	success	2026-10-24T10:34:45Z	2026-10-24T10:43:43Z
+120842480489	check-mock-not-in-release	success	2026-10-24T10:34:51Z	2026-10-24T10:40:58Z
+120844657699	check-test-budget	failure	2026-10-24T10:34:56Z	2026-10-24T10:36:49Z
+120847681345	smoke-discipline-7-1-5	success	2026-10-24T10:35:08Z	2026-10-24T10:40:21Z
+120848442682	macos-check	skipped	2026-10-24T10:25:07Z	2026-10-24T10:25:07Z
+120851009346	check-ship-gate-completeness	success	2026-10-24T10:38:23Z	2026-10-24T10:39:19Z
+120852040362	wasm-host-tests (ubuntu-24.04-arm)	success	2026-10-24T10:43:48Z	2026-10-24T11:12:05Z
+120852040367	wasm-host-tests (ubuntu-26.04-arm)	failure	2026-10-24T10:43:48Z	2026-10-24T10:53:26Z
+120852040395	wasm-host-tests (ubuntu-26.04)	success	2026-10-24T10:43:45Z	2026-10-24T11:21:41Z
+120852040437	wasm-host-tests (ubuntu-24.04)	success	2026-10-24T10:43:46Z	2026-10-24T11:20:47Z
+120859373200	v1-0-ship-gate	failure	2026-10-24T11:21:44Z	2026-10-24T11:21:47Z
+120859392092	v1-5-ship-gate	failure	2026-10-24T11:21:50Z	2026-10-24T11:21:53Z
+120859392119	aggregate	failure	2026-10-24T11:21:49Z	2026-10-24T11:21:52Z

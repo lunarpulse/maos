@@ -1,0 +1,29 @@
+18-0 creation — AC4(a) root-cause measurement at HEAD 1fec4882 (2026-10-24). Binary: cargo test --locked -p maos-bin --test hook_pump_17_4 --no-run (libtest, all 16 tests as threads of ONE process — the shape of the loom gate's whole-package leg, xtask/src/check_multi_tenant_loom.rs:1859-1862, `cargo test -p maos-bin`). env -u CI -u GITHUB_ACTIONS.
+
+HEAD, default threads (host cores) x20: pass=20 fail=0
+HEAD, --test-threads=4 x10: pass=1 fail=9
+HEAD, --test-threads=2 x10: pass=1 fail=9
+  red runs by test (a run may red both): --test-threads=4: consolidation_repeats_every_quiescent_window_and_only_while_running
+  (hook_pump_17_4.rs:700:5 'at most once per window: 8 in 6') in 5/10, fresh_inbound_frames_hold_consolidation_off
+  (hook_pump_17_4.rs:755:5 'inbound traffic is not quiescence') in 8/10; --test-threads=2: 0/10 and 9/10.
+
+Cause: World::new (hook_pump_17_4.rs:58-60) calls cap_tokens::init_monotonic_base() per test; it re-stores MONOTONIC_BASE = SystemTime::now() while BOOT_INSTANT keeps the first Instant (crates/maos-capability/src/cap_tokens/mod.rs:52-59), so monotonic_now_ns() (:63-74) jumps FORWARD by the time since the first init whenever a later-starting sibling test builds its World. The watchdog and the feeder both read that clock (crates/maos-bin/src/hook_pump.rs:729,741,758; test :745-748) -> a window 'elapses' early -> an extra fire / an apparent quiescence. Under nextest (process per test) the base is set once per process, which is why workspace-test-suite never reds it.
+
+PROTOTYPE (test-only, reverted with git checkout): World::new guards the init with a file-level std::sync::Once:
+diff --git a/crates/maos-bin/tests/hook_pump_17_4.rs b/crates/maos-bin/tests/hook_pump_17_4.rs
+index f585bb3a..10fe59b8 100755
+--- a/crates/maos-bin/tests/hook_pump_17_4.rs
++++ b/crates/maos-bin/tests/hook_pump_17_4.rs
+@@ -57,7 +57,8 @@ struct World {
+ impl World {
+     fn new() -> Self {
+         let dir = tempfile::TempDir::new().unwrap();
+-        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
++        static CLOCK: std::sync::Once = std::sync::Once::new();
++        CLOCK.call_once(maos_kernel_core::capability::cap_tokens::init_monotonic_base);
+         let tl = Arc::new(
+             TransparencyLogAdapter::open(&dir.path().join("transparency.sqlite"), NONCE).unwrap(),
+         );
+
+PROTOTYPE, --test-threads=4 x10: pass=10 fail=0
+PROTOTYPE, --test-threads=2 x10: pass=10 fail=0

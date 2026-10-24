@@ -1,0 +1,15 @@
+# 18-0 creation — check-test-budget calibration on the five post-20-12 main-run junits (artifact workspace-test-suite-junit, gh run download <id> -n workspace-test-suite-junit).
+# HEAD xtask/test-budgets.toml (default 30 s, total 300 s, no [[exception]]): every run FAILS (40080259088: 4 findings — worker_supervision 30.385, worker_terminal_facts 117.273, post_surface 64.464, total 579.881 > 300).
+# PROTOTYPE (reverted): total_seconds 800 + [[exception]] 153/81/46/40 s (owner 18-0-green-main-ci-baseline) -> /mnt/build/cargo/debug/xtask check-test-budget --junit <run>/junit.xml --json:
+#   39970039438 PASS 501 binaries Σ 538.904 s span 309.075 s; 39970126328 PASS 501 Σ 643.667 span 377.323; 39975504943 PASS 501 Σ 532.320 span 298.125; 39982797947 PASS 501 Σ 641.635 span 356.165; 40080259088 PASS 504 Σ 579.881 span 335.407 — findings [] each.
+# PLANT (prototype): worker_terminal_facts_17_7 exception 153 -> 100 against 40080259088 -> passed:false, exactly 1 finding ('took 117.273 s … budget 100.000 s'), exit 1; restored.
+
+binary | 39970039438 | 39970126328 | 39975504943 | 39982797947 | 40080259088 | max | max x1.25
+maos-bin::worker_terminal_facts_17_7 | 110.993 | 116.182 | 110.775 | 122.258 | 117.273 | 122.258 | 152.82
+maos-control::post_surface_16_1 | 64.588 | 64.655 | 64.44 | 64.56 | 64.464 | 64.655 | 80.82
+maos-bin::worker_supervision_16_3 | 31.589 | 32.928 | 31.587 | 36.711 | 30.385 | 36.711 | 45.89
+maos-eval::t3_network_escape_executor | 22.289 | 32.061 | 19.921 | 30.436 | 23.604 | 32.061 | 40.08
+maos-bin::hook_pump_17_4 | 13.461 | 13.668 | 13.394 | 13.639 | 13.492 | 13.668 | 17.09
+maos-wasm-host::recall_runner_17_3d | 2.285 | 4.65 | 2.07 | 2.978 | 2.822 | 4.65 | 5.81
+maos-kernel-core::t3_terminal_helpers_17_7 | 2.071 | 2.098 | 2.056 | 2.078 | 2.035 | 2.098 | 2.62
+maos-bin::root_shutdown_unload_16_3 | 7.808 | 9.951 | 7.098 | 8.586 | 22.934 | 22.934 | 28.67

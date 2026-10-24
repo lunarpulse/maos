@@ -1,0 +1,682 @@
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/lunarpulse/dev_ws/deny.toml:53:6
+   │
+53 │     "MPL-2.0",
+   │      ━━━━━━━ unmatched license allowance
+
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/lunarpulse/dev_ws/deny.toml:54:6
+   │
+54 │     "OpenSSL",  # Story 1a.3 — ring 0.17 (Rust crypto primitives; de-facto standard)
+   │      ━━━━━━━ unmatched license allowance
+
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/lunarpulse/dev_ws/deny.toml:51:6
+   │
+51 │     "Unicode-DFS-2016",
+   │      ━━━━━━━━━━━━━━━━ unmatched license allowance
+
+error[vulnerability]: Non-constant-time mask generation and `u128` comparisons
+   ┌─ /home/lunarpulse/dev_ws/Cargo.lock:95:1
+   │
+95 │ ctutils 0.4.2 registry+https://github.com/rust-lang/crates.io-index
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+   │
+   ├ ID: RUSTSEC-2026-0385
+   ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0385
+   ├ ## Summary
+     
+     The `ctutils::Choice` type has mask generation functions for each unsigned
+     integer size (`u8`, `u16`, `u32`, `u64`, `u128`). These are `const fn` and
+     therefore can't reuse the `asm!`-backed mask generation in the `cmov` crate
+     that's otherwise used to ensure constant-time.
+     
+     In releases prior to v0.4.4, the generated code from these functions could
+     include a branch on commonly used platforms. This has been corrected in this
+     release and now verified on several platforms using BINSEC.
+     
+     Additionally, `u128` comparison operations provided via `ctutils::Choice` and
+     intended to work in constant-time were generating branches on 32-bit targets.
+     This has been resolved via a special case implementation of these functions
+     for such targets.
+     
+     ## Impact
+     
+     Branch instructions on secret values can potentially leak such values via
+     covert channels. This can enable attackers to potentially recover such secrets.
+     
+     ## Resolution
+     
+     This has been resolved by calling `Choice::to_u8()` when generating the mask,
+     which in turn uses `black_box` as an optimization barrier. Verification that
+     this resulted in the desired change in the generated assembly across a variety
+     of target CPU architectures was performed by BINSEC, which now runs
+     automatically in CI using `cargo checkct`.
+   ├ Announcement: https://github.com/RustCrypto/utils/pull/1569
+   ├ Solution: Upgrade to >=0.4.4 (try `cargo update -p ctutils`)
+   ├ ctutils v0.4.2
+     └── digest v0.11.3
+         ├── hmac v0.13.0
+         │   ├── hkdf v0.13.0
+         │   │   └── secret-service v5.2.0
+         │   │       └── zbus-secret-service-keyring-store v1.0.1
+         │   │           └── keyring v4.2.0
+         │   │               └── maos-secrets v0.1.0-alpha.1
+         │   │                   └── maos-bin v0.1.0-alpha.1
+         │   │                       ├── (dev) maos-journey-test v0.1.0-alpha.1
+         │   │                       └── xtask v0.1.0-alpha.1
+         │   └── postgres-protocol v0.6.12
+         │       ├── postgres-types v0.2.14
+         │       │   ├── pgvector v0.4.2
+         │       │   │   └── maos-loom-lite v0.1.0-alpha.1
+         │       │   │       ├── (dev) maos-bench v0.1.0-alpha.1
+         │       │   │       │   └── maos-bin v0.1.0-alpha.1 (*)
+         │       │   │       ├── maos-bin v0.1.0-alpha.1 (*)
+         │       │   │       ├── maos-cli v0.1.0-alpha.1
+         │       │   │       │   ├── maos-bin v0.1.0-alpha.1 (*)
+         │       │   │       │   └── maos-shell v0.1.0-alpha.1
+         │       │   │       │       └── maos-bin v0.1.0-alpha.1 (*)
+         │       │   │       └── xtask v0.1.0-alpha.1 (*)
+         │       │   └── tokio-postgres v0.7.18
+         │       │       ├── deadpool-postgres v0.14.1
+         │       │       │   └── maos-loom-lite v0.1.0-alpha.1 (*)
+         │       │       ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+         │       │       ├── (dev) maos-bin v0.1.0-alpha.1 (*)
+         │       │       ├── maos-cli v0.1.0-alpha.1 (*)
+         │       │       └── maos-loom-lite v0.1.0-alpha.1 (*)
+         │       └── tokio-postgres v0.7.18 (*)
+         ├── md-5 v0.11.0
+         │   └── postgres-protocol v0.6.12 (*)
+         └── sha2 v0.11.0
+             ├── postgres-protocol v0.6.12 (*)
+             └── secret-service v5.2.0 (*)
+
+error[vulnerability]: Certificate verification may accept distrusted intermediates
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:362:1
+    │
+362 │ rustls-webpki 0.103.15 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+    │
+    ├ ID: RUSTSEC-2026-0382
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0382
+    ├ Affected versions may accept certificate paths containing distrusted emSign
+      intermediate public keys when the configured trust anchors allow such paths.
+      The private keys corresponding to these intermediates are now well known.
+      
+      Versions 0.103.16 and 0.104.0-alpha.8 reject paths containing these public keys.
+    ├ Announcement: https://github.com/rustls/webpki/pull/546
+    ├ Solution: Upgrade to >=0.103.16, <0.104.0-alpha.1 OR >=0.104.0-alpha.8 (try `cargo update -p rustls-webpki`)
+    ├ rustls-webpki v0.103.15
+      ├── maos-a2a-tcp v0.1.0-alpha.1
+      │   └── maos-bin v0.1.0-alpha.1
+      │       ├── (dev) maos-journey-test v0.1.0-alpha.1
+      │       └── xtask v0.1.0-alpha.1
+      └── rustls v0.23.46
+          ├── maos-a2a-core v0.1.0-alpha.1
+          │   ├── maos-a2a v0.1.0-alpha.1
+          │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   │   └── (dev) mira v1.5.0
+          │   │       ├── maos-bin v0.1.0-alpha.1 (*)
+          │   │       └── (dev) maos-notify-push v0.1.0-alpha.1
+          │   │           └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+          │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   └── maos-cohort v0.1.0-alpha.1
+          │       ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+          │       ├── maos-bin v0.1.0-alpha.1 (*)
+          │       ├── maos-cli v0.1.0-alpha.1
+          │       │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │       │   └── maos-shell v0.1.0-alpha.1
+          │       │       └── maos-bin v0.1.0-alpha.1 (*)
+          │       └── maos-digest v0.1.0
+          │           ├── maos-bin v0.1.0-alpha.1 (*)
+          │           └── maos-journey-test v0.1.0-alpha.1 (*)
+          ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+          ├── (dev) maos-bin v0.1.0-alpha.1 (*)
+          ├── maos-egress v0.1.0-alpha.1
+          │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   └── worker v0.1.0
+          │       └── maos-bin v0.1.0-alpha.1 (*)
+          ├── maos-kernel-core v0.1.0-alpha.1
+          │   ├── (dev) architect v0.1.0
+          │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── (dev) butler v0.1.0
+          │   │   ├── maos-bench v0.1.0-alpha.1
+          │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   │   ├── maos-journey-test v0.1.0-alpha.1 (*)
+          │   │   └── maos-shell v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-audit v0.1.0-alpha.1
+          │   │   ├── butler v0.1.0 (*)
+          │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+          │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   │   ├── maos-cli v0.1.0-alpha.1 (*)
+          │   │   ├── maos-eval v0.1.0-alpha.1
+          │   │   │   ├── (dev) butler v0.1.0 (*)
+          │   │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+          │   │   │   ├── maos-kernel-core v0.1.0-alpha.1 (*)
+          │   │   │   ├── (dev) researcher v0.1.0
+          │   │   │   │   ├── maos-bench v0.1.0-alpha.1 (*)
+          │   │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   │   │   └── xtask v0.1.0-alpha.1 (*)
+          │   │   ├── (dev) maos-journey-test v0.1.0-alpha.1 (*)
+          │   │   ├── maos-loom-lite v0.1.0-alpha.1
+          │   │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+          │   │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   │   │   ├── maos-cli v0.1.0-alpha.1 (*)
+          │   │   │   └── xtask v0.1.0-alpha.1 (*)
+          │   │   ├── maos-shell v0.1.0-alpha.1 (*)
+          │   │   ├── maos-siem v0.1.0-alpha.1
+          │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   │   └── xtask v0.1.0-alpha.1 (*)
+          │   ├── maos-bench v0.1.0-alpha.1 (*)
+          │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── maos-control v0.1.0-alpha.1
+          │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-escape-detector v0.1.0-alpha.1
+          │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-eval v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-journey-test v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-pdp v0.1.0-alpha.1
+          │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-secrets v0.1.0-alpha.1
+          │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── maos-shell v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-siem v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-spirit-hello v0.1.0-alpha.1
+          │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+          │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+          │   │   ├── (dev) maos-kernel-core v0.1.0-alpha.1 (*)
+          │   │   └── maos-shell v0.1.0-alpha.1 (*)
+          │   ├── (dev) maos-wasm-host v0.1.0-alpha.1
+          │   ├── (dev) mira v1.5.0 (*)
+          │   ├── (dev) observer v0.1.0
+          │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── (dev) orchestrator v0.1.0
+          │   │   ├── (dev) architect v0.1.0 (*)
+          │   │   └── maos-bin v0.1.0-alpha.1 (*)
+          │   ├── (dev) researcher v0.1.0 (*)
+          │   ├── (dev) worker v0.1.0 (*)
+          │   └── xtask v0.1.0-alpha.1 (*)
+          ├── tokio-rustls v0.26.4
+          │   ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+          │   └── (dev) maos-bin v0.1.0-alpha.1 (*)
+          └── ureq v2.12.1
+              ├── maos-kernel-core v0.1.0-alpha.1 (*)
+              └── maos-notify-push v0.1.0-alpha.1 (*)
+
+error[unsound]: `AsyncFd::new` and related constructors violate I/O safety
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:424:1
+    │
+424 │ tokio 1.52.3 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ unsound advisory detected
+    │
+    ├ ID: RUSTSEC-2026-0386
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0386
+    ├ `tokio::io::unix::AsyncFd` provides safe constructors (`new`, `with_interest`, `try_new`, and `try_with_interest`) that accept any `T: AsRawFd` rather than requiring proof of ownership or validity of the file descriptor. Because `RawFd` implements `AsRawFd`, safe code can construct an `AsyncFd` from an arbitrary or closed file descriptor, or close/replace the underlying file descriptor while the `AsyncFd` is still alive.
+      
+      This violates I/O safety in two ways:
+      
+      1. `AsyncFd<T>` implements `AsFd` for all `T: AsRawFd` by calling `BorrowedFd::borrow_raw(self.as_raw_fd())`, allowing safe code to obtain an arbitrary `BorrowedFd<'_>` without owning the file descriptor.
+      2. Tokio's I/O driver stores a pointer to an internal allocation in the `epoll`/`kqueue` user data for registered file descriptors. If the underlying file descriptor is duplicated and then closed while an `AsyncFd` is alive, and the OS reuses that file descriptor number for a another IO resource on the same runtime, dropping the first `AsyncFd` deregisters the reused file descriptor number and frees the first while the original file description remains registered in `epoll`, leading to a use-after-free when a readiness event fires.
+      
+      Starting in Tokio 1.51.6, 1.53.3, and 1.54.0, `AsyncFd::new`, `AsyncFd::with_interest`, `AsyncFd::try_new`, and `AsyncFd::try_with_interest` are deprecated in favor of the `unsafe` constructors `AsyncFd::register` and `AsyncFd::register_with_interest`. Callers must ensure that the file descriptor remains valid, open, and unchanged for the lifetime of the `AsyncFd`.
+    ├ Announcement: https://github.com/tokio-rs/tokio/pull/8587
+    ├ Solution: Upgrade to >=1.51.6, <1.52.0 OR >=1.53.3 (try `cargo update -p tokio`)
+    ├ tokio v1.52.3
+      ├── (dev) architect v0.1.0
+      │   └── maos-bin v0.1.0-alpha.1
+      │       ├── (dev) maos-journey-test v0.1.0-alpha.1
+      │       └── xtask v0.1.0-alpha.1
+      ├── (dev) butler v0.1.0
+      │   ├── maos-bench v0.1.0-alpha.1
+      │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   ├── maos-journey-test v0.1.0-alpha.1 (*)
+      │   └── maos-shell v0.1.0-alpha.1
+      │       └── maos-bin v0.1.0-alpha.1 (*)
+      ├── deadpool v0.12.3
+      │   └── deadpool-postgres v0.14.1
+      │       └── maos-loom-lite v0.1.0-alpha.1
+      │           ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+      │           ├── maos-bin v0.1.0-alpha.1 (*)
+      │           ├── maos-cli v0.1.0-alpha.1
+      │           │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │           │   └── maos-shell v0.1.0-alpha.1 (*)
+      │           └── xtask v0.1.0-alpha.1 (*)
+      ├── deadpool-postgres v0.14.1 (*)
+      ├── deadpool-runtime v0.1.4
+      │   └── deadpool v0.12.3 (*)
+      ├── (dev) maos-a2a v0.1.0-alpha.1
+      │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   └── (dev) mira v1.5.0
+      │       ├── maos-bin v0.1.0-alpha.1 (*)
+      │       └── (dev) maos-notify-push v0.1.0-alpha.1
+      │           └── maos-bin v0.1.0-alpha.1 (*)
+      ├── (dev) maos-a2a-core v0.1.0-alpha.1
+      │   ├── maos-a2a v0.1.0-alpha.1 (*)
+      │   ├── (dev) maos-a2a-tcp v0.1.0-alpha.1
+      │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   └── maos-cohort v0.1.0-alpha.1
+      │       ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+      │       ├── maos-bin v0.1.0-alpha.1 (*)
+      │       ├── maos-cli v0.1.0-alpha.1 (*)
+      │       └── maos-digest v0.1.0
+      │           ├── maos-bin v0.1.0-alpha.1 (*)
+      │           └── maos-journey-test v0.1.0-alpha.1 (*)
+      ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+      ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+      ├── maos-bin v0.1.0-alpha.1 (*)
+      ├── maos-capability v0.1.0-alpha.1
+      │   ├── maos-a2a-core v0.1.0-alpha.1 (*)
+      │   ├── maos-acp v0.1.0-alpha.1
+      │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │   └── maos-director-surface v0.1.0-alpha.1
+      │   │       ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │       ├── maos-kernel-core v0.1.0-alpha.1
+      │   │       │   ├── (dev) architect v0.1.0 (*)
+      │   │       │   ├── (dev) butler v0.1.0 (*)
+      │   │       │   ├── (dev) maos-audit v0.1.0-alpha.1
+      │   │       │   │   ├── butler v0.1.0 (*)
+      │   │       │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── maos-cli v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── maos-eval v0.1.0-alpha.1
+      │   │       │   │   │   ├── (dev) butler v0.1.0 (*)
+      │   │       │   │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+      │   │       │   │   │   ├── maos-kernel-core v0.1.0-alpha.1 (*)
+      │   │       │   │   │   ├── (dev) researcher v0.1.0
+      │   │       │   │   │   │   ├── maos-bench v0.1.0-alpha.1 (*)
+      │   │       │   │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   │   │   └── xtask v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── (dev) maos-journey-test v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── maos-loom-lite v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── maos-shell v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── maos-siem v0.1.0-alpha.1
+      │   │       │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   │   └── xtask v0.1.0-alpha.1 (*)
+      │   │       │   ├── maos-bench v0.1.0-alpha.1 (*)
+      │   │       │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   ├── maos-control v0.1.0-alpha.1
+      │   │       │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-escape-detector v0.1.0-alpha.1
+      │   │       │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-eval v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-journey-test v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-pdp v0.1.0-alpha.1
+      │   │       │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-secrets v0.1.0-alpha.1
+      │   │       │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   ├── maos-shell v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-siem v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-spirit-hello v0.1.0-alpha.1
+      │   │       │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   │   ├── (dev) maos-kernel-core v0.1.0-alpha.1 (*)
+      │   │       │   │   └── maos-shell v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) maos-wasm-host v0.1.0-alpha.1
+      │   │       │   ├── (dev) mira v1.5.0 (*)
+      │   │       │   ├── (dev) observer v0.1.0
+      │   │       │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) orchestrator v0.1.0
+      │   │       │   │   ├── (dev) architect v0.1.0 (*)
+      │   │       │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   ├── (dev) researcher v0.1.0 (*)
+      │   │       │   ├── (dev) worker v0.1.0
+      │   │       │   │   └── maos-bin v0.1.0-alpha.1 (*)
+      │   │       │   └── xtask v0.1.0-alpha.1 (*)
+      │   │       ├── maos-notify-push v0.1.0-alpha.1 (*)
+      │   │       ├── maos-shell v0.1.0-alpha.1 (*)
+      │   │       ├── (dev) mira v1.5.0 (*)
+      │   │       └── (dev) observer v0.1.0 (*)
+      │   ├── maos-iac v0.1.0-alpha.1
+      │   │   ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+      │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │   ├── maos-cli v0.1.0-alpha.1 (*)
+      │   │   ├── maos-cohort v0.1.0-alpha.1 (*)
+      │   │   ├── (dev) maos-digest v0.1.0 (*)
+      │   │   ├── maos-kernel-core v0.1.0-alpha.1 (*)
+      │   │   ├── (dev) maos-telemetry v0.1.0-alpha.1
+      │   │   └── xtask v0.1.0-alpha.1 (*)
+      │   └── (dev) maos-kernel-core v0.1.0-alpha.1 (*)
+      ├── maos-cli v0.1.0-alpha.1 (*)
+      ├── (dev) maos-digest v0.1.0 (*)
+      ├── maos-director-surface v0.1.0-alpha.1 (*)
+      ├── (dev) maos-escape-detector v0.1.0-alpha.1 (*)
+      ├── (dev) maos-iac v0.1.0-alpha.1 (*)
+      ├── (dev) maos-journey-test v0.1.0-alpha.1 (*)
+      ├── (dev) maos-kernel-core v0.1.0-alpha.1 (*)
+      ├── maos-loom-lite v0.1.0-alpha.1 (*)
+      ├── (dev) maos-providers v0.1.0-alpha.1
+      │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   ├── maos-kernel-core v0.1.0-alpha.1 (*)
+      │   └── maos-shell v0.1.0-alpha.1 (*)
+      ├── maos-registry v0.1.0-alpha.1
+      │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   ├── maos-cli v0.1.0-alpha.1 (*)
+      │   ├── maos-fkcs v0.1.0-alpha.1
+      │   │   └── xtask v0.1.0-alpha.1 (*)
+      │   └── maos-spirit-cli v0.1.0-alpha.1
+      │       └── maos-bin v0.1.0-alpha.1 (*)
+      ├── maos-shell v0.1.0-alpha.1 (*)
+      ├── maos-spirit-cli v0.1.0-alpha.1 (*)
+      ├── (dev) maos-telemetry v0.1.0-alpha.1 (*)
+      ├── (dev) maos-wasm-host v0.1.0-alpha.1 (*)
+      ├── (dev) mira v1.5.0 (*)
+      ├── (dev) observer v0.1.0 (*)
+      ├── opentelemetry_sdk v0.32.1
+      │   └── maos-telemetry v0.1.0-alpha.1 (*)
+      ├── (dev) orchestrator v0.1.0 (*)
+      ├── (dev) researcher v0.1.0 (*)
+      ├── tokio-postgres v0.7.18
+      │   ├── deadpool-postgres v0.14.1 (*)
+      │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+      │   ├── (dev) maos-bin v0.1.0-alpha.1 (*)
+      │   ├── maos-cli v0.1.0-alpha.1 (*)
+      │   └── maos-loom-lite v0.1.0-alpha.1 (*)
+      ├── tokio-rustls v0.26.4
+      │   ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+      │   └── (dev) maos-bin v0.1.0-alpha.1 (*)
+      ├── tokio-stream v0.1.18
+      │   └── opentelemetry_sdk v0.32.1 (*)
+      ├── tokio-util v0.7.18
+      │   ├── (dev) maos-a2a-tcp v0.1.0-alpha.1 (*)
+      │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   ├── maos-kernel-core v0.1.0-alpha.1 (*)
+      │   ├── maos-spirit-sdk v0.1.0-alpha.1
+      │   │   ├── (dev) architect v0.1.0 (*)
+      │   │   ├── (dev) butler v0.1.0 (*)
+      │   │   ├── (dev) example-spirit v0.1.0
+      │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │   ├── (dev) maos-digest v0.1.0 (*)
+      │   │   ├── maos-eval v0.1.0-alpha.1 (*)
+      │   │   ├── maos-spirit-hello v0.1.0-alpha.1 (*)
+      │   │   ├── (dev) mira v1.5.0 (*)
+      │   │   ├── (dev) nash v1.5.0
+      │   │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+      │   │   │   └── (dev) mira v1.5.0 (*)
+      │   │   ├── (dev) observer v0.1.0 (*)
+      │   │   ├── (dev) orchestrator v0.1.0 (*)
+      │   │   ├── (dev) researcher v0.1.0 (*)
+      │   │   └── (dev) reviewer v0.1.0
+      │   │       ├── (dev) architect v0.1.0 (*)
+      │   │       └── maos-bin v0.1.0-alpha.1 (*)
+      │   └── tokio-postgres v0.7.18 (*)
+      ├── wasmtime-wasi v48.0.6
+      │   └── maos-wasm-host v0.1.0-alpha.1 (*)
+      └── xtask v0.1.0-alpha.1 (*)
+
+error[vulnerability]: Panic lowering a host-created component model stream into a guest that expects a different payload type
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:477:1
+    │
+477 │ wasmtime 48.0.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+    │
+    ├ ID: RUSTSEC-2026-0378
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0378
+    ├ This is an entry in the RustSec database for the Wasmtime security advisory
+      located at
+      https://github.com/bytecodealliance/wasmtime/security/advisories/GHSA-9pvw-hwfg-92h5
+      For more information see the GitHub-hosted security advisory.
+    ├ Announcement: https://github.com/bytecodealliance/wasmtime/pull/14827
+    ├ Solution: Upgrade to >=48.0.7, <49.0.0 OR >=49.0.4 (try `cargo update -p wasmtime`)
+    ├ wasmtime v48.0.6
+      ├── maos-wasm-host v0.1.0-alpha.1
+      ├── wasmtime-wasi v48.0.6
+      │   └── maos-wasm-host v0.1.0-alpha.1 (*)
+      ├── wasmtime-wasi-io v48.0.6
+      │   └── wasmtime-wasi v48.0.6 (*)
+      └── wiggle v48.0.6
+          └── wasmtime-wasi v48.0.6 (*)
+
+error[vulnerability]: Cranelift backend on aarch64 can jump to incorrect target on large Wasm `br_table` instruction
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:477:1
+    │
+477 │ wasmtime 48.0.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+    │
+    ├ ID: RUSTSEC-2026-0379
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0379
+    ├ This is an entry in the RustSec database for the Wasmtime security advisory
+      located at
+      https://github.com/bytecodealliance/wasmtime/security/advisories/GHSA-mghf-wjfp-p5xm
+      For more information see the GitHub-hosted security advisory.
+    ├ Announcement: https://github.com/bytecodealliance/wasmtime/pull/14826
+    ├ Solution: Upgrade to >=36.0.19, <37.0.0 OR >=48.0.7, <49.0.0 OR >=49.0.4 (try `cargo update -p wasmtime`)
+    ├ wasmtime v48.0.6
+      ├── maos-wasm-host v0.1.0-alpha.1
+      ├── wasmtime-wasi v48.0.6
+      │   └── maos-wasm-host v0.1.0-alpha.1 (*)
+      ├── wasmtime-wasi-io v48.0.6
+      │   └── wasmtime-wasi v48.0.6 (*)
+      └── wiggle v48.0.6
+          └── wasmtime-wasi v48.0.6 (*)
+
+error[vulnerability]: Bundled root certificates allow trust in distrusted emSign intermediates
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:496:1
+    │
+496 │ webpki-roots 1.0.7 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+    │
+    ├ ID: RUSTSEC-2026-0381
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0381
+    ├ Affected versions include `emSign ECC Root CA - G3`, which can allow certificate
+      paths through distrusted emSign intermediates.
+      
+      Affected versions may accept certificate paths containing distrusted emSign
+      intermediate public keys. The private keys corresponding to these intermediates
+      are now well known.
+      
+      Version 1.0.10+ removes this root.
+      
+      The `webpki-roots` 0.26.11 compatibility package contains no independent trust
+      store and re-exports the roots from its separately resolved 1.x dependency.
+      That parent dependency must resolve to 1.0.10 or newer; an older parent remains
+      affected by this advisory.
+    ├ Announcement: https://github.com/rustls/webpki-roots/pull/133
+    ├ Solution: Upgrade to >=1.0.10 (try `cargo update -p webpki-roots`)
+    ├ webpki-roots v1.0.7
+      └── webpki-roots v0.26.11
+          ├── maos-egress v0.1.0-alpha.1
+          │   ├── maos-bin v0.1.0-alpha.1
+          │   │   ├── (dev) maos-journey-test v0.1.0-alpha.1
+          │   │   └── xtask v0.1.0-alpha.1
+          │   └── worker v0.1.0
+          │       └── maos-bin v0.1.0-alpha.1 (*)
+          └── ureq v2.12.1
+              ├── maos-kernel-core v0.1.0-alpha.1
+              │   ├── (dev) architect v0.1.0
+              │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) butler v0.1.0
+              │   │   ├── maos-bench v0.1.0-alpha.1
+              │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+              │   │   ├── maos-journey-test v0.1.0-alpha.1 (*)
+              │   │   └── maos-shell v0.1.0-alpha.1
+              │   │       └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-audit v0.1.0-alpha.1
+              │   │   ├── butler v0.1.0 (*)
+              │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+              │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+              │   │   ├── maos-cli v0.1.0-alpha.1
+              │   │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+              │   │   │   └── maos-shell v0.1.0-alpha.1 (*)
+              │   │   ├── maos-eval v0.1.0-alpha.1
+              │   │   │   ├── (dev) butler v0.1.0 (*)
+              │   │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+              │   │   │   ├── maos-kernel-core v0.1.0-alpha.1 (*)
+              │   │   │   ├── (dev) researcher v0.1.0
+              │   │   │   │   ├── maos-bench v0.1.0-alpha.1 (*)
+              │   │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   │   │   └── xtask v0.1.0-alpha.1 (*)
+              │   │   ├── (dev) maos-journey-test v0.1.0-alpha.1 (*)
+              │   │   ├── maos-loom-lite v0.1.0-alpha.1
+              │   │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+              │   │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+              │   │   │   ├── maos-cli v0.1.0-alpha.1 (*)
+              │   │   │   └── xtask v0.1.0-alpha.1 (*)
+              │   │   ├── maos-shell v0.1.0-alpha.1 (*)
+              │   │   ├── maos-siem v0.1.0-alpha.1
+              │   │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   │   └── xtask v0.1.0-alpha.1 (*)
+              │   ├── maos-bench v0.1.0-alpha.1 (*)
+              │   ├── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── maos-control v0.1.0-alpha.1
+              │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-escape-detector v0.1.0-alpha.1
+              │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-eval v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-journey-test v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-pdp v0.1.0-alpha.1
+              │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-secrets v0.1.0-alpha.1
+              │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── maos-shell v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-siem v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-spirit-hello v0.1.0-alpha.1
+              │   │   ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+              │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+              │   │   ├── (dev) maos-kernel-core v0.1.0-alpha.1 (*)
+              │   │   └── maos-shell v0.1.0-alpha.1 (*)
+              │   ├── (dev) maos-wasm-host v0.1.0-alpha.1
+              │   ├── (dev) mira v1.5.0
+              │   │   ├── maos-bin v0.1.0-alpha.1 (*)
+              │   │   └── (dev) maos-notify-push v0.1.0-alpha.1
+              │   │       └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) observer v0.1.0
+              │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) orchestrator v0.1.0
+              │   │   ├── (dev) architect v0.1.0 (*)
+              │   │   └── maos-bin v0.1.0-alpha.1 (*)
+              │   ├── (dev) researcher v0.1.0 (*)
+              │   ├── (dev) worker v0.1.0 (*)
+              │   └── xtask v0.1.0-alpha.1 (*)
+              └── maos-notify-push v0.1.0-alpha.1 (*)
+
+error[unmaintained]: `zbus_names` is unmaintained
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:515:1
+    │
+515 │ zbus_names 4.3.4 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ unmaintained advisory detected
+    │
+    ├ ID: RUSTSEC-2026-0371
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0371
+    ├ The `zbus_names` crate is no longer maintained as a standalone crate.
+      
+      It has been merged into [`zbus`](https://crates.io/crates/zbus) starting with version `6.0.0`, as its `names` module.
+      
+      Users should migrate to [`zbus`](https://crates.io/crates/zbus), with its default features disabled if they only need the D-Bus name types.
+    ├ Announcement: https://github.com/z-galaxy/zbus/issues/2043
+    ├ Solution: No safe upgrade is available!
+    ├ zbus_names v4.3.4
+      ├── zbus v5.19.0
+      │   ├── secret-service v5.2.0
+      │   │   └── zbus-secret-service-keyring-store v1.0.1
+      │   │       └── keyring v4.2.0
+      │   │           └── maos-secrets v0.1.0-alpha.1
+      │   │               └── maos-bin v0.1.0-alpha.1
+      │   │                   ├── (dev) maos-journey-test v0.1.0-alpha.1
+      │   │                   └── xtask v0.1.0-alpha.1
+      │   └── zbus-secret-service-keyring-store v1.0.1 (*)
+      └── zbus_macros v5.19.0
+          └── zbus v5.19.0 (*)
+
+error[unmaintained]: `zvariant` is unmaintained
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:529:1
+    │
+529 │ zvariant 5.15.0 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ unmaintained advisory detected
+    │
+    ├ ID: RUSTSEC-2026-0370
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0370
+    ├ The `zvariant` crate is no longer maintained as a standalone crate.
+      
+      It has been merged into [`zbus`](https://crates.io/crates/zbus) starting with version `6.0.0`, as its `wire` module.
+      
+      Users should migrate to [`zbus`](https://crates.io/crates/zbus), with its default features disabled if they only need the D-Bus wire format. Users of the GVariant format should migrate to [`zgvariant`](https://crates.io/crates/zgvariant).
+    ├ Announcement: https://github.com/z-galaxy/zbus/issues/2043
+    ├ Solution: No safe upgrade is available!
+    ├ zvariant v5.15.0
+      ├── zbus v5.19.0
+      │   ├── secret-service v5.2.0
+      │   │   └── zbus-secret-service-keyring-store v1.0.1
+      │   │       └── keyring v4.2.0
+      │   │           └── maos-secrets v0.1.0-alpha.1
+      │   │               └── maos-bin v0.1.0-alpha.1
+      │   │                   ├── (dev) maos-journey-test v0.1.0-alpha.1
+      │   │                   └── xtask v0.1.0-alpha.1
+      │   └── zbus-secret-service-keyring-store v1.0.1 (*)
+      ├── zbus_macros v5.19.0
+      │   └── zbus v5.19.0 (*)
+      └── zbus_names v4.3.4
+          ├── zbus v5.19.0 (*)
+          └── zbus_macros v5.19.0 (*)
+
+error[unmaintained]: `zvariant_derive` is unmaintained
+    ┌─ /home/lunarpulse/dev_ws/Cargo.lock:530:1
+    │
+530 │ zvariant_derive 5.15.0 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ unmaintained advisory detected
+    │
+    ├ ID: RUSTSEC-2026-0372
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0372
+    ├ The `zvariant_derive` crate is no longer maintained as a standalone crate.
+      
+      Its derive macros are provided by [`zbus`](https://crates.io/crates/zbus) starting with version `6.0.0`.
+      
+      Users should migrate to [`zbus`](https://crates.io/crates/zbus), with its default features disabled if they only need the D-Bus wire format.
+    ├ Announcement: https://github.com/z-galaxy/zbus/issues/2043
+    ├ Solution: No safe upgrade is available!
+    ├ zvariant_derive v5.15.0
+      └── zvariant v5.15.0
+          ├── zbus v5.19.0
+          │   ├── secret-service v5.2.0
+          │   │   └── zbus-secret-service-keyring-store v1.0.1
+          │   │       └── keyring v4.2.0
+          │   │           └── maos-secrets v0.1.0-alpha.1
+          │   │               └── maos-bin v0.1.0-alpha.1
+          │   │                   ├── (dev) maos-journey-test v0.1.0-alpha.1
+          │   │                   └── xtask v0.1.0-alpha.1
+          │   └── zbus-secret-service-keyring-store v1.0.1 (*)
+          ├── zbus_macros v5.19.0
+          │   └── zbus v5.19.0 (*)
+          └── zbus_names v4.3.4
+              ├── zbus v5.19.0 (*)
+              └── zbus_macros v5.19.0 (*)
+
+warning[yanked]: detected yanked crate (try `cargo update -p chacha20`)
+   ┌─ /home/lunarpulse/dev_ws/Cargo.lock:54:1
+   │
+54 │ chacha20 0.10.0 registry+https://github.com/rust-lang/crates.io-index
+   │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ yanked version
+   │
+   ├ chacha20 v0.10.0
+     └── rand v0.10.1
+         ├── postgres-protocol v0.6.12
+         │   ├── postgres-types v0.2.14
+         │   │   ├── pgvector v0.4.2
+         │   │   │   └── maos-loom-lite v0.1.0-alpha.1
+         │   │   │       ├── (dev) maos-bench v0.1.0-alpha.1
+         │   │   │       │   └── maos-bin v0.1.0-alpha.1
+         │   │   │       │       ├── (dev) maos-journey-test v0.1.0-alpha.1
+         │   │   │       │       └── xtask v0.1.0-alpha.1
+         │   │   │       ├── maos-bin v0.1.0-alpha.1 (*)
+         │   │   │       ├── maos-cli v0.1.0-alpha.1
+         │   │   │       │   ├── maos-bin v0.1.0-alpha.1 (*)
+         │   │   │       │   └── maos-shell v0.1.0-alpha.1
+         │   │   │       │       └── maos-bin v0.1.0-alpha.1 (*)
+         │   │   │       └── xtask v0.1.0-alpha.1 (*)
+         │   │   └── tokio-postgres v0.7.18
+         │   │       ├── deadpool-postgres v0.14.1
+         │   │       │   └── maos-loom-lite v0.1.0-alpha.1 (*)
+         │   │       ├── (dev) maos-bench v0.1.0-alpha.1 (*)
+         │   │       ├── (dev) maos-bin v0.1.0-alpha.1 (*)
+         │   │       ├── maos-cli v0.1.0-alpha.1 (*)
+         │   │       └── maos-loom-lite v0.1.0-alpha.1 (*)
+         │   └── tokio-postgres v0.7.18 (*)
+         ├── tokio-postgres v0.7.18 (*)
+         └── wasmtime-wasi v48.0.6
+             └── maos-wasm-host v0.1.0-alpha.1
+
+advisories FAILED, bans ok, licenses ok, sources ok
