@@ -223,6 +223,14 @@ The ACs below are the pre-split text, unchanged except where marked; each AC's o
 
 *Does NOT close:* the FIPS 140-3-validated provider (v1.5, PRD DELTA-2026-10-23); export classification (RELEASE-HOLDS Hold 2).
 
+### 20-9-spawned-form-lifecycle-hooks — received items (Epic-17 retrospective 2026-10-24) ◆
+
+*No §20-9 story section exists yet; the vehicle is the tracker row `sprint-status.yaml:303` and `routing-audit-2026-10-22.md:23` (FR55 for spawned forms, after 20-8). This entry records only what the retrospective routed here; story creation writes the section and re-measures these at its own HEAD (rule 9).*
+
+**Received (operator ruling R5, 2026-10-24 — watchdog items merged into 20-9 ◆):**
+- **PF-04 deterministic refused-poll observer.** `check_and_fire` is private and rate-refused / revoked polls emit nothing (`crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs:199` revoked, `:212` bucket refusal), so `crates/maos-kernel-core/tests/schedule_watchdog_fr26.rs:505-542` cannot observe "≥1 eligible poll refused by the bucket" without wall-clock; 20-9 adds the source hook and a barrier-based witness (`deferred-work.md:1193`).
+- **Untokened-fire policy.** After a refused side-effect-scope mint the fire still proceeds and is journaled with `TokenId::ZERO` (`schedule_watchdog.rs:216-221,331-342`; `deferred-work.md:1204`). Whether an untokened fire is suppressed is a design ruling, **decided at 20-9 creation**; the kernel figure of either answer is part of 20-9's measured FLAG-Winston grant.
+
 ## Dependencies
 
 Epic 19 (the J1 demo is what a cohort installs); specifically 15-3 (`check-exit-commands`; `maos --help/--version` verb table — exit line 3's bare tokens and 20-2 AC2's formula test), 15-4 (`release-dry-run` + the artifact layout the exit stages in `./dist`; 20-1 AC1 adds two binaries to that set), 15-5 (ADR-060 forms by tier, ADR-064 replay selector; Hold-2 engine-off rule in AC3), 15-6 (`MAOS_INFERENCE_MODE` + `MAOS_REPLAY_CASSETTE`), 16-1/16-2 (`maos init` mints `control.json`; the shell binds the door — exit line 9), 16-4 (`maos purge` — 20-2 AC3; ⚠ R8: the token is `purge`, not `uninstall`), 17-3b (WASM fixture Spirit `examples/example-spirit-ts` + admission by form/tier — exit lines 7–8, 20-1 AC4); hotfix-lane rows `provider-model-env-overrides` (`MAOS_DEFAULT_PROVIDER`) and `model-pin-currency-gate-and-retired-pin-sweep` (`xtask/model-currency.toml`, `check-model-currency`) before 20-4. Order: 20-1 → 20-2 → 20-3 → 20-5; 20-4 parallel. Downstream: Epic 21 depends on 20-2 and 20-3 (`epic-21…md`).

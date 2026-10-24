@@ -3698,6 +3698,45 @@ jobs:
           echo "::notice title=17-3c process gates (${{ matrix.image }})::rc=$rc fail=$fail"
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 23 spawned-17-3c.log || fail=1
           exit "$fail"
+      # Story 17-10 (AC1.1, AC3.2) — the live escape-anomaly tail under real T2:
+      # a real runner SIGSYS is surfaced by the RUNNING tail within 1 s, exactly
+      # once through the final scan; a planned stop surfaces nothing. Exact pass
+      # count, both test names, no SKIP, markers annotated.
+      - name: Live escape-anomaly consumer under real T2 (Story 17-10)
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-escape-tail --timeout 1800 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test live_escape_anomaly_17_10 -- --nocapture --test-threads=1 2>&1 | tee live-escape-17-10.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          fail=0
+          [ "$rc" -eq 0 ] || { echo "::error title=17-10 escape tail (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
+          grep -q '^test result: ok\. 2 passed;' live-escape-17-10.log || { echo "::error title=17-10 escape tail (${{ matrix.image }})::missing 'test result: ok. 2 passed;'"; fail=1; }
+          required=()
+          for name in real_sigsys_surfaces_exactly_one_anomaly_within_bound \
+                      planned_stop_surfaces_no_anomaly; do
+            required+=(--required-test "$name")
+          done
+          if grep -q '^SKIP[: ]' live-escape-17-10.log; then
+            grep '^SKIP[: ]' live-escape-17-10.log | while IFS= read -r line; do
+              echo "::error title=17-10 escape tail (${{ matrix.image }})::${line}"
+            done
+            fail=1
+          fi
+          for marker in 'ESCAPE-TAIL-17-10 sigsys ' 'ESCAPE-TAIL-17-10 planned-stop '; do
+            got=$(grep -cF -- "$marker" live-escape-17-10.log)
+            [ "$got" -eq 1 ] || { echo "::error title=17-10 escape tail (${{ matrix.image }})::marker '${marker}' seen $got times, want 1"; fail=1; }
+          done
+          grep -F 'ESCAPE-TAIL-17-10 ' live-escape-17-10.log | while IFS= read -r line; do
+            echo "::notice title=17-10 escape tail (${{ matrix.image }})::$line"
+          done
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' live-escape-17-10.log | head -5 | while IFS= read -r line; do
+            echo "::error title=17-10 escape tail (${{ matrix.image }})::${line}"
+          done
+          echo "::notice title=17-10 escape tail (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' live-escape-17-10.log)"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 2 "${required[@]}" live-escape-17-10.log || fail=1
+          exit "$fail"
       # Story 17-3d — mediated in-band recall end to end: the real release
       # runner under T2 in the same delegated envelope, exact pass count and
       # every test name present (no SKIP, no zero-test pass). Story 17-8

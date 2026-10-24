@@ -88,7 +88,7 @@ Story 13.1 has no cross-team read path, and Story 13.2 closes the forgery at bun
 ## Carried security debt
 
 - **F16 / Story 13.5b — collective cascade gap:** `CollectiveMemoryPort` still has no delete/legal-hold surface and kernel forget does not reach Collective memory. No GDPR cascade claim is permitted.
-- **F14 / Story 13.5e — team-axis Transparency Log boundary:** per-team physical artifacts, manifest-reconciled sidecar binding, scoped recall, correlation, and wrong-team backup refusal are shipped. SQLite cryptographic integrity remains absent; escape-anomaly wiring is Story 11.4b and collective erase/legal-hold fan-out is Story 13.5b.
+- **F14 / Story 13.5e — team-axis Transparency Log boundary:** per-team physical artifacts, manifest-reconciled sidecar binding, scoped recall, correlation, and wrong-team backup refusal are shipped. SQLite cryptographic integrity remains absent; escape-anomaly wiring was closed by Story 17-10 (live read-only tail in every `maos run` root) and collective erase/legal-hold fan-out is Story 13.5b.
 - **Story 13.5d — production routing residual:** the first-party Spirit→team-store route is shipped; cross-team replication still has no production initiator.
 - **Story 13.3 — error taxonomy gap:** tenant refusals are consciously compressed to `CollectivePortError::Transport(reason)` at the existing port boundary.
 - **Story 13.6 — journey gap:** no three-team Reza product flow is claimed by the mechanism gate.

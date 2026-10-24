@@ -106,6 +106,14 @@ AC1 is always the command and what the operator observes; every AC cites the cod
 - **AC3 — compaction stays Spirit-authored (FR28).** The kernel refuses; it never compacts, evicts or truncates on the Spirit's behalf, and the refusal tells the Spirit which tier is full.
 - **AC4 — proven red.** Removing the check reds AC1 in CI (rule 11).
 
+### 21-7-production-consent-granter-and-gate — received ACs (Epic-17 retrospective 2026-10-24)
+
+*No §21-7 story section exists yet; the vehicle is the tracker row `sprint-status.yaml:316` and `routing-audit-2026-10-22.md:26` (FR29 production half, after 21-2). This entry records only what the retrospective routed here (operator ruling R4, 2026-10-24: the rupture-id collision is fixed in `18-0-green-main-ci-baseline`; the rest widens 21-7). Story creation writes the section and re-measures at its own HEAD (rule 9).*
+
+- **Received AC — PG migration of the consent side tables.** The PostgreSQL migration copies `transparency_log_recipients`, `transparency_log_consent` and `transparency_log_consent_ruptures`, so participant recall and consent survive the migration (today base Transparency Log rows only; `deferred-work.md:1169`).
+- **Received AC — retract routes to all original addressees.** `retract()` (`crates/maos-iac/src/adapter.rs:641`) builds `to` from every original addressee, not `to_spirit_id` alone (`deferred-work.md:1170`).
+- **Received AC — native bus-send attribution ◆ (measured grant clause).** `IacBusPort::deliver` (`crates/maos-iac/src/adapter/mailbox.rs:792`) calls `deliver_typed(frame, 0, None)`; native compiled-in sends are attributed to the admitted Spirit's pid, not pid 0 (`deferred-work.md:1171`). The fix reaches the kernel send path, so this clause carries a measured FLAG-Winston grant at creation.
+
 ## Dependencies
 
 15-2 (the allowances the asks above draw on: maos-a2a-core +150, maos-a2a-tcp +150, maos-cohort +100, maos-domain +300, the lane-wide maos-bin row, xtask +400), 15-3 (`check-exit-commands` resolving `maos` tokens via the `maos --help` verb table — 21-1 AC1's line), 15-5 (ADR-063 → 21-3 AC3/AC4), 15-6 (`MAOS_INFERENCE_MODE`/ADR-064 → 21-1), 18-4 (`Clock` port in `maos-spirit-sdk` + `--clock compressed:…` → 21-1), 20-3 (evidence states: the nightly's ledger publication uses them; the red-on-absence leg does not wait for it), `ops-j4-live-incident-recording` → 21-1. Dropped: `17-3b → 21-2` (vestigial — 21-2 touches no WASM; `dependency-dag.md:217`'s "J3 recall over the WASM wire" is the old E17→E20 mapping) and 20-2 (no runbook/package AC in this epic). Order: 21-2 ∥ 21-3 ∥ 21-4 (21-2 and 21-4 may run alongside Epic 20; they need only 15-2/15-3) → 21-5 after 21-4 (unit of the re-pin) → 21-1 last (after 18-4 and the operator row). **21-6** (added 2026-10-22 by D-17-9-PF-R3 A) has no ordering edge; it runs whenever it is created.

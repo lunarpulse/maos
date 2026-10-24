@@ -4060,6 +4060,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // block and the serving tail, and an armed listener there would swallow the
     // SIGTERM the arm is supposed to die from.
     let mut root_supervision: Option<maos_bin::supervision::RootSupervision> = None;
+    let mut escape_tail: Option<maos_bin::escape_detector_consumer::EscapeAnomalyTail> = None;
     let mut post_unload_stop: Option<Arc<dyn Fn(u32) + Send + Sync>> = None;
 
     // ─────────────────────────────────────────────────────────────
@@ -4116,6 +4117,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&notification_dispatcher),
             boot_nonce,
         ));
+        // Story 17-10 (D-17-10-FW-01) — the live escape-anomaly consumer, armed
+        // before any admission so no kill row of this boot precedes its cursor.
+        escape_tail = Some(
+            maos_bin::escape_detector_consumer::spawn_escape_anomaly_tail(
+                audit_db_path.clone(),
+                boot_nonce,
+                maos_bin::escape_detector_consumer::ESCAPE_TAIL_INTERVAL,
+                Box::new(std::io::stderr()),
+            ),
+        );
+        eprintln!("maos: escape-anomaly consumer wired (Story 17-10, ADR-024)");
         let root_worker_supervision = Arc::clone(
             root_supervision
                 .as_ref()
@@ -4175,497 +4187,512 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // signal must exit NON-ZERO: the `--once` pass never completed, and
             // an exit 0 there is the 2a AC1.5 false-success shape.
             let mut topology_interrupted = false;
-            // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
-            // topology Worker with no `host`; `TopologyEntry` carries only
-            // `{manifest, host}`, so the position is the only stable handle.
-            for (topology_entry_index, entry) in topology_entries.into_iter().enumerate() {
-                // A signal between entries stops the load: no further Spirit or
-                // Worker is admitted, and the teardown below still runs.
-                if root_shutdown.is_cancelled() {
-                    topology_interrupted = true;
-                    break;
-                }
-                let child_path = {
-                    let p = std::path::PathBuf::from(&entry.manifest);
-                    if p.is_absolute() {
-                        p
-                    } else {
-                        topology_base.join(p)
-                    }
-                };
-                let child_toml = std::fs::read_to_string(&child_path).map_err(|e| {
-                    format!(
-                        "maos run: failed to read topology spirit manifest {}: {e}",
-                        child_path.display()
-                    )
-                })?;
-                let child_root: toml::Value = toml::from_str(&child_toml).map_err(|e| {
-                    format!(
-                        "maos run: topology spirit manifest {} TOML parse error: {e}",
-                        child_path.display()
-                    )
-                })?;
-                maos_bin::topology::validate_remote_topology_target(&entry, &child_root)?;
-                // T1 — a [cli_wrapper] topology member is a host-authorized
-                // Developer-Worker (NOT a scheduler class Spirit). Admit it
-                // through the SAME host-grant + adapter + bridge path as the
-                // standalone run (T2/T3), routing + running its delegated task,
-                // then continue loading the class Spirits. (Continuous/halt-resume
-                // of a long-running worker is T4; --once runs it to completion.)
-                if child_root.get("cli_wrapper").is_some() {
-                    if child_root.get("class").is_some() {
-                        return Err(format!(
-                            "maos run: topology entry {} declares both [cli_wrapper] and [class] — \
-                             mutually exclusive (architecture §6.7, EManifestSchemaConflict)",
-                            child_path.display()
-                        )
-                        .into());
-                    }
-                    // j1-crosshost-1a AC3.6 — the frame-borne delegation trigger.
-                    // The composition root calls `assign_frame_remote` directly,
-                    // once per `host`-bearing topology entry, at topology-load
-                    // time. THIS STORY DOES NOT BUILD AN ORCHESTRATOR DISPATCH
-                    // LOOP: `on_idle` is inert and nothing drives the Orchestrator
-                    // today, so one composition-root-driven delegation IS the v0.8
-                    // rung. The absence of a loop here is deliberate, not an
-                    // oversight — do not "fix" it by inventing a scheduler hook.
-                    //
-                    // AC3.5 — ordering is decided: emit → route → pump → drain,
-                    // ALL completed before the worker admit below.
-                    // `run_cli_wrapper_manifest` stays synchronous and receives the
-                    // already-drained goal.
-                    // `delegated_task` is `Some(goal)` only on the loopback rehearsal
-                    // arm. On the cross-host arm it is `None` AND
-                    // `crossed_the_wire` is set, because the FAR Host runs the worker
-                    // — see the skip below.
-                    let mut crossed_the_wire = false;
-                    // Story 16-3 (D-16-3-E) — a topology member WITH a `host`
-                    // that rehearses locally IS a delegated Worker, so its task
-                    // record must carry the frame id. `frame.frame_id` is `Copy`
-                    // and is read BEFORE `delegate(&iac, frame)` moves the
-                    // frame; the `SentCrossHost` arm spawns nothing locally.
-                    let mut delegation_frame_id: Option<[u8; 16]> = None;
-                    let delegated_task = match &entry.host {
-                        None => None,
-                        Some(to_host) => {
-                            let intent = maos_domain::invariants::i8::A2AIntent::new(
-                                orchestrator::DELEGATION_CONSENT_INTENT,
-                            );
-                            // `j1-crosshost-2e` AC4 (F7) — the delegated goal is
-                            // operator-supplied. Read HERE, at frame construction,
-                            // and nowhere else: the frame stays the single source
-                            // of the worker's task (`j1-crosshost-1a` deleted
-                            // `MAOS_WORKER_TASK` because a remote worker cannot
-                            // inherit local env).
-                            //
-                            // Two tiers, and the discriminator is the CROSS-HOST ARM
-                            // ALONE (§A6 review 2026-08-24, D1). The first cut keyed
-                            // fail-closed on `cross_host_arm_active &&
-                            // var("MAOS_LIVE_AGENT").is_ok()` — but that flag is
-                            // SENDER-LOCAL, while the worker is spawned by the
-                            // receiving host under ITS env (`worker_spawn.rs`):
-                            // with the flag set only on host B (the runbook's trap 7
-                            // says B is "the host that actually spawns"), host A
-                            // silently sent the rehearsal goal and host B billed a
-                            // real agent for it — F7's defect class surviving via an
-                            // env topology the runbook itself half-invites. A sender
-                            // cannot infer safety from its own environment, so the
-                            // arm alone fails closed. The hermetic
-                            // `two_host_delegation_2b` fixture now sets a dummy
-                            // goal (it asserts the delegation MECHANISM — the same
-                            // sixteen frame_id bytes in both logs — never the
-                            // goal's content), so requiring it there costs the test
-                            // one `.env(...)` line. `MAOS_LIVE_AGENT` is no longer
-                            // read here at all, which also removes the empty-string
-                            // and non-UTF-8 disagreements with the spawn gate's
-                            // `var_os(...).is_some_and(|v| !v.is_empty())` (P1).
-                            //
-                            //   * cross-host arm → goal REQUIRED. This is the path
-                            //     that can spend money, and codex's oracle needs
-                            //     EFFECT evidence; the old constant produced none,
-                            //     so the run errored `NoEffectEvidence` AFTER
-                            //     billing. Fail before the frame is emitted and
-                            //     before any spawn.
-                            //   * loopback arm → fall back to the rehearsal string.
-                            //     The loopback rehearsal and `demo-j1` set no goal
-                            //     and must stay green; they assert mechanism, not
-                            //     effect.
-                            let operator_goal = std::env::var("MAOS_DELEGATED_GOAL")
-                                .ok()
-                                .filter(|goal| !goal.trim().is_empty());
-                            let goal = match (operator_goal, cross_host_arm_active) {
-                                (Some(goal), _) => goal,
-                                (None, true) => {
-                                    return Err(
-                                        "maos run: MAOS_DELEGATED_GOAL is required for any \
-                                         cross-host delegation and is unset or blank. The \
-                                         receiving host — not this one — decides whether a real \
-                                         agent is spawned, so the sender cannot infer safety \
-                                         from its own environment; and the built-in rehearsal \
-                                         goal states no task, so a live adapter's completion \
-                                         oracle finds no effect evidence and the run fails \
-                                         AFTER the agent is billed. Set it to the concrete, \
-                                         bounded task the remote worker must perform."
-                                            .to_string()
-                                            .into(),
-                                    );
-                                }
-                                (None, false) => format!(
-                                    "founder-loop: execute the delegated assignment from {}",
-                                    maos_bin::delegation::FROM_HOST
-                                ),
-                            };
-                            let payload = delegation_emitter.build_task_assign(
-                                goal,
-                                "the worker reports completion through its adapter's \
-                                 parse_completion oracle",
-                                None,
-                            );
-                            let frame = delegation_emitter.assign_frame_remote(
-                                delegation_seq,
-                                boot_nonce,
-                                maos_bin::delegation::RECIPIENT_SPIRIT,
-                                maos_spirit_abi::identity::SpiritRole::Worker,
-                                payload,
-                                maos_domain::invariants::i13::IntentLineage::new(vec![
-                                    intent.clone()
-                                ]),
-                                to_host,
-                                maos_bin::delegation::FROM_HOST,
-                                intent,
-                            )?;
-                            delegation_frame_id = Some(frame.frame_id);
-                            delegation_emitter.begin_delegation();
-                            // j1-crosshost-2b AC2.1 — the two arms diverge here.
-                            // On loopback the frame never left, so THIS Host runs
-                            // the worker with the drained goal. On the cross-host
-                            // arm the frame is on a real mTLS socket and the FAR
-                            // Host runs it: `delegated_task` stays `None`, so the
-                            // local `[cli_wrapper]` admit below runs with no
-                            // trailing task argv — the absence of a delegation, not
-                            // a default (`delegated_task: None` has always meant
-                            // exactly that).
-                            //
-                            // This is also why nothing here claims a round trip:
-                            // the emit row is the evidence this Host holds, and the
-                            // receiver's row is joined to it on `frame_id` by
-                            // `j1-crosshost-2c`. No frame comes back in 2b.
-                            match delegation_leg.delegate(&iac, frame).await? {
-                                maos_bin::delegation::DelegationOutcome::RehearsedLocally {
-                                    goal,
-                                } => {
-                                    println!(
-                                        "{}",
-                                        serde_json::json!({
-                                            "event": "delegation_routed",
-                                            "to_host": to_host,
-                                            "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
-                                            "intent": orchestrator::DELEGATION_CONSENT_INTENT,
-                                            "transport": "loopback-rehearsal",
-                                            "goal": goal,
-                                        })
-                                    );
-                                    delegation_seq += 1;
-                                    Some(goal)
-                                }
-                                maos_bin::delegation::DelegationOutcome::SentCrossHost {
-                                    frame_id,
-                                } => {
-                                    println!(
-                                        "{}",
-                                        serde_json::json!({
-                                            "event": "delegation_routed",
-                                            "to_host": to_host,
-                                            "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
-                                            "intent": orchestrator::DELEGATION_CONSENT_INTENT,
-                                            "transport": "cross-host-tcp-mtls",
-                                            // The sixteen bytes the receiving Host's
-                                            // own row will carry. NOT a signed
-                                            // reconciliation and NOT a round trip.
-                                            "frame_id": frame_id
-                                                .iter()
-                                                .map(|b| format!("{b:02x}"))
-                                                .collect::<String>(),
-                                        })
-                                    );
-                                    delegation_seq += 1;
-                                    crossed_the_wire = true;
-                                    None
-                                }
-                            }
-                        }
-                    };
-                    // j1-crosshost-2b AC2.1 — the work went to another machine, so
-                    // this Host does NOT also run it. Spawning the local worker here
-                    // would double-execute the delegated task and let host A journal
-                    // a completion for work it did not do — the "developer-remote"
-                    // claim would then be decorative on both ends.
-                    //
-                    // The completion enforcement 2a hoisted above every
-                    // `[cli_wrapper]` entry is NOT bypassed: there is no local worker
-                    // to have a verdict about. Host B enforces its own worker's
-                    // verdict and journals the real six-value label
-                    // (`DelegationLeg::journal_inbound_outcome`), and the two logs are
-                    // joined on the frame_id printed above. No `TaskComplete` is
-                    // journaled here: host A's in-flight delegation stays in flight,
-                    // which is what FR20 requires and what `j1-crosshost-2c` closes.
-                    if crossed_the_wire {
-                        println!(
-                            "{}",
-                            serde_json::json!({
-                                "event": "topology_worker_delegated_offhost",
-                                "manifest": child_path.display().to_string(),
-                                "topology": true,
-                                "frame_borne": true,
-                                "local_worker_spawned": false,
-                            })
-                        );
-                        loaded_workers.push(child_path.display().to_string());
-                        continue;
-                    }
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "event": "topology_worker_admit",
-                            "manifest": child_path.display().to_string(),
-                            "topology": true,
-                            "frame_borne": delegated_task.is_some(),
-                        })
-                    );
-                    // Story 16-3 (D-16-3-C) — `block_in_place` so the sync
-                    // supervision port may re-enter the runtime with
-                    // `Handle::block_on`. A direct `block_on` from this reactor
-                    // worker thread panics.
-                    let worker_task = match delegation_frame_id {
-                        Some(frame_id) => {
-                            maos_bin::supervision::WorkerTask::Delegation { frame_id }
-                        }
-                        None => maos_bin::supervision::WorkerTask::TopologyEntry {
-                            index: topology_entry_index,
-                        },
-                    };
-                    let worker_result = tokio::task::block_in_place(|| {
-                        run_cli_wrapper_manifest(
-                            &child_root,
-                            &run,
-                            Arc::clone(&transparency_log),
-                            Arc::clone(&capability),
-                            Arc::clone(security.policy()),
-                            spirit_host.clone(),
-                            enterprise_runtime.clone(),
-                            enterprise_pdp_runtime.as_ref(),
-                            delegated_task.as_deref(),
-                            // Local `maos run` path keeps 2a's ratified FORK B posture.
-                            false,
-                            root_worker_supervision.as_ref(),
-                            worker_task,
-                            #[cfg(unix)]
-                            root_supervision
-                                .as_ref()
-                                .and_then(|root| root.egress_handle()),
-                        )
-                    });
-                    // Story 16-3 — checked on BOTH arms and BEFORE any `?`: a
-                    // SIGTERM during this Worker returns `Err` from the guard's
-                    // "stopped before spawn" path or leaves a stopped Worker's
-                    // non-completion, and either way the topology's teardown —
-                    // which unloads every Spirit loaded so far — must still run.
+            // Story 17-10 review D2 — the whole load runs in ONE async block
+            // whose result the teardown below takes (the 16-3 funnel of the
+            // standalone arm): a Worker that did not complete, a refused
+            // admission or any `?` after an earlier entry ran now reaches
+            // unload → audit drain → the escape tail's final scan before
+            // `return Err`, with its error text unchanged.
+            let topology_load: Result<(), Box<dyn std::error::Error>> = async {
+                // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
+                // topology Worker with no `host`; `TopologyEntry` carries only
+                // `{manifest, host}`, so the position is the only stable handle.
+                for (topology_entry_index, entry) in topology_entries.into_iter().enumerate() {
+                    // A signal between entries stops the load: no further Spirit or
+                    // Worker is admitted, and the teardown below still runs.
                     if root_shutdown.is_cancelled() {
-                        if let Err(error) = &worker_result {
-                            eprintln!("maos run: topology worker interrupted by signal: {error}");
-                        }
                         topology_interrupted = true;
                         break;
                     }
-                    let completion = worker_result?;
-                    // AC3.10 + review 2a-P4 — the verdict is enforced for EVERY
-                    // topology `[cli_wrapper]` entry, not only the delegated
-                    // ones: an entry without `host` gets `delegated_task =
-                    // None`, and gating on `is_some()` here was the SAME
-                    // false-success surface AC1.5 closed for the standalone
-                    // path, one branch over. Only an oracle-confirmed success
-                    // becomes the EXISTING `TaskComplete` frame; a crash or
-                    // missing completion marker must not close an in-flight
-                    // delegation (FR20) — and must fail the run.
-                    if !completion.is_completed() {
-                        return Err(format!(
-                            "maos run: topology cli_wrapper worker did not complete ({})",
-                            completion.label()
+                    let child_path = {
+                        let p = std::path::PathBuf::from(&entry.manifest);
+                        if p.is_absolute() {
+                            p
+                        } else {
+                            topology_base.join(p)
+                        }
+                    };
+                    let child_toml = std::fs::read_to_string(&child_path).map_err(|e| {
+                        format!(
+                            "maos run: failed to read topology spirit manifest {}: {e}",
+                            child_path.display()
                         )
-                        .into());
-                    }
-                    if delegated_task.is_some() {
-                        let drained = delegation_leg
-                            .journal_completion(&iac, delegation_seq, boot_nonce)
-                            .await?;
-                        delegation_emitter.complete_delegation();
-                        delegation_seq += 1;
+                    })?;
+                    let child_root: toml::Value = toml::from_str(&child_toml).map_err(|e| {
+                        format!(
+                            "maos run: topology spirit manifest {} TOML parse error: {e}",
+                            child_path.display()
+                        )
+                    })?;
+                    maos_bin::topology::validate_remote_topology_target(&entry, &child_root)?;
+                    // T1 — a [cli_wrapper] topology member is a host-authorized
+                    // Developer-Worker (NOT a scheduler class Spirit). Admit it
+                    // through the SAME host-grant + adapter + bridge path as the
+                    // standalone run (T2/T3), routing + running its delegated task,
+                    // then continue loading the class Spirits. (Continuous/halt-resume
+                    // of a long-running worker is T4; --once runs it to completion.)
+                    if child_root.get("cli_wrapper").is_some() {
+                        if child_root.get("class").is_some() {
+                            return Err(format!(
+                                "maos run: topology entry {} declares both [cli_wrapper] and [class] — \
+                                 mutually exclusive (architecture §6.7, EManifestSchemaConflict)",
+                                child_path.display()
+                            )
+                            .into());
+                        }
+                        // j1-crosshost-1a AC3.6 — the frame-borne delegation trigger.
+                        // The composition root calls `assign_frame_remote` directly,
+                        // once per `host`-bearing topology entry, at topology-load
+                        // time. THIS STORY DOES NOT BUILD AN ORCHESTRATOR DISPATCH
+                        // LOOP: `on_idle` is inert and nothing drives the Orchestrator
+                        // today, so one composition-root-driven delegation IS the v0.8
+                        // rung. The absence of a loop here is deliberate, not an
+                        // oversight — do not "fix" it by inventing a scheduler hook.
+                        //
+                        // AC3.5 — ordering is decided: emit → route → pump → drain,
+                        // ALL completed before the worker admit below.
+                        // `run_cli_wrapper_manifest` stays synchronous and receives the
+                        // already-drained goal.
+                        // `delegated_task` is `Some(goal)` only on the loopback rehearsal
+                        // arm. On the cross-host arm it is `None` AND
+                        // `crossed_the_wire` is set, because the FAR Host runs the worker
+                        // — see the skip below.
+                        let mut crossed_the_wire = false;
+                        // Story 16-3 (D-16-3-E) — a topology member WITH a `host`
+                        // that rehearses locally IS a delegated Worker, so its task
+                        // record must carry the frame id. `frame.frame_id` is `Copy`
+                        // and is read BEFORE `delegate(&iac, frame)` moves the
+                        // frame; the `SentCrossHost` arm spawns nothing locally.
+                        let mut delegation_frame_id: Option<[u8; 16]> = None;
+                        let delegated_task = match &entry.host {
+                            None => None,
+                            Some(to_host) => {
+                                let intent = maos_domain::invariants::i8::A2AIntent::new(
+                                    orchestrator::DELEGATION_CONSENT_INTENT,
+                                );
+                                // `j1-crosshost-2e` AC4 (F7) — the delegated goal is
+                                // operator-supplied. Read HERE, at frame construction,
+                                // and nowhere else: the frame stays the single source
+                                // of the worker's task (`j1-crosshost-1a` deleted
+                                // `MAOS_WORKER_TASK` because a remote worker cannot
+                                // inherit local env).
+                                //
+                                // Two tiers, and the discriminator is the CROSS-HOST ARM
+                                // ALONE (§A6 review 2026-08-24, D1). The first cut keyed
+                                // fail-closed on `cross_host_arm_active &&
+                                // var("MAOS_LIVE_AGENT").is_ok()` — but that flag is
+                                // SENDER-LOCAL, while the worker is spawned by the
+                                // receiving host under ITS env (`worker_spawn.rs`):
+                                // with the flag set only on host B (the runbook's trap 7
+                                // says B is "the host that actually spawns"), host A
+                                // silently sent the rehearsal goal and host B billed a
+                                // real agent for it — F7's defect class surviving via an
+                                // env topology the runbook itself half-invites. A sender
+                                // cannot infer safety from its own environment, so the
+                                // arm alone fails closed. The hermetic
+                                // `two_host_delegation_2b` fixture now sets a dummy
+                                // goal (it asserts the delegation MECHANISM — the same
+                                // sixteen frame_id bytes in both logs — never the
+                                // goal's content), so requiring it there costs the test
+                                // one `.env(...)` line. `MAOS_LIVE_AGENT` is no longer
+                                // read here at all, which also removes the empty-string
+                                // and non-UTF-8 disagreements with the spawn gate's
+                                // `var_os(...).is_some_and(|v| !v.is_empty())` (P1).
+                                //
+                                //   * cross-host arm → goal REQUIRED. This is the path
+                                //     that can spend money, and codex's oracle needs
+                                //     EFFECT evidence; the old constant produced none,
+                                //     so the run errored `NoEffectEvidence` AFTER
+                                //     billing. Fail before the frame is emitted and
+                                //     before any spawn.
+                                //   * loopback arm → fall back to the rehearsal string.
+                                //     The loopback rehearsal and `demo-j1` set no goal
+                                //     and must stay green; they assert mechanism, not
+                                //     effect.
+                                let operator_goal = std::env::var("MAOS_DELEGATED_GOAL")
+                                    .ok()
+                                    .filter(|goal| !goal.trim().is_empty());
+                                let goal = match (operator_goal, cross_host_arm_active) {
+                                    (Some(goal), _) => goal,
+                                    (None, true) => {
+                                        return Err(
+                                            "maos run: MAOS_DELEGATED_GOAL is required for any \
+                                             cross-host delegation and is unset or blank. The \
+                                             receiving host — not this one — decides whether a real \
+                                             agent is spawned, so the sender cannot infer safety \
+                                             from its own environment; and the built-in rehearsal \
+                                             goal states no task, so a live adapter's completion \
+                                             oracle finds no effect evidence and the run fails \
+                                             AFTER the agent is billed. Set it to the concrete, \
+                                             bounded task the remote worker must perform."
+                                                .to_string()
+                                                .into(),
+                                        );
+                                    }
+                                    (None, false) => format!(
+                                        "founder-loop: execute the delegated assignment from {}",
+                                        maos_bin::delegation::FROM_HOST
+                                    ),
+                                };
+                                let payload = delegation_emitter.build_task_assign(
+                                    goal,
+                                    "the worker reports completion through its adapter's \
+                                     parse_completion oracle",
+                                    None,
+                                );
+                                let frame = delegation_emitter.assign_frame_remote(
+                                    delegation_seq,
+                                    boot_nonce,
+                                    maos_bin::delegation::RECIPIENT_SPIRIT,
+                                    maos_spirit_abi::identity::SpiritRole::Worker,
+                                    payload,
+                                    maos_domain::invariants::i13::IntentLineage::new(vec![
+                                        intent.clone()
+                                    ]),
+                                    to_host,
+                                    maos_bin::delegation::FROM_HOST,
+                                    intent,
+                                )?;
+                                delegation_frame_id = Some(frame.frame_id);
+                                delegation_emitter.begin_delegation();
+                                // j1-crosshost-2b AC2.1 — the two arms diverge here.
+                                // On loopback the frame never left, so THIS Host runs
+                                // the worker with the drained goal. On the cross-host
+                                // arm the frame is on a real mTLS socket and the FAR
+                                // Host runs it: `delegated_task` stays `None`, so the
+                                // local `[cli_wrapper]` admit below runs with no
+                                // trailing task argv — the absence of a delegation, not
+                                // a default (`delegated_task: None` has always meant
+                                // exactly that).
+                                //
+                                // This is also why nothing here claims a round trip:
+                                // the emit row is the evidence this Host holds, and the
+                                // receiver's row is joined to it on `frame_id` by
+                                // `j1-crosshost-2c`. No frame comes back in 2b.
+                                match delegation_leg.delegate(&iac, frame).await? {
+                                    maos_bin::delegation::DelegationOutcome::RehearsedLocally {
+                                        goal,
+                                    } => {
+                                        println!(
+                                            "{}",
+                                            serde_json::json!({
+                                                "event": "delegation_routed",
+                                                "to_host": to_host,
+                                                "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
+                                                "intent": orchestrator::DELEGATION_CONSENT_INTENT,
+                                                "transport": "loopback-rehearsal",
+                                                "goal": goal,
+                                            })
+                                        );
+                                        delegation_seq += 1;
+                                        Some(goal)
+                                    }
+                                    maos_bin::delegation::DelegationOutcome::SentCrossHost {
+                                        frame_id,
+                                    } => {
+                                        println!(
+                                            "{}",
+                                            serde_json::json!({
+                                                "event": "delegation_routed",
+                                                "to_host": to_host,
+                                                "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
+                                                "intent": orchestrator::DELEGATION_CONSENT_INTENT,
+                                                "transport": "cross-host-tcp-mtls",
+                                                // The sixteen bytes the receiving Host's
+                                                // own row will carry. NOT a signed
+                                                // reconciliation and NOT a round trip.
+                                                "frame_id": frame_id
+                                                    .iter()
+                                                    .map(|b| format!("{b:02x}"))
+                                                    .collect::<String>(),
+                                            })
+                                        );
+                                        delegation_seq += 1;
+                                        crossed_the_wire = true;
+                                        None
+                                    }
+                                }
+                            }
+                        };
+                        // j1-crosshost-2b AC2.1 — the work went to another machine, so
+                        // this Host does NOT also run it. Spawning the local worker here
+                        // would double-execute the delegated task and let host A journal
+                        // a completion for work it did not do — the "developer-remote"
+                        // claim would then be decorative on both ends.
+                        //
+                        // The completion enforcement 2a hoisted above every
+                        // `[cli_wrapper]` entry is NOT bypassed: there is no local worker
+                        // to have a verdict about. Host B enforces its own worker's
+                        // verdict and journals the real six-value label
+                        // (`DelegationLeg::journal_inbound_outcome`), and the two logs are
+                        // joined on the frame_id printed above. No `TaskComplete` is
+                        // journaled here: host A's in-flight delegation stays in flight,
+                        // which is what FR20 requires and what `j1-crosshost-2c` closes.
+                        if crossed_the_wire {
+                            println!(
+                                "{}",
+                                serde_json::json!({
+                                    "event": "topology_worker_delegated_offhost",
+                                    "manifest": child_path.display().to_string(),
+                                    "topology": true,
+                                    "frame_borne": true,
+                                    "local_worker_spawned": false,
+                                })
+                            );
+                            loaded_workers.push(child_path.display().to_string());
+                            continue;
+                        }
                         println!(
                             "{}",
                             serde_json::json!({
-                                "event": "delegation_completed",
-                                "result": completion.label(),
-                                "orchestrator_frames_drained": drained,
-                                "orchestrator_safe_point": delegation_emitter.is_safe_point(),
+                                "event": "topology_worker_admit",
+                                "manifest": child_path.display().to_string(),
+                                "topology": true,
+                                "frame_borne": delegated_task.is_some(),
                             })
                         );
-                    }
-                    loaded_workers.push(child_path.display().to_string());
-                    continue;
-                }
-                // Story 16-6 (AC1, §14 Q5 = Shape A) — the topology arm now
-                // gates through the SAME extracted function as the standalone
-                // arm and the door. Two consequences are deliberate: it
-                // adopts the standalone ORDER (model-provenance before the
-                // load, not after admission), and its `emit_vetter_key_event`
-                // now fires on REJECTION as well as grant — at HEAD a refused
-                // topology admission wrote no vetter row at all.
-                let gated = maos_bin::admission::gate_manifest(&child_toml, &|name| {
-                    classify_spirit(name).is_some()
-                })
-                .map_err(|refusal| {
-                    format!(
-                        "maos run: topology entry {}: {refusal}",
-                        child_path.display()
-                    )
-                })?;
-                gated.require_in_process("topology")?;
-                let kind = classify_spirit(&gated.class_section.name)
-                    .expect("gate_manifest refused every class classify_spirit does not know");
-                let epistemic_policy = gated.epistemic_policy.clone();
-                let journal = Arc::clone(&shared_journal);
-                let spirit_id = gated.spirit_id.clone();
-                // Patch 7 — reject duplicate spirit_id in topology entries.
-                if loaded_pids.iter().any(|(id, _)| id == &spirit_id) {
-                    return Err(format!(
-                        "maos run: duplicate spirit_id '{spirit_id}' in [[topology.spirits]] — \
-                         each entry must resolve to a unique [class].name"
-                    )
-                    .into());
-                }
-                let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
-                let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
-                let mut pid_fixups: Vec<Box<dyn FnMut(u32) + Send>> = Vec::new();
-                let spirit_obj: Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> =
-                    match kind {
-                        LoadedSpiritKind::Orchestrator => {
-                            maos_kernel_core::scheduler::make_spirit_obj(
-                                orchestrator::Orchestrator::new(&spirit_id),
-                            )
-                        }
-                        LoadedSpiritKind::Architect => {
-                            maos_kernel_core::scheduler::make_spirit_obj(
-                                architect::Architect::new(&spirit_id)
-                                    .with_pending_spec("founder-loop topology manifest load"),
-                            )
-                        }
-                        LoadedSpiritKind::Reviewer => maos_kernel_core::scheduler::make_spirit_obj(
-                            reviewer::Reviewer::new(&spirit_id)
-                                .with_pending_design(reviewer::DesignUnderReview::default()),
-                        ),
-                        LoadedSpiritKind::Mira => {
-                            // Story 9.6 — Mira declares a synchronous diagnostic scalar
-                            // halt transport. Wire the production EpistemicScalarPort
-                            // adapter so the kernel can evaluate the scalar and fire the
-                            // halt; fail boot loud if the port cannot be wired.
-                            if needs_port && strip_port {
-                                return Err(format!(
-                                    "maos run: FATAL boot — topology Spirit '{spirit_id}' declares \
-                                     synchronous diagnostic scalar halt transport but no \
-                                     EpistemicScalarPort could be wired"
-                                )
-                                .into());
+                        // Story 16-3 (D-16-3-C) — `block_in_place` so the sync
+                        // supervision port may re-enter the runtime with
+                        // `Handle::block_on`. A direct `block_on` from this reactor
+                        // worker thread panics.
+                        let worker_task = match delegation_frame_id {
+                            Some(frame_id) => {
+                                maos_bin::supervision::WorkerTask::Delegation { frame_id }
                             }
-                            let policy = epistemic_policy
-                                .clone()
-                                .ok_or("maos run: Mira manifest must declare [epistemic_policy]")?;
-                            let last_receipt = Arc::new(std::sync::Mutex::new(None));
-                            // Story 16-3 (D-16-3-N) — Mira passes `0` through this
-                            // same adapter (`spirits/mira/src/lib.rs`), and it
-                            // DISCARDS the port's error, so an unbound port drops
-                            // its halts silently. The binding is set the instant
-                            // the load assigns a pid and before `start`; Mira only
-                            // writes scalars from `on_idle`, which cannot fire
-                            // before `start`.
-                            let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
-                            let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
-                                Arc::new(ButlerOrchestratorAdapter {
-                                    orchestrator: Arc::clone(&orchestrator),
-                                    tl: Arc::clone(&transparency_log),
-                                    journal: Arc::clone(&journal),
-                                    policy,
-                                    boot_nonce,
-                                    last_receipt,
-                                    spirit_pid_source: ButlerPidSource::Fixed(Arc::clone(
-                                        &pid_binding,
-                                    )),
-                                    spirit_id: spirit_id.clone(),
-                                });
-                            pid_fixups.push(Box::new(move |pid| {
-                                pid_binding.store(pid, std::sync::atomic::Ordering::Release);
-                            }));
-                            maos_kernel_core::scheduler::make_spirit_obj(
-                                mira::Mira::default()
-                                    .with_id(&spirit_id)
-                                    .with_scalar_port(adapter),
+                            None => maos_bin::supervision::WorkerTask::TopologyEntry {
+                                index: topology_entry_index,
+                            },
+                        };
+                        let worker_result = tokio::task::block_in_place(|| {
+                            run_cli_wrapper_manifest(
+                                &child_root,
+                                &run,
+                                Arc::clone(&transparency_log),
+                                Arc::clone(&capability),
+                                Arc::clone(security.policy()),
+                                spirit_host.clone(),
+                                enterprise_runtime.clone(),
+                                enterprise_pdp_runtime.as_ref(),
+                                delegated_task.as_deref(),
+                                // Local `maos run` path keeps 2a's ratified FORK B posture.
+                                false,
+                                root_worker_supervision.as_ref(),
+                                worker_task,
+                                #[cfg(unix)]
+                                root_supervision
+                                    .as_ref()
+                                    .and_then(|root| root.egress_handle()),
                             )
+                        });
+                        // Story 16-3 — checked on BOTH arms and BEFORE any `?`: a
+                        // SIGTERM during this Worker returns `Err` from the guard's
+                        // "stopped before spawn" path or leaves a stopped Worker's
+                        // non-completion, and either way the topology's teardown —
+                        // which unloads every Spirit loaded so far — must still run.
+                        if root_shutdown.is_cancelled() {
+                            if let Err(error) = &worker_result {
+                                eprintln!("maos run: topology worker interrupted by signal: {error}");
+                            }
+                            topology_interrupted = true;
+                            break;
                         }
-                        LoadedSpiritKind::Nash => maos_kernel_core::scheduler::make_spirit_obj(
-                            nash::Nash::default().with_id(&spirit_id),
-                        ),
-                        LoadedSpiritKind::Digest => maos_kernel_core::scheduler::make_spirit_obj(
-                            maos_digest::DigestSpirit::default(),
-                        ),
-                        LoadedSpiritKind::Observer => maos_kernel_core::scheduler::make_spirit_obj(
-                            construct_observer(&spirit_id, hook_pump.activity_sink()),
-                        ),
-                        LoadedSpiritKind::Butler | LoadedSpiritKind::Researcher => {
+                        let completion = worker_result?;
+                        // AC3.10 + review 2a-P4 — the verdict is enforced for EVERY
+                        // topology `[cli_wrapper]` entry, not only the delegated
+                        // ones: an entry without `host` gets `delegated_task =
+                        // None`, and gating on `is_some()` here was the SAME
+                        // false-success surface AC1.5 closed for the standalone
+                        // path, one branch over. Only an oracle-confirmed success
+                        // becomes the EXISTING `TaskComplete` frame; a crash or
+                        // missing completion marker must not close an in-flight
+                        // delegation (FR20) — and must fail the run.
+                        if !completion.is_completed() {
                             return Err(format!(
-                            "maos run: topology manifests currently accept deterministic class Spirits only; got {spirit_id}"
-                        )
+                                "maos run: topology cli_wrapper worker did not complete ({})",
+                                completion.label()
+                            )
                             .into());
                         }
-                    };
-                // Story 16-6 (AC1) — the ONE admission triple, shared with
-                // the standalone arm and the door.
-                let admitted = maos_bin::admission::load_admit_start(
-                    &maos_bin::admission::AdmissionDeps {
-                        scheduler: &scheduler,
-                        security: &security,
-                        transparency_log: &transparency_log,
-                        journal: &shared_journal,
-                        memory: &memory,
-                        pid_by_spirit_id: &pid_by_spirit_id,
-                        hooks: Some(&hook_pump),
-                    },
-                    &gated,
-                    spirit_obj,
-                    boot_nonce,
-                    maos_bin::admission::StartPolicy::StartNow,
-                    &mut |pid| {
-                        for fixup in pid_fixups.iter_mut() {
-                            fixup(pid);
+                        if delegated_task.is_some() {
+                            let drained = delegation_leg
+                                .journal_completion(&iac, delegation_seq, boot_nonce)
+                                .await?;
+                            delegation_emitter.complete_delegation();
+                            delegation_seq += 1;
+                            println!(
+                                "{}",
+                                serde_json::json!({
+                                    "event": "delegation_completed",
+                                    "result": completion.label(),
+                                    "orchestrator_frames_drained": drained,
+                                    "orchestrator_safe_point": delegation_emitter.is_safe_point(),
+                                })
+                            );
                         }
-                    },
-                )
-                .await
-                .map_err(|refusal| format!("maos run: topology entry '{spirit_id}': {refusal}"))?;
-                let pid = admitted.pid;
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "event": "spirit_loaded",
-                        "spirit_id": spirit_id,
-                        "pid": pid,
-                        "topology": true,
-                        "boot_loud_port": needs_port && !strip_port,
+                        loaded_workers.push(child_path.display().to_string());
+                        continue;
+                    }
+                    // Story 16-6 (AC1, §14 Q5 = Shape A) — the topology arm now
+                    // gates through the SAME extracted function as the standalone
+                    // arm and the door. Two consequences are deliberate: it
+                    // adopts the standalone ORDER (model-provenance before the
+                    // load, not after admission), and its `emit_vetter_key_event`
+                    // now fires on REJECTION as well as grant — at HEAD a refused
+                    // topology admission wrote no vetter row at all.
+                    let gated = maos_bin::admission::gate_manifest(&child_toml, &|name| {
+                        classify_spirit(name).is_some()
                     })
-                );
-                loaded_pids.push((spirit_id, pid));
+                    .map_err(|refusal| {
+                        format!(
+                            "maos run: topology entry {}: {refusal}",
+                            child_path.display()
+                        )
+                    })?;
+                    gated.require_in_process("topology")?;
+                    let kind = classify_spirit(&gated.class_section.name)
+                        .expect("gate_manifest refused every class classify_spirit does not know");
+                    let epistemic_policy = gated.epistemic_policy.clone();
+                    let journal = Arc::clone(&shared_journal);
+                    let spirit_id = gated.spirit_id.clone();
+                    // Patch 7 — reject duplicate spirit_id in topology entries.
+                    if loaded_pids.iter().any(|(id, _)| id == &spirit_id) {
+                        return Err(format!(
+                            "maos run: duplicate spirit_id '{spirit_id}' in [[topology.spirits]] — \
+                             each entry must resolve to a unique [class].name"
+                        )
+                        .into());
+                    }
+                    let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
+                    let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
+                    let mut pid_fixups: Vec<Box<dyn FnMut(u32) + Send>> = Vec::new();
+                    let spirit_obj: Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> =
+                        match kind {
+                            LoadedSpiritKind::Orchestrator => {
+                                maos_kernel_core::scheduler::make_spirit_obj(
+                                    orchestrator::Orchestrator::new(&spirit_id),
+                                )
+                            }
+                            LoadedSpiritKind::Architect => {
+                                maos_kernel_core::scheduler::make_spirit_obj(
+                                    architect::Architect::new(&spirit_id)
+                                        .with_pending_spec("founder-loop topology manifest load"),
+                                )
+                            }
+                            LoadedSpiritKind::Reviewer => maos_kernel_core::scheduler::make_spirit_obj(
+                                reviewer::Reviewer::new(&spirit_id)
+                                    .with_pending_design(reviewer::DesignUnderReview::default()),
+                            ),
+                            LoadedSpiritKind::Mira => {
+                                // Story 9.6 — Mira declares a synchronous diagnostic scalar
+                                // halt transport. Wire the production EpistemicScalarPort
+                                // adapter so the kernel can evaluate the scalar and fire the
+                                // halt; fail boot loud if the port cannot be wired.
+                                if needs_port && strip_port {
+                                    return Err(format!(
+                                        "maos run: FATAL boot — topology Spirit '{spirit_id}' declares \
+                                         synchronous diagnostic scalar halt transport but no \
+                                         EpistemicScalarPort could be wired"
+                                    )
+                                    .into());
+                                }
+                                let policy = epistemic_policy
+                                    .clone()
+                                    .ok_or("maos run: Mira manifest must declare [epistemic_policy]")?;
+                                let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                                // Story 16-3 (D-16-3-N) — Mira passes `0` through this
+                                // same adapter (`spirits/mira/src/lib.rs`), and it
+                                // DISCARDS the port's error, so an unbound port drops
+                                // its halts silently. The binding is set the instant
+                                // the load assigns a pid and before `start`; Mira only
+                                // writes scalars from `on_idle`, which cannot fire
+                                // before `start`.
+                                let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
+                                let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
+                                    Arc::new(ButlerOrchestratorAdapter {
+                                        orchestrator: Arc::clone(&orchestrator),
+                                        tl: Arc::clone(&transparency_log),
+                                        journal: Arc::clone(&journal),
+                                        policy,
+                                        boot_nonce,
+                                        last_receipt,
+                                        spirit_pid_source: ButlerPidSource::Fixed(Arc::clone(
+                                            &pid_binding,
+                                        )),
+                                        spirit_id: spirit_id.clone(),
+                                    });
+                                pid_fixups.push(Box::new(move |pid| {
+                                    pid_binding.store(pid, std::sync::atomic::Ordering::Release);
+                                }));
+                                maos_kernel_core::scheduler::make_spirit_obj(
+                                    mira::Mira::default()
+                                        .with_id(&spirit_id)
+                                        .with_scalar_port(adapter),
+                                )
+                            }
+                            LoadedSpiritKind::Nash => maos_kernel_core::scheduler::make_spirit_obj(
+                                nash::Nash::default().with_id(&spirit_id),
+                            ),
+                            LoadedSpiritKind::Digest => maos_kernel_core::scheduler::make_spirit_obj(
+                                maos_digest::DigestSpirit::default(),
+                            ),
+                            LoadedSpiritKind::Observer => maos_kernel_core::scheduler::make_spirit_obj(
+                                construct_observer(&spirit_id, hook_pump.activity_sink()),
+                            ),
+                            LoadedSpiritKind::Butler | LoadedSpiritKind::Researcher => {
+                                return Err(format!(
+                                "maos run: topology manifests currently accept deterministic class Spirits only; got {spirit_id}"
+                            )
+                                .into());
+                            }
+                        };
+                    // Story 16-6 (AC1) — the ONE admission triple, shared with
+                    // the standalone arm and the door.
+                    let admitted = maos_bin::admission::load_admit_start(
+                        &maos_bin::admission::AdmissionDeps {
+                            scheduler: &scheduler,
+                            security: &security,
+                            transparency_log: &transparency_log,
+                            journal: &shared_journal,
+                            memory: &memory,
+                            pid_by_spirit_id: &pid_by_spirit_id,
+                            hooks: Some(&hook_pump),
+                        },
+                        &gated,
+                        spirit_obj,
+                        boot_nonce,
+                        maos_bin::admission::StartPolicy::StartNow,
+                        &mut |pid| {
+                            for fixup in pid_fixups.iter_mut() {
+                                fixup(pid);
+                            }
+                        },
+                    )
+                    .await
+                    .map_err(|refusal| format!("maos run: topology entry '{spirit_id}': {refusal}"))?;
+                    let pid = admitted.pid;
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "spirit_loaded",
+                            "spirit_id": spirit_id,
+                            "pid": pid,
+                            "topology": true,
+                            "boot_loud_port": needs_port && !strip_port,
+                        })
+                    );
+                    loaded_pids.push((spirit_id, pid));
+                }
+                Ok(())
             }
-            if run.once {
+            .await;
+            if run.once || topology_load.is_err() {
                 let mut fired_pids: Vec<u32> = Vec::with_capacity(loaded_pids.len());
-                for _ in 0..loaded_pids.len() {
+                let passes = if topology_load.is_ok() {
+                    loaded_pids.len()
+                } else {
+                    0
+                };
+                for _ in 0..passes {
                     // Never cancel an in-flight hook: the check is BETWEEN
                     // passes. A dropped `fire_on_idle` future leaves its
                     // `spawn_blocking` hook running anyway.
@@ -4704,11 +4731,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         })
                     );
                 }
-                let topology_flush_error = cassette_recorder.as_ref().and_then(|recorder| {
-                    recorder.flush().err().map(|error| {
-                        format!("maos run: topology record-mode flush failed: {error}")
-                    })
-                });
+                let topology_flush_error = cassette_recorder
+                    .as_ref()
+                    .filter(|_| topology_load.is_ok())
+                    .and_then(|recorder| {
+                        recorder.flush().err().map(|error| {
+                            format!("maos run: topology record-mode flush failed: {error}")
+                        })
+                    });
                 println!(
                     "{}",
                     serde_json::json!({
@@ -4786,16 +4816,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // first releases that erased Arc clone before dropping the concrete memory.
                 drop(distillate_writer);
                 drop(memory);
-                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
-                    .await
-                {
+                let drain =
+                    tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
+                        .await;
+                let drained = drain.is_ok();
+                match drain {
                     Ok(Ok(())) => {}
                     Ok(Err(e)) => {
                         eprintln!("maos run: audit writer task failed during topology drain: {e}")
                     }
                     Err(_) => eprintln!("maos run: audit writer topology drain timed out after 5s"),
                 }
+                if let Some(tail) = escape_tail.take() {
+                    tail.shutdown(drained, hook_pump.activity_stats().detached)
+                        .await;
+                }
                 drop(store_locks);
+                topology_load?;
                 if topology_interrupted {
                     return Err(
                         "maos run: interrupted by signal before the --once pass completed".into(),
@@ -4944,9 +4981,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 drop(iac);
                 drop(distillate_writer);
                 drop(memory);
-                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
-                    .await
-                {
+                let drain =
+                    tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
+                        .await;
+                let drained = drain.is_ok();
+                match drain {
                     Ok(Ok(())) => {}
                     Ok(Err(e)) => eprintln!(
                         "maos run: audit writer task failed during standalone worker drain: {e}"
@@ -4954,6 +4993,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(_) => {
                         eprintln!("maos run: audit writer standalone drain timed out after 5s")
                     }
+                }
+                if let Some(tail) = escape_tail.take() {
+                    tail.shutdown(drained, hook_pump.activity_stats().detached)
+                        .await;
                 }
                 drop(store_locks);
                 // Preserve the run's primary failure, but a successful run
@@ -5677,6 +5720,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|refusal| format!("maos run: {refusal}"))?;
             drop(pid_fixups);
             let pid = admitted.pid;
+            // Story 17-10 (D-17-10-FW-05) — the tail correlates this pid's kill
+            // facts against its manifest-declared `[sandbox] tier` (not the
+            // effective admitted tier, which admission may lower).
+            if let Some(tail) = escape_tail.as_ref() {
+                tail.declare(pid, gated.sandbox_cfg.tier);
+            }
             if let (Some(binding), Some(provider)) = (
                 researcher_inference_binding.as_ref(),
                 researcher_inference_provider.as_ref(),
@@ -5936,12 +5985,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 drop(iac);
                 drop(mailbox);
                 drop(notification_dispatcher);
-                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
-                    .await
-                {
+                let drain =
+                    tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
+                        .await;
+                let drained = drain.is_ok();
+                match drain {
                     Ok(Ok(())) => {}
                     Ok(Err(e)) => eprintln!("maos run: audit writer task failed during drain: {e}"),
                     Err(_) => eprintln!("maos run: audit writer drain timed out after 5s"),
+                }
+                if let Some(tail) = escape_tail.take() {
+                    tail.shutdown(drained, hook_pump.activity_stats().detached)
+                        .await;
                 }
                 drop(store_locks);
                 once_result?;
@@ -8688,10 +8743,18 @@ description = "smoke test spirit successor"
     drop(mailbox);
     drop(notification_dispatcher);
 
-    match tokio::time::timeout(std::time::Duration::from_secs(10), audit_writer).await {
+    let drain = tokio::time::timeout(std::time::Duration::from_secs(10), audit_writer).await;
+    let drained = drain.is_ok();
+    match drain {
         Ok(Ok(())) => {}
         Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
         Err(_) => eprintln!("maos: audit writer drain timed out after 10s"),
+    }
+    let output_detached = hook_pump.activity_stats().detached;
+    // Story 17-10 — the escape-anomaly tail's final scan runs after the
+    // audit-writer drain so every kill row the writer held is visible.
+    if let Some(tail) = escape_tail.take() {
+        tail.shutdown(drained, output_detached).await;
     }
     drop(store_locks);
 
@@ -8711,7 +8774,6 @@ description = "smoke test spirit successor"
             0
         }
     };
-    let output_detached = hook_pump.activity_stats().detached;
     if !output_detached {
         unload_report.render(&mut std::io::stderr());
     }

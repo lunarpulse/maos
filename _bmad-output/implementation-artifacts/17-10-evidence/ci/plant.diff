@@ -1,0 +1,12 @@
+diff --git a/crates/maos-bin/src/escape_detector_consumer.rs b/crates/maos-bin/src/escape_detector_consumer.rs
+--- a/crates/maos-bin/src/escape_detector_consumer.rs
++++ b/crates/maos-bin/src/escape_detector_consumer.rs
+@@ -223,7 +223,7 @@
+                     biased;
+                     () = cancel.cancelled() => break,
+                     _ = ticker.tick() => {
+-                        scan_blocking(&state, false).await;
++                        let _ = &state; // PLANT 17-10 AC3: tick arm disconnected from the log
+                     }
+                 }
+             }

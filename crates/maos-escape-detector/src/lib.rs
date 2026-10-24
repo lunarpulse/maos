@@ -91,6 +91,15 @@ impl SandboxBlockFrame {
     }
 }
 
+/// Story 17-10 — one cursor batch of [`Detector::read_kernel_sandbox_blocks_after`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SandboxBlockBatch {
+    /// The TL's `MAX(rowid)` in the batch's snapshot — the caller's next cursor.
+    pub through_rowid: i64,
+    /// This boot's kind-8 rows in `(after_rowid, through_rowid]`, rowid order.
+    pub frames: Vec<SandboxBlockFrame>,
+}
+
 /// The Spirit manifest declaration the detector correlates against (F3). The
 /// detector does NOT read the manifest store itself (it stays a pure, decoupled
 /// consumer); the composition root / test supplies the declaration per Spirit.
@@ -184,7 +193,16 @@ pub fn correlate(frame: &SandboxBlockFrame, manifest: &ManifestDeclaration) -> C
         return CorrelationOutcome::NoAnomaly;
     }
 
-    let observed = frame.observed_tier().unwrap_or(0);
+    // Story 17-10 (D-17-10-FW-04; review D1, ruled A) — only kill facts the
+    // kernel itself observed are correlated (`is_kernel_observed_kill`). Every
+    // other kind-8 row is a refusal or a self-report — the T3 Worker's
+    // `maos-sandbox-block:` stderr line (`tier=3`, child-chosen label, the
+    // process keeps running) and the egress proxy's `sandbox.block.egress.<dest>`
+    // row (JSON payload, `maos-bin/src/egress.rs`) — and is never an anomaly.
+    if !is_kernel_observed_kill(frame) {
+        return CorrelationOutcome::NoAnomaly;
+    }
+    let observed = KERNEL_KILL_TIER;
     CorrelationOutcome::Anomaly(AnomalyReport {
         frame_id_hex: frame.frame_id_hex.clone(),
         spirit_pid: frame.spirit_pid,
@@ -219,41 +237,17 @@ impl Detector {
     pub fn read_kernel_sandbox_blocks(
         db_path: &Path,
     ) -> Result<Vec<SandboxBlockFrame>, DetectorError> {
-        let conn = rusqlite::Connection::open_with_flags(
-            db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .map_err(DetectorError::Open)?;
-
-        // `payload_redacted` holds the writer's `"tier=<n>"` bytes; `origin`
-        // holds the FrameOrigin discriminator (`3` == Kernel). The read-only
-        // connection cannot see an in-flight partial write (SQLite isolation).
+        let conn = open_read_only(db_path)?;
         let mut stmt = conn
             .prepare(
-                "SELECT frame_id, timestamp_ns, spirit_pid, intent, \
-                 payload_redacted, origin \
+                "SELECT frame_id, timestamp_ns, spirit_pid, intent, payload_redacted, origin \
                  FROM transparency_log \
                  WHERE kind = ?1 \
                  ORDER BY rowid",
             )
             .map_err(DetectorError::Query)?;
         let rows = stmt
-            .query_map(rusqlite::params![FRAME_KIND_SANDBOX_BLOCK], |row| {
-                let frame_id_blob: Vec<u8> = row.get(0)?;
-                let timestamp_ns: i64 = row.get(1)?;
-                let spirit_pid: i64 = row.get(2)?;
-                let intent: String = row.get(3)?;
-                let payload_bytes: Vec<u8> = row.get(4)?;
-                let origin: i64 = row.get(5)?;
-                Ok(SandboxBlockFrame {
-                    frame_id_hex: hex_encode(&frame_id_blob),
-                    timestamp_ns,
-                    spirit_pid,
-                    intent,
-                    payload: String::from_utf8_lossy(&payload_bytes).into_owned(),
-                    origin,
-                })
-            })
+            .query_map(rusqlite::params![FRAME_KIND_SANDBOX_BLOCK], decode_row)
             .map_err(DetectorError::Query)?;
 
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -268,6 +262,54 @@ impl Detector {
             }
         }
         Ok(out)
+    }
+
+    /// Story 17-10 (D-17-10-FW-02) — the live tail's cursor read, in ONE read
+    /// transaction: `through_rowid` is the TL's `MAX(rowid)` and `frames` the
+    /// kind-8 rows of boot `boot_nonce` with `after_rowid < rowid <=
+    /// through_rowid`, in rowid order, from the same snapshot. The caller's
+    /// next cursor is `through_rowid`, so non-kill rows are never re-walked.
+    /// Same read-only connection as [`Self::read_kernel_sandbox_blocks`].
+    pub fn read_kernel_sandbox_blocks_after(
+        db_path: &Path,
+        boot_nonce: u64,
+        after_rowid: i64,
+    ) -> Result<SandboxBlockBatch, DetectorError> {
+        let mut conn = open_read_only(db_path)?;
+        let tx = conn.transaction().map_err(DetectorError::Query)?;
+        let through_rowid = query_max_rowid(&tx)?;
+        let mut stmt = tx
+            .prepare(
+                "SELECT frame_id, timestamp_ns, spirit_pid, intent, payload_redacted, origin \
+                 FROM transparency_log \
+                 WHERE kind = ?1 AND boot_nonce = ?2 AND rowid > ?3 AND rowid <= ?4 \
+                 ORDER BY rowid",
+            )
+            .map_err(DetectorError::Query)?;
+        let frames = stmt
+            .query_map(
+                rusqlite::params![
+                    FRAME_KIND_SANDBOX_BLOCK,
+                    boot_nonce as i64,
+                    after_rowid,
+                    through_rowid
+                ],
+                decode_row,
+            )
+            .map_err(DetectorError::Query)?
+            .map(|r| r.map_err(DetectorError::Row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(SandboxBlockBatch {
+            through_rowid,
+            frames,
+        })
+    }
+
+    /// Story 17-10 — the highest rowid in the TL (0 when empty): the tail's
+    /// starting cursor, so rows written before it was spawned are never
+    /// surfaced.
+    pub fn max_rowid(db_path: &Path) -> Result<i64, DetectorError> {
+        query_max_rowid(&open_read_only(db_path)?)
     }
 
     /// Correlate the real kernel-origin `SandboxBlock` frames in `db_path`
@@ -345,6 +387,68 @@ fn extract_syscall(intent: &str) -> &str {
 /// Extract the tier number from `"tier=<n>"`.
 fn extract_tier(payload: &str) -> Option<u8> {
     payload.strip_prefix("tier=").and_then(|n| n.parse().ok())
+}
+
+/// Story 17-10 (review D1, ruled A) — the only tier at which the kernel itself
+/// observes a sandbox kill: both bridge sites gate on `SandboxTier::T2`
+/// (`maos-kernel-core` `lifecycle/cli_wrapper/runtime.rs`, SIGSYS and cgroup
+/// OOM) and `security::sandbox::classify_exit` hard-codes T2.
+const KERNEL_KILL_TIER: u8 = 2;
+
+/// True iff `frame` is a kill fact the kernel itself observed, at
+/// [`KERNEL_KILL_TIER`]. The labels are the kernel producers' own:
+/// `seccomp-kill-process (SIGSYS; …)` and `resource-cap: cgroup memory.max
+/// oom_kill x<n>` from the bridge's `wait_and_finalize` (cap-audit writer or
+/// its direct fallback), `unknown` / `access-violation-possible-sandbox` from
+/// `classify_exit` → `emit_sandbox_block` (11.4b). A T3 self-report always
+/// carries `tier=3`, whatever label the child chose.
+fn is_kernel_observed_kill(frame: &SandboxBlockFrame) -> bool {
+    let Some(label) = frame.intent.strip_prefix("sandbox.block.") else {
+        return false;
+    };
+    let kernel_label = label.starts_with("seccomp-kill-process")
+        || label.starts_with("resource-cap")
+        || label == "unknown"
+        || label == "access-violation-possible-sandbox";
+    kernel_label && frame.observed_tier() == Some(KERNEL_KILL_TIER)
+}
+
+/// Open the TL **read-only** (`SQLITE_OPEN_READ_ONLY`) — the detector is a
+/// pure consumer (ADR-024 §3; the maos-audit precedent). A read-only
+/// connection sees a transaction-consistent snapshot, so it tolerates a
+/// half-written frame while the writer is live.
+fn open_read_only(db_path: &Path) -> Result<rusqlite::Connection, DetectorError> {
+    rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(DetectorError::Open)
+}
+
+/// The one row decoder shared by both reads (columns `frame_id, timestamp_ns,
+/// spirit_pid, intent, payload_redacted, origin`): `payload_redacted` holds the
+/// writer's `"tier=<n>"` bytes; `origin` the FrameOrigin discriminator.
+fn decode_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SandboxBlockFrame> {
+    let frame_id_blob: Vec<u8> = row.get(0)?;
+    let payload_bytes: Vec<u8> = row.get(4)?;
+    Ok(SandboxBlockFrame {
+        frame_id_hex: hex_encode(&frame_id_blob),
+        timestamp_ns: row.get(1)?,
+        spirit_pid: row.get(2)?,
+        intent: row.get(3)?,
+        payload: String::from_utf8_lossy(&payload_bytes).into_owned(),
+        origin: row.get(5)?,
+    })
+}
+
+/// `MAX(rowid)` of the TL (0 when empty) on an open connection/transaction.
+fn query_max_rowid(conn: &rusqlite::Connection) -> Result<i64, DetectorError> {
+    conn.query_row(
+        "SELECT COALESCE(MAX(rowid), 0) FROM transparency_log",
+        [],
+        |r| r.get(0),
+    )
+    .map_err(DetectorError::Query)
 }
 
 /// Lowercase-hex-encode a byte slice (the 16-byte TL `frame_id` blob). No `hex`

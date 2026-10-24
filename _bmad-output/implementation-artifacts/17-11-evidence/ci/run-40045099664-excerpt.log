@@ -1,0 +1,24 @@
+# gh run view 40045099664 --job 120724912315 --log (ANSI stripped, filtered)
+proven-red	Set up job	2026-10-24T00:38:07.9068766Z Version: 20261012.601
+proven-red	Set up job	2026-10-24T00:38:07.9077107Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-24T00:38:07.9077617Z Version: 20261012.334.1
+proven-red	Apply the AC4 plant	2026-10-24T00:38:23.0665080Z git apply _bmad-output/implementation-artifacts/17-11-evidence/ci/ac4-plant.diff
+proven-red	Apply the AC4 plant	2026-10-24T00:38:23.1732948Z d66a75ae3aaae671ec489b246e8fc21b608f6baf5d3a8f1c87e99743a39362ba  _bmad-output/implementation-artifacts/17-11-evidence/ci/ac4-plant.diff
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6233415Z  Nextest run ID 606bdbad-8084-4e14-8a69-9014011e5f6d with nextest profile: default
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6235830Z     Starting 3 tests across 1 binary
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6280855Z         FAIL [   0.004s] (1/3) maos-kernel-core::scope_selector_entitlement_17_11 fs_subtree_containment_issues_beneath_the_declaration
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6289861Z     thread 'fs_subtree_containment_issues_beneath_the_declaration' (5134) panicked at crates/maos-kernel-core/tests/scope_selector_entitlement_17_11.rs:354:9:
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6290738Z     assertion `left == right` failed: declared /data/../etc entitles nothing (/etc)
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6291137Z       left: Ok(())
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6291393Z      right: Err(PolicyDenied)
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6292766Z         PASS [   0.005s] (2/3) maos-kernel-core::scope_selector_entitlement_17_11 kind_only_and_unmediated_scopes_are_unchanged
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6293791Z         FAIL [   0.005s] (3/3) maos-kernel-core::scope_selector_entitlement_17_11 declared_selectors_issue_and_undeclared_are_denied_uncharged
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6298876Z     thread 'declared_selectors_issue_and_undeclared_are_denied_uncharged' (5136) panicked at crates/maos-kernel-core/tests/scope_selector_entitlement_17_11.rs:304:13:
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6299972Z     assertion `left == right` failed: declared McpCall { server: "web", tool: "search" } must not entitle McpCall { server: "web", tool: "fetch" }
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6300528Z       left: Ok(())
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6300751Z      right: Err(PolicyDenied)
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6302111Z      Summary [   0.006s] 3 tests run: 1 passed, 2 failed, 0 skipped
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6303061Z         FAIL [   0.004s] (1/3) maos-kernel-core::scope_selector_entitlement_17_11 fs_subtree_containment_issues_beneath_the_declaration
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6304271Z         FAIL [   0.005s] (3/3) maos-kernel-core::scope_selector_entitlement_17_11 declared_selectors_issue_and_undeclared_are_denied_uncharged
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6329527Z error: test run failed
+proven-red	Planted run must be RED at the named vectors	2026-10-24T00:39:02.6367391Z ##[error]Process completed with exit code 1.

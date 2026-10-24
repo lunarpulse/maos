@@ -64,7 +64,7 @@ Consequence, stated rather than hidden: enterprise PDP subject-deny binds at tha
 - The enterprise posture is unavailable in `air-gap` / reduced builds: `maos-sso`, `maos-secrets` and `maos-siem` are optional deps behind the `network` feature and compile out. `maos-pdp` is non-optional. An air-gap host therefore has PDP mediation available and the other three not.
 - `maos-audit::query_with_redaction` still requires a quiesced database for deterministic projection. Live daemon forwarding preserves that invariant by exporting a transactionally consistent `VACUUM INTO` snapshot of the active WAL database, then removing the snapshot. The recording SIEM port receives the actual projection calls inside the governed daemon lifecycle.
 - The SIEM watermark is process-local and resets on restart. Once-per-record holds within one daemon lifetime; exactly-once across restarts is not claimed.
-- The 11.4b audit escape-anomaly detector remains a second, separate dead-wire — tracked as an honesty-ledger string, not gated, and explicitly not addressed here.
+- The 11.4b audit escape-anomaly detector was a second, separate dead-wire, not addressed here; it is closed by Story 17-10 (2026-10-24): every `maos run` root tails the Transparency Log read-only through it, gated by `check-reza-production-path` leg `audit-escape-anomaly-detector-wiring`.
 
 ## Alternatives rejected
 

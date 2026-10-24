@@ -37,6 +37,11 @@ on one image.**
   process-global clock base and run under libtest).
 - The **workspace suite runs in CI**, not at review.
 - Mutation re-plants are recorded once by the dev pass; the review repeats one only for a disputed finding.
+- **Closing a story re-runs the tree-bound tests that read its status.** Flipping a sprint key to `done` changes the
+  verdict of tests that read `sprint-status.yaml` and the story records: before the closing commit, run
+  `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule`. (20-12
+  closed with an xtask ceiling citing it and no exact `<old> → <new>` arrow grant on an `xtask` line of its record;
+  `the_live_xtask_ceiling_cites_a_real_sprint_story` went red only after the flip, and four main runs carried it.)
 - The four read-only review layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor, Test Infrastructure
   Auditor) are unchanged.
 

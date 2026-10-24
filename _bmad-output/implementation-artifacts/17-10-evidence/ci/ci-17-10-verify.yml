@@ -1,0 +1,59 @@
+# Story 17-10 AC3.1 — branch-only planted-red run (docs/testing/proof-contract.md:
+# proven-red on ONE image; D-17-10-FW-08). Copy to
+# `.github/workflows/ci-17-10-verify.yml` on `ci/17-10-verify` ONLY; never merged;
+# the branch is deleted after the run. Applies the one plant (the tail's tick
+# arm no longer scans; the final scan is untouched) and requires
+# `real_sigsys_surfaces_exactly_one_anomaly_within_bound` to go RED at its
+# within-bound arrival assertion while `planned_stop_surfaces_no_anomaly` stays
+# green.
+name: 17-10-proven-red
+on:
+  push:
+    branches: ["ci/17-10-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - name: Provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Build the T2 session fixtures (xtask build-test-fixtures, Story 20-12)
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maos-wasm-runner-fault-inject,echo_spirit.wasm,maosctl
+      - name: Apply the AC3 plant
+        run: |
+          set -euo pipefail
+          echo "d7c46ca4c2b2540a955fad18b731fb8ef7fb7b1eef41b78a7657ac3ebd859dc7  _bmad-output/implementation-artifacts/17-10-evidence/ci/plant.diff" | sha256sum -c -
+          git apply _bmad-output/implementation-artifacts/17-10-evidence/ci/plant.diff
+          git diff --stat
+          git diff
+      - name: Planted run must be RED at the within-bound arrival assertion
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-escape-tail-red --timeout 1800 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test live_escape_anomaly_17_10 -- --nocapture --test-threads=1 2>&1 | tee planted.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          set -e
+          test "$rc" -ne 0 || { echo "::error title=17-10 AC3::planted tree stayed GREEN"; exit 1; }
+          if grep -q '^SKIP[: ]' planted.log; then echo "::error title=17-10 AC3::SKIP on a declared-capable image"; exit 1; fi
+          grep -q 'the running tail surfaced no line before the hang guard' planted.log
+          grep -q '^test real_sigsys_surfaces_exactly_one_anomaly_within_bound \.\.\. .*FAILED\|^test real_sigsys_surfaces_exactly_one_anomaly_within_bound \.\.\. FAILED' planted.log \
+            || grep -q '^    real_sigsys_surfaces_exactly_one_anomaly_within_bound$' planted.log
+          grep -q 'ESCAPE-TAIL-17-10 planned-stop pid=[0-9]* anomalies=0' planted.log
+          grep -q '^test result: FAILED\. 1 passed; 1 failed;' planted.log
+          echo "::notice title=17-10 AC3 PROVEN-RED::tick arm disconnected from the log reds the within-bound arrival; the planned stop stays green"

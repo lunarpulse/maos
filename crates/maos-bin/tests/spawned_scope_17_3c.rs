@@ -1670,11 +1670,12 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
             declared_tier: 2,
             anticipated_kill: false,
         };
-        let anomalies = maos_bin::escape_detector_consumer::report_escape_anomalies(
+        let anomalies = maos_escape_detector::Detector::detect(
             &dir.path().join("transparency.sqlite"),
             &[declaration],
         )
-        .unwrap();
+        .unwrap()
+        .len();
         assert_eq!(anomalies, usize::from(forbidden));
         // Epic AC4: the kind-8 SandboxBlock row shows in `maos audit query`.
         let audit = operator_audit_view(dir.path(), id);

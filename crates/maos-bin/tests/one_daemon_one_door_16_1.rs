@@ -486,6 +486,69 @@ fn ac1_sigterm_exits_promptly_and_drains_the_audit_channel() {
         stderr.contains("exiting cleanly"),
         "the root must reach its clean-exit line: {stderr}"
     );
+    // Story 17-10 (AC1.3) — the live escape-anomaly tail is wired at this
+    // `maos run` root and stopped (final scan) before the clean-exit line.
+    assert!(
+        stderr.contains("maos: escape-anomaly consumer wired (Story 17-10, ADR-024)"),
+        "the root must wire the escape-anomaly tail: {stderr}"
+    );
+    let stop = stderr
+        .find("maos: escape-anomaly consumer stopped (final scan: 0 anomaly line(s), 0 failed scan(s))")
+        .unwrap_or_else(|| panic!("the root must stop the tail with a final scan: {stderr}"));
+    assert!(
+        stop < stderr.find("exiting cleanly").expect("checked above"),
+        "the tail's final scan must precede the clean-exit line: {stderr}"
+    );
+}
+
+/// Story 17-10 review D2 — an error exit after a Spirit ran still reaches the
+/// teardown. The second topology entry repeats the first's `spirit_id` after
+/// the first was admitted and started; the root must stop the escape tail
+/// with its final scan before returning the unchanged error.
+#[test]
+fn d2_a_topology_error_after_a_spirit_ran_still_runs_the_final_scan() {
+    let scratch = tempfile::tempdir().expect("scratch root");
+    let home = scratch.path().join("home");
+    std::fs::create_dir_all(&home).expect("create home");
+    let isolated = |command: &mut Command| {
+        command
+            .env("HOME", scratch.path())
+            .env("MAOS_HOME", &home)
+            .env("XDG_DATA_HOME", scratch.path().join("xdg"))
+            .env("MAOS_NOTIFY_DISABLE", "1")
+            .current_dir(workspace_root());
+    };
+    let mut init = Command::new(maos());
+    isolated(init.arg("init"));
+    let init = init.output().expect("run maos init");
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    let nash = workspace_root().join("spirits/nash/manifest.toml");
+    let topology = scratch.path().join("d2-duplicate.toml");
+    std::fs::write(
+        &topology,
+        format!(
+            "[topology]\nname = \"d2-duplicate\"\n\n[[topology.spirits]]\nmanifest = \"{0}\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{0}\"\n",
+            nash.display()
+        ),
+    )
+    .expect("write topology");
+    let mut run = Command::new(maos());
+    isolated(run.args(["run", topology.to_str().expect("utf-8 path"), "--once"]));
+    let out = run.output().expect("run maos run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success(), "{stderr}");
+    let error = stderr
+        .find("maos run: duplicate spirit_id")
+        .unwrap_or_else(|| panic!("the error text is unchanged: {stderr}"));
+    let stop = stderr
+        .find("maos: escape-anomaly consumer stopped (final scan: 0 anomaly line(s), 0 failed scan(s))")
+        .unwrap_or_else(|| panic!("the error exit must run the tail's final scan: {stderr}"));
+    assert!(stop < error, "final scan before the error return: {stderr}");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

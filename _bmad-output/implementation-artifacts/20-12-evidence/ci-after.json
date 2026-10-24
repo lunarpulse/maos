@@ -1,0 +1,256 @@
+{
+ "recorded": "2026-10-24",
+ "source": "gh api repos/lunarpulse/maos/actions/runs/<id>/jobs; gh run view --log-failed",
+ "metric": "job_hours = \u03a3(job completed_at - started_at) over every job of the discipline run",
+ "runs": {
+  "39928014939": {
+   "commit": "f1db3356 (before)",
+   "jobs": 184,
+   "job_hours": 13.41,
+   "wall_min": 136.6,
+   "workspace_test_suite_min": 26.9,
+   "expensive_tests": [],
+   "failed": [
+    "reproducible-build",
+    "check-env-contract",
+    "workspace-test-suite",
+    "check-multi-tenant-loom",
+    "wasm-host-tests (ubuntu-24.04-arm)",
+    "v1-0-ship-gate",
+    "v1-5-ship-gate",
+    "aggregate"
+   ]
+  },
+  "39928484413": {
+   "commit": "1c463d2f (before)",
+   "jobs": 184,
+   "job_hours": 13.46,
+   "wall_min": 120.3,
+   "workspace_test_suite_min": 19.9,
+   "expensive_tests": [],
+   "failed": [
+    "reproducible-build",
+    "check-env-contract",
+    "nfr-rel-11-halt-receipt-999pct",
+    "workspace-test-suite",
+    "check-multi-tenant-loom",
+    "v1-0-ship-gate",
+    "v1-5-ship-gate",
+    "aggregate"
+   ]
+  },
+  "39970039438": {
+   "commit": "e1d09f0b",
+   "jobs": 187,
+   "job_hours": 13.02,
+   "wall_min": 160.3,
+   "workspace_test_suite_min": 17.9,
+   "expensive_tests": [
+    [
+     "expensive-tests",
+     "success",
+     8.8
+    ]
+   ],
+   "failed": [
+    "reproducible-build",
+    "check-env-contract",
+    "check-dev-record-completeness",
+    "workspace-test-suite",
+    "check-test-budget",
+    "wasm-host-tests (ubuntu-24.04-arm)",
+    "v1-0-ship-gate",
+    "v1-5-ship-gate",
+    "aggregate"
+   ]
+  },
+  "39970126328": {
+   "commit": "a4cb586d",
+   "jobs": 187,
+   "job_hours": 12.76,
+   "wall_min": 159.4,
+   "workspace_test_suite_min": 24.1,
+   "expensive_tests": [
+    [
+     "expensive-tests",
+     "success",
+     3.2
+    ]
+   ],
+   "failed": [
+    "reproducible-build",
+    "check-env-contract",
+    "nfr-rel-11-halt-receipt-999pct",
+    "check-multi-tenant-loom",
+    "workspace-test-suite",
+    "check-test-budget",
+    "wasm-host-tests (ubuntu-24.04)",
+    "wasm-host-tests (ubuntu-24.04-arm)",
+    "v1-0-ship-gate",
+    "aggregate",
+    "v1-5-ship-gate"
+   ]
+  },
+  "39975504943": {
+   "commit": "8e93ffad",
+   "jobs": 187,
+   "job_hours": 12.87,
+   "wall_min": 126.2,
+   "workspace_test_suite_min": 17.4,
+   "expensive_tests": [
+    [
+     "expensive-tests",
+     "success",
+     8.5
+    ]
+   ],
+   "failed": [
+    "reproducible-build",
+    "check-env-contract",
+    "workspace-test-suite",
+    "check-multi-tenant-loom",
+    "check-test-budget",
+    "v1-0-ship-gate",
+    "aggregate",
+    "v1-5-ship-gate"
+   ]
+  },
+  "39982797947": {
+   "commit": "cf2fc355",
+   "jobs": 187,
+   "job_hours": 12.67,
+   "wall_min": 105.2,
+   "workspace_test_suite_min": 20.2,
+   "expensive_tests": [
+    [
+     "expensive-tests",
+     "success",
+     6.8
+    ]
+   ],
+   "failed": [
+    "reproducible-build",
+    "check-env-contract",
+    "nfr-rel-11-halt-receipt-999pct",
+    "workspace-test-suite",
+    "check-test-budget",
+    "wasm-host-tests (ubuntu-26.04-arm)",
+    "v1-0-ship-gate",
+    "aggregate",
+    "v1-5-ship-gate"
+   ]
+  }
+ },
+ "check_test_budget_ci": {
+  "39982797947": {
+   "binaries": 501,
+   "total_span_seconds": 356.1650083065033,
+   "total_sum_seconds": 641.6349999999994,
+   "findings": [
+    "maos-bin::worker_supervision_16_3 took 36.711 s (\u03a3 per-test time) over 23 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-bin::worker_terminal_facts_17_7 took 122.258 s (\u03a3 per-test time) over 31 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-control::post_surface_16_1 took 64.560 s (\u03a3 per-test time) over 36 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-eval::t3_network_escape_executor took 30.436 s (\u03a3 per-test time) over 5 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "suite test time 641.635 s (\u03a3 per-test time) exceeds total_seconds 300.000"
+   ]
+  },
+  "39975504943": {
+   "binaries": 501,
+   "total_span_seconds": 298.12499618530273,
+   "total_sum_seconds": 532.3199999999999,
+   "findings": [
+    "maos-bin::worker_supervision_16_3 took 31.587 s (\u03a3 per-test time) over 23 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-bin::worker_terminal_facts_17_7 took 110.775 s (\u03a3 per-test time) over 31 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-control::post_surface_16_1 took 64.440 s (\u03a3 per-test time) over 36 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "suite test time 532.320 s (\u03a3 per-test time) exceeds total_seconds 300.000"
+   ]
+  },
+  "39970126328": {
+   "binaries": 501,
+   "total_span_seconds": 377.3230013847351,
+   "total_sum_seconds": 643.6669999999998,
+   "findings": [
+    "maos-bin::worker_supervision_16_3 took 32.928 s (\u03a3 per-test time) over 23 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-bin::worker_terminal_facts_17_7 took 116.182 s (\u03a3 per-test time) over 31 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-control::post_surface_16_1 took 64.655 s (\u03a3 per-test time) over 36 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-eval::t3_network_escape_executor took 32.061 s (\u03a3 per-test time) over 5 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "suite test time 643.667 s (\u03a3 per-test time) exceeds total_seconds 300.000"
+   ]
+  },
+  "39970039438": {
+   "binaries": 501,
+   "total_span_seconds": 309.0749988555908,
+   "total_sum_seconds": 538.9039999999998,
+   "findings": [
+    "maos-bin::worker_supervision_16_3 took 31.589 s (\u03a3 per-test time) over 23 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-bin::worker_terminal_facts_17_7 took 110.993 s (\u03a3 per-test time) over 31 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "maos-control::post_surface_16_1 took 64.588 s (\u03a3 per-test time) over 36 test(s), budget 30.000 s \u2014 make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+    "suite test time 538.904 s (\u03a3 per-test time) exceeds total_seconds 300.000"
+   ]
+  }
+ },
+ "workspace_test_suite_ci_failure": "the only failing test in all 4 post-20-12 runs: xtask::d11_xtask_ceiling_ratchet::the_live_xtask_ceiling_cites_a_real_sprint_story (Err(DoneStory)) \u2014 20-12 flipped to done without a story line carrying the exact 'xtask 44931 \u2192 46363' arrow grant; fixed 2026-10-24 in the 20-12 Change Log",
+ "wasm_host_tests_failure": "recall_runner_17_3d.rs:74 write_frame BrokenPipe after a latching reply (deferred-work.md:1174, pre-existing race; now x86 + arm)",
+ "per_job_bucket_minutes_before_1c463d2f_after_cf2fc355": {
+  "wasm-host-tests": [
+   137.5,
+   95.3
+  ],
+  "cgroup-ceiling-undelegated": [
+   47.6,
+   60.8
+  ],
+  "cgroup-ceiling-delegated": [
+   61.7,
+   60.2
+  ],
+  "epic-17-exit": [
+   36.5,
+   45.2
+  ],
+  "workspace-test-suite": [
+   19.9,
+   20.2
+  ],
+  "release-dry-run": [
+   14.7,
+   18.8
+  ],
+  "nfr-rel-1-crash-detection-2s": [
+   7.9,
+   15.8
+  ],
+  "nfr-rel-11-halt-receipt-999pct": [
+   15.9,
+   15.3
+  ],
+  "nfr-rel-2-hang-detection-60s": [
+   6.9,
+   9.8
+  ],
+  "reproducible-build": [
+   15.6,
+   9.1
+  ],
+  "check-multi-tenant-loom": [
+   7.9,
+   8.9
+  ],
+  "check-wasm-form-equiv": [
+   8.3,
+   8.6
+  ],
+  "example-spirit-ts-tests": [
+   12.3,
+   8.3
+  ],
+  "smoke-discipline-7-1-5": [
+   6.1,
+   7.6
+  ],
+  "maosctl-smoke": [
+   5.8,
+   7.2
+  ]
+ }
+}

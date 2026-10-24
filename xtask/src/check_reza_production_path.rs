@@ -78,23 +78,23 @@ fn escape_wiring_successor(verifier: &EvidenceVerifier) -> EvidenceLeg {
             "test",
             "-p",
             "maos-bin",
-            "--bin",
-            "maos",
-            "escape_detector_consumer::tests::consumer_reports_anomaly_for_unanticipated_kill_only",
+            "--test",
+            "escape_anomaly_tail_17_10",
+            "final_scan_surfaces_a_row_after_the_last_tick_exactly_once",
             "--",
             "--exact",
         ],
     };
     let present = std::fs::read_to_string(ESCAPE_WIRING_SOURCE)
         .map_err(|error| format!("cannot inspect `{ESCAPE_WIRING_SOURCE_DISPLAY}`: {error}"))
-        .and_then(|source| source_calls_function(&source, "report_escape_anomalies"));
+        .and_then(|source| source_calls_function(&source, "spawn_escape_anomaly_tail"));
     match present {
         Ok(true) => run_exact_test_leg(&ORACLE, None, true, GATE_NAME, verifier),
         Ok(false) => absent_successor(
             ESCAPE_WIRING_LEG,
             format!(
-                "11.4b audit escape-anomaly detector consumer is not called from \
-                 the production composition root ({ESCAPE_WIRING_SOURCE_DISPLAY})"
+                "17-10 live escape-anomaly tail (spawn_escape_anomaly_tail) is not \
+                 spawned from the production composition root ({ESCAPE_WIRING_SOURCE_DISPLAY})"
             ),
             verifier,
             GATE_NAME,
@@ -1148,13 +1148,13 @@ mod tests {
     #[test]
     fn escape_wiring_probe_requires_a_real_call_expression() {
         assert!(!source_calls_function(
-            "// report_escape_anomalies(path, manifests)",
-            "report_escape_anomalies"
+            "// spawn_escape_anomaly_tail(path, nonce, every, out)",
+            "spawn_escape_anomaly_tail"
         )
         .expect("comment parses"));
         assert!(source_calls_function(
-            "fn main() { escape_detector_consumer::report_escape_anomalies(path, manifests); }",
-            "report_escape_anomalies"
+            "fn main() { escape_detector_consumer::spawn_escape_anomaly_tail(path, nonce, every, out); }",
+            "spawn_escape_anomaly_tail"
         )
         .expect("call parses"));
     }
