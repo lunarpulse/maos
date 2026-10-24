@@ -6,7 +6,7 @@ context_commit: 8e93ffad
 baseline_commit: 8e93ffad8fc629ff30db6c643604a7344c950d46
 security_sensitive: true
 kernel_grant:
-  status: proposed            # D-17-11-FW-02; set to the ruled figure by the integrator
+  status: ruled               # D-17-11-FW-02 A ruled by Lunarpulse 2026-10-23 — Δ 0 / 0, exact at landing
   files: [capability/cap_policy/mod.rs]
   physical: { before: 26361, after: 26361, delta: 0 }   # xtask/kernel-core-baseline.toml:505
   tokei: { before: 20594, after: 20594, delta: 0 }      # xtask/kloc.toml:264
@@ -15,16 +15,17 @@ kernel_grant:
   adr_069_remaining_after: 2406   # 23,000 − 20,594; 1,406 to the 22,000 alarm
   measured_by: 17-11-evidence/creation/measurements.json (in-place prototype A, removed)
 out_of_kernel_requests:        # D-17-11-FW-03 — measured at landing (RECOVERY-LANE CEILING RULE, xtask/kloc.toml:50-93)
-  maos-domain: { row: 9713, prototype: 9736 }
-  maos-bin: { row: 27614, prototype: 27614, note: measured at landing }
-  _aggregate_hardfail: { row: 181232, prototype_aggregate: 181254 }
+  maos-domain: { row: 9713, prototype: 9736, landed: 9736, review_repin: 9743 }
+  maos-manifest: { row: 4496, review_repin: 4540 }
+  maos-bin: { row: 27614, landed: 27618, review_repin: 27626, note: FW-05 A forecast ±0 was not a grant; measured at landing (+4) and at code review (+8) }
+  _aggregate_hardfail: { row: 181232, landed: 181259, review_repin: 181318 }
 ---
 
 # Story 17.11: Selector-level scope entitlement at issuance
 
-Status: ready-for-dev
+Status: done
 
-<!-- ◆ FLAG-Winston. Created 2026-10-23 under the lighter creation contract (no party-mode preflight; no non-author validation pass run). Decisions D-17-11-FW-01…FW-09 are PROPOSED in `17-11-flag-winston-decision.md`; none is ruled. E16-A7: the kernel figure was measured by an in-place prototype of FW-01 A and the prototype removed (`17-11-evidence/creation/prototype-removal.log`). The integrator sets `ready-for-dev` only after the operator rules; until then every "(FW-nn A)" below is the recommended option, not the contract. -->
+<!-- ◆ FLAG-Winston. Created 2026-10-23 under the lighter creation contract (no party-mode preflight; no non-author validation pass run). Decisions D-17-11-FW-01…FW-09 were RULED A by the operator (Lunarpulse) 2026-10-23 (`17-11-flag-winston-decision.md` §Rulings); code-review rulings 2026-10-24 are in §Review Findings. E16-A7: the kernel figure was measured by an in-place prototype of FW-01 A and the prototype removed (`17-11-evidence/creation/prototype-removal.log`). Every "(FW-nn A)" below is the ruled contract. -->
 
 > **Capability.** A Spirit is issued a capability token only for a selector it declared: the MCP server and tool, the IAC peer class, the provider, the file subtree, the domain — not merely for the same *kind* of capability.
 
@@ -128,21 +129,36 @@ ONE plant, in place: restore `std::mem::discriminant(s) == std::mem::discriminan
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight at the dev HEAD** (all ACs)
-  - [ ] Confirm FW-01…FW-09 are ruled in `17-11-flag-winston-decision.md` §Rulings and materialized here; story and tracker read `ready-for-dev`. Stop if any is still proposed.
-  - [ ] `git diff --quiet 8e93ffad -- crates xtask spirits`; any drift → Debug Log, re-run `kloc-check --json` into `17-11-evidence/t0/`, re-check the cites in §Current-tree corrections.
-- [ ] **T1 — Domain rule** (AC2.1–AC2.2; FW-01, FW-04, FW-07, FW-08) — `Scope::entitles` + `subtree_contains` in `i1.rs` (shape: `17-11-evidence/creation/prototype-A.diff`, a sizing instrument); `crates/maos-domain/tests/scope_entitles_17_11.rs`. Prototype: +23 tokei.
-- [ ] **T2 — Kernel call site** (AC2.3; FW-02) — `cap_policy/mod.rs:159-164`: comment line-for-line, closure `\|s\| s.entitles(&capability.scope)`; rustfmt keeps the four-line chain (measured 670 → 670 lines, 495 → 495 tokei).
-- [ ] **T3 — AC1 kernel suite** — `crates/maos-kernel-core/tests/scope_selector_entitlement_17_11.rs`, three tests, budget-1 manual-clock quota per pid.
-- [ ] **T4 — Regressions** (AC3; FW-05, FW-06) — R1–R8 as ruled; `main.rs:5507`; hello-spirit manifest (FW-06 A) or the six `MAOS_OLLAMA_URL=skip` edits (FW-06 B); `researcher_8_14c.rs` env. Rerun `-p maos-bin` (focused) and list every red found beyond R1–R8 in the Debug Log with its fix.
-- [ ] **T5 — Docs** — `deferred-work.md:1074` appended *resolved by 17-11* note (row stays); ADR-030 (`docs/adr/ADR-030-capability-registry-decomposition.md`) implementation note: selector entitlement at issuance, the per-scope rule, FW-05's refuse-not-reroute posture, `GatewaySend` inert until mediated; the stale "re-exported through `maos-spirit-abi`" claim at `i1.rs:56-57` is not touched (out of scope; `abi-baseline/v1-pre-bump.txt` does not list `Scope`).
-- [ ] **T6 — Proven red (AC4)** — the one plant, one image, evidence in `17-11-evidence/ci/`.
-- [ ] **T7 — Governance** — §Delivery gate re-pin set in one commit; FW-03 figures returned to the operator before landing.
-- [ ] **T8 — Record** — §Tests and commands; Dev Agent Record (plant count, wall-clock, regressions found, measured figures); reconcile story and tracker; `check-dev-record-completeness`.
+- [x] **T0 — Preflight at the dev HEAD** (all ACs)
+  - [x] Confirm FW-01…FW-09 are ruled in `17-11-flag-winston-decision.md` §Rulings and materialized here; story and tracker read `ready-for-dev`. Stop if any is still proposed.
+  - [x] `git diff --quiet 8e93ffad -- crates xtask spirits`; any drift → Debug Log, re-run `kloc-check --json` into `17-11-evidence/t0/`, re-check the cites in §Current-tree corrections.
+- [x] **T1 — Domain rule** (AC2.1–AC2.2; FW-01, FW-04, FW-07, FW-08) — `Scope::entitles` + `subtree_contains` in `i1.rs` (shape: `17-11-evidence/creation/prototype-A.diff`, a sizing instrument); `crates/maos-domain/tests/scope_entitles_17_11.rs`. Prototype: +23 tokei.
+- [x] **T2 — Kernel call site** (AC2.3; FW-02) — `cap_policy/mod.rs:159-164`: comment line-for-line, closure `\|s\| s.entitles(&capability.scope)`; rustfmt keeps the four-line chain (measured 670 → 670 lines, 495 → 495 tokei).
+- [x] **T3 — AC1 kernel suite** — `crates/maos-kernel-core/tests/scope_selector_entitlement_17_11.rs`, three tests, budget-1 manual-clock quota per pid.
+- [x] **T4 — Regressions** (AC3; FW-05, FW-06) — R1–R8 as ruled; `main.rs:5507`; hello-spirit manifest (FW-06 A) or the six `MAOS_OLLAMA_URL=skip` edits (FW-06 B); `researcher_8_14c.rs` env. Rerun `-p maos-bin` (focused) and list every red found beyond R1–R8 in the Debug Log with its fix.
+- [x] **T5 — Docs** — `deferred-work.md:1074` appended *resolved by 17-11* note (row stays); ADR-030 (`docs/adr/ADR-030-capability-registry-decomposition.md`) implementation note: selector entitlement at issuance, the per-scope rule, FW-05's refuse-not-reroute posture, `GatewaySend` inert until mediated; the stale "re-exported through `maos-spirit-abi`" claim at `i1.rs:56-57` is not touched (out of scope; `abi-baseline/v1-pre-bump.txt` does not list `Scope`).
+- [x] **T6 — Proven red (AC4)** — the one plant, one image, evidence in `17-11-evidence/ci/`. (Local red proven and recorded; the `ubuntu-24.04` CI run is owed at push — plant diff + sha256 staged in `17-11-evidence/ci/README.md`; the integrator pushes.)
+- [x] **T7 — Governance** — §Delivery gate re-pin set in one commit; FW-03 figures returned to the operator before landing. (Re-pin set staged in the working tree for the integrator's single commit; FW-03 figures in the Completion Notes.)
+- [x] **T8 — Record** — §Tests and commands; Dev Agent Record (plant count, wall-clock, regressions found, measured figures); reconcile story and tracker; `check-dev-record-completeness`. (Story → `review`; `sprint-status.yaml` left to the integrator.)
 
 ### Review Findings
 
-_(populated by code review)_
+**Review 2026-10-24 (bmad-code-review, anthropic/claude-fable-5-1; non-author; dev of record anthropic/claude-opus-5-5) — AC5 contract (`docs/testing/proof-contract.md`).** Read-only layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor, Test-Infra Auditor on the 772-line diff. Integrator re-execution (sole cargo session, 38 s wall): `-p maos-domain -p maos-kernel-core -p maos-capability` 727 passed; `cargo test -p maos-kernel-core --lib` 258 passed; `-p maos-bin --features network,wasm-host` regression binaries (`researcher_8_14c`, `shell_8_14a`, `shell_host_16_2`, `inference_mode_15_6`, `mcp_mint_receipt_17_9`) 37 passed; gates `check-kernel-baseline` 26361/95, `check-service-boundary` 0, `check-empty-kernel` 0, `kloc-check` PASS 181258, `check-test-cost` PASS. Issuance-path inventory (Blind): the only reachable mint primitive is called after `evaluate` (`capability/mod.rs:193,219-222`); every production caller funnels through `issue_with_mediation`; `entitles`' `_ => self == requested` compares every field (derived `PartialEq`). Operator rulings 2026-10-24: keyless replay arms mint the Spirit's **first declared provider** (no provider is contacted, so not a reroute; FW-05 A kept); `openai` declared in the hello-spirit and Researcher manifests; `ci/17-11-verify` push authorized.
+
+- [x] [Review][Patch] MEDIUM — keyless offline cassette replay of the Researcher is refused [`crates/maos-bin/src/main.rs:5467-5471,5510-5514`]: both replay arms mint `ProviderInfer{router.default_id()}` (= `ollama` on a keyless box) while the Researcher declares only `anthropic`. **Ruled:** replay arms mint the Spirit's first declared `ProviderInfer` scope (`CassetteReplayPort` contacts no provider); a keyless legacy-cassette test pins it. (blind+edge+accept+test-infra) **APPLIED 2026-10-24** — `main.rs` legacy cassette arm (`ResolvedInferenceMode::Replay{explicit:false}`) mints the first `ProviderInfer` of `capabilities_required_to_scopes(&gated.caps_required)`; pinned by `researcher_8_14c::researcher_17_11_keyless_legacy_cassette_replays` (keyless, Ollama at dead port ⇒ router default `ollama`, exit 0, cassette arm wired). The explicit-mode arm (`:5467-5471`) is NOT changed: it routes through `InferencePortAdapter`, whose `check_capability` compares the token against the router default (`inference/mod.rs:256-262`), so a first-declared token there would be refused at use; explicit replay keyless + undeclared default stays a typed issuance refusal.
+- [x] [Review][Patch] MEDIUM — OpenAI-only configuration now refuses the shell, the one-shot hello and the Researcher (router default `openai`, `main.rs:3552-3561`; undeclared). **Ruled:** `spirits/hello-spirit/manifest.toml:12` and `spirits/researcher/manifest.toml:46` also declare an `openai.<model>` entry (model from the router's OpenAI default; `check-model-currency` must pass). (edge+accept) **APPLIED 2026-10-24** — `openai.gpt-4o-mini` (the router's `OpenAiProvider::new` pin, allowed in `xtask/model-currency.toml`) appended to `spirits/hello-spirit/manifest.toml` and `spirits/researcher/manifest.toml`; `check-model-currency --json` passed (14 pins, 0 findings; `17-11-evidence/gates/review-patches-check-model-currency.json`).
+- [x] [Review][Patch] MEDIUM — AC3(a) "surfaced typed" has no test once `MAOS_OLLAMA_URL=skip` hides the keyless path [`researcher_8_14c.rs:253`, `journey_researcher.rs:76`]. Fix: one `maos-bin` test with no keys and Ollama at a dead port (`MAOS_OLLAMA_URL=http://127.0.0.1:9`) for a Spirit that declares only `anthropic` (a fixture manifest, since the reference manifests now declare ollama/openai) asserting a non-zero exit and `kernel policy denied capability issuance` on stderr. Both researcher tests also `env_remove` `MAOS_OPENAI_API_KEY`/`MAOS_ANTHROPIC_API_KEY` so ambient keys cannot flip the router default. (test-infra) **APPLIED 2026-10-24** — `researcher_8_14c::researcher_17_11_keyless_undeclared_provider_refused_typed` (fixture = Researcher manifest rewritten to declare only `anthropic`; keys removed, `MAOS_OLLAMA_URL=http://127.0.0.1:9`; non-zero exit + `kernel policy denied capability issuance`); `researcher_8_14c_mcp_fanout` `env_remove`s both keys; `journey_researcher::jr2` blanks both (the `JourneyWorld` builder has no removal; a blank key is `Unconfigured`).
+- [x] [Review][Patch] MEDIUM — `subtree_contains` [`crates/maos-domain/src/invariants/i1.rs:170-181`]: a relative declared subtree with zero components (`""`, `"."`, `"./"`) vacuously entitles every relative path; `\\` is not a separator (Windows is a CI target) and `"…/..\\..\\x"` passes as one component; NUL and trailing-dot/space components (`".. "`, `"... "` resolve to `..` on Win32) pass. Fix (fail-closed; no production Fs grant exists): a declared subtree with zero components entitles nothing unless it is absolute `/`; any component containing `\\` or `\0`, or ending in ` ` or `.` (other than the filtered `.`), refuses on either side; vectors for each in `scope_entitles_17_11.rs`. (blind+edge) **APPLIED 2026-10-24** — `i1.rs` `subtree_contains`: a relative zero-component declaration entitles nothing; a component containing `\` or NUL or ending in space/dot refuses on either side (subsumes `..`); vectors in `scope_entitles_17_11::fs_subtree_fails_closed_on_ambiguous_components`.
+- [x] [Review][Patch] MEDIUM — admission accepts selectors `entitles` can never match [`crates/maos-manifest/src/manifest.rs:744-833`]: empty/whitespace MCP `name` or `allowed_tools` entries, `*` in `allowed_tools`, empty or non-lowercase `provider.complete` prefixes — admitted, then every mint silently `PolicyDenied`. Fix: reject at `RawCapabilitiesRequired::validate` with typed errors; one vector each. (edge) **APPLIED 2026-10-24** — `RawCapabilitiesRequired::validate` refuses empty/whitespace and non-lowercase provider prefixes, blank MCP `name`, blank or `*`-bearing `allowed_tools` (`ManifestError::Toml` naming the field, the existing iac.send pattern); vectors in `iac_send_capability_17_3c::unmatchable_selectors_are_refused_at_admission`.
+- [x] [Review][Patch] MEDIUM — "before any quota charge" only inferred [`crates/maos-kernel-core/tests/scope_selector_entitlement_17_11.rs:292-308`]: after the `IssuanceQuotaExhausted` assertion, issue one undeclared request again and assert `PolicyDenied` (quota-first ordering would return `IssuanceQuotaExhausted`). (test-infra) **APPLIED 2026-10-24** — after the `IssuanceQuotaExhausted` assertion each row re-issues its first undeclared request and asserts `PolicyDenied`.
+- [x] [Review][Patch] MEDIUM — a drain-thread panic hangs the kernel test until nextest's terminate-after [`scope_selector_entitlement_17_11.rs:144,177-179`]: bounded `wait_timeout_while` (5 s) asserting no timeout. (test-infra) **APPLIED 2026-10-24** — `Harness::issues` uses parking_lot `wait_while_for(…, 5 s)` and asserts `!timed_out()`.
+- [x] [Review][Patch] LOW — records: story frontmatter `kernel_grant.status: proposed` and `maos-bin prototype: 27614`, the `:27` HTML comment, decision-record per-row Status column → ruled; the baseline HISTORY row names FW-01 and FW-02; `check-dev-record-completeness`, `check-model-currency --json` and `-p xtask --test model_currency_gate` run and logged in `17-11-evidence/gates/`; ADR-030 note states that the CLI wrapper's AC5 host-grant path still proceeds on `KernelPolicyDenied` (17-1 D1, ratified, unchanged). (accept+blind) **APPLIED 2026-10-24** — frontmatter `kernel_grant.status: ruled`, `out_of_kernel_requests` carry landed + review figures, `:27` comment says ruled; decision-record Status column → `ruled A`; baseline HISTORY names FW-01 and FW-02; ADR-030 AC5 host-grant note added; gate logs `17-11-evidence/gates/review-patches-*` (kloc-check, check-kernel-baseline, check-service-boundary, check-test-cost, check-model-currency --json, check-dev-record-completeness, xtask gate tests).
+- [x] [Review][Defer] Schedule watchdog fires the hook when a side-effect-scope mint is refused (`schedule_watchdog.rs:216-221,331-342`; 17-9 records the fire with `TokenId::ZERO`): the hook runs without a token, so any mediated capability use still needs one — whether an untokened fire should be suppressed is a design question, not a 17-11 regression. Owner `epic-17-retrospective`.
+- [x] [Review][Defer] Inference router walks `fallback_provider_ids` without a capability check and maps an empty provider id to the default (`inference/mod.rs:294-303`, `router.rs:32-35,46-74`) — latent (no production request sets fallbacks; empty prefixes are rejected by the admission patch above). Owner `18-1-butler-inference-seam-and-conformant-mcp` (the inference seam).
+- [x] [Review][Defer] Explicit `MAOS_INFERENCE_MODE=replay` arm for the Researcher on a keyless box (`main.rs:5467-5471`) still mints the router default and is refused: that arm dispatches through the shared router, whose adapter checks the token against the router default at use time (`inference/mod.rs:256-262`) and the Researcher sends no provider id — a declared-provider token would be minted and then refused at use. Making it work needs the Researcher to choose its provider per request or a replay-aware router check; the legacy cassette arm (the keyless offline path) is fixed per the ruling. Owner `18-3-researcher-replay-live-and-judged-five-metric` (owns `--replay`/`--deterministic` and "no silent fallback").
+- [x] [Review][Defer] AC4 planted-red CI run on `ubuntu-24.04` — owed at push on `ci/17-11-verify` (authorized 2026-10-24); recorded in `17-11-evidence/ci/` when it runs.
+
+**Post-patch (integrator):** patches re-run by the patch agent as the sole cargo process — `-p maos-bin --features network,wasm-host` `researcher_8_14c`+`inference_mode_15_6` 18/18, `one_shot_hello`+`shell_8_14a`+`shell_host_16_2` 16/16, `maos-audit` fr4 19/19, journey `journey_j0`+`journey_researcher` 8/8, `-p maos-domain --test scope_entitles_17_11` 5/5, `-p maos-manifest` 200/200, `-p maos-kernel-core --test scope_selector_entitlement_17_11` 3/3; gates `kloc-check` PASS (aggregate 181317), `check-kernel-baseline` 26361/95, `check-service-boundary` 0, `check-test-cost` PASS, `check-model-currency` 14 pins/0 findings, `check-dev-record-completeness` PASS, xtask `model_currency_gate`+`recovery_lane_ceiling_rule`+`kernel_pin_content_hash_16_0` 57/57. kloc re-pins (FW-03, measured at landing): `maos-domain` 9743, `maos-manifest` 4540, `maos-bin` 27626, `_aggregate_hardfail` 181318. Kernel src unchanged by review (Δ 0/0 total). 8 patches applied, 4 deferred, 0 dismissed. Status → done (AC4's CI planted-red run follows on `ci/17-11-verify`).
 
 ## Dev Notes
 
@@ -239,10 +255,51 @@ Creation baselines on the prototype: core 944, kernel lib 258, `maos-bin` 553 + 
 
 ### Agent Model Used
 
+`anthropic/claude-opus-5-5` (bmad-dev-story, dev of record, 2026-10-23)
+
 ### Debug Log References
+
+- **T0:** FW-01…FW-09 read `ruled` (decision record line 4, §Rulings, all A). Dev HEAD `cf2fc355`; `git diff --stat 8e93ffad cf2fc355 -- crates xtask spirits` empty → no drift, no `t0/` re-run needed. Tree clean.
+- **T1 (AC2):** `env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-domain --test scope_entitles_17_11` → 4 passed (0.003 s).
+- **T3 (AC1):** `env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-kernel-core --test scope_selector_entitlement_17_11` → **3 passed**, 0.005 s test time, 6.0 s wall incl. incremental build (< 30 s budget). Drain asserts exactly one `CapAuditEvent::Issue` per pid; no `list_active_tokens`.
+- **T4 (AC3):** `cargo run -p xtask -- build-test-fixtures` (14 artefacts) then `env -u CI -u GITHUB_ACTIONS MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked -p maos-bin --features network,wasm-host --no-fail-fast` → **560 passed, 14 skipped** (22.7 s test, 52 s wall) — R1–R7 green (553 + 7). Fixes: R1, R3–R7 by FW-06 A (`spirits/hello-spirit/manifest.toml:12` declares `ollama.llama3.1:8b` — the router's Ollama model, `main.rs:3581`); R2 by `MAOS_OLLAMA_URL=skip` in `researcher_8_14c.rs`; R8 at origin (`main.rs:5507` mints `router.default_id()` with the explicit-mode arm's typed refusal, never `"replay"`).
+- **Red beyond R1–R8 (found, fixed at origin):** R9 `maos-journey-test::journey_researcher::jr2_live_mcp_fan_out_via_pty` — `Error: "maos run: token issue failed: kernel policy denied capability issuance"` (typed refusal, AC3(a)); same root cause as R2 (`maos run researcher --live` on a keyless box ⇒ router default `ollama`, undeclared). Fix: the test's `JourneyWorld` sets `MAOS_OLLAMA_URL=skip` (`journey_researcher.rs:74-76`) → green (3/3).
+- **Not a regression:** `maos-wasm-host::recall_runner_17_3d::unknown_tag_reply_latches_broken_after_export` red once in the second `-p maos-wasm-host … -p maos-cli` run (it was green in the first); three isolated reruns 11/11 green — a door flake unrelated to issuance (no capability mint on that path).
+- **Other suites:** `-p maos-domain -p maos-kernel-core -p maos-capability -p maos-pdp -p maos-manifest` → 949 passed, 4 skipped (creation 944 included the 2-test prototype domain file; +4 domain +3 kernel −2); `cargo test --locked -p maos-kernel-core --lib` → 258 passed; `-p maos-wasm-host -p maos-shell -p butler -p researcher -p maos-iac -p maos-journey-test -p maos-cli` → 573 run, 572 passed + the flake above (after the R9 fix). `intent-lineage-coverage-report.md` reverted after the kernel nextest run.
+- **AC2(c) shipped-manifest pins:** no test pins `spirits/hello-spirit/manifest.toml` content (whole `maos-bin`, journey and cli suites green with the edit).
+- **AC4 plant (count 1):** `cap_policy/mod.rs:164` restored to the discriminant match → tests 1 and 2 red at their first undeclared vector (`declared McpCall { server: "web", tool: "search" } must not entitle McpCall { server: "web", tool: "fetch" }`), test 3 green; wall-clock **10.44 s** (2026-10-23T16:06:53Z). File copied aside and restored (it carried the story's uncommitted edit); rerun 3 passed. `17-11-evidence/plants.md`, `plant-ac4-local.log`, `ci/ac4-plant.diff` (sha256 `d66a75ae…62ba`).
+- **T7 gates (after `cargo fmt --all`; logs `17-11-evidence/gates/`):** `check-kernel-baseline` PASSED (26361 lines, 95 files, pinned 26361); `check-service-boundary` PASSED (0 violations; `kernel-surface-v0.1-beta.json` byte-identical — no public symbol added/moved, no `kernel-api-classes.toml` row); `check-empty-kernel` PASSED; `check-test-cost` PASS (515 files); `kloc-check --json` passed (aggregate 181258, over_budget []); `kernel_pin_content_hash_16_0` 25 passed, `recovery_lane_ceiling_rule` 12 passed; `cargo fmt --all -- --check` clean. `check-test-budget` needs `--junit` (CI-only, advisory) — not run locally.
 
 ### Completion Notes List
 
 - 2026-10-23 — Created by `anthropic/claude-opus-5-5` (bmad-create-story, lighter contract). Status left `backlog`: FW-01…FW-09 PROPOSED; the integrator sets `ready-for-dev` after the operator rules.
+- 2026-10-23 — Dev (`anthropic/claude-opus-5-5`): `Scope::entitles` in `maos-domain` (Fs lexical component-wise containment with `..`/absolute-relative refusal; every other variant `==`; allocation-free; per-variant rule in rustdoc) and the kernel closure swap at `cap_policy/mod.rs:159-164` (comment rewritten line-for-line). AC1–AC3 green on focused suites; AC4 plant proven red locally.
+- **Kernel (FW-02):** measured **26361 physical / 20594 tokei — Δ 0 / 0, exact**; only `capability/cap_policy/mod.rs`. Re-pin: `kernel-core-baseline.toml` HISTORY row after `:505`, `set_hash` `45b89741…06d8`, `cap_policy/mod.rs` digest `6276a69f…2a37` (identical to the creation prototype's `--emit-pin`); `PINNED_ENTRIES` 95; `kloc.toml:264` and `RATIFIED_AT_EASING` 20_594 unchanged. ADR-069 remaining 2,406.
+- **FW-03 figures for the operator:** `maos-domain` 9713 → **9736** (+23), `maos-bin` 27614 → **27618** (+4, the cassette arm), aggregate measured **181258** → `_aggregate_hardfail` 181232 → **181259**; rows re-pinned exact with dated notes citing `17-11-scope-selector-entitlement`.
+- **Owed at push (integrator):** the AC4 `ubuntu-24.04` planted-red run (`17-11-evidence/ci/README.md`) and the final tree's green `discipline` run; the re-pin set lands in one commit; `sprint-status.yaml` reconciliation.
 
 ### File List
+
+- `crates/maos-domain/src/invariants/i1.rs`
+- `crates/maos-domain/tests/scope_entitles_17_11.rs` (new)
+- `crates/maos-kernel-core/src/capability/cap_policy/mod.rs`
+- `crates/maos-kernel-core/tests/scope_selector_entitlement_17_11.rs` (new)
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/tests/researcher_8_14c.rs`
+- `crates/maos-journey-test/tests/journey_researcher.rs`
+- `spirits/hello-spirit/manifest.toml`
+- `xtask/kernel-core-baseline.toml`
+- `xtask/kloc.toml`
+- `docs/adr/ADR-030-capability-registry-decomposition.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/17-11-scope-selector-entitlement.md`
+- `_bmad-output/implementation-artifacts/17-11-evidence/plants.md` (new)
+- `_bmad-output/implementation-artifacts/17-11-evidence/plant-ac4-local.log` (new)
+- `_bmad-output/implementation-artifacts/17-11-evidence/ci/ac4-plant.diff` (new)
+- `_bmad-output/implementation-artifacts/17-11-evidence/ci/README.md` (new)
+- `_bmad-output/implementation-artifacts/17-11-evidence/gates/` (new: gate logs, `kloc-check.json`)
+- `_bmad-output/implementation-artifacts/17-11-evidence/kloc-check-landing-before-repin.json` (new)
+
+## Change Log
+
+- 2026-10-23 — Dev: selector-level entitlement at issuance (`Scope::entitles`), kernel call-site swap (Δ 0/0), AC1/AC2 suites, AC3 regressions R1–R9 fixed at origin, ADR-030 note, deferred-work row resolved, kernel and kloc re-pins; status → `review`.

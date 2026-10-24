@@ -156,12 +156,12 @@ impl PolicyTable {
             None => return PolicyDecision::Deny,
         };
 
-        // Scope-match check: the requested capability must be in the
-        // Spirit's declared manifest scopes.
+        // Scope-match check (Story 17-11): a declared manifest scope must
+        // entitle the requested scope, selector included (`Scope::entitles`).
         let scope_match = manifest
             .scopes
             .iter()
-            .any(|s| std::mem::discriminant(s) == std::mem::discriminant(&capability.scope));
+            .any(|s| s.entitles(&capability.scope));
         if !scope_match {
             return PolicyDecision::Deny;
         }

@@ -56,3 +56,32 @@ The issuance quota's `cap.quota:*` signals are distinct from ADR-016's
 context tokens versus manifest `[budget].context_window_size`. ADR-016 is not
 implemented by 17-9; its owner is `18-5-context-token-budget-accounting`.
 `CapError::ContextExhausted` remains available for that context-token error.
+
+## Implementation note — Story 17-11
+
+`cap-policy` now issues a capability only when a **declared** manifest scope
+entitles the exact selector requested (`Scope::entitles`,
+`maos-domain` `invariants/i1.rs`), not merely a scope of the same kind.
+`FsRead`/`FsWrite` use lexical, component-wise subtree containment (a `..`
+component on either side or an absolute/relative mismatch refuses; symlinks
+are never resolved at issuance); every other parameterized scope —
+`NetHttps` (exact bytes, no wildcard, case-sensitive), `ProcExec`,
+`SubSpiritSpawn`, `ProviderInfer`, `IacSend`, `MemRead`/`MemWrite`, `McpCall`,
+the `CliSubprocessSpawn` triplet and `GatewaySend` — must be equal on every
+field; selector-free scopes match by kind. The match runs after the org/Spirit
+deny sets and the unknown-pid deny and before the tier and approval checks, so
+a refused selector is `CapError::PolicyDenied` and is never charged to the
+issuance quota. No new error variant or audit row is introduced.
+
+`ProviderInfer` refuses a provider the Spirit did not declare; the composition
+root never reroutes a request to a declared provider the operator did not
+select. `GatewaySend` stays unmediated (`scope_to_intent` refuses it), so its
+exact rule is inert until a story mediates it.
+
+The CLI wrapper's AC5 host-grant path is unchanged by 17-11: a
+`GovernedMintError::KernelPolicyDenied` (or `Mediation`) on the kernel
+`proc.exec` mint still proceeds under the AC5 host grant
+(`crates/maos-bin/src/worker_spawn.rs` spawn path; 17-1 D1, ratified), so a
+narrower selector refusal does not by itself block a wrapper spawn there.
+Only `QuotaExhausted` (17-9 FW-06) refuses on both paths, and
+`PdpDenied`/`SsoAssertionMissing` refuse on the remote-requested path.

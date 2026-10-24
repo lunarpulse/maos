@@ -43,7 +43,10 @@ description = "MAOS Researcher v0.5 reference Spirit — survey-mode distillatio
 # Inference Port — the Spirit-side compressor. App F.4: ≥Sonnet-tier (70B+),
 # temp ≤0.3. At v0.5 the compressor is seeded/mocked in CI (no live LLM); the
 # declared provider class is the production target.
-provider.complete = ["anthropic.claude-sonnet-5-5"]
+# Story 17-11 (review ruling 2026-10-24): `openai` is declared too, so an
+# OpenAI-only box (router default `openai`) is not refused at issuance. The
+# model is the router's OpenAI pin (`main.rs` `OpenAiProvider::new`).
+provider.complete = ["anthropic.claude-sonnet-5-5", "openai.gpt-4o-mini"]
 
 [capabilities.required.loom]
 read = true

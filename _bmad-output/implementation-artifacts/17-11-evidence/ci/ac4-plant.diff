@@ -1,0 +1,11 @@
+--- a/crates/maos-kernel-core/src/capability/cap_policy/mod.rs
++++ b/crates/maos-kernel-core/src/capability/cap_policy/mod.rs
+@@ -161,7 +161,7 @@
+         let scope_match = manifest
+             .scopes
+             .iter()
+-            .any(|s| s.entitles(&capability.scope));
++            .any(|s| std::mem::discriminant(s) == std::mem::discriminant(&capability.scope));
+         if !scope_match {
+             return PolicyDecision::Deny;
+         }

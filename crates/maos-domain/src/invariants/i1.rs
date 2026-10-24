@@ -130,6 +130,68 @@ pub enum Scope {
     LoomScan,
 }
 
+impl Scope {
+    /// Story 17-11 — `true` when this *declared* manifest scope entitles the
+    /// `requested` scope at capability issuance. Allocation-free; never reads
+    /// the filesystem. The rule per variant (D-17-11-FW-04/05/07/08, ruled A):
+    ///
+    /// - `FsRead` / `FsWrite` — lexical, component-wise subtree containment:
+    ///   the requested path equals the declared subtree or lies beneath it.
+    ///   Empty and `.` components are ignored; a `..` component on either
+    ///   side refuses; an absolute/relative mismatch refuses; symlinks are
+    ///   never resolved. `FsRead` never entitles `FsWrite` (or vice versa).
+    /// - `NetHttps` — exact byte equality of `domain`: no suffix, no wildcard
+    ///   (`*.example.com` entitles nothing but itself), case-sensitive.
+    /// - `ProcExec` — exact `binary`.
+    /// - `SubSpiritSpawn` — exact `class`.
+    /// - `ProviderInfer` — exact `provider`; a mismatch refuses, never reroutes.
+    /// - `IacSend` — exact `peer_class`.
+    /// - `MemRead` / `MemWrite` — exact `scope` (no hierarchy).
+    /// - `McpCall` — exact `server` and `tool`.
+    /// - `CliSubprocessSpawn` — exact `(cli_binary_path, argv_prefix_hash,
+    ///   output_shape_version)` triplet.
+    /// - `GatewaySend` — exact `(gateway_id, recipient)`.
+    /// - `SelfTelemetryRead`, `LogRecall`, `LogFetch`, `DistillateWrite`,
+    ///   `SkillAuthorSelf`, `LoomRead`, `LoomWrite`, `LoomScan` — by kind.
+    ///
+    /// Different variants never entitle each other.
+    pub fn entitles(&self, requested: &Scope) -> bool {
+        match (self, requested) {
+            (Scope::FsRead { subtree: d }, Scope::FsRead { subtree: r })
+            | (Scope::FsWrite { subtree: d }, Scope::FsWrite { subtree: r }) => {
+                subtree_contains(d, r)
+            }
+            _ => self == requested,
+        }
+    }
+}
+
+/// Lexical, allocation-free subtree containment (Story 17-11, FW-07 A).
+///
+/// Fail-closed (17-11 review): a declared subtree with zero components
+/// entitles nothing unless it is the absolute root `/`; any component that
+/// contains `\` or NUL, or ends in a space or dot (`..`; Win32 strips
+/// trailing dots/spaces, so `".. "` resolves to `..`), refuses on either side.
+fn subtree_contains(declared: &str, requested: &str) -> bool {
+    fn parts(p: &str) -> impl Iterator<Item = &str> {
+        p.split('/').filter(|c| !c.is_empty() && *c != ".")
+    }
+    fn unsafe_component(c: &str) -> bool {
+        c.contains(['\\', '\0']) || c.ends_with([' ', '.'])
+    }
+    let absolute = declared.starts_with('/');
+    if absolute != requested.starts_with('/')
+        || (!absolute && parts(declared).next().is_none())
+        || parts(declared)
+            .chain(parts(requested))
+            .any(unsafe_component)
+    {
+        return false;
+    }
+    let mut r = parts(requested);
+    parts(declared).all(|d| r.next() == Some(d))
+}
+
 /// Intent classification for approval policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum IntentClass {

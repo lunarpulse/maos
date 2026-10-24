@@ -9,7 +9,9 @@ trust_tier = "local"
 description = "MAOS reference Spirit — structured acknowledgement"
 
 [capabilities.required]
-provider.complete = ["anthropic.claude-haiku-4-5-20251001"]
+# Story 17-11 (review ruling 2026-10-24): `openai` declared so an OpenAI-only
+# box (router default `openai`) is not refused at issuance.
+provider.complete = ["anthropic.claude-haiku-4-5-20251001", "ollama.llama3.1:8b", "openai.gpt-4o-mini"]
 
 [posture]
 default = "assistive"

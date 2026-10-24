@@ -84,3 +84,50 @@ fn schema_below_v5_drops_iac() {
         }]
     );
 }
+
+/// Story 17-11 review — selectors `Scope::entitles` can never match are
+/// refused at admission, one vector each, naming the field.
+#[test]
+fn unmatchable_selectors_are_refused_at_admission() {
+    let mcp = |name: &str, tool: &str| {
+        format!("[[mcp.servers]]\nname = {name:?}\nallowed_tools = [{tool:?}]")
+    };
+    for (toml, field) in [
+        (mcp("", "search"), "mcp.servers.name"),
+        (mcp("  ", "search"), "mcp.servers.name"),
+        (mcp("web", ""), "mcp.servers.allowed_tools"),
+        (mcp("web", " \t"), "mcp.servers.allowed_tools"),
+        (mcp("web", "*"), "mcp.servers.allowed_tools"),
+        (mcp("web", "search*"), "mcp.servers.allowed_tools"),
+        (
+            "provider.complete = [\".claude\"]".into(),
+            "provider.complete",
+        ),
+        ("provider.complete = [\"\"]".into(), "provider.complete"),
+        ("provider.complete = [\" .x\"]".into(), "provider.complete"),
+        (
+            "provider.complete = [\"Anthropic.claude\"]".into(),
+            "provider.complete",
+        ),
+        (
+            "provider.complete = [\"OPENAI\"]".into(),
+            "provider.complete",
+        ),
+    ] {
+        let msg = refusal(&toml);
+        assert!(
+            msg.starts_with(&format!(
+                "validation failed for capabilities.required.{field}:"
+            )),
+            "{toml}: {msg}"
+        );
+    }
+    // The well-formed neighbours still admit.
+    let ok = CapabilitiesRequired::from_toml_str(&format!(
+        "provider.complete = [\"openai.gpt-4o-mini\", \"ollama\"]\n{}",
+        mcp("web", "search")
+    ))
+    .unwrap();
+    assert_eq!(ok.provider.complete.len(), 2);
+    assert_eq!(ok.mcp.servers.len(), 1);
+}

@@ -248,6 +248,12 @@ fn researcher_8_14c_mcp_fanout() {
         ])
         .env("HOME", doorless_home::doorless_home())
         .env("XDG_DATA_HOME", home.path.clone())
+        // Story 17-11 (FW-05 A): no local Ollama ⇒ router default `anthropic`,
+        // the Researcher's declared provider.
+        .env("MAOS_OLLAMA_URL", "skip")
+        // Story 17-11 review: ambient keys must not flip the router default.
+        .env_remove("MAOS_OPENAI_API_KEY")
+        .env_remove("MAOS_ANTHROPIC_API_KEY")
         .env("MAOS_MCP_WEB_URI", &web_url)
         .env("MAOS_MCP_ARXIV_URI", &arxiv_url)
         .env("MAOS_MCP_GITHUB_URI", &github_url)
@@ -327,5 +333,96 @@ fn researcher_8_14c_mcp_fanout() {
     assert!(
         cit_rx.recv_timeout(timeout).is_ok(),
         "citation-graph mock must receive Phase-2 get_citations request"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Story 17-11 review — keyless provider entitlement at issuance.
+// ---------------------------------------------------------------------------
+
+/// A keyless box with Ollama at a dead port: the router default is `ollama`,
+/// which neither the Researcher nor this fixture declares.
+fn keyless_researcher(args: &[&str], home: &IsolatedDataHome) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command
+        .args(args)
+        .env("HOME", doorless_home::doorless_home())
+        .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_OLLAMA_URL", "http://127.0.0.1:9")
+        .env_remove("MAOS_OPENAI_API_KEY")
+        .env_remove("MAOS_ANTHROPIC_API_KEY")
+        .env_remove("MAOS_INFERENCE_MODE")
+        .env_remove("MAOS_REPLAY_CASSETTE")
+        .current_dir(workspace_root());
+    command
+}
+
+/// AC3(a): an undeclared router default is refused TYPED at issuance — a
+/// non-zero exit naming the kernel policy refusal, never a silent success.
+#[test]
+fn researcher_17_11_keyless_undeclared_provider_refused_typed() {
+    let home = isolated_data_home("17-11-refused");
+    let reference = std::fs::read_to_string(format!(
+        "{}/spirits/researcher/manifest.toml",
+        workspace_root()
+    ))
+    .unwrap();
+    let line = reference
+        .lines()
+        .find(|l| l.starts_with("provider.complete"))
+        .expect("the Researcher declares provider.complete");
+    let fixture = reference.replace(
+        line,
+        r#"provider.complete = ["anthropic.claude-sonnet-5-5"]"#,
+    );
+    let manifest = home.path.join("researcher-anthropic-only.toml");
+    std::fs::write(&manifest, fixture).unwrap();
+
+    let output = keyless_researcher(
+        &["run", manifest.to_str().unwrap(), "--live", "--once"],
+        &home,
+    )
+    .output()
+    .expect("failed to execute maos run researcher fixture --live --once");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "an undeclared provider must refuse the run; stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("kernel policy denied capability issuance"),
+        "the refusal must be the typed kernel policy denial; stderr:\n{stderr}"
+    );
+}
+
+/// Review ruling 2026-10-24: the legacy cassette arm mints the Spirit's FIRST
+/// declared provider (`CassetteReplayPort` contacts none), so a keyless box
+/// whose router default (`ollama`) is undeclared still replays.
+#[test]
+fn researcher_17_11_keyless_legacy_cassette_replays() {
+    let home = isolated_data_home("17-11-cassette");
+    let cassette = format!(
+        "{}/crates/maos-journey-test/cassettes/j-researcher/survey-distill.json",
+        workspace_root()
+    );
+    let output = keyless_researcher(
+        &["run", "spirits/researcher/manifest.toml", "--once"],
+        &home,
+    )
+    .env("MAOS_REPLAY_CASSETTE", cassette)
+    .output()
+    .expect("failed to execute maos run researcher --once (legacy cassette)");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "keyless legacy cassette replay must exit 0; stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("researcher cassette-replay inference wired"),
+        "the legacy cassette arm must be the one exercised; stderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("kernel policy denied capability issuance"),
+        "stderr:\n{stderr}"
     );
 }

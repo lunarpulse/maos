@@ -503,6 +503,15 @@
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
 src_lines = 26361
+# HISTORY: Story 17-11-scope-selector-entitlement ◆ FLAG-Winston (2026-10-23),
+#          D-17-11-FW-01 A (rule home `Scope::entitles` in maos-domain) and
+#          D-17-11-FW-02 A ruled by Lunarpulse 2026-10-23 (kernel Δ 0 physical /
+#          0 tokei, exact at landing): physical 26361 -> 26361 (+0), tokei
+#          20594 -> 20594 (+0), 95 files unchanged. Driver: `PolicyTable::evaluate`
+#          scope match calls `Scope::entitles` (maos-domain) instead of comparing
+#          enum discriminants — closure and its two-line comment rewritten
+#          line-for-line (capability/cap_policy/mod.rs only). Digest + set_hash
+#          re-emitted via `--emit-pin`; no public kernel symbol added or moved.
 # HISTORY: Story 17-9 FLAG-Winston landing (2026-10-22), D-17-9-FW-01/FW-02
 #          ratified by Lunarpulse 2026-10-22 (kernel <= 26361 physical /
 #          <= 20594 tokei, exact at landing): physical 26304 -> 26361 (+57),
@@ -776,7 +785,7 @@ src_lines = 26361
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "2588fa58f92cbbec2af3337d033eb7e94538b96e27bd0863fb7a167dafb284ec"
+set_hash = "45b89741e6752f460a90346173f15823fdae42f2ef44b802fdc0fbd3436206d8"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -784,7 +793,7 @@ set_hash = "2588fa58f92cbbec2af3337d033eb7e94538b96e27bd0863fb7a167dafb284ec"
 "capability/cap_audit/mod.rs" = "9f253336da1d618808984fef11941929a6af927ef66120d84b43e122ff70decc"
 "capability/cap_audit/writer_task.rs" = "ae9cdf683e272c954afcfe34d607d38221c4edc6b8f01e1e1c1f37517bf05b35"
 "capability/cap_policy/decision.rs" = "be8b2e5a0b08821f55f019ab85b0a91b953dd60f3a8d3f994bd59e087b409e41"
-"capability/cap_policy/mod.rs" = "6deb125b813c2f291cfa4519f299244889090f47ee5f08e352acd82222790acb"
+"capability/cap_policy/mod.rs" = "6276a69fff48fb56beb0ca7a28f28422145cbb0249ade07b0d5ba5356f9e2a37"
 "capability/mod.rs" = "5e939443d2a48ae0fe53e910e93545af321a15d9bbe764e1e2a6746fac9f8a99"
 "capability/working_memory/mod.rs" = "151f1ea71b3b05e575b4771736a65aaaba0503e3a33a20d949d8e5382829892a"
 "capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"

@@ -5504,7 +5504,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 })?;
                             let binding = Arc::new(std::sync::Mutex::new(None));
                             researcher_inference_binding = Some(Arc::clone(&binding));
-                            let _ = researcher_inference_provider.insert("replay".into());
+                            // Story 17-11 (review ruling 2026-10-24): the token names
+                            // the Spirit's FIRST declared provider — the root already
+                            // holds the admitted manifest scopes. `CassetteReplayPort`
+                            // contacts no provider and never reads it, so this is not a
+                            // reroute (FW-05 A kept), and a keyless box still replays.
+                            let provider =
+                                maos_kernel_core::security::capabilities_required_to_scopes(
+                                    &gated.caps_required,
+                                )
+                                .into_iter()
+                                .find_map(|scope| match scope {
+                                    Scope::ProviderInfer { provider } => Some(provider),
+                                    _ => None,
+                                })
+                                .ok_or(
+                                    "maos run: cassette replay: the Spirit declares no provider",
+                                )?;
+                            researcher_inference_provider = Some(provider);
                             let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
                                 Arc::new(replay);
                             researcher = researcher.with_deferred_inference_port(port, binding);

@@ -766,6 +766,55 @@ impl RawCapabilitiesRequired {
                     &format!("entry > 128 chars: {v}"),
                 )));
             }
+            // Story 17-11 review: `entitles` compares the provider prefix
+            // byte-exactly against lowercase router keys — an empty or
+            // non-lowercase prefix could never match, so refuse it here.
+            let prefix = v.split('.').next().unwrap_or(v);
+            if prefix.trim().is_empty() {
+                return Err(ManifestError::Toml(validation_msg(
+                    "capabilities.required.provider.complete",
+                    &format!("empty provider prefix: {v:?}"),
+                )));
+            }
+            if prefix
+                .chars()
+                .any(|c| c.is_uppercase() || c.is_whitespace())
+            {
+                return Err(ManifestError::Toml(validation_msg(
+                    "capabilities.required.provider.complete",
+                    &format!("provider prefix must be lowercase: {v:?}"),
+                )));
+            }
+        }
+        // Story 17-11 review: MCP selectors are matched exactly (no wildcard),
+        // so a blank name/tool or a `*` tool is admitted-but-unusable — refuse.
+        let mcp_err = |field: &str, reason: String| {
+            Err(ManifestError::Toml(validation_msg(
+                &format!("capabilities.required.mcp.servers.{field}"),
+                &reason,
+            )))
+        };
+        for server in &self.mcp.servers {
+            if server.name.trim().is_empty() {
+                return mcp_err("name", format!("must be non-blank: {:?}", server.name));
+            }
+            for tool in &server.allowed_tools {
+                if tool.trim().is_empty() {
+                    return mcp_err(
+                        "allowed_tools",
+                        format!("blank tool for server {}: {tool:?}", server.name),
+                    );
+                }
+                if tool.contains('*') {
+                    return mcp_err(
+                        "allowed_tools",
+                        format!(
+                            "wildcard is not a selector (tools match exactly) for server {}: {tool:?}",
+                            server.name
+                        ),
+                    );
+                }
+            }
         }
         let send_declared = self.iac.send.is_some();
         let send = self.iac.send.unwrap_or_default();

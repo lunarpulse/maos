@@ -71,6 +71,13 @@ fn jr2_live_mcp_fan_out_via_pty() {
         .mcp("citation-graph", citation_mock)
         .audit(audit)
         .cassette(cassette.to_str().unwrap())
+        // Story 17-11 (FW-05 A): no local Ollama ⇒ router default `anthropic`,
+        // the Researcher's declared provider.
+        .env("MAOS_OLLAMA_URL", "skip")
+        // Story 17-11 review: ambient keys must not flip the router default
+        // (the world builder has no removal; a blank key is Unconfigured).
+        .env("MAOS_OPENAI_API_KEY", "")
+        .env("MAOS_ANTHROPIC_API_KEY", "")
         .build();
 
     let manifest = workspace_root().join("spirits/researcher/manifest.toml");
