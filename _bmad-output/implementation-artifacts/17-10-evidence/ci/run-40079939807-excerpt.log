@@ -1,0 +1,17 @@
+# gh run view 40079939807 --job 120831202050 --log (ANSI stripped, filtered)
+proven-red	Set up job	2026-10-24T09:12:52.5366232Z Version: 20261012.601
+proven-red	Set up job	2026-10-24T09:12:52.5381530Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-24T09:12:52.5382486Z Version: 20261012.334.1
+proven-red	Apply the AC3 plant	2026-10-24T09:17:14.9236130Z echo "d7c46ca4c2b2540a955fad18b731fb8ef7fb7b1eef41b78a7657ac3ebd859dc7  _bmad-output/implementation-artifacts/17-10-evidence/ci/plant.diff" | sha256sum -c -
+proven-red	Apply the AC3 plant	2026-10-24T09:17:14.9405424Z _bmad-output/implementation-artifacts/17-10-evidence/ci/plant.diff: OK
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:17:15.1984886Z grep -q 'the running tail surfaced no line before the hang guard' planted.log
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:17:15.1985771Z grep -q '^test real_sigsys_surfaces_exactly_one_anomaly_within_bound \.\.\. .*FAILED\|^test real_sigsys_surfaces_exactly_one_anomaly_within_bound \.\.\. FAILED' planted.log \
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:17:15.1987688Z grep -q '^test result: FAILED\. 1 passed; 1 failed;' planted.log
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:31.8370465Z running 2 tests
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:31.8594249Z test planned_stop_surfaces_no_anomaly ... maos: root supervision armed
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:31.9082747Z test real_sigsys_surfaces_exactly_one_anomaly_within_bound ... maos: root supervision armed
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:44.5037550Z thread 'real_sigsys_surfaces_exactly_one_anomaly_within_bound' (16553) panicked at crates/maos-bin/tests/live_escape_anomaly_17_10.rs:428:10:
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:44.5039336Z the running tail surfaced no line before the hang guard: Elapsed(())
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:44.5057580Z test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.67s
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:44.5278877Z Main processes terminated with: code=exited/status=101
+proven-red	Planted run must be RED at the within-bound arrival assertion	2026-10-24T09:19:44.5782110Z ##[notice]tick arm disconnected from the log reds the within-bound arrival; the planned stop stays green
