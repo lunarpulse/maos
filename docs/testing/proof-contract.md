@@ -51,6 +51,10 @@ on one image.**
   an empty provider prefix; the focused set passed and the landing-tree workspace run found two reds.)
 - The four read-only review layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor, Test Infrastructure
   Auditor) are unchanged.
+- **Reviewer model (operator ruling 2026-10-24).** Code-review layers run on `anthropic/claude-opus-5-5` or
+  `gpt-6.1-sol`. `anthropic/claude-fable-5-1` is reserved for plan review (PRD, architecture, epic, story and
+  decision documents) and for code review of a safety- or security-critical change — and every use of it, either
+  kind, needs the operator's permission first. 17-9, 17-10 and 17-11 were reviewed on fable-5.1 before this ruling.
 
 ## Test cost (AC1/AC2)
 
