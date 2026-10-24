@@ -42,6 +42,13 @@ on one image.**
   `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule`. (20-12
   closed with an xtask ceiling citing it and no exact `<old> → <new>` arrow grant on an `xtask` line of its record;
   `the_live_xtask_ceiling_cites_a_real_sprint_story` went red only after the flip, and four main runs carried it.)
+- **A manifest or admission change widens the focused set to every reader of it.** When the diff changes a checked-in
+  manifest (`spirits/*/manifest.toml`, `examples/*/manifest.toml`) or the manifest/capability parser
+  (`crates/maos-manifest/src`, `capabilities_required_to_scopes`), the focused set adds every test file that names
+  that manifest or parser (`grep -rlE '<manifest path>|from_toml_str|gate_manifest|capabilities_required_to_scopes'
+  crates/*/tests spirits/*/tests`), `cargo test -p maos-kernel-core --test spirit_boundary_invariants` and
+  `cargo run -p xtask -- check-corpus`. (17-11's review patches added `openai` to the Researcher manifest and refused
+  an empty provider prefix; the focused set passed and the landing-tree workspace run found two reds.)
 - The four read-only review layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor, Test Infrastructure
   Auditor) are unchanged.
 

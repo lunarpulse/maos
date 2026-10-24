@@ -25,7 +25,7 @@ description = "v0.1-α secret-redaction per-commit corpus 10⁴ items determinis
 # judge_id omitted
 
 [corpus."spirit-boundary-v0.1"]
-sha256 = "015500151e16bc086b69723e6871970b29c35c615f3c5769926117a857bed251"
+sha256 = "e9b72fb59716f05ac0105e9e4e6b43390528c4029a540967564bb527da515a65"  # re-pinned 2026-10-24: sb-007 now expects the 17-11 empty-provider-prefix refusal (was 015500151e16bc086b69723e6871970b29c35c615f3c5769926117a857bed251)
 schema_version = 1
 item_count = 24
 valid_until = "2027-05-16"

@@ -303,3 +303,5 @@ Creation baselines on the prototype: core 944, kernel lib 258, `maos-bin` 553 + 
 ## Change Log
 
 - 2026-10-23 — Dev: selector-level entitlement at issuance (`Scope::entitles`), kernel call-site swap (Δ 0/0), AC1/AC2 suites, AC3 regressions R1–R9 fixed at origin, ADR-030 note, deferred-work row resolved, kernel and kloc re-pins; status → `review`.
+- 2026-10-24 — Review (fable-5.1, AC5 contract): 8 patches, 4 deferred; status → `done` (`15b02d98`).
+- 2026-10-24 — CI: AC4 proven red on `ubuntu-24.04` (run `40045099664`). Landing-tree discipline run `40045055432` found two workspace reds caused by the review patches and outside the focused set — `researcher_log_grant_17_3d` (scope count with the ruled `openai` provider) and `spirit_boundary_invariants` corpus case `sb-007` (empty provider prefix now refused) — fixed in a follow-up commit (test + corpus case + `MANIFEST.toml` re-pin); details `17-11-evidence/ci/README.md`. Lesson recorded at the Epic 17 retrospective: a manifest or admission change must run the corpus and manifest-reading suites of every crate that parses that manifest (E17-A6).

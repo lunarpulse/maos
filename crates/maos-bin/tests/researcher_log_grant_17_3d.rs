@@ -79,6 +79,11 @@ fn checked_in_researcher_admission_preserves_both_schema_five_log_scopes() {
     assert!(scopes.contains(&Scope::ProviderInfer {
         provider: "anthropic".into()
     }));
+    // 17-11 review (operator ruling 2026-10-24): the Researcher also declares an
+    // `openai.<model>` provider so an OpenAI-only router default is issuable.
+    assert!(scopes.contains(&Scope::ProviderInfer {
+        provider: "openai".into()
+    }));
     for (server, tools) in [
         ("web", ["search", "fetch"]),
         ("arxiv", ["search", "get_paper"]),
@@ -101,8 +106,8 @@ fn checked_in_researcher_admission_preserves_both_schema_five_log_scopes() {
         .any(|scope| matches!(scope, Scope::IacSend { .. })));
     assert_eq!(
         scopes.len(),
-        13,
-        "only the existing eleven grants plus recall/fetch"
+        14,
+        "only the existing eleven grants plus recall/fetch plus the 17-11 openai provider"
     );
 }
 
