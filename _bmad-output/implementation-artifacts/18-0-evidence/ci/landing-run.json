@@ -1,0 +1,36 @@
+{
+ "run_id": 40152313635,
+ "workflow": "discipline",
+ "head_sha": "b15eb503",
+ "attempt": 1,
+ "recorded": "2026-10-25",
+ "jobs": 188,
+ "conclusions": {
+  "success": 188
+ },
+ "aggregate": "success",
+ "v1_0_ship_gate": "success",
+ "v1_5_ship_gate": "success",
+ "job_hours": 13.05,
+ "wall_minutes": 80.6,
+ "check_test_budget": {
+  "passed": true,
+  "binaries": 506,
+  "total_span_seconds": 345.5,
+  "total_sum_seconds": 595.3,
+  "findings": []
+ },
+ "wasm_host_tests_17_10_step": "success on ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm",
+ "top_job_buckets_minutes": {
+  "wasm-host-tests": 129.0,
+  "cgroup-ceiling-delegated": 59.5,
+  "cgroup-ceiling-undelegated": 53.6,
+  "epic-17-exit": 43.9,
+  "workspace-test-suite": 21.6,
+  "release-dry-run": 12.6,
+  "nfr-rel-11-halt-receipt-999pct": 12.1,
+  "example-spirit-ts-tests": 11.6,
+  "windows-check": 10.3,
+  "reproducible-build": 9.2
+ }
+}

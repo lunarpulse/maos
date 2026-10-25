@@ -12,7 +12,7 @@ review: "bmad-code-review under `docs/testing/proof-contract.md` (focused suites
 
 # Story 18.0: Green-main CI baseline
 
-Status: review
+Status: done
 
 <!-- Created 2026-10-24 at 1fec4882 by bmad-create-story under the lighter creation contract (no party-mode preflight). Every open decision is D-18-0-xx, status PROPOSED, with options and a recommendation. `ready-for-dev` is set ONLY by the integrator after the operator rules; the tracker row stays `backlog` until then. Creation ran cargo as the host's only cargo process (one target dir, /mnt/build/cargo); every prototype was reverted and is recorded under 18-0-evidence/creation/. -->
 
@@ -171,7 +171,7 @@ From AC1's landing run logs only (no new CI job): for `wasm-host-tests` (4 legs)
 - [x] **T9 — CRL directory** (AC8; D-18-0-12, CR-6) — `maos-shell/src/lib.rs:64-67`; `shell_8_14a.rs`; the plant.
 - [x] **T10 — Records** (AC9, CR-7) — `deferred-work.md` rows; `epic-18…md` §18-0 if anything moved at dev HEAD; `docs/` mentions of the advisory posture of `check-test-budget`.
 - [x] **T11 — Governance** (D-18-0-14) — `cargo fmt --all`; `kloc-check --json`; measured requests to the operator **before** landing; `check-kernel-baseline` 26361 / 95 unchanged; `check-test-cost`; `check-dev-record-completeness`; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule` before the closing commit (`proof-contract.md:40-44`).
-- [ ] **T12 — Landing and AC1/AC10** (integrator pushes) — the landing run; D-18-0-01 if a 20-7 vector reds; `landing-run.json`; `compile-vs-test.json`.
+- [x] **T12 — Landing and AC1/AC10** (integrator pushes) — the landing run; D-18-0-01 if a 20-7 vector reds; `landing-run.json`; `compile-vs-test.json`. **DONE 2026-10-25:** discipline run `40152313635` on main @ `b15eb503`, attempt 1 (no re-run, D-18-0-01 unused), 188/188 jobs success; `aggregate` / `v1-0-ship-gate` / `v1-5-ship-gate` success; 13.05 job-hours, wall 80.6 min; `18-0-evidence/ci/landing-run.json`.
 
 ### Review Findings
 
@@ -351,6 +351,9 @@ anthropic/claude-opus-5-5 (dev, 2026-10-24)
 - Modified: `xtask/test-budgets.toml`, `xtask/gate-registry.toml`, `xtask/src/check_test_budget.rs` (doc), `xtask/tests/check_test_budget_proven_red.rs`, `xtask/kloc.toml`
 - Modified: `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`, `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md` (review pass), this story
 - New: `_bmad-output/implementation-artifacts/18-0-evidence/plants.md`, `18-0-evidence/dev/t0-cargo-deny-head.txt`, `18-0-evidence/dev/t1-t3-deps-and-reissue.txt`, `18-0-evidence/ci/compile-vs-test-40080259088.json`, `18-0-evidence/ci/compile-vs-test.method.py`
+- **AC1 landing (T12, 2026-10-25):** discipline run `40152313635` @ `b15eb503`, attempt 1, **188/188 jobs success**; `aggregate`, `v1-0-ship-gate`, `v1-5-ship-gate` success — first green `aggregate` on main since 17-9. `cargo-deny` success; `check-test-budget` passed (506 binaries, Σ span 345.5 s, Σ per-test 595.3 s, no findings); 17-10 step "Live escape-anomaly consumer under real T2 (Story 17-10)" success on all four `wasm-host-tests` images (24.04, 26.04, 24.04-arm, 26.04-arm). Evidence `18-0-evidence/ci/landing-run.json`.
+- **AC9 (2026-10-25):** first fully green `workspace-test-suite` after 20-12 = run `40152313635`.
+- **AC10 landing figures (2026-10-25):** per-job compile vs test in `18-0-evidence/`; landing run 40152313635 = 13.05 job-hours, wall 80.6 min; top buckets (job-min): wasm-host-tests 129.0, cgroup-ceiling-delegated 59.5, cgroup-ceiling-undelegated 53.6, epic-17-exit 43.9, workspace-test-suite 21.6, release-dry-run 12.6, nfr-rel-11-halt-receipt-999pct 12.1, example-spirit-ts-tests 11.6, windows-check 10.3, reproducible-build 9.2 (`landing-run.json`).
 
 ### Change Log
 
@@ -358,3 +361,4 @@ anthropic/claude-opus-5-5 (dev, 2026-10-24)
 - 2026-10-24 — Story created (backlog; D-18-0-01…14 PROPOSED) at `1fec4882`: advisory set re-measured (only 0378/0379 are wasmtime; zbus ×3 unmaintained; 0385/0386 new; deny runs in an advisory job); wasmtime 48.0.7 proven zero-diff; WIT comment re-issue proven byte-identical; hook-pump root cause measured (clock re-init under libtest) and fixed in prototype; pidfd ESRCH is the reap window of `PIDFD_GET_INFO`; budget rows proven on five CI junits; rupture counter starts at 1 and the collision answers `CODE_INTERNAL`; CRL dir alone does not silence the poller; E17-A2 method probed; epic §18-0 corrected in place.
 - 2026-10-24 — Dev (anthropic/claude-opus-5-5): T0–T11 implemented per the rulings; 4 plants; focused suites and gates green locally; kloc measured and pinned for ratification; status → review. T12 (AC1 landing run, landing-run.json, landing AC10) is the integrator's.
 - 2026-10-25 — Review patch pass (anthropic/claude-opus-5-5): the 13 `[Review]` items applied (rulings DA/DB/DC/DD); AC5 plant re-proved; focused suites and gates green locally; maos-shell 613 / aggregate 181566 re-pinned for ratification; status stays review.
+- 2026-10-25 — AC1 landing run 40152313635 green (188/188, attempt 1); status → done
