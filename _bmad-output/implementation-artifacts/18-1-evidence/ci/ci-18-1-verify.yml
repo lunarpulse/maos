@@ -1,0 +1,78 @@
+# Story 18-1 AC1 (TIA-1b) — branch-only planted-red run (docs/testing/proof-contract.md:
+# proven-red on ONE image). Copy to `.github/workflows/ci-18-1-verify.yml` on
+# `ci/18-1-verify` ONLY; never merged; the branch is deleted after the run.
+# Applies the one plant (the refused-pass arm of `butler_root::pass_verdict` is
+# disabled) and requires the `epic-18-exit` twin command to EXIT 0 under it —
+# i.e. the twin step on main would go RED — while exit line 1 (the control)
+# stays rc=0 with the seam bound.
+name: 18-1-proven-red
+on:
+  push:
+    branches: ["ci/18-1-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Apply the TIA-1b plant
+        run: |
+          set -euo pipefail
+          echo "943be65d0bfbab1aa48ec86ccea357a0848a9062ac6bb7dac33d531f214204a7  _bmad-output/implementation-artifacts/18-1-evidence/ci/plant.diff" | sha256sum -c -
+          git apply _bmad-output/implementation-artifacts/18-1-evidence/ci/plant.diff
+          git diff --stat
+          git diff
+      - name: Build the planted root
+        run: cargo build --locked -p maos-bin --bin maos
+      - name: Control — exit line 1 stays green under the plant
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --once > line1.out 2> line1.err
+          rc=$?
+          cat line1.out line1.err
+          set -e
+          test "$rc" -eq 0 || { echo "::error title=18-1 control::exit line 1 rc=${rc} under the plant"; exit 1; }
+          grep -q 'butler inference seam wired' line1.err
+          grep -q '"event":"butler_notification".*"options":\[' line1.out
+      - name: Planted twin must EXIT 0 (the twin step on main would go RED)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          twin="$RUNNER_TEMP/on-idle-halt-missing-options.json"
+          python3 - crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json "$twin" <<'PY'
+          import json, sys
+          cassette = json.load(open(sys.argv[1]))
+          completion = json.loads(cassette["entries"][0]["response"]["text"])
+          del completion["options"]
+          cassette["entries"][0]["response"]["text"] = json.dumps(completion)
+          json.dump(cassette, open(sys.argv[2], "w"))
+          PY
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/butler/manifest.toml --once > twin.out 2> twin.err
+          rc=$?
+          cat twin.out twin.err
+          set -e
+          test "$rc" -eq 0 || { echo "::error title=18-1 TIA-1b::planted twin still exits ${rc} — the plant did not disable the refused-pass arm"; exit 1; }
+          echo "::notice title=18-1 TIA-1b PROVEN-RED::refused-pass arm disabled → the missing-options twin exits 0, so epic-18-exit's twin step reds"
