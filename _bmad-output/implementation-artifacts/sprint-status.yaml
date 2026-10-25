@@ -364,7 +364,7 @@ action_items:
   - epic: 11
     action: "A6 (carry-forward): recalibrate preflight LOC-budget to count in-src #[cfg(test)] modules (11.2a +59 vs ratified +16 overshoot)."
     owner: "Winston"
-    status: in-progress  # E13 follow-through 2026-08-11: STILL OPEN and now given a mechanical home — in-src #[cfg(test)] modules ARE budget-charged but are NOT CI-executed, which is the same defect from the other side. Carried forward as E13-C5(b), owned by 14.6. E12 follow-through: baseline discipline held; checklist item not yet formalized — carry-forward
+    status: in-progress  # STILL OPEN — tracker hygiene 2026-10-25 correction: the "owned by 14.6" home below is stale; 14-6 was never built and D11 (which carries E11-A6) now targets `21-4-one-instrument-and-env-registry` (still `backlog`, sprint-status.yaml:314; epic-14-preflight-decisions.md:77, D11 OPEN; D11-E3 :654-673 measures the in-src cfg(test) charge). | WAS: E13 follow-through 2026-08-11: STILL OPEN and now given a mechanical home — in-src #[cfg(test)] modules ARE budget-charged but are NOT CI-executed, which is the same defect from the other side. Carried forward as E13-C5(b), owned by 14.6. E12 follow-through: baseline discipline held; checklist item not yet formalized — carry-forward
 
 # Epic 12 retrospective action items (2026-07-13)
   - epic: 12
@@ -404,7 +404,7 @@ action_items:
   - epic: 13
     action: "C3: Extend Story 13.6e's EvidenceState discipline (absent != green, skipped != passed) from the four Family-A journey gates to the eight Family-B gates BEFORE Epic 14's advisory-substrate-gated fleet legs rely on advisory classification. Today check-vetting-attestation and check-wasm-form-equiv cannot represent ABSENT at all, and skipped AdvisorySubstrate legs still report passed: true under the shared house pattern. 14.1 (N=100 churn) and 14.2 (10-host rotation) inherit the weaker half. Absence is unmeasured, never proof."
     owner: "Murat + Winston"
-    status: open
+    status: done  # ✅ CLOSED 2026-10-15 (tracker hygiene 2026-10-25): decision D1 CLOSED at commit 389a07e9 (epic-14-preflight-decisions.md:64, restated :411) — the "eight Family-B gates; vetting-attestation/wasm-form-equiv cannot represent ABSENT" premise was measured close to inverted by 14-0; the real seven-gate subject set was fixed by `20-3a-gate-honesty` (done 2026-10-17, sprint-status.yaml:296). Residual passed/product_claim split ratified as claim boundary, filed as D20 (:398-408). | WAS: (no comment)
   - epic: 13
     action: "C4: Merge epic-13 -> main as the v2.2 Reza line and update RELEASE-HOLDS.md with Epic 13's accepted-risk boundaries (operator-axis authorization open, provenance presence-based not cryptographically validated, TL-artifact TOCTOU, CollectivePortError 8->1 on the Spirit path). main..epic-13 = 69 commits, epic-13..main = 0; main has not moved since 79a880ec. E11-A3 slipped to E12-B2, B2 landed, and the identical drift re-accumulated within ONE epic — treat the merge as a recurring close-out control, not a one-time task."
     owner: "Lunarpulse + John"
@@ -423,7 +423,7 @@ action_items:
   - epic: 14
     action: "A1: Turn the discipline aggregate green on tree content and cut `v0.1.0-alpha.1`."
     owner: "Lunarpulse + Amelia"
-    status: in-progress  # HALF DONE, measured 2026-09-12. Green: all 8 Epic-15 exit legs pass at 843d5365 (7 xtask gates + `cargo test --workspace --no-fail-fast` exit 0, 4231 passed / 0 failed). Tag: NOT CUT — `git tag -l` is `frozen-kernel-v2.0` only. The tag was moved out of Epic 15's exit block under R2 rule 2 and is the operator-lane row `ops-first-signed-tag`, blocked on `ops-provisioning-secrets-and-accounts`. Carried forward as E15-A3.
+    status: done  # ✅ CLOSED 2026-09-25 (tracker hygiene 2026-10-25): `v0.1.0-alpha.1` cut → `0c661995`, release.yml run 36094027381 green (`ops-first-signed-tag: done`, sprint-status.yaml:326; recorded in commit 92911f59); `git tag -l` lists v0.1.0-alpha.1. | WAS: HALF DONE, measured 2026-09-12. Green: all 8 Epic-15 exit legs pass at 843d5365 (7 xtask gates + `cargo test --workspace --no-fail-fast` exit 0, 4231 passed / 0 failed). Tag: NOT CUT — `git tag -l` is `frozen-kernel-v2.0` only. The tag was moved out of Epic 15's exit block under R2 rule 2 and is the operator-lane row `ops-first-signed-tag`, blocked on `ops-provisioning-secrets-and-accounts`. Carried forward as E15-A3.
   - epic: 14
     action: "A2: One `CURRENT_PHASE` — a single phase source with no second copy."
     owner: "Winston"
@@ -431,11 +431,11 @@ action_items:
   - epic: 14
     action: "A3: Land the approved model-pin currency lane (gate + retired-pin sweep)."
     owner: "John + Winston"
-    status: open  # NOT STARTED as of 2026-09-12. `model-pin-currency-gate-and-retired-pin-sweep` is still `backlog` AND has silently moved from wave W0 to W1+W2 with no filing — the slip this backfill and E15-A1's gate exist to make visible. Carried forward as E15-A2.
+    status: done  # ✅ CLOSED 2026-10-06 (tracker hygiene 2026-10-25): lane landed as `17-5-model-pin-currency-gate: done` (sprint-status.yaml:266, commit 12790dd9); gate at xtask/src/check_model_currency.rs. | WAS: NOT STARTED as of 2026-09-12. `model-pin-currency-gate-and-retired-pin-sweep` is still `backlog` AND has silently moved from wave W0 to W1+W2 with no filing — the slip this backfill and E15-A1's gate exist to make visible. Carried forward as E15-A2.
   - epic: 14
     action: "A4: Daemon RPC + applied sandbox — J0 for real."
     owner: "Amelia"
-    status: open  # NOT DUE — this is Epic 16 (`16-1-daemon-post-surface-and-verb-retarget`, the door) and Epic 17 (`17-1`/`17-2`, applied sandbox). Recorded here so the action has a queryable home rather than living only in prose.
+    status: done  # ✅ CLOSED 2026-10-13 (tracker hygiene 2026-10-25): door `16-1-daemon-post-surface-and-verb-retarget: done` (sprint-status.yaml:243, commit bb9f0657, 2026-09-14); applied sandbox `17-1-worker-egress-allowlist-and-scoped-credential: done` (:256) + `17-2-worker-cgroups-applied: done` (:257, commit 37c34be4); epic-16 and epic-17 both `done`. | WAS: NOT DUE — this is Epic 16 (`16-1-daemon-post-surface-and-verb-retarget`, the door) and Epic 17 (`17-1`/`17-2`, applied sandbox). Recorded here so the action has a queryable home rather than living only in prose.
   # === EPIC 15 ACTIONS (retrospective 2026-09-12, convened as a refinement session) ===
   - epic: 15
     action: "A1: A retrospective's actions must reach the tracker, not just its document — every closed `epic-N-retrospective` from Epic 11 forward owes at least one queryable `action_items` row, with a non-empty owner and a status this project can query."
@@ -444,11 +444,11 @@ action_items:
   - epic: 15
     action: "A2: Land the model-pin currency lane. Its wave was ambiguous ('W1+W2'), which is how E14-A3 slipped unnoticed."
     owner: "Winston (wave + pin policy) + Murat (gate)"
-    status: in-progress  # WAVE DECIDED 2026-09-12 (Epic-15 retro): **W1, parallel with Epic 16** — it touches no `main.rs` line so it does not contend for the write lock Epic 16 holds. Written into the `model-pin-currency-gate-and-retired-pin-sweep` row. The story itself remains to be built; what is closed is the ambiguity.
+    status: done  # ✅ CLOSED 2026-10-06 (tracker hygiene 2026-10-25): story built as `17-5-model-pin-currency-gate: done` (sprint-status.yaml:266, commit 12790dd9; xtask/src/check_model_currency.rs), via E16-A4 option A promotion (:488). | WAS: WAVE DECIDED 2026-09-12 (Epic-15 retro): **W1, parallel with Epic 16** — it touches no `main.rs` line so it does not contend for the write lock Epic 16 holds. Written into the `model-pin-currency-gate-and-retired-pin-sweep` row. The story itself remains to be built; what is closed is the ambiguity.
   - epic: 15
     action: "A3: Unblock and cut the first signed tag — a 4-node chain, not a single act. CORRECTED 2026-09-12: as first filed this action was NOT ACTIONABLE, and saying so is the point."
     owner: "Lunarpulse (nodes 1-3) + Amelia (node 3 triage)"
-    status: in-progress  # ⚠ CORRECTION, same day: `check_release_precondition.rs:58` refuses a tagged SHA that has not reached `main` ("discipline runs only after the commit reaches main"), AND `main`'s `release.yml` is `on: push: tags` ONLY — 15-4 added `workflow_dispatch` on THIS branch, and GitHub exposes a dispatch trigger only for workflows on the DEFAULT branch. So the Darwin rehearsal cannot run today either. EVERY node except provisioning is downstream of the operator's merge decision. The chain: (1) `ops-provisioning-secrets-and-accounts` STARTS NOW — the only parallelizable node and the long pole (external accounts, not secrets); (2) operator merges `recovery-lane` -> `main` when they judge it ready — explicitly NOT scheduled here; (3) NEW `ops-darwin-rehearsal` fires immediately post-merge, pre-tag — `aarch64-apple-darwin` has never compiled in this project and `packaging/homebrew/maos.rb:24` is the entire macOS install route; (4) `ops-first-signed-tag`. 20-2 AC1/AC3 keep their no-secret proof and must NOT be re-blocked on provisioning.
+    status: done  # ✅ CLOSED 2026-09-25 (tracker hygiene 2026-10-25): nodes 2-4 landed — merge `d6a94f96` (E16-A8, :504), `ops-darwin-rehearsal: done` (:327), `ops-first-signed-tag: done` → `v0.1.0-alpha.1` at `0c661995`, release.yml run 36094027381 green (:326, commit 92911f59). Node 1 `ops-provisioning-secrets-and-accounts` is still `backlog` (:321) but no longer gates this first tag; it is tracked on its own ops row. | WAS: ⚠ CORRECTION, same day: `check_release_precondition.rs:58` refuses a tagged SHA that has not reached `main` ("discipline runs only after the commit reaches main"), AND `main`'s `release.yml` is `on: push: tags` ONLY — 15-4 added `workflow_dispatch` on THIS branch, and GitHub exposes a dispatch trigger only for workflows on the DEFAULT branch. So the Darwin rehearsal cannot run today either. EVERY node except provisioning is downstream of the operator's merge decision. The chain: (1) `ops-provisioning-secrets-and-accounts` STARTS NOW — the only parallelizable node and the long pole (external accounts, not secrets); (2) operator merges `recovery-lane` -> `main` when they judge it ready — explicitly NOT scheduled here; (3) NEW `ops-darwin-rehearsal` fires immediately post-merge, pre-tag — `aarch64-apple-darwin` has never compiled in this project and `packaging/homebrew/maos.rb:24` is the entire macOS install route; (4) `ops-first-signed-tag`. 20-2 AC1/AC3 keep their no-secret proof and must NOT be re-blocked on provisioning.
   - epic: 15
     action: "A4: Close decision-register row D11 or re-point it at `21-4-one-instrument-and-env-registry` with a QUERYABLE deadline. Story 15-4 filed D11's closure at this retrospective (`xtask/kloc.toml:231`); the ratchet shipped but its own review found it was a null control and patched it."
     owner: "Winston + Murat"
