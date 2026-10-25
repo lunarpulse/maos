@@ -14,7 +14,9 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
-use maos_bin::escape_detector_consumer::{spawn_escape_anomaly_tail, EscapeAnomalyTail};
+use maos_bin::escape_detector_consumer::{
+    anomaly_flagged_payload, spawn_escape_anomaly_tail, EscapeAnomalyTail, ANOMALY_FLAGGED_INTENT,
+};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i9::SandboxTier;
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
@@ -47,7 +49,13 @@ impl Write for Lines {
 
 fn spawn(path: &Path, every: Duration) -> (EscapeAnomalyTail, UnboundedReceiver<String>) {
     let (tx, rx) = unbounded_channel();
-    let tail = spawn_escape_anomaly_tail(path.to_path_buf(), NONCE, every, Box::new(Lines(tx)));
+    let tail = spawn_escape_anomaly_tail(
+        path.to_path_buf(),
+        NONCE,
+        every,
+        Box::new(Lines(tx)),
+        Box::new(|_| {}),
+    );
     (tail, rx)
 }
 
@@ -114,6 +122,62 @@ async fn final_scan_surfaces_a_row_after_the_last_tick_exactly_once() {
             "maos: escape-anomaly consumer stopped (final scan: 1 anomaly line(s), 0 failed scan(s))"
         )
     );
+}
+
+/// Story 18-4 (D-18-4-07 A, AC5.2; I2) — each anomaly is journaled as an
+/// `anomaly.flagged:escape-detector` TL frame carrying the `AnomalyFlagged`
+/// fields BEFORE its stderr line: the journal and the line share one ordered
+/// channel, and the frame is in the TL the digest reads.
+#[tokio::test(flavor = "multi_thread")]
+async fn each_anomaly_is_journaled_before_its_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("transparency.sqlite");
+    let tl = std::sync::Arc::new(TransparencyLogAdapter::open(&db, NONCE).unwrap());
+    let (tx, mut rx) = unbounded_channel();
+    let journal_tx = tx.clone();
+    let journal_tl = std::sync::Arc::clone(&tl);
+    let tail = spawn_escape_anomaly_tail(
+        db.clone(),
+        NONCE,
+        Duration::from_secs(3600),
+        Box::new(Lines(tx)),
+        Box::new(move |report| {
+            journal_tl.insert_frame_event(
+                FrameKind::TelemetryEvent,
+                report.spirit_pid as u32,
+                None,
+                ANOMALY_FLAGGED_INTENT,
+                anomaly_flagged_payload(report).as_bytes(),
+                FrameOrigin::SpiritAuto,
+            );
+            let _ = journal_tx.send(format!("journaled {}", report.frame_id_hex));
+        }),
+    );
+    tail.declare(4243, SandboxTier::T2);
+    kill(&tl, 4243, SIGSYS);
+    tail.shutdown(true, false).await;
+    let lines = rest(&mut rx);
+    let journaled = lines.iter().position(|l| l.starts_with("journaled "));
+    let surfaced = lines.iter().position(|l| l.starts_with("escape-anomaly:"));
+    assert!(
+        matches!((journaled, surfaced), (Some(j), Some(s)) if j < s),
+        "the frame must precede the line: {lines:?}"
+    );
+    let frames = tl
+        .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter::default())
+        .unwrap();
+    let flagged: Vec<_> = frames
+        .iter()
+        .filter(|f| f.intent == ANOMALY_FLAGGED_INTENT)
+        .collect();
+    assert_eq!(flagged.len(), 1, "one anomaly.flagged frame");
+    let payload: serde_json::Value = serde_json::from_slice(&flagged[0].payload_redacted).unwrap();
+    assert_eq!(payload["observer"], "escape-detector");
+    assert_eq!(payload["subject"], "spirit_pid=4243");
+    assert_eq!(payload["confidence"], 1.0);
+    assert!(payload["summary"]
+        .as_str()
+        .is_some_and(|s| s.starts_with("escape-anomaly: spirit_pid=4243")));
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -232,7 +232,9 @@ fn the_production_digest_meets_fr17_against_a_seeded_tl() {
         butler::MORNING_DIGEST_INTENT
     );
     // Review ruling D-18-1-R3: the pass's scalar write is recorded as a
-    // predicate evaluation (FR17 (d)'s denominator); (c) is an explicit unknown.
+    // predicate evaluation (FR17 (d)'s denominator). Story 18-4 (D-18-4-07 A):
+    // (c) reads the `anomaly.flagged:` feed and names its wired and unwired
+    // producers, so an empty list is honest.
     let evaluated = format!("{}belief_variance", butler::INTENT_PREDICATE_EVALUATED);
     assert!(
         intents
@@ -240,15 +242,17 @@ fn the_production_digest_meets_fr17_against_a_seeded_tl() {
             .any(|(kind, intent)| kind == "telemetry.event" && *intent == evaluated),
         "the scalar write must leave an `{evaluated}` frame: {intents:?}"
     );
+    assert!(digest["anomalies"].is_array(), "(c) is a list: {digest}");
     assert_eq!(
-        digest["anomalies"],
-        serde_json::json!(butler::ANOMALY_FEED_UNKNOWN)
+        digest["anomalies_basis"],
+        serde_json::json!({"wired": ["escape-detector"], "unwired": ["observer"]})
     );
     assert_eq!(
-        digest["trust_bar_basis"]["day_utc"],
+        digest["trust_bar_basis"]["local_day"],
         serde_json::json!(rendered_ns / DAY_NS - 1),
-        "(d) covers yesterday's UTC day"
+        "(d) covers yesterday (UTC: MAOS_UTC_OFFSET unset)"
     );
+    assert_eq!(digest["utc_offset_secs"], serde_json::json!(0));
 }
 
 #[test]

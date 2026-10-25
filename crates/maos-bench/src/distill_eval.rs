@@ -280,6 +280,9 @@ pub fn evaluate(
     // Pass 2 (live) — the other rows through the run's router, then the
     // pinned judge per finding of those rows, one token minted per call.
     let mut replies = Vec::new();
+    // Story 18-4 (BH-3, `deferred-work.md:1253`): the distinct tokens the
+    // judge was asked with, against the judge calls made.
+    let mut judge_tokens = std::collections::HashSet::new();
     let mut ask = || -> Result<(), String> {
         let live_rows = rows
             .iter()
@@ -298,6 +301,8 @@ pub fn evaluate(
                 let source = row.claims.iter().find(|c| c.claim_id == f.claim_id);
                 let pair = (source.map_or("", |c| c.statement.as_str()), &*f.statement);
                 let token = mint(EVAL_PID, &provider)?;
+                // Story 18-4 (BH-3 witness): one token per judge call, counted.
+                judge_tokens.insert(token.token_id.0);
                 let req = scorer::judge_request(EVAL_PID, token, pair, &provider, &model);
                 let response = judge.complete(req).map_err(|e| format!("judge: {e}"))?;
                 let (scenario, claim) = (row.scenario_id.clone(), f.claim_id.clone());
@@ -310,6 +315,7 @@ pub fn evaluate(
     let asked = if live { ask() } else { Ok(()) };
     // BH-4: what was recorded is flushed before any reply is parsed.
     asked.and(flush.map_or(Ok(()), |flush| flush()))?;
+    let judge_calls = replies.len();
     let mut facts: Vec<ScenarioFacts> = facts.into_values().collect();
     scorer::apply_judge(&mut facts, replies, &model)?;
     check_consumed(consumed.load(Ordering::SeqCst), calls)?;
@@ -344,6 +350,8 @@ pub fn evaluate(
         "judge_provenance": judge_provenance,
         "judge_prompt_sha256": sha256_hex(scorer::JUDGE_PROMPT.as_bytes()),
         "completions_consumed": calls,
+        "judge_calls": judge_calls,
+        "judge_tokens_minted": judge_tokens.len(),
         "score": score,
         "pass": failures.is_empty(),
         "missed_floors": &failures,

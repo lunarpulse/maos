@@ -3924,6 +3924,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(port)
         })
     };
+    // Story 18-4 (CR-1/CR-2, D-18-4-06 A) — the root's one clock: the scene's
+    // scenario clock (from the fixture, never the wall) or the wall clock at
+    // `MAOS_UTC_OFFSET` (read once here; malformed refuses the boot, typed).
+    let butler_scene = match run_args.as_ref().and_then(|run| run.scene.as_ref()) {
+        Some(scene) => Some(
+            butler::Scene::load(&scene.clock, &scene.acceptance)
+                .map_err(|error| format!("maos run: butler scene: {error}"))?,
+        ),
+        None => None,
+    };
+    let butler_clock: Arc<dyn maos_spirit_sdk::clock::Clock> = match &butler_scene {
+        Some(scene) => Arc::clone(&scene.clock) as Arc<dyn maos_spirit_sdk::clock::Clock>,
+        None => Arc::new(
+            maos_spirit_sdk::clock::SystemClock::from_env()
+                .map_err(|error| format!("maos run: MAOS_UTC_OFFSET: {error}"))?,
+        ),
+    };
     // Story 18-1 (review ruling D-18-1-R1) — the Butler seam every Butler of
     // this root attaches (boot arm, door load, hot-swap successor): bound
     // under `--live` and every explicit mode (unset mode stays deterministic,
@@ -3972,8 +3989,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 })
             },
+            Arc::clone(&butler_clock),
         )),
-        rollover: !run_args.as_ref().is_some_and(|run| run.once),
+        rollover: !run_args
+            .as_ref()
+            .is_some_and(|run| run.once || run.scene.is_some()),
+        clock: butler_clock,
+        // Story 18-4 (D-18-4-02/05 A) — a principal is known only from the
+        // scene fixture: the record goes through a port fused to the pid the
+        // scheduler resolved, and each decision's non-personal attestation
+        // is a TL frame written before its effect (I2).
+        acceptance: butler_scene.as_ref().map(|scene| butler::AcceptanceSeam {
+            principal: scene.fixture.principal.clone(),
+            port_for: {
+                let memory = Arc::downgrade(&memory);
+                Arc::new(move |pid| {
+                    Arc::new(maos_bin::butler_root::PidBoundPrincipalPort::new(
+                        memory.clone(),
+                        pid,
+                    ))
+                        as Arc<dyn maos_spirit_sdk::principal::PrincipalMemoryPort>
+                })
+            },
+            attest: {
+                let tl = Arc::clone(&transparency_log);
+                Arc::new(move |pid, payload: &[u8]| {
+                    let _ = tl.insert_frame_event(
+                        FrameKind::TelemetryEvent,
+                        pid,
+                        None,
+                        butler::ACCEPTANCE_INTENT,
+                        payload,
+                        maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+                    );
+                    Ok(())
+                })
+            },
+        }),
     });
     // Story 18-3 (review rulings D-18-3-R1/R2, BH-1) — what every Researcher
     // of this root is built with: `--live` surveys MCP (a configured client
@@ -4443,12 +4495,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
         // Story 17-10 (D-17-10-FW-01) — the live escape-anomaly consumer, armed
         // before any admission so no kill row of this boot precedes its cursor.
+        // Story 18-4 (D-18-4-07 A) — each anomaly is journaled as an
+        // `anomaly.flagged:escape-detector` frame before its stderr line (the
+        // TL is held weakly: the final scan runs after the audit drain, where
+        // a frame can no longer be written — said, never silent).
         escape_tail = Some(
             maos_bin::escape_detector_consumer::spawn_escape_anomaly_tail(
                 audit_db_path.clone(),
                 boot_nonce,
                 maos_bin::escape_detector_consumer::ESCAPE_TAIL_INTERVAL,
                 Box::new(std::io::stderr()),
+                {
+                    let tl = Arc::downgrade(&transparency_log);
+                    Box::new(move |report| match tl.upgrade() {
+                        Some(tl) => {
+                            let _ = tl.insert_frame_event(
+                                FrameKind::TelemetryEvent,
+                                u32::try_from(report.spirit_pid).unwrap_or(0),
+                                None,
+                                maos_bin::escape_detector_consumer::ANOMALY_FLAGGED_INTENT,
+                                maos_bin::escape_detector_consumer::anomaly_flagged_payload(report)
+                                    .as_bytes(),
+                                maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+                            );
+                        }
+                        None => eprintln!(
+                            "maos: escape-anomaly not journaled (the Transparency Log is closed)"
+                        ),
+                    })
+                },
             ),
         );
         eprintln!("maos: escape-anomaly consumer wired (Story 17-10, ADR-024)");
@@ -4482,6 +4557,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
         let manifest_root: toml::Value = toml::from_str(&manifest_toml)
             .map_err(|e| format!("maos run: manifest TOML parse error: {e}"))?;
+        // Story 18-4 (CR-2) — the compressed scene drives Butler only.
+        if run.scene.is_some()
+            && manifest_root
+                .get("class")
+                .and_then(|class| class.get("name"))
+                .and_then(toml::Value::as_str)
+                .and_then(classify_spirit)
+                != Some(LoadedSpiritKind::Butler)
+        {
+            return Err(format!(
+                "maos run: --clock/--acceptance drive a Butler scene; {} is not a Butler manifest",
+                manifest_path.display()
+            )
+            .into());
+        }
         if let Some(topology_entries) =
             maos_bin::topology::topology_manifest_entries(&manifest_root)?
         {
@@ -5831,7 +5921,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // digest at process start (the first session) and hands the
             // renderer to the serving loop's day-rollover timer (review ruling
             // D-18-1-R4); `--once` renders it after its pass.
-            if let Some(digest) = butler_morning_digest.as_ref().filter(|_| !run.once) {
+            if let Some(digest) = butler_morning_digest
+                .as_ref()
+                .filter(|_| !run.once && run.scene.is_none())
+            {
                 digest.render_logged(pid);
                 butler_rollover = Some((Arc::clone(digest), pid));
             }
@@ -5888,7 +5981,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             let spawned_session = spawned_result.is_some();
-            if run.once || spawned_session {
+            if run.once || spawned_session || run.scene.is_some() {
                 // Story 16-3 (D-16-3-M) — the `--once` tail moved into ONE async
                 // block whose result the teardown below takes. Five post-`start`
                 // early returns live inside it (the researcher round-trip, the
@@ -5919,6 +6012,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         guard.get(&pid).map(Arc::clone)
                     }
                     .ok_or("maos run: loaded SCB not found")?;
+                    // Story 18-4 (CR-2, AC1) — the compressed scene: per
+                    // simulated day the scenario clock moves to the day's
+                    // morning, ONE `on_idle` fires (never the watchdog), the
+                    // day's fixture response is applied and the day's digest
+                    // renders; the scene ends at the halt (a pending halt
+                    // gates every later pass) and drains.
+                    if let (Some(scene), Some(butler)) =
+                        (butler_scene.as_ref(), butler_pass_handle.as_ref())
+                    {
+                        let predicate = maos_kernel_core::security::OutputShapePredicate::from(
+                            &gated.output_shape,
+                        );
+                        butler
+                            .seed_acceptance_history(&scene.fixture)
+                            .map_err(|error| format!("maos run: butler scene: {error}"))?;
+                        let days = scene.days().map_err(|error| format!("maos run: {error}"))?;
+                        let mut halt_day = None;
+                        for day in &days {
+                            if root_shutdown.is_cancelled() {
+                                once_interrupted = true;
+                                return Ok(());
+                            }
+                            scene.clock.set_ns(scene.fixture.day_ns(day.day));
+                            let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
+                            let output = butler_output_ch
+                                .lock()
+                                .unwrap_or_else(|error| error.into_inner())
+                                .take();
+                            let halted = maos_bin::butler_root::pass_verdict(
+                                Some(butler),
+                                &outcome,
+                                output.as_ref(),
+                                &predicate,
+                            )
+                            .and_then(|()| butler.scene_step(day))
+                            .map_err(|error| format!("maos run: {error}"))?;
+                            if let Some(digest) = butler_morning_digest.as_ref() {
+                                digest
+                                    .render_if_new_day(pid)
+                                    .map_err(|error| format!("maos run: {error}"))?;
+                            }
+                            if halted {
+                                halt_day = Some(day.day);
+                                break;
+                            }
+                        }
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "event": "scene_complete",
+                                "days": days.len(),
+                                "halt_day": halt_day,
+                            })
+                        );
+                        println!(
+                            "{}",
+                            serde_json::json!({ "event": "drain", "spirit_id": spirit_id })
+                        );
+                        return Ok(());
+                    }
                     let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
                     println!(
                         "{}",
@@ -10566,6 +10719,7 @@ fn host_b_worker_context(
             // decided by the adapter the resolved binary selects.
             live: false,
             once: true,
+            scene: None,
         },
         transparency_log: std::sync::Arc::clone(transparency_log),
         capability: Arc::clone(capability),

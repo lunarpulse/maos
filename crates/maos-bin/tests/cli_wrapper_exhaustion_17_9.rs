@@ -286,6 +286,7 @@ impl World {
                     manifest_path: "cli-quota-17-9.toml".into(),
                     live: false,
                     once: true,
+                    scene: None,
                 },
                 Arc::clone(&self.log),
                 Arc::clone(&self.capability),

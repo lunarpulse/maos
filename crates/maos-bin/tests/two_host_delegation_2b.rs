@@ -756,6 +756,7 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
             manifest_path: fixture.worker_manifest.display().to_string(),
             live: false,
             once: true,
+            scene: None,
         },
         transparency_log: log,
         capability,

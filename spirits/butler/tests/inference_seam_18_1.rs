@@ -28,9 +28,10 @@ use maos_domain::ports::inference::{
     TokenUsage,
 };
 use maos_domain::ports::{EpistemicScalarPort, InferencePort, ScalarPortError};
+use maos_spirit_sdk::clock::SystemClock;
 use maos_spirit_sdk::spirit_test::SpiritTest;
 
-const GOOD: &str = r#"{"pattern":"calendar-conflict","confidence":0.82,"evidence":"Board review overlaps Investor call","options":["(a) note","(b) remind","(c) snooze"],"user_preference_drift":0.9}"#;
+const GOOD: &str = r#"{"pattern":"calendar-conflict","confidence":0.82,"evidence":"Board review overlaps Investor call","options":["linear_note: note","reminder: remind","snooze: snooze"],"user_preference_drift":0.9}"#;
 
 fn conflict() -> ScenarioInput {
     let event = |id: &str, start, end| CalendarEvent {
@@ -191,7 +192,10 @@ fn ill_typed_or_out_of_range_values_refuse() {
         GOOD.replace("0.82", "\"high\""),
         GOOD.replace("0.82", "1.5"),
         GOOD.replace("0.9}", "-0.1}"),
-        GOOD.replace(r#"["(a) note","(b) remind","(c) snooze"]"#, "[]"),
+        GOOD.replace(
+            r#"["linear_note: note","reminder: remind","snooze: snooze"]"#,
+            "[]",
+        ),
         "I notice a pattern: prose is not a proposal".to_owned(),
     ] {
         let err = parse_proposal(&text).expect_err("must refuse");
@@ -212,7 +216,7 @@ fn bound_pass_takes_the_proposal_from_the_completion() {
     assert_eq!(notification.evidence, "Board review overlaps Investor call");
     assert_eq!(
         notification.options,
-        vec!["(a) note", "(b) remind", "(c) snooze"]
+        vec!["linear_note: note", "reminder: remind", "snooze: snooze"]
     );
     let emitted = b.channel.lock().unwrap().clone().expect("channel written");
     assert_eq!(emitted["options"], serde_json::json!(notification.options));
@@ -255,9 +259,10 @@ fn every_pass_mints_its_own_token() {
 
 #[test]
 fn a_malformed_completion_refuses_the_pass_without_side_effects() {
-    let port = ScriptedPort::answering(
-        &GOOD.replace(r#","options":["(a) note","(b) remind","(c) snooze"]"#, ""),
-    );
+    let port = ScriptedPort::answering(&GOOD.replace(
+        r#","options":["linear_note: note","reminder: remind","snooze: snooze"]"#,
+        "",
+    ));
     let b = bound(port);
     drive_on_idle(&b.butler);
     let err = b.butler.take_pass_error().expect("the pass is refused");
@@ -330,12 +335,69 @@ fn blank_fields_are_refused() {
             "evidence",
             GOOD.replace("\"Board review overlaps Investor call\"", "\"\""),
         ),
-        ("options", GOOD.replace("\"(b) remind\"", "\" \"")),
+        ("options", GOOD.replace("\"reminder: remind\"", "\" \"")),
     ] {
         let err = parse_proposal(&text).expect_err("a blank field must refuse");
         assert!(matches!(err, ButlerError::Proposal(_)), "{err:?}");
         assert!(err.to_string().contains(field), "{err} must name `{field}`");
     }
+}
+
+/// Story 18-4 (D-18-4-03 A, AC4.1) — an option naming an unknown action, no
+/// action, or an action already offered is a typed refusal: the director is
+/// never shown an option whose effect Butler cannot run as declared.
+#[test]
+fn options_outside_the_closed_vocabulary_are_refused() {
+    for (case, text, says) in [
+        (
+            "unknown",
+            GOOD.replace("reminder: remind", "email_ceo: remind"),
+            "unknown action",
+        ),
+        (
+            "missing",
+            GOOD.replace("reminder: remind", "remind"),
+            "names no action",
+        ),
+        (
+            "duplicate",
+            GOOD.replace("reminder: remind", "snooze: again"),
+            "twice",
+        ),
+        (
+            "blank text",
+            GOOD.replace("reminder: remind", "reminder:  "),
+            "no text",
+        ),
+    ] {
+        let err = parse_proposal(&text).expect_err(case);
+        assert!(matches!(err, ButlerError::Proposal(_)), "{case}: {err:?}");
+        assert!(err.to_string().contains(says), "{case}: {err}");
+    }
+    let port = ScriptedPort::answering(&GOOD.replace("reminder: remind", "email_ceo: remind"));
+    let b = bound(port);
+    drive_on_idle(&b.butler);
+    assert!(b.butler.take_pass_error().is_some(), "the pass is refused");
+    assert!(
+        b.butler.last_notification().is_none(),
+        "nothing to pick from"
+    );
+}
+
+/// Story 18-4 (D-18-4-03 A) — the prompt declares the closed vocabulary.
+#[test]
+fn the_prompt_declares_the_option_actions() {
+    let port = ScriptedPort::answering(GOOD);
+    let b = bound(Arc::clone(&port));
+    drive_on_idle(&b.butler);
+    let requests = port.requests.lock().unwrap();
+    assert!(
+        requests[0]
+            .2
+            .contains("one of linear_note, reminder, snooze, each at most once"),
+        "{}",
+        requests[0].2
+    );
 }
 
 /// Review BH-1/EC-5: the prompt states which end of the drift scale is good.
@@ -492,8 +554,11 @@ fn seam(
             "unused-tl".into(),
             "unused-journal".into(),
             Arc::new(|_, _| {}),
+            Arc::new(SystemClock::UTC),
         )),
         rollover: false,
+        clock: Arc::new(SystemClock::UTC),
+        acceptance: None,
     }
 }
 

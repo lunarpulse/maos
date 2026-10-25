@@ -58,45 +58,91 @@ pub struct RunArgs {
     pub live: bool,
     /// `--once` → single `on_idle` pass + graceful drain (headless tests).
     pub once: bool,
+    /// Story 18-4 (CR-2) — `--clock compressed:<n>d --acceptance <path>`: a
+    /// compressed Butler scene, one `on_idle` per simulated day.
+    pub scene: Option<SceneArgs>,
+}
+
+/// Story 18-4 (CR-2) — the compressed scene's clock and acceptance fixture.
+#[cfg(feature = "network")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneArgs {
+    pub clock: maos_spirit_sdk::clock::ClockSpec,
+    pub acceptance: String,
 }
 
 #[cfg(feature = "network")]
-/// Parse `run <manifest-path> [--live] [--once]` from the process args (the args
-/// AFTER the binary name). Manual parsing — the binary has no clap dependency.
-/// Returns `None` when the first arg is not `run` (the env-gated paths win).
+const RUN_USAGE: &str =
+    "<manifest> [--live] [--once] [--clock compressed:<n>d --acceptance <path>]";
+
+#[cfg(feature = "network")]
+/// Parse `run <manifest-path> [--live] [--once] [--clock <spec> --acceptance
+/// <path>]` from the process args (the args AFTER the binary name). Manual
+/// parsing — the binary has no clap dependency. Returns `None` when the
+/// first arg is not `run` (the env-gated paths win). Story 18-4 (CR-2): the
+/// scene flags come as a pair, never with `--once` or `--live`.
 pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunArgs>, String> {
     let mut it = args.into_iter();
     if it.next().as_deref() != Some("run") {
         return Ok(None);
     }
     let mut manifest_path: Option<String> = None;
-    let mut live = false;
-    let mut once = false;
-    for a in it {
+    let (mut live, mut once) = (false, false);
+    let (mut clock, mut acceptance): (Option<String>, Option<String>) = (None, None);
+    while let Some(a) = it.next() {
         match a.as_str() {
             "--live" => live = true,
             "--once" => once = true,
+            "--clock" | "--acceptance" => {
+                let value = it.next().ok_or_else(|| {
+                    format!("maos run: {a} needs a value — expected: {RUN_USAGE}")
+                })?;
+                *(if a == "--clock" {
+                    &mut clock
+                } else {
+                    &mut acceptance
+                }) = Some(value);
+            }
             other if !other.starts_with("--") && manifest_path.is_none() => {
                 manifest_path = Some(other.to_string());
             }
             other => {
                 return Err(format!(
-                    "maos run: unknown argument '{}' — expected: <manifest> [--live] [--once]",
-                    other
+                    "maos run: unknown argument '{other}' — expected: {RUN_USAGE}"
                 ));
             }
         }
     }
+    let scene = match (clock, acceptance) {
+        (None, None) => None,
+        (Some(_), None) => return Err("maos run: --clock requires --acceptance <path>".into()),
+        (None, Some(_)) => return Err("maos run: --acceptance requires --clock <spec>".into()),
+        (Some(_), Some(_)) if once => {
+            return Err(
+                "maos run: --clock/--acceptance run a scene; they cannot be combined with --once"
+                    .into(),
+            )
+        }
+        (Some(_), Some(_)) if live => return Err(
+            "maos run: --clock/--acceptance replay a scene; they cannot be combined with --live"
+                .into(),
+        ),
+        (Some(clock), Some(acceptance)) => Some(SceneArgs {
+            clock: maos_spirit_sdk::clock::ClockSpec::parse(&clock)
+                .map_err(|e| format!("maos run: --clock: {e}"))?,
+            acceptance,
+        }),
+    };
     match manifest_path {
         Some(manifest_path) => Ok(Some(RunArgs {
             manifest_path,
             live,
             once,
+            scene,
         })),
-        None => Err(
-            "maos run: missing manifest path — expected: maos run <manifest> [--live] [--once]"
-                .into(),
-        ),
+        None => Err(format!(
+            "maos run: missing manifest path — expected: maos run {RUN_USAGE}"
+        )),
     }
 }
 

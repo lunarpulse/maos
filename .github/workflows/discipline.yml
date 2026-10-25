@@ -2274,8 +2274,13 @@ jobs:
   # cassette entry) and its proven-red twin (the same line over an EMPTY
   # cassette must exit non-zero, refused naming `exhausted`), and closes TIA-6
   # (`deferred-work.md:1248`): `maosctl spirit benchmark butler` verifies the
-  # sidecar exit line 2 just wrote, under the same scratch HOME. Line 4 joins
-  # with 18-4.
+  # sidecar exit line 2 just wrote, under the same scratch HOME. Story 18-4
+  # (AC1.4) adds exit line 4 verbatim — 21 simulated days of the acceptance
+  # fixture; the ledger-informed belief_variance halt must fire on a day ≤ 21
+  # with the pooled rate still ≥ 0.6 (upstream), one digest per simulated day —
+  # and its steady twin: the same line over the steady fixture must run 21 days
+  # with NO halt (the standing red for line 4: a rule that ignores the window
+  # halts the steady director on day 1).
   epic-18-exit:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -2462,6 +2467,56 @@ jobs:
             exit 1
           fi
           echo "::notice title=Epic-18 exit line 3 twin::rc=${rc}, refused naming \`exhausted\`"
+      - name: Epic-18 exit line 4 — 21 compressed days and the variance-led halt (Story 18-4)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d.jsonl > line4.out 2> line4.err
+          rc=$?
+          cat line4.out line4.err
+          if [ "$rc" -eq 0 ] && ! grep -q 'butler inference seam wired' line4.err; then
+            rc=1
+            echo "::error title=Epic-18 exit line 4::exit 0 but Butler never bound the Inference Port"
+          fi
+          halt_day="$(jq -rs '[.[] | select(.event == "halt" and .render == "halted on belief_variance" and .day <= 21 and .diagnostic.rate >= 0.6) | .day] | if length == 1 then .[0] else "none" end' line4.out)"
+          if [ "$rc" -eq 0 ] && [ "$halt_day" = "none" ]; then
+            rc=1
+            echo "::error title=Epic-18 exit line 4::exit 0 without exactly one belief_variance halt on a day <= 21 at a pooled rate >= 0.6"
+          fi
+          if [ "$rc" -eq 0 ] && ! jq -es --argjson d "$halt_day" '([.[] | select(.event == "acceptance_day")] | length) == ($d - 1) and ([.[] | select(.event == "morning_digest")] | length) == $d and ([.[] | select(.event == "scene_complete" and .halt_day == $d)] | length) == 1' line4.out > /dev/null; then
+            rc=1
+            echo "::error title=Epic-18 exit line 4::the scene did not decide one offer and render one digest per simulated day up to the halt"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-18 exit line 4::rc=${rc} $(tail -n 3 line4.err | paste -sd' ' -)"
+          else
+            echo "::notice title=Epic-18 exit line 4::rc=0, halted on day ${halt_day}"
+          fi
+          exit "$rc"
+      - name: Epic-18 exit line 4 twin — the steady director must never halt (Story 18-4)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d-steady.jsonl > line4-twin.out 2> line4-twin.err
+          rc=$?
+          cat line4-twin.out line4-twin.err
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-18 exit line 4 twin::rc=${rc} $(tail -n 3 line4-twin.err | paste -sd' ' -)"
+            exit 1
+          fi
+          if ! jq -es '([.[] | select(.event == "halt")] | length) == 0 and ([.[] | select(.event == "acceptance_day")] | length) == 21 and ([.[] | select(.event == "scene_complete" and .halt_day == null)] | length) == 1' line4-twin.out > /dev/null; then
+            echo "::error title=Epic-18 exit line 4 twin::the steady director halted or the scene ran short — the halt does not lead on the director's uncertainty"
+            exit 1
+          fi
+          echo "::notice title=Epic-18 exit line 4 twin::rc=0, 21 days, no halt"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -2482,6 +2537,10 @@ jobs:
             line3.err
             line3-twin.out
             line3-twin.err
+            line4.out
+            line4.err
+            line4-twin.out
+            line4-twin.err
           if-no-files-found: warn
 
   # Story 5.5b — multi-provider drift-check tool tests

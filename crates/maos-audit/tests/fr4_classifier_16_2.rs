@@ -729,7 +729,11 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
             continue;
         };
         let token_arg = args.get(token_pos).cloned().unwrap_or_default();
-        let kind_arg = args.first().cloned().unwrap_or_default();
+        // `insert_frame_event_with_id(frame_id, kind, …)` carries the kind
+        // SECOND (18-3 landing: its first argument is the explicit frame id,
+        // which read as a "variable kind").
+        let kind_pos = usize::from(method == "insert_frame_event_with_id");
+        let kind_arg = args.get(kind_pos).cloned().unwrap_or_default();
 
         let kind_is_capability_invocation = kind_arg
             .rsplit("::")

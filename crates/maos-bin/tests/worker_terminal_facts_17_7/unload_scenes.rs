@@ -195,6 +195,7 @@ async fn exercise_unload(
         manifest_path: dir.join("worker.toml").display().to_string(),
         live: false,
         once: false,
+        scene: None,
     };
     let tl = Arc::clone(&world.tl);
     let capability = Arc::clone(&world.capability);

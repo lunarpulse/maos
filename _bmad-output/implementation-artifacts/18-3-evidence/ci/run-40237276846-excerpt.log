@@ -1,0 +1,10 @@
+proven-red	Set up job	2026-10-25T21:58:31.2668304Z Version: 20261021.618
+proven-red	Set up job	2026-10-25T21:58:31.2674215Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-25T21:58:31.2674616Z Version: 20261012.334.1
+proven-red	Apply the AC1 plant	2026-10-25T21:58:43.5583992Z _bmad-output/implementation-artifacts/18-3-evidence/ci/plant.diff: OK
+proven-red	Control — exit line 3 stays green under the plant	2026-10-25T22:00:06.0132360Z researcher inference seam wired (provider `anthropic`)
+proven-red	Control — exit line 3 stays green under the plant	2026-10-25T22:00:06.0134222Z maos run: --once complete — exiting cleanly
+proven-red	Planted twin must defeat the twin step (no refusal naming the exhausted cassette)	2026-10-25T22:00:11.1018488Z researcher inference seam wired (provider `anthropic`)
+proven-red	Planted twin must defeat the twin step (no refusal naming the exhausted cassette)	2026-10-25T22:00:11.1018952Z maos: CASSETTE EXHAUSTED — cassette replay: exhausted (0 entries consumed, no more available)
+proven-red	Planted twin must defeat the twin step (no refusal naming the exhausted cassette)	2026-10-25T22:00:11.1019703Z maos: CASSETTE EXHAUSTED — cassette replay: exhausted (0 entries consumed, no more available)
+proven-red	Planted twin must defeat the twin step (no refusal naming the exhausted cassette)	2026-10-25T22:00:11.1020210Z maos: CASSETTE EXHAUSTED — cassette replay: exhausted (0 entries consumed, no more available)

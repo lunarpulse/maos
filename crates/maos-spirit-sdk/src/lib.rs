@@ -27,6 +27,12 @@ pub use maos_spirit_abi::{
 #[cfg(feature = "std")]
 pub mod cancellation;
 
+/// Story 18-4 — the injectable clock (CR-1).
+pub mod clock;
+
+/// Story 18-4 — the pid-fused principal-namespace port (AC3.1).
+pub mod principal;
+
 #[cfg(feature = "local_runner")]
 pub mod local_runner;
 

@@ -12,7 +12,7 @@ review: "bmad-code-review under `docs/testing/proof-contract.md`. Dev and review
 
 # Story 18.4: Self-tuning halt with an injectable clock
 
-Status: ready-for-dev
+Status: review
 
 <!-- Created 2026-10-25 at 419f051f by bmad-create-story under the lighter creation contract (no party-mode preflight); 18-0/18-1/18-8/18-2 done, 18-3 under review and treated as landing. The host's only cargo process was used (CARGO_TARGET_DIR=/mnt/build/cargo, `env -u CI -u GITHUB_ACTIONS`): `kloc-check --json`, `check-kernel-baseline`, one `cargo build -p maos-bin --bin maos` of HEAD, one throwaway kernel prototype (priced, reverted). RULED 2026-10-25 by the operator (Lunarpulse): D-18-4-01…08 all A as recommended; review opus-5-5 only (security reading on D-02/D-03) → `ready-for-dev`. Rulings applied docs-only (no cargo). -->
 
@@ -149,15 +149,15 @@ Filed at the rulings (owned elsewhere): `deferred-work.md:1252` (pid-keyed priva
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight at the dev HEAD.** Every D-18-4 row RULED 2026-10-25; tracker `ready-for-dev` → `in-progress`. `git diff --stat 419f051f -- spirits/butler crates/maos-spirit-sdk crates/maos-bin/src/{main.rs,worker_spawn.rs,butler_root.rs,escape_detector_consumer.rs,env_contract.rs} crates/maos-journey-test/cassettes/j-butler .github/workflows/discipline.yml xtask/tests/ci_shape_18_0.rs tests/corpora/MANIFEST.toml`; re-anchor drift. Re-measure `kloc-check --json` / `check-kernel-baseline` (expect 28328 / 20608 / 26377 if 18-3 landed unchanged).
-- [ ] **T1 — SDK** (CR-1, AC3.1): `clock` module + `ClockSpec`; `PrincipalMemoryPort` trait; unit tests.
-- [ ] **T2 — Butler** (AC1–AC5): `with_clock`; acceptance record + window + D-18-4-01 rule; restore; attestation sink; option vocabulary (D-18-4-03); effects (D-18-4-04); local day; anomaly reader; `ButlerSeam` fields + `attach`.
-- [ ] **T3 — Root** (AC1–AC3, AC5): parser + refusals (`worker_spawn.rs:55-101`); scene loop beside the `--once` tail (`main.rs:6171-6325`); seam fill (`:4073-4119`); pid-fused principal port; `MAOS_UTC_OFFSET`; escape-tail frame write.
-- [ ] **T4 — Fixtures + cassettes** (CR-3, AC4.3): both acceptance fixtures; `on-idle-halt.json` (21 entries, the D-18-4-03 prompt); **D-18-4-03 cost:** run the 18-2 generator (`cargo test -p butler --test halt_eval_corpus_18_2 -- --ignored`, `halt_eval_corpus_18_2.rs:185-188`) to rewrite `calendar-comms-v0.3.jsonl` and the three `halt-corpus-v0.3*.json` cassettes, then re-pin `corpus_pin.rs:25` and `tests/corpora/MANIFEST.toml:133-139` in the same commit; `maos eval halt --class butler` must still meet its floors.
-- [ ] **T5 — Witnesses**: `butler_scene_18_4.rs` (AC1, AC2.3 process, AC3.2–3.3); Butler library tests (AC2.3, AC4.2); 17-10 tail + digest tests (AC5.2); `butler_digest_18_1` basis assertion.
-- [ ] **T6 — CI** (AC1.4): `epic-18-exit` line 4 + steady twin; `ci_shape_18_0.rs`.
-- [ ] **T7 — Plants and records:** AC1–AC5 once each in `18-4-evidence/plants.md` (command, output, wall-clock); a CI plant for the line-4 twin; epic §18-4 if anything moved (the D-18-4-02 / D-18-4-05 rows are already filed, `deferred-work.md:1252-1253`).
-- [ ] **T8 — Governance** (D-18-4-08 A): `cargo fmt --all`; `kloc-check --json`; maos-bin re-pinned at its exact figure ≤ 28510 (above → stop and re-ask), exact re-pins with HISTORY notes; `check-kernel-baseline` (unchanged), `check-exit-commands`, `check-env-contract`, `check-corpus`, `cassette-age-gate`, `check-test-cost`, `check-dev-record-completeness`; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule --test ci_shape_18_0`.
+- [x] **T0 — Preflight at the dev HEAD.** Every D-18-4 row RULED 2026-10-25; tracker `ready-for-dev` → `in-progress`. `git diff --stat 419f051f -- spirits/butler crates/maos-spirit-sdk crates/maos-bin/src/{main.rs,worker_spawn.rs,butler_root.rs,escape_detector_consumer.rs,env_contract.rs} crates/maos-journey-test/cassettes/j-butler .github/workflows/discipline.yml xtask/tests/ci_shape_18_0.rs tests/corpora/MANIFEST.toml`; re-anchor drift. Re-measure `kloc-check --json` / `check-kernel-baseline` (expect 28328 / 20608 / 26377 if 18-3 landed unchanged).
+- [x] **T1 — SDK** (CR-1, AC3.1): `clock` module + `ClockSpec`; `PrincipalMemoryPort` trait; unit tests.
+- [x] **T2 — Butler** (AC1–AC5): `with_clock`; acceptance record + window + D-18-4-01 rule; restore; attestation sink; option vocabulary (D-18-4-03); effects (D-18-4-04); local day; anomaly reader; `ButlerSeam` fields + `attach`.
+- [x] **T3 — Root** (AC1–AC3, AC5): parser + refusals (`worker_spawn.rs:55-101`); scene loop beside the `--once` tail (`main.rs:6171-6325`); seam fill (`:4073-4119`); pid-fused principal port; `MAOS_UTC_OFFSET`; escape-tail frame write.
+- [x] **T4 — Fixtures + cassettes** (CR-3, AC4.3): both acceptance fixtures; `on-idle-halt.json` (21 entries, the D-18-4-03 prompt); **D-18-4-03 cost:** run the 18-2 generator (`cargo test -p butler --test halt_eval_corpus_18_2 -- --ignored`, `halt_eval_corpus_18_2.rs:185-188`) to rewrite `calendar-comms-v0.3.jsonl` and the three `halt-corpus-v0.3*.json` cassettes, then re-pin `corpus_pin.rs:25` and `tests/corpora/MANIFEST.toml:133-139` in the same commit; `maos eval halt --class butler` must still meet its floors.
+- [x] **T5 — Witnesses**: `butler_scene_18_4.rs` (AC1, AC2.3 process, AC3.2–3.3); Butler library tests (AC2.3, AC4.2); 17-10 tail + digest tests (AC5.2); `butler_digest_18_1` basis assertion.
+- [x] **T6 — CI** (AC1.4): `epic-18-exit` line 4 + steady twin; `ci_shape_18_0.rs`.
+- [x] **T7 — Plants and records:** AC1–AC5 once each in `18-4-evidence/plants.md` (command, output, wall-clock); a CI plant for the line-4 twin; epic §18-4 if anything moved (the D-18-4-02 / D-18-4-05 rows are already filed, `deferred-work.md:1252-1253`).
+- [x] **T8 — Governance** (D-18-4-08 A): `cargo fmt --all`; `kloc-check --json`; maos-bin re-pinned at its exact figure ≤ 28510 (above → stop and re-ask), exact re-pins with HISTORY notes; `check-kernel-baseline` (unchanged), `check-exit-commands`, `check-env-contract`, `check-corpus`, `cassette-age-gate`, `check-test-cost`, `check-dev-record-completeness`; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule --test ci_shape_18_0`.
 
 ## Dev Notes
 
@@ -245,22 +245,46 @@ Created 2026-10-25 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter co
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation, 2026-10-25)
+anthropic/claude-opus-5-5 (creation, 2026-10-25); anthropic/claude-opus-5-5 (dev, 2026-10-25)
 
 ### Debug Log References
 
+- T0 drift: `main.rs` anchors moved after 18-3 (seam fill now `:3927-4028`, bounded tail `:5960-6275`); kernel pin 26387 / 20617 after 18-3's ratified halt gating (a pending halt gates later passes — the scene ends at the halt, so no pass is gated).
+- Kloc: first measure maos-bin 28645 > 28510 → STOP; operator ruling 2026-10-25 **kloc C** (D-18-4-08 addendum): the per-day scene step moved Spirit-side (`butler::Scene`, `Butler::scene_step`), re-measured 28558 ≤ 28600 (pre-ratified) → exact re-pin; Epic 18 named budget 28510 → 28558 (epic kloc asks, after `:42`).
+- Seed prompt hash recomputed and verified against the old one (70f7ae50… reproduced; new ae8094f6…, len 843). `butler_daemon_18_1` built its two-entry cassette by appending to the seed; it now builds exactly two entries (the seed grew to 21).
+
 ### Completion Notes List
+
+- AC1: ledger-informed `belief_variance` = H₂(pooled 7-day rate) once ≥ 7 decided offers, conflict proxy before; the scene (`--clock compressed:<n>d --acceptance <path>`) fires one `on_idle` per simulated day on a `ScenarioClock`, halts on day 14 at rate 0.714; steady twin 21 days, no halt; typed refusals (pair, `--once`, `--live`, non-day unit, non-Butler manifest, missing day, malformed line). Process witness `butler_scene_18_4` (6 tests, Σ ≈ 10 s).
+- AC2: `maos_spirit_sdk::clock`; renderer/snooze/yesterday window on the local day; `MAOS_UTC_OFFSET` (typed boot refusal); one digest per simulated day; one non-personal `butler:acceptance` attestation per decided offer (`action`, `decision_id`, `notification_ref`, `sim_ns`) — `notification_ref` is Butler's notification sequence, as no TL frame records a notification.
+- AC3: `PrincipalMemoryPort` + `PidBoundPrincipalPort` (weak adapter, fused pid, Markdown, Private tier); restore on the first pass/decision once the pid resolves (`acceptance_ledger_restored`); restart split halts on day 14; forget → 0 records; a new pid restores 0 (library witness); pid-reuse finding stays routed (`deferred-work.md`, 20-3b), unchanged.
+- AC4: closed vocabulary, typed refusals, declared-action dispatch, scripted-MCP witness; scene `linear_note` → `refused (mcp unconfigured)`; 18-2 corpus regenerated, pinned 7c5bf481…; `eval_halt_18_2` green.
+- AC5: escape tail journals `anomaly.flagged:escape-detector` before its line (root sink, TL held weakly; a post-drain final-scan anomaly prints "not journaled"); digest reads the feed and names `anomalies_basis`.
+- Inherited BH-3 row (`deferred-work.md`, 18-3 review): closed per operator ruling 2026-10-25 with a mint-counter witness in `maos-bench` (`judge_calls` == `judge_tokens_minted`, > 1); the 60 s expiry itself is not reproduced (capability crate's process-global monotonic clock).
+- Plants: 5 (one per AC), all red then restored green — `18-4-evidence/plants.md` (per-plant wall-clock 1–11 s). CI plant prepared: `18-4-evidence/ci/plant.diff` (sha256 3e2be7e2bc923a57…).
+- Gates PASS: kloc-check, check-kernel-baseline (26387), check-env-contract, check-exit-commands, check-service-boundary, check-test-cost, check-corpus, coverage-matrix, check-serde-error-handling, check-model-currency, check-dev-record-completeness; `cargo fmt --all -- --check` clean; xtask d11 / recovery-lane / retro / ci_shape / budget-proven-red 52/52. Broad Butler-reader set green (maos-bin 135, maos-control 36, maos-cli 30, maos-journey-test 19 + 3 skipped, maos-audit 17, butler/digest/sdk 143). Not run locally: `live_escape_anomaly_17_10` (T3 substrate), `cassette-age-gate`.
 
 ### File List
 
-- `_bmad-output/implementation-artifacts/18-4-self-tuning-halt-with-injectable-clock.md` (A)
-- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md` (M — exit-line-4 provenance `:25`, shape `:26`, 18-4 kloc ruling `:38`, §R R18-16/17 `:67-68`, stories row `:95`, §18-4 `:168-173` incl. creation corrections + rulings `:170`, Dependencies `:232`)
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (M — 18-4 row only: comment at creation; `backlog` → `ready-for-dev` at the rulings)
-- `_bmad-output/implementation-artifacts/deferred-work.md` (M — rows `:1232-1234` mapped; `:1252-1253` filed at the rulings)
-- `_bmad-output/planning-artifacts/epics/epic-19-founder-loop-w4.md` (M — §19-2 Closes `:67`, received AC4 `:72`)
-- `_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md` (M — 20-3b received item before Dependencies `:248-251`)
+- `_bmad-output/implementation-artifacts/18-4-self-tuning-halt-with-injectable-clock.md` (A; M at dev)
+- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md` (M — creation re-anchors; dev: 18-4 kloc C ruling + landed figures after `:42`)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (M — 18-4 row)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (M — `:1232-1234` mapped, FIXED in tree; `:1252-1253` filed; BH-3 row closed)
+- `_bmad-output/planning-artifacts/epics/epic-19-founder-loop-w4.md`, `epic-20-ship-it-w5.md` (M at the rulings)
+- `_bmad-output/implementation-artifacts/18-4-evidence/plants.md`, `18-4-evidence/ci/plant.diff`, `18-4-evidence/ci/plant.diff.sha256` (A)
+- `crates/maos-spirit-sdk/src/lib.rs` (M), `clock.rs` (A), `principal.rs` (A)
+- `spirits/butler/src/lib.rs` (M), `spirits/butler/src/acceptance.rs` (A); `spirits/butler/tests/acceptance_18_4.rs` (A), `digest_production_18_1.rs`, `inference_seam_18_1.rs`, `corpus_pin.rs` (M)
+- `spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl`, `halt-corpus-v0.3.drift-blind.json`, `halt-corpus-v0.3.precision-planted.json` (M, regenerated)
+- `crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json`, `halt-corpus-v0.3.json` (M)
+- `tests/fixtures/j-butler/acceptance-21d.jsonl`, `acceptance-21d-steady.jsonl` (A); `tests/corpora/MANIFEST.toml`, `tests/coverage-matrix.yaml` (M)
+- `crates/maos-bin/src/main.rs`, `worker_spawn.rs`, `butler_root.rs`, `escape_detector_consumer.rs`, `env_contract.rs` (M)
+- `crates/maos-bin/tests/butler_scene_18_4.rs` (A); `escape_anomaly_tail_17_10.rs`, `live_escape_anomaly_17_10.rs`, `butler_digest_18_1.rs`, `butler_daemon_18_1.rs`, `researcher_inference_18_3.rs`, `eval_distill_18_3.rs`, `two_host_delegation_2b.rs`, `cli_wrapper_exhaustion_17_9.rs`, `worker_terminal_facts_17_7/unload_scenes.rs` (M)
+- `crates/maos-bench/src/distill_eval.rs` (M — BH-3 witness)
+- `.github/workflows/discipline.yml`, `xtask/tests/ci_shape_18_0.rs`, `xtask/kloc.toml` (M)
+- 18-3 landing fixes (separate hunks, not 18-4 scope): `crates/maos-audit/tests/fr4_classifier_16_2.rs`, `xtask/test-budgets.toml` (M)
 
 ### Change Log
 
 - 2026-10-25 — Story created (backlog; D-18-4-01…08 PROPOSED) at `419f051f`. Exit line 4 measured red. Epic AC1's tuning rule is infeasible on the seed (conflict halts pass 1) and contradicts AC3 → D-18-4-01 (ledger-informed `belief_variance`, upstream of the rate). Small Private-tier values are not durable and spills are keyed by the boot-local pid → D-18-4-02 (principal namespace as restore source, `Markdown`, finding routed; kernel alternative priced +1/+1 and reverted). Option mapping, scene effects, pick surface, local day, anomaly feed, kloc → D-18-4-03…08. Kernel-Δ 0. Epic §18-4, exit-line-4 provenance, R18-16/17 and the stories row re-anchored in place; tracker comment refreshed.
 - 2026-10-25 — RULED (operator, Lunarpulse): D-18-4-01…08 all A as recommended (08: Epic 18 named maos-bin budget 28444 → 28510, exact re-pin at landing, above → re-ask). Review `anthropic/claude-opus-5-5` only; security-focused reading on D-02/D-03. Filed `deferred-work.md:1252` (⚠ pid-keyed private memory → 20-3b; received item in epic-20) and `:1253` (director pick surface → 19-2 AC4, received in epic-19); `:1232-1234` mapped to AC2/AC4/AC5. Status → `ready-for-dev`.
+- 2026-10-25 — DEV (anthropic/claude-opus-5-5): T0–T8; 5 plants red→green; CI plant prepared; gates PASS. D-18-4-08 addendum (operator ruling 2026-10-25, kloc C): scene step Spirit-side; maos-bin 28301 → 28558 and Epic 18 budget 28510 → 28558; maos-spirit-sdk 1068 (ceiling 3000); maos-bench 2354 → 2359 (BH-3 witness, ruling 2026-10-25); `_aggregate_hardfail` 184223 → 184707; kernel 0. `deferred-work.md:1232-1234` FIXED in tree (close on landing); BH-3 row closed. Status → `review`.

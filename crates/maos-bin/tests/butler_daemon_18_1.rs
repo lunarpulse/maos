@@ -197,10 +197,12 @@ fn the_serving_root_renders_at_start_mints_per_pass_and_survives_a_refused_pass(
         &std::fs::read_to_string(workspace_root().join(SEED_CASSETTE)).unwrap(),
     )
     .unwrap();
+    // Exactly two entries (the seed's first, twice): the third pass exhausts
+    // it. Story 18-4 grew the seed to 21 entries for exit line 4.
     let mut cassette = seed.clone();
     let mut second = seed["entries"][0].clone();
     second["sequence"] = 1.into();
-    cassette["entries"].as_array_mut().unwrap().push(second);
+    cassette["entries"] = serde_json::json!([seed["entries"][0].clone(), second]);
     let cassette_path = scratch.join("on-idle-halt-x2.json");
     std::fs::write(&cassette_path, serde_json::to_vec(&cassette).unwrap()).unwrap();
 

@@ -8,10 +8,230 @@
   "entries": [
     {
       "sequence": 0,
-      "prompt_sha256": "70f7ae5051ad50f57b318e9a62dc914521aed25a59e0ac52afa266a7631ec851",
-      "prompt_len": 697,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
       "response": {
-        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"(a) Create a Linear issue to track the conflict resolution\",\"(b) Send a Slack reminder to reschedule\",\"(c) Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 4,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 5,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 6,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 7,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 8,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 9,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 10,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 11,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 12,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 13,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 14,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 15,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 16,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 17,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 18,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 19,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {"input_tokens": 100, "output_tokens": 80},
+        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}
+      }
+    },
+    {
+      "sequence": 20,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
         "stop_reason": "stop_sequence",
         "usage": {"input_tokens": 100, "output_tokens": 80},
         "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-butler/on-idle-halt", "model_id": "hand-authored-seed"}

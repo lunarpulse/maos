@@ -306,6 +306,7 @@ async fn run(dir: &Path, forbidden: bool) -> Run {
         NONCE,
         ESCAPE_TAIL_INTERVAL,
         Box::new(StampedLines(tx)),
+        Box::new(|_| {}),
     );
     let fault_runner = fixtures::fixture("maos-wasm-runner-fault-inject");
     let artifact = fixtures::fixture("echo_spirit.wasm");

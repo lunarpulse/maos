@@ -35,6 +35,12 @@ reason = "17-7 terminal-facts suite (31 tests): runtime-backed scenes on the sig
 owner = "18-0-green-main-ci-baseline"
 
 [[exception]]
+binary = "maos-bin::researcher_inference_18_3"
+seconds = 47
+reason = "18-3 Researcher seam (9 tests): every bound-pass witness boots a real `maos run` root per case (boot arm, door load, successor, --live refusal); CI Σ 37.341 s on landing run 40237233599 @ b96d123a; budget = observed max + 25 %"
+owner = "18-3-researcher-replay-live-and-judged-five-metric"
+
+[[exception]]
 binary = "maos-control::post_surface_16_1"
 seconds = 81
 reason = "16-1 AC3 operator-door POST surface (bounded, typed, concurrent; read-route guards); CI Σ 64.4-64.7 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088)"

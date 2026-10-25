@@ -260,6 +260,19 @@ fn record_through_the_router_writes_a_live_cassette_and_sidecar_that_replay_gree
         serde_json::json!(["live-record", "seed"])
     );
     assert_all_five_controls_detected(&line);
+    // Story 18-4 (BH-3, `deferred-work.md:1253`): record mode mints ONE token
+    // per judge call — one loop-wide token would show 1 distinct token here.
+    // (The 60 s expiry itself is not reproduced: the TTL is checked against
+    // the capability crate's process-global monotonic clock.)
+    let judge_calls = line["judge_calls"].as_u64().expect("judge_calls");
+    assert!(
+        judge_calls > 1,
+        "the record run asks the judge more than once"
+    );
+    assert_eq!(
+        line["judge_tokens_minted"], judge_calls,
+        "one distinct token per judge call"
+    );
 
     let cassette = read_json(&recorded);
     assert_eq!(cassette["provenance"], "live-record");

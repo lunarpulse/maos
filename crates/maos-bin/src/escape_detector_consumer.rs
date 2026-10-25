@@ -39,6 +39,13 @@
 //! authoritative; when 17-4's output-only writer detached at teardown the
 //! tail's last lines are dropped (a stalled `2>&1` pipe must not hang the
 //! exit) while its counters still move.
+//!
+//! Story 18-4 (D-18-4-07 A; FR17 (c)) — each anomaly is journaled through
+//! the root-supplied [`AnomalyJournal`] (the root writes it as a TL
+//! `telemetry.event` frame [`ANOMALY_FLAGGED_INTENT`] carrying
+//! [`anomaly_flagged_payload`]) BEFORE its stderr line (I2): the production
+//! morning digest reads those frames. The tail itself still holds no
+//! `TransparencyLogAdapter`.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -48,7 +55,8 @@ use std::time::Duration;
 
 use maos_domain::invariants::i9::SandboxTier;
 use maos_escape_detector::{
-    correlate, format_anomaly_line, CorrelationOutcome, Detector, ManifestDeclaration,
+    correlate, format_anomaly_line, AnomalyReport, CorrelationOutcome, Detector,
+    ManifestDeclaration,
 };
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -56,6 +64,27 @@ use tokio_util::sync::CancellationToken;
 /// The tail's scan period (D-17-10-FW-06): bound ≤ 1 s from the kill row's
 /// `timestamp_ns` to the surfaced line.
 pub const ESCAPE_TAIL_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Story 18-4 (D-18-4-07 A) — the TL intent of a surfaced escape anomaly
+/// (`butler::INTENT_ANOMALY_FLAGGED` + this source).
+pub const ANOMALY_FLAGGED_INTENT: &str = "anomaly.flagged:escape-detector";
+
+/// Story 18-4 — journals one anomaly (the root writes the TL frame); called
+/// before the anomaly's stderr line.
+pub type AnomalyJournal = Box<dyn FnMut(&AnomalyReport) + Send>;
+
+/// The `NotificationEvent::AnomalyFlagged` fields of `report` (a kernel-
+/// observed kill: confidence 1.0), plus the kill row it traces to.
+pub fn anomaly_flagged_payload(report: &AnomalyReport) -> String {
+    serde_json::json!({
+        "observer": "escape-detector",
+        "subject": format!("spirit_pid={}", report.spirit_pid),
+        "summary": format_anomaly_line(report),
+        "confidence": 1.0,
+        "kill_frame": report.frame_id_hex,
+    })
+    .to_string()
+}
 
 /// What a stopped tail reports (also printed as the stop line).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,6 +108,7 @@ struct TailState {
     tl_path: PathBuf,
     boot_nonce: u64,
     out: Box<dyn Write + Send>,
+    journal: AnomalyJournal,
     cursor: i64,
     declared: Declared,
     consecutive_failures: usize,
@@ -138,6 +168,7 @@ impl TailState {
                 anticipated_kill: false,
             };
             if let CorrelationOutcome::Anomaly(report) = correlate(frame, &declaration) {
+                (self.journal)(&report);
                 self.line(&format_anomaly_line(&report));
                 written += 1;
             }
@@ -190,6 +221,7 @@ pub fn spawn_escape_anomaly_tail(
     boot_nonce: u64,
     interval: Duration,
     out: Box<dyn Write + Send>,
+    journal: AnomalyJournal,
 ) -> EscapeAnomalyTail {
     let declared = Declared::default();
     let mut state = TailState {
@@ -197,6 +229,7 @@ pub fn spawn_escape_anomaly_tail(
         tl_path,
         boot_nonce,
         out,
+        journal,
         declared: Arc::clone(&declared),
         consecutive_failures: 0,
         failed_scans: 0,

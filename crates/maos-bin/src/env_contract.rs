@@ -324,6 +324,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_UTC_OFFSET",
+        purpose: "Story 18-4 (D-18-4-06 A) — the director's fixed local offset `±HH:MM` (within ±18:00) the root's clock reads once at boot; Butler's morning digest rolls over on that local day. Unset ⇒ UTC; malformed ⇒ typed boot refusal. DST is not modelled",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_EVAL_PRODUCER_SEED",
         purpose: "Story 18-2 — 64-hex Ed25519 seed signing `maos eval halt`'s benchmark sidecar (a secret, never logged); unset ⇒ the documented dev seed, labelled `signer: dev-seed`",
         stability: EnvStability::UserFacing,

@@ -542,6 +542,72 @@ fn epic_18_exit_runs_line_3_verbatim_and_its_empty_cassette_twin() {
     }
 }
 
+const EXIT_LINE_4_STEP: &str =
+    "Epic-18 exit line 4 — 21 compressed days and the variance-led halt (Story 18-4)";
+const EXIT_LINE_4_TWIN_STEP: &str =
+    "Epic-18 exit line 4 twin — the steady director must never halt (Story 18-4)";
+const ACCEPTANCE_FIXTURE: &str = "--acceptance tests/fixtures/j-butler/acceptance-21d.jsonl";
+
+/// Story 18-4 AC1.4 — `epic-18-exit` runs exit line 4 verbatim (keyless,
+/// scratch `HOME`): the binding witness, exactly one `belief_variance` halt on
+/// a day ≤ 21 at a pooled rate ≥ 0.6, one decided offer and one digest per
+/// simulated day; its steady twin runs the same line over the steady fixture
+/// and fails on any halt or a short scene (the standing red for line 4).
+#[test]
+fn epic_18_exit_runs_line_4_verbatim_and_its_steady_twin() {
+    let line = epic_18_exit_line(4);
+    assert!(line.contains("--clock compressed:21d") && line.contains(ACCEPTANCE_FIXTURE));
+    let workflow = workflow();
+    let job = key(key(&workflow, "jobs"), "epic-18-exit");
+    for step in steps(job) {
+        assert_no_continue_on_error(step, "an epic-18-exit step");
+    }
+    let (line_4, twin) = (
+        step_index(job, EXIT_LINE_4_STEP),
+        step_index(job, EXIT_LINE_4_TWIN_STEP),
+    );
+    assert_eq!(twin, line_4 + 1, "the twin follows line 4");
+    let run = str_of(&steps(job)[line_4], "run").expect("line-4 run");
+    assert!(run.contains(&format!("{line} > line4.out 2> line4.err")));
+    assert!(run.contains("unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY"));
+    assert!(run.contains("export HOME=\"$scratch\""));
+    assert!(run.contains("grep -q 'butler inference seam wired' line4.err"));
+    for needle in [
+        ".render == \"halted on belief_variance\"",
+        ".day <= 21",
+        ".diagnostic.rate >= 0.6",
+        "select(.event == \"acceptance_day\")] | length) == ($d - 1)",
+        "select(.event == \"morning_digest\")] | length) == $d",
+    ] {
+        assert!(run.contains(needle), "line 4 asserts {needle}");
+    }
+    assert!(
+        run.contains("exit \"$rc\""),
+        "line 4 exits with the command's code"
+    );
+
+    let run = str_of(&steps(job)[twin], "run").expect("twin run");
+    let steady = line.replace(
+        ACCEPTANCE_FIXTURE,
+        "--acceptance tests/fixtures/j-butler/acceptance-21d-steady.jsonl",
+    );
+    assert!(run.contains(&format!("{steady} > line4-twin.out 2> line4-twin.err")));
+    for needle in [
+        "select(.event == \"halt\")] | length) == 0",
+        "select(.event == \"acceptance_day\")] | length) == 21",
+    ] {
+        assert!(run.contains(needle), "the twin asserts {needle}");
+    }
+    let upload = steps(job)
+        .iter()
+        .find(|step| str_of(step, "uses") == Some("actions/upload-artifact@v4"))
+        .expect("epic-18-exit uploads");
+    let paths = str_of(key(upload, "with"), "path").expect("upload paths");
+    for path in ["line4.out", "line4.err", "line4-twin.out", "line4-twin.err"] {
+        assert!(paths.lines().any(|p| p.trim() == path), "uploads {path}");
+    }
+}
+
 /// Story 18-3 AC2.3 / CR-3 — the NFR-Aud-7 job scores the Researcher's
 /// frozen corpus through the shipped verb (keyless) and requires `pass ==
 /// true`, keeps the maos-eval floor test, and runs the Digest-class gate
