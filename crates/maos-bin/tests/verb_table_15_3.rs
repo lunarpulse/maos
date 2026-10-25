@@ -52,12 +52,13 @@ fn expected_argv(name: verbs::VerbName) -> &'static str {
         verbs::VerbName::Backup => "backup",
         verbs::VerbName::Install => "install",
         verbs::VerbName::Purge => "purge",
+        verbs::VerbName::Eval => "eval",
     }
 }
 
 /// Every variant, spelled out — kept in sync with [`expected_argv`] (the
 /// compiler enforces both against the enum).
-const ALL_NAMES: [verbs::VerbName; 8] = [
+const ALL_NAMES: [verbs::VerbName; 9] = [
     verbs::VerbName::Init,
     verbs::VerbName::Run,
     verbs::VerbName::Shell,
@@ -66,6 +67,7 @@ const ALL_NAMES: [verbs::VerbName; 8] = [
     verbs::VerbName::Backup,
     verbs::VerbName::Install,
     verbs::VerbName::Purge,
+    verbs::VerbName::Eval,
 ];
 
 fn maos() -> Command {
@@ -134,7 +136,7 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
         !verbs::VERBS.is_empty(),
         "the verb table must not be empty — a vacuous green is the failure mode"
     );
-    assert_eq!(verbs::VERBS.len(), 8, "exact expected verb count");
+    assert_eq!(verbs::VERBS.len(), 9, "exact expected verb count");
     for name in ALL_NAMES {
         let rows: Vec<&verbs::Verb> = verbs::VERBS
             .iter()
@@ -165,7 +167,15 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
     );
     assert_eq!(
         verbs_of_build(verbs::Build::Network),
-        vec!["audit", "init", "purge", "run", "shell", "traceback"],
+        vec![
+            "audit",
+            "eval",
+            "init",
+            "purge",
+            "run",
+            "shell",
+            "traceback"
+        ],
         "network build surface"
     );
 }
@@ -386,12 +396,13 @@ fn version_flag_prints_the_version_line() {
 #[test]
 fn unknown_verb_exits_non_zero_with_the_table() {
     let expected = rendered_help();
-    let out = output_with_deadline(maos().arg("eval"));
+    // Story 18-2 made `eval` a network verb; the probe is a token no build lists.
+    let out = output_with_deadline(maos().arg("frobnicate"));
     assert!(
         !out.status.success(),
-        "`maos eval` must exit non-zero instead of hanging, got {out:?}"
+        "`maos frobnicate` must exit non-zero instead of hanging, got {out:?}"
     );
-    assert_eq!(out.status.code(), Some(1), "`maos eval` must exit 1");
+    assert_eq!(out.status.code(), Some(1), "`maos frobnicate` must exit 1");
     assert_eq!(
         out.stdout, expected,
         "an unknown verb must print the usage table on stdout"

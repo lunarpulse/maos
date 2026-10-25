@@ -13,7 +13,9 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-audit = { path = "../maos-audit", optional = true }
 maos-spirit-sdk = { path = "../maos-spirit-sdk", features = ["local_runner"], optional = true }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# Story 18-2 review (BH-1/EC-1) — `raw_value`: the halt benchmark sidecar keeps its
+# body's exact signed bytes, so verification never re-encodes a float.
+serde_json = { version = "1.0", features = ["raw_value"] }
 thiserror = "2.0"
 walkdir = "2"
 # Story 7.5b — SHA-256 pinning of the Butler-class fixture corpus (the resolver
@@ -22,6 +24,8 @@ sha2 = "0.10"
 
 [features]
 trial-attestation = ["maos-audit", "maos-spirit-sdk"]
+# Story 18-2 (D-18-2-04 A) — Ed25519 signing/verification of the halt benchmark sidecar.
+benchmark-sidecar = ["maos-audit"]
 
 [dev-dependencies]
 maos-kernel-core = { path = "../maos-kernel-core" }

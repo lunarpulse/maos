@@ -76,6 +76,24 @@ pub trait RegistryStorage: Send + Sync {
         pkg: &SignedPackage,
         origin: &crate::origin::RegistryOrigin,
     ) -> Result<(), StorageError>;
+
+    /// Story 18-2 (D-18-2-04 A) — store a version's signed halt benchmark
+    /// sidecar ([`BENCHMARK_FILE`]). The producer signs; `maosctl spirit
+    /// benchmark` verifies. Storage never inspects the bytes.
+    fn put_benchmark(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        sidecar: &[u8],
+    ) -> Result<(), StorageError>;
+
+    /// Story 18-2 — a version's sidecar, or (`None`) the highest version
+    /// that has one. Returns the version read and the bytes.
+    fn get_benchmark(
+        &self,
+        spirit_id: &SpiritId,
+        version: Option<&str>,
+    ) -> Result<(String, Vec<u8>), StorageError>;
 }
 
 /// Filesystem-backed registry storage using `~/.local/share/maos/registry/`.
@@ -387,6 +405,59 @@ impl RegistryStorage for LocalFsRegistryStorage {
             .collect();
         Ok(YankList::new(entries))
     }
+
+    fn put_benchmark(
+        &self,
+        spirit_id: &SpiritId,
+        version: &str,
+        sidecar: &[u8],
+    ) -> Result<(), StorageError> {
+        path_segment(spirit_id.as_str())?;
+        let vdir = self.version_dir(spirit_id, path_segment(version)?);
+        fs::create_dir_all(&vdir).map_err(|e| StorageError::Io(e.to_string()))?;
+        fs::write(vdir.join(BENCHMARK_FILE), sidecar).map_err(|e| StorageError::Io(e.to_string()))
+    }
+
+    fn get_benchmark(
+        &self,
+        spirit_id: &SpiritId,
+        version: Option<&str>,
+    ) -> Result<(String, Vec<u8>), StorageError> {
+        path_segment(spirit_id.as_str())?;
+        let not_found = |version: &str| StorageError::BenchmarkNotFound {
+            spirit_id: spirit_id.as_str().to_string(),
+            version: version.to_string(),
+        };
+        let version = match version {
+            Some(version) => path_segment(version)?.to_owned(),
+            None => fs::read_dir(self.spirit_dir(spirit_id))
+                .map_err(|_| not_found("any"))?
+                .flatten()
+                .filter(|entry| entry.path().join(BENCHMARK_FILE).is_file())
+                .filter_map(|entry| entry.file_name().into_string().ok())
+                .max_by_key(|v| {
+                    v.split('.')
+                        .map(|p| p.parse().unwrap_or(0))
+                        .collect::<Vec<u64>>()
+                })
+                .ok_or_else(|| not_found("any"))?,
+        };
+        let bytes = fs::read(self.version_dir(spirit_id, &version).join(BENCHMARK_FILE))
+            .map_err(|_| not_found(&version))?;
+        Ok((version, bytes))
+    }
+}
+
+/// Story 18-2 — a version directory's signed halt benchmark sidecar.
+pub const BENCHMARK_FILE: &str = "benchmark.signed.json";
+
+/// One directory name under the registry root: never empty, `.`/`..`, or a
+/// path separator.
+fn path_segment(segment: &str) -> Result<&str, StorageError> {
+    if segment.is_empty() || segment == "." || segment == ".." || segment.contains(['/', '\\']) {
+        return Err(StorageError::InvalidSegment(segment.to_owned()));
+    }
+    Ok(segment)
 }
 
 /// Truncate a string at a character boundary, keeping at most `max_chars` characters.
@@ -447,6 +518,10 @@ pub enum StorageError {
     Serde(String),
     #[error("version '{version}' not found for spirit '{spirit_id}'")]
     VersionNotFound { spirit_id: String, version: String },
+    #[error("no benchmark sidecar for spirit '{spirit_id}' version '{version}'")]
+    BenchmarkNotFound { spirit_id: String, version: String },
+    #[error("invalid registry path segment '{0}'")]
+    InvalidSegment(String),
 }
 
 // ---------------------------------------------------------------------------

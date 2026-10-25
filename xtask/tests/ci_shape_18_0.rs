@@ -303,3 +303,92 @@ fn epic_18_exit_runs_line_1_verbatim_and_its_proven_red_twin() {
         "the twin exits 1 when the planted violation exits 0"
     );
 }
+
+const EXIT_LINE_2_STEP: &str =
+    "Epic-18 exit line 2 — maos eval halt replays the Butler halt corpus (Story 18-2)";
+const EXIT_LINE_2_TWIN_STEP: &str =
+    "Epic-18 exit line 2 twin — the drift-blind cassette must miss overall recall (Story 18-2)";
+
+/// Story 18-2 CR-4 — `epic-18-exit` runs exit line 2 verbatim (keyless,
+/// scratch `HOME`), uploads the signed sidecar, and runs the drift-blind
+/// twin, which fails the step when it exits 0 or does not name the
+/// overall-recall floor (D-18-2-02 B). The nightly re-record leg records the
+/// eval cassette (D-18-2-06 A) into the `.live.json` SIBLING, never the
+/// committed seed (review ruling D-18-2-R3), and still uploads after a missed
+/// live floor.
+#[test]
+fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
+    let epic = fs::read_to_string(
+        root().join("_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md"),
+    )
+    .expect("read epic 18");
+    let line = epic
+        .lines()
+        .find_map(|line| {
+            line.split_once("   # 2 —")
+                .map(|(command, _)| command.trim())
+        })
+        .expect("epic 18 exit line 2");
+    assert_eq!(line, "maos eval halt --class butler");
+
+    let workflow = workflow();
+    let job = key(key(&workflow, "jobs"), "epic-18-exit");
+    let run = str_of(&steps(job)[step_index(job, EXIT_LINE_2_STEP)], "run").expect("line-2 run");
+    assert!(run.contains(&format!("{line} > line2.out 2> line2.err")));
+    assert!(run.contains("unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY"));
+    assert!(run.contains("export HOME=\"$scratch\""));
+    assert!(run.contains("benchmark.signed.json line2.benchmark.signed.json"));
+    assert!(
+        run.contains("exit \"$rc\""),
+        "line 2 exits with the command's code"
+    );
+
+    let run = str_of(&steps(job)[step_index(job, EXIT_LINE_2_TWIN_STEP)], "run").expect("twin run");
+    assert!(run.contains(&format!(
+        "{line} --cassette spirits/butler/tests/fixtures/halt-corpus-v0.3.drift-blind.json"
+    )));
+    let when_zero = run
+        .split_once("if [ \"$rc\" -eq 0 ]; then")
+        .and_then(|(_, rest)| rest.split_once("fi"))
+        .map(|(block, _)| block)
+        .expect("the twin checks rc == 0");
+    assert!(
+        when_zero.contains("exit 1"),
+        "the twin exits 1 when the drift-blind run exits 0"
+    );
+    assert!(run.contains("grep -q 'halt_recall_overall 0.800 below floor 0.90' line2-twin.err"));
+
+    let upload = steps(job)
+        .iter()
+        .find(|step| str_of(step, "uses") == Some("actions/upload-artifact@v4"))
+        .expect("epic-18-exit uploads");
+    let paths = str_of(key(upload, "with"), "path").expect("upload paths");
+    assert!(paths
+        .lines()
+        .any(|p| p.trim() == "line2.benchmark.signed.json"));
+
+    let nightly: Value = serde_yaml::from_str(
+        &fs::read_to_string(root().join(".github/workflows/journey-nightly.yml"))
+            .expect("read journey-nightly"),
+    )
+    .expect("parse journey-nightly");
+    let rerecord = key(key(&nightly, "jobs"), "tier-2-rerecord");
+    let record =
+        &steps(rerecord)[step_index(rerecord, "Re-record the Butler halt-eval cassette (live)")];
+    let env = key(record, "env");
+    assert_eq!(str_of(env, "MAOS_INFERENCE_MODE"), Some("record"));
+    assert_eq!(
+        str_of(env, "MAOS_REPLAY_CASSETTE"),
+        Some("crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.live.json")
+    );
+    assert_eq!(
+        str_of(record, "run"),
+        Some("target/debug/maos eval halt --class butler")
+    );
+    let upload = &steps(rerecord)[step_index(rerecord, "Upload refreshed cassettes")];
+    assert!(
+        step_index(rerecord, "Upload refreshed cassettes")
+            > step_index(rerecord, "Re-record the Butler halt-eval cassette (live)")
+    );
+    assert_eq!(condition(upload).as_deref(), Some(NOT_CANCELLED));
+}

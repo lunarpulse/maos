@@ -2397,6 +2397,52 @@ fn dispatch_spirit(args: &SpiritArgs, _color: ColorChoice) -> ExitCode {
                 spirit_status_report(spirit)
             }
         }
+        SpiritOp::Benchmark { class, version } => {
+            if let Some(code) = checked_id("spirit benchmark", class) {
+                return code;
+            }
+            spirit_benchmark(class, version.as_deref())
+        }
+    }
+}
+
+/// Story 18-2 (D-18-2-04 A) — read a class's halt benchmark sidecar from
+/// registry storage; print its body's exact signed bytes only once the
+/// signature, its signer label, class, version and schema all verify.
+fn spirit_benchmark(class: &str, version: Option<&str>) -> ExitCode {
+    use maos_eval::halt_replay::sidecar;
+    use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage, StorageError};
+    let read = LocalFsRegistryStorage::new()
+        .map_err(|e| StorageError::Io(e.to_string()))
+        .and_then(|storage| storage.get_benchmark(&class.into(), version));
+    let (version, bytes) = match read {
+        Ok(found) => found,
+        Err(error) => {
+            eprintln!("maosctl: spirit benchmark — {error}");
+            let missing = matches!(error, StorageError::BenchmarkNotFound { .. });
+            return ExitCode::from(if missing { 5 } else { 1 });
+        }
+    };
+    let verified = sidecar::producer_pubkey().and_then(|pubkey| {
+        let (_, raw) = sidecar::verify(&bytes, &pubkey, class, &version)?;
+        Ok((raw, sidecar::signer_for(&pubkey)))
+    });
+    match verified {
+        Ok((raw, signer)) => {
+            println!("{}", raw.get());
+            let basis = match signer {
+                "dev-seed" => "the development seed's key — integrity, not provenance",
+                _ => "MAOS_EVAL_PRODUCER_PUBKEY — the producer",
+            };
+            eprintln!(
+                "maosctl: spirit benchmark — {class} {version}: signature verified against {basis}"
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("maosctl: spirit benchmark — {class} {version}: {error}");
+            ExitCode::from(1)
+        }
     }
 }
 

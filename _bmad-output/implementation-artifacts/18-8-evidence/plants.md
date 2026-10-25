@@ -20,6 +20,16 @@ CI: the story names no CI plant. `ci/plant.diff` (= `ac1-plant.diff`, sha256 in 
 the one-image proven-red run if the integrator wants one. **Regenerated at the review patch pass** (the file moved):
 sha256 `9682e3df138220578ab4d9b20346e56aa9d80d001f2fc16a0475773783898e3a`; `git apply --check` clean on the patched
 tree; applied, five `mcp_conformance_18_8` legacy-path tests red (row AC1 below).
+**CI proven-red DONE 2026-10-25:** run `40191749007` (`ci/18-8-verify` @ `c68167c7`, job `121164008579`, `ubuntu-24.04`
+image 20261012.334.1; workflow `ci/ci-18-8-verify.yml`): `plant.diff: OK`; `legacy_two_calls_share_one_initialize_and_one_session
+... FAILED` ("Bad Request: no session, initialize first"), control `modern_two_calls_succeed_without_a_handshake ... ok`,
+`test result: FAILED. 10 passed; 5 failed`. Excerpt `ci/run-40191749007-excerpt.log`; branch deleted.
+**Landing run `40191703238` @ `140b906b`** (13.03 job-h, 78.0 min, 187/189 success): `workspace-test-suite` (incl. 18-1's
+`cohort_daemon_smoke_13_5c` fix), `epic-18-exit`, `cargo-deny`, `check-test-budget` green; the only reds were
+`check-serde-error-handling` (3 violations in this story's conformance fixture, `crates/maos-journey-test/src/lib.rs:213,542-543`:
+serde result `.unwrap_or`/`.expect`) and the `aggregate` fan-in. Fixed by the integrator (explicit `match` for the
+non-JSON probe body; `sse_frame` returns `Result`, a framing failure answers 500), carried with 18-2's push;
+`check-serde-error-handling: PASSED (0 violations)`, `mcp_conformance_18_8` 15/15.
 
 ## Review patch pass (2026-10-25, `anthropic/claude-opus-5-5`)
 

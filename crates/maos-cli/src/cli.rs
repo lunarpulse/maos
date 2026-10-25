@@ -881,6 +881,17 @@ pub enum SpiritOp {
         #[arg(long)]
         sandbox: bool,
     },
+    /// Story 18-2 (D-18-2-04 A) — print a class's signed halt benchmark
+    /// sidecar (`maos eval halt`) after verifying its Ed25519 signature
+    /// against `MAOS_EVAL_PRODUCER_PUBKEY` (else the dev pubkey). Exit 5 when
+    /// no sidecar exists, 1 when it does not verify.
+    Benchmark {
+        /// Class / Spirit id (e.g. "butler").
+        class: String,
+        /// Manifest version; defaults to the highest version with a sidecar.
+        #[arg(long)]
+        version: Option<String>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

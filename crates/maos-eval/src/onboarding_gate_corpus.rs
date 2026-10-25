@@ -60,6 +60,9 @@ pub const P95_MINUTES_MAX: f64 = 90.0;
 pub const HALT_RECALL_FLOOR: f64 = 0.90;
 /// Halt-precision overall must be ≥0.85.
 pub const HALT_PRECISION_FLOOR: f64 = 0.85;
+/// NFR-Test-4 per-class halt recall floor (`prd/non-functional-requirements.md:81`)
+/// for a class with no NFR-Onb-1 floor of its own (Story 18-2, the Researcher).
+pub const NFR_TEST_4_RECALL_FLOOR: f64 = 0.70;
 /// NFR-Onb-1 corpus size (the Butler-class regression corpus the candidate
 /// Spirit is scored against).
 pub const CORPUS_SCENARIO_COUNT: usize = 30;

@@ -1,0 +1,11 @@
+--- a/crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.json	2026-10-25 13:08:02.674208477 +0000
++++ b/crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.json	2026-10-25 13:17:45.502654911 +0000
+@@ -2,7 +2,7 @@
+   "entries": [
+     {
+       "prompt_len": 723,
+-      "prompt_sha256": "6d0c37be9cfabe610b01a68415303ba51728185358e4af47aee142ef8834d45a",
++      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+       "response": {
+         "provider_attribution": {
+           "endpoint_url": "cassette://j-butler/halt-corpus-v0.3",

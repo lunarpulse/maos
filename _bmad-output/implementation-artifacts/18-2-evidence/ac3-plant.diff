@@ -1,0 +1,11 @@
+--- a/crates/maos-bench/src/halt_eval.rs	2026-10-25 13:17:26.291476886 +0000
++++ b/crates/maos-bench/src/halt_eval.rs	2026-10-25 13:17:51.514911921 +0000
+@@ -445,7 +445,7 @@
+     }
+     check_consumed(consumed.load(Ordering::SeqCst), rows.len())?;
+     if let Some(flush) = flush {
+-        flush()?;
++        let _ = flush;
+     }
+     let bytes = std::fs::read(&cassette).map_err(|e| format!("cassette {cassette:?}: {e}"))?;
+     let provenance = serde_json::from_slice::<serde_json::Value>(&bytes)

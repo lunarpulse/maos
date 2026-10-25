@@ -32,6 +32,9 @@ maos-spirit-sdk = { path = "../../crates/maos-spirit-sdk", features = ["local_ru
 maos-kernel-core = { path = "../../crates/maos-kernel-core" }
 maos-manifest = { path = "../../crates/maos-manifest" }
 maos-eval = { path = "../../crates/maos-eval" }
+# Story 18-2 AC4.5 — the FR15 witness resolves a kernel halt through the
+# operator door's `HaltFlow` (test-only; no production edge).
+maos-director-surface = { path = "../../crates/maos-director-surface" }
 tokio = { version = "1", features = ["macros", "rt", "time", "sync"] }
 tempfile = "3"
 sha2 = "0.10"

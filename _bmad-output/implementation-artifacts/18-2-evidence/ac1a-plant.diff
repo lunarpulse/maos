@@ -1,0 +1,12 @@
+--- a/crates/maos-bench/src/halt_eval.rs	2026-10-25 13:16:32.844544578 +0000
++++ b/crates/maos-bench/src/halt_eval.rs	2026-10-25 13:17:09.729711308 +0000
+@@ -429,7 +429,8 @@
+         });
+         let butler = Butler::with_scenario(row.input.clone())
+             .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>)
+-            .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))));
++;
++        let _ = (port, binding);
+         butler.on_idle(&mut Ctx::for_rust_inproc_hook(
+             CapabilityHandle(0),
+             MailboxHandle(0),

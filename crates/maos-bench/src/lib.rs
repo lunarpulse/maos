@@ -17,6 +17,8 @@
 //! - `fixture_replay.rs` — canned-latency runner for fast-mode / smoke-arm use.
 //! - `benches/section_13_1.rs` — criterion bench entry point.
 //! - `src/bin/section_13_1_run.rs` — operator-facing orchestrator binary.
+//! - `halt_eval.rs` — Story 18-2: the `maos eval halt` replay composition
+//!   (class table, per-row kernel world, scored and signed numbers).
 //!
 //! ## Safety
 //!
@@ -25,5 +27,6 @@
 pub mod decision;
 #[cfg(any(test, feature = "fixture_replay"))]
 pub mod fixture_replay;
+pub mod halt_eval;
 pub mod harness;
 pub mod report;

@@ -1,0 +1,12 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -1927,8 +1927,7 @@
+             verbs::VerbName::Eval => {
+                 let mode = std::env::var_os("MAOS_INFERENCE_MODE");
+                 let mode = mode.map(|m| m.to_string_lossy().into_owned());
+-                let env_cassette =
+-                    std::env::var_os("MAOS_REPLAY_CASSETTE").map(std::path::PathBuf::from);
++                let env_cassette = None::<std::path::PathBuf>;
+                 match maos_bench::halt_eval::parse_args(&argv[1..], mode.as_deref(), env_cassette) {
+                     Err(usage) => {
+                         eprintln!("maos eval: {usage}");

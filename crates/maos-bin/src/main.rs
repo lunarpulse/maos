@@ -739,6 +739,61 @@ fn construct_butler_core(
     Ok((butler, last_receipt, pid_binding))
 }
 
+/// Story 18-2 (CR-1) — `maos eval halt`: score a class's halt corpus through
+/// `maos-bench`'s composition, print one JSON line, store the signed sidecar
+/// in registry storage. 0 = every floor holds; 1 = a missed floor, a run
+/// without numbers, or a failed sidecar write.
+#[cfg(feature = "network")]
+fn run_eval(
+    eval: &maos_bench::halt_eval::EvalRequest,
+    recorded: Option<maos_bench::halt_eval::Completions>,
+) -> i32 {
+    use maos_bench::halt_eval::{evaluate, Completions};
+    use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
+    let completions = match (recorded, eval.replay_cassette()) {
+        (None, Some(cassette)) => {
+            match cassette_replay::CassetteReplayProvider::from_file(&cassette, true) {
+                Ok(driver) => Some(Completions::Replay {
+                    driver: Arc::new(driver),
+                    cassette,
+                }),
+                Err(error) => return eval_failed(error),
+            }
+        }
+        (recorded, _) => recorded,
+    };
+    let run = match evaluate(eval, completions) {
+        Ok(run) => run,
+        Err(error) => return eval_failed(error),
+    };
+    println!("{}", run.line);
+    // D-18-2-R2: an override cassette's run prints numbers, never the class sidecar.
+    let stored = if eval.publishes_sidecar() {
+        LocalFsRegistryStorage::new()
+            .map_err(|e| e.to_string())
+            .and_then(|storage| {
+                let id = run.spirit_id.as_str().into();
+                (storage.put_benchmark(&id, &run.version, &run.sidecar)).map_err(|e| e.to_string())
+            })
+    } else {
+        eprintln!("maos eval: override cassette — numbers only, no sidecar written");
+        Ok(())
+    };
+    if let Err(error) = stored {
+        return eval_failed(format!("benchmark sidecar write failed: {error}"));
+    }
+    for missed in &run.missed_floors {
+        eprintln!("maos eval: {missed}");
+    }
+    i32::from(!run.pass)
+}
+
+#[cfg(feature = "network")]
+fn eval_failed(error: String) -> i32 {
+    eprintln!("maos eval: {error}");
+    1
+}
+
 /// Story 17-11 / 18-1 — the Spirit's FIRST declared `ProviderInfer`: the
 /// provider a composition-root mint names (never the router default, which a
 /// Spirit need not declare — 17-11 entitlement refuses it at issuance).
@@ -1470,8 +1525,8 @@ fn main() {
             verbs::VerbName::Audit => air_gap_audit(&argv[1..]),
             verbs::VerbName::Install => air_gap_install(&argv[1..]),
             verbs::VerbName::Purge => run_purge(&argv[1..]),
-            verbs::VerbName::Shell | verbs::VerbName::Traceback => {
-                unreachable!("shell and traceback are not rows of the air-gap table")
+            verbs::VerbName::Shell | verbs::VerbName::Traceback | verbs::VerbName::Eval => {
+                unreachable!("shell, traceback and eval are not rows of the air-gap table")
             }
         },
     }
@@ -1787,6 +1842,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let mut shell_mode = false;
     let mut plain_flag = false;
+    let mut eval_record = None;
     match verbs::dispatch(&argv) {
         verbs::Outcome::Help => {
             verbs::print_help(&mut std::io::stdout());
@@ -1865,6 +1921,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             verbs::VerbName::Shell => {
                 plain_flag = argv.iter().skip(1).any(|a| a == "--plain");
                 shell_mode = true;
+            }
+            // Story 18-2 (CR-1) — replay runs now; `record` needs the
+            // root's shared router and runs once it is built (D-18-2-06 A).
+            verbs::VerbName::Eval => {
+                let mode = std::env::var_os("MAOS_INFERENCE_MODE");
+                let mode = mode.map(|m| m.to_string_lossy().into_owned());
+                let env_cassette =
+                    std::env::var_os("MAOS_REPLAY_CASSETTE").map(std::path::PathBuf::from);
+                match maos_bench::halt_eval::parse_args(&argv[1..], mode.as_deref(), env_cassette) {
+                    Err(usage) => {
+                        eprintln!("maos eval: {usage}");
+                        std::process::exit(2);
+                    }
+                    Ok(eval) if eval.record => eval_record = Some(eval),
+                    Ok(eval) => std::process::exit(run_eval(&eval, None)),
+                }
             }
             // Resolved here; acted on by their dedicated parsers below
             // (`parse_run_args` / `parse_cross_wall_traceback_args`) once the
@@ -3816,6 +3888,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = Arc::new(
         maos_kernel_core::inference::router::MultiProviderRouter::new(providers_map, default_id),
     );
+    // Story 18-2 (D-18-2-06 A) — `MAOS_INFERENCE_MODE=record maos eval halt`:
+    // the shared router, every driver wrapped by the recorder above, answers
+    // Butler's declared provider; then the recorder flushes.
+    if let (Some(eval), Some(cassette)) = (&eval_record, inference_mode.cassette()) {
+        let recorder = cassette_recorder.clone();
+        let completions = maos_bench::halt_eval::Completions::Record {
+            router: Arc::clone(&router),
+            cassette: cassette.to_owned(),
+            flush: Box::new(move || recorder.map_or(Ok(()), |r| r.flush().map(drop))),
+        };
+        std::process::exit(run_eval(eval, Some(completions)));
+    }
     // Story 6.4 / NFR-Scale-4 — per-(provider, credential) rate-limit substrate.
     let rate_limiter = Arc::new(maos_providers::ProviderRateLimiter::new(
         maos_providers::ProviderRateLimitConfig::from_env(),

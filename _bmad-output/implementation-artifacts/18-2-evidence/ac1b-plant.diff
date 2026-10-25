@@ -1,0 +1,14 @@
+--- a/crates/maos-eval/src/halt_replay.rs	2026-10-25 12:55:16.280466904 +0000
++++ b/crates/maos-eval/src/halt_replay.rs	2026-10-25 13:17:31.255532231 +0000
+@@ -110,11 +110,6 @@
+     [
+         cc.map(|(v, f)| ("halt_recall_calendar_conflict", v, f)),
+         Some((
+-            "halt_recall_overall",
+-            score.halt_recall_overall,
+-            floors.halt_recall_overall,
+-        )),
+-        Some((
+             "halt_precision_overall",
+             score.halt_precision_overall,
+             floors.halt_precision_overall,

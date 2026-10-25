@@ -1,0 +1,12 @@
+--- a/crates/maos-eval/src/halt_replay.rs
++++ b/crates/maos-eval/src/halt_replay.rs
+@@ -211,7 +211,8 @@
+         let hex = match std::env::var(name) {
+             Err(std::env::VarError::NotPresent) => return Ok(None),
+             // A non-UTF-8 value refuses like any malformed one; it never falls back.
+-            other => other.unwrap_or_default(),
++            Err(_) => return Ok(None),
++            Ok(hex) => hex,
+         };
+         // The value is never echoed: the seed is a secret.
+         parse_hex(&hex)

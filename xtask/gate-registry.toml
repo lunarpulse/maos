@@ -49,6 +49,9 @@ gates = [
     # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit gate: stratification + cohort
     # evaluator + Butler-corpus seam over committed example artifacts (provisional).
     "nfr-onb-1-gate",
+    # Story 18-2 (CR-4) — NFR-Test-4 per-class halt numbers: `maos eval halt
+    # --class butler` (exit line 2) and its drift-blind twin in `epic-18-exit`.
+    "eval-halt",
     # Story 9.6 AC-5 — retired founder/J4 smoke-arm literal reappearance guard.
     "check-literal-reappearance",
     # Story 10.1b AC1 — pen-test gate (conditional: advisory-if-absent).

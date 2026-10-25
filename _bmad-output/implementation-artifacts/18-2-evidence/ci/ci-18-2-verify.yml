@@ -1,0 +1,69 @@
+# Story 18-2 AC1 (b) — branch-only planted-red run (docs/testing/proof-contract.md:
+# proven-red on ONE image). Copy to `.github/workflows/ci-18-2-verify.yml` on
+# `ci/18-2-verify` ONLY; never merged; the branch is deleted after the run.
+# Applies the one plant (the overall-recall floor is dropped from the scorer's
+# floor list) and requires the `epic-18-exit` line-2 twin command (drift-blind
+# cassette) to EXIT 0 under it — i.e. the twin step on main would go RED —
+# while exit line 2 itself (the control) stays rc=0.
+name: 18-2-proven-red
+on:
+  push:
+    branches: ["ci/18-2-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Apply the AC1 (b) plant
+        run: |
+          set -euo pipefail
+          echo "f3255f459efd043860f825546056f0ea374941d7852afa89d3dd80c541deedb2  _bmad-output/implementation-artifacts/18-2-evidence/ci/plant.diff" | sha256sum -c -
+          git apply _bmad-output/implementation-artifacts/18-2-evidence/ci/plant.diff
+          git diff --stat
+          git diff
+      - name: Build the planted root
+        run: cargo build --locked -p maos-bin --bin maos
+      - name: Control — exit line 2 stays green under the plant
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          maos eval halt --class butler > line2.out 2> line2.err
+          rc=$?
+          cat line2.out line2.err
+          set -e
+          test "$rc" -eq 0 || { echo "::error title=18-2 control::exit line 2 rc=${rc} under the plant"; exit 1; }
+          grep -q '"completions_consumed":30' line2.out
+      - name: Planted drift-blind twin must EXIT 0 (the twin step on main would go RED)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          maos eval halt --class butler --cassette spirits/butler/tests/fixtures/halt-corpus-v0.3.drift-blind.json > twin.out 2> twin.err
+          rc=$?
+          cat twin.out twin.err
+          set -e
+          test "$rc" -eq 0 || { echo "::error title=18-2 AC1 (b)::planted twin still exits ${rc} — the plant did not drop the overall-recall floor"; exit 1; }
+          grep -q '"halt_recall_overall":0.8' twin.out
+          echo "::notice title=18-2 AC1 (b) PROVEN-RED::overall-recall floor dropped → the drift-blind cassette (0.80) exits 0, so epic-18-exit's line-2 twin step reds"

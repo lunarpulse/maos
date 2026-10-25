@@ -129,6 +129,7 @@ maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["process"] }
 tempfile = "3"
+maos-eval = { path = "../maos-eval", features = ["benchmark-sidecar"] }   # Story 18-2 — verify the eval sidecar in eval_halt_18_2.rs
 wit-parser = "0.254"
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test
 tokio-postgres = "0.7"   # Story 13.6c CI remediation — raw physical row oracle for live two-datname tests

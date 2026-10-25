@@ -1,0 +1,13 @@
+proven-red	Set up job	2026-10-25T12:17:36.9125818Z Version: 20261021.618
+proven-red	Set up job	2026-10-25T12:17:36.9135513Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-25T12:17:36.9136090Z Version: 20261012.334.1
+proven-red	Apply the AC1 plant	2026-10-25T12:17:49.9900176Z _bmad-output/implementation-artifacts/18-8-evidence/ci/plant.diff: OK
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:17:51.1270108Z ^[[36;1mecho "::notice title=18-8 AC1 PROVEN-RED::session id not stored reds the legacy two-call witness; the modern control stays green"^[[0m
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4205951Z test legacy_two_calls_share_one_initialize_and_one_session ... FAILED
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4681247Z test modern_two_calls_succeed_without_a_handshake ... ok
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4686647Z legacy call caches the era: HttpStatus { status: 400, body: Some("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Bad Request: no session, initialize first\",\"data\":null}}") }
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4691639Z Legacy: HttpStatus { status: 400, body: Some("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Bad Request: no session, initialize first\",\"data\":null}}") }
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4695072Z the legacy path serves the call: HttpStatus { status: 400, body: Some("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Bad Request: no session, initialize first\",\"data\":null}}
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4698291Z first legacy call: HttpStatus { status: 400, body: Some("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Bad Request: no session, initialize first\",\"data\":null}}") }
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4700938Z a legacy server accepts the client: HttpStatus { status: 400, body: Some("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Bad Request: no session, initialize first\",\"data\":nul
+proven-red	Planted run must be RED at the legacy session assertion	2026-10-25T12:19:31.4704464Z test result: FAILED. 10 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s

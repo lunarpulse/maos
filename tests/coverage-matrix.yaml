@@ -1215,7 +1215,9 @@ coverage:
       stamped provisional) until Story 8.1 lands the canonical
       spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl corpus, which the
       resolver auto-prefers. Story 8.1 LANDED that corpus (30 scenarios, SHA-256
-      89c073353f8697159c61794f6fd59546933eb5d79d6c2891e090483960d2f3ad, pinned by
+      60ed4f9384cb2e89d47d299f1656611b90a748c044dad7856a7485ba58f8b9da since
+      Story 18-2 added each row's completion reference + prompt_sha256 (was
+      89c073353f8697159c61794f6fd59546933eb5d79d6c2891e090483960d2f3ad), pinned by
       the spirits/butler corpus_pin drift test); resolve_corpus now returns
       CorpusSource::Butler and Butler-sourced verdicts are non-provisional.
       The live N=12 / 14-day human trial runs out-of-band against
@@ -1894,8 +1896,22 @@ coverage:
       trial fills the third_party=true requirement at ship-gate hardening.
       Floor flips to hard-fail at Story 7.5a v1.0 STABILITY.md publication.
   NFR-Test-4:
-    gates: []
-    corpora: []
+    gates: [eval-halt]
+    # Story 18-2 review ruling D-18-2-R5: both class corpora are registered in
+    # tests/corpora/MANIFEST.toml (symlinks to the Spirit fixtures).
+    corpora: [butler-calendar-comms-v0.3, researcher-halt-corpus-v0.5]
+    notes: |
+      Story 18-2 (D-18-2-02 B, D-18-2-05 A) — `maos eval halt --class <class>`
+      (job epic-18-exit: exit line 2 + the drift-blind twin, which must exit 1
+      at halt_recall_overall 0.80). Butler: 30 rows of
+      spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl replayed through
+      the 18-1 seam from crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.json
+      (provenance seed), floors calendar-conflict recall >= 0.90, overall recall
+      >= 0.90, precision >= 0.85, model_driven true. Researcher:
+      spirits/researcher/tests/fixtures/halt-corpus-v0.5.jsonl (SHA-pinned),
+      overall recall >= 0.70, precision >= 0.85, model_driven false
+      (claim-metadata arithmetic). Orchestrator: received by 19-1 AC5. Numbers
+      published as a signed sidecar read by `maosctl spirit benchmark`.
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Test-5:

@@ -1,0 +1,12 @@
+--- a/crates/maos-eval/src/halt_replay.rs
++++ b/crates/maos-eval/src/halt_replay.rs
+@@ -291,9 +291,6 @@
+         let body: BenchmarkBody = serde_json::from_str(signed.body.get())
+             .map_err(|e| format!("sidecar body malformed: {e}"))?;
+         let claims = [
+-            ("schema", body.schema.as_str(), BENCHMARK_SCHEMA),
+-            ("class", body.class.as_str(), class),
+-            ("spirit_version", body.spirit_version.as_str(), version),
+             ("signer", body.signer.as_str(), signer_for(pubkey)),
+         ];
+         if let Some((field, got, want)) = claims.into_iter().find(|(_, got, want)| got != want) {

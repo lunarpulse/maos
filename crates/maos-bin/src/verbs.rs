@@ -65,6 +65,7 @@ pub enum VerbName {
     Backup,
     Install,
     Purge,
+    Eval,
 }
 
 /// One row of the verb table.
@@ -76,7 +77,7 @@ pub struct Verb {
     pub argv: &'static str,
     /// The builds whose binary dispatches this verb (F6). A build not listed
     /// here rejects the token as unknown: `backup`/`install` are air-gap-only,
-    /// `shell`/`traceback` are network-only, and `purge` ships in both.
+    /// `shell`/`traceback`/`eval` are network-only, and `purge` ships in both.
     pub builds: &'static [Build],
     /// One-line summary rendered in the help table.
     pub summary: &'static str,
@@ -133,6 +134,12 @@ pub const VERBS: &[Verb] = &[
         argv: "purge",
         builds: &[Build::AirGap, Build::Network],
         summary: "Remove MAOS-owned local state",
+    },
+    Verb {
+        name: VerbName::Eval,
+        argv: "eval",
+        builds: &[Build::Network],
+        summary: "Replay a class's halt corpus and score it (eval halt --class <c>)",
     },
 ];
 

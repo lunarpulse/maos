@@ -324,6 +324,16 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_EVAL_PRODUCER_SEED",
+        purpose: "Story 18-2 — 64-hex Ed25519 seed signing `maos eval halt`'s benchmark sidecar (a secret, never logged); unset ⇒ the documented dev seed, labelled `signer: dev-seed`",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_EVAL_PRODUCER_PUBKEY",
+        purpose: "Story 18-2 — 64-hex pubkey `maosctl spirit benchmark` verifies the sidecar against; unset ⇒ the dev seed's pubkey",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_HOME",
         purpose: "MAOS home directory (init'd home, overrides XDG)",
         stability: EnvStability::UserFacing,

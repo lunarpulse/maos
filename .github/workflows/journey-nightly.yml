@@ -99,7 +99,27 @@ jobs:
             --test-threads 1 \
             --no-fail-fast
 
+      # Story 18-2 AC3 (D-18-2-06 A) — re-record the 30-row Butler halt-eval
+      # cassette through the shared router's live driver (the 15-6 recorder;
+      # `provenance: live-record`) and score it. A live run that misses a
+      # floor exits 1 after the cassette is written; the upload still runs.
+      # This run is the proof of the binary's record-flush success path
+      # (review ruling D-18-2-R4). Ruling D-18-2-R3: it writes the SIBLING
+      # `halt-corpus-v0.3.live.json`, never the committed seed. Promotion is an
+      # operator procedure: download `refreshed-cassettes`, review the live
+      # cassette (30 entries, real prompt hashes, `provenance: live-record`),
+      # replay it with `maos eval halt --class butler --cassette <live>`, then
+      # copy it over `halt-corpus-v0.3.json` in a PR that re-pins the seed-pinned
+      # tests (deferred row, owner `ops-nightly-cassette-rerecord`).
+      - name: Re-record the Butler halt-eval cassette (live)
+        env:
+          MAOS_INFERENCE_MODE: record
+          MAOS_REPLAY_CASSETTE: crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.live.json
+          MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
+        run: target/debug/maos eval halt --class butler
+
       - name: Upload refreshed cassettes
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: refreshed-cassettes

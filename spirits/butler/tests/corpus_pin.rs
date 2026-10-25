@@ -17,10 +17,12 @@ fn sha256_hex(path: &str) -> String {
     format!("{:x}", h.finalize())
 }
 
-/// The 30-scenario calendar/comms regression corpus (AC3).
+/// The 30-scenario calendar/comms regression corpus (AC3). Re-pinned by
+/// Story 18-2 (CR-3): each row gained `completion {cassette, sequence}` and
+/// `prompt_sha256` (was 89c073353f8697159c61794f6fd59546933eb5d79d6c2891e090483960d2f3ad).
 #[test]
 fn calendar_comms_corpus_sha_is_pinned() {
-    const PINNED: &str = "89c073353f8697159c61794f6fd59546933eb5d79d6c2891e090483960d2f3ad";
+    const PINNED: &str = "60ed4f9384cb2e89d47d299f1656611b90a748c044dad7856a7485ba58f8b9da";
     let actual = sha256_hex("tests/fixtures/calendar-comms-v0.3.jsonl");
     assert_eq!(
         actual, PINNED,

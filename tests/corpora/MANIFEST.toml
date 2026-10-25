@@ -125,3 +125,23 @@ item_count = 20
 valid_until = "2027-10-20"
 prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
 description = "Story 17-4 Observer activity-stream ship gate: 20 authored scenarios across six classes, 5720 scalar writes, production admission/store/registry/pump/dispatcher/Observer path. Structural file-backed seq identity, bit-exact value, loss-accounting and per-emitter causal oracle; missed-event rate <=2%, causal correctness >=99%. No model judge or prompt."
+
+# Story 18-2 review ruling D-18-2-R5 (2026-10-25) — the two NFR-Test-4 class
+# corpora `maos eval halt` scores. Each entry is a symlink into its Spirit's
+# fixtures (single source of truth; the Spirit-side pin tests stay), so this
+# gate content-addresses the exact bytes the eval reads.
+[corpus."butler-calendar-comms-v0.3"]
+sha256 = "60ed4f9384cb2e89d47d299f1656611b90a748c044dad7856a7485ba58f8b9da"
+schema_version = 1
+item_count = 30
+valid_until = "2027-10-25"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Story 18-2 NFR-Test-4 Butler class corpus (symlink to spirits/butler/tests/fixtures/calendar-comms-v0.3.jsonl): 30 calendar-comms scenarios (15 expected halts, 18 calendar-conflict rows), each carrying the 18-2 halt-eval fields `completion` (cassette + sequence) and `prompt_sha256`. Replayed by `maos eval halt --class butler` from crates/maos-journey-test/cassettes/j-butler/halt-corpus-v0.3.json; floors calendar-conflict recall >= 0.90, overall recall >= 0.90, precision >= 0.85. Also pinned by spirits/butler/tests/corpus_pin.rs."
+
+[corpus."researcher-halt-corpus-v0.5"]
+sha256 = "b4b3e33ea45d175e947b30b6a0a301d0fb71fde92e4abcc4e21e31f3f1977604"
+schema_version = 1
+item_count = 30
+valid_until = "2027-10-25"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Story 18-2 NFR-Test-4 Researcher class corpus (symlink to spirits/researcher/tests/fixtures/halt-corpus-v0.5.jsonl): 30 claim-metadata scenarios (15 expected halts) scored by `maos eval halt --class researcher` through the kernel's epistemic policy; model_driven false (claim-metadata arithmetic); floors overall recall >= 0.70, precision >= 0.85. Also pinned by spirits/researcher/tests/halt_corpus_18_2.rs."

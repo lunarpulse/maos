@@ -21,6 +21,7 @@ clap = { version = "4.5", features = ["derive"] }
 maos-audit = { path = "../maos-audit" }
 maos-domain = { path = "../maos-domain" }  # Story 9.1 FR44 — audit key loader
 maos-registry = { path = "../maos-registry" }
+maos-eval = { path = "../maos-eval", features = ["benchmark-sidecar"] }  # Story 18-2 — verify the signed halt benchmark sidecar
 maos-compliance = { path = "../maos-compliance" }
 maos-skill = { path = "../maos-skill" }   # Story 7.4 — `maosctl skills` discovery + admission exit
 maos-iac = { path = "../maos-iac" }       # Story 9.7 AC-7 — write-capable TL adapter for skill admission journal

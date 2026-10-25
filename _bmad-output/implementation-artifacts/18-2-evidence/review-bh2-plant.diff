@@ -1,0 +1,10 @@
+--- a/crates/maos-eval/src/halt_replay.rs
++++ b/crates/maos-eval/src/halt_replay.rs
+@@ -294,7 +294,6 @@
+             ("schema", body.schema.as_str(), BENCHMARK_SCHEMA),
+             ("class", body.class.as_str(), class),
+             ("spirit_version", body.spirit_version.as_str(), version),
+-            ("signer", body.signer.as_str(), signer_for(pubkey)),
+         ];
+         if let Some((field, got, want)) = claims.into_iter().find(|(_, got, want)| got != want) {
+             return Err(format!("sidecar {field} is '{got}', expected '{want}'"));

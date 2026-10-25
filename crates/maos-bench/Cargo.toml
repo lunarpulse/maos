@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "MAOS §13.1 rust-inproc measurement gate — J1 founder-loop IPC + J4 Mira-Nash colocation latency benchmarks"
+description = "MAOS measurement harnesses — §13.1 rust-inproc gate (J1 founder-loop IPC + J4 Mira-Nash colocation latency) and the Story 18-2 `maos eval halt` replay composition"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
@@ -18,6 +18,11 @@ maos-kernel-core = { path = "../maos-kernel-core" }
 butler = { path = "../../spirits/butler" }
 researcher = { path = "../../spirits/researcher" }
 tempfile = "3"
+# Story 18-2 (D-18-2-01 B) — the halt-eval composition: the kernel-free scorer +
+# signed sidecar, the class manifests' tables, and the replay driver's trait.
+maos-eval = { path = "../maos-eval", features = ["benchmark-sidecar"] }
+maos-providers = { path = "../maos-providers" }
+toml = "0.8"
 
 [dev-dependencies]
 maos-spirit-hello = { path = "../maos-spirit-hello" }

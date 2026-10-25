@@ -2228,8 +2228,11 @@ jobs:
   # MAOS_HOME and XDG_DATA_HOME, no provider key, MAOS_OLLAMA_URL unset — and
   # its proven-red twin: the same line over a planted-violation cassette (the
   # seed completion without `options`) that must exit non-zero naming the
-  # field. One image: exit line 1 is not an image claim. Lines 2–4 join with
-  # 18-2/18-3/18-4.
+  # field. One image: exit line 1 is not an image claim. Story 18-2 CR-4 adds
+  # exit line 2 verbatim (`maos eval halt --class butler`, the signed sidecar
+  # uploaded) and its proven-red twin: the committed drift-blind cassette must
+  # exit 1 with `halt_recall_overall 0.800 below floor 0.90` (D-18-2-02 B).
+  # Lines 3–4 join with 18-3/18-4.
   epic-18-exit:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -2301,6 +2304,55 @@ jobs:
             exit 1
           fi
           echo "::notice title=Epic-18 exit line 1 twin::rc=${rc}, refused naming \`options\`"
+      - name: Epic-18 exit line 2 — maos eval halt replays the Butler halt corpus (Story 18-2)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          maos eval halt --class butler > line2.out 2> line2.err
+          rc=$?
+          cat line2.out line2.err
+          if [ "$rc" -eq 0 ] && ! grep -q '"event":"eval_halt"' line2.out; then
+            rc=1
+            echo "::error title=Epic-18 exit line 2::exit 0 without the eval_halt line"
+          fi
+          if [ "$rc" -eq 0 ] && ! grep -q '"completions_consumed":30' line2.out; then
+            rc=1
+            echo "::error title=Epic-18 exit line 2::exit 0 but the run did not consume one completion per row"
+          fi
+          if ! cp "$scratch"/.local/share/maos/registry/spirits/butler/*/benchmark.signed.json line2.benchmark.signed.json; then
+            rc=1
+            echo "::error title=Epic-18 exit line 2::no signed benchmark sidecar in registry storage"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-18 exit line 2::rc=${rc} $(tail -n 3 line2.err | paste -sd' ' -)"
+          else
+            echo "::notice title=Epic-18 exit line 2::rc=0"
+          fi
+          exit "$rc"
+      - name: Epic-18 exit line 2 twin — the drift-blind cassette must miss overall recall (Story 18-2)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          maos eval halt --class butler --cassette spirits/butler/tests/fixtures/halt-corpus-v0.3.drift-blind.json > line2-twin.out 2> line2-twin.err
+          rc=$?
+          cat line2-twin.out line2-twin.err
+          if [ "$rc" -eq 0 ]; then
+            echo "::error title=Epic-18 exit line 2 twin::the drift-blind cassette exited 0 — the overall-recall floor is not a control"
+            exit 1
+          fi
+          if ! grep -q 'halt_recall_overall 0.800 below floor 0.90' line2-twin.err; then
+            echo "::error title=Epic-18 exit line 2 twin::rc=${rc} but the refusal does not name the overall-recall floor: $(tail -n 3 line2-twin.err | paste -sd' ' -)"
+            exit 1
+          fi
+          echo "::notice title=Epic-18 exit line 2 twin::rc=${rc}, halt_recall_overall 0.800 below floor 0.90"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -2310,6 +2362,11 @@ jobs:
             line1.err
             twin.out
             twin.err
+            line2.out
+            line2.err
+            line2.benchmark.signed.json
+            line2-twin.out
+            line2-twin.err
           if-no-files-found: warn
 
   # Story 5.5b — multi-provider drift-check tool tests

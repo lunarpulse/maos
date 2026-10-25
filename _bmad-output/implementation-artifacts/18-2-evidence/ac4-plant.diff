@@ -1,0 +1,12 @@
+--- a/crates/maos-director-surface/src/halt_ui.rs	2026-09-21 14:11:46.012909193 +0000
++++ b/crates/maos-director-surface/src/halt_ui.rs	2026-10-25 13:17:59.865094844 +0000
+@@ -88,8 +88,7 @@
+     ) -> Result<(), HaltUiError> {
+         resolution.validate()?;
+         self.resolver.resolve(&halt_id, resolution.clone())?;
+-        self.journal
+-            .journal_halt_resolution("director", spirit_id, &halt_id, &resolution)?;
++        let _ = (&self.journal, spirit_id, &resolution);
+         Ok(())
+     }
+ 

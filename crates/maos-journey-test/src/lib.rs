@@ -208,9 +208,13 @@ impl McpRequestCapture {
             .map(|(_, value)| value.as_str())
     }
 
-    /// The JSON-RPC body, or `Null` when it is not JSON.
+    /// The JSON-RPC body, or `Null` when it is not JSON (a non-JSON body is a
+    /// legitimate probe the fixture answers, not an error to propagate).
     pub fn json(&self) -> serde_json::Value {
-        serde_json::from_slice(&self.body).unwrap_or(serde_json::Value::Null)
+        match serde_json::from_slice(&self.body) {
+            Ok(value) => value,
+            Err(_) => serde_json::Value::Null,
+        }
     }
 }
 
@@ -538,16 +542,16 @@ impl ConformantState {
 /// priming event with an empty `data`, a progress notification, a
 /// server-to-client request reusing the id, then the response split across
 /// several `data:` lines.
-fn sse_frame(response: &str) -> String {
-    let value: serde_json::Value = serde_json::from_str(response).expect("a JSON response");
-    let pretty = serde_json::to_string_pretty(&value).expect("re-encode");
+fn sse_frame(response: &str) -> Result<String, serde_json::Error> {
+    let value: serde_json::Value = serde_json::from_str(response)?;
+    let pretty = serde_json::to_string_pretty(&value)?;
     let data: String = pretty
         .lines()
         .map(|line| format!("data: {line}\n"))
         .collect();
     let progress = r#"{"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":1,"progress":1}}"#;
     let ping = serde_json::json!({"jsonrpc": "2.0", "id": value["id"], "method": "ping"});
-    format!("id: prime-1\ndata:\n\nevent: message\ndata: {progress}\n\ndata: {ping}\n\nevent: message\n{data}\n")
+    Ok(format!("id: prime-1\ndata:\n\nevent: message\ndata: {progress}\n\ndata: {ping}\n\nevent: message\n{data}\n"))
 }
 
 /// A strict MCP Streamable-HTTP server (Story 18-8 CR-4): it enforces the
@@ -596,9 +600,18 @@ impl ConformantMcp {
                 let sse = state.sse && status.starts_with("200");
                 state.requests.push(request);
                 drop(state);
-                let (content_type, body) = match sse {
-                    true => ("text/event-stream", sse_frame(&body)),
-                    false => ("application/json", body),
+                let (status, content_type, body) = match sse {
+                    true => match sse_frame(&body) {
+                        Ok(framed) => (status, "text/event-stream", framed),
+                        // A fixture that cannot frame its own answer fails the
+                        // client loudly rather than switching content type.
+                        Err(error) => (
+                            "500 Internal Server Error",
+                            "text/plain",
+                            format!("fixture could not SSE-frame its response: {error}"),
+                        ),
+                    },
+                    false => (status, "application/json", body),
                 };
                 let extra: String = headers
                     .iter()
