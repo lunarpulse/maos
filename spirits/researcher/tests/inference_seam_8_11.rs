@@ -93,12 +93,13 @@ fn live_path_uses_inference_port_text_with_token_and_pid() {
 
     let researcher = Researcher::with_frames(frames.clone()).with_inference_port(
         Arc::clone(&port) as Arc<dyn InferencePort + Send + Sync>,
+        "anthropic",
         token(PID),
         PID,
     );
     assert!(researcher.is_live());
 
-    let out = researcher.survey(&frames);
+    let out = researcher.infer_survey(&frames).unwrap();
     assert_eq!(out.findings.len(), 1);
     let f = &out.findings[0];
     assert_eq!(
@@ -144,10 +145,11 @@ fn deterministic_path_is_byte_identical_to_v05_survey() {
         Arc::new(StubInferencePort::new(
             "a completely different model sentence",
         )) as Arc<dyn InferencePort + Send + Sync>,
+        "anthropic",
         token(7),
         7,
     );
-    let live_out = live.survey(&frames);
+    let live_out = live.infer_survey(&frames).unwrap();
 
     // Same cites, same scalars, same bibliography — ONLY the statement differs.
     assert_eq!(
@@ -162,11 +164,10 @@ fn deterministic_path_is_byte_identical_to_v05_survey() {
     );
 }
 
-/// A live error degrades to the deterministic summary (a finding is never
-/// dropped). The daemon enforces fail-loud-on-Unconfigured BEFORE a --live run,
-/// so this is genuine degradation, not silent disablement.
+/// Story 18-3 (AC1.2, D-18-3-05 A) — a live error is a typed refusal: the
+/// deterministic summary is never substituted for the model's text.
 #[test]
-fn live_error_falls_back_to_deterministic_summary() {
+fn live_error_is_a_typed_refusal_never_a_fallback() {
     struct FailingPort;
     impl InferencePort for FailingPort {
         fn complete(&self, _req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
@@ -180,12 +181,16 @@ fn live_error_falls_back_to_deterministic_summary() {
     )];
     let researcher = Researcher::with_frames(frames.clone()).with_inference_port(
         Arc::new(FailingPort) as Arc<dyn InferencePort + Send + Sync>,
+        "anthropic",
         token(9),
         9,
     );
-    let out = researcher.survey(&frames);
-    assert_eq!(
-        out.findings[0].statement, "the original source statement",
-        "on a live error the deterministic summary is the fail-safe"
+    let err = researcher.infer_survey(&frames).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            researcher::ResearcherError::Inference(InferenceError::Timeout)
+        ),
+        "{err:?}"
     );
 }

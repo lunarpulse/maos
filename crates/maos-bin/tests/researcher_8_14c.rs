@@ -276,9 +276,18 @@ fn researcher_8_14c_mcp_fanout() {
     let stderr_str = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{stdout_str}{stderr_str}");
 
+    // Story 18-3 (CR-4, D-18-3-05 A): the zero-config box's only provider is
+    // the `anthropic` placeholder, so after the fan-out the bound pass is
+    // refused typed `Unconfigured` — never the summarize fallback's exit 0.
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "a zero-config bound pass exits 1. stderr:\n{stderr_str}"
+    );
     assert!(
-        output.status.success(),
-        "maos run researcher --live --once must exit 0. stderr:\n{stderr_str}"
+        stderr_str.contains("researcher on_idle pass refused")
+            && stderr_str.contains("Unconfigured"),
+        "the refusal is typed `Unconfigured`. stderr:\n{stderr_str}"
     );
     assert!(
         combined.contains("researcher live MCP port wired (--live)"),
@@ -595,9 +604,14 @@ fn researcher_17_11_keyless_undeclared_provider_refused_typed() {
         !output.status.success(),
         "an undeclared provider must refuse the run; stderr:\n{stderr}"
     );
+    // Story 18-3 (D-18-3-02 B): the declared provider is not registered, so
+    // the refusal moves to boot and no token is minted for the undeclared one.
     assert!(
-        stderr.contains("kernel policy denied capability issuance"),
-        "the refusal must be the typed kernel policy denial; stderr:\n{stderr}"
+        stderr.contains(
+            "researcher inference: no inference provider is configured for its declared \
+             providers `anthropic`"
+        ),
+        "the refusal must be the typed boot refusal; stderr:\n{stderr}"
     );
 }
 

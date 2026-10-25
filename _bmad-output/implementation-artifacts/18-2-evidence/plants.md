@@ -39,7 +39,11 @@ from the workspace root, with `PATH` pointing at `/mnt/build/cargo/debug`.
   `::notice title=Epic-18 exit line 2::rc=0`, and the sidecar was copied. The twin step exited 0 with
   `::notice title=Epic-18 exit line 2 twin::rc=1, halt_recall_overall 0.800 below floor 0.90`.
 
-The integrator owns the remote CI proven-red run on a branch with `ci/plant.diff` applied.
+**Remote CI proven-red (2026-10-25, integrator):** run `40200067350` on `ci/18-2-verify` @ `68aae558`, job
+`121189173425`, image `ubuntu-24.04` 20261012.334.1. Plant sha `f3255f45…edb2`, `plant.diff: OK`. Control: exit line 2
+rc=0 with `"completions_consumed":30`. The planted drift-blind twin exited 0 with `"halt_recall_overall":0.8`, so the twin
+step went red as designed. Excerpt: `ci/run-40200067350-excerpt.log`. Branch deleted. Landing run `40200028265` @
+`ee395748`: `epic-18-exit` (exit lines 1, 2 and both twins) green.
 
 ## Review plants (2026-10-25, review patch pass)
 

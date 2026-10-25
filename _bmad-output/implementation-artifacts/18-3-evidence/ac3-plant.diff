@@ -1,0 +1,11 @@
+--- a/crates/maos-kernel-core/src/scheduler/hook_dispatch.rs
++++ b/crates/maos-kernel-core/src/scheduler/hook_dispatch.rs
+@@ -579,7 +579,7 @@
+ 
+         // Preserve the 80% boundary below one second: whole-second rounding
+         // would turn a one-second cap into a 100%-time warning.
+-        let warn_sleep = tokio::time::sleep(Duration::from_millis(cap_seconds.saturating_mul(800)));
++        let warn_sleep = tokio::time::sleep(Duration::from_millis(cap_seconds.saturating_mul(1000)));
+         tokio::pin!(hook_future);
+         tokio::pin!(warn_sleep);
+ 

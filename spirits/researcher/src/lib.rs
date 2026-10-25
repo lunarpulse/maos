@@ -35,7 +35,7 @@
 //! class is declared in the manifest (`provider.complete`, ≥Sonnet-tier).
 
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -49,7 +49,7 @@ use maos_domain::log_recall::{
 };
 use maos_domain::memory::{MemoryEntry, MemoryNamespace, MemoryValue};
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
-use maos_domain::ports::{DistillationPort, InferencePort, LogRecallPort};
+use maos_domain::ports::{DistillationPort, EpistemicScalarPort, InferencePort, LogRecallPort};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
 
@@ -315,6 +315,14 @@ pub enum ResearcherError {
     BadFrameIdHex(String),
     /// Internal consistency check failed.
     Internal(String),
+    /// Story 18-3 (D-18-3-05 A) — the bound Inference Port has no binding yet,
+    /// or the pass's token mint was refused.
+    Unbound(String),
+    /// Story 18-3 — `InferencePort::complete` failed (provider error,
+    /// capability denial, cassette exhaustion or strict drift).
+    Inference(InferenceError),
+    /// Story 18-3 (D-18-3-05 A) — a bound pass's MCP survey failed.
+    McpSurvey(ResearcherMcpError),
 }
 
 impl std::fmt::Display for ResearcherError {
@@ -324,6 +332,9 @@ impl std::fmt::Display for ResearcherError {
             ResearcherError::Distillation(e) => write!(f, "distillation error: {e}"),
             ResearcherError::BadFrameIdHex(s) => write!(f, "malformed source_log_ref hex: {s}"),
             ResearcherError::Internal(s) => write!(f, "internal consistency error: {s}"),
+            ResearcherError::Unbound(s) => write!(f, "inference unavailable: {s}"),
+            ResearcherError::Inference(e) => write!(f, "inference failed: {e}"),
+            ResearcherError::McpSurvey(e) => write!(f, "MCP survey failed: {e}"),
         }
     }
 }
@@ -333,13 +344,14 @@ impl std::error::Error for ResearcherError {}
 // The Researcher Spirit.
 // ───────────────────────────────────────────────────────────────────────────
 
-/// Story 8.11 / AC2 — the optional live-inference seam. The daemon installs
-/// the port before load, then binds the token and real scheduler pid before
-/// the first hook can run.
+/// Story 8.11 / 18-3 — the bound Inference Port, its deferred binding and the
+/// count of completions it returned (the root's `--once` verdict compares it
+/// with the surveyed claims).
 #[derive(Clone)]
 struct LiveInference {
     port: Arc<dyn InferencePort + Send + Sync>,
-    binding: Arc<Mutex<Option<(CapabilityToken, u32)>>>,
+    binding: Arc<Mutex<Option<ResearcherInferenceBinding>>>,
+    consumed: Arc<AtomicUsize>,
 }
 
 impl std::fmt::Debug for LiveInference {
@@ -351,6 +363,126 @@ impl std::fmt::Debug for LiveInference {
             )
             .finish_non_exhaustive()
     }
+}
+
+/// Story 18-3 (CR-1) — mints a fresh `ProviderInfer` token and the admitted
+/// pid for ONE pass (D-18-3-03 A: the root's audited issuance, 60 s TTL).
+pub type InferenceMint = Arc<dyn Fn() -> Result<(CapabilityToken, u32), String> + Send + Sync>;
+
+/// Story 18-3 — a host's audited `ProviderInfer` issuance for `(pid,
+/// provider)` (the `maos run` root passes its Butler seam's mint).
+pub type ProviderMint = Arc<dyn Fn(u32, &str) -> Result<CapabilityToken, String> + Send + Sync>;
+
+/// Story 18-3 — the Spirit's admitted pid once the scheduler assigned it.
+pub type PidSource = Arc<dyn Fn() -> Option<u32> + Send + Sync>;
+
+/// Story 18-3 (D-18-3-01 A) — the root journals one seed claim payload at
+/// `pid` as a Transparency Log frame and returns that frame's id.
+pub type SeedSink = Arc<dyn Fn(u32, &[u8]) -> Result<[u8; 16], String> + Send + Sync>;
+
+/// Story 18-3 (CR-1, mirrors `butler::ButlerInferenceBinding`) — the provider
+/// the token and every request name, and the per-pass mint.
+#[derive(Clone)]
+pub struct ResearcherInferenceBinding {
+    pub provider_id: String,
+    pub mint: InferenceMint,
+}
+
+impl ResearcherInferenceBinding {
+    /// D-18-3-03 A — each pass mints at the pid `pid_of` resolves then.
+    pub fn per_pass(provider_id: String, mint: ProviderMint, pid_of: PidSource) -> Self {
+        let provider = provider_id.clone();
+        Self {
+            provider_id,
+            mint: Arc::new(move || {
+                let pid = pid_of().ok_or("the Spirit has no admitted pid yet")?;
+                mint(pid, &provider).map(|token| (token, pid))
+            }),
+        }
+    }
+}
+
+/// Story 18-3 (D-18-3-02 B) — the provider a Researcher's token and requests
+/// name: its first declared `ProviderInfer` the host router registers; none
+/// registered is a typed boot refusal naming every declared provider.
+pub fn declared_provider(declared: &[String], registered: &[String]) -> Result<String, String> {
+    if declared.is_empty() {
+        return Err("researcher inference: the Spirit declares no provider".into());
+    }
+    declared
+        .iter()
+        .find(|provider| registered.contains(provider))
+        .cloned()
+        .ok_or_else(|| {
+            let names: Vec<String> = declared.iter().map(|p| format!("`{p}`")).collect();
+            format!(
+                "researcher inference: no inference provider is configured for its declared \
+                 providers {}",
+                names.join(", ")
+            )
+        })
+}
+
+/// Story 18-3 — the scheduler id the Researcher's scalar writes claim (the
+/// root's adapter refuses any other).
+pub const RESEARCHER_SPIRIT_ID: &str = "researcher";
+
+/// Story 18-3 (D-18-3-01 A) — the TL intent of a journaled seed claim.
+pub const SEED_CLAIM_INTENT: &str = "researcher:seed_claim";
+
+/// Story 18-3 (D-18-3-01 A) — what a bound pass surveys when no MCP port is
+/// wired: two strong-methodology claims that contradict each other on one
+/// topic (`methodology_conflict` 0.8 against the manifest's 0.7 halt — the
+/// J-Researcher contradiction halt) and one hedged load-bearing claim.
+pub fn seed_claims() -> Vec<ClaimPayload> {
+    let claim =
+        |id: &str, statement: &str, topic: &str, strength: f32, polarity: bool| ClaimPayload {
+            claim_id: id.into(),
+            statement: statement.into(),
+            topic: topic.into(),
+            methodology_strength: strength,
+            confidence: strength,
+            load_bearing: false,
+            polarity,
+            hedges: Vec::new(),
+        };
+    vec![
+        claim(
+            "seed-rag-helps",
+            "Retrieval augmentation reduces hallucinated citations in literature surveys.",
+            "rag-citation-accuracy",
+            0.85,
+            true,
+        ),
+        claim(
+            "seed-rag-noisy",
+            "Retrieval augmentation does not reduce hallucinated citations over a noisy corpus.",
+            "rag-citation-accuracy",
+            0.8,
+            false,
+        ),
+        ClaimPayload {
+            load_bearing: true,
+            hedges: vec!["may improve".into(), "appear limited".into()],
+            ..claim(
+                "seed-self-consistency",
+                "Self-consistency voting may improve factual recall, though gains appear limited \
+                 to larger models.",
+                "self-consistency",
+                0.75,
+                true,
+            )
+        },
+    ]
+}
+
+/// Story 8.11 / 18-3 — the finding-synthesis prompt for one source claim
+/// (cassette entries pin its SHA-256 and length).
+pub fn synthesis_prompt(statement: &str) -> String {
+    format!(
+        "Summarize this research claim in one sentence for a digest. \
+         Preserve any hedges; add no facts.\n\nClaim: {statement}"
+    )
 }
 
 /// Idle surveys retain fetched MCP frames and resume strictly after the last
@@ -398,6 +530,18 @@ pub struct Researcher {
     /// Set when the latest collective readiness round-trip fails so a one-shot
     /// driver can return a non-zero status without changing the hook ABI.
     collective_probe_failed: Arc<AtomicBool>,
+    /// Story 18-3 (D-18-3-05 A) — the typed refusal of the most recent pass,
+    /// taken by the composition root (`--once` exits non-zero on it).
+    pass_error: Arc<Mutex<Option<ResearcherError>>>,
+    /// Story 18-3 (D-18-3-01 A) — journals the seed claims a bound pass with
+    /// no MCP port surveys; the journaled frames are shared by clones.
+    seed_sink: Option<SeedSink>,
+    seed_frames: Arc<Mutex<Option<Vec<RecalledFrame>>>>,
+    /// Story 18-3 (AC4.1) — a surveyed pass writes its distillate here (I11).
+    distillation_port: Option<Arc<dyn DistillationPort + Send + Sync>>,
+    /// Story 18-3 (D-18-3-09 A) — a surveyed pass writes its primary scalar
+    /// here; the kernel owns the `[epistemic_policy]` halt.
+    scalar_port: Option<Arc<dyn EpistemicScalarPort>>,
 }
 
 impl std::fmt::Debug for Researcher {
@@ -410,6 +554,8 @@ impl std::fmt::Debug for Researcher {
             .field("mcp_port", &self.mcp_port.is_some())
             .field("log_recall_port", &self.log_recall_port.is_some())
             .field("collective_port", &self.collective_port.is_some())
+            .field("scalar_port", &self.scalar_port.is_some())
+            .field("distillation_port", &self.distillation_port.is_some())
             .field("spirit_pid", &self.spirit_pid)
             .finish()
     }
@@ -430,62 +576,26 @@ impl Researcher {
                 eprintln!("researcher: collective readiness round-trip failed: {error}");
             }
         }
-        if let Some(mcp_port) = &self.mcp_port {
-            // Story 8.14c — MCP fan-out → scoped walk → join → survey.
-            // ResearcherMcpPort is sync: LiveResearcherMcpPort blocks internally
-            // via Handle::current().block_on (FORK 3 resolution, 2026-06-10).
-            debug_assert!(
-                self.log_recall_port.is_some(),
-                "ResearcherMcpPort wired without LogRecallPort — MCP claims cannot be joined to frames"
-            );
-            // v0.5 fixture placeholder — production derives query from Spirit's
-            // pending research context or operator configuration.
-            let query = "positional-bias";
-            let fetched = match mcp_port.survey_literature(query) {
-                Ok(claims) => claims,
-                Err(e) => {
-                    eprintln!("researcher: MCP survey failed: {e}");
-                    return;
-                }
+        // Story 18-3 (D-18-3-05 A) — a bound pass infers or is refused typed;
+        // the deterministic pass (ADR-064 unset mode) keeps its v0.5 shape.
+        let Some(live) = &self.inference else {
+            let frames = match self.input_frames() {
+                Ok(Some(frames)) => frames,
+                Ok(None) => return,
+                Err(error) => return eprintln!("researcher: {error}"),
             };
-            if let Some(log_port) = &self.log_recall_port {
-                let mut state = self.mcp_recall.lock().unwrap_or_else(|e| e.into_inner());
-                let filter = LogRecallFilter {
-                    kind: Some(FrameKindLabel::McpInvocation),
-                    cursor: state.cursor.clone(),
-                    order_by_insertion: true,
-                    ..Default::default()
-                };
-                let spirit_pid = self.spirit_pid.load(Ordering::Acquire);
-                let recalled =
-                    recall_all(log_port.as_ref(), spirit_pid, filter).and_then(|entries| {
-                        for entry in entries {
-                            let frame = fetch_payload(log_port.as_ref(), spirit_pid, &entry)?;
-                            state.frames.push(frame);
-                            state.cursor =
-                                Some(LogRecallCursor::new(entry.timestamp_ns, entry.frame_id));
-                        }
-                        Ok(())
-                    });
-                match recalled {
-                    Ok(()) => {
-                        let joined = self.join_claims_to_frames(&fetched, &state.frames);
-                        drop(state);
-                        let output = self.survey(&joined);
-                        let mut guard = self.last_output.lock().unwrap_or_else(|e| e.into_inner());
-                        *guard = Some(output);
-                    }
-                    Err(e) => {
-                        eprintln!("researcher: walk failed: {e}");
-                    }
-                }
-            } else {
-                eprintln!("researcher: MCP port wired but no LogRecallPort — cannot join claims");
+            let output = self.survey(&frames);
+            if let Err(error) = self.persist(&output, self.spirit_pid.load(Ordering::Acquire)) {
+                eprintln!("researcher: {error}");
             }
-        } else if let Some(frames) = &self.pending {
-            let output = self.survey(frames);
-            let mut guard = self.last_output.lock().unwrap_or_else(|e| e.into_inner());
-            *guard = Some(output);
+            *self.last_output.lock().unwrap_or_else(|e| e.into_inner()) = Some(output);
+            return;
+        };
+        match self.bound_pass(live) {
+            Ok(output) => {
+                *self.last_output.lock().unwrap_or_else(|e| e.into_inner()) = Some(output);
+            }
+            Err(error) => self.refuse(error),
         }
     }
 }
@@ -504,6 +614,11 @@ impl Default for Researcher {
             collective_port: None,
             collective_probe_completed: Arc::new(AtomicBool::new(false)),
             collective_probe_failed: Arc::new(AtomicBool::new(false)),
+            pass_error: Arc::new(Mutex::new(None)),
+            seed_sink: None,
+            seed_frames: Arc::new(Mutex::new(None)),
+            distillation_port: None,
+            scalar_port: None,
         }
     }
 }
@@ -522,25 +637,69 @@ impl Researcher {
         }
     }
 
-    /// Wire live inference before scheduler load. The capability token and real
-    /// pid are backfilled into the shared binding after admission.
+    /// Wire the Inference Port before scheduler load (Story 18-3, CR-1: the
+    /// binding names the provider and mints per pass; `None` until bound).
     pub fn with_deferred_inference_port(
         mut self,
         port: Arc<dyn InferencePort + Send + Sync>,
-        binding: Arc<Mutex<Option<(CapabilityToken, u32)>>>,
+        binding: Arc<Mutex<Option<ResearcherInferenceBinding>>>,
     ) -> Self {
-        self.inference = Some(LiveInference { port, binding });
+        self.inference = Some(LiveInference {
+            port,
+            binding,
+            consumed: Arc::new(AtomicUsize::new(0)),
+        });
         self
     }
 
-    /// Convenience builder for callers that already own an admitted pid.
+    /// Convenience builder for callers that already own an admitted pid and
+    /// a token for `provider_id`: every pass reuses that token.
     pub fn with_inference_port(
         self,
         port: Arc<dyn InferencePort + Send + Sync>,
+        provider_id: &str,
         token: CapabilityToken,
         spirit_pid: u32,
     ) -> Self {
-        self.with_deferred_inference_port(port, Arc::new(Mutex::new(Some((token, spirit_pid)))))
+        let binding = ResearcherInferenceBinding {
+            provider_id: provider_id.into(),
+            mint: Arc::new(move || Ok((token.clone(), spirit_pid))),
+        };
+        self.with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))))
+    }
+
+    /// Story 18-3 (D-18-3-01 A) — the root's seed journal.
+    pub fn with_seed_sink(mut self, sink: SeedSink) -> Self {
+        self.seed_sink = Some(sink);
+        self
+    }
+
+    /// Story 18-3 (AC4.1) — the root's `DistillateWriter`.
+    pub fn with_distillation_port(mut self, port: Arc<dyn DistillationPort + Send + Sync>) -> Self {
+        self.distillation_port = Some(port);
+        self
+    }
+
+    /// Story 18-3 (D-18-3-09 A) — the root's epistemic-scalar write port.
+    pub fn with_scalar_port(mut self, port: Arc<dyn EpistemicScalarPort>) -> Self {
+        self.scalar_port = Some(port);
+        self
+    }
+
+    /// Story 18-3 (D-18-3-05 A) — take the typed refusal of the most recent
+    /// pass, if it was refused.
+    pub fn take_pass_error(&self) -> Option<ResearcherError> {
+        self.pass_error
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+    }
+
+    /// Story 18-3 — completions the bound Inference Port returned so far.
+    pub fn completions_consumed(&self) -> usize {
+        self.inference
+            .as_ref()
+            .map_or(0, |live| live.consumed.load(Ordering::SeqCst))
     }
 
     /// Story 8.14c — wire the MCP domain port. `maos run` supplies the
@@ -743,9 +902,9 @@ impl Researcher {
 
     // ── survey cognition (the deterministic seeded compressor) ───────────────
 
-    /// Survey the recalled frames into a [`SurveyOutput`]. Deterministic and
-    /// pure (no live LLM): the production compressor model class is declared in
-    /// the manifest; here the compression is a seeded survey.
+    /// Survey the recalled frames into a [`SurveyOutput`] with the
+    /// deterministic compressor: never the model, on a bound Researcher too
+    /// (its model pass is [`Researcher::infer_survey`]).
     ///
     /// - **findings**: one per claim frame; hedges preserved verbatim.
     /// - **methodology_conflict** scalar: two claims on the same `topic`, both
@@ -753,6 +912,173 @@ impl Researcher {
     /// - **load_bearing_confidence** scalar: the weakest load-bearing confidence.
     /// - **open_questions**: contradictions + claims below the 0.7 floor.
     pub fn survey(&self, frames: &[RecalledFrame]) -> SurveyOutput {
+        match self.survey_with(frames, |statement| {
+            Ok::<_, std::convert::Infallible>(summarize(statement))
+        }) {
+            Ok(output) => output,
+            Err(never) => match never {},
+        }
+    }
+
+    /// Story 18-3 (AC1.2) — the survey a pass emits: through the bound
+    /// Inference Port (one mint, one completion per claim, the request naming
+    /// the bound provider) or, unbound, [`Researcher::survey`]. A missing
+    /// binding, a refused mint or any `InferenceError` is a typed error —
+    /// never a fallback to the deterministic summary.
+    pub fn infer_survey(&self, frames: &[RecalledFrame]) -> Result<SurveyOutput, ResearcherError> {
+        let Some(live) = &self.inference else {
+            return Ok(self.survey(frames));
+        };
+        let (binding, token, pid) = Self::mint(live)?;
+        Self::survey_bound(self, live, &binding, &token, pid, frames)
+    }
+
+    fn mint(
+        live: &LiveInference,
+    ) -> Result<(ResearcherInferenceBinding, CapabilityToken, u32), ResearcherError> {
+        let binding = live
+            .binding
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .ok_or_else(|| ResearcherError::Unbound("the inference binding is not ready".into()))?;
+        let (token, pid) = (binding.mint)().map_err(ResearcherError::Unbound)?;
+        Ok((binding, token, pid))
+    }
+
+    fn survey_bound(
+        &self,
+        live: &LiveInference,
+        binding: &ResearcherInferenceBinding,
+        token: &CapabilityToken,
+        pid: u32,
+        frames: &[RecalledFrame],
+    ) -> Result<SurveyOutput, ResearcherError> {
+        self.survey_with(frames, |statement| {
+            let req = InferenceRequest::new(
+                pid,
+                token.clone(),
+                synthesis_prompt(statement),
+                InferenceOptions {
+                    max_tokens: 256,
+                    temperature: Some(0.0),
+                    model_id: None,
+                },
+                Some(binding.provider_id.clone()),
+                Vec::new(),
+            );
+            let response = live
+                .port
+                .complete(req)
+                .map_err(ResearcherError::Inference)?;
+            live.consumed.fetch_add(1, Ordering::SeqCst);
+            // §9.5: the model's text is bounded, so the digest stays smaller
+            // than its inputs regardless of model verbosity.
+            Ok(summarize(&response.text))
+        })
+    }
+
+    /// Story 18-3 — one bound pass: mint, input (MCP fan-out, pending frames
+    /// or the journaled seed), model survey, scalar, distillate.
+    fn bound_pass(&self, live: &LiveInference) -> Result<SurveyOutput, ResearcherError> {
+        let (binding, token, pid) = Self::mint(live)?;
+        let frames = match self.input_frames()? {
+            Some(frames) => frames,
+            None => self.seed_frames(pid)?,
+        };
+        let output = self.survey_bound(live, &binding, &token, pid, &frames)?;
+        self.persist(&output, pid)?;
+        Ok(output)
+    }
+
+    /// Story 8.14c — MCP fan-out → scoped walk → join; else the pending
+    /// frames; `None` when neither is wired.
+    fn input_frames(&self) -> Result<Option<Vec<RecalledFrame>>, ResearcherError> {
+        let Some(mcp_port) = &self.mcp_port else {
+            return Ok(self.pending.clone());
+        };
+        // v0.5 fixture placeholder — production derives query from Spirit's
+        // pending research context or operator configuration.
+        let fetched = mcp_port
+            .survey_literature("positional-bias")
+            .map_err(ResearcherError::McpSurvey)?;
+        let log_port = self.log_recall_port.as_ref().ok_or_else(|| {
+            ResearcherError::Internal(
+                "MCP port wired but no LogRecallPort — cannot join claims".into(),
+            )
+        })?;
+        let mut state = self.mcp_recall.lock().unwrap_or_else(|e| e.into_inner());
+        let filter = LogRecallFilter {
+            kind: Some(FrameKindLabel::McpInvocation),
+            cursor: state.cursor.clone(),
+            order_by_insertion: true,
+            ..Default::default()
+        };
+        let spirit_pid = self.spirit_pid.load(Ordering::Acquire);
+        let entries =
+            recall_all(log_port.as_ref(), spirit_pid, filter).map_err(ResearcherError::Recall)?;
+        for entry in entries {
+            let frame = fetch_payload(log_port.as_ref(), spirit_pid, &entry)
+                .map_err(ResearcherError::Recall)?;
+            state.frames.push(frame);
+            state.cursor = Some(LogRecallCursor::new(entry.timestamp_ns, entry.frame_id));
+        }
+        Ok(Some(self.join_claims_to_frames(&fetched, &state.frames)))
+    }
+
+    /// Story 18-3 (D-18-3-01 A) — the seed claims, journaled once through the
+    /// root's sink at the pass's pid so every finding cites a resolvable frame.
+    fn seed_frames(&self, pid: u32) -> Result<Vec<RecalledFrame>, ResearcherError> {
+        let mut seeded = self.seed_frames.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(frames) = seeded.as_ref() {
+            return Ok(frames.clone());
+        }
+        let sink = self.seed_sink.as_ref().ok_or_else(|| {
+            ResearcherError::Internal("bound with no MCP port and no seed journal".into())
+        })?;
+        let mut frames = Vec::new();
+        for claim in seed_claims() {
+            let payload = serde_json::to_vec(&claim)
+                .map_err(|e| ResearcherError::Internal(format!("seed encode: {e}")))?;
+            let frame_id = sink(pid, &payload)
+                .map_err(|e| ResearcherError::Internal(format!("seed journal: {e}")))?;
+            frames.push(RecalledFrame {
+                frame_id,
+                intent: SEED_CLAIM_INTENT.into(),
+                payload,
+            });
+        }
+        *seeded = Some(frames.clone());
+        Ok(frames)
+    }
+
+    /// Story 18-3 (D-18-3-09 A, AC4.1) — the surveyed pass's primary scalar
+    /// (the kernel decides the halt) and its I11 distillate.
+    fn persist(&self, output: &SurveyOutput, pid: u32) -> Result<(), ResearcherError> {
+        if let Some(port) = &self.scalar_port {
+            let (tag, value, derived_from) = output.primary_scalar();
+            port.write_scalar(pid, RESEARCHER_SPIRIT_ID, tag, value, &derived_from)
+                .map_err(|e| ResearcherError::Internal(format!("scalar write refused: {e}")))?;
+        }
+        if let Some(port) = &self.distillation_port {
+            self.distill_through(port.as_ref(), pid, output, 1)?;
+        }
+        Ok(())
+    }
+
+    /// Refuse this pass typed (D-18-3-05 A): no `last_output`, and the error
+    /// for the root to take.
+    fn refuse(&self, error: ResearcherError) {
+        eprintln!("researcher: on_idle pass refused: {error}");
+        *self.last_output.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.pass_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+    }
+
+    fn survey_with<E>(
+        &self,
+        frames: &[RecalledFrame],
+        mut synthesize: impl FnMut(&str) -> Result<String, E>,
+    ) -> Result<SurveyOutput, E> {
         let mut findings = Vec::new();
         let mut bibliography = Vec::new();
         let mut confidence_map: BTreeMap<String, f32> = BTreeMap::new();
@@ -807,9 +1133,9 @@ impl Researcher {
                         // source statement, not the verbatim source — a digest is
                         // smaller than its inputs (§9.5). Hedges are preserved
                         // separately below, so summarizing never drops a hedge.
-                        // Story 8.11 / AC2 — live (Inference Port) when the seam
-                        // is wired, else the deterministic bounded summary.
-                        statement: self.synthesize(&claim.statement),
+                        // Story 8.11 / 18-3 — the bound model's text, else the
+                        // deterministic bounded summary.
+                        statement: synthesize(&claim.statement)?,
                         confidence,
                         hedges: claim.hedges,
                         source_log_ref: hex,
@@ -891,71 +1217,13 @@ impl Researcher {
         let mut seen_refs: std::collections::HashSet<String> = std::collections::HashSet::new();
         bibliography.retain(|b| seen_refs.insert(b.source_log_ref.clone()));
 
-        SurveyOutput {
+        Ok(SurveyOutput {
             findings,
             open_questions,
             confidence_map,
             bibliography,
             scalars,
-        }
-    }
-
-    /// Story 8.11 / AC2 — synthesize a finding statement from a source claim.
-    ///
-    /// - **Live** (the `--live` path, Inference Port wired): builds an
-    ///   [`InferenceRequest`] carrying the daemon-issued `Scope::ProviderInfer`
-    ///   token + real pid and calls [`InferencePort::complete`]; the model's text
-    ///   is bounded by [`summarize`] so the digest stays smaller than its inputs
-    ///   (§9.5) regardless of model verbosity. On a transient error the
-    ///   deterministic summary is the fail-safe so a finding is never dropped
-    ///   (the daemon fails boot LOUDLY on `Unconfigured` before a `--live` run,
-    ///   so this path is genuine degradation, not silent disablement).
-    /// - **Deterministic** (no seam): the v0.5 bounded summary, byte-for-byte.
-    fn synthesize(&self, statement: &str) -> String {
-        let Some(live) = &self.inference else {
-            return summarize(statement);
-        };
-        let binding = live
-            .binding
-            .lock()
-            .unwrap_or_else(|error| error.into_inner());
-        let Some((token, spirit_pid)) = binding.as_ref() else {
-            eprintln!("researcher: live inference binding is not ready");
-            return summarize(statement);
-        };
-        let req = InferenceRequest::new(
-            *spirit_pid,
-            token.clone(),
-            format!(
-                "Summarize this research claim in one sentence for a digest. \
-                 Preserve any hedges; add no facts.\n\nClaim: {statement}"
-            ),
-            InferenceOptions {
-                max_tokens: 256,
-                temperature: Some(0.0),
-                model_id: None,
-            },
-            None,
-            Vec::new(),
-        );
-        match live.port.complete(req) {
-            Ok(resp) => summarize(&resp.text),
-            Err(ref e) => {
-                // Log non-transient errors so operators running --live can
-                // detect misconfiguration (e.g. missing API key) rather than
-                // silently degrading to the deterministic path.
-                match e {
-                    InferenceError::Unconfigured { .. }
-                    | InferenceError::CapabilityDenied { .. } => {
-                        eprintln!(
-                            "researcher: live inference failed with non-transient error                              ({e:?}) — falling back to deterministic summarize"
-                        );
-                    }
-                    _ => {}
-                }
-                summarize(statement)
-            }
-        }
+        })
     }
 
     /// Incorporate an observed `scalar.tap` event into a survey output (AC6):

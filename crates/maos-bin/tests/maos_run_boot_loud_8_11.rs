@@ -82,10 +82,12 @@ fn halt_posture_spirit_without_port_fatally_fails_boot() {
 }
 
 /// (b) Deterministic-posture Spirit without a port → boots clean (the over-fire guard).
+/// Story 18-3 (D-18-3-09 A) wired the Researcher's declared halts to an
+/// `EpistemicScalarPort`, so the guard now boots the Observer (no declared halts).
 #[test]
 fn deterministic_posture_spirit_without_port_boots_clean() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
-        .args(["run", "spirits/researcher/manifest.toml", "--once"])
+        .args(["run", "spirits/observer/manifest.toml", "--once"])
         .env("HOME", doorless_home::doorless_home())
         .env(
             "XDG_DATA_HOME",
@@ -97,7 +99,7 @@ fn deterministic_posture_spirit_without_port_boots_clean() {
 
     assert!(
         output.status.success(),
-        "Researcher (assistive, no port) MUST boot clean — the posture-keyed boot-loud \
+        "Observer (no declared halts, no port) MUST boot clean — the posture-keyed boot-loud \
          predicate must not decapitate a deterministic Spirit; stderr:\n{}",
         String::from_utf8_lossy(&output.stderr)
     );
@@ -106,10 +108,10 @@ fn deterministic_posture_spirit_without_port_boots_clean() {
         .lines()
         .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
         .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("spirit_loaded"))
-        .expect("Researcher must load");
+        .expect("Observer must load");
     assert_eq!(
         loaded.get("boot_loud_port").and_then(|v| v.as_bool()),
         Some(false),
-        "Researcher must boot WITHOUT requiring an EpistemicScalarPort"
+        "Observer must boot WITHOUT requiring an EpistemicScalarPort"
     );
 }

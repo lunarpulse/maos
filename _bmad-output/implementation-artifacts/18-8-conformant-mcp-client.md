@@ -13,7 +13,7 @@ review: "bmad-code-review under `docs/testing/proof-contract.md`. Reviewer model
 
 # Story 18.8: A conformant (dual-era) MCP client
 
-Status: review
+Status: done
 
 <!-- Created 2026-10-25 at c816c544 by bmad-create-story (lighter creation contract) as the SPLIT of 18-1 ruled by the operator (D-18-1-01 B): 18-1's former AC2 (conformant client) and AC5 (stdio early-close witness) with decisions D-18-1-06/07/12, all three ruled B. D-18-8-01 RULED A the same day (full exchange; kernel +15 / +13, maos-domain +70) → `ready-for-dev`. 18-1 lands first; 18-8 re-measures the kernel pin after it. Prototypes measured and reverted (one cargo process, /mnt/build/cargo). -->
 
@@ -220,6 +220,7 @@ anthropic/claude-opus-5-5 (dev, 2026-10-25)
 - **Focused suites (local, `env -u CI -u GITHUB_ACTIONS`):** `-p maos-mcp` 33/33; `-p maos-domain -p maos-secrets -p maos-providers -p maos-journey-test` 409 run: 407 passed, the 2 `journey_j0` tests refused a stale `maosctl` (freshness guard) and passed 5/5 after the rebuild; 6 skipped; `-p maos-kernel-core` 384/384 (4 skipped) and `cargo test -p maos-kernel-core --lib` 258/258; `cargo check -p maos-kernel-core --features io_call_journal` clean; `-p maos-bin --test researcher_8_14c --test butler_8_14b --test maos_uninstall_16_4` 34/34; `-p maos-bin --bin maos` env-contract/purge units 3/3; xtask `d11_xtask_ceiling_ratchet recovery_lane_ceiling_rule retro_action_items kernel_pin_content_hash_16_0 decision_adrs_and_provisioning diagnostics_20_3a fkcs_oracle gate_honesty_20_3a macos_compile_guard_20_6` 116/116 (6 skipped).
 - **Gates:** `kloc-check` PASSED (aggregate 182220); `check-kernel-baseline` PASSED (26377, 95 files); `check-env-contract` PASS (106 vars, 0 violations); `check-service-boundary` PASSED; `check-exit-commands` PASS; `check-test-cost` PASS; `check-dev-record-completeness` PASSED; `cargo fmt --all -- --check` clean.
 - Docs: `docs-site/docs/run-maos.md`, its mirror `docs/maos.dev/run-maos.md` and the Korean translation gain "MCP server bearers".
+- **CI (2026-10-25, integrator):** proven-red run `40191749007` (`18-8-evidence/plants.md`, which also records landing `40191703238`). Landing `40200028265` @ `ee395748` (185/189): `check-serde-error-handling` green with the integrator's serde fixture fix (in `ee395748`), `workspace-test-suite` and `epic-18-exit` green; reds only the 20-7-owned S3 podman-4 bound in `check-multi-tenant-loom` + the three fan-in gates. Kernel +14 physical / +13 tokei landed (within the ratified +15 / +13). `deferred-work.md:1235` (EC-8, AC5) closed.
 
 ### Review (2026-10-25, anthropic/claude-opus-5-5, 4 layers)
 
@@ -312,3 +313,4 @@ Layers: Blind Hunter (BH), Edge Case Hunter (EC), Acceptance Auditor (AA), Test-
 - 2026-10-25 — RULED (operator, Lunarpulse): D-18-8-01 **A** full exchange — kernel grant +15 physical / +13 tokei (◆ FLAG-Winston, ADR-069 envelope), maos-domain +70; 18-1 lands first, 18-8 re-measures; AC4 witness written for `HttpExchange`. Status → `ready-for-dev`.
 - 2026-10-25 — DEV (`anthropic/claude-opus-5-5`): T0–T7. Full-exchange IO port (kernel +14 / +13 within the ratified +15 / +13; pin and ceiling re-pinned together); closed `SecretKey::McpBearer(McpServer)` with env rows, purge coverage and secret-store plumbing; dual-era Streamable-HTTP client with typed `HttpStatus`/`Unauthorized`; `ConformantMcp` + `mcp_conformance_18_8.rs`; bounded, always-reaping stdio read; 4 plants proven red; kloc re-pins (maos-domain 9805, maos-bin 28024, aggregate 182221) returned to the operator for ratification. Status → `review`.
 - 2026-10-25 — REVIEW PATCHES (`anthropic/claude-opus-5-5`): 4-layer review dispositions applied; rulings D-18-8-R1…R5 recorded; AC5 added (R4, closes deferred EC-8); bearer byte refusal + trim, MCP-reserved modern range, full-body era verdict with the R2 legacy path, unlocked exchanges, event-stream responses, stdio write+read under the bound with process-group kill; 13 review plants; maos-bin 28005, maos-mcp 1174, maos-journey-test 905, aggregate 182292; two deferred rows → `20-4-gemini-driver-and-endpoint-pin`. Status stays `review`.
+- 2026-10-25 — CI: proven-red `40191749007`; landing `40191703238`, `40200028265` @ `ee395748` (serde fixture fix green). Kernel +14 / +13 landed. `deferred-work.md:1235` closed. Status → `done`.

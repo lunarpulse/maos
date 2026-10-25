@@ -1,0 +1,604 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
+  "recorded_at": "2026-10-25T00:00:00Z",
+  "model_id": "hand-authored-seed",
+  "spirit_id": "researcher",
+  "session": "distill-corpus-v0",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "75d15cc2729dee3476c0a991f59548c5e70b678a1383da8b385d6e033e7a4ec6",
+      "prompt_len": 175,
+      "response": {
+        "text": "The source reports that retrieval grounding is likely to reduce citation errors in long surveys.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 24
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "0a0ab5e9d3ff56e2443a68d6eaa1926d154696e7be9a89736dd6f572e3f7951d",
+      "prompt_len": 172,
+      "response": {
+        "text": "The source reports that grounded agents cite primary sources more often than ungrounded ones.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "0975d4238cbd3c68a473305874118f656fb89be54811172724182e998cd0a8eb",
+      "prompt_len": 175,
+      "response": {
+        "text": "The source reports that parallel tool calls appear to cut end-to-end latency by roughly a third.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 24
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "d36189a0d474e657433d2af9093bbf34633463cd5374515693ec75172d046642",
+      "prompt_len": 145,
+      "response": {
+        "text": "The source reports that serial tool calls remain simpler to audit.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 36,
+          "output_tokens": 16
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "prompt_sha256": "5d64665d242aa7c4eec8bdeeb72e84c88d0c2b741f2e539029b6d686754afaa3",
+      "prompt_len": 167,
+      "response": {
+        "text": "The source reports that longer context windows may improve recall of early instructions.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 41,
+          "output_tokens": 22
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 5,
+      "prompt_sha256": "96d584017631d2997007860283f7b8f8e1823ce1c010361a80bd43337e22db46",
+      "prompt_len": 146,
+      "response": {
+        "text": "The source reports that position bias persists even at 128k tokens.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 36,
+          "output_tokens": 16
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 6,
+      "prompt_sha256": "14bcf707f014682310a64631c0b10e24b0f3019bdd33b33c9ea6ab82bb77e1c1",
+      "prompt_len": 172,
+      "response": {
+        "text": "The source reports that preliminary evidence suggests chunked summaries offset position bias.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 7,
+      "prompt_sha256": "47acc38f7bf10e5b1f3c2caa055c11cb7ea9107bdebda0ee2d2b3fcd79ccfc11",
+      "prompt_len": 165,
+      "response": {
+        "text": "The source reports that self-critique loops probably help on arithmetic word problems.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 41,
+          "output_tokens": 21
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 8,
+      "prompt_sha256": "8765052c5339f1087ce141e591f6d89741f21f7bd4e1d34328ce6196388f2e53",
+      "prompt_len": 149,
+      "response": {
+        "text": "The source reports that self-critique adds a measurable cost per task.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 37,
+          "output_tokens": 17
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 9,
+      "prompt_sha256": "f47e1bff092b156b928836c0cc8d30f56c3f201276d50d22bc67abcfb2cb2f7b",
+      "prompt_len": 177,
+      "response": {
+        "text": "The source reports that ensembles of small judges seem to match a single large judge on agreement.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 44,
+          "output_tokens": 24
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 10,
+      "prompt_sha256": "7d25f3b27d8d7d57c411ef555e4381c34fcde3b90af61b85f81d58c4b4b9a650",
+      "prompt_len": 149,
+      "response": {
+        "text": "The source reports that judge ensembles reduce variance across reruns.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 37,
+          "output_tokens": 17
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 11,
+      "prompt_sha256": "dea07a8964148fa3f7b9f17d2be4ac22c0a82a98a2d97e40da5dddc5bd39a785",
+      "prompt_len": 160,
+      "response": {
+        "text": "The source reports that distilled digests may lose rare but load-bearing caveats.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 40,
+          "output_tokens": 20
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 12,
+      "prompt_sha256": "b08205762b173119efe1dc959d4e62e4c73bb25194fc7dad5b88c128d0bd40ee",
+      "prompt_len": 155,
+      "response": {
+        "text": "The source reports that hedge-aware prompts tend to keep caveats in digests.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 38,
+          "output_tokens": 19
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 13,
+      "prompt_sha256": "1cd3c2992998c8e6a124c609f5b241a3712559bdd0a52aa3a485375a8fa6ba6c",
+      "prompt_len": 182,
+      "response": {
+        "text": "The source reports that citation-graph traversal likely surfaces seminal work missed by keyword search.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 45,
+          "output_tokens": 25
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 14,
+      "prompt_sha256": "c23c9ecd1332ead4c1cdcefe542f0272a43cac0b4b434faae6419ca79085bcc3",
+      "prompt_len": 152,
+      "response": {
+        "text": "The source reports that keyword search still finds most recent preprints.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 38,
+          "output_tokens": 18
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 15,
+      "prompt_sha256": "f80b93989600a369c406faba0e2e2dc719e8f6f5281edb49a96715a6b81c6c95",
+      "prompt_len": 173,
+      "response": {
+        "text": "The source reports that repository search could shorten literature reviews for systems topics.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 16,
+      "prompt_sha256": "c73c2116f550a687d32b3d84cad930b0f3fdcbd0cc3f05547dc5f7e2242db855",
+      "prompt_len": 138,
+      "response": {
+        "text": "The source reports that rEADME claims are often unverified.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 34,
+          "output_tokens": 14
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 17,
+      "prompt_sha256": "43f51f19e6ee3cf779ac04394f654bb144e378a026f299ddef9498846ee70081",
+      "prompt_len": 166,
+      "response": {
+        "text": "The source reports that benchmark scores may drift as providers update models silently.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 41,
+          "output_tokens": 21
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 18,
+      "prompt_sha256": "6ed5803b003b8374ab1e23cb2cd44f57a98d54ea7a12b54f6f0a72d42c033b2f",
+      "prompt_len": 148,
+      "response": {
+        "text": "The source reports that pinned model versions make reruns comparable.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 37,
+          "output_tokens": 17
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 19,
+      "prompt_sha256": "081facfac65cd20946a2e1dc4df0fde7dd5f57baaaca70eb55dcf05ed9a8716f",
+      "prompt_len": 190,
+      "response": {
+        "text": "The source reports that annotator agreement is reportedly higher for hedge labels than for faithfulness labels.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 47,
+          "output_tokens": 27
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 20,
+      "prompt_sha256": "b4651edecc6e4ac473f50e78c89c203cd01a42c88f60c9538bc10726717ef2ab",
+      "prompt_len": 154,
+      "response": {
+        "text": "The source reports that two-annotator protocols catch most labelling slips.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 38,
+          "output_tokens": 18
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 21,
+      "prompt_sha256": "bcb8cb2c88f21fd6fe92396e14be83e41b68c2dd9887866e3288b2713c23bd96",
+      "prompt_len": 171,
+      "response": {
+        "text": "The source reports that redaction before persistence prevents most credential leaks in logs.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 42,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 22,
+      "prompt_sha256": "c6f3cd39031bc97c18a1c81cabfebe39a56c0a9f584235da7134d58b7dbcec4f",
+      "prompt_len": 164,
+      "response": {
+        "text": "The source reports that token-shaped strings are the most common leaked secret class.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 41,
+          "output_tokens": 21
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 23,
+      "prompt_sha256": "951ed9dfc536fe2b793d79fc33e84cace11c6bee2f150b0c838d9460f0e85852",
+      "prompt_len": 175,
+      "response": {
+        "text": "The source reports that contradictory strong studies should pause a survey for a human decision.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 24
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 24,
+      "prompt_sha256": "a412b269ae5743a1fbbb64f693b448c031b6c5c60ca9066fd2ed4e2a8e3d6fe3",
+      "prompt_len": 161,
+      "response": {
+        "text": "The source reports that weak contradicting studies can be noted as open questions.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 40,
+          "output_tokens": 20
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 25,
+      "prompt_sha256": "4c111053bb0bb082ac2ade87eb9da74f9f4b1245e8b39b66304061c3e4c781ba",
+      "prompt_len": 160,
+      "response": {
+        "text": "Fine-tuning on surveys improves hedge recall.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 40,
+          "output_tokens": 11
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 26,
+      "prompt_sha256": "c4981286590b025f9adf273d5693ec925acf4992543fb12ca0ee444059fefe7d",
+      "prompt_len": 158,
+      "response": {
+        "text": "Hedge omission is the commonest digest defect.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 39,
+          "output_tokens": 11
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 27,
+      "prompt_sha256": "d23903e0198e5b65dbc68bd77cc13f707f28e0c80c52f5a47587962f998511b2",
+      "prompt_len": 146,
+      "response": {
+        "text": "The source reports that agent surveys rarely cite retracted papers.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 36,
+          "output_tokens": 16
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 28,
+      "prompt_sha256": "3f3c700be2a01efe6b300dc5c7918176862f5b9b117582e167ada6e249e6ee3e",
+      "prompt_len": 145,
+      "response": {
+        "text": "The source reports that retraction watch feeds are updated weekly.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 36,
+          "output_tokens": 16
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 29,
+      "prompt_sha256": "89c448724d1f29c1ee41eeed4f008d667dacfbc4be7a02e1d9477ba6065247d2",
+      "prompt_len": 160,
+      "response": {
+        "text": "The source reports that provider keys belong in the secret store, not in prompts.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 40,
+          "output_tokens": 20
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 30,
+      "prompt_sha256": "8532ddb2cff9b06712fb5d1e7c49b4056c1d569954625eeca25fcaf98639ccb5",
+      "prompt_len": 148,
+      "response": {
+        "text": "The source reports that leaked keys such as sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4 are usually rotated within a day.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 37,
+          "output_tokens": 30
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 31,
+      "prompt_sha256": "93e217496580704176c30abd4e8b7a0096df0ef3fc1eca4bbc56a164255293c4",
+      "prompt_len": 148,
+      "response": {
+        "text": "The source reports that snowball sampling widens literature coverage.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 37,
+          "output_tokens": 17
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 32,
+      "prompt_sha256": "ee5ec601dcd76c0dbdd6ed1ea0ddecf02bfca8ac4673419f3bf5db355f92e375",
+      "prompt_len": 153,
+      "response": {
+        "text": "The source reports that snowball sampling may over-weight popular authors.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 38,
+          "output_tokens": 18
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/distill-corpus-v0",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    }
+  ]
+}

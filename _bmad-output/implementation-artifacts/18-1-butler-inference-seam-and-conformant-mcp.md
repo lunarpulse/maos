@@ -12,7 +12,7 @@ review: "bmad-code-review under `docs/testing/proof-contract.md` (focused suites
 
 # Story 18.1: Butler inference seam
 
-Status: review
+Status: done
 
 <!-- Created 2026-10-25 at c816c544 by bmad-create-story under the lighter creation contract (no party-mode preflight). RULED 2026-10-25 by the operator (Lunarpulse): every D-18-1 row below carries its ruling; D-18-1-01 B split the MCP half (old AC2, AC5; D-18-1-06/07/12) to `18-8-conformant-mcp-client`. The story key keeps its name (tracker keys are not renamed); the title drops "conformant MCP". Creation ran cargo as the host's only cargo process (one target dir, /mnt/build/cargo); every kernel prototype was measured and reverted (figures in §Kernel pricing). -->
 
@@ -302,6 +302,8 @@ anthropic/claude-opus-5-5 (creation, 2026-10-25); dev `anthropic/claude-opus-5-5
 
 **Gates PASS:** `kloc-check`, `check-kernel-baseline`, `check-service-boundary`, `check-env-contract` (no new `MAOS_*` read), `check-exit-commands`, `check-test-cost`, `check-model-currency`, `cargo fmt --all -- --check`. There is no manifest or parser change, so the focused set was not widened.
 
+**CI (2026-10-25, integrator):** proven-red run `40183063919` (`18-1-evidence/plants.md`). Landing runs: `40183021781` @ `08ae68ad` (reds: `cohort_daemon_smoke_13_5c` unlisted `butler_root.rs`, fixed in `140b906b`, and the 20-7-owned `ac4_v5` orphan vector; recorded in `plants.md`); `40191703238` @ `140b906b` (13.03 job-h, 187/189: `workspace-test-suite` green incl. the 13_5c fix; reds only `check-serde-error-handling` = 18-8's fixture + aggregate); `40200028265` @ `ee395748` (13.2 job-h, 74.2 min, 185/189: `workspace-test-suite`, `epic-18-exit`, `cargo-deny`, `check-test-budget`, `check-corpus`, `check-serde-error-handling` green; reds only `check-multi-tenant-loom` on `worker_terminal_facts_17_7::s3_external_sigkill_requires_pidfd_fact` (`worker_terminal_facts_17_7.rs:426`, 10.104 s vs the 5 s podman-4.9.3 bound — the 20-7-owned vector at `deferred-work.md:1157`, recurrence recorded there) + the three fan-in gates). No re-run taken. FLAG-Winston kernel grant consumed exactly (+2 physical / +1 tokei) and landed. Closed `done` on the 17-10 precedent (only reds pre-existing, owned, unrelated). `deferred-work.md:1214` closed.
+
 ### Review (2026-10-25, anthropic/claude-opus-5-5, 4 layers)
 
 Layers: Blind Hunter (BH, diff only), Edge Case Hunter (EC), Acceptance Auditor (AA), Test Infrastructure Auditor (TIA). Patch pass on the uncommitted tree at `7b0b59e1` (one cargo process, `CARGO_TARGET_DIR=/mnt/build/cargo`, `env -u CI -u GITHUB_ACTIONS`). Plants: `18-1-evidence/plants.md` §Review pass (19 plants, diffs in `18-1-evidence/review-plants/`).
@@ -395,3 +397,4 @@ Layers: Blind Hunter (BH, diff only), Edge Case Hunter (EC), Acceptance Auditor 
   - Kernel 26361→26363 / 20594→20595; maos-bin 27809→27927; hardfail 181566→181685.
   - Status → `review`.
 - 2026-10-25 — Code review (`anthropic/claude-opus-5-5`, 4 layers: BH/EC/AA/TIA; 33 findings) and patch pass. Operator rulings D-18-1-R1…R7 applied: one Butler seam binds the boot, door-loaded and hot-swapped Butler (R1); typed boot refusal for an unregistered declared provider (R2); real trust bar, FR17 (c) unknown and its closure claim removed (R3); 60 s rollover timer (R4); UTC day + clock-step guard (R5); notification only on conflicts (R6); maos-bin 27927 → 27969 ≤ 28009 (R7). Patched BH-1…4, EC-2/5/6, AA-2/3/4/8/9, TIA-1/3–11; deferred EC-8 → 18-8 and rollover test, local day, option-pick mapping, anomaly feed → 18-4; dismissed EC-9. Daemon witness root cause measured (once-per-quiet-period `on_idle`; a hot swap keeps the idle stamps) → `unload`/`load`/`start` witness; ac4 restored to swapping inside the first idle window. 19 review plants; CI plant regenerated. `_aggregate_hardfail` 181685 → 181727; kernel unchanged. Status stays `review`.
+- 2026-10-25 — CI: proven-red `40183063919`; landing `40183021781` @ `08ae68ad`, `40191703238` @ `140b906b`, `40200028265` @ `ee395748` (only reds the 20-7-owned S3 podman-4 bound + fan-in gates). Kernel +2 / +1 landed. `deferred-work.md:1214` closed. Status → `done`.

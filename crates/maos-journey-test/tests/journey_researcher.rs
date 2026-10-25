@@ -5,7 +5,8 @@
 //! JR-1: PTY-level deterministic survey — researcher runs without --live,
 //!       no network, exits 0 with "deterministic survey" confirmation.
 //! JR-2: PTY-level live MCP — researcher runs --live --once with MockMcp
-//!       servers for web/arxiv/github/citation-graph, exits 0.
+//!       servers for web/arxiv/github/citation-graph; the zero-config box's
+//!       bound pass is then refused typed `Unconfigured` (Story 18-3, CR-4).
 
 #[path = "support/binaries.rs"]
 mod binaries;
@@ -86,9 +87,17 @@ fn jr2_live_mcp_fan_out_via_pty() {
 
     let status = pty.wait();
     let screen = pty.screen();
+    // Story 18-3 (CR-4, D-18-3-05 A): after the fan-out, the bound pass on a
+    // zero-config box (only the `anthropic` placeholder) is refused typed —
+    // never the summarize fallback's exit 0.
     assert!(
-        status.map(|s| s.success()).unwrap_or(false),
-        "maos run researcher --live --once should exit 0; screen:\n{}",
+        !status.map(|s| s.success()).unwrap_or(true),
+        "a zero-config bound pass must exit non-zero; screen:\n{}",
+        screen.text()
+    );
+    assert!(
+        screen.contains("on_idle pass refused") && screen.contains("Unconfigured"),
+        "the refusal is typed `Unconfigured`; screen:\n{}",
         screen.text()
     );
 

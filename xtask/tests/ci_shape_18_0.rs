@@ -232,20 +232,20 @@ const EXIT_LINE_1_STEP: &str =
 const EXIT_LINE_1_TWIN_STEP: &str =
     "Epic-18 exit line 1 twin — a planted-violation cassette must exit non-zero (Story 18-1)";
 
-/// Exit line 1, verbatim from the epic's hermetic exit block (the command
-/// before its `# 1` comment).
-fn epic_18_exit_line_1() -> String {
+/// Exit line `n`, verbatim from the epic's hermetic exit block (the command
+/// before its `# n —` comment).
+fn epic_18_exit_line(n: u8) -> String {
     let epic = fs::read_to_string(
         root().join("_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md"),
     )
     .expect("read epic 18");
+    let marker = format!("   # {n} —");
     epic.lines()
         .find_map(|line| {
-            line.split_once("   # 1 —")
-                .map(|(command, _)| command.trim())
+            line.split_once(marker.as_str())
+                .map(|(command, _)| command.trim().to_string())
         })
-        .expect("epic 18 exit line 1")
-        .to_string()
+        .unwrap_or_else(|| panic!("epic 18 exit line {n}"))
 }
 
 /// Story 18-1 code review TIA-8/TIA-9 (D-18-1-11 A) — `epic-18-exit` keeps
@@ -261,7 +261,7 @@ fn epic_18_exit_runs_line_1_verbatim_and_its_proven_red_twin() {
     for step in steps(job) {
         assert_no_continue_on_error(step, "an epic-18-exit step");
     }
-    let line = epic_18_exit_line_1();
+    let line = epic_18_exit_line(1);
     let (line_1, twin) = (
         step_index(job, EXIT_LINE_1_STEP),
         step_index(job, EXIT_LINE_1_TWIN_STEP),
@@ -391,4 +391,161 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
             > step_index(rerecord, "Re-record the Butler halt-eval cassette (live)")
     );
     assert_eq!(condition(upload).as_deref(), Some(NOT_CANCELLED));
+}
+
+const EXIT_LINE_3_STEP: &str =
+    "Epic-18 exit line 3 — Researcher replays through the Inference Port (Story 18-3)";
+const EXIT_LINE_3_TWIN_STEP: &str =
+    "Epic-18 exit line 3 twin — an empty cassette must exit non-zero (Story 18-3)";
+const SURVEY_CASSETTE: &str =
+    "MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-researcher/survey-distill.json";
+
+/// Story 18-3 CR-3 — `epic-18-exit` runs exit line 3 verbatim (keyless,
+/// scratch `HOME`): the binding witness, one `researcher_survey` event with
+/// the four survey keys and one completion per cassette entry; its twin runs
+/// the same line over an EMPTY cassette and fails when that exits 0 or when
+/// stderr lacks the refusal AND `exhausted` (the replay port prints
+/// `CASSETTE EXHAUSTED` on its own). TIA-6 (`deferred-work.md:1248`):
+/// maosctl is built and `maosctl spirit benchmark butler` reads the sidecar
+/// line 2 wrote, under line 2's scratch `HOME`.
+#[test]
+fn epic_18_exit_runs_line_3_verbatim_and_its_empty_cassette_twin() {
+    let line = epic_18_exit_line(3);
+    assert!(
+        line.contains(SURVEY_CASSETTE),
+        "epic line 3 replays the survey cassette"
+    );
+    let workflow = workflow();
+    let job = key(key(&workflow, "jobs"), "epic-18-exit");
+    assert_no_continue_on_error(job, "epic-18-exit");
+    for step in steps(job) {
+        assert_no_continue_on_error(step, "an epic-18-exit step");
+    }
+    let (line_3, twin) = (
+        step_index(job, EXIT_LINE_3_STEP),
+        step_index(job, EXIT_LINE_3_TWIN_STEP),
+    );
+    assert_eq!(twin, line_3 + 1, "the twin follows line 3");
+
+    let run = str_of(&steps(job)[line_3], "run").expect("line-3 run");
+    assert!(run.contains(&format!("{line} > line3.out 2> line3.err")));
+    assert!(run.contains("unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY"));
+    assert!(run.contains("scratch=\"$(mktemp -d)\""));
+    assert!(run.contains("export HOME=\"$scratch\""));
+    assert!(run.contains("grep -q 'researcher inference seam wired' line3.err"));
+    assert!(run.contains(
+        "entries=\"$(jq '.entries | length' crates/maos-journey-test/cassettes/j-researcher/survey-distill.json)\""
+    ));
+    for needle in [
+        ".event == \"researcher_survey\"",
+        "has(\"findings\")",
+        "has(\"open_questions\")",
+        "has(\"confidence_map\")",
+        "has(\"bibliography\")",
+        ".completions_consumed == $n",
+        "--argjson n \"$entries\"",
+    ] {
+        assert!(run.contains(needle), "line 3 asserts {needle}");
+    }
+    assert!(
+        run.contains("exit \"$rc\""),
+        "line 3 exits with the command's code"
+    );
+
+    let run = str_of(&steps(job)[twin], "run").expect("twin run");
+    assert!(run.contains(
+        "jq '.entries = []' crates/maos-journey-test/cassettes/j-researcher/survey-distill.json > \"$twin\""
+    ));
+    let empty = line.replace(SURVEY_CASSETTE, "MAOS_REPLAY_CASSETTE=\"$twin\"");
+    assert!(
+        run.contains(&format!("{empty} > line3-twin.out 2> line3-twin.err")),
+        "the twin runs line 3 over the empty cassette"
+    );
+    let when_zero = run
+        .split_once("if [ \"$rc\" -eq 0 ]; then")
+        .and_then(|(_, rest)| rest.split_once("fi"))
+        .map(|(block, _)| block)
+        .expect("the twin checks rc == 0");
+    assert!(
+        when_zero.contains("exit 1"),
+        "the twin exits 1 when the empty cassette exits 0"
+    );
+    assert!(run.contains("grep -q 'researcher on_idle pass refused' line3-twin.err"));
+    assert!(run.contains("grep -q 'exhausted' line3-twin.err"));
+
+    // TIA-6: maosctl is built and reads line 2's sidecar in line 2's step.
+    assert!(steps(job)
+        .iter()
+        .filter_map(|step| str_of(step, "run"))
+        .any(|run| run.contains("cargo build --locked -p maos-cli --bin maosctl")));
+    let run = str_of(&steps(job)[step_index(job, EXIT_LINE_2_STEP)], "run").expect("line-2 run");
+    let (eval, bench) = (
+        run.find("maos eval halt --class butler")
+            .expect("line 2 evals"),
+        run.find("target/debug/maosctl spirit benchmark butler")
+            .expect("line 2 runs maosctl spirit benchmark butler"),
+    );
+    assert!(
+        bench > eval,
+        "maosctl reads the sidecar after eval halt wrote it"
+    );
+    assert!(run.contains("bench_rc=$?"));
+    assert!(run.contains("if [ \"$bench_rc\" -ne 0 ]; then\n  rc=1"));
+
+    let upload = steps(job)
+        .iter()
+        .find(|step| str_of(step, "uses") == Some("actions/upload-artifact@v4"))
+        .expect("epic-18-exit uploads");
+    let paths: Vec<&str> = str_of(key(upload, "with"), "path")
+        .expect("upload paths")
+        .lines()
+        .map(str::trim)
+        .collect();
+    for path in [
+        "line2.maosctl.out",
+        "line2.maosctl.err",
+        "line3.out",
+        "line3.err",
+        "line3-twin.out",
+        "line3-twin.err",
+    ] {
+        assert!(paths.contains(&path), "epic-18-exit uploads {path}");
+    }
+}
+
+/// Story 18-3 AC2.3 / CR-3 — the NFR-Aud-7 job scores the Researcher's
+/// frozen corpus through the shipped verb (keyless) and requires `pass ==
+/// true`, keeps the maos-eval floor test, and runs the Digest-class gate
+/// (AC4.2, D-18-3-08 B).
+#[test]
+fn nfr_aud_7_runs_maos_eval_distill_for_the_researcher() {
+    let workflow = workflow();
+    let job = key(
+        key(&workflow, "jobs"),
+        "nfr-aud-7-distillate-five-metrics-floor",
+    );
+    assert_no_continue_on_error(job, "nfr-aud-7-distillate-five-metrics-floor");
+    let runs: Vec<&str> = steps(job)
+        .iter()
+        .inspect(|step| assert_no_continue_on_error(step, "an nfr-aud-7 step"))
+        .filter_map(|step| str_of(step, "run"))
+        .collect();
+    assert!(runs
+        .iter()
+        .any(|run| runs_test(run, "distillate_five_metrics_floor")));
+    assert!(runs
+        .iter()
+        .any(|run| runs_test(run, "five_metric_digest_18_3")));
+    assert!(runs
+        .iter()
+        .any(|run| run.contains("cargo build --locked -p maos-bin --bin maos")));
+    let eval = runs
+        .iter()
+        .find(|run| run.contains("target/debug/maos eval distill --class researcher"))
+        .expect("the job runs maos eval distill --class researcher");
+    assert!(eval.contains("unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY"));
+    assert!(eval.contains("export HOME=\"$scratch\""));
+    assert!(eval.contains(".event == \"eval_distill\""));
+    assert!(eval.contains(".pass == true"));
+    assert!(eval.contains("exit \"$rc\""));
 }

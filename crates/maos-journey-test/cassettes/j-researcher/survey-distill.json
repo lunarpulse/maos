@@ -1,20 +1,63 @@
 {
   "schema_version": "maos.journey.cassette/v1",
   "provenance": "seed",
-  "recorded_at": "2026-06-11T00:00:00Z",
+  "recorded_at": "2026-10-25T00:00:00Z",
   "model_id": "hand-authored-seed",
   "spirit_id": "researcher",
   "session": "survey-distill",
   "entries": [
     {
       "sequence": 0,
-      "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "prompt_len": 120,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Epistemic drift in LLM agents can be detected via belief-variance scalar tracking with a 0.75 threshold.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
-        "usage": {"input_tokens": 120, "output_tokens": 30},
-        "provider_attribution": {"provider_id": "replay", "endpoint_url": "cassette://j-researcher/survey-distill", "model_id": "hand-authored-seed"}
+        "usage": {
+          "input_tokens": 44,
+          "output_tokens": 18
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "918e4919e4e227521296cb5c2239af44c75c0efac321c105a6e6664b193511a8",
+      "prompt_len": 185,
+      "response": {
+        "text": "Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 46,
+          "output_tokens": 20
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
+      "response": {
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 50,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed"
+        }
       }
     }
   ]

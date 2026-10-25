@@ -73,7 +73,7 @@ use tokio_util::sync::CancellationToken;
 #[cfg(feature = "network")]
 use maos_director_surface::notification::{NotificationDispatcher, TerminalChannel};
 #[cfg(feature = "network")]
-use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
+use maos_domain::invariants::i1::{IntentClass, Scope};
 #[cfg(feature = "network")]
 use maos_domain::ports::CryptoProvider;
 #[cfg(feature = "network")]
@@ -505,9 +505,10 @@ fn render_j3_digest_scene(
 
 /// Story 9.6 — boot-loud predicate keyed to synchronous scalar halt transport,
 /// not posture. The current manifests expose transport structurally through the
-/// scalar tags consumed by in-process ports: Butler's belief/preference scalars
-/// and Mira's diagnostic-confidence scalar require a port; founder-loop dispatch
-/// ambiguity rules are deterministic and do not.
+/// scalar tags consumed by in-process ports: Butler's belief/preference scalars,
+/// Mira's diagnostic-confidence scalar and (Story 18-3, D-18-3-09 A) the
+/// Researcher's methodology/load-bearing scalars require a port; founder-loop
+/// dispatch ambiguity rules are deterministic and do not.
 #[cfg(feature = "network")]
 fn requires_epistemic_halt_port(
     policy: Option<&maos_kernel_core::security::manifest::EpistemicPolicySection>,
@@ -521,7 +522,11 @@ fn requires_epistemic_halt_port(
             && rule.predicate.is_some()
             && matches!(
                 rule.tag.as_str(),
-                "belief_variance" | "user_preference_drift" | "diagnostic_confidence"
+                "belief_variance"
+                    | "user_preference_drift"
+                    | "diagnostic_confidence"
+                    | "methodology_conflict"
+                    | "load_bearing_confidence"
             )
     })
 }
@@ -788,6 +793,39 @@ fn run_eval(
     i32::from(!run.pass)
 }
 
+/// Story 18-3 (D-18-3-07 A) — `maos eval distill --class researcher`: replay
+/// (or record) the frozen five-metric corpus through `maos-bench`, print one
+/// JSON line. 0 = every NFR-Aud-7 floor holds and every control is detected.
+#[cfg(feature = "network")]
+fn run_distill(
+    replay: Option<std::path::PathBuf>,
+    recorded: Option<maos_bench::halt_eval::Completions>,
+) -> i32 {
+    let completions = match (recorded, replay) {
+        (Some(recorded), _) => recorded,
+        (None, Some(cassette)) => {
+            match cassette_replay::CassetteReplayProvider::from_file(&cassette, true) {
+                Ok(driver) => maos_bench::halt_eval::Completions::Replay {
+                    driver: Arc::new(driver),
+                    cassette,
+                },
+                Err(error) => return eval_failed(error),
+            }
+        }
+        (None, None) => return eval_failed("record needs MAOS_REPLAY_CASSETTE".into()),
+    };
+    match maos_bench::distill_eval::evaluate(completions) {
+        Err(error) => eval_failed(error),
+        Ok(run) => {
+            println!("{}", run.line);
+            for failure in &run.failures {
+                eprintln!("maos eval: {failure}");
+            }
+            i32::from(!run.failures.is_empty())
+        }
+    }
+}
+
 #[cfg(feature = "network")]
 fn eval_failed(error: String) -> i32 {
     eprintln!("maos eval: {error}");
@@ -799,12 +837,30 @@ fn eval_failed(error: String) -> i32 {
 /// Spirit need not declare — 17-11 entitlement refuses it at issuance).
 #[cfg(feature = "network")]
 fn first_declared_provider(gated: &maos_bin::admission::GatedManifest) -> Option<String> {
+    declared_providers(gated).into_iter().next()
+}
+
+/// Story 18-3 (D-18-3-02 B) — every declared `ProviderInfer`, in order.
+#[cfg(feature = "network")]
+fn declared_providers(gated: &maos_bin::admission::GatedManifest) -> Vec<String> {
     maos_kernel_core::security::capabilities_required_to_scopes(&gated.caps_required)
         .into_iter()
-        .find_map(|scope| match scope {
+        .filter_map(|scope| match scope {
             Scope::ProviderInfer { provider } => Some(provider),
             _ => None,
         })
+        .collect()
+}
+
+/// Story 18-1 / 18-3 — the door-staged TARGET manifest, gated (its declared
+/// providers name a successor's token).
+#[cfg(feature = "network")]
+fn gate_staged(staged: &std::path::Path) -> Option<maos_bin::admission::GatedManifest> {
+    maos_bin::admission::read_manifest(staged)
+        .and_then(|text| {
+            maos_bin::admission::gate_manifest(&text, &|name| classify_spirit(name).is_some())
+        })
+        .ok()
 }
 
 /// Story 16-1 (D-16-1-W) — re-parse `[epistemic_policy]` from the TARGET
@@ -830,7 +886,7 @@ fn read_butler_epistemic_policy(
     })?;
     let section = root.get("epistemic_policy").ok_or_else(|| {
         maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
-            reason: "butler successor manifest lacks [epistemic_policy]".into(),
+            reason: "successor manifest lacks [epistemic_policy]".into(),
         }
     })?;
     let serialized = toml::to_string(section).map_err(|error| {
@@ -874,6 +930,8 @@ struct SpiritBuildDeps {
     /// Story 18-1 (review ruling D-18-1-R1) — the root's Butler seam, filled
     /// once the router exists (it holds the `audit_tx` owners only weakly).
     butler_seam: ButlerSeamSlot,
+    /// Story 18-3 (AC4.1) — a bound Researcher's distillate writer.
+    distillate_writer: Arc<maos_kernel_core::iac::distillate::DistillateWriter>,
 }
 
 /// Story 18-1 — the root's late-filled [`butler::ButlerSeam`].
@@ -927,7 +985,45 @@ fn build_spirit_obj(
             ::reviewer::Reviewer::new(class_name)
                 .with_pending_design(::reviewer::DesignUnderReview::default()),
         ),
-        LoadedSpiritKind::Researcher => make_spirit_obj(::researcher::Researcher::new()),
+        // Story 18-3 (D-18-3-04 A, D-18-3-09 A) — bound and halting like the
+        // boot arm: the scalar port at the resolved pid and, under `--live` or
+        // an explicit mode, the TARGET manifest's declared provider.
+        LoadedSpiritKind::Researcher => {
+            let staged = butler_manifest
+                .ok_or("researcher requires the target manifest to re-parse [epistemic_policy]")?;
+            let policy = read_butler_epistemic_policy(staged).map_err(|e| e.to_string())?;
+            let (id, scheduler) = (class_name.to_owned(), Arc::clone(&deps.scheduler));
+            let pid_of: Arc<dyn Fn() -> Option<u32> + Send + Sync> =
+                Arc::new(move || scheduler.resolve_pid(&id));
+            let scalar = Arc::new(ButlerOrchestratorAdapter {
+                orchestrator: Arc::clone(&deps.orchestrator),
+                tl: Arc::clone(&deps.transparency_log),
+                journal: Arc::clone(&deps.shared_journal),
+                policy,
+                boot_nonce: deps.boot_nonce,
+                last_receipt: Arc::default(),
+                spirit_pid_source: ButlerPidSource::Resolve(Arc::clone(&pid_of)),
+                spirit_id: class_name.to_owned(),
+            });
+            let seam = deps
+                .butler_seam
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .clone()
+                .ok_or("butler seam not ready")?;
+            let declared = gate_staged(staged).map_or_else(Vec::new, |g| declared_providers(&g));
+            let host = maos_bin::researcher_root::ResearcherHost::new(
+                Arc::clone(&deps.transparency_log),
+                Arc::clone(&deps.distillate_writer) as _,
+            );
+            make_spirit_obj(maos_bin::researcher_root::attach(
+                ::researcher::Researcher::new().with_scalar_port(scalar),
+                &seam,
+                &declared,
+                pid_of,
+                &host,
+            )?)
+        }
         LoadedSpiritKind::Mira => make_spirit_obj(::mira::Mira::default().with_id(class_name)),
         LoadedSpiritKind::Nash => make_spirit_obj(::nash::Nash::default().with_id(class_name)),
         LoadedSpiritKind::Digest => make_spirit_obj(maos_digest::DigestSpirit::default()),
@@ -951,13 +1047,7 @@ fn build_spirit_obj(
                 .ok_or("butler seam not ready")?;
             // The token names the TARGET manifest's first declared provider.
             let declared = || {
-                maos_bin::admission::read_manifest(staged)
-                    .and_then(|text| {
-                        maos_bin::admission::gate_manifest(&text, &|name| {
-                            classify_spirit(name).is_some()
-                        })
-                    })
-                    .ok()
+                gate_staged(staged)
                     .as_ref()
                     .and_then(first_declared_provider)
             };
@@ -1842,7 +1932,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let mut shell_mode = false;
     let mut plain_flag = false;
-    let mut eval_record = None;
+    let (mut eval_record, mut distill_record) = (None, false);
     match verbs::dispatch(&argv) {
         verbs::Outcome::Help => {
             verbs::print_help(&mut std::io::stdout());
@@ -1929,13 +2019,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mode = mode.map(|m| m.to_string_lossy().into_owned());
                 let env_cassette =
                     std::env::var_os("MAOS_REPLAY_CASSETTE").map(std::path::PathBuf::from);
-                match maos_bench::halt_eval::parse_args(&argv[1..], mode.as_deref(), env_cassette) {
-                    Err(usage) => {
-                        eprintln!("maos eval: {usage}");
-                        std::process::exit(2);
+                if argv.get(1).is_some_and(|verb| verb == "distill") {
+                    let parsed = maos_bench::distill_eval::parse_args(
+                        &argv[1..],
+                        mode.as_deref(),
+                        env_cassette,
+                    );
+                    match parsed {
+                        Err(usage) => {
+                            eprintln!("maos eval: {usage}");
+                            std::process::exit(2);
+                        }
+                        Ok(req) if req.record => distill_record = true,
+                        Ok(req) => std::process::exit(run_distill(req.replay_cassette(), None)),
                     }
-                    Ok(eval) if eval.record => eval_record = Some(eval),
-                    Ok(eval) => std::process::exit(run_eval(&eval, None)),
+                } else {
+                    match maos_bench::halt_eval::parse_args(
+                        &argv[1..],
+                        mode.as_deref(),
+                        env_cassette,
+                    ) {
+                        Err(usage) => {
+                            eprintln!("maos eval: {usage}");
+                            std::process::exit(2);
+                        }
+                        Ok(eval) if eval.record => eval_record = Some(eval),
+                        Ok(eval) => std::process::exit(run_eval(&eval, None)),
+                    }
                 }
             }
             // Resolved here; acted on by their dedicated parsers below
@@ -3306,6 +3416,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let factory_successor_slot = successor_manifest_slot.clone();
     let butler_seam: ButlerSeamSlot = Arc::default();
     let factory_butler_seam = Arc::clone(&butler_seam);
+    let factory_distillate_writer = Arc::clone(&distillate_writer);
     // Story 16-3 (D-16-3-N) — the successor factory's butler arm must set the
     // new adapter's pid binding BEFORE it returns: the factory's signature is
     // fixed (`create(&SpiritManifestBundle) -> Result<Arc<dyn AnySpiritObj>>`)
@@ -3352,6 +3463,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     boot_nonce,
                     activity_sink: Arc::clone(&factory_activity_sink),
                     butler_seam: Arc::clone(&factory_butler_seam),
+                    distillate_writer: Arc::clone(&factory_distillate_writer),
                 },
                 &class.name,
                 factory_successor_slot.peek().as_deref(),
@@ -3515,6 +3627,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 boot_nonce,
                 activity_sink: hook_pump.activity_sink(),
                 butler_seam: Arc::clone(&butler_seam),
+                distillate_writer: Arc::clone(&distillate_writer),
             }),
             hooks: Arc::clone(&hook_pump),
         });
@@ -3888,17 +4001,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = Arc::new(
         maos_kernel_core::inference::router::MultiProviderRouter::new(providers_map, default_id),
     );
-    // Story 18-2 (D-18-2-06 A) — `MAOS_INFERENCE_MODE=record maos eval halt`:
-    // the shared router, every driver wrapped by the recorder above, answers
-    // Butler's declared provider; then the recorder flushes.
-    if let (Some(eval), Some(cassette)) = (&eval_record, inference_mode.cassette()) {
+    // Story 18-2 (D-18-2-06 A) / 18-3 (D-18-3-07 A) — `MAOS_INFERENCE_MODE=
+    // record maos eval halt|distill`: the shared router, every driver wrapped
+    // by the recorder above, answers the class's declared provider; then the
+    // recorder flushes.
+    let eval_records = eval_record.is_some() || distill_record;
+    if let Some(cassette) = inference_mode.cassette().filter(|_| eval_records) {
         let recorder = cassette_recorder.clone();
         let completions = maos_bench::halt_eval::Completions::Record {
             router: Arc::clone(&router),
             cassette: cassette.to_owned(),
             flush: Box::new(move || recorder.map_or(Ok(()), |r| r.flush().map(drop))),
         };
-        std::process::exit(run_eval(eval, Some(completions)));
+        std::process::exit(match &eval_record {
+            Some(eval) => run_eval(eval, Some(completions)),
+            None => run_distill(None, Some(completions)),
+        });
     }
     // Story 6.4 / NFR-Scale-4 — per-(provider, credential) rate-limit substrate.
     let rate_limiter = Arc::new(maos_providers::ProviderRateLimiter::new(
@@ -5373,10 +5491,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut researcher_collective_failure: Option<Arc<std::sync::atomic::AtomicBool>> =
                 None;
             let researcher_pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
-            let mut researcher_inference_binding: Option<
-                Arc<std::sync::Mutex<Option<(CapabilityToken, u32)>>>,
-            > = None;
-            let mut researcher_inference_provider: Option<String> = None;
+            // Story 18-3 (D-18-3-05 A) — a handle on the loaded Researcher (its
+            // state is `Arc`-shared) so `--once` can take a refused pass.
+            let mut researcher_pass_handle: Option<researcher::Researcher> = None;
             // Story 18-1 (D-18-1-04 A) — a handle on the loaded Butler (its
             // state is `Arc`-shared) so `--once` can take a refused pass.
             let mut butler_pass_handle: Option<butler::Butler> = None;
@@ -5590,17 +5707,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         maos_kernel_core::scheduler::make_spirit_obj(butler)
                     }
                     Some(LoadedSpiritKind::Researcher) => {
-                        if needs_port {
-                            // Defensive: a Researcher-shaped manifest in the halt-set is
-                            // a misconfiguration — fail loud rather than boot a deterministic
-                            // Spirit that silently can't honor its declared posture.
+                        // Story 18-3 (D-18-3-09 A) — the Researcher's declared
+                        // halts are evaluated: its scalar port is wired on every
+                        // boot (its two tags are in the halt-port set).
+                        if needs_port && strip_port {
                             return Err(format!(
-                            "maos run: FATAL boot — '{spirit_id}' declares a self-halting posture \
-                         but has no EpistemicScalarPort wiring"
-                        )
+                                "maos run: FATAL boot — '{spirit_id}' declares a self-halting \
+                                 posture but no EpistemicScalarPort could be wired"
+                            )
                             .into());
                         }
-                        let mut researcher = researcher::Researcher::new();
+                        let policy = epistemic_policy.clone().ok_or(
+                            "maos run: Researcher manifest must declare [epistemic_policy]",
+                        )?;
+                        let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                        halt_receipt_handle = Some(Arc::clone(&last_receipt));
+                        let mut researcher = researcher::Researcher::new().with_scalar_port(
+                            Arc::new(ButlerOrchestratorAdapter {
+                                orchestrator: Arc::clone(&orchestrator),
+                                tl: Arc::clone(&transparency_log),
+                                journal: Arc::clone(&journal),
+                                policy,
+                                boot_nonce,
+                                last_receipt,
+                                spirit_pid_source: ButlerPidSource::Fixed(Arc::clone(
+                                    &researcher_pid_binding,
+                                )),
+                                spirit_id: spirit_id.clone(),
+                            }),
+                        );
                         let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
                         let researcher_collective_ref = collective_port.as_ref().map(|_| {
                             Arc::new(LiveResearcherCollectivePort::new(
@@ -5709,7 +5844,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err(e) => {
                             eprintln!(
                                 "maos run: warning — failed to construct MCP client for --live: {e}. \
-                                 Researcher will fall back to deterministic survey."
+                                 Researcher will survey its seed claims."
                             );
                             None
                         }
@@ -5750,76 +5885,79 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 researcher_mcp_ref = Some(live_mcp);
                                 eprintln!("maos run: researcher live MCP port wired (--live)");
                             }
-
-                            // --live also wires the inference seam. Token issuance is
-                            // deferred until scheduler load and canonical admission
-                            // have bound the real pid.
-                            let provider = router
-                            .default_id()
-                            .ok_or_else(|| {
-                                "maos run: --live requested but no inference provider is configured"
-                            })?
-                            .to_string();
-                            researcher_inference_provider = Some(provider);
-                            let binding = Arc::new(std::sync::Mutex::new(None));
-                            researcher_inference_binding = Some(Arc::clone(&binding));
-                            let port =
-                                port_builder().ok_or("maos run: inference port unavailable")?;
-                            researcher = researcher.with_deferred_inference_port(port, binding);
-                            eprintln!("maos run: researcher live-inference seam wired (--live)");
-                        } else if inference_mode.is_explicit() {
-                            // Explicit mode is authoritative even without the legacy
-                            // `--live` switch. Replay/record already replaced or wrapped
-                            // every router driver above.
-                            let provider = router
-                                .default_id()
-                                .ok_or("maos run: selected inference mode has no provider key")?
-                                .to_string();
-                            researcher_inference_provider = Some(provider);
-                            let binding = Arc::new(std::sync::Mutex::new(None));
-                            researcher_inference_binding = Some(Arc::clone(&binding));
-                            let port =
-                                port_builder().ok_or("maos run: inference port unavailable")?;
-                            researcher = researcher.with_deferred_inference_port(port, binding);
-                            eprintln!(
-                                "maos run: researcher inference seam wired ({inference_mode:?})"
-                            );
-                        } else if let ResolvedInferenceMode::Replay {
-                            cassette,
-                            strict,
-                            explicit: false,
-                        } = &inference_mode
-                        {
-                            // Exact pre-ADR-064 compatibility path: cassette presence
-                            // alone bypasses the shared router only for Researcher.
-                            let replay =
-                                cassette_replay::CassetteReplayPort::from_file(cassette, *strict)
-                                    .map_err(|error| {
-                                    format!("maos run: cassette replay init failed: {error}")
+                        }
+                        // Story 18-3 (CR-1; D-18-3-02 B, 03 A) — `--live` and every
+                        // explicit mode bind the Butler seam's port to the first
+                        // declared provider the router registers (none → boot
+                        // refusal), minting per pass; the legacy cassette arm binds
+                        // its replay port to the first declared provider.
+                        let seam = butler_seam
+                            .lock()
+                            .unwrap_or_else(|error| error.into_inner())
+                            .clone()
+                            .ok_or("maos run: butler seam not ready")?;
+                        let pid_of: researcher::PidSource = {
+                            let binding = Arc::clone(&researcher_pid_binding);
+                            Arc::new(move || {
+                                Some(binding.load(std::sync::atomic::Ordering::Acquire))
+                                    .filter(|pid| *pid != 0)
+                            })
+                        };
+                        let host = maos_bin::researcher_root::ResearcherHost::new(
+                            Arc::clone(&transparency_log),
+                            Arc::clone(&distillate_writer) as _,
+                        );
+                        researcher = match (&seam.inference, &inference_mode) {
+                            (
+                                None,
+                                ResolvedInferenceMode::Replay {
+                                    cassette,
+                                    strict,
+                                    explicit: false,
+                                },
+                            ) => {
+                                // Exact pre-ADR-064 compatibility path: cassette
+                                // presence alone bypasses the shared router only for
+                                // Researcher (17-11: `CassetteReplayPort` contacts no
+                                // provider, so naming the first declared one is not a
+                                // reroute and a keyless box still replays).
+                                let replay = cassette_replay::CassetteReplayPort::from_file(
+                                    cassette, *strict,
+                                )
+                                .map_err(|e| {
+                                    format!("maos run: cassette replay init failed: {e}")
                                 })?;
-                            let binding = Arc::new(std::sync::Mutex::new(None));
-                            researcher_inference_binding = Some(Arc::clone(&binding));
-                            // Story 17-11 (review ruling 2026-10-24): the token names
-                            // the Spirit's FIRST declared provider — the root already
-                            // holds the admitted manifest scopes. `CassetteReplayPort`
-                            // contacts no provider and never reads it, so this is not a
-                            // reroute (FW-05 A kept), and a keyless box still replays.
-                            let provider = first_declared_provider(&gated).ok_or(
-                                "maos run: cassette replay: the Spirit declares no provider",
-                            )?;
-                            researcher_inference_provider = Some(provider);
-                            let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                                Arc::new(replay);
-                            researcher = researcher.with_deferred_inference_port(port, binding);
-                            eprintln!(
-                                "maos run: researcher cassette-replay inference wired ({})",
-                                cassette.display()
-                            );
-                        } else {
+                                let provider = first_declared_provider(&gated).ok_or(
+                                    "maos run: cassette replay: the Spirit declares no provider",
+                                )?;
+                                eprintln!(
+                                    "maos run: researcher cassette-replay inference wired ({})",
+                                    cassette.display()
+                                );
+                                maos_bin::researcher_root::bind(
+                                    researcher,
+                                    Arc::new(replay),
+                                    provider,
+                                    &seam,
+                                    pid_of,
+                                    &host,
+                                )
+                            }
+                            _ => maos_bin::researcher_root::attach(
+                                researcher,
+                                &seam,
+                                &declared_providers(&gated),
+                                pid_of,
+                                &host,
+                            )
+                            .map_err(|e| format!("maos run: {e}"))?,
+                        };
+                        if !researcher.is_live() {
                             eprintln!(
                                 "maos run: researcher deterministic survey (no --live; zero network)"
                             );
                         }
+                        researcher_pass_handle = Some(researcher.clone());
                         {
                             let binding = Arc::clone(&researcher_pid_binding);
                             pid_fixups.push(Box::new(move |pid| {
@@ -5969,22 +6107,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(tail) = escape_tail.as_ref() {
                 tail.declare(pid, gated.sandbox_cfg.tier);
             }
-            // Story 18-1 — the Researcher's one token comes from the root's
-            // mint (the Butler seam's): audited, policy-checked, quota-charged
-            // issuance (17-9/17-11), 60 s TTL. Butler mints per pass itself.
-            if let (Some(binding), Some(provider)) = (
-                researcher_inference_binding.as_ref(),
-                researcher_inference_provider.as_ref(),
-            ) {
-                let mint = butler_seam
-                    .lock()
-                    .unwrap_or_else(|error| error.into_inner())
-                    .as_ref()
-                    .map(|seam| Arc::clone(&seam.mint))
-                    .ok_or("maos run: butler seam not ready")?;
-                let token = mint(pid, provider).map_err(|e| format!("maos run: {e}"))?;
-                *binding.lock().unwrap_or_else(|error| error.into_inner()) = Some((token, pid));
-            }
             // Story 18-1 (D-18-1-08 A) — a serving Butler renders the morning
             // digest at process start (the first session) and hands the
             // renderer to the serving loop's day-rollover timer (review ruling
@@ -6121,6 +6243,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             })
                         );
                     }
+                    // Story 18-3 (D-18-3-05 A) — a refused or incomplete bound
+                    // Researcher pass, consumed ≠ surveyed claims, or an
+                    // `output_shape` violation is fatal under `--once`.
+                    let researcher_pass = maos_bin::researcher_root::pass_verdict(
+                        researcher_pass_handle.as_ref(),
+                        &outcome,
+                        &maos_kernel_core::security::OutputShapePredicate::from(&gated.output_shape),
+                    )
+                    .map_err(|error| format!("maos run: {error}"))?;
+                    let halt_tag = researcher_pass.as_ref().map_or(
+                        butler::SCALAR_TAG_BELIEF_VARIANCE,
+                        |(event, tag)| {
+                            println!("{event}");
+                            tag
+                        },
+                    );
                     // JB-5 / Story 18-1 (D-18-1-04 A) — under `--once` a refused
                     // Butler pass (inference, malformed proposal) and an
                     // `output_shape` violation are fatal (log-only before 18-1).
@@ -6166,7 +6304,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             // constants so production output and the JB-3 assertion can
                             // never drift (compile-error on rename).
                             let render =
-                                butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
+                                butler::halt_screen_line(halt_tag);
                             println!(
                                 "{}",
                                 serde_json::json!({
@@ -9288,7 +9426,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         let kind = classify_spirit(&gated.class_section.name)
             .expect("gate_manifest accepted a class that classify_spirit rejects");
         if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
-            && matches!(kind, LoadedSpiritKind::Mira | LoadedSpiritKind::Researcher)
+            && matches!(kind, LoadedSpiritKind::Mira)
         {
             return Err(
                 maos_bin::admission::AdmissionRefusal::EpistemicPortRequired {

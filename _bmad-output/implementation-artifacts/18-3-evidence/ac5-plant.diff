@@ -1,0 +1,11 @@
+--- a/spirits/researcher/src/lib.rs	2026-10-25 15:43:40.846820806 +0000
++++ b/spirits/researcher/src/lib.rs	2026-10-25 15:43:40.847112220 +0000
+@@ -964,7 +964,7 @@
+                     temperature: Some(0.0),
+                     model_id: None,
+                 },
+-                Some(binding.provider_id.clone()),
++                None,
+                 Vec::new(),
+             );
+             let response = live

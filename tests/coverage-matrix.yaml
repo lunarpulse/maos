@@ -979,8 +979,24 @@ coverage:
     phase: v1.0
     valid_until: '2027-05-12'
   NFR-Aud-7:
-    gates: []
-    corpora: []
+    gates: [nfr-aud-7-distillate-five-metrics-floor]
+    corpora: [researcher-distill-corpus-v0]
+    notes: |
+      Story 18-3 (AC2, AC4.2; CR-3, CR-5; D-18-3-08 B) — job
+      nfr-aud-7-distillate-five-metrics-floor. Researcher: `maos eval distill
+      --class researcher` scores all five NFR-Aud-7 floors (recall,
+      faithfulness, hedge preservation, traceability, secret leakage) over the
+      frozen corpus researcher-distill-corpus-v0, replayed keyless from
+      crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.json;
+      faithfulness from the frozen judge verdicts (provenance seed); the four
+      negative controls must be detected; the live judge runs nightly via
+      journey-nightly `tier-2-rerecord`. crates/maos-eval/tests/distillate_five_metrics_floor.rs
+      scores the same frozen corpus. Digest class: traceability + secret
+      leakage on its production distillate
+      (spirits/digest/tests/five_metric_digest_18_3.rs, same job); recall,
+      faithfulness and hedge preservation are N/A by construction — a Digest
+      distillate is a roll-up of TL fact refs (spirits/digest/src/lib.rs:437-456)
+      with no source claims or hedges.
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Aud-9:
@@ -1376,8 +1392,15 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Perf-6:
-    gates: []
+    gates: [nfr-perf-6-hook-dispatch-envelope]
     corpora: []
+    notes: |
+      Story 18-3 AC3 — job researcher-tests, step "NFR-Perf-6 hook-dispatch
+      envelope": crates/maos-kernel-core/tests/hook_dispatch_paused_time_18_3.rs
+      drives the Researcher's 60 s cap (read from spirits/researcher/manifest.toml
+      [budget]) under tokio paused time through the unchanged kernel
+      dispatcher (80 % BudgetWarning, 100 % BudgetExceeded, real-time Fired),
+      beside the wall-clock hook_dispatch_budget_envelope.rs.
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Perf-7:

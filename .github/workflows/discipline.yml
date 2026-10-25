@@ -992,7 +992,8 @@ jobs:
 
   researcher-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Story 18-3 AC3.2 / CR-5: 15 -> 30 for the kernel-core envelope tests below.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1009,6 +1010,11 @@ jobs:
         # five-metric traceability/secret-leakage self-verification (five_metric_self_verify),
         # and the scalar.tap subscription + FR17 composability demo (scalar_tap).
         run: cargo test -p researcher --locked
+      # Story 18-3 AC3.2 / CR-5 — NFR-Perf-6: the Researcher's 60 s hook cap
+      # read from its manifest, driven under tokio paused time through the
+      # unchanged kernel dispatcher, beside the wall-clock budget envelope.
+      - name: NFR-Perf-6 hook-dispatch envelope (Story 18-3 AC3)
+        run: cargo test --locked -p maos-kernel-core --test hook_dispatch_paused_time_18_3 --test hook_dispatch_budget_envelope
 
   researcher-bench:
     runs-on: ubuntu-latest
@@ -1498,6 +1504,36 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run distillate five-metrics floor test
         run: cargo test -p maos-eval --test distillate_five_metrics_floor
+      # Story 18-3 AC2.3 / CR-3 — the Researcher's five metrics over the frozen
+      # corpus `researcher-distill-corpus-v0`, replayed keyless (committed
+      # completions + frozen judge verdicts); exit 0 = all five NFR-Aud-7 floors
+      # held and all four negative controls detected.
+      - name: Build the root
+        run: cargo build --locked -p maos-bin --bin maos
+      - name: maos eval distill --class researcher (Story 18-3 AC2.3 / CR-3)
+        shell: bash
+        run: |
+          set +e
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          target/debug/maos eval distill --class researcher > eval-distill.out 2> eval-distill.err
+          rc=$?
+          cat eval-distill.out eval-distill.err
+          if [ "$rc" -eq 0 ] && ! jq -Rse '[split("\n")[] | fromjson? | select(type == "object" and .event == "eval_distill")] | length == 1 and .[0].pass == true' eval-distill.out > /dev/null; then
+            rc=1
+            echo "::error title=NFR-Aud-7 eval distill::exit 0 without one eval_distill line carrying pass == true"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=NFR-Aud-7 eval distill::rc=${rc} $(tail -n 3 eval-distill.err | paste -sd' ' -)"
+          else
+            echo "::notice title=NFR-Aud-7 eval distill::rc=0, pass=true"
+          fi
+          exit "$rc"
+      # Story 18-3 AC4.2 (D-18-3-08 B) — the Digest class: traceability and
+      # secret leakage on its production distillate.
+      - name: Digest-class traceability + secret leakage (Story 18-3 AC4.2)
+        run: cargo test --locked -p maos-digest --test five_metric_digest_18_3
 
   # Story 4.5 — NFR-Sec-14 cross-Spirit isolation 200-corpus gate
   nfr-sec-14-cross-spirit-isolation-200:
@@ -2232,7 +2268,14 @@ jobs:
   # exit line 2 verbatim (`maos eval halt --class butler`, the signed sidecar
   # uploaded) and its proven-red twin: the committed drift-blind cassette must
   # exit 1 with `halt_recall_overall 0.800 below floor 0.90` (D-18-2-02 B).
-  # Lines 3–4 join with 18-3/18-4.
+  # Story 18-3 CR-3 adds exit line 3 verbatim (the Researcher's survey through
+  # the Inference Port: the binding witness, a `researcher_survey` event with
+  # findings/open_questions/confidence_map/bibliography and one completion per
+  # cassette entry) and its proven-red twin (the same line over an EMPTY
+  # cassette must exit non-zero, refused naming `exhausted`), and closes TIA-6
+  # (`deferred-work.md:1248`): `maosctl spirit benchmark butler` verifies the
+  # sidecar exit line 2 just wrote, under the same scratch HOME. Line 4 joins
+  # with 18-4.
   epic-18-exit:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -2246,6 +2289,9 @@ jobs:
           key: epic-18-exit-${{ hashFiles('**/Cargo.lock') }}
       - name: Build the root
         run: cargo build --locked -p maos-bin --bin maos
+      # Story 18-3 CR-3 (TIA-6) — the registry reader the line-2 sidecar is served by.
+      - name: Build maosctl
+        run: cargo build --locked -p maos-cli --bin maosctl
       - name: Epic-18 exit line 1 — Butler's proposal through the Inference Port (Story 18-1)
         shell: bash
         run: |
@@ -2327,6 +2373,15 @@ jobs:
             rc=1
             echo "::error title=Epic-18 exit line 2::no signed benchmark sidecar in registry storage"
           fi
+          # Story 18-3 CR-3 (TIA-6): the two binaries meet — maosctl reads and
+          # verifies the sidecar maos eval halt wrote, same scratch HOME.
+          target/debug/maosctl spirit benchmark butler > line2.maosctl.out 2> line2.maosctl.err
+          bench_rc=$?
+          cat line2.maosctl.out line2.maosctl.err
+          if [ "$bench_rc" -ne 0 ]; then
+            rc=1
+            echo "::error title=Epic-18 exit line 2::maosctl spirit benchmark butler rc=${bench_rc} $(tail -n 3 line2.maosctl.err | paste -sd' ' -)"
+          fi
           if [ "$rc" -ne 0 ]; then
             echo "::error title=Epic-18 exit line 2::rc=${rc} $(tail -n 3 line2.err | paste -sd' ' -)"
           else
@@ -2353,6 +2408,59 @@ jobs:
             exit 1
           fi
           echo "::notice title=Epic-18 exit line 2 twin::rc=${rc}, halt_recall_overall 0.800 below floor 0.90"
+      - name: Epic-18 exit line 3 — Researcher replays through the Inference Port (Story 18-3)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-researcher/survey-distill.json maos run spirits/researcher/manifest.toml --once > line3.out 2> line3.err
+          rc=$?
+          cat line3.out line3.err
+          entries="$(jq '.entries | length' crates/maos-journey-test/cassettes/j-researcher/survey-distill.json)"
+          if [ "$rc" -eq 0 ] && ! grep -q 'researcher inference seam wired' line3.err; then
+            rc=1
+            echo "::error title=Epic-18 exit line 3::exit 0 but the Researcher never bound the Inference Port"
+          fi
+          if [ "$rc" -eq 0 ] && ! jq -Rse --argjson n "$entries" '[split("\n")[] | fromjson? | select(type == "object" and .event == "researcher_survey")] | length == 1 and $n > 0 and (.[0] | has("findings") and has("open_questions") and has("confidence_map") and has("bibliography") and .completions_consumed == $n)' line3.out > /dev/null; then
+            rc=1
+            echo "::error title=Epic-18 exit line 3::exit 0 without one researcher_survey event carrying findings/open_questions/confidence_map/bibliography and completions_consumed == ${entries} (the cassette's entries)"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-18 exit line 3::rc=${rc} $(tail -n 3 line3.err | paste -sd' ' -)"
+          else
+            echo "::notice title=Epic-18 exit line 3::rc=0, completions_consumed=${entries}"
+          fi
+          exit "$rc"
+      - name: Epic-18 exit line 3 twin — an empty cassette must exit non-zero (Story 18-3)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          twin="$RUNNER_TEMP/survey-distill-empty.json"
+          if ! jq '.entries = []' crates/maos-journey-test/cassettes/j-researcher/survey-distill.json > "$twin"; then
+            echo "::error title=Epic-18 exit line 3 twin::could not build the empty cassette"
+            exit 1
+          fi
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/researcher/manifest.toml --once > line3-twin.out 2> line3-twin.err
+          rc=$?
+          cat line3-twin.out line3-twin.err
+          if [ "$rc" -eq 0 ]; then
+            echo "::error title=Epic-18 exit line 3 twin::the empty cassette exited 0 — a fallback still answers without a completion"
+            exit 1
+          fi
+          # The replay port prints `CASSETTE EXHAUSTED` on its own; the
+          # refusal line is what proves the pass failed closed.
+          if ! grep -q 'researcher on_idle pass refused' line3-twin.err || ! grep -q 'exhausted' line3-twin.err; then
+            echo "::error title=Epic-18 exit line 3 twin::rc=${rc} but the refusal does not name the exhausted cassette: $(tail -n 3 line3-twin.err | paste -sd' ' -)"
+            exit 1
+          fi
+          echo "::notice title=Epic-18 exit line 3 twin::rc=${rc}, refused naming \`exhausted\`"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -2365,8 +2473,14 @@ jobs:
             line2.out
             line2.err
             line2.benchmark.signed.json
+            line2.maosctl.out
+            line2.maosctl.err
             line2-twin.out
             line2-twin.err
+            line3.out
+            line3.err
+            line3-twin.out
+            line3-twin.err
           if-no-files-found: warn
 
   # Story 5.5b — multi-provider drift-check tool tests

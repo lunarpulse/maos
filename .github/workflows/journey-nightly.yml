@@ -118,6 +118,25 @@ jobs:
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
         run: target/debug/maos eval halt --class butler
 
+      # Story 18-3 AC2.4 (D-18-3-07 A) — regenerate the Researcher five-metric
+      # completions AND the live faithfulness judge's verdicts through the
+      # shared router's live driver (the 15-6 recorder; surveys first, then the
+      # judge, all `provenance: live-record`) into the SIBLING
+      # `distill-corpus-v0.live.json`, never the committed seed cassette or
+      # corpus. Runs even if the Butler step missed a floor. Promotion is the
+      # D-18-2-R3 operator procedure: download `refreshed-cassettes`, replay
+      # with `maos eval distill --class researcher --cassette <live>` (a
+      # re-pin message names each survey that moved), then re-pin the corpus's
+      # frozen surveys and judge verdicts (`provenance: live-record`) in a PR
+      # (owner `ops-nightly-cassette-rerecord`).
+      - name: Re-record the Researcher five-metric cassette and judge (live)
+        if: ${{ !cancelled() }}
+        env:
+          MAOS_INFERENCE_MODE: record
+          MAOS_REPLAY_CASSETTE: crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.json
+          MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
+        run: target/debug/maos eval distill --class researcher
+
       - name: Upload refreshed cassettes
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

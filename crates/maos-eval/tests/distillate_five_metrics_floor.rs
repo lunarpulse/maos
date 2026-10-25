@@ -1,20 +1,28 @@
 #![forbid(unsafe_code)]
 
-//! AC4 — Five-metric distillation gate (NFR-Aud-7).
+//! AC4 — Five-metric distillation gate (NFR-Aud-7), Story 18-3 (D-18-3-06 A).
 //!
-//! Asserts that the N=100 synthetic-v0 distillate corpus clears:
-//! - digest-recall ≥0.90
-//! - digest-faithfulness ≥0.98
-//! - digest-hedge-preservation ≥0.95 (gated on IAA ≥0.85)
-//! - digest-traceability = 100% (kernel-enforced via non-empty source_log_ref)
-//! - digest-secret-leakage = 0% (kernel-mediated pre-write redaction)
+//! The per-commit gate no longer averages hand-authored labels: it scores
+//! what the Researcher EMITTED over the frozen corpus
+//! (`spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl`, the frozen
+//! survey of each row) with `maos_eval::distill_replay` — recall (source
+//! claims present as findings), hedge preservation (each source hedge in the
+//! finding's statement TEXT), traceability (every cite is a journaled frame),
+//! secret leakage (the real `CorpusBackedRedactionPolicy`) and faithfulness
+//! (frozen judge verdicts, provenance-labelled). Every negative control must
+//! miss the metric it plants. `maos eval distill --class researcher` replays
+//! the same rows through the kernel and must reproduce each frozen survey.
 //!
-//! Test surface:
-//! - `maos_eval::DistillateCorpus::load_from`
-//! - `maos_kernel_core::iac::redaction::CorpusBackedRedactionPolicy::redact`
-//! - Pure scoring math
+//! The NFR-Aud-8 quarterly N=500 slice below keeps its annotated means
+//! (non-goal of 18-3).
 
+use std::collections::BTreeSet;
+
+use maos_eval::distill_replay::{
+    frame_id, gate_failures, load_rows, score, Control, FindingFacts, ScenarioFacts,
+};
 use maos_eval::DistillateCorpus;
+use maos_kernel_core::iac::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 
 fn mean(values: &[f64]) -> f64 {
     if values.is_empty() {
@@ -23,115 +31,96 @@ fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
 
+#[derive(serde::Deserialize)]
+struct Claim {
+    claim_id: String,
+    hedges: Vec<String>,
+}
+
+/// A cite as its 16 bytes (`researcher::encode_frame_id_hex` groups by `:`).
+fn cite(hex: &str) -> Option<Vec<u8>> {
+    let clean: String = hex.chars().filter(|c| *c != ':').collect();
+    (0..clean.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(clean.get(i..i + 2)?, 16).ok())
+        .collect()
+}
+
 #[test]
 fn test_distillate_five_metrics_floor() {
-    let corpus =
-        DistillateCorpus::load_from(std::path::Path::new("fixtures/distillate-corpus-v0/"))
-            .expect("distillate-corpus-v0 must exist");
-
-    // Corpus size lock
-    assert_eq!(
-        corpus.scenarios.len(),
-        100,
-        "corpus size lock — 100 synthetic-v0 scenarios"
-    );
-
-    // All scenarios must carry tag=synthetic-v0
-    assert!(
-        corpus.scenarios.iter().all(|s| s.tag == "synthetic-v0"),
-        "every scenario MUST carry tag=synthetic-v0 to distinguish from E8 reference"
-    );
-
-    // IAA gate
-    assert!(
-        corpus.iaa_attestation.hedge_cohen_kappa >= 0.85,
-        "IAA gate failed: kappa={} < 0.85",
-        corpus.iaa_attestation.hedge_cohen_kappa
-    );
-
-    // Metric floors
-    let recall_mean = mean(
-        &corpus
-            .scenarios
-            .iter()
-            .map(|s| s.expected_recall)
-            .collect::<Vec<_>>(),
-    );
-    let faithfulness_mean = mean(
-        &corpus
-            .scenarios
-            .iter()
-            .map(|s| s.expected_faithfulness)
-            .collect::<Vec<_>>(),
-    );
-    let hedge_mean = mean(
-        &corpus
-            .scenarios
-            .iter()
-            .map(|s| s.expected_hedge_preservation)
-            .collect::<Vec<_>>(),
-    );
-
-    assert!(
-        recall_mean >= 0.90,
-        "digest-recall mean {recall_mean:.3} below 0.90 floor (NFR-Aud-7)"
-    );
-    assert!(
-        faithfulness_mean >= 0.98,
-        "digest-faithfulness mean {faithfulness_mean:.3} below 0.98 floor"
-    );
-    assert!(
-        hedge_mean >= 0.95,
-        "digest-hedge-preservation mean {hedge_mean:.3} below 0.95 floor"
-    );
-
-    // Traceability — structural: every scenario MUST have non-empty source_log_ref
-    let untraceable: Vec<_> = corpus
-        .scenarios
-        .iter()
-        .filter(|s| s.source_log_ref.is_empty())
-        .map(|s| s.scenario_id.clone())
-        .collect();
-    assert!(
-        untraceable.is_empty(),
-        "untraceable scenarios: {untraceable:?}"
-    );
-
-    // Secret-leakage — run each digest through the redaction policy
-    use maos_kernel_core::iac::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
+    let text =
+        std::fs::read_to_string("../../spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl")
+            .expect("the frozen Researcher corpus");
+    let rows = load_rows::<Claim>(&text).expect("corpus rows parse");
     let policy = CorpusBackedRedactionPolicy::new();
-    let mut leaks: Vec<String> = Vec::new();
-    let mut planted_secret_positive_controls: Vec<String> = Vec::new();
-    for scenario in &corpus.scenarios {
-        let digest_bytes = scenario.digest_payload.as_bytes();
-        use std::borrow::Cow;
-        let redacted = policy.redact(digest_bytes);
-        let redaction_fired = match &redacted {
-            Cow::Borrowed(_) => false,
-            Cow::Owned(ref redacted_bytes) => redacted_bytes != digest_bytes,
-        };
+    let facts: Vec<ScenarioFacts> = rows
+        .iter()
+        .enumerate()
+        .map(|(s, row)| {
+            let journaled: BTreeSet<Vec<u8>> = row
+                .claims
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| !row.unjournaled.contains(&c.claim_id))
+                .map(|(c, _)| frame_id(s, c).to_vec())
+                .collect();
+            let findings = row.survey["findings"]
+                .as_array()
+                .expect("frozen findings")
+                .iter()
+                .map(|f| {
+                    let statement = f["statement"].as_str().unwrap().to_owned();
+                    FindingFacts {
+                        claim_id: f["claim_id"].as_str().unwrap().to_owned(),
+                        hedges: serde_json::from_value(f["hedges"].clone()).unwrap(),
+                        resolves: cite(f["source_log_ref"].as_str().unwrap())
+                            .is_some_and(|id| journaled.contains(&id)),
+                        leaks: policy.redact(statement.as_bytes()).as_ref() != statement.as_bytes(),
+                        statement,
+                    }
+                })
+                .collect();
+            ScenarioFacts {
+                scenario_id: row.scenario_id.clone(),
+                control: row.control,
+                source: row
+                    .claims
+                    .iter()
+                    .map(|c| (c.claim_id.clone(), c.hedges.clone()))
+                    .collect(),
+                findings,
+                verdicts: row.judge.verdicts.clone(),
+            }
+        })
+        .collect();
 
-        if !scenario.planted_secrets.is_empty() {
-            // Positive control: a scenario with planted_secrets MUST trigger redaction.
-            if redaction_fired {
-                planted_secret_positive_controls.push(scenario.scenario_id.clone());
-            }
-            // If redaction did NOT fire, this is a real leak — the secret wasn't detected.
-            if !redaction_fired {
-                leaks.push(scenario.scenario_id.clone());
-            }
-        } else if redaction_fired {
-            // Unexpected redaction on a clean scenario
-            leaks.push(scenario.scenario_id.clone());
-        }
+    let score = score(&facts).expect("the corpus scores");
+    assert!(score.clean_scenarios >= 12, "{score:?}");
+    let planted: BTreeSet<_> = score
+        .controls
+        .iter()
+        .map(|c| format!("{:?}", c.control))
+        .collect();
+    for control in [
+        Control::HedgeDrop,
+        Control::FabricatedCite,
+        Control::PlantedSecret,
+        Control::DroppedClaim,
+    ] {
+        assert!(
+            planted.contains(&format!("{control:?}")),
+            "missing control {control:?}"
+        );
     }
+    let failures = gate_failures(&score);
     assert!(
-        !planted_secret_positive_controls.is_empty(),
-        "no planted-secret positive controls triggered redaction — redaction infrastructure may be broken"
+        failures.is_empty(),
+        "NFR-Aud-7 five-metric gate: {failures:?}\n{score:?}"
     );
     assert!(
-        leaks.is_empty(),
-        "digest-secret-leakage > 0 — scenarios {leaks:?} contain redactable patterns without planted_secrets annotation"
+        rows.iter()
+            .all(|r| r.judge.provenance == "seed" || r.judge.provenance == "live-record"),
+        "every frozen verdict carries its provenance"
     );
 }
 

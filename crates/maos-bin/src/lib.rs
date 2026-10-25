@@ -63,6 +63,9 @@ pub mod operator_door;
 pub mod purge;
 #[cfg(feature = "network")]
 pub mod recall_mediation;
+/// Story 18-3 — the Researcher's Inference Port seam and `--once` verdict.
+#[cfg(feature = "network")]
+pub mod researcher_root;
 pub mod shell_host;
 #[cfg(all(feature = "network", feature = "wasm-host"))]
 pub mod spirit_session;

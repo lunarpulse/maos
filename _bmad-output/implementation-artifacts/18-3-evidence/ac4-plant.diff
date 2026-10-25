@@ -1,0 +1,22 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -5718,7 +5718,8 @@
+                         )?;
+                         let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                         halt_receipt_handle = Some(Arc::clone(&last_receipt));
+-                        let mut researcher = researcher::Researcher::new().with_scalar_port(
++                        let mut researcher = researcher::Researcher::new();
++                        let _dropped_scalar_port: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
+                             Arc::new(ButlerOrchestratorAdapter {
+                                 orchestrator: Arc::clone(&orchestrator),
+                                 tl: Arc::clone(&transparency_log),
+@@ -5730,8 +5731,7 @@
+                                     &researcher_pid_binding,
+                                 )),
+                                 spirit_id: spirit_id.clone(),
+-                            }),
+-                        );
++                            });
+                         let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
+                         let researcher_collective_ref = collective_port.as_ref().map(|_| {
+                             Arc::new(LiveResearcherCollectivePort::new(

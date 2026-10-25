@@ -13,3 +13,20 @@
 # when the Inference Port lands.
 
 [judge]
+
+# Story 18-3 (CR-6, D-18-3-06 A) — the live faithfulness judge of
+# `MAOS_INFERENCE_MODE=record maos eval distill --class researcher` (nightly
+# `tier-2-rerecord`). It is called only through the kernel Inference Port
+# (`maos-bench` distill composition), never a provider client; CI replays the
+# frozen verdicts committed with the corpus. `prompt_version_hash` is the
+# SHA-256 of `maos_eval::distill_replay::JUDGE_PROMPT` (the corpus MANIFEST
+# row pins the same hash). Hedge preservation is a deterministic string
+# metric and has no judge row.
+[judge.researcher-faithfulness]
+model = "anthropic:claude-sonnet-5-5@2026-10-25"
+temperature = 0.0
+top_p = 1.0
+seed = 1803
+retry_budget = 1
+prompt_version_hash = "56bebf0beca733ffd335a4d175704aa71c56f18367b1a4b62ee002d9dd42be4c"
+added_in_story = "18-3-researcher-replay-live-and-judged-five-metric"

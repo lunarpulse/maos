@@ -1,0 +1,17 @@
+--- a/spirits/researcher/src/lib.rs
++++ b/spirits/researcher/src/lib.rs
+@@ -967,10 +967,10 @@
+                 Some(binding.provider_id.clone()),
+                 Vec::new(),
+             );
+-            let response = live
+-                .port
+-                .complete(req)
+-                .map_err(ResearcherError::Inference)?;
++            let response = match live.port.complete(req) {
++                Ok(response) => response,
++                Err(_) => return Ok(summarize(statement)),
++            };
+             live.consumed.fetch_add(1, Ordering::SeqCst);
+             // §9.5: the model's text is bounded, so the digest stays smaller
+             // than its inputs regardless of model verbosity.

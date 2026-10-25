@@ -141,10 +141,11 @@ fn traceability_and_leakage_hard_gate_pass_on_both_fixture_and_live_paths() {
         Arc::new(StubProvider {
             text: "a clean one-sentence digest of the claim".into(),
         }) as Arc<dyn InferencePort + Send + Sync>,
+        "anthropic",
         token(),
         10,
     );
-    let live_survey = live.survey(&frames);
+    let live_survey = live.infer_survey(&frames).unwrap();
     assert_traceable(&live_survey, &adapter);
     assert!(
         !redaction_fires(&live, &live_survey),
@@ -168,10 +169,11 @@ fn digest_secret_leakage_hard_gate_fires_on_live_digest() {
         Arc::new(StubProvider {
             text: "leaked integration key sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4".into(),
         }) as Arc<dyn InferencePort + Send + Sync>,
+        "anthropic",
         token(),
         10,
     );
-    let survey = live.survey(&frames);
+    let survey = live.infer_survey(&frames).unwrap();
     assert!(
         redaction_fires(&live, &survey),
         "a live digest carrying a 32-hex secret MUST fire the redaction hard gate"

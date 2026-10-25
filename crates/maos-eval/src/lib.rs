@@ -14,6 +14,7 @@
 //! tests under `tests/` can pull it in as a dev-dependency for
 //! integration runs.
 
+pub mod distill_replay; // NEW — Story 18-3 NFR-Aud-7 five-metric Researcher scorer
 pub mod distillate_corpus; // NEW — Story 4.4 five-metric distillation gate
 pub mod halt_continuity_corpus; // NEW — Story 5.2 halt-continuity corpus (AC4)
 pub mod halt_corpus;

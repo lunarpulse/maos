@@ -922,8 +922,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // 2026-10-06: 17-3c added the file without ringing this doorbell).
     // Story 17-4 — 27 → 28: `hook_pump.rs` joins it.
     // Story 18-1 — 28 → 29: `butler_root.rs` joins it.
+    // Story 18-3 — 29 → 30: `researcher_root.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 29] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 30] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("egress.rs", include_str!("../src/egress.rs")),
         // Story 16-6 — the extracted `load → admit → start` path. Enrolled
@@ -1039,6 +1040,13 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // Story 18-1 — Butler's composition-root seam (morning-digest rollover,
         // the pass outcome). It must never seed the manifest-derived policy table.
         ("butler_root.rs", include_str!("../src/butler_root.rs")),
+        // Story 18-3 — the Researcher's composition-root seam (provider rule,
+        // per-pass mint, seed journal, the pass verdict). It must never seed
+        // the manifest-derived policy table.
+        (
+            "researcher_root.rs",
+            include_str!("../src/researcher_root.rs"),
+        ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

@@ -52,7 +52,7 @@ use maos_spirit_abi::ctx::{CapabilityHandle, Ctx, MailboxHandle};
 use maos_spirit_abi::lifecycle::Spirit;
 use researcher::{ClaimPayload, RecalledFrame, Researcher};
 
-const EVAL_PID: u32 = 1;
+pub(crate) const EVAL_PID: u32 = 1;
 const BOOT_NONCE: u64 = 0x18_02;
 
 /// Which producer a class's rows are scored through.
@@ -106,8 +106,8 @@ pub const CLASSES: &[HaltClass] = &[
             halt_precision_overall: HALT_PRECISION_FLOOR,
         },
         not_model_driven: Some(
-            "the halt scalars are claim-metadata arithmetic (spirits/researcher/src/lib.rs:835-886) \
-             and no production path writes a Researcher scalar",
+            "the halt scalars are claim-metadata arithmetic over the surveyed claims (production \
+             writes them since Story 18-3, D-18-3-09 A); no completion moves them",
         ),
         calendar_conflict_basis: None,
         manifest: include_str!("../../../spirits/researcher/manifest.toml"),
@@ -341,7 +341,7 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
     })
 }
 
-fn required(manifest: &toml::Value) -> Result<String, String> {
+pub(crate) fn required(manifest: &toml::Value) -> Result<String, String> {
     manifest
         .get("capabilities")
         .and_then(|c| c.get("required"))
@@ -482,17 +482,17 @@ fn butler_verdicts(
 
 /// A fresh, isolated kernel world for one row. `scopes` are admitted at
 /// [`EVAL_PID`] so the Inference Port's token check is the kernel's.
-struct World {
-    tl: Arc<TransparencyLogAdapter>,
+pub(crate) struct World {
+    pub(crate) tl: Arc<TransparencyLogAdapter>,
     journal: JournalAdapter,
-    capability: Arc<CapabilityRegistryAdapter>,
+    pub(crate) capability: Arc<CapabilityRegistryAdapter>,
     orchestrator: WorkingMemoryOrchestrator,
     _audit_rx: Box<dyn std::any::Any + Send + Sync>,
     _tmp: tempfile::TempDir,
 }
 
 impl World {
-    fn new(scopes: Vec<Scope>) -> Result<Self, String> {
+    pub(crate) fn new(scopes: Vec<Scope>) -> Result<Self, String> {
         let policy = Arc::new(PolicyTable::new());
         let mut admitted = PolicyTableInner::default();
         let scope = ManifestCapabilityScope {
@@ -582,9 +582,9 @@ impl EpistemicScalarPort for ScalarPort {
 
 /// Counts the completions the run actually consumed (AC1: consumed ≠ rows
 /// is refused).
-struct Counted {
-    inner: InferencePortAdapter,
-    consumed: Arc<AtomicUsize>,
+pub(crate) struct Counted {
+    pub(crate) inner: InferencePortAdapter,
+    pub(crate) consumed: Arc<AtomicUsize>,
 }
 
 impl InferencePort for Counted {

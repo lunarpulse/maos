@@ -12,7 +12,7 @@ review: "bmad-code-review under `docs/testing/proof-contract.md` (focused suites
 
 # Story 18.2: `maos eval halt` and model-dependent per-class numbers
 
-Status: review
+Status: done
 
 <!-- Created 2026-10-25 at 140b906b by bmad-create-story under the lighter creation contract (no party-mode preflight); 18-1 and 18-8 were treated as landed. The host's only cargo process was used for measurement (CARGO_TARGET_DIR=/mnt/build/cargo, `env -u CI -u GITHUB_ACTIONS`). Three throwaway prototypes were built: two compiled and ran, one was refused by cargo. All were measured and reverted by copy-back, and the HEAD `maos` binary was rebuilt. RULED 2026-10-25 by the operator (Lunarpulse): D-18-2-01 B, 02 B, 03 A, 04 A, 05 A, 06 A, plus the maos-bin pre-ratification ≤ 28140 → `ready-for-dev`. -->
 
@@ -356,6 +356,8 @@ The CI plant is AC1 (b), `ci/plant.diff`, sha256 `f3255f459efd043860f825546056f0
 
 `intent-lineage-coverage-report.md` was not modified.
 
+**CI (2026-10-25, integrator; TIA-5):** proven-red run `40200067350` (`ci/18-2-verify` @ `68aae558`, job `121189173425`; recorded in `18-2-evidence/plants.md` §CI plant). Landing `40200028265` @ `ee395748`: `epic-18-exit` (exit lines 1, 2 and both twins) green; reds only the 20-7-owned S3 podman-4 bound + fan-in gates. No deferred row is owned by this key.
+
 ### Review (2026-10-25, anthropic/claude-opus-5-5, 4 layers)
 
 Layers: Blind Hunter (BH), Edge Case Hunter (EC), Acceptance Auditor (AA), Test-Infra Auditor (TIA), all `anthropic/claude-opus-5-5`. Patches applied by `anthropic/claude-opus-5-5` the same day on the uncommitted tree above `140b906b`; story stays `review`.
@@ -434,3 +436,4 @@ Layers: Blind Hunter (BH), Edge Case Hunter (EC), Acceptance Auditor (AA), Test-
 
   Status `review`.
 - 2026-10-25 — Code review (anthropic/claude-opus-5-5, 4 layers: BH, EC, AA, TIA) and review patch pass. Operator rulings D-18-2-R1…R5 recorded (§Review). Patched BH-1/EC-1 (HIGH), BH-2/EC-2/AA-2, BH-3/EC-3/AA-3, BH-4, BH-5, EC-4, EC-5 (R2), AA-1, AA-6 (R5), AA-7, TIA-3, TIA-4; R3 nightly `.live.json`; deferred BH-6 → 19-1, AA-5/TIA-2 and EC-6/TIA-1 promotion → `ops-nightly-cassette-rerecord`, TIA-6 → 18-3; TIA-5 stays the integrator's. 7 review plants + the regenerated AC5 plant proven red. kloc: maos-bin 28094, maos-bench 2032, maos-eval 4271, `_aggregate_hardfail` 183248, kernel 0. Status stays `review`.
+- 2026-10-25 — CI: proven-red `40200067350` (`68aae558`); landing `40200028265` @ `ee395748`, `epic-18-exit` green. Status → `done`.

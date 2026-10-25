@@ -1,0 +1,9 @@
+proven-red	Set up job	2026-10-25T14:09:14.2800073Z Version: 20261021.618
+proven-red	Set up job	2026-10-25T14:09:14.2807561Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-25T14:09:14.2808031Z Version: 20261012.334.1
+proven-red	Apply the AC1 (b) plant	2026-10-25T14:09:26.5811036Z _bmad-output/implementation-artifacts/18-2-evidence/ci/plant.diff: OK
+proven-red	Apply the AC1 (b) plant	2026-10-25T14:09:27.5473293Z -            "halt_recall_overall",
+proven-red	Apply the AC1 (b) plant	2026-10-25T14:09:27.5473729Z -            score.halt_recall_overall,
+proven-red	Apply the AC1 (b) plant	2026-10-25T14:09:27.5473944Z -            floors.halt_recall_overall,
+proven-red	Control — exit line 2 stays green under the plant	2026-10-25T14:10:48.6731796Z {"schema":"maos.benchmark.halt/v1","class":"butler","spirit_version":"0.3.0","maos_version":"0.1.0-alpha.1","corpus":"spirits/butler/tests/fixtures/calendar-comms-v0.3.
+proven-red	Planted drift-blind twin must EXIT 0 (the twin step on main would go RED)	2026-10-25T14:10:48.9226200Z {"schema":"maos.benchmark.halt/v1","class":"butler","spirit_version":"0.3.0","maos_version":"0.1.0-alpha.1","corpus":"spirits/butler/tests/fixture

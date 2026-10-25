@@ -52,6 +52,14 @@ gates = [
     # Story 18-2 (CR-4) — NFR-Test-4 per-class halt numbers: `maos eval halt
     # --class butler` (exit line 2) and its drift-blind twin in `epic-18-exit`.
     "eval-halt",
+    # Story 18-3 (CR-5) — NFR-Aud-7 five metrics: job
+    # `nfr-aud-7-distillate-five-metrics-floor` (`maos eval distill --class
+    # researcher` over `researcher-distill-corpus-v0`, the maos-eval floor test,
+    # and the Digest-class traceability/leakage test).
+    "nfr-aud-7-distillate-five-metrics-floor",
+    # Story 18-3 (CR-5, AC3) — NFR-Perf-6: the Researcher's 60 s hook cap under
+    # tokio paused time (`hook_dispatch_paused_time_18_3`, job researcher-tests).
+    "nfr-perf-6-hook-dispatch-envelope",
     # Story 9.6 AC-5 — retired founder/J4 smoke-arm literal reappearance guard.
     "check-literal-reappearance",
     # Story 10.1b AC1 — pen-test gate (conditional: advisory-if-absent).
