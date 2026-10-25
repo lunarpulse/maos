@@ -1,0 +1,14 @@
+--- a/crates/maos-bin/src/main.rs	2026-10-25 06:24:26.412884484 +0000
++++ b/crates/maos-bin/src/main.rs	2026-10-25 06:24:26.414884468 +0000
+@@ -6050,11 +6050,6 @@
+                     }
+                     // Story 18-1 (D-18-1-08 A) — `--once` renders the FR17 morning
+                     // digest after its pass.
+-                    if let Some(digest) = butler_morning_digest.as_ref() {
+-                        digest
+-                            .render_if_new_day()
+-                            .map_err(|error| format!("maos run: {error}"))?;
+-                    }
+                     if let Some(handle) = &halt_receipt_handle {
+                         if let Some(receipt) = handle
+                             .lock()

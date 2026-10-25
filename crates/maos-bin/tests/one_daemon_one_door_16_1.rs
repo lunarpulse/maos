@@ -271,6 +271,26 @@ impl Root {
             .count()
     }
 
+    /// How many Inference Port calls (`infer:` TL frames) the root has made.
+    fn infer_row_count(&self) -> usize {
+        self.tl_rows()
+            .iter()
+            .filter(|(_, intent)| intent.starts_with("infer:"))
+            .count()
+    }
+
+    /// Wait, bounded, until at least `n` Inference Port calls are journaled.
+    fn await_infer_rows(&self, n: usize) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while Instant::now() < deadline {
+            if self.infer_row_count() >= n {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        false
+    }
+
     /// SIGTERM the root and return how long it took to exit, plus its stderr.
     fn terminate(&mut self) -> (Duration, String) {
         let mut child = self.child.take().expect("root not already terminated");
@@ -952,6 +972,13 @@ fn ac2_a_one_shot_child_does_not_bind_the_door() {
 /// passes.
 #[test]
 fn ac4_root_e_a_faithful_successor_survives_the_hot_swap() {
+    // Story 18-1 review ruling D-18-1-R1: the successor is bound to the
+    // Inference Port like its predecessor. The swap lands inside the
+    // predecessor's first idle window (as at HEAD), so the successor runs the
+    // quiet period's one pass and consumes the seed's single entry. A pass
+    // fires once per quiet period and a hot swap keeps the control block's
+    // idle stamps, so a successor swapped in AFTER the predecessor's pass gets
+    // no pass of its own until an inbound frame arrives (measured 2026-10-25).
     // `MAOS_IDLE_FAST=1` shortens butler's idle window from 30 s to ~300 ms,
     // so a post-swap halt is observable inside a test budget.
     let root = Root::butler_with("root-e", &[("MAOS_IDLE_FAST", "1")]);
@@ -974,6 +1001,7 @@ fn ac4_root_e_a_faithful_successor_survives_the_hot_swap() {
     std::fs::write(&target, target_body).expect("write the 0.3.1 fixture");
 
     let before_halts = root.halt_row_count();
+    let before_infers = root.infer_row_count();
     let upgrade = root.ctl(&[
         "spirit",
         "upgrade",
@@ -1022,6 +1050,14 @@ fn ac4_root_e_a_faithful_successor_survives_the_hot_swap() {
          ({before_halts} -> {after_halts}); a successor that completes the swap \
          and silently loses its halt is the measured failure this arm exists \
          to prevent"
+    );
+    // Review ruling D-18-1-R1 — and it halts THINKING: its pass went through
+    // the Inference Port (an unbound successor halts arithmetically and adds
+    // no `infer:` frame — the silent fallback D-18-1-04 A forbids).
+    assert!(
+        root.await_infer_rows(before_infers + 1),
+        "the successor must be bound to the Inference Port: infer frames stayed \
+         at {before_infers}"
     );
 }
 

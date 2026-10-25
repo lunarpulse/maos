@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -468,7 +468,7 @@
+             &payload,
+             maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+         );
+-        evidence.source_log_ref = hex::encode(transparency_log.last_frame_id());
++        evidence.source_log_ref = "f".repeat(32);
+     }
+     for evidence in &mut raw.receipt_presence {
+         let payload = serde_json::to_vec(evidence)

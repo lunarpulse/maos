@@ -1,0 +1,22 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -3808,7 +3808,11 @@
+             let capability = Arc::downgrade(&capability);
+             let enterprise_runtime = enterprise_runtime.clone();
+             let enterprise_pdp_runtime = enterprise_pdp_runtime.clone();
++            let cache = std::sync::Mutex::new(None);
+             Arc::new(move |pid, provider: &str| {
++                if let Some(token) = cache.lock().unwrap().clone() {
++                    return Ok(token);
++                }
+                 issue_enterprise_governed_capability(
+                     capability
+                         .upgrade()
+@@ -3825,6 +3829,7 @@
+                     IntentClass::Standard,
+                 )
+                 .map_err(|e| format!("token issue failed: {e}"))
++                .inspect(|token| *cache.lock().unwrap() = Some(token.clone()))
+             })
+         },
+         digest: Arc::new(butler::MorningDigestRenderer::new(

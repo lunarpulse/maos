@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -915,7 +915,7 @@
+                 deps.boot_nonce,
+                 Some(pid_resolver),
+                 class_name,
+-                &seam,
++                &butler::ButlerSeam { inference: None, ..seam.clone() },
+                 declared,
+             )?;
+             make_spirit_obj(butler)

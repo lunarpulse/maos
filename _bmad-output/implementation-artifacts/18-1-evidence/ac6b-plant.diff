@@ -1,0 +1,18 @@
+--- a/crates/maos-bin/src/main.rs	2026-10-25 06:27:49.045425159 +0000
++++ b/crates/maos-bin/src/main.rs	2026-10-25 06:27:49.047562106 +0000
+@@ -468,7 +468,6 @@
+             &payload,
+             maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+         );
+-        evidence.source_log_ref = hex::encode(transparency_log.last_frame_id());
+     }
+     for evidence in &mut raw.receipt_presence {
+         let payload = serde_json::to_vec(evidence)
+@@ -481,7 +480,6 @@
+             &payload,
+             maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+         );
+-        evidence.source_log_ref = hex::encode(transparency_log.last_frame_id());
+     }
+     for evidence in &mut raw.consent_journal {
+         let payload = serde_json::to_vec(evidence)

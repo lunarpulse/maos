@@ -1,0 +1,10 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -5897,7 +5897,6 @@
+             // renderer to the serving loop's day-rollover timer (review ruling
+             // D-18-1-R4); `--once` renders it after its pass.
+             if let Some(digest) = butler_morning_digest.as_ref().filter(|_| !run.once) {
+-                digest.render_logged(pid);
+                 butler_rollover = Some((Arc::clone(digest), pid));
+             }
+             #[cfg(feature = "wasm-host")]

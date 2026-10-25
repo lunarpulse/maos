@@ -1,0 +1,13 @@
+--- a/spirits/digest/tests/hallucination_18_1.rs
++++ b/spirits/digest/tests/hallucination_18_1.rs
+@@ -146,7 +146,9 @@
+ }
+ 
+ fn check(log: &TransparencyLogAdapter, w: u32, digest: &TeamDigest) -> Verdict {
+-    let window: BTreeSet<String> = window_frames(log, w)
++    let window: BTreeSet<String> = log
++        .query_frames(FrameFilter::default())
++        .unwrap()
+         .iter()
+         .map(|frame| hex(&frame.frame_id))
+         .collect();

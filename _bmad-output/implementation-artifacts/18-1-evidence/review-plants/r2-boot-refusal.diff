@@ -1,0 +1,11 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -258,7 +258,7 @@
+     ) -> Result<Butler, String> {
+         if let Some((build_port, registered)) = self.inference.clone() {
+             let provider = declared().ok_or("butler inference: the Spirit declares no provider")?;
+-            if !registered.contains(&provider) {
++            if false && !registered.contains(&provider) {
+                 return Err(format!(
+                     "butler inference: no inference provider is configured for its declared \
+                      provider `{provider}`"

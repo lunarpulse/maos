@@ -30,9 +30,7 @@ impl MultiProviderRouter {
     }
 
     pub fn dispatch(&self, provider_id: Option<&str>) -> Result<Arc<dyn Provider>, RouterError> {
-        let key = provider_id
-            .filter(|s| !s.is_empty())
-            .or(self.default_id.as_deref());
+        let key = provider_id.or(self.default_id.as_deref());
         match key {
             Some(id) => self
                 .providers

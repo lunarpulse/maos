@@ -257,9 +257,13 @@ impl InferencePort for InferencePortAdapter {
             .provider_id
             .as_deref()
             .or_else(|| self.router.default_id())
+            .filter(|id| !id.is_empty())
             .ok_or(InferenceError::Unconfigured)?;
 
         self.check_capability(&req.capability_token, provider_id)?;
+        if req.fallback_provider_ids.iter().any(|id| id != provider_id) {
+            return Err(InferenceError::CapabilityDenied);
+        }
 
         // Story 6.4 / NFR-Scale-4 — consult the per-(provider, credential)
         // token bucket BEFORE dispatching to the provider. On exhaustion,
@@ -586,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn fallback_503_routes_to_secondary() {
+    fn fallback_not_named_by_the_token_is_refused_before_dispatch() {
         let crypto: Arc<dyn maos_domain::ports::crypto::CryptoProvider> =
             Arc::new(MockCryptoProvider);
         let signing_key = Ed25519SigningKey::new([0u8; 32]);
@@ -658,9 +662,9 @@ mod tests {
             Some("primary".into()),
             vec!["secondary".into()],
         );
-        let resp = adapter.complete(req).unwrap();
-        assert_eq!(resp.provider_attribution.provider_id, "anthropic");
-        assert_eq!(resp.text, "mock response");
+        // 18-1 AC7: a 503 primary would hand off to `secondary` (Ok) if any driver ran.
+        let err = adapter.complete(req).unwrap_err();
+        assert!(matches!(err, InferenceError::CapabilityDenied), "{err:?}");
     }
 
     struct MockProviderErr(ProviderError);

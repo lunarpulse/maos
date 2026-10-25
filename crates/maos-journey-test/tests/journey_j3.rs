@@ -75,6 +75,99 @@ fn j3_day_30_digest_renders_and_persists_via_real_daemon() {
     );
 }
 
+/// Story 18-1 AC6.2 (D-18-1-09 B, CR-9) — the Digest class's production
+/// witness for FR17's floors: the real daemon emits `team_digest` within 30 s
+/// of spawn (the bounded run's whole lifetime), every `clause_sources` ref
+/// resolves to a frame of the daemon's own Transparency Log, every
+/// halt receipt is cited, and the manifest's field set is present.
+#[test]
+fn j3_team_digest_within_30s_cites_only_real_tl_frames() {
+    let captured = workspace_root().join("crates/maos-journey-test/fixtures/j3/day-30-raw.json");
+    let audit = AuditDb::temp();
+    std::fs::copy(&captured, audit.path().join("j3-digest-inputs.json"))
+        .expect("captured J3 raw-input fixture must exist");
+    let tl_path = audit.transparency_log_path();
+    let world = JourneyWorld::builder().audit(audit).build();
+    let manifest = workspace_root().join("spirits/digest/manifest.toml");
+
+    let run = maos_journey_test::run_bounded(
+        &world,
+        &maos_bin(),
+        &["run", manifest.to_str().unwrap(), "--once"],
+        &[],
+        30,
+        "FR17: maos run digest --once within 30 s of spawn",
+    );
+    assert_eq!(
+        run.code,
+        Some(0),
+        "maos run digest --once must exit 0; stderr:\n{}",
+        run.stderr
+    );
+    let event: serde_json::Value = run
+        .stdout
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|event| event["event"] == "team_digest")
+        .unwrap_or_else(|| panic!("no team_digest event; stdout:\n{}", run.stdout));
+    let digest = &event["digest"];
+
+    // `spirits/digest/manifest.toml:18` — the `[output_shape]` field set.
+    let manifest_text = std::fs::read_to_string(&manifest).unwrap();
+    let required_line = manifest_text
+        .lines()
+        .find(|line| line.starts_with("required_fields"))
+        .expect("[output_shape] required_fields");
+    let required: Vec<&str> = required_line.split('"').skip(1).step_by(2).collect();
+    assert_eq!(required.len(), 8, "{required_line}");
+    for field in required {
+        assert!(
+            digest.get(field).is_some(),
+            "manifest field `{field}` missing"
+        );
+    }
+
+    let rows = maos_audit::query(&tl_path, maos_audit::AuditFilter::default())
+        .expect("J3 transparency log query");
+    let frames: std::collections::BTreeSet<&str> =
+        rows.iter().map(|row| row.frame_id_hex.as_str()).collect();
+    let cited: Vec<&str> = digest["clause_sources"]
+        .as_object()
+        .expect("clause_sources map")
+        .values()
+        .flat_map(|refs| refs.as_array().unwrap())
+        .map(|cited| cited.as_str().unwrap())
+        .collect();
+    assert!(!cited.is_empty());
+    for cited in &cited {
+        assert!(
+            frames.contains(cited),
+            "clause_sources ref {cited} resolves to no frame of the daemon's TL"
+        );
+    }
+
+    let raw: maos_digest::RawDigestInputs =
+        serde_json::from_slice(&std::fs::read(&captured).unwrap()).unwrap();
+    let halted_members: std::collections::BTreeSet<&str> = raw
+        .receipt_presence
+        .iter()
+        .map(|receipt| receipt.member.as_str())
+        .collect();
+    assert_eq!(
+        digest["agents_halted"].as_u64(),
+        Some(halted_members.len() as u64),
+        "every receipt-backed halt is reported"
+    );
+    assert_eq!(
+        digest["clause_sources"]["halts_and_visibility"]
+            .as_array()
+            .unwrap()
+            .len(),
+        raw.summaries.len() + raw.receipt_presence.len(),
+        "every summary and halt receipt is cited"
+    );
+}
+
 fn derive_captured(bytes: &[u8]) -> maos_digest::TeamDigest {
     let raw: maos_digest::RawDigestInputs =
         serde_json::from_slice(bytes).expect("captured fixture decodes as raw inputs");

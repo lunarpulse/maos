@@ -12,13 +12,13 @@ review: "bmad-code-review under `docs/testing/proof-contract.md` (focused suites
 
 # Story 18.1: Butler inference seam
 
-Status: ready-for-dev
+Status: review
 
 <!-- Created 2026-10-25 at c816c544 by bmad-create-story under the lighter creation contract (no party-mode preflight). RULED 2026-10-25 by the operator (Lunarpulse): every D-18-1 row below carries its ruling; D-18-1-01 B split the MCP half (old AC2, AC5; D-18-1-06/07/12) to `18-8-conformant-mcp-client`. The story key keeps its name (tracker keys are not renamed); the title drops "conformant MCP". Creation ran cargo as the host's only cargo process (one target dir, /mnt/build/cargo); every kernel prototype was measured and reverted (figures in §Kernel pricing). -->
 
 > **The capability:** *Butler thinks through the Inference Port — its proposal comes from a recorded (or live) completion, a malformed one is a red exit, and every provider it can reach is one its capability names; the morning digests the running Spirits produce meet FR17's floors.*
 
-**Closes:** S3 (Butler third; epic `:9`) · FR17 on the production path for both digest-shipping classes, Butler and the Digest class (`prd/functional-requirements.md:51`; D-18-1-09 B) with the routing-audit widening (`routing-audit-2026-10-22.md:35`: first-session ≤ 30 s, every field, 100-digest floors) · FR58 Butler zero-config response (`functional-requirements.md:92`) · `deferred-work.md:1213` (router fallback/empty id, AC7) — the only `deferred-work.md` row whose Owner is this key (grep at c816c544). Epic contract: `epic-18-spirits-that-think-w3.md` §18-1 (`:121-136`, corrected and ruled in place) and §R (`:44-81`).
+**Closes:** S3 (Butler third; epic `:9`) · FR17 on the production path for both digest-shipping classes, Butler and the Digest class (`prd/functional-requirements.md:51`; D-18-1-09 B) with the routing-audit widening (`routing-audit-2026-10-22.md:35`: first-session ≤ 30 s, every field, 100-digest floors) — **except FR17 (c) anomalies**: no production anomaly feed exists, so Butler's digest reports `anomalies` as an explicit unknown (review ruling D-18-1-R3; owner `18-4-self-tuning-halt-with-injectable-clock`, `deferred-work.md` §"code review of 18-1") · FR58 Butler zero-config response (`functional-requirements.md:92`) · `deferred-work.md:1213` (router fallback/empty id, AC7) — the only `deferred-work.md` row whose Owner is this key (grep at c816c544). Epic contract: `epic-18-spirits-that-think-w3.md` §18-1 (`:121-136`, corrected and ruled in place) and §R (`:44-81`).
 
 **Does NOT close, and says so:**
 - The conformant MCP client and the stdio early-close witness (old AC2, AC5) — **split to `18-8-conformant-mcp-client`** (D-18-1-01 B; epic §18-8). This story's AC numbering keeps AC2 and AC5 as "moved" so cites to AC1/3/4/6/7 stay stable.
@@ -135,18 +135,18 @@ Ruled figure: **+2 physical / +1 tokei** (production +2 tokei: +4 adapter, −2 
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight at the dev HEAD** (all ACs)
-  - [ ] Confirm §Decisions reads RULED (done 2026-10-25) and story + tracker read `ready-for-dev`; record Winston's FLAG sign-off on the AC7 kernel diff before landing.
-  - [ ] `git diff --stat c816c544 -- crates/maos-kernel-core/src/inference crates/maos-bin/src/main.rs crates/maos-bin/src/cassette_replay.rs spirits/butler spirits/digest spirits/researcher/src/lib.rs crates/maos-journey-test .github/workflows/discipline.yml`; any drift → Debug Log, re-anchor. If 18-8 landed first, re-measure the kernel pin from its new value.
-- [ ] **T1 — Butler seam** (AC1.1, AC1.4; D-18-1-03) — `spirits/butler/src/lib.rs`: inference field + `with_deferred_inference_port`; prompt built from the scenario (calendar, comms); typed proposal parse; `NotificationPayload.options`; `user_preference_drift` from the completion; unbound path unchanged except `options`. Re-author `on-idle-halt.json`.
-- [ ] **T2 — Daemon wiring** (AC1.2; D-18-1-02/05) — `main.rs:3629-3647` replay registration; Butler arm binding for `--live`/explicit modes (extract a helper from `:5478-5534` rather than copying); backfill `:5729-5747` generalized; per-pass mint closure for Butler.
-- [ ] **T3 — Reds** (AC1.3; D-18-1-04) — `--once` typed exits; `:5876-5888` fatal under `--once`; daemon pass refusal; JB-5 flip.
-- [ ] **T4 — Butler digest caller** (AC3, AC6.1, AC6.3; D-18-1-08) — production call + event; `butler_digest_18_1.rs` (30 s, refs, open halts, fields; FR58 fresh-home case).
-- [ ] **T5 — Digest class floors** (AC6.2; D-18-1-09 B, CR-8/9) — `spirits/digest/tests/hallucination_18_1.rs` (100-window corpus + two negative controls); `journey_j3.rs:18-77` extended (30 s, TL ref resolution).
-- [ ] **T6 — Kernel** (AC7; D-18-1-10, CR-5/6) — `inference/mod.rs:256-262`, `router.rs:33-35`; inverted unit test; `tests/inference_fallback_authz_18_1.rs`; `cargo test -p maos-kernel-core --lib`.
-- [ ] **T7 — Exit job** (AC1.5; D-18-1-11) — `epic-18-exit` in `.github/workflows/discipline.yml` (one image, line 1 verbatim + twin), `aggregate.needs`.
-- [ ] **T8 — Plants and records** — plants for AC1, AC3, AC6 (a)+(b), AC7, recorded once in `18-1-evidence/plants.md` (command, output, wall-clock); `deferred-work.md` per CR-7; epic §18-1 if anything moved at dev HEAD.
-- [ ] **T9 — Governance** (D-18-1-13) — `cargo fmt --all`; `kloc-check --json`; `check-kernel-baseline` (re-pin under FLAG-Winston); `check-model-currency`; `check-test-cost`; `check-dev-record-completeness`; measured requests to the operator **before** landing; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule` before the closing commit (`proof-contract.md:40-44`).
+- [x] **T0 — Preflight at the dev HEAD** (all ACs) *(review AA-9: unticked until the FLAG record below was written; written 2026-10-25)*
+  - [x] Confirm §Decisions reads RULED (done 2026-10-25) and story + tracker read `ready-for-dev`; record Winston's FLAG sign-off on the AC7 kernel diff before landing. **FLAG-Winston record:** the kernel grant was ratified by the operator (Lunarpulse) at D-18-1-10 A on 2026-10-25 and landed exactly at the grant — **+2 physical (26361 → 26363) / +1 tokei (20594 → 20595)**, `inference/{mod,router}.rs` only; the review pass changed no kernel line (`check-kernel-baseline` 26363 / 95).
+  - [x] `git diff --stat c816c544 -- …`; any drift → Debug Log, re-anchor. If 18-8 landed first, re-measure the kernel pin from its new value.
+- [x] **T1 — Butler seam** (AC1.1, AC1.4; D-18-1-03) — `spirits/butler/src/lib.rs`: inference field + `with_deferred_inference_port`; prompt built from the scenario (calendar, comms); typed proposal parse; `NotificationPayload.options`; `user_preference_drift` from the completion; unbound path unchanged except `options`. Re-author `on-idle-halt.json`.
+- [x] **T2 — Daemon wiring** (AC1.2; D-18-1-02/05) — `main.rs:3629-3647` replay registration; Butler arm binding for `--live`/explicit modes (extract a helper from `:5478-5534` rather than copying); backfill `:5729-5747` generalized; per-pass mint closure for Butler.
+- [x] **T3 — Reds** (AC1.3; D-18-1-04) — `--once` typed exits; `:5876-5888` fatal under `--once`; daemon pass refusal; JB-5 flip.
+- [x] **T4 — Butler digest caller** (AC3, AC6.1, AC6.3; D-18-1-08) — production call + event; `butler_digest_18_1.rs` (30 s, refs, open halts, fields; FR58 fresh-home case).
+- [x] **T5 — Digest class floors** (AC6.2; D-18-1-09 B, CR-8/9) — `spirits/digest/tests/hallucination_18_1.rs` (100-window corpus + two negative controls); `journey_j3.rs:18-77` extended (30 s, TL ref resolution).
+- [x] **T6 — Kernel** (AC7; D-18-1-10, CR-5/6) — `inference/mod.rs:256-262`, `router.rs:33-35`; inverted unit test; `tests/inference_fallback_authz_18_1.rs`; `cargo test -p maos-kernel-core --lib`.
+- [x] **T7 — Exit job** (AC1.5; D-18-1-11) — `epic-18-exit` in `.github/workflows/discipline.yml` (one image, line 1 verbatim + twin), `aggregate.needs`.
+- [x] **T8 — Plants and records** — plants for AC1, AC3, AC6 (a)+(b), AC7, recorded once in `18-1-evidence/plants.md` (command, output, wall-clock); `deferred-work.md` per CR-7; epic §18-1 if anything moved at dev HEAD.
+- [x] **T9 — Governance** (D-18-1-13) — `cargo fmt --all`; `kloc-check --json`; `check-kernel-baseline` (re-pin under FLAG-Winston); `check-model-currency`; `check-test-cost`; `check-dev-record-completeness`; measured requests to the operator **before** landing; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule` before the closing commit (`proof-contract.md:40-44`).
 
 ## Dev Notes
 
@@ -247,15 +247,151 @@ Created 2026-10-25 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter cr
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation, 2026-10-25)
+anthropic/claude-opus-5-5 (creation, 2026-10-25); dev `anthropic/claude-opus-5-5` (2026-10-25)
 
 ### Debug Log References
 
+- Dev HEAD `7b0b59e1`, which equals `c816c544` plus planning docs only. No story file had drifted, 18-8 had not landed, and the kernel pin was still 26361/95.
+- Under `--once`, the Butler handle and inference binding kept `capability`, and with it `audit_tx`, alive. The result was `audit writer drain timed out after 5s`. Fixed by dropping both before the drain (`main.rs`, `--once` teardown).
+- The AC6(a) red first landed on the completion-subset assertion. The assertions were reordered so the open-halt equality reds first, as AC6.4 names. The truth set is bounded by the render instant, because the `--once` unload writes halt frames after the digest.
+- The journey binaries are freshness-checked against `crates/maos-{bin,cli}/src` mtimes, so every `main.rs` plant or restore needs `cargo build -p maos-bin -p maos-cli` first. The local fixtures `worker-cli-fixture`, `forbidden-syscall-probe` and `escape-forbidden-syscall-probe` were stale and were rebuilt with `build-test-fixtures --only`.
+- `intent-lineage-coverage-report.md` was modified by the kernel nextest run. Reverted.
+
 ### Completion Notes List
 
+**ACs and witnesses**
+
+- **AC1:** `crates/maos-bin/tests/butler_inference_18_1.rs`, 6 tests: exit line 1 green; missing `options`, exhaustion and strict drift exit non-zero; unset mode stays deterministic; an undeclared provider is refused at issuance.
+  - `spirits/butler/tests/inference_seam_18_1.rs`, 10 tests: parse contract, one complete and one mint per pass, typed refusal with no side effects, the deterministic path's `options`, the post-pass hook.
+  - JB-5 now asserts a non-zero exit.
+  - Daemon (D-18-1-04 A): a refused pass is typed on stderr, with no notification and no scalar write, and the loop continues. `--once` prints a new `{"event":"butler_notification"}` line.
+- **AC3, AC6.1, AC6.3:** `crates/maos-bin/tests/butler_digest_18_1.rs`, 2 tests: the 30 s FR17 digest against a seeded TL (refs resolve, open halts = truth set, 4 fields) and FR58 `maos init` → run.
+  - The "day" is the UTC day of `SystemTime` until 18-4's `Clock`. The local-offset API is not used.
+  - FR17 (c) anomalies are an explicit unknown string (no production feed; deferred to 18-4) and (d) is yesterday's predicate-fire rate over `epistemic.evaluated:<tag>` frames, with a `trust_bar_basis` (review ruling D-18-1-R3; was `[]` and 0.0 at dev).
+- **AC6.2:**
+  - `spirits/digest/tests/hallucination_18_1.rs`: 0/100 hallucinated, 100/100 receipt-complete, two negative controls.
+  - `journey_j3::j3_team_digest_within_30s_cites_only_real_tl_frames`.
+- **AC7:** inverted unit test plus `crates/maos-kernel-core/tests/inference_fallback_authz_18_1.rs` (4 tests). `deferred-work.md:1213` is marked FIXED in tree (CR-7).
+- **AC1.5:** `epic-18-exit` (ubuntu-24.04) runs line 1 verbatim and the planted-violation twin (a python-derived cassette without `options`). It is in `aggregate.needs` only, and `xtask/tests/ci_shape_18_0.rs` now enrols it. Both steps were simulated locally from the workflow text: line 1 exits 0; the twin exits 1 naming `options`.
+
+**Plants:** 5 plants (AC1, AC3, AC6 a+b, AC7), all red, then restored and green. Details and wall-clocks are in `18-1-evidence/plants.md`. The AC6(b) red lands at the daemon's exit precondition (the I11 persist refuses the fixture ref `local:self-report`), not at the ref loop. *Review: AC1 split into TIA-1a/1b; AC6(b) re-planted with an absent well-formed ref (I11 still refuses first — the loop is defence in depth); 19 review plants (`plants.md` §Review pass).*
+
+**Deviation, consequence of AC1.2 plus D-18-1-04 A (needs the operator's eye):**
+- `--live` now binds Butler's Inference Port.
+- On a keyless runner, Butler's declared `anthropic` is not in the router, so a `--live --once` pass is refused typed and exits non-zero.
+- `butler_8_14b::butler_8_14b_mcp_drivers` and `journey_butler::jb2_mcp_calendar_fetch_reaches_mock` were changed from "exit 0 + arithmetic halt" to "MCP calls reach the mock + typed refusal + non-zero exit, no halt".
+- On the keyed nightly `tier-2-rerecord` leg (non-gating), JB-2 will make a live call and may red.
+
+**Kernel (◆ FLAG-Winston, within the grant):**
+- physical **26361 → 26363 (+2)**; tokei `maos-kernel-core` **20594 → 20595 (+1)**; 95 files.
+- Pin (`xtask/kernel-core-baseline.toml:505` plus HISTORY, `set_hash`, 2 digests), ceiling (`xtask/kloc.toml:264`) and the readers (`kernel_pin_content_hash_16_0.rs` 26361→26363, `recovery_lane_ceiling_rule.rs` `RATIFIED_AT_EASING` 20_594→20_595) moved together.
+- `check-service-boundary` 0 violations; no public symbol changed.
+- **FLAG-Winston:** grant ratified by the operator at D-18-1-10 A (2026-10-25); landed exactly +2 physical / +1 tokei (T0 record).
+
+**kloc (after `cargo fmt --all`, `kloc-check --json`, tokei 14.0.0) — returned to the operator for ratification before landing:**
+- maos-bin **27809 → 27927 (+118)**, inside the +60–120 forecast.
+- maos-kernel-core **20594 → 20595 (+1)**.
+- aggregate measured **181684**; `_aggregate_hardfail` **181566 → 181685**.
+- xtask unchanged: 46363 → 46363. maos-domain, maos-mcp and maos-journey-test unchanged.
+
+**Focused suites, green locally:**
+- `-p butler`, `-p researcher`, `-p maos-digest`, `-p maos-journey-test` (all 136; the j0 reds were stale-binary only).
+- `-p maos-kernel-core` nextest 380 (the 5 T2 reds were a missing fixture; green after `build-test-fixtures`) and `cargo test -p maos-kernel-core --lib` 258/258.
+- `-p maos-bin`: `butler_inference_18_1`, `butler_digest_18_1`, `butler_8_14b`, `inference_mode_15_6`, `researcher_8_14c`, `maosctl_load_16_6`, `one_daemon_one_door_16_1`, `root_shutdown_unload_16_3`, `wasm_form_admission_17_3b`: 72/72. `root_shutdown_unload_16_3` and some 16-1 scenes printed SKIP locally; their proof is CI's.
+- xtask: `d11_xtask_ceiling_ratchet`, `recovery_lane_ceiling_rule`, `retro_action_items`, `kernel_pin_content_hash_16_0`, `ci_shape_18_0` and every other discipline.yml / kloc / pin reader: 348/348.
+
+**Gates PASS:** `kloc-check`, `check-kernel-baseline`, `check-service-boundary`, `check-env-contract` (no new `MAOS_*` read), `check-exit-commands`, `check-test-cost`, `check-model-currency`, `cargo fmt --all -- --check`. There is no manifest or parser change, so the focused set was not widened.
+
+### Review (2026-10-25, anthropic/claude-opus-5-5, 4 layers)
+
+Layers: Blind Hunter (BH, diff only), Edge Case Hunter (EC), Acceptance Auditor (AA), Test Infrastructure Auditor (TIA). Patch pass on the uncommitted tree at `7b0b59e1` (one cargo process, `CARGO_TARGET_DIR=/mnt/build/cargo`, `env -u CI -u GITHUB_ACTIONS`). Plants: `18-1-evidence/plants.md` §Review pass (19 plants, diffs in `18-1-evidence/review-plants/`).
+
+**Review rulings D-18-1-R1…R7** (operator, Lunarpulse, 2026-10-25):
+- **D-18-1-R1 = A** (EC-3/TIA-2) — the hot-swap successor and the door-loaded Butler are bound like the boot Butler. One construction path: `butler::ButlerSeam` (port builder, registered provider ids, per-pass mint, digest renderer, rollover flag) is filled once the router exists and attached by `construct_butler_core` for the boot arm, the door `load` and the successor, each reading its declared provider from its own manifest and minting at the pid resolved per pass. The seam's closures hold `router`/`capability`/`iac`/the rate limiter weakly (a strong hold stalls the audit drain on the other exit paths). Witnesses: `ac4_root_e…` asserts the successor's pass adds an `infer:` frame; `butler_daemon_18_1` asserts a door-loaded Butler's pass does. `maosctl_load_16_6` was not re-authored: its only Butler is the boot Spirit (its loads are reviewer and mira).
+- **D-18-1-R2 = A** (AA-5/EC-4) — under `--live` or an explicit mode, a declared provider the router does not register refuses at BOOT (or load), typed: "butler inference: no inference provider is configured for its declared provider `anthropic`", mirroring the Researcher `--live` arm. **Zero-config nuance:** the check mirrors the Researcher arm exactly, so a host with NOTHING configured registers the `anthropic` placeholder (`UnconfiguredProvider`), still boots, and each pass is refused typed (`Unconfigured`); a host with any provider but not `anthropic` (e.g. the default-URL Ollama) refuses at boot. Hence two `butler_8_14b` tests and `journey_butler::jb6_capability_denied` set `MAOS_OLLAMA_URL=skip` with no keys (zero-config, hermetic, they reach their MCP oracle), and JB-2 sets empty keys plus an explicit Ollama URL (TIA-4) and expects the boot refusal.
+- **D-18-1-R3 = A** (AA-1) — FR17 (d) trust bar = 1 − yesterday's (UTC) predicate-fire rate. The TL had no per-pass record, so the denominator is new: the scalar port writes one `epistemic.evaluated:<tag>` frame per scalar write; fires = `epistemic.halt` frames on evaluated tags (`yesterday_predicate_fire_rate`); the digest carries `trust_bar_basis`. FR17 (c) is an explicit unknown string; production anomaly feed deferred → `18-4-self-tuning-halt-with-injectable-clock`. The FR17 (c) closure claim is removed from the story header and epic §18-1.
+- **D-18-1-R4 = A** (EC-1) — the day-rollover check also runs from a 60 s serving-loop timer (first tick one period out; the start render covers process start); the rollover TEST is deferred → 18-4 (owns the injectable `Clock`).
+- **D-18-1-R5 = A** (AA-6/EC-7) — UTC day ratified until 18-4's `Clock` (local day deferred → 18-4); the clock-step duplicate is patched (`day <= d`).
+- **D-18-1-R6 = A** (AA-7) — bound: the model is called every pass (the drift scalar is its), a notification is stored/emitted only when conflicts exist.
+- **D-18-1-R7** — maos-bin ≤ 28009 pre-ratified: measured **27969**.
+
+**Findings → disposition (33):**
+- BH-1 HIGH prompt drift scale — **patched** (prompt states "1.0 = fully aligned …; lower = more drift"; cassette re-recorded: prompt sha `70f7ae50…ec851`, len 697). EC-5 — same patch.
+- BH-2 MED verdict ignores the hook outcome — **patched** (`maos_bin::butler_root::pass_verdict` takes it; bound pass not `Fired`/`BudgetWarning80{fired:true}` is a refusal). EC-2 — same patch.
+- BH-3 LOW — **patched** (a refused pass clears the notification and output channel) + option-pick mapping **deferred → `18-4-self-tuning-halt-with-injectable-clock`**.
+- BH-4 LOW zero prompt hash — **patched** (real sha/len; strict replay checks it).
+- EC-1 MED — **ruled R4**; rollover test **deferred → 18-4**.
+- EC-3 MED — **ruled R1**. EC-4 MED — **ruled R2**.
+- EC-6 LOW blank fields — **patched** (`parse_proposal` refuses blank `pattern`/`evidence`/option).
+- EC-7 LOW — **ruled R5** (patched `day <= d`; local day **deferred → 18-4**).
+- EC-8 LOW both MCP fetches failed → model still called — **deferred → `18-8-conformant-mcp-client`**.
+- EC-9 — **dismissed** (matches D-18-1-10 A; the retry walk predates 18-1).
+- AA-1 MED — **ruled R3**; anomaly feed **deferred → 18-4**.
+- AA-2 MED — **patched** (`butler:morning_digest` `TelemetryEvent` TL frame; asserted in `butler_digest_18_1`).
+- AA-3 MED — **patched** (`butler_daemon_18_1`, see below); rollover **deferred → 18-4**.
+- AA-4 MED — **patched** (AC6(b) re-planted with `"f".repeat(32)`; I11 persist refuses first → the j3 ref loop is recorded as defence in depth). TIA-7 — same.
+- AA-5 MED — **ruled R2**. AA-6 LOW — **ruled R5**. AA-7 LOW — **ruled R6**.
+- AA-8 LOW — **patched** (asserts `CapError::PolicyDenied`; relabelled a 17-11 regression guard). TIA-11 — same.
+- AA-9 LOW — **patched** (T0 FLAG record written; `check-dev-record-completeness` run for T9: PASSED).
+- TIA-1 MED — **patched** (AC1 plant split: TIA-1a shape arm → JB-5 red; TIA-1b refused-pass arm → the 3 CR-1 cases red; `ci/plant.diff` regenerated = TIA-1b, sha256 `943be65d…14204a7`).
+- TIA-2 MED — **ruled R1**. TIA-3 MED — **patched** (daemon test). TIA-4 MED — **patched** (JB-2 empty keys).
+- TIA-5 MED — **patched** (`a_bound_butler_reasons_over_the_mcp_scenario`: fake MCP port → the prompt carries the MCP event ids → the `belief_variance` scalar over the MCP conflict is written → the notification is the completion's).
+- TIA-6 LOW — **patched** (refs resolve against the window's own frames; borrowed-ref negative control).
+- TIA-8 LOW — **patched** (`ci_shape_18_0::epic_18_exit_runs_line_1_verbatim_and_its_proven_red_twin`: both step names, exit line 1 verbatim from the epic, twin `exit 1` when rc = 0, no `continue-on-error`, `ubuntu-24.04`; `aggregate.needs`-only stays in the existing test). TIA-9 LOW — **patched** (line 1 also greps `butler inference seam wired`).
+- TIA-10 LOW — **patched** (bound no-conflict pass writes the completion's `user_preference_drift` scalar).
+
+**Measured finding — why the first daemon witness stayed red.** `IdleWatchdog` fires `on_idle` once per quiet period (`idle_watchdog.rs:93-95`); only an inbound frame resets it, and nothing outside the root can deliver one to Butler. A hot swap replaces only the control block's runtime (`hot_swap/coordinator.rs:300-318`), keeping its idle stamps, so a successor swapped in AFTER the predecessor's pass gets no pass. The first daemon test hot-swapped twice and timed out; `ac4_root_e` turned red the same way once the review made it wait for the predecessor's pass first. At HEAD, ac4 swapped inside the predecessor's first idle window, and that window is restored (seed cassette, successor runs the quiet period's pass). The daemon witness instead does `unload` + `load` + `start` over the door — a fresh control block per pass, bound through the same seam. It asserts: `morning_digest` on stdout before the first `ProviderInfer` issuance; three passes → three audited issuance rows (D-05); a typed refusal after cassette exhaustion while Butler stays `Running` and the process alive (D-04); a clean SIGTERM with no drain stall. To make the start render falsifiable, the rollover timer's first tick moved one period out: a `tokio::time::interval` ticks at once, which would also render at start.
+
+**Spirit boundary (R1 move).** `spirits/butler/Cargo.toml` is unchanged (no new dependency); the seam in `spirits/butler` holds only type-erased closures (`PortBuilder`, `ProviderMint`, `PidSource`) and the digest renderer (Spirit-side per FR17). The weak holds on router, capability, iac and rate limiter live in `maos-bin`'s closures. `check-service-boundary` PASSED (0 violations); `spirit_boundary_invariants` 1/1.
+
+**Focused suites (wall-clock, this pass, restored tree):** `-p maos-bin` `butler_8_14b` + `maosctl_load_16_6` + `butler_inference_18_1` + `butler_digest_18_1` + `butler_daemon_18_1` + `one_daemon_one_door_16_1` 40/40 (13 s) · `-p butler -p maos-digest` 64/64, 1 skipped (7 s) · `-p maos-journey-test` 40/40, 3 skipped (2 s; JB-2, JB-5, JB-6, j3 included) · kernel `inference_fallback_authz_18_1` 4/4 (1 s) · `cargo test -p maos-kernel-core --lib` 258/258 (1 s, cached build) · `-p xtask` 1100/1100, 12 skipped (28 s; includes `d11_xtask_ceiling_ratchet`, `recovery_lane_ceiling_rule`, `retro_action_items`, `ci_shape_18_0`, `kernel_pin_content_hash_16_0` and every discipline.yml/kloc reader). Exit line 1 and its twin simulated locally from the workflow text: rc 0 with the seam line / rc 1 naming `options`.
+
+**Gates (this pass):** `cargo fmt --all -- --check` clean · `kloc-check` PASSED (aggregate 181726) · `check-kernel-baseline` PASSED (26363 lines, 95 files) · `check-env-contract` PASS (98 vars, 0 violations) · `check-exit-commands` PASS (11 resolved, 4 owed; `maosctl` built) · `check-test-cost` PASS (526 files) · `check-model-currency` PASS (14 pins) · `check-service-boundary` PASSED (0) · `check-dev-record-completeness` PASSED (178 stories). Each gate ran in ≤ 1 s on the warm build. `intent-lineage-coverage-report.md` unmodified.
+
+**Figures (after `cargo fmt --all`, `kloc-check`, tokei 14.0.0):** maos-bin **27927 → 27969 (+42)** (≤ 28009, R7); `_aggregate_hardfail` **181685 → 181727** (measured 181726 + 1); kernel unchanged **26363 / 20595**; xtask unchanged 46363 (no `xtask` row arrow). Re-pinned in `xtask/kloc.toml` with HISTORY notes citing this key.
+
 ### File List
+
+- `spirits/butler/src/lib.rs` (M)
+- `spirits/butler/tests/inference_seam_18_1.rs` (A)
+- `spirits/digest/tests/hallucination_18_1.rs` (A)
+- `crates/maos-bin/src/main.rs` (M)
+- `crates/maos-bin/src/lib.rs` (M), `crates/maos-bin/src/butler_root.rs` (A) — review: the `--once` pass verdict
+- `crates/maos-bin/tests/butler_daemon_18_1.rs` (A), `crates/maos-bin/tests/one_daemon_one_door_16_1.rs` (M) — review
+- `spirits/butler/tests/digest_production_18_1.rs` (A) — review
+- `crates/maos-bin/tests/butler_inference_18_1.rs` (A)
+- `crates/maos-bin/tests/butler_digest_18_1.rs` (A)
+- `crates/maos-bin/tests/butler_8_14b.rs` (M)
+- `crates/maos-kernel-core/src/inference/mod.rs` (M)
+- `crates/maos-kernel-core/src/inference/router.rs` (M)
+- `crates/maos-kernel-core/tests/inference_fallback_authz_18_1.rs` (A)
+- `crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json` (M)
+- `crates/maos-journey-test/tests/journey_butler.rs` (M)
+- `crates/maos-journey-test/tests/journey_j3.rs` (M)
+- `.github/workflows/discipline.yml` (M)
+- `xtask/tests/ci_shape_18_0.rs` (M)
+- `xtask/tests/kernel_pin_content_hash_16_0.rs` (M)
+- `xtask/tests/recovery_lane_ceiling_rule.rs` (M)
+- `xtask/kernel-core-baseline.toml` (M)
+- `xtask/kloc.toml` (M)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (M)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (M, 18-1 row only)
+- `_bmad-output/implementation-artifacts/18-1-evidence/` (A): `plants.md`, `ac1/ac3/ac6a/ac6b/ac7-plant.diff`, `ci/plant.diff`, `ci/plant.diff.sha256`; review: `review-plants/*.diff` (19)
+- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md` (M, §18-1 FR17 (c) claim — review)
+- `_bmad-output/implementation-artifacts/18-1-butler-inference-seam-and-conformant-mcp.md` (M)
 
 ### Change Log
 
 - 2026-10-25 — Story created (backlog; D-18-1-01…13 PROPOSED) at `c816c544`: AC7 needs kernel code (◆ FLAG-Winston; A +2 physical / +1 tokei by reverted prototype, plant proven 13/14); keyless explicit replay cannot reach Butler's declared provider; Butler's notification lacks the manifest's `options` and JB-5 pins exit 0 on a violation; the daemon token expires after 60 s; MCP 2026-07-28 removed `initialize`/`Mcp-Session-Id` and the IO port drops response headers; the 100-digest floors exist at library level for Butler; epic §18-1/§R cites corrected in place.
 - 2026-10-25 — RULED (operator, Lunarpulse): D-18-1-01 B split (old AC2/AC5 + D-06/07/12 → `18-8-conformant-mcp-client`); 02/03/04/05/08/10/11 A; 09 B (AC6 re-scoped to Butler + the Digest class: one production witness per class + a new Digest 100-digest corpus; CR-8/CR-9); kernel grant +2 / +1 ratified; review `anthropic/claude-opus-5-5` only. Status → `ready-for-dev`.
+- 2026-10-25 — Dev (`anthropic/claude-opus-5-5`). Implemented T0–T9:
+  - Butler infers through the Inference Port (typed proposal, `options` on both paths).
+  - Explicit replay answers the interned ids; per-pass mint.
+  - `--once` is fatal on a refused pass or a shape violation.
+  - FR17 digest on the production path; Digest-class 100-window corpus and j3 witness.
+  - AC7 fail-closed kernel fix.
+  - `epic-18-exit` job.
+  - 5 plants proven.
+  - Kernel 26361→26363 / 20594→20595; maos-bin 27809→27927; hardfail 181566→181685.
+  - Status → `review`.
+- 2026-10-25 — Code review (`anthropic/claude-opus-5-5`, 4 layers: BH/EC/AA/TIA; 33 findings) and patch pass. Operator rulings D-18-1-R1…R7 applied: one Butler seam binds the boot, door-loaded and hot-swapped Butler (R1); typed boot refusal for an unregistered declared provider (R2); real trust bar, FR17 (c) unknown and its closure claim removed (R3); 60 s rollover timer (R4); UTC day + clock-step guard (R5); notification only on conflicts (R6); maos-bin 27927 → 27969 ≤ 28009 (R7). Patched BH-1…4, EC-2/5/6, AA-2/3/4/8/9, TIA-1/3–11; deferred EC-8 → 18-8 and rollover test, local day, option-pick mapping, anomaly feed → 18-4; dismissed EC-9. Daemon witness root cause measured (once-per-quiet-period `on_idle`; a hot swap keeps the idle stamps) → `unload`/`load`/`start` witness; ac4 restored to swapping inside the first idle window. 19 review plants; CI plant regenerated. `_aggregate_hardfail` 181685 → 181727; kernel unchanged. Status stays `review`.

@@ -502,7 +502,21 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26361
+src_lines = 26363
+# HISTORY: Story 18-1-butler-inference-seam-and-conformant-mcp ◆ FLAG-Winston
+#          (2026-10-25), D-18-1-10 A ratified by Lunarpulse 2026-10-25 (grant
+#          +2 physical / +1 tokei, exact at landing): physical 26361 -> 26363
+#          (+2), tokei 20594 -> 20595 (+1), exactly the creation prototype.
+#          Driver (AC7, `deferred-work.md:1213`): `InferencePortAdapter::complete`
+#          refuses an empty resolved provider id (`Unconfigured`) and, after
+#          `check_capability`, refuses with `CapabilityDenied` before any
+#          dispatch a fallback id the token does not name (inference/mod.rs
+#          +4); `MultiProviderRouter::dispatch` stops mapping `""` to the
+#          default (router.rs -2); the in-`src` unit test inverted to
+#          `fallback_not_named_by_the_token_is_refused_before_dispatch` (+0
+#          physical, -1 tokei). Only inference/{mod,router}.rs changed; all 95
+#          files retained; digests + set_hash re-emitted via `--emit-pin`; no
+#          public kernel symbol added, removed or moved.
 # HISTORY: Story 17-11-scope-selector-entitlement ◆ FLAG-Winston (2026-10-23),
 #          D-17-11-FW-01 A (rule home `Scope::entitles` in maos-domain) and
 #          D-17-11-FW-02 A ruled by Lunarpulse 2026-10-23 (kernel Δ 0 physical /
@@ -785,7 +799,7 @@ src_lines = 26361
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "45b89741e6752f460a90346173f15823fdae42f2ef44b802fdc0fbd3436206d8"
+set_hash = "188089021a311771aa36e96a8b1d965e2918b736e2d3a63e6a72b69e904a1eb1"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -812,8 +826,8 @@ set_hash = "45b89741e6752f460a90346173f15823fdae42f2ef44b802fdc0fbd3436206d8"
 "hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
-"inference/mod.rs" = "43bcd71c59c47d1cdc7c6058fd168a21a22235e038258bfd9afe45d985284065"
-"inference/router.rs" = "4cd2744273861514bf0989eb43f723380a5caf0801454078bd10a1953a94e8b1"
+"inference/mod.rs" = "3c60dd2f871117effa1734baa12563628a703cd69b1ec06a007ecaede065f564"
+"inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
 "io/mod.rs" = "1c4c5202c33d39de7dd61d36607015dd07dac01922bd82ac6fd40300a8e72bf6"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"

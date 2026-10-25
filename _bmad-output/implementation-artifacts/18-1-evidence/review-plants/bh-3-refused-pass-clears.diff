@@ -1,0 +1,13 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -847,10 +847,6 @@
+                         // Review BH-3: a refused pass leaves no stale
+                         // notification pending from an earlier pass.
+                         eprintln!("butler: on_idle pass refused: {error}");
+-                        *self.last_notification.lock() = None;
+-                        if let Some(ch) = &self.output_channel {
+-                            *ch.lock().unwrap_or_else(|e| e.into_inner()) = None;
+-                        }
+                         *self.pass_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+                         return;
+                     }

@@ -7,6 +7,9 @@
 /// than a re-implementation of them.
 #[cfg(feature = "network")]
 pub mod admission;
+/// Story 18-1 — the `--once` Butler pass verdict.
+#[cfg(feature = "network")]
+pub mod butler_root;
 /// Story 15-6 — provider-level cassette replay/record adapters shared by every
 /// inference consumer.
 #[cfg(feature = "network")]

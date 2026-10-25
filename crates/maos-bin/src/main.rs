@@ -534,6 +534,7 @@ fn requires_epistemic_halt_port(
 /// the daemon can render the halt screen-string. `process_scalar_write` is
 /// `&self` (no `Mutex` around the orchestrator).
 #[cfg(feature = "network")]
+#[derive(Clone)]
 enum ButlerPidSource {
     Fixed(Arc<std::sync::atomic::AtomicU32>),
     Resolve(Arc<dyn Fn() -> Option<u32> + Send + Sync>),
@@ -627,6 +628,16 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
         *self.last_receipt.lock().expect(
             "ButlerOrchestratorAdapter::write_scalar: poisoned mutex — a prior panic left the receipt state inconsistent"
         ) = receipt.clone();
+        // Story 18-1 (review ruling D-18-1-R3) — the evaluation itself is a TL
+        // frame: FR17 (d)'s fire-rate denominator (`yesterday_predicate_fire_rate`).
+        let _ = self.tl.insert_frame_event(
+            FrameKind::TelemetryEvent,
+            spirit_pid,
+            None,
+            &format!("{}{tag}", butler::INTENT_PREDICATE_EVALUATED),
+            &[],
+            maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+        );
         Ok(receipt)
     }
 }
@@ -643,6 +654,14 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
 /// `policy == None` is the `MAOS_TEST_ONLY_STRIP_SCALAR_PORT` seam and nothing
 /// else: the receipt handle comes back `None` and every caller that requires a
 /// port (`needs_port`) must fail loudly on it.
+///
+/// Story 18-1 (review ruling D-18-1-R1) — the root's [`ButlerSeam`] (bound
+/// Inference Port, per-pass mint at the resolved pid, digest rollover) is
+/// attached here too, so the boot arm, the door load and the hot-swap
+/// successor share it; `declared` names the Spirit's first declared provider.
+///
+/// [`ButlerSeam`]: butler::ButlerSeam
+#[allow(clippy::too_many_arguments)]
 #[cfg(feature = "network")]
 fn construct_butler_core(
     policy: Option<maos_kernel_core::security::manifest::EpistemicPolicySection>,
@@ -655,13 +674,18 @@ fn construct_butler_core(
     boot_nonce: u64,
     pid_resolver: Option<Arc<dyn Fn() -> Option<u32> + Send + Sync>>,
     spirit_id: &str,
-) -> (
-    butler::Butler,
-    Option<Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>>,
-    // The fixed pid binding the CALLER must set to `scheduler.load`'s return.
-    // Upgrade successors use the supplied resolver instead and return `None`.
-    Option<Arc<std::sync::atomic::AtomicU32>>,
-) {
+    seam: &butler::ButlerSeam,
+    declared: impl FnOnce() -> Option<String>,
+) -> Result<
+    (
+        butler::Butler,
+        Option<Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>>,
+        // The fixed pid binding the CALLER must set to `scheduler.load`'s return.
+        // Upgrade successors use the supplied resolver instead and return `None`.
+        Option<Arc<std::sync::atomic::AtomicU32>>,
+    ),
+    String,
+> {
     let scenario = butler::ScenarioInput {
         calendar: vec![
             butler::CalendarEvent {
@@ -689,15 +713,14 @@ fn construct_butler_core(
     // move local to this scope.
     let mut last_receipt = None;
     let mut pid_binding = None;
+    let pid_source = match pid_resolver {
+        Some(resolve) => ButlerPidSource::Resolve(resolve),
+        None => ButlerPidSource::Fixed(Arc::clone(
+            pid_binding.insert(Arc::new(std::sync::atomic::AtomicU32::new(0))),
+        )),
+    };
     if let Some(policy) = policy {
         let receipt = Arc::new(std::sync::Mutex::new(None));
-        let pid_source = if let Some(resolve) = pid_resolver {
-            ButlerPidSource::Resolve(resolve)
-        } else {
-            let binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
-            pid_binding = Some(Arc::clone(&binding));
-            ButlerPidSource::Fixed(binding)
-        };
         let adapter = Arc::new(ButlerOrchestratorAdapter {
             orchestrator,
             tl,
@@ -705,14 +728,28 @@ fn construct_butler_core(
             policy,
             boot_nonce,
             last_receipt: Arc::clone(&receipt),
-            spirit_pid_source: pid_source,
+            spirit_pid_source: pid_source.clone(),
             spirit_id: spirit_id.to_owned(),
         });
         butler =
             butler.with_scalar_port(adapter as Arc<dyn maos_domain::ports::EpistemicScalarPort>);
         last_receipt = Some(receipt);
     }
-    (butler, last_receipt, pid_binding)
+    let butler = seam.attach(butler, declared, Arc::new(move || pid_source.get()))?;
+    Ok((butler, last_receipt, pid_binding))
+}
+
+/// Story 17-11 / 18-1 — the Spirit's FIRST declared `ProviderInfer`: the
+/// provider a composition-root mint names (never the router default, which a
+/// Spirit need not declare — 17-11 entitlement refuses it at issuance).
+#[cfg(feature = "network")]
+fn first_declared_provider(gated: &maos_bin::admission::GatedManifest) -> Option<String> {
+    maos_kernel_core::security::capabilities_required_to_scopes(&gated.caps_required)
+        .into_iter()
+        .find_map(|scope| match scope {
+            Scope::ProviderInfer { provider } => Some(provider),
+            _ => None,
+        })
 }
 
 /// Story 16-1 (D-16-1-W) — re-parse `[epistemic_policy]` from the TARGET
@@ -779,7 +816,14 @@ struct SpiritBuildDeps {
     boot_nonce: u64,
     /// Story 17-4 — the root's Observer activity sink.
     activity_sink: Arc<dyn ::observer::ActivitySink>,
+    /// Story 18-1 (review ruling D-18-1-R1) — the root's Butler seam, filled
+    /// once the router exists (it holds the `audit_tx` owners only weakly).
+    butler_seam: ButlerSeamSlot,
 }
+
+/// Story 18-1 — the root's late-filled [`butler::ButlerSeam`].
+#[cfg(feature = "network")]
+type ButlerSeamSlot = Arc<std::sync::Mutex<Option<butler::ButlerSeam>>>;
 
 /// Story 16-6 — the ONE class-dispatch switch for a Spirit that is being
 /// created from a manifest rather than from `maos run`'s own bespoke boot
@@ -844,6 +888,24 @@ fn build_spirit_obj(
             let resolver_scheduler = Arc::clone(&deps.scheduler);
             let pid_resolver: Arc<dyn Fn() -> Option<u32> + Send + Sync> =
                 Arc::new(move || resolver_scheduler.resolve_pid(&successor_id));
+            let seam = deps
+                .butler_seam
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .clone()
+                .ok_or("butler seam not ready")?;
+            // The token names the TARGET manifest's first declared provider.
+            let declared = || {
+                maos_bin::admission::read_manifest(staged)
+                    .and_then(|text| {
+                        maos_bin::admission::gate_manifest(&text, &|name| {
+                            classify_spirit(name).is_some()
+                        })
+                    })
+                    .ok()
+                    .as_ref()
+                    .and_then(first_declared_provider)
+            };
             let (butler, _receipt, _fixed_pid_binding) = construct_butler_core(
                 Some(policy),
                 Arc::new(std::sync::Mutex::new(None)),
@@ -853,7 +915,9 @@ fn build_spirit_obj(
                 deps.boot_nonce,
                 Some(pid_resolver),
                 class_name,
-            );
+                &seam,
+                declared,
+            )?;
             make_spirit_obj(butler)
         }
     })
@@ -3100,6 +3164,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let factory_transparency_log = Arc::clone(&transparency_log);
     let factory_shared_journal = Arc::clone(&shared_journal);
     let factory_successor_slot = successor_manifest_slot.clone();
+    let butler_seam: ButlerSeamSlot = Arc::default();
+    let factory_butler_seam = Arc::clone(&butler_seam);
     // Story 16-3 (D-16-3-N) — the successor factory's butler arm must set the
     // new adapter's pid binding BEFORE it returns: the factory's signature is
     // fixed (`create(&SpiritManifestBundle) -> Result<Arc<dyn AnySpiritObj>>`)
@@ -3145,6 +3211,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     scheduler: Arc::clone(&factory_scheduler),
                     boot_nonce,
                     activity_sink: Arc::clone(&factory_activity_sink),
+                    butler_seam: Arc::clone(&factory_butler_seam),
                 },
                 &class.name,
                 factory_successor_slot.peek().as_deref(),
@@ -3307,6 +3374,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 scheduler: Arc::clone(&scheduler),
                 boot_nonce,
                 activity_sink: hook_pump.activity_sink(),
+                butler_seam: Arc::clone(&butler_seam),
             }),
             hooks: Arc::clone(&hook_pump),
         });
@@ -3622,7 +3690,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .map_err(|error| error.to_string())?;
 
-    // The router's public key set and default remain unchanged. Only each
+    // The router's default remains unchanged, and so does its key set except
+    // that explicit replay also answers the interned ids (18-1, below). Each
     // key's driver is replaced/wrapped, so capability scopes, fallback, IAC,
     // attribution, and Transparency Log behavior stay in the kernel adapter.
     let mut cassette_recorder: Option<Arc<cassette_replay::CassetteRecorder>> = None;
@@ -3643,6 +3712,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             for provider in providers_map.values_mut() {
                 *provider = Arc::clone(&replay);
+            }
+            // Story 18-1 (D-18-1-02 A) — replay contacts no provider, so the
+            // driver also answers every id the kernel interns; a Spirit's
+            // token and request then name its own declared provider on a
+            // keyless runner. The default is unchanged.
+            for id in ["anthropic", "openai", "ollama"] {
+                providers_map
+                    .entry(id.to_owned())
+                    .or_insert_with(|| Arc::clone(&replay));
             }
         }
         ResolvedInferenceMode::Record { cassette } => {
@@ -3688,6 +3766,86 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     .with_iac(Arc::clone(&iac));
     eprintln!("maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)");
+    // Story 18-1 — ONE builder for a Spirit's bound Inference Port over the
+    // shared router (the 15-6 wrapping already replaced or wrapped every
+    // driver). It captures the `audit_tx` owners weakly (see `PortBuilder`).
+    let port_builder: butler::PortBuilder = {
+        let (router, capability, iac) = (
+            Arc::downgrade(&router),
+            Arc::downgrade(&capability),
+            Arc::downgrade(&iac),
+        );
+        let (tl, telemetry) = (Arc::clone(&transparency_log), Arc::clone(&telemetry));
+        let limiter = inference_mode
+            .uses_rate_limiter()
+            .then(|| Arc::downgrade(&rate_limiter));
+        Arc::new(move || {
+            let adapter = InferencePortAdapter::new(
+                router.upgrade()?,
+                capability.upgrade()?,
+                Arc::clone(&tl),
+                Arc::clone(&telemetry),
+            );
+            let adapter = match &limiter {
+                Some(limiter) => adapter.with_rate_limiter(limiter.upgrade()?),
+                None => adapter,
+            };
+            let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
+                Arc::new(adapter.with_iac(iac.upgrade()?));
+            Some(port)
+        })
+    };
+    // Story 18-1 (review ruling D-18-1-R1) — the Butler seam every Butler of
+    // this root attaches (boot arm, door load, hot-swap successor): bound
+    // under `--live` and every explicit mode (unset mode stays deterministic,
+    // ADR-064), the root's audited per-pass mint, the FR17 digest renderer.
+    *butler_seam
+        .lock()
+        .unwrap_or_else(|error| error.into_inner()) = Some(butler::ButlerSeam {
+        inference: (run_args.as_ref().is_some_and(|run| run.live) || inference_mode.is_explicit())
+            .then(|| (Arc::clone(&port_builder), router.registered_ids())),
+        mint: {
+            let capability = Arc::downgrade(&capability);
+            let enterprise_runtime = enterprise_runtime.clone();
+            let enterprise_pdp_runtime = enterprise_pdp_runtime.clone();
+            Arc::new(move |pid, provider: &str| {
+                issue_enterprise_governed_capability(
+                    capability
+                        .upgrade()
+                        .ok_or("token issue failed: root shut down")?
+                        .as_ref(),
+                    enterprise_runtime.as_deref(),
+                    enterprise_pdp_runtime.as_ref(),
+                    pid,
+                    Scope::ProviderInfer {
+                        provider: provider.to_owned(),
+                    },
+                    60,
+                    [0u8; 32],
+                    IntentClass::Standard,
+                )
+                .map_err(|e| format!("token issue failed: {e}"))
+            })
+        },
+        digest: Arc::new(butler::MorningDigestRenderer::new(
+            audit_db_path.clone(),
+            journal_path.clone(),
+            {
+                let tl = Arc::clone(&transparency_log);
+                Arc::new(move |pid, line: &[u8]| {
+                    let _ = tl.insert_frame_event(
+                        FrameKind::TelemetryEvent,
+                        pid,
+                        None,
+                        butler::MORNING_DIGEST_INTENT,
+                        line,
+                        maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+                    );
+                })
+            },
+        )),
+        rollover: !run_args.as_ref().is_some_and(|run| run.once),
+    });
     // Story 8.14a — kernel-rendered shell dispatch.
     if shell_mode {
         if let Some(mode) = inference_mode_value.as_deref() {
@@ -4062,6 +4220,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut root_supervision: Option<maos_bin::supervision::RootSupervision> = None;
     let mut escape_tail: Option<maos_bin::escape_detector_consumer::EscapeAnomalyTail> = None;
     let mut post_unload_stop: Option<Arc<dyn Fn(u32) + Send + Sync>> = None;
+    // Story 18-1 (review ruling D-18-1-R4) — a serving Butler's digest
+    // renderer and pid, for the serving loop's day-rollover timer.
+    let mut butler_rollover: Option<(Arc<butler::MorningDigestRenderer>, u32)> = None;
 
     // ─────────────────────────────────────────────────────────────
     // Story 8.11 / AC1 — `maos run <manifest> [--live] [--once]`.
@@ -5063,6 +5224,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Arc<std::sync::Mutex<Option<(CapabilityToken, u32)>>>,
             > = None;
             let mut researcher_inference_provider: Option<String> = None;
+            // Story 18-1 (D-18-1-04 A) — a handle on the loaded Butler (its
+            // state is `Arc`-shared) so `--once` can take a refused pass.
+            let mut butler_pass_handle: Option<butler::Butler> = None;
+            // Story 18-1 (D-18-1-08 A) — the FR17 morning digest renderer.
+            let mut butler_morning_digest: Option<Arc<butler::MorningDigestRenderer>> = None;
 
             // JB-5 — shared output channel for output_shape validation (only
             // populated for Butler-class Spirits).
@@ -5088,6 +5254,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // boot-loud scalar port (which IS the halt). `strip_port`
                         // is the MAOS_TEST_ONLY_STRIP_SCALAR_PORT test seam and
                         // must never silently strip in production boots.
+                        // Story 18-1 (review ruling D-18-1-R1/R2) — the root's
+                        // Butler seam is attached inside the shared constructor;
+                        // under `--live`/explicit mode a declared provider the
+                        // router does not register refuses the BOOT, typed.
+                        let seam = butler_seam
+                            .lock()
+                            .unwrap_or_else(|error| error.into_inner())
+                            .clone()
+                            .ok_or("maos run: butler seam not ready")?;
                         let (mut butler, butler_receipt, butler_pid_binding) =
                             construct_butler_core(
                                 if strip_port {
@@ -5104,7 +5279,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 boot_nonce,
                                 None,
                                 &spirit_id,
-                            );
+                                &seam,
+                                || first_declared_provider(&gated),
+                            )
+                            .map_err(|error| format!("maos run: {error}"))?;
                         halt_receipt_handle = butler_receipt;
                         if needs_port && halt_receipt_handle.is_none() {
                             return Err(format!(
@@ -5265,6 +5443,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 eprintln!("maos run: butler live MCP port wired (--live)");
                             }
                         }
+                        // Story 18-1 (D-18-1-08 A) — the FR17 morning digest: a
+                        // serving root renders it at start (after admission) and
+                        // on a day rollover; `--once` renders it after its pass.
+                        butler_morning_digest = Some(Arc::clone(&seam.digest));
+                        butler_pass_handle = Some(butler.clone());
                         // Patch 4 / Story 16-3 (D-16-3-N) — the MCP port and the
                         // scalar port were built with a placeholder pid; they are
                         // re-pointed the instant the scheduler assigns the real
@@ -5487,20 +5670,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             researcher_inference_provider = Some(provider);
                             let binding = Arc::new(std::sync::Mutex::new(None));
                             researcher_inference_binding = Some(Arc::clone(&binding));
-                            let researcher_inference = InferencePortAdapter::new(
-                                Arc::clone(&router),
-                                Arc::clone(&capability),
-                                Arc::clone(&transparency_log),
-                                Arc::clone(&telemetry),
-                            );
-                            let researcher_inference = if inference_mode.uses_rate_limiter() {
-                                researcher_inference.with_rate_limiter(Arc::clone(&rate_limiter))
-                            } else {
-                                researcher_inference
-                            }
-                            .with_iac(Arc::clone(&iac));
-                            let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                                Arc::new(researcher_inference);
+                            let port =
+                                port_builder().ok_or("maos run: inference port unavailable")?;
                             researcher = researcher.with_deferred_inference_port(port, binding);
                             eprintln!("maos run: researcher live-inference seam wired (--live)");
                         } else if inference_mode.is_explicit() {
@@ -5514,20 +5685,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             researcher_inference_provider = Some(provider);
                             let binding = Arc::new(std::sync::Mutex::new(None));
                             researcher_inference_binding = Some(Arc::clone(&binding));
-                            let researcher_inference = InferencePortAdapter::new(
-                                Arc::clone(&router),
-                                Arc::clone(&capability),
-                                Arc::clone(&transparency_log),
-                                Arc::clone(&telemetry),
-                            );
-                            let researcher_inference = if inference_mode.uses_rate_limiter() {
-                                researcher_inference.with_rate_limiter(Arc::clone(&rate_limiter))
-                            } else {
-                                researcher_inference
-                            }
-                            .with_iac(Arc::clone(&iac));
-                            let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                                Arc::new(researcher_inference);
+                            let port =
+                                port_builder().ok_or("maos run: inference port unavailable")?;
                             researcher = researcher.with_deferred_inference_port(port, binding);
                             eprintln!(
                                 "maos run: researcher inference seam wired ({inference_mode:?})"
@@ -5552,18 +5711,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             // holds the admitted manifest scopes. `CassetteReplayPort`
                             // contacts no provider and never reads it, so this is not a
                             // reroute (FW-05 A kept), and a keyless box still replays.
-                            let provider =
-                                maos_kernel_core::security::capabilities_required_to_scopes(
-                                    &gated.caps_required,
-                                )
-                                .into_iter()
-                                .find_map(|scope| match scope {
-                                    Scope::ProviderInfer { provider } => Some(provider),
-                                    _ => None,
-                                })
-                                .ok_or(
-                                    "maos run: cassette replay: the Spirit declares no provider",
-                                )?;
+                            let provider = first_declared_provider(&gated).ok_or(
+                                "maos run: cassette replay: the Spirit declares no provider",
+                            )?;
                             researcher_inference_provider = Some(provider);
                             let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
                                 Arc::new(replay);
@@ -5726,24 +5876,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(tail) = escape_tail.as_ref() {
                 tail.declare(pid, gated.sandbox_cfg.tier);
             }
+            // Story 18-1 — the Researcher's one token comes from the root's
+            // mint (the Butler seam's): audited, policy-checked, quota-charged
+            // issuance (17-9/17-11), 60 s TTL. Butler mints per pass itself.
             if let (Some(binding), Some(provider)) = (
                 researcher_inference_binding.as_ref(),
                 researcher_inference_provider.as_ref(),
             ) {
-                let token = issue_enterprise_governed_capability(
-                    capability.as_ref(),
-                    enterprise_runtime.as_deref(),
-                    enterprise_pdp_runtime.as_ref(),
-                    pid,
-                    Scope::ProviderInfer {
-                        provider: provider.clone(),
-                    },
-                    60,
-                    [0u8; 32],
-                    IntentClass::Standard,
-                )
-                .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                let mint = butler_seam
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner())
+                    .as_ref()
+                    .map(|seam| Arc::clone(&seam.mint))
+                    .ok_or("maos run: butler seam not ready")?;
+                let token = mint(pid, provider).map_err(|e| format!("maos run: {e}"))?;
                 *binding.lock().unwrap_or_else(|error| error.into_inner()) = Some((token, pid));
+            }
+            // Story 18-1 (D-18-1-08 A) — a serving Butler renders the morning
+            // digest at process start (the first session) and hands the
+            // renderer to the serving loop's day-rollover timer (review ruling
+            // D-18-1-R4); `--once` renders it after its pass.
+            if let Some(digest) = butler_morning_digest.as_ref().filter(|_| !run.once) {
+                digest.render_logged(pid);
+                butler_rollover = Some((Arc::clone(digest), pid));
             }
             #[cfg(feature = "wasm-host")]
             let spawned_result: Option<Result<(), Box<dyn std::error::Error>>> =
@@ -5873,19 +6028,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             })
                         );
                     }
-                    // JB-5 — output_shape enforcement: validate the Spirit's notification
-                    // output against the manifest's OutputShapePredicate. The Spirit writes
-                    // to the shared output channel during on_idle; the daemon validates here.
+                    // JB-5 / Story 18-1 (D-18-1-04 A) — under `--once` a refused
+                    // Butler pass (inference, malformed proposal) and an
+                    // `output_shape` violation are fatal (log-only before 18-1).
+                    // The Spirit writes the shared output channel during on_idle.
                     {
                         let predicate =
                             maos_kernel_core::security::OutputShapePredicate::from(&gated.output_shape);
-                        let output_guard = butler_output_ch.lock().unwrap();
-                        if let Some(output_json) = &*output_guard {
-                            if let Err(violation) = predicate.check(output_json) {
-                                eprintln!("maos run: output_shape violation: {violation}");
-                            }
+                        let output = butler_output_ch.lock().unwrap().clone();
+                        let verdict = maos_bin::butler_root::pass_verdict(
+                            butler_pass_handle.as_ref(),
+                            &outcome,
+                            output.as_ref(),
+                            &predicate,
+                        );
+                        verdict.map_err(|error| format!("maos run: {error}"))?;
+                        if let Some(notification) = output {
+                            println!(
+                                "{}",
+                                serde_json::json!({
+                                    "event": "butler_notification",
+                                    "notification": notification,
+                                })
+                            );
                         }
-                        drop(output_guard);
+                    }
+                    // Story 18-1 (D-18-1-08 A) — `--once` renders the FR17 morning
+                    // digest after its pass.
+                    if let Some(digest) = butler_morning_digest.as_ref() {
+                        digest
+                            .render_if_new_day(pid)
+                            .map_err(|error| format!("maos run: {error}"))?;
                     }
                     if let Some(handle) = &halt_receipt_handle {
                         if let Some(receipt) = handle
@@ -5958,6 +6131,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 drop(journal);
                 drop(audit_tx);
                 drop(inference);
+                // Story 18-1 — the Butler handle holds `capability` (and so
+                // `audit_tx`) through its bound port.
+                drop(butler_pass_handle);
                 drop(orchestrator);
                 drop(root_worker_supervision);
                 drop(scheduler);
@@ -8534,6 +8710,24 @@ description = "smoke test spirit successor"
     ))
     .spawn(cancel.child_token());
     eprintln!("maos: IdleWatchdog spawned (Story 5.1)");
+    // Story 18-1 (review ruling D-18-1-R4) — a quiet Butler daemon gets no
+    // second `on_idle` (IdleWatchdog fires once per quiet period), so the
+    // FR17 day-rollover check also runs from the serving loop on a 60 s
+    // interval (the SIEM consumer's cadence above); `render_at` dedupes the day.
+    // Its first tick is one period out: the start render covers process start.
+    if let Some((digest, pid)) = butler_rollover.take() {
+        let stop = cancel.child_token();
+        tokio::spawn(async move {
+            let period = std::time::Duration::from_secs(60);
+            let mut tick = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
+            loop {
+                tokio::select! {
+                    _ = stop.cancelled() => break,
+                    _ = tick.tick() => digest.render_logged(pid),
+                }
+            }
+        });
+    }
 
     // Story 17-4 (AC3) — the `on_consolidate` caller, beside IdleWatchdog:
     // every registered compiled-in Spirit, once per its own idle window while

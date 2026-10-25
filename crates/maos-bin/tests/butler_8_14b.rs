@@ -89,6 +89,13 @@ fn maos_run_butler_live_once_wires_mcp_port() {
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_HOME", home.path.clone())
         .env("MAOS_MCP_CALENDAR_URI", "http://localhost:9999")
+        // Story 18-1 review ruling D-18-1-R2: `--live` refuses a boot whose
+        // router lacks Butler's declared provider. No key and no Ollama leave
+        // the `anthropic` Unconfigured placeholder registered (no network), so
+        // the root boots and wires MCP; the pass is then refused typed.
+        .env("MAOS_OLLAMA_URL", "skip")
+        .env_remove("MAOS_ANTHROPIC_API_KEY")
+        .env_remove("MAOS_OPENAI_API_KEY")
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos run butler --live --once");
@@ -255,8 +262,6 @@ const CHILD_BUDGET: Duration = Duration::from_secs(60);
 /// inherited the pipe (the Story 16-3 grandchild class). Waiting on it is a
 /// hang, so it is bounded and named instead.
 const PIPE_SETTLE: Duration = Duration::from_secs(10);
-/// Once `maos` has exited, a call it never made will never arrive.
-const MOCK_CALL_BUDGET: Duration = Duration::from_secs(10);
 
 /// Wait for a piped `maos` child with every wait BOUNDED.
 ///
@@ -345,6 +350,8 @@ fn butler_8_14b_mcp_drivers() {
         .env("MAOS_MCP_SLACK_URI", url.clone())
         .env("MAOS_MCP_LINEAR_URI", url.clone())
         .env("MAOS_MCP_FIGMA_URI", url.clone())
+        .env_remove("MAOS_ANTHROPIC_API_KEY")
+        .env_remove("MAOS_OLLAMA_URL")
         .current_dir(workspace_root())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -356,34 +363,31 @@ fn butler_8_14b_mcp_drivers() {
     eprintln!("Child stdout: {}", stdout_str);
     eprintln!("Child stderr: {}", stderr_str);
 
-    let stdout = stdout_str;
-
-    // Assert calendar list_events was called
-    let req1 = rx
-        .recv_timeout(MOCK_CALL_BUDGET)
-        .unwrap_or_else(|e| panic!("expected calendar_events call ({e}); stderr:\n{stderr_str}"));
-    assert!(req1.path.contains("tools/call") || req1.path.contains("/"));
-
-    // Assert comms list_messages was called
-    let req2 = rx
-        .recv_timeout(MOCK_CALL_BUDGET)
-        .unwrap_or_else(|e| panic!("expected comms_messages call ({e}); stderr:\n{stderr_str}"));
-    assert!(req2.path.contains("tools/call") || req2.path.contains("/"));
-
-    // Assert halt event is in stdout
-    let events: Vec<serde_json::Value> = stdout
-        .lines()
-        .filter_map(|l| serde_json::from_str(l).ok())
-        .collect();
-    let halt = events
-        .iter()
-        .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("halt"))
-        .expect("stdout must contain a halt event");
-
-    let expected_render = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
-    assert_eq!(
-        halt.get("render").and_then(|v| v.as_str()),
-        Some(expected_render.as_str())
+    // Story 18-1 review ruling D-18-1-R2: `--live` binds Butler's Inference
+    // Port, and on this keyless runner the router does not register Butler's
+    // declared `anthropic` — the root refuses at BOOT, typed (the Researcher
+    // `--live` arm's "no inference provider is configured" pattern), before
+    // any pass: no MCP call, no proposal, no halt. That MCP data drives the
+    // bound pass is proven at library level
+    // (`spirits/butler/tests/inference_seam_18_1.rs`,
+    // `a_bound_butler_reasons_over_the_mcp_scenario`).
+    assert!(
+        !status.success(),
+        "a keyless --live boot must not exit 0; stderr:\n{stderr_str}"
+    );
+    assert!(
+        stderr_str.contains(
+            "butler inference: no inference provider is configured for its declared provider `anthropic`"
+        ),
+        "the boot refusal must be typed; stderr:\n{stderr_str}"
+    );
+    assert!(
+        !stdout_str.contains("\"event\":\"on_idle_fired\""),
+        "no pass runs after a boot refusal; stdout:\n{stdout_str}"
+    );
+    assert!(
+        rx.recv_timeout(Duration::from_millis(200)).is_err(),
+        "no MCP call is made after a boot refusal"
     );
 }
 
@@ -431,6 +435,10 @@ fn butler_undeclared_tool_returns_capability_denied() {
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_HOME", home.path.clone())
         .env("MAOS_MCP_CALENDAR_URI", url)
+        // Story 18-1 review ruling D-18-1-R2 — see `maos_run_butler_live_once_wires_mcp_port`.
+        .env("MAOS_OLLAMA_URL", "skip")
+        .env_remove("MAOS_ANTHROPIC_API_KEY")
+        .env_remove("MAOS_OPENAI_API_KEY")
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos run butler --live --once");

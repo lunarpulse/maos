@@ -1,0 +1,12 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -186,8 +186,7 @@
+          comms below and propose ONE notification. Reply with exactly one JSON object \
+          and nothing else: {{\"pattern\": string, \"confidence\": number in [0,1], \
+          \"evidence\": string, \"options\": [string, ...], \"user_preference_drift\": \
+-         number in [0,1]}}. user_preference_drift: 1.0 = fully aligned with the \
+-         director's preferences; lower = more drift.\n\nUnresolved calendar conflicts: \
++         number in [0,1]}}.\n\nUnresolved calendar conflicts: \
+          [{conflicts}]\n\nScenario: {scenario_json}"
+     ))
+ }

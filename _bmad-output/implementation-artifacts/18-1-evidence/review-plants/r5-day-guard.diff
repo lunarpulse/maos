@@ -1,0 +1,11 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -341,7 +341,7 @@
+             .rendered_day
+             .lock()
+             .unwrap_or_else(|error| error.into_inner());
+-        if rendered_day.is_some_and(|d| day <= d) {
++        if rendered_day.is_some_and(|d| day == d) {
+             return Ok(None);
+         }
+         let digest = Butler::new()

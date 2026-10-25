@@ -1,0 +1,10 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -353,7 +353,6 @@
+             "digest": digest,
+         });
+         let line = event.to_string();
+-        (self.frame_sink)(pid, line.as_bytes());
+         println!("{line}");
+         *rendered_day = Some(day);
+         Ok(Some(event))

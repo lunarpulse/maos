@@ -1,0 +1,11 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -638,7 +638,7 @@
+     Ok(PredicateFireRate {
+         day_utc,
+         fires,
+-        evaluations: evaluated.len(),
++        evaluations: evaluated.len() + 1,
+     })
+ }
+ 

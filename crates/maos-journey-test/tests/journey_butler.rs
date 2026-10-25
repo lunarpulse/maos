@@ -63,55 +63,49 @@ fn jb2_mcp_calendar_fetch_reaches_mock() {
     let comms_mock = MockMcp::from_fixture(comms_fixture.to_str().unwrap());
 
     let audit = AuditDb::temp();
-    let tl_path = audit.transparency_log_path();
+    // Review TIA-4: no inherited provider key reaches the run, so the result
+    // does not depend on the developer's shell or the keyed nightly leg; an
+    // explicit (unreachable) Ollama keeps the map non-empty, so no `anthropic`
+    // placeholder is registered either.
     let world = JourneyWorld::builder()
         .mcp("calendar", calendar_mock)
         .mcp("slack", comms_mock)
         .audit(audit)
+        .env("MAOS_ANTHROPIC_API_KEY", "")
+        .env("MAOS_OPENAI_API_KEY", "")
+        .env("MAOS_OLLAMA_URL", "http://127.0.0.1:9")
         .build();
 
     let manifest = workspace_root().join("spirits/butler/manifest.toml");
     let cmd = format!("{} run {} --live --once", maos_bin(), manifest.display());
     let pty = Pty::spawn(&cmd, &world);
 
+    // Story 18-1 review ruling D-18-1-R2: `--live` binds Butler's Inference
+    // Port and the router does not register Butler's declared `anthropic`,
+    // so the root refuses at BOOT, typed — before any pass, so no MCP call
+    // and never the arithmetic halt as a fallback. MCP data driving the bound
+    // pass is proven at library level (`inference_seam_18_1.rs`,
+    // `a_bound_butler_reasons_over_the_mcp_scenario`).
     let status = pty.wait();
     assert!(
-        status.map(|s| s.success()).unwrap_or(false),
-        "maos run butler --live --once should exit 0"
+        !status.map(|s| s.success()).unwrap_or(false),
+        "a keyless maos run butler --live --once must not exit 0"
     );
 
     let screen = pty.screen();
-    let halt_line = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
     assert!(
-        screen.contains(&halt_line),
-        "PTY screen should contain halt render via live MCP, got:\n{}",
+        screen.contains("no inference provider is configured for its declared provider"),
+        "PTY screen should carry the typed boot refusal, got:\n{}",
         screen.text()
     );
-
-    // ── P7: MCP write oracle ──────────────────────────────────────────
-    // The daemon calls the Calendar MCP during --once to fetch events that
-    // drive belief_variance.  Assert the mock received at least one request.
-    // (Linear write is a director option-pick action that only fires after
-    // halt resolution in --interactive mode, not in --once halt-only mode.)
     let calendar = world
         .mcp("calendar")
         .expect("calendar mock must be in world");
-    let calendar_writes = calendar.writes();
     assert!(
-        !calendar_writes.is_empty(),
-        "mock_calendar.writes() should contain at least one MCP request, got 0 writes"
+        calendar.writes().is_empty(),
+        "a refused boot makes no MCP call, got {} writes",
+        calendar.writes().len()
     );
-
-    // ── P7: TL audit-row oracle ───────────────────────────────────────
-    if tl_path.exists() {
-        let entries = maos_audit::query(&tl_path, maos_audit::AuditFilter::default());
-        if let Ok(rows) = entries {
-            assert!(
-                !rows.is_empty(),
-                "Transparency Log should contain at least one audit row after JB-2 run"
-            );
-        }
-    }
 }
 
 fn hex(id: &[u8; 16]) -> String {
@@ -158,13 +152,10 @@ fn jb4_driver_integration_test() {
 //
 // The daemon's output_shape enforcement (JB-5) validates the Spirit's
 // notification JSON against the manifest's `OutputShapePredicate` after
-// `fire_on_idle`. Butler's `NotificationPayload` has `pattern`, `confidence`,
-// `evidence`, `conflict_summary` — but the manifest requires `["pattern",
-// "confidence", "evidence", "options"]`. The missing `options` field triggers
-// a real `OutputShapeViolation::MissingField`.
-//
-// For a stronger signal, this test uses a manifest that additionally requires
-// `"nonexistent"` — proving the enforcement catches any missing field.
+// `fire_on_idle`. Story 18-1 (D-18-1-03 A) gave Butler's notification the
+// manifest's `options`, so this test uses a manifest that additionally
+// requires `"nonexistent"` — proving the enforcement catches any missing
+// field — and (D-18-1-04 A) a violation is fatal under `--once`.
 #[test]
 fn jb5_output_shape_violation() {
     // Create a temp manifest that adds a nonexistent required field,
@@ -184,8 +175,8 @@ fn jb5_output_shape_violation() {
     let pty = Pty::spawn(&cmd, &world);
     let status = pty.wait();
     assert!(
-        status.map(|s| s.success()).unwrap_or(false),
-        "maos run butler --once should exit 0 even with output_shape violation"
+        !status.map(|s| s.success()).unwrap_or(false),
+        "maos run butler --once must exit non-zero on an output_shape violation (D-18-1-04 A)"
     );
 
     let screen = pty.screen();
@@ -195,7 +186,7 @@ fn jb5_output_shape_violation() {
         screen.text()
     );
     assert!(
-        screen.contains("nonexistent") || screen.contains("options"),
+        screen.contains("nonexistent"),
         "violation message should name the missing field, got:\n{}",
         screen.text()
     );
@@ -252,9 +243,18 @@ fn jb6_capability_denied() {
             .unwrap(),
     );
 
+    // Story 18-1 review ruling D-18-1-R2: `--live` binds Butler's Inference
+    // Port, and a host that registers providers but not Butler's declared one
+    // refuses at boot. This arm is about the MCP denial, so the world
+    // configures NO provider: the zero-config `anthropic` placeholder boots,
+    // the run reaches its MCP call on every host, and the pass's model call
+    // is refused typed (`Unconfigured`) without touching the network.
     let world = JourneyWorld::builder()
         .mcp("calendar", calendar_mock)
         .audit(audit)
+        .env("MAOS_ANTHROPIC_API_KEY", "")
+        .env("MAOS_OPENAI_API_KEY", "")
+        .env("MAOS_OLLAMA_URL", "skip")
         .build();
 
     let cmd = format!(

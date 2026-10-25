@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/main.rs	2026-10-25 06:26:36.130430550 +0000
++++ b/crates/maos-bin/src/main.rs	2026-10-25 06:26:36.132374382 +0000
+@@ -786,7 +786,7 @@
+         // No production anomaly feed or predicate-fire-rate source exists at
+         // v0.3: (c) is empty and (d) reads full trust (rate 0.0, as jb4 does).
+         let digest = butler::Butler::new()
+-            .morning_digest(&self.audit_db, &self.journal_path, now_ns, &[], 0.0)
++            .morning_digest(&self.audit_db, &self.journal_path, now_ns - 3_600_000_000_000, &[], 0.0)
+             .map_err(|error| format!("butler morning digest: {error}"))?;
+         *rendered_day = Some(day);
+         println!(

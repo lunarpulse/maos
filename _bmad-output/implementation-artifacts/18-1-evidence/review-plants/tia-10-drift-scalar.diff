@@ -1,0 +1,11 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -834,7 +834,7 @@
+                 // path.
+                 Some(live) => match self.infer_proposal(live, scenario, &assessment) {
+                     Ok(proposal) => {
+-                        assessment.user_preference_drift = proposal.user_preference_drift;
++                        let _ = proposal.user_preference_drift;
+                         (!assessment.conflicts.is_empty()).then(|| NotificationPayload {
+                             pattern: proposal.pattern,
+                             confidence: proposal.confidence,

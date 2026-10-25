@@ -2223,6 +2223,95 @@ jobs:
             line2b.err
           if-no-files-found: warn
 
+  # Story 18-1 AC1.5 (D-18-1-11 A) — the Epic-18 hermetic exit job: exit line 1
+  # verbatim (epic-18 exit block, line 1) on a keyless runner — fresh HOME,
+  # MAOS_HOME and XDG_DATA_HOME, no provider key, MAOS_OLLAMA_URL unset — and
+  # its proven-red twin: the same line over a planted-violation cassette (the
+  # seed completion without `options`) that must exit non-zero naming the
+  # field. One image: exit line 1 is not an image claim. Lines 2–4 join with
+  # 18-2/18-3/18-4.
+  epic-18-exit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: epic-18-exit-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build the root
+        run: cargo build --locked -p maos-bin --bin maos
+      - name: Epic-18 exit line 1 — Butler's proposal through the Inference Port (Story 18-1)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --once > line1.out 2> line1.err
+          rc=$?
+          cat line1.out line1.err
+          if [ "$rc" -eq 0 ] && ! grep -q '"event":"butler_notification".*"options":\[' line1.out; then
+            rc=1
+            echo "::error title=Epic-18 exit line 1::exit 0 without a notification carrying the completion's options"
+          fi
+          if [ "$rc" -eq 0 ] && ! grep -q '"event":"halt"' line1.out; then
+            rc=1
+            echo "::error title=Epic-18 exit line 1::exit 0 without the belief_variance halt"
+          fi
+          if [ "$rc" -eq 0 ] && ! grep -q 'butler inference seam wired' line1.err; then
+            rc=1
+            echo "::error title=Epic-18 exit line 1::exit 0 but Butler never bound the Inference Port (the arithmetic path also emits options and the halt)"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-18 exit line 1::rc=${rc} $(tail -n 3 line1.err | paste -sd' ' -)"
+          else
+            echo "::notice title=Epic-18 exit line 1::rc=0"
+          fi
+          exit "$rc"
+      - name: Epic-18 exit line 1 twin — a planted-violation cassette must exit non-zero (Story 18-1)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          twin="$RUNNER_TEMP/on-idle-halt-missing-options.json"
+          python3 - crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json "$twin" <<'PY'
+          import json, sys
+          cassette = json.load(open(sys.argv[1]))
+          completion = json.loads(cassette["entries"][0]["response"]["text"])
+          del completion["options"]
+          cassette["entries"][0]["response"]["text"] = json.dumps(completion)
+          json.dump(cassette, open(sys.argv[2], "w"))
+          PY
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/butler/manifest.toml --once > twin.out 2> twin.err
+          rc=$?
+          cat twin.out twin.err
+          if [ "$rc" -eq 0 ]; then
+            echo "::error title=Epic-18 exit line 1 twin::the planted violation exited 0 — the shape/proposal gate is not a control"
+            exit 1
+          fi
+          if ! grep -q 'pass refused.*options' twin.err; then
+            echo "::error title=Epic-18 exit line 1 twin::rc=${rc} but the refusal does not name the missing field: $(tail -n 3 twin.err | paste -sd' ' -)"
+            exit 1
+          fi
+          echo "::notice title=Epic-18 exit line 1 twin::rc=${rc}, refused naming \`options\`"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-18-exit
+          path: |
+            line1.out
+            line1.err
+            twin.out
+            twin.err
+          if-no-files-found: warn
+
   # Story 5.5b — multi-provider drift-check tool tests
   multi-provider-drift-tests:
     runs-on: ubuntu-latest
@@ -5591,6 +5680,7 @@ jobs:
       - nfr-sec-1-t3-image-signature
       - t3-smoke-busybox
       - epic-17-exit
+      - epic-18-exit
       - multi-provider-drift-tests
       - retract-corpus-tests
       - check-serde-error-handling

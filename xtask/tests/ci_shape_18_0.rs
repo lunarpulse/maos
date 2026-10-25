@@ -175,13 +175,14 @@ fn expensive_tests_uploads_its_junit_and_builds_no_fixtures() {
     );
 }
 
-/// D-18-0-10 A / D-15-4-F (and D-18-0-04's enrolment): an unregistered job is
-/// enrolled in `aggregate.needs` and in no other job's `needs`.
+/// D-18-0-10 A / D-15-4-F (and D-18-0-04's enrolment; D-18-1-11 A for
+/// `epic-18-exit`): an unregistered job is enrolled in `aggregate.needs` and
+/// in no other job's `needs`.
 #[test]
 fn unregistered_jobs_are_enrolled_in_aggregate_only() {
     let workflow = workflow();
     let jobs = key(&workflow, "jobs");
-    for unregistered in ["expensive-tests", "cargo-deny"] {
+    for unregistered in ["expensive-tests", "cargo-deny", "epic-18-exit"] {
         assert!(
             needs(jobs, "aggregate").contains(&unregistered.to_string()),
             "{unregistered} is in aggregate.needs"
@@ -223,5 +224,82 @@ fn cargo_deny_is_its_own_blocking_job_in_aggregate() {
             .filter_map(|step| str_of(step, "run"))
             .all(|run| !run.contains("cargo deny")),
         "cargo deny no longer runs inside the ADVISORY reproducible-build"
+    );
+}
+
+const EXIT_LINE_1_STEP: &str =
+    "Epic-18 exit line 1 — Butler's proposal through the Inference Port (Story 18-1)";
+const EXIT_LINE_1_TWIN_STEP: &str =
+    "Epic-18 exit line 1 twin — a planted-violation cassette must exit non-zero (Story 18-1)";
+
+/// Exit line 1, verbatim from the epic's hermetic exit block (the command
+/// before its `# 1` comment).
+fn epic_18_exit_line_1() -> String {
+    let epic = fs::read_to_string(
+        root().join("_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md"),
+    )
+    .expect("read epic 18");
+    epic.lines()
+        .find_map(|line| {
+            line.split_once("   # 1 —")
+                .map(|(command, _)| command.trim())
+        })
+        .expect("epic 18 exit line 1")
+        .to_string()
+}
+
+/// Story 18-1 code review TIA-8/TIA-9 (D-18-1-11 A) — `epic-18-exit` keeps
+/// its shape: exit line 1 verbatim, the binding witness, a twin that fails
+/// when the planted violation exits 0, no masking, the pinned image.
+#[test]
+fn epic_18_exit_runs_line_1_verbatim_and_its_proven_red_twin() {
+    let workflow = workflow();
+    let jobs = key(&workflow, "jobs");
+    let job = key(jobs, "epic-18-exit");
+    assert_eq!(str_of(job, "runs-on"), Some("ubuntu-24.04"));
+    assert_no_continue_on_error(job, "epic-18-exit");
+    for step in steps(job) {
+        assert_no_continue_on_error(step, "an epic-18-exit step");
+    }
+    let line = epic_18_exit_line_1();
+    let (line_1, twin) = (
+        step_index(job, EXIT_LINE_1_STEP),
+        step_index(job, EXIT_LINE_1_TWIN_STEP),
+    );
+    let run = str_of(&steps(job)[line_1], "run").expect("line-1 run");
+    assert!(
+        run.contains(&line),
+        "line 1 runs the epic's exit line verbatim: {line}"
+    );
+    assert!(
+        run.contains("grep -q 'butler inference seam wired' line1.err"),
+        "line 1 fails a Butler that never bound the Inference Port (TIA-9)"
+    );
+    assert!(
+        run.contains("exit \"$rc\""),
+        "line 1 exits with the command's code"
+    );
+
+    let run = str_of(&steps(job)[twin], "run").expect("twin run");
+    let planted = line.replace(
+        "MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json",
+        "MAOS_REPLAY_CASSETTE=\"$twin\"",
+    );
+    assert!(
+        run.contains(&planted),
+        "the twin runs line 1 over the planted cassette"
+    );
+    assert!(
+        run.contains("del completion[\"options\"]"),
+        "the twin drops `options`"
+    );
+    let when_zero = run
+        .split_once("if [ \"$rc\" -eq 0 ]; then")
+        .and_then(|(_, rest)| rest.split_once("fi"))
+        .map(|(block, _)| block)
+        .expect("the twin checks rc == 0");
+    assert!(
+        when_zero.contains("exit 1"),
+        "the twin exits 1 when the planted violation exits 0"
     );
 }

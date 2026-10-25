@@ -1,0 +1,15 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -803,9 +803,10 @@
+                     vec![]
+                 }
+             };
++            let _ = (calendar, comms);
+             Some(ScenarioInput {
+-                calendar,
+-                comms,
++                calendar: vec![],
++                comms: vec![],
+                 preference_alignment: None,
+             })
+         } else {

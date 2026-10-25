@@ -6,16 +6,16 @@ context_commit: c816c544
 baseline_commit: c816c544
 split_from: 18-1-butler-inference-seam-and-conformant-mcp
 security_sensitive: true
-kernel_grant: "◆ FLAG-Winston on `crates/maos-kernel-core/src/io/mod.rs`. RATIFIED 2026-10-25 with D-18-1-06 B: **+7 physical / +4 tokei** (response-header capture; maos-domain +9), prototype-measured at 18-1 creation. Re-measured at the split (prototypes, reverted): the dual-era fallback also needs the non-2xx status — and, per the spec, the 400 body — through the IO port: full exchange **+15 / +13** (maos-domain IO +19), typed status only **+9 / +7** (IO +11). Both exceed the ratified grant → **D-18-8-01 OPEN**. Exact figures re-measured at landing; pin `xtask/kernel-core-baseline.toml:505` and ceiling `xtask/kloc.toml:264` move in one commit with a dated HISTORY note; `18-1-butler-inference-seam-and-conformant-mcp` also moves the pin (`inference/`), whichever lands second re-measures. ADR-069 envelope 23,000 / alarm 22,000 untouched."
-kloc_grant: "Measured at landing after `cargo fmt --all` (RECOVERY-LANE CEILING RULE, `xtask/kloc.toml:60-70,86-95`). maos-domain **+62 (D-18-8-01 B) / +70 (A) measured by prototype** (closed `SecretKey::McpBearer(McpServer)` +51; IO port +11/+19; 9743 at zero headroom → measured request); maos-secrets 0 (measured: the backends key off `as_str`, compile unchanged); kernel per kernel_grant; [INFERENCE] maos-mcp +150–250 (999 / 1194 — likely above the 195 headroom, measured request), maos-journey-test +120–250 (626 / 1104), maos-bin +20–40 (27809, zero headroom). `_aggregate_hardfail` = measured + 1. Test files uncharged."
+kernel_grant: "◆ FLAG-Winston on `crates/maos-kernel-core/src/io/mod.rs` — RATIFIED 2026-10-25 by the operator (Lunarpulse) with D-18-8-01 A (full exchange): **+15 physical / +13 tokei** (pin 26361 → 26376, `maos-kernel-core` 20594 → 20607 as measured by the reverted prototype against c816c544), inside the ADR-069 envelope (≤ 23,000, alarm 22,000). Supersedes the +7 / +4 ratified earlier the same day with D-18-1-06 B (header capture only). Exact figures re-measured at landing; pin `xtask/kernel-core-baseline.toml:505` and ceiling `xtask/kloc.toml:264` move in one commit with a dated HISTORY note. Ordering (operator 2026-10-25): `18-1-butler-inference-seam-and-conformant-mcp` lands first (its +2 / +1 in `inference/`); **18-8 lands second and re-measures** from 18-1's landed pin."
+kloc_grant: "Measured at landing after `cargo fmt --all` (RECOVERY-LANE CEILING RULE, `xtask/kloc.toml:60-70,86-95`). maos-domain **+70 ratified with D-18-8-01 A** (measured by prototype: closed `SecretKey::McpBearer(McpServer)` +51, IO port exchange +19; 9743 at zero headroom → exact request at landing); maos-secrets 0 (measured: the backends key off `as_str`, compile unchanged); kernel per kernel_grant; [INFERENCE] maos-mcp +150–250 (999 / 1194 — likely above the 195 headroom, measured request), maos-journey-test +120–250 (626 / 1104), maos-bin +20–40 (27809, zero headroom). `_aggregate_hardfail` = measured + 1. Test files uncharged."
 review: "bmad-code-review under `docs/testing/proof-contract.md`. Reviewer model `anthropic/claude-opus-5-5` ONLY — operator ruling 2026-10-25 (fable-5.1 declined for the security layer). Security-critical: bearer storage and transmission (AC2), session-id handling (AC1), the kernel IO port (AC4); the Security layer runs on opus-5-5 and is named in the review record. ◆ FLAG-Winston signs off the kernel diff."
 ---
 
 # Story 18.8: A conformant (dual-era) MCP client
 
-Status: backlog
+Status: ready-for-dev
 
-<!-- Created 2026-10-25 at c816c544 by bmad-create-story (lighter creation contract) as the SPLIT of 18-1 ruled by the operator (D-18-1-01 B): 18-1's former AC2 (conformant client) and AC5 (stdio early-close witness) with decisions D-18-1-06/07/12, all three ruled B. Stays `backlog` because ONE row is open: D-18-8-01 (the kernel grant — the measured dual-era IO change exceeds the ratified +7 / +4). Prototypes measured and reverted (one cargo process, /mnt/build/cargo). -->
+<!-- Created 2026-10-25 at c816c544 by bmad-create-story (lighter creation contract) as the SPLIT of 18-1 ruled by the operator (D-18-1-01 B): 18-1's former AC2 (conformant client) and AC5 (stdio early-close witness) with decisions D-18-1-06/07/12, all three ruled B. D-18-8-01 RULED A the same day (full exchange; kernel +15 / +13, maos-domain +70) → `ready-for-dev`. 18-1 lands first; 18-8 re-measures the kernel pin after it. Prototypes measured and reverted (one cargo process, /mnt/build/cargo). -->
 
 > **The capability:** *Butler's and the Researcher's MCP calls are accepted by a conformant server of either protocol era — modern 2026-07-28 or legacy handshake — carry a bearer the secret store holds, and a stdio server that dies or hangs is a typed error, never a panic or a wedge.*
 
@@ -55,19 +55,19 @@ Method as 18-1 (§Kernel pricing there): in place at `c816c544`, `cargo fmt`, ph
 
 | Variant (IO port + `IoSubsystemAdapter`; provider mocks untouched via a default trait method) | Physical (26361) | Tokei kernel (20594) | maos-domain IO | Notes |
 |---|---|---|---|---|
-| (i) `http_post_with_response_header` → `(body, Option<header>)`; `http_post`/`http_get` share `post`/`read_capped` | 26368 (+7) | 20598 (+4) | +9 | **ratified** with D-18-1-06 B; non-2xx stays `Transport(String)` — the fallback could only parse "status code N" out of text |
-| (ii) (i) + typed `IoError::Status(u16)` for a non-2xx on the new method | 26370 (+9) | 20601 (+7) | +11 | status typed, 400 body not readable |
-| (iii) `http_post_exchange` → `HttpExchange { status, body, header }`, non-2xx returned as data | 26376 (+15) | 20607 (+13) | +19 | the spec's "inspect the body of a 400" |
+| (i) `http_post_with_response_header` → `(body, Option<header>)`; `http_post`/`http_get` share `post`/`read_capped` | 26368 (+7) | 20598 (+4) | +9 | ratified first with D-18-1-06 B, **superseded** by D-18-8-01 A; non-2xx stays `Transport(String)` — the fallback could only parse "status code N" out of text |
+| (ii) (i) + typed `IoError::Status(u16)` for a non-2xx on the new method | 26370 (+9) | 20601 (+7) | +11 | status typed, 400 body not readable — not taken |
+| **(iii) RULED (D-18-8-01 A)** — `http_post_exchange` → `HttpExchange { status, body, header }`, non-2xx returned as data | **26376 (+15)** | **20607 (+13)** | +19 | the spec's "inspect the body of a 400"; grant ratified 2026-10-25 |
 
 maos-domain totals with the secret-store keys: (ii) 9743 → **9805 (+62)**, (iii) → **9813 (+70)**, both measured.
 
 ## Decisions
 
-**Ruling record (2026-10-25, operator Lunarpulse, via the 18-1 rulings):** D-18-1-06 **B** dual-era · D-18-1-07 **B** secret store · D-18-1-12 **B** bounded read. Review `anthropic/claude-opus-5-5` only. **Open: D-18-8-01** — the story stays `backlog` until it is ruled.
+**Ruling record (2026-10-25, operator Lunarpulse):** D-18-1-06 **B** dual-era · D-18-1-07 **B** secret store · D-18-1-12 **B** bounded read (via the 18-1 rulings) · **D-18-8-01 A** full exchange — kernel grant +15 physical / +13 tokei, maos-domain +70, ◆ FLAG-Winston, ADR-069 envelope; 18-8 lands after 18-1 and re-measures. Review `anthropic/claude-opus-5-5` only. No open row.
 
 | ID | Question | Options | Recommendation / ruling and evidence | Status |
 |---|---|---|---|---|
-| **D-18-8-01** | Which IO-port change, and which kernel grant? The ratified +7 / +4 (variant i) cannot type the dual-era fallback trigger. | **A** — variant (iii) full exchange: **+15 physical / +13 tokei**, maos-domain +70 (with keys); the client reads the 400 body, a recognised modern JSON-RPC error (`HeaderMismatch` −32020, `UnsupportedProtocolVersion` −32022) stays modern, anything else falls back to legacy — exactly the spec's rule. **B** — variant (ii) typed status: **+9 / +7**, domain +62; with one supported modern version, any non-401 4xx on the modern attempt ⇒ legacy (a modern server cannot reject 2026-07-28 as unsupported); a modern server's `HeaderMismatch` (a client bug) would trigger a wrong fallback that then fails typed. **C** — keep the ratified (i): parse the status out of `IoError::Transport` text — untyped, brittle. | **A.** It implements the specification's detection rule rather than an approximation, and it is the only variant that can surface a modern server's error body to the operator; +6 tokei over B. B is acceptable if the operator wants the smaller kernel figure: its mis-fallback case is a client defect the AC1 fixture negatives catch. Evidence: versioning page, compatibility matrix ("HTTP: attempt a modern request and inspect the body of a `400 Bad Request` before falling back"); `io/mod.rs:106-109`. | **OPEN** |
+| **D-18-8-01** | Which IO-port change, and which kernel grant? The ratified +7 / +4 (variant i) cannot type the dual-era fallback trigger. | **A** — variant (iii) full exchange: **+15 physical / +13 tokei**, maos-domain +70 (with keys); the client reads the 400 body, a recognised modern JSON-RPC error (`HeaderMismatch` −32020, `UnsupportedProtocolVersion` −32022) stays modern, anything else falls back to legacy — exactly the spec's rule. **B** — variant (ii) typed status: **+9 / +7**, domain +62; with one supported modern version, any non-401 4xx on the modern attempt ⇒ legacy; a modern server's `HeaderMismatch` (a client bug) would trigger a wrong fallback that then fails typed. **C** — keep the ratified (i): parse the status out of `IoError::Transport` text — untyped, brittle. | **A (operator, as recommended).** It implements the specification's detection rule ("HTTP: attempt a modern request and inspect the body of a `400 Bad Request` before falling back", versioning page) rather than an approximation, and it is the only variant that can surface a modern server's error body; `io/mod.rs:106-109` drops both today. Grant +15 / +13 kernel, +70 maos-domain ratified. | RULED 2026-10-25 — A |
 | D-18-1-06 | MCP revision | A modern only · **B dual-era** · C legacy only | **B (operator).** Interop with servers of either era (compatibility matrix: Dual-era × Modern and × Legacy both work). | RULED 2026-10-25 — B |
 | D-18-1-07 | Bearer source | A env var · **B secret store** · C OAuth now | **B (operator; deviates from the creation recommendation A).** Credentials at rest follow the 16-4 provider-key path (keyring / encrypted file / env backend, fallback journaled `main.rs:3405-3425`). Concrete shape: AC2. | RULED 2026-10-25 — B |
 | D-18-1-12 | stdio hang | A deferred row · **B bounded read + typed `Timeout` here** | **B (operator).** Rule 10(a): same file and harness; `Timeout` exists unused. | RULED 2026-10-25 — B |
@@ -82,7 +82,7 @@ maos-domain totals with the secret-store keys: (ii) 9743 → **9805 (+62)**, (ii
 
 ## Acceptance Criteria
 
-*(Epic §18-8. AC4 depends on D-18-8-01; the rest is ruled. One plant per control AC, `docs/testing/proof-contract.md:26`.)*
+*(Epic §18-8 as ruled; AC4 is D-18-8-01 A. One plant per control AC, `docs/testing/proof-contract.md:26`.)*
 
 ### AC1 — command: a dual-era Streamable-HTTP client (was 18-1 AC2; D-18-1-06 B)
 
@@ -106,16 +106,16 @@ maos-domain totals with the secret-store keys: (ii) 9743 → **9805 (+62)**, (ii
 3. Tests in `crates/maos-mcp/tests/stdio_transport_test.rs`.
 4. **Proven red (1 plant):** `.unwrap()` the write (`stdio.rs:48-50`) → the early-close witness panics.
 
-### AC4 — the IO port carries what the dual-era client needs (◆ FLAG-Winston; D-18-8-01)
+### AC4 — the IO port carries what the dual-era client needs (◆ FLAG-Winston; D-18-8-01 A, grant ratified)
 
 1. Per the ruled variant (§Kernel pricing): `IoSubsystemPort` gains one default method (`crates/maos-domain/src/ports/io_subsystem.rs`), overridden by `IoSubsystemAdapter` (`crates/maos-kernel-core/src/io/mod.rs:71-122`), with `http_post`/`http_get` sharing the request/read helpers so the 10 MiB cap (`:32`) and the `io_call_journal` record (`:99-100`) apply once; the seven provider `MockTransport`s are untouched.
-2. Witness: NEW `crates/maos-kernel-core/tests/io_exchange_18_8.rs` against a local TCP server: a 2xx returns body + the named header; a 4xx returns the ruled shape (status + body under A, `IoError::Status` under B); a body over 10 MiB is still `Decode`.
+2. Witness: NEW `crates/maos-kernel-core/tests/io_exchange_18_8.rs` against a local TCP server: a 2xx returns `HttpExchange { status, body, header }` with the named header; a 4xx (400, 401, 404) returns `Ok(HttpExchange)` carrying its status and body — never `Err`; a transport failure (refused connection) is still `Err(IoError::Transport)`; a body over 10 MiB is still `Decode`.
 3. Kernel figure re-measured at landing against the ruled grant; pin + ceiling re-pinned in one commit.
 4. **Proven red (1 plant):** restore the old non-2xx `Transport` mapping on the new method → the 4xx case reds.
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight** — D-18-8-01 RULED and materialized in AC4 and the kernel grant; story + tracker `ready-for-dev`; Winston's FLAG sign-off recorded before landing. `git diff --stat c816c544 -- crates/maos-mcp crates/maos-journey-test crates/maos-kernel-core/src/io crates/maos-domain/src/ports crates/maos-secrets crates/maos-bin/src/main.rs crates/maos-bin/src/env_contract.rs crates/maos-bin/src/purge.rs`; if 18-1 landed first, re-measure the kernel pin from its new value.
+- [ ] **T0 — Preflight** — §Decisions reads RULED (all rows, 2026-10-25); story + tracker `ready-for-dev`; Winston's FLAG sign-off recorded before landing. 18-1 lands first: re-measure the kernel pin from 18-1's landed value before claiming the +15 / +13. `git diff --stat c816c544 -- crates/maos-mcp crates/maos-journey-test crates/maos-kernel-core/src/io crates/maos-domain/src/ports crates/maos-secrets crates/maos-bin/src/main.rs crates/maos-bin/src/env_contract.rs crates/maos-bin/src/purge.rs`; drift → Debug Log, re-anchor.
 - [ ] **T1 — IO port** (AC4) — domain default method + adapter override + helpers; `io_exchange_18_8.rs`.
 - [ ] **T2 — Secret store keys** (AC2.1–2.2) — `McpServer`, `McpBearer`, `ALL`; env rows; purge list; `maos-secrets` round-trip tests.
 - [ ] **T3 — Client** (AC1.1–1.2, AC2.3; CR-1/2/3/5) — headers, `_meta`, era cache, legacy handshake + session, typed errors, bearer plumbing at `main.rs:5187,5382`.
@@ -183,7 +183,7 @@ cargo fmt --all -- --check
 
 ### Story context creation
 
-Created 2026-10-25 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter creation contract) at `c816c544` as the operator-ruled split of 18-1 (D-18-1-01 B). Inputs: the 18-1 creation's MCP scout and IO prototype (variant i), plus two prototypes at the split as the host's only cargo process — the closed `SecretKey::McpBearer(McpServer)` (+51 maos-domain) with the full-exchange IO port (iii), and the typed-status IO port (ii) — each measured (`find … | wc -l`, `kloc-check --json`, `cargo check` over kernel/domain/secrets/providers/mcp/bin) and reverted by copy-back (`git status` clean for crates; pin 26361 / 95 files). Status `backlog`: D-18-8-01 open.
+Created 2026-10-25 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter creation contract) at `c816c544` as the operator-ruled split of 18-1 (D-18-1-01 B). Inputs: the 18-1 creation's MCP scout and IO prototype (variant i), plus two prototypes at the split as the host's only cargo process — the closed `SecretKey::McpBearer(McpServer)` (+51 maos-domain) with the full-exchange IO port (iii), and the typed-status IO port (ii) — each measured (`find … | wc -l`, `kloc-check --json`, `cargo check` over kernel/domain/secrets/providers/mcp/bin) and reverted by copy-back (`git status` clean for crates; pin 26361 / 95 files). D-18-8-01 ruled A the same day; status `ready-for-dev`.
 
 ### Agent Model Used
 
@@ -198,3 +198,4 @@ anthropic/claude-opus-5-5 (creation, 2026-10-25)
 ### Change Log
 
 - 2026-10-25 — Story created by the split of 18-1 (operator ruling D-18-1-01 B): old 18-1 AC2 → AC1, AC5 → AC3; D-18-1-06/07/12 ruled B; AC2 (secret-store bearer) and AC4 (IO port) written concretely from measured prototypes; the ratified kernel grant (+7 / +4) does not cover the dual-era 4xx probe (+15 / +13 or +9 / +7) → D-18-8-01 OPEN; status `backlog`.
+- 2026-10-25 — RULED (operator, Lunarpulse): D-18-8-01 **A** full exchange — kernel grant +15 physical / +13 tokei (◆ FLAG-Winston, ADR-069 envelope), maos-domain +70; 18-1 lands first, 18-8 re-measures; AC4 witness written for `HttpExchange`. Status → `ready-for-dev`.

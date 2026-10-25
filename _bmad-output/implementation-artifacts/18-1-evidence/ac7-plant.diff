@@ -1,0 +1,12 @@
+--- a/crates/maos-kernel-core/src/inference/mod.rs	2026-10-25 06:23:41.893056933 +0000
++++ b/crates/maos-kernel-core/src/inference/mod.rs	2026-10-25 06:23:47.259651105 +0000
+@@ -261,9 +261,6 @@
+             .ok_or(InferenceError::Unconfigured)?;
+ 
+         self.check_capability(&req.capability_token, provider_id)?;
+-        if req.fallback_provider_ids.iter().any(|id| id != provider_id) {
+-            return Err(InferenceError::CapabilityDenied);
+-        }
+ 
+         // Story 6.4 / NFR-Scale-4 — consult the per-(provider, credential)
+         // token bucket BEFORE dispatching to the provider. On exhaustion,
