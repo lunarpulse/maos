@@ -562,12 +562,12 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR39/FR57 skill.author.self + revision proposals (CANNED) | follow-on at Epic 18 preflight |
 | FR45 re-distillation trigger + cross-Spirit cascade (PARTIAL: no trigger; Shared tier and unindexed distillates escape forget) | `18-6-fr45-forget-redistillation-and-cascade-closure` (operator ruling D-17-9-PF-R5 A, 2026-10-22; was mis-routed to 21-4, the instrument/env-registry story; ADR-044's unnamed "follow-up") |
 | FR48 operator-selectable crypto provider (PARTIAL) | later (post-v1.0) |
-| FR54 gateway connectors (CANNED) | parked v2.5 |
+| FR54 gateway connectors (CANNED) | parked v2.5 — **RULED 2026-10-25** (audit DECIDE-3): kept v2.5; PRD v1.0 phase entry retagged by DELTA-2026-10-25 |
 | FR55 hook firers (CLOSED for compiled-in Spirits) | 17-4 — done 2026-10-20: live telemetry and idle-quiescent consolidation callers, Observer activity corpus and reviewed shutdown ordering. Spawned forms remain explicitly outside this story. |
 | FR59 yank policy (PARTIAL) | 20-1 |
 | FR61 GPG key (documented deviation, ADR-047) | unchanged |
 | FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the `maos:spirit@2.0.0` break is the first **recorded** WIT ABI-extension proposal — a ratified `xtask/abi-ratifications.toml` entry gated by `wit_corpus.rs`; no Transparency-Log emitter exists or is claimed — epic-17 R17-59, R17-67) |
-| FR64 cost dimensions (PARTIAL) | later (post-v1.0) |
+| FR64 cost dimensions (PARTIAL) | `20-14-complete-cost-attribution` (v1.0: per-task + per-principal token attribution, **RULED 2026-10-25**, audit DECIDE-2 split); CPU-time / storage-I/O dimensions v1.1 (PRD DELTA-2026-10-25) |
 | FR65 pending halts + lineage in erasure proof (PARTIAL) | 16-4 |
 | NFR-Test-4 per-class halt-recall (UNMEASURED) | 18-2, 21-1 |
 | NFR-Aud-7 five-metric gate (TAUTOLOGY) | 18-3 |
@@ -616,4 +616,5 @@ Source: `../routing-audit-2026-10-22.md` — every row of the Recovery Coverage 
 | FR6 macOS/Windows caps; FR33 Python template | 17-2 / 17-3b | parked v1.5 (Windows = 10.5's phase; round-3 "Python later") |
 | FR48 crypto provider selection (PRD v0.5) + NFR-Sec-15 | later | **RULED 2026-10-23 (split):** `20-13-pluggable-crypto-provider-selection` (v1.0 — one operator selection point, every kernel FR48 surface through the selected provider, unknown provider refused at boot); FIPS 140-3 module → v1.5 (PRD DELTA-2026-10-23) |
 | NFR-Maint-1 ≤20 KLOC | 21-4 | **RULED 2026-10-23:** ADR-069 — `maos-kernel-core` ≤ 23,000 (alarm 22,000) through `v1.0.0` GA; 21-4 keeps the instrument/env-registry scope only |
-| FR64 cost dimensions (PRD v1.0); FR54 gateway contracts | later / v2.5 | **operator decision owed** (audit DECIDE-2/3) — the parking contradicts the PRD phase and has no DELTA |
+| FR64 cost dimensions (PRD v1.0) + NFR-Cost-1 | later | **RULED 2026-10-25 (split):** `20-14-complete-cost-attribution` (v1.0 — task reference on the cost frame from an `InferenceRequest` correlation id + SCB current-task marker; `AttributionSource::SessionPrincipal` emitted when a session principal is bound, SR-4 count-not-members kept; `maosctl audit cost-reconcile` grouped by task and principal); CPU-time + storage-I/O dimensions → v1.1 (PRD DELTA-2026-10-25; ADR-046 R6) |
+| FR54 gateway contracts | v2.5 | **RULED 2026-10-25 (keep v2.5):** no story; the PRD's v1.0 phase entry is retagged v2.5 in place (DELTA-2026-10-25) — the v1.0 hermes-tenant positioning rests on FR65/NFR-Aud-12 erasure (`20-11`) and principal scoping |

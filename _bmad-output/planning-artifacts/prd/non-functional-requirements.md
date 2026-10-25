@@ -176,7 +176,7 @@ The 13 categories below cover **~85 NFRs** anchoring the substrate's quality con
 
 ## Cost & Tenancy [NEW CATEGORY, John]
 
-- **NFR-Cost-1:** Cost-attribution accuracy ≥ 98% reconciliation against provider billing, sampled monthly. Per-Spirit per-task per-principal attribution. **Without this NFR, FR64 (cost accounting) is theater.** v1.0.
+- **NFR-Cost-1:** Cost-attribution accuracy ≥ 98% reconciliation against provider billing, sampled monthly. Per-Spirit per-task per-principal attribution. **Without this NFR, FR64 (cost accounting) is theater.** v1.0. **[DELTA-2026-10-25, operator ruling — FR64 split]** v1.0: per-Spirit / per-task / per-principal attribution of the token dimensions (story `20-14-complete-cost-attribution`: task reference on the cost frame, session-principal attribution source, `maosctl audit cost-reconcile` grouped by task and principal). v1.1: the CPU-time and storage-I/O dimensions (ADR-046 R6).
 - **NFR-Tenancy-1:** Explicit single-tenant per kernel instance commitment through v2.0; multi-tenant primitive-reserved at v1.0 per NFR-Ops-11; ~~full multi-tenant out of scope before v2.5~~ **full multi-tenant lands at v2.2 [DELTA-2026-07-06: retagged — Reza-journey prerequisite in the functional-completeness wave; the single-tenant guarantee holds through v2.0 exactly as declared, and the boundary stays loud: multi-tenancy arrives as an explicit v2.2 capability, never as a silent assumption]**. v0.1 (declared); v2.0 (single-tenant guaranteed); v2.2 (multi-tenant implemented).
 
 ---

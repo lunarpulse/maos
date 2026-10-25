@@ -354,9 +354,9 @@ Most FRs trace directly to a named user journey (per the Journey Requirements Su
 |---|---|---|---|
 | FR23a / FR23b | J3 Marcus Team Nexus + J4 Mira-Nash + Reza Cortex | v0.8 (loopback) → v1.0 (cross-host) | A2A peer mesh — enables team mesh + bilateral diagnostic-architect + cross-region Cortex |
 | FR48 | Reza Cortex (enterprise/regulated) | v0.5 | Pluggable cryptographic provider (FIPS / hardware-backed / post-quantum); enterprise-readiness substrate primitive |
-| FR54 | J3 Marcus Team Nexus + J6 Diego (hermes-tenant defense) | v1.0 | Gateway sub-modules (Telegram/Slack/Discord/Signal/email); operationalizes the v1.0 hermes-tenant positioning claim |
+| FR54 | J3 Marcus Team Nexus + J6 Diego (hermes-tenant defense) | ~~v1.0~~ v2.5 **[DELTA-2026-10-25: DECIDE-3]** | Gateway sub-modules (Telegram/Slack/Discord/Signal/email); ~~operationalizes the v1.0 hermes-tenant positioning claim~~ parked v2.5 — the v1.0 hermes-tenant positioning is defended by FR65 / NFR-Aud-12 uninstall-and-erasure (`20-11`) and principal scoping |
 | FR60 | Reza Cortex (air-gapped enterprise) + Aisha-CVE scenario | v1.5 | Air-gapped Spirit/skill artifact import; enterprise-readiness substrate primitive |
-| FR64 | Reza Cortex (enterprise multi-tenant cost accounting) | v1.0 | Per-Spirit cost attribution; "no enterprise deployment without per-tenant cost accounting" gate |
+| FR64 | Reza Cortex (enterprise multi-tenant cost accounting) | v1.0 (token dimensions) → v1.1 (CPU-time, storage I/O) **[DELTA-2026-10-25: DECIDE-2]** | Per-Spirit / per-task / per-principal cost attribution (`20-14`); "no enterprise deployment without per-tenant cost accounting" gate |
 
 **Category B — Substrate-property (architectural-invariant trace):** FRs that serve all journeys uniformly via the kernel's invariant guarantees rather than a single journey. These trace to architectural anchors (invariants I1–I14 + ADRs) per the FR-to-architecture traceability table in §Functional Requirements.
 
