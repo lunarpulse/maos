@@ -57,7 +57,12 @@ struct World {
 impl World {
     fn new() -> Self {
         let dir = tempfile::TempDir::new().unwrap();
-        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        // 18-0 AC4(a): set the clock base ONCE per process. Under libtest (the
+        // loom gate's `cargo test -p maos-bin` leg) sibling tests share this
+        // process; a re-init re-stores MONOTONIC_BASE while BOOT_INSTANT keeps
+        // the first value, so `monotonic_now_ns()` jumped forward mid-test.
+        static CLOCK: std::sync::Once = std::sync::Once::new();
+        CLOCK.call_once(maos_kernel_core::capability::cap_tokens::init_monotonic_base);
         let tl = Arc::new(
             TransparencyLogAdapter::open(&dir.path().join("transparency.sqlite"), NONCE).unwrap(),
         );
@@ -636,11 +641,13 @@ fn stderr_lines_escape_spirit_controlled_text() {
 
 // ── AC3 — the consolidation watchdog ──────────────────────────────────────
 
-/// Counts `on_consolidate` calls and the payload bytes it was handed.
+/// Counts `on_consolidate` calls and the payload bytes it was handed; when a
+/// test installs `fired_at`, each call also reports its production-clock stamp.
 #[derive(Default)]
 struct Consolidations {
     count: AtomicU32,
     payload_bytes: AtomicU32,
+    fired_at: Mutex<Option<tokio::sync::mpsc::UnboundedSender<u64>>>,
 }
 
 struct CountsConsolidations(Arc<Consolidations>);
@@ -650,6 +657,10 @@ impl Spirit for CountsConsolidations {
         self.0
             .payload_bytes
             .fetch_add(payload.batch_len as u32, Ordering::SeqCst);
+        if let Some(tx) = self.0.fired_at.lock().unwrap().as_ref() {
+            // A closed receiver means the test has its stamps; nothing to report.
+            let _ = tx.send(maos_kernel_core::capability::cap_tokens::monotonic_now_ns());
+        }
     }
 }
 
@@ -688,19 +699,34 @@ async fn consolidation_repeats_every_quiescent_window_and_only_while_running() {
         "Loaded never consolidates"
     );
 
+    let (fired_tx, mut fired) = tokio::sync::mpsc::unbounded_channel();
+    *counts.fired_at.lock().unwrap() = Some(fired_tx);
     world.scheduler.start(pid).await.unwrap();
-    let started = Instant::now();
-    tokio::time::sleep(Duration::from_millis(650)).await;
-    let fired = counts.count.load(Ordering::SeqCst);
-    let windows = started.elapsed().as_millis() as u32 / 100;
-    assert!(
-        fired >= 2,
-        "at least two quiescent windows fired, got {fired}"
-    );
-    assert!(
-        fired <= windows + 1,
-        "at most once per window: {fired} in {windows}"
-    );
+    // Barrier, not a deadline: await three fires. The 10 s timeout is a hang
+    // guard only (a healthy run fires every ~100 ms).
+    let mut stamps = Vec::new();
+    while stamps.len() < 3 {
+        let stamp = tokio::time::timeout(Duration::from_secs(10), fired.recv())
+            .await
+            .expect("hang guard (10 s): a Running, quiescent Spirit stopped consolidating")
+            .expect("the fire channel stays open while the Spirit is loaded");
+        stamps.push(stamp);
+    }
+    // "At most once per window", on the clock the watchdog itself reads; and
+    // "every quiescent window" (review 2026-10-25): each gap < 5 s = 50 fast
+    // windows, which catches the ÷100 fast knob regressing (≈10 s gaps) while
+    // leaving wide slack so no wall-clock flake returns.
+    for pair in stamps.windows(2) {
+        let gap = pair[1].saturating_sub(pair[0]);
+        assert!(
+            gap >= 100_000_000,
+            "at most once per 100 ms window on the production clock: {stamps:?}"
+        );
+        assert!(
+            gap < 5_000_000_000,
+            "a quiescent Spirit consolidates every fast window (gap < 5 s): {stamps:?}"
+        );
+    }
     assert_eq!(
         counts.payload_bytes.load(Ordering::SeqCst),
         0,

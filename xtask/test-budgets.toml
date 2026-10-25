@@ -3,8 +3,10 @@
 # `check-test-budget --junit <nextest junit>` reds any test binary whose time
 # (Σ of its tests' junit `time` — review 2026-10-23; the first-start ->
 # last-end span is reported only, it includes queue time) exceeds its budget,
-# and the suite whose Σ over every binary exceeds `total_seconds`. Advisory at
-# v1_0 until one CI run calibrates `total_seconds`. Before this file the
+# and the suite whose Σ over every binary exceeds `total_seconds`. Blocking at
+# v1_0 since 18-0-green-main-ci-baseline (operator ruling R3, 2026-10-24):
+# calibrated on the five post-20-12 main-run junits (`20-12-evidence/ci-after.json`
+# + run 40080259088, `18-0-evidence/creation/test-budget-calibration.txt`). Before this file the
 # workspace suite cost 1,871 s (17-8 log, libtest `finished in`), 67 % of it
 # one test that ran a whole gate.
 #
@@ -22,7 +24,33 @@
 # `pkgid` are `// cargo-query:` instead and need no row.
 
 default_seconds = 30
-total_seconds = 300
+total_seconds = 800
+
+# --- Exceptions (18-0 AC5, ruling R3: ~ CI max Σ x 1.25) ---------------------
+
+[[exception]]
+binary = "maos-bin::worker_terminal_facts_17_7"
+seconds = 153
+reason = "17-7 terminal-facts suite (31 tests): runtime-backed scenes on the signed rootless T3 substrate plus stub-runtime CID teardown scenes; CI Σ 110.8-122.3 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088)"
+owner = "18-0-green-main-ci-baseline"
+
+[[exception]]
+binary = "maos-control::post_surface_16_1"
+seconds = 81
+reason = "16-1 AC3 operator-door POST surface (bounded, typed, concurrent; read-route guards); CI Σ 64.4-64.7 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088)"
+owner = "18-0-green-main-ci-baseline"
+
+[[exception]]
+binary = "maos-bin::worker_supervision_16_3"
+seconds = 46
+reason = "16-3 AC3 Worker supervision wiring (live Workers killed and supervised, every path); CI Σ 30.4-36.7 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088)"
+owner = "18-0-green-main-ci-baseline"
+
+[[exception]]
+binary = "maos-eval::t3_network_escape_executor"
+seconds = 40
+reason = "20-3a AC11 versioned containment scenarios (24 executed) through verified production T3, plus the M3 socket-custody pair; CI Σ 19.9-32.1 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088); 40 is the ruled figure (R3)"
+owner = "18-0-green-main-ci-baseline"
 
 # --- Expensive tests (ignored in the default run) ---------------------------
 

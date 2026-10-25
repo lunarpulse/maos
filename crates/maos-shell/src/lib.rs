@@ -65,6 +65,17 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
     for leaf in ["skills", "audit", "journal"] {
         std::fs::create_dir_all(home.join(leaf))?;
     }
+    // 18-0 AC8 (E16-A5, D-18-0-12 A) — the CRL drop location the revocation
+    // poller reads (`MAOS_CRL_PATH`, else `$XDG_DATA_HOME/maos/crl`), created
+    // before the idempotent early return so an existing home gains it too.
+    // Review DA: a failure warns and init continues (exit code unchanged).
+    let crl_dir = maos_domain::revocation::default_crl_dir();
+    if let Err(e) = std::fs::create_dir_all(&crl_dir) {
+        eprintln!(
+            "maos: could not create CRL directory {}: {e}",
+            crl_dir.display()
+        );
+    }
 
     // Atomic create-exclusive: fails if config.toml already exists (idempotent guard).
     let mut file = match std::fs::OpenOptions::new()

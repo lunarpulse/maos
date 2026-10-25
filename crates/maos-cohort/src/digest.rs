@@ -354,13 +354,14 @@ pub fn journal_rupture_frame(log: &TransparencyLogAdapter, frame: &IacFrame) -> 
         (Some(_), Some(resolver)) => resolver.resolve(&rejected).into_iter().flatten().collect(),
         _ => Vec::new(),
     };
-    // j1-crosshost-2b §A6 review P6 — the typed write verdict is CHECKED. This
-    // sink's ids mix a peer frame-id half with a process-local counter, so a
-    // post-restart collision is possible; pre-2b code HALTED there (the plain
-    // INSERT panicked), and silently swallowing the `Duplicate` now would
-    // suppress a NEW durable rupture record — exactly the fail-loud behaviour
-    // this ConsentRupture path was built to keep. Surface it as an error so the
-    // rupture is never quietly missing from the TL.
+    // j1-crosshost-2b §A6 review P6 — the typed write verdict is CHECKED. The
+    // router mints a fresh ULID per consent-intent denial (`emit_consent_rupture`)
+    // since 18-0 (D-18-0-11; it once mixed a peer frame-id half with a
+    // process-local counter that collided across restarts), so for that path a
+    // `Duplicate` now means a replayed rupture frame. Silently
+    // swallowing it would suppress a durable rupture record — exactly the
+    // fail-loud behaviour this ConsentRupture path was built to keep. Surface it
+    // as an error so the rupture is never quietly missing from the TL.
     let write = log
         .insert_consent_rupture(
             Some(frame.frame_id),

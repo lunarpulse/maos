@@ -38,6 +38,17 @@ ignore = [
     # vulnerability advisory. Migration = move both crates to a maintained YAML
     # parser; tracked in deferred-work.md, not done as a CI-green patch.
     "RUSTSEC-2024-0449",
+    # zvariant 5.15.0 / zbus_names 4.3.4 / zvariant_derive 5.15.0 — unmaintained
+    # (RUSTSEC-2026-0370/0371/0372; "No safe upgrade is
+    # available!"). Pulled only by the Linux OS-keyring backend:
+    # maos-secrets → keyring 4.2.0 → zbus-secret-service-keyring-store 1.0.1 →
+    # secret-service 5.2.0 → zbus 5.19.0. Not a vulnerability advisory. Trigger
+    # to drop: a secret-service/keyring release on zbus ≥ 6 (or a ruled move off
+    # Secret Service). Ruled 2026-10-24 (D-18-0-03, 18-0-green-main-ci-baseline);
+    # re-checked by 20-5-v1-0-rc-tag-and-lts-rule, tracked in deferred-work.md.
+    "RUSTSEC-2026-0370",
+    "RUSTSEC-2026-0371",
+    "RUSTSEC-2026-0372",
 ]
 
 [licenses]

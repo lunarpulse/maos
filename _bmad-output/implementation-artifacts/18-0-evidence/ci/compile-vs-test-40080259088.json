@@ -1,0 +1,347 @@
+{
+  "run_id": 40080259088,
+  "method": "18-0 AC10 (creation/e17-a2-method-probe.txt): compile_s = sum of cargo `Finished ... in <t>` lines attributed (by timestamp, the steps API windows) to non-setup steps; setup_s = wall of set-up/checkout/toolchain/cache/install/artifact/post steps (their own cargo-install builds included); test_s = job wall - compile_s - setup_s (also absorbs fixture fetch, scripts and runner overhead)",
+  "legs": [
+    {
+      "bucket": "epic-17-exit",
+      "job": "epic-17-exit (ubuntu-24.04)",
+      "job_id": 120832155044,
+      "conclusion": "success",
+      "wall_s": 1512,
+      "compile_s": 1026,
+      "setup_s": 54,
+      "test_s": 432,
+      "finished_lines": 14,
+      "compile_share": 0.679,
+      "compile_by_step_s": {
+        "Epic-17 exit line 2 \u2014 the TypeScript Spirit launch (Story 17-3c)": 516,
+        "Epic-17 exit line 4 \u2014 retained T3 terminal facts (Story 17-7)": 193,
+        "Build the Worker root and the static probe fixture": 143,
+        "Epic-17 exit line 3 \u2014 T2 kill (Story 17-6)": 89,
+        "Build the forbidden-syscall probes (line 3 prerequisite; xtask build-test-fixtures, Story 20-12)": 72,
+        "Build terminal-facts scene prerequisites": 10,
+        "Epic-17 exit line 5 \u2014 Observer live scene + activity corpus (Story 17-4)": 1,
+        "CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)": 1
+      }
+    },
+    {
+      "bucket": "epic-17-exit",
+      "job": "epic-17-exit (ubuntu-26.04)",
+      "job_id": 120832155152,
+      "conclusion": "success",
+      "wall_s": 1265,
+      "compile_s": 831,
+      "setup_s": 54,
+      "test_s": 380,
+      "finished_lines": 14,
+      "compile_share": 0.657,
+      "compile_by_step_s": {
+        "Epic-17 exit line 2 \u2014 the TypeScript Spirit launch (Story 17-3c)": 411,
+        "Epic-17 exit line 4 \u2014 retained T3 terminal facts (Story 17-7)": 157,
+        "Build the Worker root and the static probe fixture": 118,
+        "Epic-17 exit line 3 \u2014 T2 kill (Story 17-6)": 74,
+        "Build the forbidden-syscall probes (line 3 prerequisite; xtask build-test-fixtures, Story 20-12)": 59,
+        "Build terminal-facts scene prerequisites": 9,
+        "CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)": 2,
+        "Epic-17 exit line 5 \u2014 Observer live scene + activity corpus (Story 17-4)": 1
+      }
+    },
+    {
+      "bucket": "workspace-test-suite",
+      "job": "workspace-test-suite",
+      "job_id": 120832157350,
+      "conclusion": "failure",
+      "wall_s": 1170,
+      "compile_s": 862,
+      "setup_s": 118,
+      "test_s": 190,
+      "finished_lines": 19,
+      "compile_share": 0.737,
+      "compile_by_step_s": {
+        "Build every test fixture (xtask build-test-fixtures)": 480,
+        "Run the full workspace test suite (nextest)": 313,
+        "Seed a decoy operator door on HOME (D-16-1-Q control)": 47,
+        "Observe all three telemetry air-gap controls (no green skips)": 21
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-undelegated",
+      "job": "cgroup-ceiling-undelegated (ubuntu-24.04-arm)",
+      "job_id": 120832157366,
+      "conclusion": "success",
+      "wall_s": 758,
+      "compile_s": 588,
+      "setup_s": 130,
+      "test_s": 40,
+      "finished_lines": 8,
+      "compile_share": 0.776,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 477,
+        "Full undelegated session suite \u2014 live fallback, strict refusal, persistence and ordering": 111
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-undelegated",
+      "job": "cgroup-ceiling-undelegated (ubuntu-26.04-arm)",
+      "job_id": 120832157373,
+      "conclusion": "success",
+      "wall_s": 770,
+      "compile_s": 593,
+      "setup_s": 130,
+      "test_s": 47,
+      "finished_lines": 8,
+      "compile_share": 0.77,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 480,
+        "Full undelegated session suite \u2014 live fallback, strict refusal, persistence and ordering": 113
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-undelegated",
+      "job": "cgroup-ceiling-undelegated (ubuntu-24.04)",
+      "job_id": 120832157416,
+      "conclusion": "success",
+      "wall_s": 1001,
+      "compile_s": 775,
+      "setup_s": 170,
+      "test_s": 56,
+      "finished_lines": 8,
+      "compile_share": 0.774,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 642,
+        "Full undelegated session suite \u2014 live fallback, strict refusal, persistence and ordering": 133
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-undelegated",
+      "job": "cgroup-ceiling-undelegated (ubuntu-26.04)",
+      "job_id": 120832157433,
+      "conclusion": "success",
+      "wall_s": 1078,
+      "compile_s": 849,
+      "setup_s": 176,
+      "test_s": 53,
+      "finished_lines": 8,
+      "compile_share": 0.788,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 701,
+        "Full undelegated session suite \u2014 live fallback, strict refusal, persistence and ordering": 148
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-delegated",
+      "job": "cgroup-ceiling-delegated (ubuntu-26.04)",
+      "job_id": 120832157601,
+      "conclusion": "success",
+      "wall_s": 811,
+      "compile_s": 583,
+      "setup_s": 122,
+      "test_s": 106,
+      "finished_lines": 13,
+      "compile_share": 0.719,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 462,
+        "Real admitted session suite \u2014 23 cases, serial": 94,
+        "Native cgroup-v2 smoke \u2014 four real cases": 19,
+        "Build the actual Worker CLI fixture before the in-unit canary (x64)": 7,
+        "Rootless T3 Worker resource enforcement (x64)": 1
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-delegated",
+      "job": "cgroup-ceiling-delegated (ubuntu-26.04-arm)",
+      "job_id": 120832157615,
+      "conclusion": "success",
+      "wall_s": 828,
+      "compile_s": 625,
+      "setup_s": 126,
+      "test_s": 77,
+      "finished_lines": 9,
+      "compile_share": 0.754,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 489,
+        "Real admitted session suite \u2014 23 cases, serial": 112,
+        "Native cgroup-v2 smoke \u2014 four real cases": 23
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-delegated",
+      "job": "cgroup-ceiling-delegated (ubuntu-24.04)",
+      "job_id": 120832157633,
+      "conclusion": "success",
+      "wall_s": 933,
+      "compile_s": 672,
+      "setup_s": 146,
+      "test_s": 115,
+      "finished_lines": 13,
+      "compile_share": 0.72,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 533,
+        "Real admitted session suite \u2014 23 cases, serial": 108,
+        "Native cgroup-v2 smoke \u2014 four real cases": 22,
+        "Build the actual Worker CLI fixture before the in-unit canary (x64)": 8,
+        "Rootless T3 Worker resource enforcement (x64)": 1
+      }
+    },
+    {
+      "bucket": "cgroup-ceiling-delegated",
+      "job": "cgroup-ceiling-delegated (ubuntu-24.04-arm)",
+      "job_id": 120832157649,
+      "conclusion": "success",
+      "wall_s": 839,
+      "compile_s": 634,
+      "setup_s": 136,
+      "test_s": 69,
+      "finished_lines": 9,
+      "compile_share": 0.755,
+      "compile_by_step_s": {
+        "Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)": 496,
+        "Real admitted session suite \u2014 23 cases, serial": 115,
+        "Native cgroup-v2 smoke \u2014 four real cases": 23
+      }
+    },
+    {
+      "bucket": "wasm-host-tests",
+      "job": "wasm-host-tests (ubuntu-24.04-arm)",
+      "job_id": 120852040362,
+      "conclusion": "success",
+      "wall_s": 1697,
+      "compile_s": 1245,
+      "setup_s": 147,
+      "test_s": 305,
+      "finished_lines": 23,
+      "compile_share": 0.734,
+      "compile_by_step_s": {
+        "Build the T2/WASM fixtures \u2014 probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)": 497,
+        "Build the actual feature-enabled CLI and release runner": 419,
+        "Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates": 118,
+        "Standalone native-twin fixture tests (Story 17-3c)": 90,
+        "Epic-17 exit line 3 \u2014 T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)": 47,
+        "Kernel T2 suites \u2014 sandbox enforcement + the launch primitive's route (Story 17-6 AC5)": 22,
+        "Escape-detector suite on a real T2 kill (Story 17-6 AC4)": 13,
+        "Run maos-host + maos-wasm-host test suites": 12,
+        "Participant recall and consent envelopes, both forms (Story 17-8)": 9,
+        "In-band recall through the admitted session (Story 17-3d)": 9,
+        "Live escape-anomaly consumer under real T2 (Story 17-10)": 9
+      }
+    },
+    {
+      "bucket": "wasm-host-tests",
+      "job": "wasm-host-tests (ubuntu-26.04-arm)",
+      "job_id": 120852040367,
+      "conclusion": "failure",
+      "wall_s": 578,
+      "compile_s": 548,
+      "setup_s": 12,
+      "test_s": 18,
+      "finished_lines": 15,
+      "compile_share": 0.948,
+      "compile_by_step_s": {
+        "Build the T2/WASM fixtures \u2014 probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)": 466,
+        "Epic-17 exit line 3 \u2014 T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)": 42,
+        "Kernel T2 suites \u2014 sandbox enforcement + the launch primitive's route (Story 17-6 AC5)": 21,
+        "Escape-detector suite on a real T2 kill (Story 17-6 AC4)": 11,
+        "Run maos-host + maos-wasm-host test suites": 8
+      }
+    },
+    {
+      "bucket": "wasm-host-tests",
+      "job": "wasm-host-tests (ubuntu-26.04)",
+      "job_id": 120852040395,
+      "conclusion": "success",
+      "wall_s": 2276,
+      "compile_s": 1704,
+      "setup_s": 183,
+      "test_s": 389,
+      "finished_lines": 23,
+      "compile_share": 0.749,
+      "compile_by_step_s": {
+        "Build the T2/WASM fixtures \u2014 probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)": 726,
+        "Build the actual feature-enabled CLI and release runner": 608,
+        "Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates": 148,
+        "Standalone native-twin fixture tests (Story 17-3c)": 114,
+        "Epic-17 exit line 3 \u2014 T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)": 54,
+        "Kernel T2 suites \u2014 sandbox enforcement + the launch primitive's route (Story 17-6 AC5)": 30,
+        "Escape-detector suite on a real T2 kill (Story 17-6 AC4)": 13,
+        "Run maos-host + maos-wasm-host test suites": 5,
+        "In-band recall through the admitted session (Story 17-3d)": 2,
+        "Participant recall and consent envelopes, both forms (Story 17-8)": 2,
+        "Live escape-anomaly consumer under real T2 (Story 17-10)": 2
+      }
+    },
+    {
+      "bucket": "wasm-host-tests",
+      "job": "wasm-host-tests (ubuntu-24.04)",
+      "job_id": 120852040437,
+      "conclusion": "success",
+      "wall_s": 2221,
+      "compile_s": 1632,
+      "setup_s": 185,
+      "test_s": 404,
+      "finished_lines": 23,
+      "compile_share": 0.735,
+      "compile_by_step_s": {
+        "Build the T2/WASM fixtures \u2014 probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)": 686,
+        "Build the actual feature-enabled CLI and release runner": 588,
+        "Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates": 143,
+        "Standalone native-twin fixture tests (Story 17-3c)": 111,
+        "Epic-17 exit line 3 \u2014 T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)": 51,
+        "Kernel T2 suites \u2014 sandbox enforcement + the launch primitive's route (Story 17-6 AC5)": 29,
+        "Escape-detector suite on a real T2 kill (Story 17-6 AC4)": 12,
+        "Run maos-host + maos-wasm-host test suites": 5,
+        "In-band recall through the admitted session (Story 17-3d)": 2,
+        "Participant recall and consent envelopes, both forms (Story 17-8)": 2,
+        "Live escape-anomaly consumer under real T2 (Story 17-10)": 2
+      }
+    }
+  ],
+  "summary": {
+    "wasm-host-tests": {
+      "legs": 4,
+      "wall_s": 6772,
+      "compile_s": 5129,
+      "setup_s": 527,
+      "test_s": 1116,
+      "compile_share": 0.757
+    },
+    "cgroup-ceiling-undelegated": {
+      "legs": 4,
+      "wall_s": 3607,
+      "compile_s": 2805,
+      "setup_s": 606,
+      "test_s": 196,
+      "compile_share": 0.778
+    },
+    "cgroup-ceiling-delegated": {
+      "legs": 4,
+      "wall_s": 3411,
+      "compile_s": 2514,
+      "setup_s": 530,
+      "test_s": 367,
+      "compile_share": 0.737
+    },
+    "epic-17-exit": {
+      "legs": 2,
+      "wall_s": 2777,
+      "compile_s": 1857,
+      "setup_s": 108,
+      "test_s": 812,
+      "compile_share": 0.669
+    },
+    "workspace-test-suite": {
+      "legs": 1,
+      "wall_s": 1170,
+      "compile_s": 862,
+      "setup_s": 118,
+      "test_s": 190,
+      "compile_share": 0.737
+    }
+  },
+  "total": {
+    "wall_s": 17737,
+    "compile_s": 13167,
+    "setup_s": 1889,
+    "test_s": 2681,
+    "compile_share": 0.742
+  }
+}

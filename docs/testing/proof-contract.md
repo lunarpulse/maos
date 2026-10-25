@@ -63,8 +63,8 @@ on one image.**
   `cargo run -p xtask -- check-test-budget --junit <path>`. The same job runs `cargo test --locked --workspace --doc`
   (nextest does not run doctests) and `cargo test -p maos-kernel-core --lib`; neither is in the junit budget.
 - Every test binary's Σ per-test time stays under its budget in `xtask/test-budgets.toml` (default 30 s; an
-  `[[exception]]` names `binary`, `seconds`, `reason`, `owner`). `check-test-budget` is advisory at v1.0 until one CI
-  run calibrates `total_seconds` (operator ruling 2026-10-23).
+  `[[exception]]` names `binary`, `seconds`, `reason`, `owner`). `check-test-budget` is blocking at v1.0 since
+  `18-0-green-main-ci-baseline` (operator ruling R3 2026-10-24: calibrated on five CI junits, total 800 s).
 - No test spawns `cargo` (`Command::new("cargo")`, `env!("CARGO")`, `var("CARGO")`/`var_os("CARGO")`),
   `rustc` or `trybuild` unless the line before the call says `// expensive: <reason>`, the test is
   `#[ignore = "expensive: <reason>"]`, and its binary is listed in `[[expensive]]`

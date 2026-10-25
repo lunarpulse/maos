@@ -153,17 +153,40 @@ jobs:
             exit 1
           fi
           echo "No nightly-only features detected."
-      - name: Install cargo-deny
+
+  # Story 18-0 AC2 (D-18-0-04, ruled 2026-10-24) — the supply-chain gate is
+  # BLOCKING. Until 18-0, `cargo deny check` ran as the last steps of the
+  # ADVISORY `reproducible-build` job, whose `continue-on-error` reported the
+  # job `success` to `aggregate` while the deny step failed (run 40080259088),
+  # so a red advisory DB never reached the fan-in. Its own job, no
+  # `continue-on-error`, in `aggregate.needs` only (no gate-registry row, the
+  # 15-3 enrolment precedent). Policy: `deny.toml`.
+  cargo-deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      # Review 2026-10-25: the pinned prebuilt binary (the nextest precedent)
+      # instead of compiling cargo-deny from source on every run.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@${{ env.CARGO_DENY_VERSION }}
+      # Review DC (2026-10-25): a transient advisory-DB fetch failure retries
+      # (3 tries, bounded); the check then runs on the fetched DB, so a newly
+      # published advisory still reds the job (intended).
+      - name: cargo deny fetch (bounded retry)
         run: |
-          # Mirrors the tokei install pattern (kloc-check job): cargo-installed
-          # rather than curl-from-release-tarball. The previous recipe failed
-          # because cargo-deny's tarball extracts to a versioned subdirectory
-          # (`cargo-deny-${V}-x86_64-unknown-linux-musl/cargo-deny`), not to
-          # the binary at root. Switching to `cargo install` retires the
-          # release-tarball assumption class — see retro post-mortem.
-          cargo install --locked --version ${CARGO_DENY_VERSION} cargo-deny
+          for try in 1 2 3; do
+            if cargo deny fetch db; then exit 0; fi
+            echo "cargo deny fetch failed (try $try of 3)"
+            if [ "$try" -lt 3 ]; then sleep 15; fi
+          done
+          exit 1
       - name: cargo deny check
-        run: cargo deny check
+        run: cargo deny check --disable-fetch
 
   check-unsafe:
     runs-on: ubuntu-latest
@@ -553,7 +576,9 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-test-cost
         run: cargo run -p xtask -- check-test-cost --json
+      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
       - name: Run the 20-12 AC2 proven-red vectors
+        if: ${{ !cancelled() }}
         run: cargo test -p xtask --test check_test_cost_proven_red
 
   # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
@@ -561,8 +586,9 @@ jobs:
   # (default 30 s, total 300 s). Reads the junit `workspace-test-suite`
   # uploads; runs even when the suite went red (a red suite still has a cost to
   # judge) but not when it was cancelled. In `aggregate.needs` (AC4) and
-  # `v1-0-ship-gate.needs`; ADVISORY at v1_0 in `gate-registry.toml` until one
-  # CI calibration (operator ruling 2026-10-23, flip owner epic-17-retrospective).
+  # `v1-0-ship-gate.needs`; BLOCKING at v1_0 in `gate-registry.toml` since
+  # 18-0-green-main-ci-baseline (operator ruling R3 2026-10-24: four calibrated
+  # exceptions, total 800 s, from `20-12-evidence/ci-after.json` + run 40080259088).
   check-test-budget:
     needs: [workspace-test-suite]
     if: ${{ !cancelled() }}
@@ -582,7 +608,9 @@ jobs:
           path: workspace-junit
       - name: Run check-test-budget on the workspace junit
         run: cargo run -p xtask -- check-test-budget --junit workspace-junit/junit.xml --json
+      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
       - name: Run the 20-12 AC1 proven-red vectors
+        if: ${{ !cancelled() }}
         run: cargo test -p xtask --test check_test_budget_proven_red
 
   # Story 20-12 AC2 — the ONE job that runs the registered expensive tests:
@@ -591,7 +619,11 @@ jobs:
   # (filter derived by `check-test-cost --expensive-filter`, so the job cannot
   # drift from the register). Rows naming a dedicated job (the 16-3 corpora,
   # the 11.3 meshes) run there, where their substrate is provisioned.
-  # One image: none of these tests has the image as its subject.
+  # One image: none of these tests has the image as its subject. No fixture
+  # build (D-18-0-09): no registered `job = "expensive-tests"` row needs one; a
+  # fixture-needing test without a build fails closed naming `build-test-fixtures`.
+  # Enrolled in `aggregate.needs` only — an unregistered job never joins a ship
+  # gate's needs (D-15-4-F, D-18-0-10).
   expensive-tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -616,6 +648,13 @@ jobs:
           filter="$(cargo run -q -p xtask -- check-test-cost --expensive-filter)"
           echo "expensive filter: $filter"
           cargo nextest run --workspace --locked --profile expensive --run-ignored ignored-only -E "$filter"
+      - name: Upload the expensive-tests junit
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: expensive-tests-junit
+          path: target/nextest/expensive/junit.xml
+          if-no-files-found: error
 
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
@@ -5480,6 +5519,8 @@ jobs:
     timeout-minutes: 30
     needs:
       - reproducible-build
+      # Story 18-0 AC2 (D-18-0-04) — the blocking supply-chain gate.
+      - cargo-deny
       - check-unsafe
       - check-fmt
       - kloc-check

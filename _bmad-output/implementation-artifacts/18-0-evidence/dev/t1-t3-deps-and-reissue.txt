@@ -1,0 +1,36 @@
+# 18-0 dev — T1 (dependencies) and T3 (WIT comment re-issue), dev HEAD c8613658, 2026-10-24.
+# cargo-deny 0.19.4 (release musl binary), advisory-db 21d909e4 (2026-10-24T10:30:13+02:00; `cargo deny fetch db` = no newer).
+
+## T0: HEAD deny = the same nine errors as creation (t0-cargo-deny-head.txt); no new advisory.
+
+## T1 lock updates (D-18-0-02 A)
+$ cargo update -p wasmtime -p wasmtime-wasi                 # Locking 33 packages; wasmtime/wasmtime-wasi 48.0.6 -> 48.0.7 (+31 family)
+$ cargo update -p rustls-webpki -p webpki-roots@1.0.7 -p ctutils -p chacha20
+    Updating chacha20 v0.10.0 -> v0.10.2
+    Updating ctutils v0.4.2 -> v0.4.5
+    Updating rustls-webpki v0.103.15 -> v0.103.16
+    Updating webpki-roots v1.0.7 -> v1.0.11
+$ cargo update -p tokio --precise 1.53.3                    # tokio v1.52.3 -> v1.53.3
+$ cargo update --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml -p wasmtime -p wasmtime-wasi
+     Locking 33 packages to latest compatible versions      # wasmtime/wasmtime-wasi v48.0.5 -> v48.0.7 (D-18-0-05 A)
+crates/maos-wasm-host/Cargo.toml: wasmtime / wasmtime-wasi floor 48.0.4 -> 48.0.7 (+ comment line).
+deny.toml: ignore += RUSTSEC-2026-0370/0371/0372 (D-18-0-03 A).
+
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+
+## T3 WIT comment (D-18-0-06 A)
+wit/spirit.wit:1 -> "// `maos:spirit@2.1.0` — lossless frames and participant-scoped log recall."
+Toolchain: rustc 1.98.1 (48a229cea 2026-09-01) = pinned; src/lib.rs of each guest touched (content unchanged) to force the rebuild.
+$ cargo build --locked --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/<g>/Cargo.toml   (x4)
+36ff30298eee24c25abfcf1dde2c6e8992aeaa77641c22c789605d17673f2894  echo_spirit.wasm             == committed wasm_sha256
+0f220aef0b512dde9285b4a7d8e3b2a23148d3a4b06efe7bc76cda6fc50d8508  equiv_identity_spirit.wasm   == committed
+77e2bc9029e7779a4a4e53f3a3b7bb8dbd2530d15459232c499a7f2e5e3c8b9b  equiv_divergent_spirit.wasm  == committed
+5369a0527490b7cec43e15e1f69502757625597cf589f462f47a3103f7e80a30  equiv_cosmetic_spirit.wasm   == committed
+-> byte-identical; wasm_sha256 unchanged; four source_sha256 re-pinned:
+  echo_spirit_component.wasm            96885af4… -> a92e12cbef6217f044381d34b699f7d9439bd1c6e5d044d825687f3f67b0b9fb
+  equiv_identity_spirit_component.wasm  adb08013… -> 6d486e28472fd641f27bdb6f4639228a389456f7e5f12cad722ea7e02a685428
+  equiv_divergent_spirit_component.wasm 1d47ce22… -> dd3c3c5212f1921cd97103ab3c82255f76f08419383f1a003570182fea59c8f1
+  equiv_cosmetic_spirit_component.wasm  2ca1e43d… -> 1eea9e533c5f496dbc10c9740fa2587a30472772a6292f17c0cea9374724104d
+$ xtask check-equiv-fixture-provenance
+check-equiv-fixture-provenance: PASSED (4 fixtures in sync with source, WIT, and manifest)

@@ -428,15 +428,11 @@ impl A2ARouterCore {
             return Ok(());
         };
         let now_ns = self.consent_now_ns();
-        // Story 8.13.1-review / P4 — unique-per-denial correlation id: the first
-        // half preserves the original frame_id for correlation; the second half
-        // is a monotonic nonce so retries / re-routing cannot collide.
-        let rupture_id = {
-            let mut id = frame.frame_id;
-            let nonce = self.alloc_id();
-            id[8..16].copy_from_slice(&nonce.to_le_bytes());
-            id
-        };
+        // 18-0 AC7 (D-18-0-11 C) — a fresh ULID per denial: unique across
+        // retries, re-routing AND process restarts (the old process-local
+        // counter restarted at 1, so a restarted router re-minted a journaled
+        // id). No peer-controlled bits; one id for payload, frame and TL row.
+        let rupture_id = ulid::Ulid::new().to_bytes();
         // Story 8.13.1-review / P1 — the denier is the receiver host; if frame.to
         // is empty (protocol invariant violation at this point), skip emission
         // rather than fall back to the sender identity, which would be semantically

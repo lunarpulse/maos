@@ -1,4 +1,4 @@
-// `maos:spirit@2.1.0` — lossless frames and emitter-scoped log recall.
+// `maos:spirit@2.1.0` — lossless frames and participant-scoped log recall.
 //
 // Story 11.1a, ADR-031 §3: this WIT is the typed face a WASM Spirit author
 // binds against (wit-bindgen, `jco guest-types`). The host serializes and

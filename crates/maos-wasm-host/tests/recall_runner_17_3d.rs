@@ -70,14 +70,15 @@ impl Session {
     fn control(&self) {
         assert_eq!(self.record(), Some(vec![]));
     }
-    fn send(&mut self, body: &[u8]) {
-        maos_frame_codec::write_frame(self.stdin.as_mut().unwrap(), body).unwrap();
+    fn send(&mut self, body: &[u8]) -> io::Result<()> {
+        maos_frame_codec::write_frame(self.stdin.as_mut().unwrap(), body)
     }
     fn request(&self) -> RecallRequest {
         decode_request(&self.record().expect("recall request")).unwrap()
     }
     fn reply(&mut self, reply: RecallReply) {
-        self.send(&encode_reply(&reply).unwrap());
+        self.send(&encode_reply(&reply).unwrap())
+            .expect("runner reads the reply");
     }
     fn report(&self) -> String {
         let body = self.record().expect("emitted report");
@@ -136,7 +137,8 @@ fn frame(script: &str) -> IacFrame {
 fn recall_probe_maps_filter_page_fetch_and_open_labels() {
     let mut s = Session::start();
     s.control();
-    s.send(&codec::encode_cbor(&frame("recall limit=3 kind=TaskAssign since=4 until=99 intent=737464 cursor=2:01010101010101010101010101010101\nfetch last\nfetch self")).unwrap());
+    s.send(&codec::encode_cbor(&frame("recall limit=3 kind=TaskAssign since=4 until=99 intent=737464 cursor=2:01010101010101010101010101010101\nfetch last\nfetch self")).unwrap())
+        .expect("runner reads the frame");
     let expected = WireFilter {
         kind: Some("TaskAssign".into()),
         since_ns: Some(4),
@@ -198,17 +200,25 @@ fn recall_probe_maps_filter_page_fetch_and_open_labels() {
 fn hostile(body: &[u8], raw: bool) {
     let mut s = Session::start();
     s.control();
-    s.send(&codec::encode_cbor(&frame("recall\nfetch self\nrecall")).unwrap());
+    s.send(&codec::encode_cbor(&frame("recall\nfetch self\nrecall")).unwrap())
+        .expect("runner reads the frame");
     assert!(matches!(s.request(), RecallRequest::Recall { .. }));
     if raw {
         s.stdin.as_mut().unwrap().write_all(body).unwrap();
         s.stdin.as_mut().unwrap().flush().unwrap();
     } else {
-        s.send(body);
+        s.send(body).expect("runner reads the hostile reply");
     }
     // Queue another frame: the broken client must not consume it after this export.
+    // 18-0 AC4(c): the runner exits after its latching reply, so this write may
+    // race that exit; EPIPE here IS the latch. Only BrokenPipe is accepted, and
+    // only on this post-latch write; the latch itself is proven below.
     if !raw {
-        s.send(&codec::encode_cbor(&frame("recall")).unwrap());
+        match s.send(&codec::encode_cbor(&frame("recall")).unwrap()) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::BrokenPipe => {}
+            Err(error) => panic!("post-latch write failed other than EPIPE: {error}"),
+        }
     }
     assert_eq!(
         s.report(),
@@ -237,7 +247,8 @@ fn oversized_reply_latches_broken_after_export() {
 fn partial_reply_header_latches_broken_after_export() {
     let mut s = Session::start();
     s.control();
-    s.send(&codec::encode_cbor(&frame("recall\nfetch self")).unwrap());
+    s.send(&codec::encode_cbor(&frame("recall\nfetch self")).unwrap())
+        .expect("runner reads the frame");
     s.request();
     s.stdin
         .as_mut()
@@ -256,7 +267,8 @@ fn partial_reply_header_latches_broken_after_export() {
 fn eof_outstanding_closes_client_but_finishes_export_and_exits_zero() {
     let mut s = Session::start();
     s.control();
-    s.send(&codec::encode_cbor(&frame("recall\nfetch self\nrecall")).unwrap());
+    s.send(&codec::encode_cbor(&frame("recall\nfetch self\nrecall")).unwrap())
+        .expect("runner reads the frame");
     s.request();
     s.stdin.take();
     assert_eq!(
@@ -276,7 +288,8 @@ fn recall_outside_handle_frame_is_unavailable_without_records() {
 fn reply_too_large_is_typed_and_does_not_break_following_call() {
     let mut s = Session::start();
     s.control();
-    s.send(&codec::encode_cbor(&frame("fetch self\nrecall")).unwrap());
+    s.send(&codec::encode_cbor(&frame("fetch self\nrecall")).unwrap())
+        .expect("runner reads the frame");
     assert!(matches!(s.request(), RecallRequest::Fetch { .. }));
     s.reply(RecallReply::Error(WireError::ReplyTooLarge(
         REPLY_BYTE_BOUND,
@@ -297,7 +310,8 @@ fn reply_too_large_is_typed_and_does_not_break_following_call() {
 fn wrong_reply_variant_is_protocol_desync() {
     let mut s = Session::start();
     s.control();
-    s.send(&codec::encode_cbor(&frame("fetch self\nrecall")).unwrap());
+    s.send(&codec::encode_cbor(&frame("fetch self\nrecall")).unwrap())
+        .expect("runner reads the frame");
     s.request();
     s.reply(RecallReply::Page {
         entries: vec![],

@@ -2,6 +2,7 @@
 //!
 //! Exercises: `maos init`, `maos shell`, `maos audit query`.
 
+use std::path::Path;
 use std::process::Command;
 
 fn workspace_root() -> String {
@@ -24,18 +25,27 @@ fn isolated_home(label: &str) -> std::path::PathBuf {
     path
 }
 
+/// 18-0 CR-6 — `maos init` with `HOME` and `XDG_DATA_HOME` inside the test's
+/// own home and no inherited `MAOS_CRL_PATH`, so the CRL directory `init`
+/// creates never lands in the runner's real `~/.local/share/maos/crl`.
+fn init(home: &Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command
+        .arg("init")
+        .env("MAOS_HOME", home)
+        .env("HOME", home.join("user-home"))
+        .env("XDG_DATA_HOME", home.join("xdg-data"))
+        .env_remove("MAOS_CRL_PATH")
+        .current_dir(workspace_root());
+    command
+}
+
 #[test]
 fn init_creates_dot_maos_and_is_idempotent() {
     let home = isolated_home("init");
-    let bin = env!("CARGO_BIN_EXE_maos");
 
     // First init.
-    let out = Command::new(bin)
-        .arg("init")
-        .env("MAOS_HOME", &home)
-        .current_dir(workspace_root())
-        .output()
-        .expect("failed to execute maos init");
+    let out = init(&home).output().expect("failed to execute maos init");
     assert!(
         out.status.success(),
         "init exit 0: {}",
@@ -44,10 +54,7 @@ fn init_creates_dot_maos_and_is_idempotent() {
     assert!(home.join("config.toml").exists());
 
     // Second init — idempotent.
-    let out2 = Command::new(bin)
-        .arg("init")
-        .env("MAOS_HOME", &home)
-        .current_dir(workspace_root())
+    let out2 = init(&home)
         .output()
         .expect("failed to execute maos init again");
     assert!(out2.status.success());
@@ -60,17 +67,75 @@ fn init_creates_dot_maos_and_is_idempotent() {
     let _ = std::fs::remove_dir_all(&home);
 }
 
+/// 18-0 AC8 (E16-A5, D-18-0-12 A) — `maos init` creates the CRL directory the
+/// revocation poller reads, on a fresh home and again on an initialized one
+/// (before the idempotent early return), and honours `MAOS_CRL_PATH`.
+#[test]
+fn init_creates_the_crl_directory_and_honours_maos_crl_path() {
+    let home = isolated_home("crl");
+    let crl = home.join("xdg-data").join("maos").join("crl");
+    for run in ["first", "second"] {
+        let out = init(&home).output().expect("failed to execute maos init");
+        assert!(
+            out.status.success(),
+            "{run} init exit 0: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(crl.is_dir(), "{run} init: {} is a directory", crl.display());
+    }
+    let explicit = home.join("explicit-crl");
+    let out = init(&home)
+        .env("MAOS_CRL_PATH", &explicit)
+        .output()
+        .expect("failed to execute maos init with MAOS_CRL_PATH");
+    assert!(
+        out.status.success(),
+        "MAOS_CRL_PATH init exit 0: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        explicit.is_dir(),
+        "MAOS_CRL_PATH={} is created instead",
+        explicit.display()
+    );
+
+    let _ = std::fs::remove_dir_all(&home);
+}
+
+/// 18-0 review DA — an uncreatable CRL directory (`MAOS_CRL_PATH` under a
+/// regular file: ENOTDIR for any uid, root included) warns on stderr and
+/// `maos init` still succeeds, on a fresh home and on an initialized one.
+#[test]
+fn init_warns_and_succeeds_when_the_crl_directory_cannot_be_created() {
+    let home = isolated_home("crl-warn");
+    let blocker = home.join("not-a-dir");
+    std::fs::write(&blocker, b"file").expect("write blocker file");
+    let crl = blocker.join("crl");
+    let warning = format!("maos: could not create CRL directory {}: ", crl.display());
+    for run in ["first", "second"] {
+        let out = init(&home)
+            .env("MAOS_CRL_PATH", &crl)
+            .output()
+            .expect("failed to execute maos init");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{run} init exit 0: {stderr}");
+        assert!(
+            stderr.contains(&warning),
+            "{run} init warns `{warning}…`: {stderr}"
+        );
+        assert!(home.join("config.toml").exists(), "{run} init wrote config");
+    }
+
+    let _ = std::fs::remove_dir_all(&home);
+}
+
 #[test]
 fn shell_hello_spirit_say_hi_and_audit_query() {
     let home = isolated_home("shell");
     let bin = env!("CARGO_BIN_EXE_maos");
 
     // Init.
-    let _ = Command::new(bin)
-        .arg("init")
-        .env("MAOS_HOME", &home)
-        .current_dir(workspace_root())
-        .output();
+    let _ = init(&home).output();
 
     // Shell turn: @hello-spirit say hi
     let mut child = Command::new(bin)
@@ -109,11 +174,7 @@ fn audit_query_plain_no_ansi() {
     let bin = env!("CARGO_BIN_EXE_maos");
 
     // Init so audit DB path exists under MAOS_HOME.
-    let _ = Command::new(bin)
-        .arg("init")
-        .env("MAOS_HOME", &home)
-        .current_dir(workspace_root())
-        .output();
+    let _ = init(&home).output();
 
     // audit query --plain should emit zero ANSI bytes even when empty.
     let out = Command::new(bin)
@@ -139,11 +200,7 @@ fn shell_plain_no_ansi() {
     let bin = env!("CARGO_BIN_EXE_maos");
 
     // Init.
-    let _ = Command::new(bin)
-        .arg("init")
-        .env("MAOS_HOME", &home)
-        .current_dir(workspace_root())
-        .output();
+    let _ = init(&home).output();
 
     // Shell with --plain should emit zero ANSI bytes.
     let mut child = Command::new(bin)
@@ -178,11 +235,7 @@ fn audit_query_returns_shell_turn_rows() {
     let bin = env!("CARGO_BIN_EXE_maos");
 
     // Init.
-    let _ = Command::new(bin)
-        .arg("init")
-        .env("MAOS_HOME", &home)
-        .current_dir(workspace_root())
-        .output();
+    let _ = init(&home).output();
 
     // Shell turn: @hello-spirit say hi
     let mut child = Command::new(bin)

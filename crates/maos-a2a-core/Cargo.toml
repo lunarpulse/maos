@@ -29,6 +29,10 @@ hex = "0.4"
 # entries (the "silent never-match" failure mode made loud). `tracing 0.1` is
 # the workspace-standard facade (maos-skill / maos-manifest / maos-registry).
 tracing = "0.1"
+# 18-0 AC7 (D-18-0-11 C) — consent-rupture ids are fresh ULIDs per denial, so a
+# restarted router never re-mints a journaled id. Same spec as maos-iac /
+# maos-kernel-core (Cargo.lock resolves 1.2.1; no new crate).
+ulid = "1.1"
 
 [dev-dependencies]
 rcgen = "0.13"

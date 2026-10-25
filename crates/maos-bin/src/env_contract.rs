@@ -132,6 +132,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_IDLE_FAST",
+        purpose: "Test-only idle fast mode: presence (any value, even empty or \"0\") sets a 40 ms consolidation poll and divides idle windows by 100 (hook_pump ConsolidationCadence; the kernel IdleWatchdog reads the same name)",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_SPIRIT_ID",
         purpose: "Spirit identifier for one-shot lifecycle verbs",
         stability: EnvStability::UserFacing,

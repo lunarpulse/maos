@@ -44,9 +44,11 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 # their own `wit-bindgen` dependency there).
 # 48 is a Wasmtime LTS line (supported 24 months). 46.x has no fix for
 # RUSTSEC-2026-0314/0316/0321/0322/0323/0324/0327; 48.0.4 is the first
-# fixed 48.x (CI repair 2026-10-06, `cargo deny check`).
-wasmtime = { version = "48.0.4", features = ["component-model"] }
-wasmtime-wasi = "48.0.4"
+# fixed 48.x (CI repair 2026-10-06, `cargo deny check`). 48.0.7 is the first
+# 48.x fixing RUSTSEC-2026-0378/0379 (2026-10-24, 18-0-green-main-ci-baseline;
+# the native-twin guest lock moves with it).
+wasmtime = { version = "48.0.7", features = ["component-model"] }
+wasmtime-wasi = "48.0.7"
 
 # ADR-032 wire protocol: Content-Length + CBOR
 ciborium = "0.2"

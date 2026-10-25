@@ -427,14 +427,15 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 binding = "blocking"
 
 # Story 20-12 AC1 — `check-test-budget`, over the junit `workspace-test-suite`
-# uploads. ADVISORY at v1_0 by operator ruling 2026-10-23 (review of 20-12):
-# the budgeted metric is Σ per-test junit `time` and `total_seconds` has not yet
-# been calibrated on one CI run; it flips to blocking (the 15-1
-# `workspace-test-suite` precedent) once that calibration lands — flip owner
-# `epic-17-retrospective`. Blocking from v1_5.
+# uploads. Was ADVISORY at v1_0 (operator ruling 2026-10-23, review of 20-12)
+# until one CI calibration of the Σ per-test junit `time` metric. BLOCKING at
+# v1_0 since 18-0-green-main-ci-baseline (flip owner; operator ruling R3,
+# 2026-10-24, the 15-1 `workspace-test-suite` precedent): calibrated on the five
+# post-20-12 main-run junits (`20-12-evidence/ci-after.json` + run 40080259088)
+# — four `[[exception]]` rows, `total_seconds` 800.
 [[ship_gate]]
 name = "check-test-budget"
-disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 
 # Story 20-3a — J4 budget advisory at v1.5; binding gate = 20-7 / ADR-068 stable runner.

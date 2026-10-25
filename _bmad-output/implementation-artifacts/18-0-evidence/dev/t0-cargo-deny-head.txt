@@ -1,0 +1,24 @@
+# T0 preflight at dev HEAD c8613658, 2026-10-24T22:47:17+00:00; cargo-deny 0.19.4; advisory-db 21d909e4 2026-10-24T10:30:13+02:00
+warning[license-not-encountered]: license was not encountered
+warning[license-not-encountered]: license was not encountered
+warning[license-not-encountered]: license was not encountered
+error[vulnerability]: Non-constant-time mask generation and `u128` comparisons
+   ├ ID: RUSTSEC-2026-0385
+error[vulnerability]: Certificate verification may accept distrusted intermediates
+    ├ ID: RUSTSEC-2026-0382
+error[unsound]: `AsyncFd::new` and related constructors violate I/O safety
+    ├ ID: RUSTSEC-2026-0386
+error[vulnerability]: Panic lowering a host-created component model stream into a guest that expects a different payload type
+    ├ ID: RUSTSEC-2026-0378
+error[vulnerability]: Cranelift backend on aarch64 can jump to incorrect target on large Wasm `br_table` instruction
+    ├ ID: RUSTSEC-2026-0379
+error[vulnerability]: Bundled root certificates allow trust in distrusted emSign intermediates
+    ├ ID: RUSTSEC-2026-0381
+error[unmaintained]: `zbus_names` is unmaintained
+    ├ ID: RUSTSEC-2026-0371
+error[unmaintained]: `zvariant` is unmaintained
+    ├ ID: RUSTSEC-2026-0370
+error[unmaintained]: `zvariant_derive` is unmaintained
+    ├ ID: RUSTSEC-2026-0372
+warning[yanked]: detected yanked crate (try `cargo update -p chacha20`)
+advisories FAILED, bans ok, licenses ok, sources ok

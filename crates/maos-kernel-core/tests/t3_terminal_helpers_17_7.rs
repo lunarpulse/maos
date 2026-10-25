@@ -283,7 +283,15 @@ fn require_pidfd_exit() -> bool {
     }
     panic!("PIDFD_INFO_EXIT requires Linux >= 6.15; CI kernel is {kernel}");
 }
-fn external_child(script: &str) -> (std::process::Child, u32) {
+/// An owner shell that prints its grandchild's pid first; scripts that reap
+/// the grandchild then print `reaped` (read by [`await_reaped`]).
+fn external_child(
+    script: &str,
+) -> (
+    std::process::Child,
+    u32,
+    std::io::BufReader<std::process::ChildStdout>,
+) {
     let mut child = Command::new("sh")
         .arg("-c")
         .arg(script)
@@ -293,7 +301,23 @@ fn external_child(script: &str) -> (std::process::Child, u32) {
     let mut line = String::new();
     let mut stdout = std::io::BufReader::new(child.stdout.take().unwrap());
     std::io::BufRead::read_line(&mut stdout, &mut line).unwrap();
-    (child, line.trim().parse().unwrap())
+    (child, line.trim().parse().unwrap(), stdout)
+}
+/// 18-0 AC4(d): barrier on the owner shell's reap acknowledgement. After it,
+/// the grandchild is released, so its PIDFD_INFO_EXIT data is final; the 10 s
+/// timeout is a hang guard only.
+fn await_reaped(mut stdout: std::io::BufReader<std::process::ChildStdout>) {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut line = String::new();
+        let read = std::io::BufRead::read_line(&mut stdout, &mut line).map(|_| line);
+        let _ = tx.send(read);
+    });
+    let line = rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("hang guard (10 s): the owner shell never acknowledged the reap")
+        .unwrap();
+    assert_eq!(line.trim(), "reaped", "the owner shell reaps, then says so");
 }
 
 #[test]
@@ -470,41 +494,34 @@ fn pidfd_reports_non_child_exit_status_signals_and_live_absence() {
     if !require_pidfd_exit() {
         return;
     }
-    use std::os::fd::AsFd;
-    // Evidence may lag readability until the reaper runs: poll like production.
-    let exit_status = |fd: &std::os::fd::OwnedFd| {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        loop {
-            if let Some(raw) = linux::pidfd_exit_status(fd.as_fd()).unwrap() {
-                return Some(raw);
-            }
-            if std::time::Instant::now() >= deadline {
-                return None;
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-    };
     let dir = tempfile::tempdir().unwrap();
     let release = dir.path().join("release");
     // A grandchild (never our child) held until its pidfd is open.
-    let (mut owner, pid) = external_child(&format!(
-        "(while [ ! -e '{}' ]; do sleep 0.01; done; exit 137) & echo $!; wait",
+    let (mut owner, pid, stdout) = external_child(&format!(
+        "(while [ ! -e '{}' ]; do sleep 0.01; done; exit 137) & p=$!; echo $p; wait $p; echo reaped",
         release.display()
     ));
     let fd = linux::pidfd_open(pid).unwrap();
     std::fs::write(&release, b"").unwrap();
+    await_reaped(stdout);
     assert!(linux::readable(fd.as_fd(), Duration::from_secs(5)));
-    assert_eq!(exit_status(&fd), Some(0x8900), "exit(137) is Exited(137)");
+    // ONE read after the barrier: any error, ESRCH included, is a failure.
+    assert_eq!(
+        linux::pidfd_exit_status(fd.as_fd()).unwrap(),
+        Some(0x8900),
+        "exit(137) is Exited(137)"
+    );
     let _ = owner.wait();
-    let (mut owner, pid) = external_child("sleep 30 & echo $!; wait");
+    let (mut owner, pid, stdout) = external_child("sleep 30 & p=$!; echo $p; wait $p; echo reaped");
     let fd = linux::pidfd_open(pid).unwrap();
     Command::new("kill")
         .args(["-KILL", &pid.to_string()])
         .status()
         .unwrap();
+    await_reaped(stdout);
     assert!(linux::readable(fd.as_fd(), Duration::from_secs(5)));
     assert_eq!(
-        exit_status(&fd),
+        linux::pidfd_exit_status(fd.as_fd()).unwrap(),
         Some(9),
         "an external SIGKILL is Signaled(9)"
     );

@@ -14,9 +14,9 @@
 //!
 //! Every budget must be finite and positive, every junit `time` finite and
 //! non-negative, and every `[[exception]]` must name a binary present in the
-//! junit (a stale row is a finding). Disposition: ADVISORY at v1_0 until one CI
-//! calibration re-sets `total_seconds` from the CI figure (operator ruling
-//! 2026-10-23; flip owner `epic-17-retrospective`).
+//! junit (a stale row is a finding). Disposition: BLOCKING at v1_0 since
+//! 18-0-green-main-ci-baseline (operator ruling R3 2026-10-24; calibrated on
+//! five CI junits, `total_seconds` 800).
 //!
 //! The file is also the register of expensive tests (`[[expensive]]`), read by
 //! `check-test-cost`.

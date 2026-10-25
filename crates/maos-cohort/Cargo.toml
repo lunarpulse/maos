@@ -30,3 +30,11 @@ sha2 = "0.10"
 thiserror = "2.0"
 # Authority-key / fingerprint hex encode+decode.
 hex = "0.4"
+
+[dev-dependencies]
+# 18-0 AC7 — `tests/rupture_restart_18_0.rs` drives the async router over a
+# file-backed log reopened across two boots and counts the grant-scoped rupture
+# rows. All three are already in Cargo.lock (maos-iac's dev set; no new crate).
+tokio = { version = "1", features = ["macros", "rt"] }
+tempfile = "3"
+rusqlite = { version = "0.31", features = ["bundled"] }

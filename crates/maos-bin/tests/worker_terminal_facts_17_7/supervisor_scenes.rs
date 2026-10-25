@@ -742,9 +742,16 @@ async fn binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease()
         .attach_container(Arc::clone(child.terminal()));
     let stopping_core = Arc::clone(binding.core());
     let stop = tokio::task::spawn_blocking(move || stopping_core.stop_session());
-    let deadline = Instant::now() + Duration::from_secs(3);
+    // 18-0 AC4(b): a barrier on the stub's own `argv=<kill>` record (written
+    // before its `sleep 30` gate), not a deadline. The 20 s timeout is a hang
+    // guard only, kept inside the stub's 30 s gate so the pending-termination
+    // assertion below still observes a gated kill.
+    let hang_guard = Instant::now() + Duration::from_secs(20);
     while !super::stub_scenes::calls(dir.path()).contains("argv=<kill>") {
-        assert!(Instant::now() < deadline, "test runtime kill was not gated");
+        assert!(
+            Instant::now() < hang_guard,
+            "hang guard (20 s): the stub runtime never recorded the kill call"
+        );
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     assert!(
