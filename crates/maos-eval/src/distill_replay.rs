@@ -8,11 +8,16 @@
 //!
 //! Four metrics are deterministic string facts over what the Researcher
 //! emits; faithfulness comes from frozen judge verdicts committed with the
-//! corpus (`provenance: seed` until the nightly judge records them). Clean
+//! corpus (`provenance: seed` until the nightly judge records them) or, for a
+//! `live-record` cassette, from its recorded judge completions. Clean
 //! scenarios are held to the floors; each negative control must MISS the
-//! metric it plants, or the gate is blind.
+//! metric it plants, or the gate is blind — including the faithfulness
+//! control the control rows' frozen `false` verdicts plant.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+use maos_domain::invariants::i1::CapabilityToken;
+use maos_domain::ports::inference::{InferenceOptions, InferenceRequest, InferenceResponse};
 
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +36,9 @@ pub const SECRET_LEAKAGE_CEILING: f64 = 0.0;
 pub const CORPUS: &str = "spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl";
 /// Its committed completions (one per surveyed claim, corpus order).
 pub const CASSETTE: &str = "crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.json";
+/// The pinned-judge contract; `[judge.researcher-faithfulness]` is the
+/// nightly record's judge.
+pub const JUDGE_CONFIG: &str = "tests/judge-config.toml";
 
 /// The live judge's prompt template (nightly record only); its SHA-256 is
 /// `tests/judge-config.toml`'s `[judge.researcher-faithfulness]` pin.
@@ -43,12 +51,76 @@ pub fn judge_prompt(source: &str, finding: &str) -> String {
     format!("{JUDGE_PROMPT}\n\nSource claim: {source}\nDigest finding: {finding}")
 }
 
-/// A live judge completion's verdict; anything but the two words is refused.
+/// The pinned judge's request for one finding: temperature 0, the wire
+/// `model` pinned in `options.model_id` (R3). `top_p`/`seed` are not Inference
+/// Port options.
+pub fn judge_request(
+    pid: u32,
+    token: CapabilityToken,
+    (source, finding): (&str, &str),
+    provider: &str,
+    model: &str,
+) -> InferenceRequest {
+    let options = InferenceOptions {
+        max_tokens: 8,
+        temperature: Some(0.0),
+        model_id: Some(model.to_owned()),
+    };
+    let prompt = judge_prompt(source, finding);
+    InferenceRequest::new(
+        pid,
+        token,
+        prompt,
+        options,
+        Some(provider.into()),
+        Vec::new(),
+    )
+}
+
+/// A live judge completion's verdict: the one word, any non-letters around it
+/// (`Faithful.`, `**faithful**`, `` `unfaithful` ``) stripped; anything else
+/// is refused.
 pub fn judge_verdict(text: &str) -> Result<bool, String> {
-    match text.trim().trim_matches('`').to_ascii_lowercase().as_str() {
+    let word = text.trim_matches(|c: char| !c.is_ascii_alphabetic());
+    match word.to_ascii_lowercase().as_str() {
         "faithful" => Ok(true),
         "unfaithful" => Ok(false),
-        other => Err(format!("judge answered `{other}`, not faithful/unfaithful")),
+        _ => Err(format!(
+            "judge answered `{}`, not faithful/unfaithful",
+            text.trim()
+        )),
+    }
+}
+
+/// The `[judge.<name>]` rows of [`JUDGE_CONFIG`] this scorer reads.
+#[derive(Debug, Deserialize)]
+pub struct JudgeConfig {
+    pub judge: BTreeMap<String, JudgeRow>,
+}
+
+/// One pinned judge: `model = "<provider>:<model>@<version>"` and the SHA-256
+/// of its prompt.
+#[derive(Debug, Deserialize)]
+pub struct JudgeRow {
+    pub model: String,
+    pub prompt_version_hash: String,
+}
+
+impl JudgeConfig {
+    /// `[judge.researcher-faithfulness]`'s wire model id — the one documented
+    /// derivation: the part of `<provider>:<model>@<version>` between `:` and
+    /// `@` (`anthropic:claude-sonnet-5-5@2026-10-25` → `claude-sonnet-5-5`).
+    pub fn wire_model(&self) -> Result<String, String> {
+        let pin = &self
+            .judge
+            .get("researcher-faithfulness")
+            .ok_or("no [judge.researcher-faithfulness] row")?
+            .model;
+        pin.split_once(':')
+            .and_then(|(_, rest)| rest.split_once('@'))
+            .map(|(model, _)| model.to_owned())
+            .filter(|model| !model.is_empty())
+            .ok_or_else(|| format!("judge model {pin} is not <provider>:<model>@<version>"))
     }
 }
 
@@ -64,6 +136,18 @@ pub enum Control {
     PlantedSecret,
     /// A source claim is withheld from the survey → recall.
     DroppedClaim,
+    /// A finding the judge rules unfaithful → faithfulness. Scored over every
+    /// control row carrying a `false` verdict (the fifth control).
+    UnfaithfulFinding,
+}
+
+impl Control {
+    /// Planted in the committed completions themselves: a live model plants
+    /// no hedge drop or secret, so record and a `live-record` replay serve
+    /// these rows from the committed cassette.
+    pub fn completion_planted(self) -> bool {
+        matches!(self, Control::HedgeDrop | Control::PlantedSecret)
+    }
 }
 
 /// Frozen judge verdicts: finding `claim_id` → faithful.
@@ -94,12 +178,24 @@ pub struct DistillRow<C> {
     pub judge: FrozenJudge,
 }
 
-/// The corpus rows and the SHA-256 of the corpus bytes.
+/// The corpus rows. A blank hedge is refused (it would match every
+/// statement).
 pub fn load_rows<C: serde::de::DeserializeOwned>(text: &str) -> Result<Vec<DistillRow<C>>, String> {
     let rows = text
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| serde_json::from_str(line).map_err(|e| format!("corpus row: {e}")))
+        .map(|line| {
+            let row: serde_json::Value =
+                serde_json::from_str(line).map_err(|e| format!("corpus row: {e}"))?;
+            let hedges = row["claims"].as_array().into_iter().flatten();
+            if hedges
+                .flat_map(|claim| claim["hedges"].as_array().into_iter().flatten())
+                .any(|hedge| hedge.as_str().is_none_or(|h| h.trim().is_empty()))
+            {
+                return Err(format!("corpus row {}: an empty hedge", row["scenario_id"]));
+            }
+            serde_json::from_value(row).map_err(|e| format!("corpus row: {e}"))
+        })
         .collect::<Result<Vec<DistillRow<C>>, _>>()?;
     let mut seen = std::collections::BTreeSet::new();
     match rows
@@ -109,6 +205,124 @@ pub fn load_rows<C: serde::de::DeserializeOwned>(text: &str) -> Result<Vec<Disti
         Some(dup) => Err(format!("duplicate scenario_id {}", dup.scenario_id)),
         None => Ok(rows),
     }
+}
+
+/// Every row whose frozen verdicts were judged under another prompt than
+/// [`JUDGE_PROMPT`] (AA-2: a replay fails, never scores them).
+pub fn stale_judge_prompts<C>(rows: &[DistillRow<C>]) -> Vec<String> {
+    let prompt = crate::onboarding_gate_corpus::sha256_hex(JUDGE_PROMPT.as_bytes());
+    rows.iter()
+        .filter(|row| row.judge.prompt_sha256 != prompt)
+        .map(|row| {
+            format!(
+                "{}: frozen verdicts pin a different judge prompt",
+                row.scenario_id
+            )
+        })
+        .collect()
+}
+
+/// Served by the run's own completions: every row but a
+/// [`Control::completion_planted`] one.
+pub fn served_live<C>(row: &DistillRow<C>) -> bool {
+    !row.control.is_some_and(Control::completion_planted)
+}
+
+/// Whether a cassette is `live-record` rather than `seed`. `seed`: every
+/// row's survey completions in corpus order (faithfulness from the frozen
+/// verdicts). `live-record`: the [`served_live`] rows' survey completions,
+/// then one judge completion per finding of those rows, in corpus order.
+pub fn live_layout(cassette: &serde_json::Value) -> Result<bool, String> {
+    match cassette["provenance"].as_str() {
+        Some("seed") => Ok(false),
+        Some("live-record") => Ok(true),
+        other => Err(format!(
+            "cassette provenance {other:?} is neither seed nor live-record"
+        )),
+    }
+}
+
+/// Read a cassette: its bytes and its JSON.
+pub fn read_cassette(path: &std::path::Path) -> Result<(Vec<u8>, serde_json::Value), String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("cassette {path:?}: {e}"))?;
+    let json = serde_json::from_slice(&bytes).map_err(|e| format!("cassette {path:?}: {e}"))?;
+    Ok((bytes, json))
+}
+
+/// The provenances behind a run's verdicts: the frozen rows' and, for a live
+/// run, `live-record`.
+pub fn judge_provenance<C>(rows: &[DistillRow<C>], live: bool) -> BTreeSet<&str> {
+    let frozen = rows.iter().filter(|row| !live || !served_live(*row));
+    let mut provenance: BTreeSet<&str> = frozen.map(|row| row.judge.provenance.as_str()).collect();
+    if live {
+        provenance.insert("live-record");
+    }
+    provenance
+}
+
+/// A replay consumes every entry of its cassette: a trailing entry (an
+/// unscored judge reply) fails the run.
+pub fn fully_consumed(cassette: &serde_json::Value, consumed: usize) -> Result<(), String> {
+    match cassette["entries"].as_array().map(Vec::len) {
+        Some(entries) if entries == consumed => Ok(()),
+        entries => Err(format!(
+            "cassette has {entries:?} entries, the run consumed {consumed} (unconsumed entries)"
+        )),
+    }
+}
+
+/// One judge completion: (scenario_id, finding claim_id, the response).
+#[derive(Debug, Clone)]
+pub struct JudgeReply(pub String, pub String, pub InferenceResponse);
+
+/// Parse every reply into its scenario's verdicts. A reply its provider
+/// attributes to any model but the pinned `model` is refused (R3), as is a
+/// reply that is not one of the two words.
+pub fn apply_judge(
+    facts: &mut [ScenarioFacts],
+    replies: Vec<JudgeReply>,
+    model: &str,
+) -> Result<(), String> {
+    for JudgeReply(scenario_id, claim_id, response) in replies {
+        let at = format!("{scenario_id}/{claim_id}");
+        let attributed = response.provider_attribution.model_id;
+        if attributed.as_deref() != Some(model) {
+            return Err(format!(
+                "{at}: judge reply attributed to {attributed:?}, not the pinned {model}"
+            ));
+        }
+        let verdict = judge_verdict(&response.text).map_err(|e| format!("{at}: {e}"))?;
+        facts
+            .iter_mut()
+            .find(|f| f.scenario_id == scenario_id)
+            .ok_or_else(|| format!("{at}: no such scenario"))?
+            .verdicts
+            .insert(claim_id, verdict);
+    }
+    Ok(())
+}
+
+/// Where record writes the live verdicts: beside the cassette,
+/// `<stem>.verdicts.json` (`distill-corpus-v0.live.verdicts.json`).
+pub fn verdicts_sidecar(cassette: &std::path::Path) -> std::path::PathBuf {
+    let stem = cassette.file_stem().unwrap_or_default().to_string_lossy();
+    cassette.with_file_name(format!("{stem}.verdicts.json"))
+}
+
+/// The sidecar's bytes: the judge model, the prompt's SHA-256 and every
+/// [`served_live`] scenario's verdicts (scenario → claim_id → faithful).
+pub fn live_verdicts(facts: &[ScenarioFacts], model: &str) -> Result<String, String> {
+    let verdicts: BTreeMap<&str, &BTreeMap<String, bool>> = facts
+        .iter()
+        .filter(|f| !f.control.is_some_and(Control::completion_planted))
+        .map(|f| (f.scenario_id.as_str(), &f.verdicts))
+        .collect();
+    serde_json::to_string_pretty(&serde_json::json!({
+        "judge_model": model,
+        "judge_prompt_sha256": crate::onboarding_gate_corpus::sha256_hex(JUDGE_PROMPT.as_bytes()),
+        "verdicts": verdicts,
+    }))
+    .map_err(|e| format!("verdicts sidecar: {e}"))
 }
 
 /// The deterministic frame id of claim `claim` in scenario `scenario`.
@@ -191,11 +405,10 @@ pub fn metrics(scenarios: &[&ScenarioFacts]) -> Result<FiveMetrics, String> {
                 continue;
             };
             found += 1;
-            let statement = finding.statement.to_lowercase();
             hedges += source_hedges.len();
             kept += source_hedges
                 .iter()
-                .filter(|h| statement.contains(&h.to_lowercase()))
+                .filter(|h| keeps_hedge(&finding.statement, h))
                 .count();
         }
         for f in &s.findings {
@@ -221,6 +434,18 @@ pub fn metrics(scenarios: &[&ScenarioFacts]) -> Result<FiveMetrics, String> {
         } else {
             leaked as f64 / findings as f64
         },
+    })
+}
+
+/// `statement` carries `hedge` as whole words, case-insensitively (EC-6):
+/// `likely` never matches inside `unlikely`, `most` inside `almost`/`mostly`,
+/// `could` inside `couldn't`.
+pub fn keeps_hedge(statement: &str, hedge: &str) -> bool {
+    let (statement, hedge) = (statement.to_lowercase(), hedge.to_lowercase());
+    let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+    statement.match_indices(&hedge).any(|(at, _)| {
+        !word(statement[..at].chars().next_back())
+            && !word(statement[at + hedge.len()..].chars().next())
     })
 }
 
@@ -260,8 +485,9 @@ pub fn missed_floors(m: &FiveMetrics) -> Vec<String> {
         .collect()
 }
 
-/// Score the clean scenarios against the floors and every control against
-/// the metric it plants.
+/// Score the clean scenarios against the floors, every control row against
+/// the metric it plants, and the control rows' `false` verdicts against the
+/// faithfulness floor (the fifth control). Control rows never enter a floor.
 pub fn score(scenarios: &[ScenarioFacts]) -> Result<DistillScore, String> {
     let clean: Vec<&ScenarioFacts> = scenarios.iter().filter(|s| s.control.is_none()).collect();
     if clean.is_empty() {
@@ -276,6 +502,7 @@ pub fn score(scenarios: &[ScenarioFacts]) -> Result<DistillScore, String> {
             Control::FabricatedCite => m.traceability < TRACEABILITY_FLOOR,
             Control::PlantedSecret => m.secret_leakage > SECRET_LEAKAGE_CEILING,
             Control::DroppedClaim => m.recall < RECALL_FLOOR,
+            Control::UnfaithfulFinding => m.faithfulness < FAITHFULNESS_FLOOR,
         };
         controls.push(ControlOutcome {
             scenario_id: s.scenario_id.clone(),
@@ -283,6 +510,19 @@ pub fn score(scenarios: &[ScenarioFacts]) -> Result<DistillScore, String> {
             detected,
         });
     }
+    let judged: Vec<&ScenarioFacts> = scenarios
+        .iter()
+        .filter(|s| s.control.is_some() && s.verdicts.values().any(|v| !v))
+        .collect();
+    controls.push(ControlOutcome {
+        scenario_id: judged
+            .iter()
+            .map(|s| s.scenario_id.as_str())
+            .collect::<Vec<_>>()
+            .join(","),
+        control: Control::UnfaithfulFinding,
+        detected: !judged.is_empty() && metrics(&judged)?.faithfulness < FAITHFULNESS_FLOOR,
+    });
     Ok(DistillScore {
         metrics: metrics(&clean)?,
         clean_scenarios: clean.len(),

@@ -200,7 +200,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::scheduler::hook_dispatch::HookOutcome",
-      "signature_hash": "f10c54c3f78265730936027cdbbe01177241444a90298f837712db2fb0b3a31d"
+      "signature_hash": "7dabf64e452c514a029b3f49089b2a86767e5c2cf10cfa092e9916c842106fce"
     },
     {
       "kind": "enum",

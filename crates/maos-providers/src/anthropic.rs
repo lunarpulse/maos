@@ -73,7 +73,11 @@ impl Provider for AnthropicProvider {
     }
 
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
-        let body = build_request_body(req, &self.model_id);
+        // Story 18-3 (R3): a request pinning `options.model_id` (the eval
+        // judge) is served — and attributed — by that model; else the
+        // configured one.
+        let model_id = req.options.model_id.as_deref().unwrap_or(&self.model_id);
+        let body = build_request_body(req, model_id);
         let body_bytes =
             serde_json::to_vec(&body).map_err(|e| ProviderError::Serde(e.to_string()))?;
 
@@ -94,7 +98,7 @@ impl Provider for AnthropicProvider {
         let response_json: serde_json::Value = serde_json::from_slice(&response_bytes)
             .map_err(|e| ProviderError::Serde(e.to_string()))?;
 
-        parse_response(&response_json, &self.endpoint_url, &self.model_id)
+        parse_response(&response_json, &self.endpoint_url, model_id)
     }
 }
 
@@ -345,6 +349,39 @@ mod tests {
         let req = sample_request();
         let resp = provider.complete(&req).unwrap();
         assert_eq!(resp.text, "Mock reply");
+    }
+
+    #[test]
+    fn request_model_id_overrides_the_configured_model() {
+        let response_json = serde_json::json!({
+            "content": [{ "type": "text", "text": "faithful" }],
+            "stop_reason": "end_turn",
+            "usage": { "input_tokens": 3, "output_tokens": 1 }
+        });
+        let transport =
+            std::sync::Arc::new(MockTransport(serde_json::to_vec(&response_json).unwrap()));
+        let provider = AnthropicProvider::with_api_key(
+            transport,
+            "https://api.anthropic.com".into(),
+            "claude-3-haiku-20240307".into(),
+            "fake-key".into(),
+        );
+        let mut req = sample_request();
+        req.options.model_id = Some("claude-sonnet-5-5".into());
+        assert_eq!(
+            build_request_body(&req, req.options.model_id.as_deref().unwrap())["model"],
+            "claude-sonnet-5-5"
+        );
+        let resp = provider.complete(&req).unwrap();
+        assert_eq!(
+            resp.provider_attribution.model_id.as_deref(),
+            Some("claude-sonnet-5-5")
+        );
+        let resp = provider.complete(&sample_request()).unwrap();
+        assert_eq!(
+            resp.provider_attribution.model_id.as_deref(),
+            Some("claude-3-haiku-20240307")
+        );
     }
 
     #[test]

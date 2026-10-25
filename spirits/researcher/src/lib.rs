@@ -113,6 +113,10 @@ pub enum ResearcherMcpError {
     NoResults,
     #[error("decode error: {0}")]
     Decode(String),
+    /// Story 18-3 (review ruling D-18-3-R2) — a bound `--live` pass surveys
+    /// MCP, never the seed claims, and no MCP server is configured.
+    #[error("no MCP server is configured (a --live pass never surveys the seed claims)")]
+    Unconfigured,
 }
 
 /// Story 8.14c — the MCP domain port Researcher's `on_idle` calls to fan out
@@ -323,6 +327,9 @@ pub enum ResearcherError {
     Inference(InferenceError),
     /// Story 18-3 (D-18-3-05 A) — a bound pass's MCP survey failed.
     McpSurvey(ResearcherMcpError),
+    /// Story 18-3 (review EC-8) — a bound pass surveyed no claims (no
+    /// scalar, no distillate).
+    NoClaims,
 }
 
 impl std::fmt::Display for ResearcherError {
@@ -335,6 +342,7 @@ impl std::fmt::Display for ResearcherError {
             ResearcherError::Unbound(s) => write!(f, "inference unavailable: {s}"),
             ResearcherError::Inference(e) => write!(f, "inference failed: {e}"),
             ResearcherError::McpSurvey(e) => write!(f, "MCP survey failed: {e}"),
+            ResearcherError::NoClaims => write!(f, "the pass surveyed no claims"),
         }
     }
 }
@@ -982,11 +990,17 @@ impl Researcher {
     /// or the journaled seed), model survey, scalar, distillate.
     fn bound_pass(&self, live: &LiveInference) -> Result<SurveyOutput, ResearcherError> {
         let (binding, token, pid) = Self::mint(live)?;
+        // The minted pid is the admitted one on every construction path (a
+        // door-loaded Researcher's recall pid is never backfilled otherwise).
+        self.spirit_pid.store(pid, Ordering::Release);
         let frames = match self.input_frames()? {
             Some(frames) => frames,
             None => self.seed_frames(pid)?,
         };
         let output = self.survey_bound(live, &binding, &token, pid, &frames)?;
+        if output.findings.is_empty() {
+            return Err(ResearcherError::NoClaims);
+        }
         self.persist(&output, pid)?;
         Ok(output)
     }
@@ -1033,9 +1047,10 @@ impl Researcher {
         if let Some(frames) = seeded.as_ref() {
             return Ok(frames.clone());
         }
-        let sink = self.seed_sink.as_ref().ok_or_else(|| {
-            ResearcherError::Internal("bound with no MCP port and no seed journal".into())
-        })?;
+        let sink = self
+            .seed_sink
+            .as_ref()
+            .ok_or(ResearcherError::McpSurvey(ResearcherMcpError::Unconfigured))?;
         let mut frames = Vec::new();
         for claim in seed_claims() {
             let payload = serde_json::to_vec(&claim)
@@ -1053,15 +1068,21 @@ impl Researcher {
     }
 
     /// Story 18-3 (D-18-3-09 A, AC4.1) — the surveyed pass's primary scalar
-    /// (the kernel decides the halt) and its I11 distillate.
+    /// (the kernel decides the halt) and its I11 distillate. The request is
+    /// built first (review EC-8): a pass it refuses writes no scalar.
     fn persist(&self, output: &SurveyOutput, pid: u32) -> Result<(), ResearcherError> {
+        let request = match &self.distillation_port {
+            Some(port) => Some((port, self.to_distillation_request(output, 1)?)),
+            None => None,
+        };
         if let Some(port) = &self.scalar_port {
             let (tag, value, derived_from) = output.primary_scalar();
             port.write_scalar(pid, RESEARCHER_SPIRIT_ID, tag, value, &derived_from)
                 .map_err(|e| ResearcherError::Internal(format!("scalar write refused: {e}")))?;
         }
-        if let Some(port) = &self.distillation_port {
-            self.distill_through(port.as_ref(), pid, output, 1)?;
+        if let Some((port, request)) = request {
+            port.write_distillate(pid, request)
+                .map_err(ResearcherError::Distillation)?;
         }
         Ok(())
     }

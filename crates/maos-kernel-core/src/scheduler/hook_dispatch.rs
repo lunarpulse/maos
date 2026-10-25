@@ -40,6 +40,8 @@ pub enum HookOutcome {
         panic_payload_preview: String,
     },
     DeferredToNextStory,
+    /// The Spirit has a pending epistemic halt; the idle pass did not run.
+    HaltPending,
 }
 
 /// Dispatches lifecycle hooks through the Spirit's AnySpiritObj,
@@ -277,6 +279,11 @@ impl HookDispatcher {
     }
 
     pub async fn fire_on_idle(&self, scb: &SpiritControlBlock) -> HookOutcome {
+        if let Some(halts) = &self.halt_registry {
+            if !halts.drain_for_spirit_dry_run(scb.pid).is_empty() {
+                return HookOutcome::HaltPending;
+            }
+        }
         self.fire_no_payload_hook(scb, "on_idle", |obj, ctx| obj.on_idle(ctx))
             .await
     }

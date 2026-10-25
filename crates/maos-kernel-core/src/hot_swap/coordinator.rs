@@ -194,7 +194,8 @@ impl HotSwapCoordinator {
             HookOutcome::Fired { .. }
             | HookOutcome::BudgetWarning80 { .. }
             | HookOutcome::SkippedManifest
-            | HookOutcome::DeferredToNextStory => {}
+            | HookOutcome::DeferredToNextStory
+            | HookOutcome::HaltPending => {}
             HookOutcome::BudgetExceeded { .. } | HookOutcome::Panicked { .. } => {
                 saga.compensate(
                     SagaCompensation::RestorePredecessor {
@@ -334,7 +335,8 @@ impl HotSwapCoordinator {
             HookOutcome::Fired { .. }
             | HookOutcome::BudgetWarning80 { .. }
             | HookOutcome::SkippedManifest
-            | HookOutcome::DeferredToNextStory => {}
+            | HookOutcome::DeferredToNextStory
+            | HookOutcome::HaltPending => {}
             HookOutcome::BudgetExceeded { .. } | HookOutcome::Panicked { .. } => {
                 // Saga: restore predecessor SCB.
                 saga.compensate(

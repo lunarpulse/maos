@@ -1,0 +1,74 @@
+# Story 18-3 AC1 — branch-only planted-red run (docs/testing/proof-contract.md:
+# proven-red on ONE image). Copy to `.github/workflows/ci-18-3-verify.yml` on
+# `ci/18-3-verify` ONLY; never merged; the branch is deleted after the run.
+# Applies the one plant (the Researcher's survey answers a failed completion
+# with the deterministic `summarize` fallback again) and requires the
+# `epic-18-exit` line-3 twin step's condition to FAIL under it — the empty
+# cassette no longer yields a refusal naming `exhausted` — while exit line 3
+# itself (the control) stays rc=0 with one `researcher_survey` event.
+name: 18-3-proven-red
+on:
+  push:
+    branches: ["ci/18-3-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Apply the AC1 plant
+        run: |
+          set -euo pipefail
+          echo "c59ac2191e4d889ae5483e8c1f947ecb27095d7401aed07d59ab35fb536213f2  _bmad-output/implementation-artifacts/18-3-evidence/ci/plant.diff" | sha256sum -c -
+          git apply _bmad-output/implementation-artifacts/18-3-evidence/ci/plant.diff
+          git diff --stat
+          git diff
+      - name: Build the planted root
+        run: cargo build --locked -p maos-bin --bin maos
+      - name: Control — exit line 3 stays green under the plant
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-researcher/survey-distill.json maos run spirits/researcher/manifest.toml --once > line3.out 2> line3.err
+          rc=$?
+          cat line3.out line3.err
+          set -e
+          test "$rc" -eq 0 || { echo "::error title=18-3 control::exit line 3 rc=${rc} under the plant"; exit 1; }
+          grep -q 'researcher inference seam wired' line3.err
+          test "$(grep -c '"event":"researcher_survey"' line3.out)" -eq 1
+      - name: Planted twin must defeat the twin step (no refusal naming the exhausted cassette)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          twin="$RUNNER_TEMP/survey-distill-empty.json"
+          jq '.entries = []' crates/maos-journey-test/cassettes/j-researcher/survey-distill.json > "$twin"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/researcher/manifest.toml --once > twin.out 2> twin.err
+          rc=$?
+          cat twin.out twin.err
+          if [ "$rc" -ne 0 ] && grep -qE 'researcher on_idle pass refused: .*exhausted' twin.err; then
+            echo "::error title=18-3 AC1::planted twin still refuses naming the exhausted cassette — the plant did not restore the fallback"
+            exit 1
+          fi
+          echo "::notice title=18-3 AC1 PROVEN-RED::fallback restored → the empty-cassette twin (rc=${rc}) no longer refuses naming \`exhausted\`, so epic-18-exit's line-3 twin step reds"

@@ -15,3 +15,38 @@ Wall-clock: plant → red observed (incl. rebuild), restore → green observed.
 
 CI plant (`ci/plant.diff`, sha256 `c59ac2191e4d889ae5483e8c1f947ecb27095d7401aed07d59ab35fb536213f2` in `ci/plant.diff.sha256`): the AC1 diff (restored
 fallback), which reds the `epic-18-exit` line-3 twin through its `researcher on_idle pass refused` assertion. `git apply --check`: all six diffs (ac1–ac5, ci) apply at the dev tree.
+
+## Review patch pass (2026-10-25, `anthropic/claude-opus-5-5`, rulings D-18-3-R1…R5)
+
+Same protocol: file copied to `/tmp/plants183/`, planted in place with the edit tool, focused `cargo nextest run --locked
+--no-fail-fast`, copied back, `cmp` OK, `touch`, green re-run. Wall-clock = plant run incl. incremental rebuild.
+`ac2-plant.diff` and `ac4-plant.diff` no longer applied after the review moves and were regenerated at the review tree
+(AC2: `keeps_hedge(&finding.statement, h)` → `finding.hedges.contains(h)` → floor test + `eval_distill_18_3` committed
+and record cases red on `rd13-hedge-drop (HedgeDrop) not detected`, 9.3 s; AC4: Researcher boot-arm scalar port built
+but not attached → `exit_line_3_…` red at `:204`, 15.5 s). All six diffs (ac1–ac5, ci) `git apply --check` OK; the CI
+plant is unchanged (sha256 above), and now reds the twin's single `grep -qE 'researcher on_idle pass refused: .*exhausted'`.
+
+| Finding | File · plant | Red test → assertion | Wall |
+|---|---|---|---|
+| R5 (TIA-7) | `hook_dispatch.rs` `fire_on_idle` gate `if false && …` (kernel, temporary) | `j_researcher_survey_18_3` `:453` — `left: Fired, right: HaltPending` ("a pending halt gates the pass") | 14.1 s |
+| TIA-1/AA-4 | `researcher_root.rs` production `Semaphore::new(RESEARCHER_PARALLELISM + 4)` | `j_researcher_survey_18_3` `:401` — peak `12` ≠ `8` | 6.6 s |
+| R2 | `ResearcherHost::new` seeds under `--live` (`(!live \|\| true)`) | `researcher_inference_18_3::a_live_pass_without_an_mcp_server_is_refused_typed_never_seeded` `:323` | 9.2 s |
+| BH-1 | `build_spirit_obj` passes `ResearcherWiring { legacy_cassette: None, .. }` | `a_legacy_cassette_root_binds_a_door_loaded_researcher` `:355` (no door issuance within 45 s) | 56.2 s |
+| TIA-2/AA-7 | `ResearcherInferenceBinding::per_pass` memoizes the first token | `the_root_binding_mints_once_per_pass_on_one_instance` `:571` — mints `1` ≠ `2` | 14.2 s |
+| TIA-3 | `ac1-plant.diff` (fallback restored) | `the_legacy_cassette_arm_refuses_an_exhausted_cassette_typed` `:277` now reds (it stayed green at the dev pass) + `empty_drifted_and_short_…` `:247`; 9 run, 2 failed | 13.6 s |
+| EC-8 | `bound_pass` zero-claim check `if false && …` | `inference_seam_18_3::a_zero_claim_bound_pass_refuses_typed_and_writes_no_scalar` `:251` (refusal is `Distillation`, not `NoClaims`; still no scalar — the request-first order holds) | 2.7 s |
+| EC-9 | `hook_dispatch.rs:572` timeout `from_millis(cap * 990)` (kernel, temporary) | `hook_dispatch_paused_time_18_3::researcher_cap_exceeds_…` `:203` (BudgetExceeded just under the cap) | 4.8 s |
+| R3 | `apply_judge` model check `if false && …` | `eval_distill_18_3::record_refuses_a_judge_reply_attributed_to_another_model_after_flushing` `:398` | 9.0 s |
+| R3 | `AnthropicProvider::complete` ignores `options.model_id` | `anthropic::tests::request_model_id_overrides_the_configured_model` `:376` — `claude-3-haiku…` ≠ `claude-sonnet-5-5` | 2.0 s |
+| R4 | live replay scores frozen verdicts (`survey(s, &router, !record)` + `apply_judge` record-only) | `a_live_record_replay_scores_the_recorded_judge_replies_not_the_frozen_verdicts` `:382` — exit `0` ≠ `1` | 8.0 s |
+| R4 | unconsumed-entry check removed | `record_through_the_router_writes_a_live_cassette_and_sidecar_that_replay_green` `:348` — exit `0` ≠ `1` | 5.2 s |
+| R4 | sidecar write skipped (with the check above) | both record tests red at `read_json` (no `distill-corpus-v0.live.verdicts.json`) | 5.0 s |
+| TIA-4 | `UnfaithfulFinding` overall `detected: false && …` | floor test `:132` + `eval_distill_18_3` `:108` — `rd13-hedge-drop,rd15-planted-secret (UnfaithfulFinding) not detected` | 14.6 s |
+| EC-6 | `keeps_hedge` → `statement.contains(&hedge)` | `hedges_match_whole_words_only` `:185` — `unlikely` matched `likely` | 3.3 s |
+| BH-4 | `judge_verdict` back to `trim().trim_matches('`')` | `judge_verdicts_strip_non_letters_around_the_word` `:210` — `Faithful.` refused | 3.1 s |
+| AA-2 | `stale_judge_prompts` filter `false && …` | `the_judge_config_and_the_manifest_pin_the_judge_prompt` `:167` — `[]` ≠ `["rd01: …"]` | 2.8 s |
+| TIA-8 | nightly `MAOS_REPLAY_CASSETTE` → the committed `distill-corpus-v0.json` | `ci_shape_18_0` `:405` (the Researcher nightly pin) | 7.7 s |
+
+Not planted (no hermetic witness): BH-3 per-call judge mint (TTL needs a clock; deferred → 18-4); the R2 boot refusal
+(`McpClientImpl::new` only fails on an internal transport-map shape, unreachable from env); AA-5 consumed ≠ claims guard
+(a mismatch is unreachable without the fallback — witnessed only by the AC1 plant run, where it caught the empty cassette).

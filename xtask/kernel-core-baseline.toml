@@ -502,7 +502,20 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26377
+src_lines = 26387
+# HISTORY: Story 18-3-researcher-replay-live-and-judged-five-metric ◆
+#          FLAG-Winston (2026-10-25), review ruling D-18-3-R5 A ratified by
+#          Lunarpulse 2026-10-25 (grant +10 physical / +9 tokei over 18-8's
+#          landed pin, ADR-069 envelope, exact at landing): physical 26377 ->
+#          26387 (+10), tokei 20608 -> 20617 (+9). Driver (review TIA-7, halt
+#          gating): `HookDispatcher::fire_on_idle` returns the new
+#          `HookOutcome::HaltPending` without running the hook while the
+#          Spirit's pid has a pending epistemic halt
+#          (`HaltRegistry::drain_for_spirit_dry_run`, non-draining); the two
+#          hot-swap saga matches and `check_hook_outcome` treat it as a
+#          non-failure. Changed files: scheduler/hook_dispatch.rs,
+#          hot_swap/coordinator.rs, scheduler/scheduler_loop.rs; all 95 files
+#          retained; digests + set_hash re-emitted via `--emit-pin`.
 # HISTORY: Story 18-8-conformant-mcp-client ◆ FLAG-Winston (2026-10-25),
 #          D-18-8-01 A ratified by Lunarpulse 2026-10-25 (grant +15 physical /
 #          +13 tokei over 18-1's landed pin, exact at landing): physical
@@ -813,7 +826,7 @@ src_lines = 26377
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "7dcbc81ed4ffd55ec8b28d564818b0a8a705636ca96fa31c3bf9c391092be390"
+set_hash = "c8e91bf4b7bb861befce041230f97b5e7584112280e283624127ec01d0269103"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -832,7 +845,7 @@ set_hash = "7dcbc81ed4ffd55ec8b28d564818b0a8a705636ca96fa31c3bf9c391092be390"
 "halt/resolver.rs" = "3756181d4a06e121fdd3b63818b45d20205e6acb9b43cc18fb5ad82c93ac6b1f"
 "halt/termination.rs" = "13f32e1f6dcca190621a5a47bff8fca181b63d79d10b20e9c6264080722f7a70"
 "hot_swap/archive.rs" = "a6e4ea60193e182b2dad8edeb793d3de366ef95b0be30e8c85756af78aeb7ddb"
-"hot_swap/coordinator.rs" = "a481b1d671cc25a091714f05962bbedf246da2ff9480b46b36949a8fd02ca959"
+"hot_swap/coordinator.rs" = "0d6b6f4ef277206acc782699b05fb738ec7063e023b44c3956a838c79ad23b31"
 "hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
 "hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
 "hot_swap/post_swap_monitor.rs" = "33bf93474c5b9d83012b5b4c9f032e13ff57dfa28c4b4cf03bbb80aa02e42b10"
@@ -875,12 +888,12 @@ set_hash = "7dcbc81ed4ffd55ec8b28d564818b0a8a705636ca96fa31c3bf9c391092be390"
 "revocation/rules.rs" = "726b27e55d5fff3e1cbd9ca2c1cf38494dfd272fbe586c1a0ed869c760366f44"
 "revocation/version_match.rs" = "b225bac84b6e2529cab18b4dadbc271f0c0ff487eaca4f11e23a49ea0ccf5046"
 "scheduler/control_block.rs" = "f7e6e26447ecf9822244956dbd341e96472f7d81edc0c644732d414c3d4c6ed5"
-"scheduler/hook_dispatch.rs" = "33ce11fe8e9edf7c52b914f08e16635d28a459dc49c251ed278ed3c75f4c3f9a"
+"scheduler/hook_dispatch.rs" = "11276d17fcc7bae976cd8c812ce8c4ca296b0bf06c130aae6716e1ce8a567e32"
 "scheduler/idle_watchdog.rs" = "07901b89eab3911e6cc23df9d383ba6fee5547c43bbc028fe6eedcacadeffdc7"
 "scheduler/kernel_ctx.rs" = "4fb780685c375ddf4115da9d9712dbafea52d8b2c4bd7b15a77059907127f807"
 "scheduler/mod.rs" = "9eb15c7cb98f00ab5a08085dd3a7d8d4ea5d940df8643f9110c540889ef1bcb2"
 "scheduler/schedule_watchdog.rs" = "d09a72d6d1ae27013a9de5e0a294dad3289776b68c133cc2210dfaa4cfd58703"
-"scheduler/scheduler_loop.rs" = "7f9c9391b4c7e2eb4cf8596ff947dd38de0ec70eb0bc39aa1bfb5a5597e89d54"
+"scheduler/scheduler_loop.rs" = "ad913329d28281ef06b03485be7b8cdd918c27d1908f016be923a51bbbda79eb"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
 "security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"

@@ -180,25 +180,42 @@ async fn researcher_cap_warns_at_eighty_percent_under_paused_time() {
     );
 }
 
-// AC3 case 2 — exceeding the 60 s cap yields BudgetExceeded after BudgetWarning.
+// AC3 case 2 — exceeding the 60 s cap yields BudgetExceeded after BudgetWarning;
+// just under the cap only the warning has fired and the hook still runs
+// (review EC-9: the 100 % boundary from both sides).
 #[tokio::test(start_paused = true)]
 async fn researcher_cap_exceeds_at_one_hundred_percent_under_paused_time() {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let cap = u64::from(researcher_budget().time_cap_seconds);
     let (dispatcher, mut mailbox) = make_dispatcher_with_mailbox();
     let (scb, entered, release) = gated_scb();
+    let done = std::sync::atomic::AtomicBool::new(false);
 
+    let fire = async {
+        let outcome = dispatcher.fire_on_load(&scb).await;
+        done.store(true, Ordering::SeqCst);
+        outcome
+    };
     let driver = async {
         wait_entered(&entered).await;
-        tokio::time::advance(Duration::from_secs(cap) + Duration::from_millis(100)).await;
+        tokio::time::advance(Duration::from_secs(cap) - Duration::from_millis(100)).await;
+        expect_budget_frame(&mut mailbox, FrameKind::BudgetWarning, cap).await;
+        assert!(
+            mailbox.try_recv().expect("mailbox open").is_none(),
+            "no BudgetExceeded just under the cap"
+        );
+        assert!(
+            !done.load(Ordering::SeqCst),
+            "the hook still runs just under the cap"
+        );
+        tokio::time::advance(Duration::from_millis(200)).await;
     };
-    let (outcome, ()) = tokio::join!(dispatcher.fire_on_load(&scb), driver);
+    let (outcome, ()) = tokio::join!(fire, driver);
 
     assert!(
         matches!(outcome, HookOutcome::BudgetExceeded { cap_seconds, .. } if cap_seconds == cap),
         "expected BudgetExceeded at cap {cap}: {outcome:?}"
     );
-    expect_budget_frame(&mut mailbox, FrameKind::BudgetWarning, cap).await;
     expect_budget_frame(&mut mailbox, FrameKind::BudgetExceeded, cap).await;
     // spawn_blocking cannot be cancelled: unblock the hook so runtime shutdown can join it.
     release.send(()).expect("release hook");

@@ -21,7 +21,12 @@
 # frozen verdicts committed with the corpus. `prompt_version_hash` is the
 # SHA-256 of `maos_eval::distill_replay::JUDGE_PROMPT` (the corpus MANIFEST
 # row pins the same hash). Hedge preservation is a deterministic string
-# metric and has no judge row.
+# metric and has no judge row. The judge request carries the wire model
+# derived from `model` (the part between `:` and `@`, in
+# `options.model_id`; record refuses a reply attributed to any other model)
+# and `temperature`. `top_p` and `seed` are recorded here for the pinned-judge
+# contract but are NOT applied: the Inference Port's `InferenceOptions` has no
+# top_p/seed fields (review R3, 2026-10-25).
 [judge.researcher-faithfulness]
 model = "anthropic:claude-sonnet-5-5@2026-10-25"
 temperature = 0.0

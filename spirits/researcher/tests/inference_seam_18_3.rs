@@ -230,6 +230,49 @@ fn a_bound_mcp_failure_is_a_typed_refusal_and_unbound_stays_a_no_op() {
     assert!(unbound.last_output().is_none());
 }
 
+/// Review EC-8 — a bound pass that surveys no claims refuses typed before
+/// any scalar or distillate is written.
+#[test]
+fn a_zero_claim_bound_pass_refuses_typed_and_writes_no_scalar() {
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x18_03_08));
+    let scalars = Arc::new(Scalars::default());
+    let r = bound(
+        Researcher::with_frames(Vec::new()),
+        Port::answering(),
+        Some(binding("anthropic", &Arc::new(AtomicUsize::new(0)))),
+    )
+    .with_scalar_port(Arc::clone(&scalars) as Arc<dyn EpistemicScalarPort>)
+    .with_distillation_port(Arc::new(DistillateWriter::new(
+        Arc::clone(&tl),
+        Arc::new(0u8),
+    )));
+    idle(&r);
+    let err = r.take_pass_error().expect("refused");
+    assert!(matches!(err, ResearcherError::NoClaims), "{err:?}");
+    assert!(r.last_output().is_none());
+    assert!(
+        scalars.0.lock().unwrap().is_empty(),
+        "no scalar on a zero-claim pass"
+    );
+}
+
+/// Review ruling D-18-3-R2 — a bound pass with no MCP port and no seed journal
+/// (the `--live` host) refuses typed; it never surveys the seed claims.
+#[test]
+fn a_bound_pass_without_mcp_or_seed_journal_refuses_unconfigured() {
+    let r = bound(
+        Researcher::new(),
+        Port::answering(),
+        Some(binding("anthropic", &Arc::new(AtomicUsize::new(0)))),
+    );
+    idle(&r);
+    assert!(matches!(
+        r.take_pass_error(),
+        Some(ResearcherError::McpSurvey(ResearcherMcpError::Unconfigured))
+    ));
+    assert_eq!(r.completions_consumed(), 0);
+}
+
 #[test]
 fn the_seed_is_journaled_once_halts_on_its_contradiction_and_distills_through_i11() {
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x18_03_01));

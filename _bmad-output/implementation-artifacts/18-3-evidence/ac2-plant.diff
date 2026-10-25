@@ -1,10 +1,10 @@
 --- a/crates/maos-eval/src/distill_replay.rs
 +++ b/crates/maos-eval/src/distill_replay.rs
-@@ -194,7 +194,7 @@
+@@ -408,7 +408,7 @@
              hedges += source_hedges.len();
              kept += source_hedges
                  .iter()
--                .filter(|h| statement.contains(&h.to_lowercase()))
+-                .filter(|h| keeps_hedge(&finding.statement, h))
 +                .filter(|h| finding.hedges.contains(h))
                  .count();
          }

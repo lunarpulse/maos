@@ -19,8 +19,10 @@
 use std::collections::BTreeSet;
 
 use maos_eval::distill_replay::{
-    frame_id, gate_failures, load_rows, score, Control, FindingFacts, ScenarioFacts,
+    frame_id, gate_failures, judge_verdict, keeps_hedge, load_rows, score, stale_judge_prompts,
+    Control, FindingFacts, JudgeConfig, ScenarioFacts, JUDGE_PROMPT,
 };
+use maos_eval::onboarding_gate_corpus::sha256_hex;
 use maos_eval::DistillateCorpus;
 use maos_kernel_core::iac::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 
@@ -31,7 +33,7 @@ fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Claim {
     claim_id: String,
     hedges: Vec<String>,
@@ -106,12 +108,26 @@ fn test_distillate_five_metrics_floor() {
         Control::FabricatedCite,
         Control::PlantedSecret,
         Control::DroppedClaim,
+        Control::UnfaithfulFinding,
     ] {
         assert!(
             planted.contains(&format!("{control:?}")),
             "missing control {control:?}"
         );
     }
+    assert_eq!(score.controls.len(), 5, "{score:?}");
+    // TIA-4: the faithfulness control is the control rows' frozen `false`
+    // verdicts — and control rows never enter a floor.
+    let unfaithful = score
+        .controls
+        .iter()
+        .find(|c| c.control == Control::UnfaithfulFinding)
+        .expect("the faithfulness control");
+    assert_eq!(
+        unfaithful.scenario_id,
+        "rd13-hedge-drop,rd15-planted-secret"
+    );
+    assert_eq!(score.metrics.faithfulness, 1.0, "{score:?}");
     let failures = gate_failures(&score);
     assert!(
         failures.is_empty(),
@@ -122,6 +138,83 @@ fn test_distillate_five_metrics_floor() {
             .all(|r| r.judge.provenance == "seed" || r.judge.provenance == "live-record"),
         "every frozen verdict carries its provenance"
     );
+}
+
+/// AA-2 — the judge prompt the scorer sends is the one both pins name.
+#[test]
+fn the_judge_config_and_the_manifest_pin_the_judge_prompt() {
+    let prompt = sha256_hex(JUDGE_PROMPT.as_bytes());
+    let config: JudgeConfig =
+        toml::from_str(&std::fs::read_to_string("../../tests/judge-config.toml").unwrap())
+            .expect("judge config");
+    let judge = &config.judge["researcher-faithfulness"];
+    assert_eq!(judge.prompt_version_hash, prompt);
+    assert_eq!(config.wire_model().unwrap(), "claude-sonnet-5-5");
+    let manifest: toml::Value =
+        toml::from_str(&std::fs::read_to_string("../../tests/corpora/MANIFEST.toml").unwrap())
+            .expect("corpora manifest");
+    assert_eq!(
+        manifest["corpus"]["researcher-distill-corpus-v0"]["prompt_version_hash"].as_str(),
+        Some(prompt.as_str())
+    );
+    // Every frozen row pins this prompt; a row judged under another is refused.
+    let text =
+        std::fs::read_to_string("../../spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl")
+            .expect("the frozen Researcher corpus");
+    let mut rows = load_rows::<Claim>(&text).expect("corpus rows parse");
+    assert!(stale_judge_prompts(&rows).is_empty());
+    rows[0].judge.prompt_sha256 = "ab".repeat(32);
+    assert_eq!(
+        stale_judge_prompts(&rows),
+        [format!(
+            "{}: frozen verdicts pin a different judge prompt",
+            rows[0].scenario_id
+        )]
+    );
+}
+
+/// EC-6 — hedges match on word boundaries, case-insensitively.
+#[test]
+fn hedges_match_whole_words_only() {
+    assert!(keeps_hedge("Retrieval is Likely to help.", "likely"));
+    assert!(keeps_hedge(
+        "It may over-weight authors.",
+        "may over-weight"
+    ));
+    assert!(keeps_hedge("most", "most"));
+    assert!(!keeps_hedge("That is unlikely to help.", "likely"));
+    assert!(!keeps_hedge("It almost always helps.", "most"));
+    assert!(!keeps_hedge("It mostly helps.", "most"));
+    assert!(!keeps_hedge("It couldn't help.", "could"));
+}
+
+/// EC-6 — an empty (or blank) hedge is refused at corpus load.
+#[test]
+fn a_blank_hedge_is_refused_at_load() {
+    for hedge in ["", "  "] {
+        let row = serde_json::json!({
+            "scenario_id": "x",
+            "claims": [{ "claim_id": "x-c1", "hedges": [hedge] }],
+            "survey": {},
+            "judge": { "prompt_sha256": "", "provenance": "seed", "verdicts": {} },
+        });
+        let error = load_rows::<Claim>(&row.to_string()).unwrap_err();
+        assert!(error.contains("empty hedge"), "{error}");
+    }
+}
+
+/// BH-4 — a verdict word survives surrounding punctuation and markup.
+#[test]
+fn judge_verdicts_strip_non_letters_around_the_word() {
+    for text in ["faithful", "Faithful.", "**faithful**", "`faithful`\n"] {
+        assert_eq!(judge_verdict(text), Ok(true), "{text}");
+    }
+    for text in ["unfaithful", "UNFAITHFUL!", " *unfaithful* "] {
+        assert_eq!(judge_verdict(text), Ok(false), "{text}");
+    }
+    for text in ["", "faithful enough", "not faithful"] {
+        assert!(judge_verdict(text).is_err(), "{text}");
+    }
 }
 
 /// NFR-Aud-8 — the quarterly N≥500 audit slice (Story 8.2, AC5). The `#[ignore]`

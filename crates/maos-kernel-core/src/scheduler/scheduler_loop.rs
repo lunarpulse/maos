@@ -621,7 +621,8 @@ impl SpiritSchedulerAdapter {
             HookOutcome::Fired { .. }
             | HookOutcome::SkippedManifest
             | HookOutcome::BudgetWarning80 { .. }
-            | HookOutcome::DeferredToNextStory => Ok(()),
+            | HookOutcome::DeferredToNextStory
+            | HookOutcome::HaltPending => Ok(()),
             HookOutcome::BudgetExceeded {
                 wall_ns,
                 cap_seconds,

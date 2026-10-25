@@ -118,17 +118,25 @@ jobs:
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
         run: target/debug/maos eval halt --class butler
 
-      # Story 18-3 AC2.4 (D-18-3-07 A) — regenerate the Researcher five-metric
-      # completions AND the live faithfulness judge's verdicts through the
-      # shared router's live driver (the 15-6 recorder; surveys first, then the
-      # judge, all `provenance: live-record`) into the SIBLING
-      # `distill-corpus-v0.live.json`, never the committed seed cassette or
-      # corpus. Runs even if the Butler step missed a floor. Promotion is the
-      # D-18-2-R3 operator procedure: download `refreshed-cassettes`, replay
-      # with `maos eval distill --class researcher --cassette <live>` (a
-      # re-pin message names each survey that moved), then re-pin the corpus's
-      # frozen surveys and judge verdicts (`provenance: live-record`) in a PR
-      # (owner `ops-nightly-cassette-rerecord`).
+      # Story 18-3 AC2.4 (D-18-3-07 A, review R3/R4) — record the Researcher
+      # five-metric run through the shared router's live driver (the 15-6
+      # recorder) into the SIBLING `distill-corpus-v0.live.json`, never the
+      # committed seed cassette or corpus. Layout `provenance: live-record`:
+      # the live rows' survey completions (the completion-planted hedge-drop
+      # and planted-secret controls are served from the committed cassette),
+      # then one judge completion per finding of those rows, the judge pinned
+      # to `tests/judge-config.toml` [judge.researcher-faithfulness] (a reply
+      # attributed to another model is refused after the flush). The per-
+      # finding live verdicts land beside it in
+      # `distill-corpus-v0.live.verdicts.json` (scenario → claim_id → verdict,
+      # judge model, prompt SHA-256); the upload below carries both. Runs even
+      # if the Butler step missed a floor. Promotion is the D-18-2-R3 operator
+      # procedure: download `refreshed-cassettes`, replay with `maos eval
+      # distill --class researcher --cassette <live>` (it scores the RECORDED
+      # judge completions and fails on any unconsumed entry), then re-pin the
+      # corpus's frozen surveys and copy the sidecar's verdicts into the
+      # corpus rows (`provenance: live-record`) in a PR (owner
+      # `ops-nightly-cassette-rerecord`).
       - name: Re-record the Researcher five-metric cassette and judge (live)
         if: ${{ !cancelled() }}
         env:
@@ -137,6 +145,8 @@ jobs:
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
         run: target/debug/maos eval distill --class researcher
 
+      # The cassettes directory carries every `.live.json` and the Researcher
+      # judge sidecar `j-researcher/distill-corpus-v0.live.verdicts.json`.
       - name: Upload refreshed cassettes
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

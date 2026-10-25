@@ -7,37 +7,38 @@
 //! World: a capability registry admitting `spirits/researcher/manifest.toml`'s
 //! `[capabilities.required]` scopes at one pid, an in-memory Transparency Log,
 //! a temp lifecycle journal, a `WorkingMemoryOrchestrator` over a
-//! `HaltRegistry` the test keeps.
+//! `HaltRegistry` the kernel `HookDispatcher` also gates on.
 //!
-//! - **MCP fan-out:** the 14 recorded exchanges of
-//!   `spirits/researcher/tests/fixtures/researcher-mcp-corpus-v0.5.jsonl` are
-//!   replayed THROUGH the kernel `McpClientAdapter`, each call under its own
-//!   `Scope::McpCall` token, mirroring `LiveResearcherMcpPort`'s two phases
-//!   (`crates/maos-bin/src/main.rs` `survey_literature_impl`) bounded by
-//!   `Semaphore::new(RESEARCHER_PARALLELISM)`. The replay client holds each
-//!   call `HOLD` and counts in-flight calls: phase 2 issues 10 fetches, so the
-//!   observed peak must equal the bound (8). The traverse also names three
-//!   cluster-only paper ids the fixture recorded no `get_citations` for; a
-//!   replay cannot invent a response, so those keys are not fetched.
-//! - **Contradiction:** the fixture already carries a strong-methodology pair
+//! - **MCP fan-out (review TIA-1/AA-4):** the PRODUCTION
+//!   `maos_bin::researcher_root::LiveResearcherMcpPort` (its governed
+//!   per-call mint, its `Semaphore::new(RESEARCHER_PARALLELISM)`) over the 17
+//!   recorded exchanges of
+//!   `spirits/researcher/tests/fixtures/researcher-mcp-corpus-v0.5.jsonl`,
+//!   THROUGH the kernel `McpClientAdapter`. The replay client holds each call
+//!   `HOLD` and counts in-flight calls: phase 2 issues 13 fetches, so the
+//!   observed peak must equal the production bound (8).
+//! - **Contradiction:** the fixture carries a strong-methodology pair
 //!   (`arxiv-2501.12345` supports at 0.92, `arxiv-2501.67890` refutes at 0.88,
-//!   topic `positional-bias`), so no claim is added: `methodology_conflict` =
-//!   0.88 > the manifest's 0.7 → the kernel halt (an `EpistemicHalt` TL row,
-//!   pending in the registry) → resolved ONCE `accepted-halt` through the
-//!   operator door's composition (`HaltFlow` over `KernelHaltResolver`, which
-//!   transitions `HaltRegistry::resolve`, `crates/maos-kernel-core/src/halt/mod.rs:243`)
-//!   and journaled → the next pass surveys.
+//!   topic `positional-bias`): `methodology_conflict` = 0.88 > the manifest's
+//!   0.7 → the kernel halt (an `EpistemicHalt` TL row, pending in the registry).
+//! - **Halt gating, cause and effect (review ruling D-18-3-R5):** every pass is
+//!   fired by the kernel `HookDispatcher::fire_on_idle`; while the halt is
+//!   pending the dispatcher returns `HookOutcome::HaltPending` and the pass
+//!   does not run (no MCP call, no completion, no scalar); resolved ONCE
+//!   `accepted-halt` through the operator door's composition (`HaltFlow` over
+//!   `KernelHaltResolver`, which transitions `HaltRegistry::resolve`) and
+//!   journaled → the next pass runs and surveys.
 //! - **Survey:** the output passes the manifest's four-section
 //!   `OutputShapePredicate`; ≥ 95 % of findings' `source_log_ref`s resolve via
 //!   `LogRecallAdapter::fetch` (`prd/user-journeys.md:104`); each pass finishes
 //!   inside the manifest's `[budget] time_cap_seconds` (wall-clock printed).
 
 use std::collections::BTreeMap;
-use std::future::Future;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use maos_bin::researcher_root::LiveResearcherMcpPort;
 use maos_director_surface::halt_ui::HaltFlow;
 use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::halt::{HaltJournal, HaltReceipt, HaltState, Resolution};
@@ -68,18 +69,21 @@ use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
 };
-use maos_kernel_core::security::manifest::{CapabilitiesRequired, EpistemicPolicySection};
+use maos_kernel_core::scheduler::control_block::{
+    make_spirit_obj, ScbLifecycleState, SpiritControlBlock, SpiritManifestBundle,
+};
+use maos_kernel_core::scheduler::hook_dispatch::{HookDispatcher, HookOutcome};
+use maos_kernel_core::security::manifest::{
+    CapabilitiesRequired, EpistemicPolicySection, LifecycleSection,
+};
 use maos_kernel_core::security::{
     capabilities_required_to_scopes, Budget, OutputShape, OutputShapePredicate, RingCryptoProvider,
 };
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
-use maos_mcp::drivers::researcher as drivers;
-use maos_spirit_abi::ctx::{CapabilityHandle, Ctx, MailboxHandle};
-use maos_spirit_abi::lifecycle::Spirit;
 use researcher::{
-    decode_frame_id_hex, FetchedClaim, Researcher, ResearcherInferenceBinding, ResearcherMcpError,
-    ResearcherMcpPort, RESEARCHER_PARALLELISM, RESEARCHER_SPIRIT_ID,
+    decode_frame_id_hex, Researcher, ResearcherInferenceBinding, ResearcherMcpPort,
+    RESEARCHER_PARALLELISM, RESEARCHER_SPIRIT_ID,
 };
 
 const PID: u32 = 183;
@@ -125,11 +129,6 @@ impl Replay {
             peak: AtomicUsize::new(0),
         }
     }
-
-    fn records(&self, server: &str, tool: &str, args: &serde_json::Value) -> bool {
-        let key = (server.to_owned(), tool.to_owned(), args.to_string());
-        self.exchanges.contains_key(&key)
-    }
 }
 
 impl maos_mcp::McpClient for Replay {
@@ -151,137 +150,6 @@ impl maos_mcp::McpClient for Replay {
         let attribution =
             McpAttribution::new(server.into(), McpTransportId::StreamableHttp, tool.into());
         Ok(McpResponse::new(content, is_error, attribution))
-    }
-}
-
-/// Story 18-3 AC4.4 — `LiveResearcherMcpPort`'s two-phase fan-out, compact:
-/// every call takes a permit, then a per-call `Scope::McpCall` token and the
-/// kernel adapter (which journals the `McpInvocation` frame the walk joins).
-struct ReplayMcpPort {
-    rt: tokio::runtime::Runtime,
-    sem: Arc<tokio::sync::Semaphore>,
-    capability: Arc<CapabilityRegistryAdapter>,
-    adapter: Arc<McpClientAdapter>,
-    replay: Arc<Replay>,
-}
-
-impl ReplayMcpPort {
-    fn governed(
-        &self,
-        server: &'static str,
-        tool: &'static str,
-        args: serde_json::Value,
-    ) -> impl Future<Output = Result<serde_json::Value, ResearcherMcpError>> + Send + 'static {
-        let (sem, capability, adapter) = (
-            Arc::clone(&self.sem),
-            Arc::clone(&self.capability),
-            Arc::clone(&self.adapter),
-        );
-        let failed = move |cause: String| ResearcherMcpError::CallFailed {
-            server: server.into(),
-            tool: tool.into(),
-            cause,
-        };
-        async move {
-            let _permit = sem
-                .acquire_owned()
-                .await
-                .map_err(|e| failed(e.to_string()))?;
-            tokio::task::spawn_blocking(move || {
-                let scope = Scope::McpCall {
-                    server: server.into(),
-                    tool: tool.into(),
-                };
-                let token = capability
-                    .issue_with_mediation(PID, scope, 60, [0; 32], IntentClass::Standard)
-                    .map_err(|e| ResearcherMcpError::TokenIssuanceFailed(e.to_string()))?;
-                let response = adapter
-                    .call(&token, server, tool, args)
-                    .map_err(|e| failed(e.to_string()))?;
-                drivers::extract_content(&response).map_err(|e| failed(e.to_string()))
-            })
-            .await
-            .map_err(|e| failed(e.to_string()))?
-        }
-    }
-}
-
-impl ResearcherMcpPort for ReplayMcpPort {
-    fn survey_literature(&self, query: &str) -> Result<Vec<FetchedClaim>, ResearcherMcpError> {
-        let joined = |e: tokio::task::JoinError| ResearcherMcpError::CallFailed {
-            server: "unknown".into(),
-            tool: "unknown".into(),
-            cause: e.to_string(),
-        };
-        self.rt.block_on(async {
-            // Phase 1: search / traverse (not citable; yields source keys).
-            let searches: [(&'static str, &'static str, serde_json::Value); 4] = [
-                ("web", "search", drivers::web_search_args(query)),
-                ("arxiv", "search", drivers::arxiv_search_args(query)),
-                (
-                    "github",
-                    "search_code",
-                    drivers::github_search_code_args(query),
-                ),
-                (
-                    "citation-graph",
-                    "traverse",
-                    drivers::citation_graph_traverse_args(query),
-                ),
-            ];
-            let mut set = tokio::task::JoinSet::new();
-            for (server, tool, args) in searches {
-                let call = self.governed(server, tool, args);
-                set.spawn(async move {
-                    let content = call.await?;
-                    let keys = drivers::parse_search_results(&content, server);
-                    Ok::<_, ResearcherMcpError>(keys.into_iter().map(move |k| (server, k)))
-                });
-            }
-            let mut keys = Vec::new();
-            while let Some(res) = set.join_next().await {
-                keys.extend(res.map_err(joined)??);
-            }
-            // Phase 2: one fetch per recorded source key (citable claims).
-            let mut set = tokio::task::JoinSet::new();
-            for (server, key) in keys {
-                let (tool, args) = match server {
-                    "web" => ("fetch", drivers::web_fetch_args(&key)),
-                    "arxiv" => ("get_paper", drivers::arxiv_get_paper_args(&key)),
-                    "github" => ("get_repo", drivers::github_get_repo_args(&key)),
-                    "citation-graph" => (
-                        "get_citations",
-                        drivers::citation_graph_get_citations_args(&key),
-                    ),
-                    _ => continue,
-                };
-                if !self.replay.records(server, tool, &args) {
-                    continue;
-                }
-                let call = self.governed(server, tool, args);
-                set.spawn(async move {
-                    let content = call.await?;
-                    let decode = |what: &str| ResearcherMcpError::Decode(format!("missing {what}"));
-                    let claim = content
-                        .get("claim")
-                        .cloned()
-                        .ok_or_else(|| decode("claim"))?;
-                    let source_key = content
-                        .get("source_key")
-                        .and_then(serde_json::Value::as_str)
-                        .ok_or_else(|| decode("source_key"))?
-                        .to_owned();
-                    let claim = serde_json::from_value(claim)
-                        .map_err(|e| ResearcherMcpError::Decode(e.to_string()))?;
-                    Ok::<_, ResearcherMcpError>(FetchedClaim { claim, source_key })
-                });
-            }
-            let mut claims = Vec::new();
-            while let Some(res) = set.join_next().await {
-                claims.push(res.map_err(joined)??);
-            }
-            Ok::<_, ResearcherMcpError>(claims)
-        })
     }
 }
 
@@ -376,17 +244,16 @@ fn section(manifest: &toml::Value, path: &[&str]) -> String {
     toml::to_string(value).unwrap()
 }
 
-fn idle(researcher: &Researcher) -> Duration {
+/// One `on_idle` pass fired by the kernel dispatcher (the production path,
+/// including its halt gating), and its wall-clock.
+async fn idle(dispatcher: &HookDispatcher, scb: &SpiritControlBlock) -> (HookOutcome, Duration) {
     let started = Instant::now();
-    researcher.on_idle(&mut Ctx::for_rust_inproc_hook(
-        CapabilityHandle(0),
-        MailboxHandle(0),
-    ));
-    started.elapsed()
+    let outcome = dispatcher.fire_on_idle(scb).await;
+    (outcome, started.elapsed())
 }
 
-#[test]
-fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
+#[tokio::test(flavor = "multi_thread")]
+async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
     init_monotonic_base();
     let manifest: toml::Value = toml::from_str(MANIFEST).unwrap();
     let policy =
@@ -440,22 +307,24 @@ fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
         Arc::clone(&registry),
     ));
     let replay = Arc::new(Replay::from_corpus());
-    assert_eq!(replay.exchanges.len(), 14, "the 14 recorded exchanges");
-    let mcp = Arc::new(ReplayMcpPort {
-        rt: tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap(),
-        sem: Arc::new(tokio::sync::Semaphore::new(RESEARCHER_PARALLELISM)),
-        capability: Arc::clone(&capability),
-        adapter: Arc::new(McpClientAdapter::new(
+    assert_eq!(replay.exchanges.len(), 17, "the 17 recorded exchanges");
+    // The PRODUCTION fan-out port (constructed on this runtime: its handle
+    // drives the fan-out from the dispatcher's blocking hook thread).
+    let mcp = Arc::new(LiveResearcherMcpPort::new(
+        Arc::new(|| Some(PID)),
+        [0; 32],
+        Arc::new(McpClientAdapter::new(
             Arc::clone(&replay) as Arc<dyn maos_mcp::McpClient + Send + Sync>,
             Arc::clone(&capability),
             Arc::clone(&tl),
             Arc::new(IacRtMetrics::new()),
-        )),
-        replay: Arc::clone(&replay),
-    });
+        )) as Arc<dyn McpClientPort>,
+        Arc::clone(&capability),
+        None,
+        None,
+        Arc::clone(&tl),
+        RESEARCHER_SPIRIT_ID,
+    ));
     let recall = Arc::new(LogRecallAdapter::new(Arc::clone(&tl)));
     let scalars = Arc::new(KernelScalars {
         tl: Arc::clone(&tl),
@@ -493,26 +362,46 @@ fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
             Arc::clone(&tl),
             Arc::new(0u8),
         )));
+    // The kernel dispatcher every production pass goes through, gating on
+    // the same halt registry the scalar path writes (D-18-3-R5).
+    let dispatcher = HookDispatcher::new(Arc::clone(&tl), Arc::new(IacRtMetrics::new()))
+        .with_halt_registry(Arc::clone(&registry));
+    let scb = SpiritControlBlock::new(
+        PID,
+        RESEARCHER_SPIRIT_ID.into(),
+        SpiritManifestBundle {
+            lifecycle: LifecycleSection {
+                enabled_hooks: vec!["on_idle".into()],
+            },
+            budget: Some(Budget::from_toml_str(&section(&manifest, &["budget"])).unwrap()),
+            ..Default::default()
+        },
+        make_spirit_obj(researcher.clone()),
+        0,
+    );
+    scb.state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
 
     // Pass 1: the fan-out replays every recorded exchange once, bounded at 8.
-    let first = idle(&researcher);
+    let (outcome, first) = idle(&dispatcher, &scb).await;
+    assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
     assert!(researcher.take_pass_error().is_none(), "pass 1 refused");
     let out1 = researcher.last_output().expect("pass 1 surveyed");
     let calls = replay.calls.lock().unwrap().clone();
-    assert_eq!(calls.len(), 14, "one call per recorded exchange");
+    assert_eq!(calls.len(), 17, "one call per recorded exchange");
     assert!(calls.iter().all(|c| replay.exchanges.contains_key(c)));
     assert_eq!(
         calls
             .iter()
             .collect::<std::collections::BTreeSet<_>>()
             .len(),
-        14,
+        17,
         "every recorded exchange replayed exactly once"
     );
     assert_eq!(
         replay.peak.load(Ordering::SeqCst),
         RESEARCHER_PARALLELISM,
-        "observed peak MCP concurrency = RESEARCHER_PARALLELISM"
+        "observed peak MCP concurrency = the production port's bound"
     );
     let mcp_rows = tl
         .query_frames(FrameFilter {
@@ -521,7 +410,7 @@ fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
             ..Default::default()
         })
         .unwrap();
-    assert_eq!(mcp_rows.len(), 14, "the kernel adapter journaled each call");
+    assert_eq!(mcp_rows.len(), 17, "the kernel adapter journaled each call");
     assert!(mcp_rows.iter().all(|row| row.capability_token.is_some()));
     let fetches = calls
         .iter()
@@ -556,6 +445,31 @@ fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
     );
     let halt_id = receipt.halt_id;
     assert_eq!(registry.pending_halt_ids(), vec![halt_id.clone()]);
+
+    // Cause → effect (D-18-3-R5): while the halt is pending the kernel
+    // dispatcher does not run the pass — no MCP call, completion or scalar.
+    let consumed = researcher.completions_consumed();
+    let (gated, _) = idle(&dispatcher, &scb).await;
+    assert_eq!(
+        gated,
+        HookOutcome::HaltPending,
+        "a pending halt gates the pass"
+    );
+    assert_eq!(
+        replay.calls.lock().unwrap().len(),
+        17,
+        "no MCP call while halted"
+    );
+    assert_eq!(
+        researcher.completions_consumed(),
+        consumed,
+        "no completion while halted"
+    );
+    assert_eq!(
+        scalars.writes.lock().unwrap().len(),
+        1,
+        "no scalar while halted"
+    );
 
     // Resolve ONCE (accepted-halt) through the operator door's composition.
     let db = tmp.path().join("audit.db");
@@ -609,13 +523,14 @@ fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
         Some(format!("halt={}: accepted_halt", halt_id.as_str()).as_str())
     );
 
-    // Pass 2 resumes and surveys.
-    let second = idle(&researcher);
+    // Pass 2: the resolution lets the dispatcher run the pass; it surveys.
+    let (outcome, second) = idle(&dispatcher, &scb).await;
+    assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
     assert!(researcher.take_pass_error().is_none(), "pass 2 refused");
     let out2 = researcher.last_output().expect("pass 2 surveyed");
     assert_eq!(
         replay.calls.lock().unwrap().len(),
-        28,
+        34,
         "pass 2 fanned out again"
     );
     assert_eq!(replay.peak.load(Ordering::SeqCst), RESEARCHER_PARALLELISM);
@@ -629,6 +544,8 @@ fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
     assert_eq!(scalars.writes.lock().unwrap().len(), 2);
     assert_eq!(registry.pending_halt_ids().len(), 1);
     assert!(!registry.pending_halt_ids().contains(&halt_id));
+    let (gated, _) = idle(&dispatcher, &scb).await;
+    assert_eq!(gated, HookOutcome::HaltPending, "the new halt gates again");
     let distillates = tl
         .query_frames(FrameFilter {
             kind: Some(FrameKind::Distillate),

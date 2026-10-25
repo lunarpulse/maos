@@ -1507,7 +1507,7 @@ jobs:
       # Story 18-3 AC2.3 / CR-3 — the Researcher's five metrics over the frozen
       # corpus `researcher-distill-corpus-v0`, replayed keyless (committed
       # completions + frozen judge verdicts); exit 0 = all five NFR-Aud-7 floors
-      # held and all four negative controls detected.
+      # held and all five negative controls detected.
       - name: Build the root
         run: cargo build --locked -p maos-bin --bin maos
       - name: maos eval distill --class researcher (Story 18-3 AC2.3 / CR-3)
@@ -2455,8 +2455,9 @@ jobs:
             exit 1
           fi
           # The replay port prints `CASSETTE EXHAUSTED` on its own; the
-          # refusal line is what proves the pass failed closed.
-          if ! grep -q 'researcher on_idle pass refused' line3-twin.err || ! grep -q 'exhausted' line3-twin.err; then
+          # refusal line itself must name the cause (TIA-3) — that is what
+          # proves the pass failed closed on the exhausted cassette.
+          if ! grep -qE 'researcher on_idle pass refused: .*exhausted' line3-twin.err; then
             echo "::error title=Epic-18 exit line 3 twin::rc=${rc} but the refusal does not name the exhausted cassette: $(tail -n 3 line3-twin.err | paste -sd' ' -)"
             exit 1
           fi

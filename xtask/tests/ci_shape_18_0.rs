@@ -391,6 +391,32 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
             > step_index(rerecord, "Re-record the Butler halt-eval cassette (live)")
     );
     assert_eq!(condition(upload).as_deref(), Some(NOT_CANCELLED));
+
+    // Story 18-3 TIA-8 (review R4) — the Researcher re-record step: its
+    // `.live.json` sibling, the shipped verb, `!cancelled()` (it runs after a
+    // missed Butler floor), before the upload, whose directory carries the
+    // `.live.verdicts.json` judge sidecar.
+    const RESEARCHER_STEP: &str = "Re-record the Researcher five-metric cassette and judge (live)";
+    const LIVE: &str =
+        "crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.json";
+    let researcher = &steps(rerecord)[step_index(rerecord, RESEARCHER_STEP)];
+    let env = key(researcher, "env");
+    assert_eq!(str_of(env, "MAOS_INFERENCE_MODE"), Some("record"));
+    assert_eq!(str_of(env, "MAOS_REPLAY_CASSETTE"), Some(LIVE));
+    assert_eq!(
+        str_of(researcher, "run"),
+        Some("target/debug/maos eval distill --class researcher")
+    );
+    assert_eq!(condition(researcher).as_deref(), Some(NOT_CANCELLED));
+    assert!(
+        step_index(rerecord, "Upload refreshed cassettes") > step_index(rerecord, RESEARCHER_STEP)
+    );
+    let uploaded = str_of(key(upload, "with"), "path").expect("upload path");
+    assert!(
+        "crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.verdicts.json"
+            .starts_with(uploaded.trim()),
+        "the upload carries the judge sidecar: {uploaded}"
+    );
 }
 
 const EXIT_LINE_3_STEP: &str =
@@ -404,8 +430,8 @@ const SURVEY_CASSETTE: &str =
 /// scratch `HOME`): the binding witness, one `researcher_survey` event with
 /// the four survey keys and one completion per cassette entry; its twin runs
 /// the same line over an EMPTY cassette and fails when that exits 0 or when
-/// stderr lacks the refusal AND `exhausted` (the replay port prints
-/// `CASSETTE EXHAUSTED` on its own). TIA-6 (`deferred-work.md:1248`):
+/// stderr's refusal line does not itself name `exhausted` (TIA-3: the replay
+/// port prints `CASSETTE EXHAUSTED` on its own). TIA-6 (`deferred-work.md:1248`):
 /// maosctl is built and `maosctl spirit benchmark butler` reads the sidecar
 /// line 2 wrote, under line 2's scratch `HOME`.
 #[test]
@@ -470,8 +496,11 @@ fn epic_18_exit_runs_line_3_verbatim_and_its_empty_cassette_twin() {
         when_zero.contains("exit 1"),
         "the twin exits 1 when the empty cassette exits 0"
     );
-    assert!(run.contains("grep -q 'researcher on_idle pass refused' line3-twin.err"));
-    assert!(run.contains("grep -q 'exhausted' line3-twin.err"));
+    assert!(run.contains("grep -qE 'researcher on_idle pass refused: .*exhausted' line3-twin.err"));
+    assert!(
+        !run.contains("grep -q 'exhausted' line3-twin.err"),
+        "the cause is matched on the refusal line, not anywhere in stderr"
+    );
 
     // TIA-6: maosctl is built and reads line 2's sidecar in line 2's step.
     assert!(steps(job)

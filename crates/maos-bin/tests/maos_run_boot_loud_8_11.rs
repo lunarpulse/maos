@@ -10,9 +10,11 @@
 //!   loaded with its EpistemicScalarPort STRIPPED must **fatally fail boot**
 //!   (specific `Err`, not a panic); the serving loop is never reached. Goes RED
 //!   the moment anyone re-adds a `None`/store-only escape.
-//! - (b) a **deterministic-posture** Spirit (Researcher, `assistive`) with no
-//!   port must boot **SUCCESSFULLY** — the guard that the posture-keyed predicate
-//!   does not over-fire and decapitate Researcher (written to pass, NOT panic).
+//! - (b) a Spirit whose declared Halt rules are all OUTSIDE the halt-port set
+//!   (the Orchestrator: `dispatch_ambiguity` / `delegation_confidence`) with no
+//!   port must boot **SUCCESSFULLY** — the guard that the posture-keyed
+//!   predicate does not over-fire on any declared halt (written to pass, NOT
+//!   panic).
 
 use std::process::Command;
 
@@ -81,13 +83,14 @@ fn halt_posture_spirit_without_port_fatally_fails_boot() {
     );
 }
 
-/// (b) Deterministic-posture Spirit without a port → boots clean (the over-fire guard).
-/// Story 18-3 (D-18-3-09 A) wired the Researcher's declared halts to an
-/// `EpistemicScalarPort`, so the guard now boots the Observer (no declared halts).
+/// (b) A Spirit with Halt rules outside the halt-port set, no port → boots clean
+/// (the over-fire guard). Story 18-3 (D-18-3-09 A) moved the Researcher's tags
+/// into the set; review AA-6/TIA-10: the guard now boots the Orchestrator,
+/// whose `[epistemic_policy]` Halt rules need no port.
 #[test]
 fn deterministic_posture_spirit_without_port_boots_clean() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
-        .args(["run", "spirits/observer/manifest.toml", "--once"])
+        .args(["run", "spirits/orchestrator/manifest.toml", "--once"])
         .env("HOME", doorless_home::doorless_home())
         .env(
             "XDG_DATA_HOME",
@@ -99,8 +102,8 @@ fn deterministic_posture_spirit_without_port_boots_clean() {
 
     assert!(
         output.status.success(),
-        "Observer (no declared halts, no port) MUST boot clean — the posture-keyed boot-loud \
-         predicate must not decapitate a deterministic Spirit; stderr:\n{}",
+        "Orchestrator (Halt rules outside the port set, no port) MUST boot clean — the \
+         posture-keyed boot-loud predicate must not over-fire; stderr:\n{}",
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -108,10 +111,10 @@ fn deterministic_posture_spirit_without_port_boots_clean() {
         .lines()
         .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
         .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("spirit_loaded"))
-        .expect("Observer must load");
+        .expect("Orchestrator must load");
     assert_eq!(
         loaded.get("boot_loud_port").and_then(|v| v.as_bool()),
         Some(false),
-        "Observer must boot WITHOUT requiring an EpistemicScalarPort"
+        "Orchestrator must boot WITHOUT requiring an EpistemicScalarPort"
     );
 }

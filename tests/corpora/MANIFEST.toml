@@ -151,9 +151,9 @@ description = "Story 18-2 NFR-Test-4 Researcher class corpus (symlink to spirits
 # fixtures, single source of truth). prompt_version_hash pins the live judge's
 # prompt (tests/judge-config.toml [judge.researcher-faithfulness]).
 [corpus."researcher-distill-corpus-v0"]
-sha256 = "1c6682d43146dd10e5775cf0f0237823f513dd5dc5119482a879334266a59f69"
+sha256 = "6f69f2e60c23174452e3360a4fffca89ff24e7c3df3f42c46aa89216c7d467e8"
 schema_version = 1
 item_count = 16
 valid_until = "2027-10-25"
 prompt_version_hash = "56bebf0beca733ffd335a4d175704aa71c56f18367b1a4b62ee002d9dd42be4c"
-description = "Story 18-3 NFR-Aud-7 Researcher distillation corpus (symlink to spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl): 16 scenarios (12 clean, 4 negative controls: hedge-drop, fabricated-cite, planted-secret, dropped-claim) of source claims journaled as TL frames, each with its frozen survey and frozen judge verdicts (provenance seed). Completions in crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.json (33 real-hash entries, provenance seed). Floors recall >= 0.90, faithfulness >= 0.98, hedge preservation >= 0.95, traceability = 100%, secret leakage = 0% over the clean rows; every control must miss its metric. Also scored hermetically by crates/maos-eval/tests/distillate_five_metrics_floor.rs."
+description = "Story 18-3 NFR-Aud-7 Researcher distillation corpus (symlink to spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl): 16 scenarios (12 clean, 4 negative-control rows: hedge-drop, fabricated-cite, planted-secret, dropped-claim) of source claims journaled as TL frames, each with its frozen survey and frozen judge verdicts (provenance seed; the hedge-drop and planted-secret rows freeze `false` verdicts for their rubric-breaking findings — the fifth, unfaithful-finding control). Completions in crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.json (33 real-hash entries, provenance seed). Floors recall >= 0.90, faithfulness >= 0.98, hedge preservation >= 0.95 (word-boundary hedge match), traceability = 100%, secret leakage = 0% over the clean rows; every control must miss its metric. Also scored hermetically by crates/maos-eval/tests/distillate_five_metrics_floor.rs."

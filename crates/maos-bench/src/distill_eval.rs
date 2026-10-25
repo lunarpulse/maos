@@ -9,20 +9,22 @@
 //! kernel `InferencePortAdapter` over the given router, minting its declared
 //! provider; its distillate through the kernel `DistillateWriter` (I11); each
 //! cite resolved through `LogRecallAdapter` and each statement through the
-//! real `CorpusBackedRedactionPolicy`. Replay checks every survey against the
-//! frozen one and reads the frozen judge verdicts; record (nightly) asks the
-//! live judge after every survey, through the same port. Scoring is
-//! `maos_eval::distill_replay`'s.
+//! real `CorpusBackedRedactionPolicy`. The cassette's provenance decides its
+//! layout (`scorer::live_layout`): a `seed` replay checks every survey
+//! against the frozen one and reads the frozen judge verdicts; record
+//! (nightly) and a `live-record` replay serve the completion-planted controls
+//! from the committed cassette, the other rows from the run's router, then
+//! the pinned judge per finding of those rows, through the same port.
+//! Scoring is `maos_eval::distill_replay`'s.
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i3::FrameOrigin;
-use maos_domain::ports::inference::{InferenceOptions, InferenceRequest};
 use maos_domain::ports::{InferencePort, LogRecallPort};
 use maos_eval::distill_replay::{self as scorer, DistillRow, FindingFacts, ScenarioFacts};
 use maos_eval::halt_replay::check_consumed;
@@ -41,6 +43,9 @@ use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use researcher::{ClaimPayload, RecalledFrame, Researcher, ResearcherInferenceBinding};
 
 use crate::halt_eval::{required, Completions, Counted, World, EVAL_PID};
+
+/// The committed seed cassette `evaluate`'s `committed` driver replays.
+pub use maos_eval::distill_replay::CASSETTE as COMMITTED_CASSETTE;
 
 const USAGE: &str = "usage: maos eval distill --class researcher [--cassette <path>]";
 const INTENT: &str = "researcher:corpus_claim";
@@ -105,13 +110,23 @@ pub struct DistillRun {
     pub failures: Vec<String>,
 }
 
-/// Replay (or record) the frozen corpus and score it. `Err` is a run with no
-/// numbers: a refused pass, drift, exhaustion, consumed ≠ calls.
-pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
+/// Replay (or record) the frozen corpus and score it. `committed` is the
+/// strict replay driver over the committed `scorer::CASSETTE`. `Err` is a run
+/// with no numbers: a refused pass, drift, exhaustion, consumed ≠ calls, an
+/// unconsumed entry, a judge reply not the pinned model's.
+pub fn evaluate(
+    completions: Completions,
+    committed: Arc<dyn maos_providers::Provider>,
+) -> Result<DistillRun, String> {
     init_monotonic_base();
     let text = std::fs::read_to_string(scorer::CORPUS)
         .map_err(|e| format!("corpus {}: {e}", scorer::CORPUS))?;
     let rows: Vec<DistillRow<ClaimPayload>> = scorer::load_rows(&text)?;
+    let model = std::fs::read_to_string(scorer::JUDGE_CONFIG)
+        .map_err(|e| e.to_string())
+        .and_then(|t| toml::from_str::<scorer::JudgeConfig>(&t).map_err(|e| e.to_string()))
+        .and_then(|config| config.wire_model())
+        .map_err(|e| format!("{}: {e}", scorer::JUDGE_CONFIG))?;
     let manifest: toml::Value =
         toml::from_str(include_str!("../../../spirits/researcher/manifest.toml"))
             .map_err(|e| format!("researcher manifest: {e}"))?;
@@ -126,22 +141,29 @@ pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
             _ => None,
         })
         .ok_or("researcher declares no inference provider")?;
+    let route = |driver: Arc<dyn maos_providers::Provider>| {
+        let drivers = BTreeMap::from([(provider.clone(), driver)]);
+        Arc::new(MultiProviderRouter::new(drivers, Some(provider.clone())))
+    };
     let (router, cassette, flush) = match completions {
-        Completions::Replay { driver, cassette } => {
-            let drivers = BTreeMap::from([(provider.clone(), driver)]);
-            let router = MultiProviderRouter::new(drivers, Some(provider.clone()));
-            (Arc::new(router), cassette, None)
-        }
+        Completions::Replay { driver, cassette } => (route(driver), cassette, None),
         Completions::Record {
             router,
             cassette,
             flush,
         } => (router, cassette, Some(flush)),
     };
+    let record = flush.is_some();
+    let replayed = (!record)
+        .then(|| scorer::read_cassette(&cassette))
+        .transpose()?;
+    let live = replayed
+        .as_ref()
+        .map_or(Ok(true), |(_, json)| scorer::live_layout(json))?;
     let consumed = Arc::new(AtomicUsize::new(0));
-    let port_over = |world: &World| Counted {
+    let port_over = |world: &World, router: &Arc<MultiProviderRouter>| Counted {
         inner: InferencePortAdapter::new(
-            Arc::clone(&router),
+            Arc::clone(router),
             Arc::clone(&world.capability),
             Arc::clone(&world.tl),
             Arc::new(IacRtMetrics::new()),
@@ -149,8 +171,14 @@ pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
         consumed: Arc::clone(&consumed),
     };
     let redaction = CorpusBackedRedactionPolicy::new();
-    let (mut facts, mut failures, mut calls) = (Vec::new(), Vec::new(), 0);
-    for (s, row) in rows.iter().enumerate() {
+    // One row surveyed through `router`: its facts, its failures and the
+    // completions it took. A `frozen` row must reproduce its frozen survey
+    // and scores the frozen verdicts.
+    let survey = |s: usize,
+                  router: &Arc<MultiProviderRouter>,
+                  frozen: bool|
+     -> Result<(ScenarioFacts, Vec<String>, usize), String> {
+        let row = &rows[s];
         let id = &row.scenario_id;
         let world = World::new(declared.clone())?;
         let mut frames = Vec::new();
@@ -179,7 +207,6 @@ pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
                 payload,
             });
         }
-        calls += frames.len();
         let mint = minter(&world.capability);
         let binding = ResearcherInferenceBinding::per_pass(
             provider.clone(),
@@ -187,7 +214,7 @@ pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
             Arc::new(|| Some(EVAL_PID)),
         );
         let researcher = Researcher::new().with_deferred_inference_port(
-            Arc::new(port_over(&world)),
+            Arc::new(port_over(&world, router)),
             Arc::new(Mutex::new(Some(binding))),
         );
         let output = researcher
@@ -211,21 +238,17 @@ pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
                     Cow::Owned(r) if r != f.statement.as_bytes()),
             })
             .collect();
+        let mut failures = Vec::new();
         if written != findings.iter().all(|f| f.resolves) {
             failures.push(format!("{id}: the I11 writer and cite resolution disagree"));
         }
-        let verdicts = if flush.is_none() {
-            let recomputed = serde_json::to_value(&output).map_err(|e| format!("{id}: {e}"))?;
-            if recomputed != row.survey {
-                failures.push(format!(
-                    "{id}: survey differs from the frozen one (re-pin needed): {recomputed}"
-                ));
-            }
-            row.judge.verdicts.clone()
-        } else {
-            BTreeMap::new()
-        };
-        facts.push(ScenarioFacts {
+        let recomputed = serde_json::to_value(&output).map_err(|e| format!("{id}: {e}"))?;
+        if frozen && recomputed != row.survey {
+            failures.push(format!(
+                "{id}: survey differs from the frozen one (re-pin needed): {recomputed}"
+            ));
+        }
+        let fact = ScenarioFacts {
             scenario_id: id.clone(),
             control: row.control,
             source: row
@@ -234,65 +257,82 @@ pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
                 .map(|c| (c.claim_id.clone(), c.hedges.clone()))
                 .collect(),
             findings,
-            verdicts,
-        });
+            verdicts: frozen
+                .then(|| row.judge.verdicts.clone())
+                .unwrap_or_default(),
+        };
+        Ok((fact, failures, frames.len()))
+    };
+    let committed_router = route(committed);
+    let mut failures = scorer::stale_judge_prompts(&rows);
+    let (mut facts, mut calls) = (BTreeMap::new(), 0);
+    // Pass 1 — every row through the committed completions (a `seed`
+    // cassette's own); a live run keeps only the completion-planted controls.
+    for (s, row) in rows.iter().enumerate() {
+        let (fact, failed, n) = survey(s, if live { &committed_router } else { &router }, true)?;
+        calls += n;
+        failures.extend(failed);
+        if !live || !scorer::served_live(row) {
+            facts.insert(s, fact);
+        }
     }
-    // Record: the live judge runs after EVERY survey, so the recorded
-    // cassette replays its survey completions first, in corpus order.
-    if flush.is_some() {
+    let committed_calls = calls;
+    // Pass 2 (live) — the other rows through the run's router, then the
+    // pinned judge per finding of those rows, one token minted per call.
+    let mut replies = Vec::new();
+    let mut ask = || -> Result<(), String> {
+        let live_rows = rows
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| scorer::served_live(*row));
+        for (s, _) in live_rows.clone() {
+            let (fact, failed, n) = survey(s, &router, false)?;
+            calls += n;
+            failures.extend(failed);
+            facts.insert(s, fact);
+        }
         let world = World::new(declared.clone())?;
-        let (judge, token) = (
-            port_over(&world),
-            minter(&world.capability)(EVAL_PID, &provider)?,
-        );
-        for (row, fact) in rows.iter().zip(&mut facts) {
-            for f in &fact.findings {
+        let (judge, mint) = (port_over(&world, &router), minter(&world.capability));
+        for (s, row) in live_rows {
+            for f in &facts[&s].findings {
                 let source = row.claims.iter().find(|c| c.claim_id == f.claim_id);
-                let req = InferenceRequest::new(
-                    EVAL_PID,
-                    token.clone(),
-                    scorer::judge_prompt(source.map_or("", |c| &c.statement), &f.statement),
-                    InferenceOptions {
-                        max_tokens: 8,
-                        temperature: Some(0.0),
-                        model_id: None,
-                    },
-                    Some(provider.clone()),
-                    Vec::new(),
-                );
-                let text = judge.complete(req).map_err(|e| format!("judge: {e}"))?.text;
-                fact.verdicts
-                    .insert(f.claim_id.clone(), scorer::judge_verdict(&text)?);
+                let pair = (source.map_or("", |c| c.statement.as_str()), &*f.statement);
+                let token = mint(EVAL_PID, &provider)?;
+                let req = scorer::judge_request(EVAL_PID, token, pair, &provider, &model);
+                let response = judge.complete(req).map_err(|e| format!("judge: {e}"))?;
+                let (scenario, claim) = (row.scenario_id.clone(), f.claim_id.clone());
+                replies.push(scorer::JudgeReply(scenario, claim, response));
                 calls += 1;
             }
         }
-    }
-    check_consumed(consumed.load(Ordering::SeqCst), calls)?;
-    let record = flush.is_some();
-    let judge_provenance: BTreeSet<&str> = match flush {
-        Some(flush) => {
-            flush()?;
-            BTreeSet::from(["live-record"])
-        }
-        None => rows.iter().map(|r| r.judge.provenance.as_str()).collect(),
+        Ok(())
     };
-    let mut score = scorer::score(&facts)?;
-    if record {
-        // A live model plants no hedge drop or secret: those two controls
-        // live in the committed completions and are replay-only.
-        score.controls.retain(|c| {
-            !matches!(
-                c.control,
-                scorer::Control::HedgeDrop | scorer::Control::PlantedSecret
-            )
-        });
+    let asked = if live { ask() } else { Ok(()) };
+    // BH-4: what was recorded is flushed before any reply is parsed.
+    asked.and(flush.map_or(Ok(()), |flush| flush()))?;
+    let mut facts: Vec<ScenarioFacts> = facts.into_values().collect();
+    scorer::apply_judge(&mut facts, replies, &model)?;
+    check_consumed(consumed.load(Ordering::SeqCst), calls)?;
+    if live {
+        let (_, json) = scorer::read_cassette(Path::new(scorer::CASSETTE))?;
+        scorer::fully_consumed(&json, committed_calls).map_err(|e| format!("committed {e}"))?;
     }
+    if let Some((_, json)) = &replayed {
+        let served = if live { calls - committed_calls } else { calls };
+        scorer::fully_consumed(json, served).map_err(|e| format!("{cassette:?}: {e}"))?;
+    }
+    if record {
+        let sidecar = scorer::verdicts_sidecar(&cassette);
+        std::fs::write(&sidecar, scorer::live_verdicts(&facts, &model)?)
+            .map_err(|e| format!("verdicts sidecar {sidecar:?}: {e}"))?;
+    }
+    let judge_provenance = scorer::judge_provenance(&rows, live);
+    let score = scorer::score(&facts)?;
     failures.extend(scorer::gate_failures(&score));
-    let bytes = std::fs::read(&cassette).map_err(|e| format!("cassette {cassette:?}: {e}"))?;
-    let provenance = serde_json::from_slice::<serde_json::Value>(&bytes)
-        .map_err(|e| format!("cassette {cassette:?}: {e}"))?
-        .get("provenance")
-        .cloned();
+    let (bytes, json) = match replayed {
+        Some(read) => read,
+        None => scorer::read_cassette(&cassette)?,
+    };
     let line = serde_json::json!({
         "event": "eval_distill",
         "class": "researcher",
@@ -300,7 +340,7 @@ pub fn evaluate(completions: Completions) -> Result<DistillRun, String> {
         "corpus_sha256": sha256_hex(text.as_bytes()),
         "cassette": cassette.display().to_string(),
         "cassette_sha256": sha256_hex(&bytes),
-        "provenance": provenance,
+        "provenance": json.get("provenance"),
         "judge_provenance": judge_provenance,
         "judge_prompt_sha256": sha256_hex(scorer::JUDGE_PROMPT.as_bytes()),
         "completions_consumed": calls,

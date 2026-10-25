@@ -376,7 +376,9 @@ impl Shared {
                 let why = format!("{} exceeded its {cap_seconds} s budget", hook.name());
                 self.quarantine(pid, entry, OBSERVER_CLASS, &why);
             }
-            HookOutcome::SkippedManifest | HookOutcome::DeferredToNextStory => {}
+            HookOutcome::SkippedManifest
+            | HookOutcome::DeferredToNextStory
+            | HookOutcome::HaltPending => {}
         }
     }
 

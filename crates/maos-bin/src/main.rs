@@ -814,7 +814,14 @@ fn run_distill(
         }
         (None, None) => return eval_failed("record needs MAOS_REPLAY_CASSETTE".into()),
     };
-    match maos_bench::distill_eval::evaluate(completions) {
+    // R4: the committed seed cassette serves the completion-planted controls
+    // of a record or `live-record` replay.
+    let committed = std::path::Path::new(maos_bench::distill_eval::COMMITTED_CASSETTE);
+    let committed = match cassette_replay::CassetteReplayProvider::from_file(committed, true) {
+        Ok(driver) => Arc::new(driver),
+        Err(error) => return eval_failed(error),
+    };
+    match maos_bench::distill_eval::evaluate(completions, committed) {
         Err(error) => eval_failed(error),
         Ok(run) => {
             println!("{}", run.line);
@@ -932,11 +939,18 @@ struct SpiritBuildDeps {
     butler_seam: ButlerSeamSlot,
     /// Story 18-3 (AC4.1) — a bound Researcher's distillate writer.
     distillate_writer: Arc<maos_kernel_core::iac::distillate::DistillateWriter>,
+    /// Story 18-3 (review rulings D-18-3-R1/R2, BH-1) — the Researcher wiring.
+    researcher: ResearcherSlot,
 }
 
 /// Story 18-1 — the root's late-filled [`butler::ButlerSeam`].
 #[cfg(feature = "network")]
 type ButlerSeamSlot = Arc<std::sync::Mutex<Option<butler::ButlerSeam>>>;
+
+/// Story 18-3 (review ruling D-18-3-R1) — the root's late-filled
+/// [`maos_bin::researcher_root::ResearcherWiring`].
+#[cfg(feature = "network")]
+type ResearcherSlot = Arc<std::sync::Mutex<Option<maos_bin::researcher_root::ResearcherWiring>>>;
 
 /// Story 16-6 — the ONE class-dispatch switch for a Spirit that is being
 /// created from a manifest rather than from `maos run`'s own bespoke boot
@@ -985,9 +999,10 @@ fn build_spirit_obj(
             ::reviewer::Reviewer::new(class_name)
                 .with_pending_design(::reviewer::DesignUnderReview::default()),
         ),
-        // Story 18-3 (D-18-3-04 A, D-18-3-09 A) — bound and halting like the
-        // boot arm: the scalar port at the resolved pid and, under `--live` or
-        // an explicit mode, the TARGET manifest's declared provider.
+        // Story 18-3 (D-18-3-04 A, D-18-3-09 A; review rulings D-18-3-R1/R2,
+        // BH-1) — the boot arm's ONE construction: the scalar port at the
+        // resolved pid, the `--live` MCP + recall ports, the TARGET manifest's
+        // declared provider (or the legacy cassette's replay port).
         LoadedSpiritKind::Researcher => {
             let staged = butler_manifest
                 .ok_or("researcher requires the target manifest to re-parse [epistemic_policy]")?;
@@ -1012,14 +1027,23 @@ fn build_spirit_obj(
                 .clone()
                 .ok_or("butler seam not ready")?;
             let declared = gate_staged(staged).map_or_else(Vec::new, |g| declared_providers(&g));
+            let wiring = deps
+                .researcher
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .clone()
+                .ok_or("researcher wiring not ready")?;
             let host = maos_bin::researcher_root::ResearcherHost::new(
                 Arc::clone(&deps.transparency_log),
                 Arc::clone(&deps.distillate_writer) as _,
+                wiring.live,
             );
-            make_spirit_obj(maos_bin::researcher_root::attach(
+            make_spirit_obj(maos_bin::researcher_root::construct(
                 ::researcher::Researcher::new().with_scalar_port(scalar),
+                &wiring,
                 &seam,
                 &declared,
+                class_name,
                 pid_of,
                 &host,
             )?)
@@ -1277,289 +1301,119 @@ fn live_mcp_client(
     )
     .map(Some)
 }
+/// Story 18-3 (review rulings D-18-3-R1/R2) — the `--live` Researcher MCP
+/// wiring every Researcher of the root takes (boot arm, door `load`, hot-swap
+/// successor): `None` when no `MAOS_MCP_*_URI` names a Researcher server (each
+/// `--live` pass then refuses typed), `Err` when one is set but its client
+/// fails to build (the boot refuses). The builder holds the capability
+/// registry and the security manager only weakly.
 #[cfg(feature = "network")]
-/// Story 8.14c — Live MCP port for Researcher. Wraps the kernel's
-/// `McpClientAdapter` with a two-phase fan-out (search → fetch) bounded by
-/// `RESEARCHER_PARALLELISM` permits.
-///
-/// The async-trait future completes in a single poll because `survey_literature`
-/// internally calls `Handle::current().block_on(...)` — this is the FORK 3
-/// bridge pattern that avoids the 8.14b `Waker::noop()` deadlock on concurrent
-/// `spawn_blocking`.
-#[cfg(feature = "network")]
-struct LiveResearcherMcpPort {
-    spirit_pid: std::sync::atomic::AtomicU32,
-    posture_hash: [u8; 32],
-    mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
-    capability: Arc<CapabilityRegistryAdapter>,
-    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
-    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
-    handle: tokio::runtime::Handle,
-    sem: Arc<tokio::sync::Semaphore>,
-    /// Story 17-9 — where a refused mint's receipt goes, and whose it is.
-    journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
-    spirit_id: Arc<str>,
-}
-#[cfg(feature = "network")]
-impl LiveResearcherMcpPort {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        spirit_pid: u32,
-        posture_hash: [u8; 32],
-        mcp_client: Arc<dyn maos_domain::ports::mcp::McpClientPort>,
-        capability: Arc<CapabilityRegistryAdapter>,
-        enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
-        enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
-        journal: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
-        spirit_id: &str,
-    ) -> Self {
-        Self {
-            spirit_pid: std::sync::atomic::AtomicU32::new(spirit_pid),
-            posture_hash,
-            mcp_client,
-            capability,
-            enterprise_runtime,
-            enterprise_pdp_runtime,
-            handle: tokio::runtime::Handle::current(),
-            sem: Arc::new(tokio::sync::Semaphore::new(
-                researcher::RESEARCHER_PARALLELISM,
-            )),
-            journal,
-            spirit_id: spirit_id.into(),
-        }
+#[allow(clippy::too_many_arguments)]
+fn researcher_mcp_builder(
+    io: &Arc<dyn maos_domain::ports::IoSubsystemPort>,
+    secrets: &dyn maos_domain::ports::SecretStore,
+    capability: &Arc<CapabilityRegistryAdapter>,
+    security: &Arc<maos_kernel_core::security::SecurityManagerAdapter>,
+    tl: &Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    telemetry: &Arc<IacRtMetrics>,
+    log_recall: &Arc<maos_kernel_core::iac::log_recall::LogRecallAdapter>,
+    enterprise: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    pdp: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+) -> Result<Option<maos_bin::researcher_root::McpBuilder>, String> {
+    use maos_domain::ports::mcp::McpError;
+    use maos_domain::ports::McpServer;
+    use maos_mcp::client::McpClientImpl;
+    use maos_mcp::McpClient as _;
+
+    /// Story 8.14c — routes each call to its server's client.
+    struct ResearcherLiveMcpClient {
+        web: Option<McpClientImpl>,
+        arxiv: Option<McpClientImpl>,
+        github: Option<McpClientImpl>,
+        citation_graph: Option<McpClientImpl>,
     }
-}
-#[cfg(feature = "network")]
-impl researcher::ResearcherMcpPort for LiveResearcherMcpPort {
-    fn survey_literature(
-        &self,
-        query: &str,
-    ) -> Result<Vec<researcher::FetchedClaim>, researcher::ResearcherMcpError> {
-        // FORK 3 resolution: block_on from spawn_blocking pool thread.
-        // No noop-waker bridge — Handle::block_on parks the calling thread
-        // until the JoinSet fan-out completes.
-        self.handle.block_on(self.survey_literature_impl(query))
-    }
-}
-#[cfg(feature = "network")]
-impl LiveResearcherMcpPort {
-    async fn survey_literature_impl(
-        &self,
-        query: &str,
-    ) -> Result<Vec<researcher::FetchedClaim>, researcher::ResearcherMcpError> {
-        use maos_domain::ports::mcp::McpError;
-        // Phase 1: search / traverse (NOT citable; produce source keys)
-        let searches: Vec<(&str, &str, serde_json::Value)> = vec![
-            (
-                "web",
-                "search",
-                maos_mcp::drivers::researcher::web_search_args(query),
-            ),
-            (
-                "arxiv",
-                "search",
-                maos_mcp::drivers::researcher::arxiv_search_args(query),
-            ),
-            (
-                "github",
-                "search_code",
-                maos_mcp::drivers::researcher::github_search_code_args(query),
-            ),
-            (
-                "citation-graph",
-                "traverse",
-                maos_mcp::drivers::researcher::citation_graph_traverse_args(query),
-            ),
-        ];
-        let mut set = tokio::task::JoinSet::new();
-        for (server, tool, args) in searches {
-            let sem = Arc::clone(&self.sem);
-            let mcp_client = Arc::clone(&self.mcp_client);
-            let capability = Arc::clone(&self.capability);
-            let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
-            let posture_hash = self.posture_hash;
-            let enterprise_runtime = self.enterprise_runtime.clone();
-            let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
-            let (journal, spirit_id) = (Arc::clone(&self.journal), Arc::clone(&self.spirit_id));
-            set.spawn(async move {
-                let _permit = sem.acquire().await.map_err(|e| {
-                    researcher::ResearcherMcpError::CallFailed {
-                        server: server.into(),
-                        tool: tool.into(),
-                        cause: e.to_string(),
-                    }
-                })?;
-                let content = tokio::task::spawn_blocking(move || {
-                    let token = issue_governed_mcp_capability(
-                        capability.as_ref(),
-                        enterprise_runtime.as_deref(),
-                        enterprise_pdp_runtime.as_ref(),
-                        &journal,
-                        spirit_pid,
-                        &spirit_id,
-                        server,
-                        tool,
-                        posture_hash,
-                    )
-                    .map_err(|e| {
-                        researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
-                    })?;
-                    let response = mcp_client.call(&token, server, tool, args).map_err(|e| {
-                        researcher::ResearcherMcpError::CallFailed {
-                            server: server.into(),
-                            tool: tool.into(),
-                            cause: match e {
-                                McpError::CapabilityDenied { .. } => "unauthorized".into(),
-                                other => other.to_string(),
-                            },
-                        }
-                    })?;
-                    maos_mcp::drivers::researcher::extract_content(&response).map_err(|e| {
-                        researcher::ResearcherMcpError::CallFailed {
-                            server: server.into(),
-                            tool: tool.into(),
-                            cause: e.to_string(),
-                        }
-                    })
-                })
-                .await
-                .map_err(|e| researcher::ResearcherMcpError::CallFailed {
-                    server: server.into(),
-                    tool: tool.into(),
-                    cause: e.to_string(),
-                })??;
-                let keys = maos_mcp::drivers::researcher::parse_search_results(&content, server);
-                Ok::<_, researcher::ResearcherMcpError>(
-                    keys.into_iter()
-                        .map(|key| (server.to_string(), key))
-                        .collect::<Vec<_>>(),
-                )
-            });
-        }
-        let mut source_keys: Vec<(String, String)> = Vec::new();
-        while let Some(res) = set.join_next().await {
-            let keys = res.map_err(|e| researcher::ResearcherMcpError::CallFailed {
-                server: "unknown".into(),
-                tool: "unknown".into(),
-                cause: e.to_string(),
-            })??;
-            source_keys.extend(keys);
-        }
-        if source_keys.is_empty() {
-            return Err(researcher::ResearcherMcpError::NoResults);
-        }
-        // Phase 2: fetch (citable; produce ClaimPayload)
-        let mut set = tokio::task::JoinSet::new();
-        for (server, key) in source_keys {
-            let (fetch_server, fetch_tool, args) = match server.as_str() {
-                "web" => (
-                    "web",
-                    "fetch",
-                    maos_mcp::drivers::researcher::web_fetch_args(&key),
-                ),
-                "arxiv" => (
-                    "arxiv",
-                    "get_paper",
-                    maos_mcp::drivers::researcher::arxiv_get_paper_args(&key),
-                ),
-                "github" => (
-                    "github",
-                    "get_repo",
-                    maos_mcp::drivers::researcher::github_get_repo_args(&key),
-                ),
-                "citation-graph" => (
-                    "citation-graph",
-                    "get_citations",
-                    maos_mcp::drivers::researcher::citation_graph_get_citations_args(&key),
-                ),
-                _ => continue,
+    impl maos_mcp::McpClient for ResearcherLiveMcpClient {
+        fn call(
+            &self,
+            server_name: &str,
+            tool: &str,
+            args: serde_json::Value,
+        ) -> Result<maos_domain::ports::mcp::McpCallResponse, McpError> {
+            let client = match server_name {
+                "web" => &self.web,
+                "arxiv" => &self.arxiv,
+                "github" => &self.github,
+                "citation-graph" => &self.citation_graph,
+                _ => return Err(McpError::UnknownServer(server_name.into())),
             };
-            let sem = Arc::clone(&self.sem);
-            let mcp_client = Arc::clone(&self.mcp_client);
-            let capability = Arc::clone(&self.capability);
-            let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
-            let posture_hash = self.posture_hash;
-            let enterprise_runtime = self.enterprise_runtime.clone();
-            let enterprise_pdp_runtime = self.enterprise_pdp_runtime.clone();
-            let (journal, spirit_id) = (Arc::clone(&self.journal), Arc::clone(&self.spirit_id));
-            set.spawn(async move {
-                let _permit = sem.acquire().await.map_err(|e| {
-                    researcher::ResearcherMcpError::CallFailed {
-                        server: fetch_server.into(),
-                        tool: fetch_tool.into(),
-                        cause: e.to_string(),
-                    }
-                })?;
-                let claim = tokio::task::spawn_blocking(move || {
-                    let token = issue_governed_mcp_capability(
-                        capability.as_ref(),
-                        enterprise_runtime.as_deref(),
-                        enterprise_pdp_runtime.as_ref(),
-                        &journal,
-                        spirit_pid,
-                        &spirit_id,
-                        fetch_server,
-                        fetch_tool,
-                        posture_hash,
-                    )
-                    .map_err(|e| {
-                        researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
-                    })?;
-                    let response = mcp_client
-                        .call(&token, fetch_server, fetch_tool, args)
-                        .map_err(|e| researcher::ResearcherMcpError::CallFailed {
-                            server: fetch_server.into(),
-                            tool: fetch_tool.into(),
-                            cause: match e {
-                                McpError::CapabilityDenied { .. } => "unauthorized".into(),
-                                other => other.to_string(),
-                            },
-                        })?;
-                    let content = maos_mcp::drivers::researcher::extract_content(&response)
-                        .map_err(|e| researcher::ResearcherMcpError::CallFailed {
-                            server: fetch_server.into(),
-                            tool: fetch_tool.into(),
-                            cause: e.to_string(),
-                        })?;
-                    let claim_json = content.get("claim").ok_or_else(|| {
-                        researcher::ResearcherMcpError::Decode("missing 'claim' field".into())
-                    })?;
-                    let source_key = content
-                        .get("source_key")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            researcher::ResearcherMcpError::Decode(
-                                "missing 'source_key' field".into(),
-                            )
-                        })?;
-                    let claim: researcher::ClaimPayload =
-                        serde_json::from_value(claim_json.clone())
-                            .map_err(|e| researcher::ResearcherMcpError::Decode(e.to_string()))?;
-                    Ok::<_, researcher::ResearcherMcpError>(researcher::FetchedClaim {
-                        claim,
-                        source_key: source_key.to_string(),
-                    })
-                })
-                .await
-                .map_err(|e| researcher::ResearcherMcpError::CallFailed {
-                    server: fetch_server.into(),
-                    tool: fetch_tool.into(),
-                    cause: e.to_string(),
-                })??;
-                Ok::<_, researcher::ResearcherMcpError>(claim)
-            });
+            client
+                .as_ref()
+                .ok_or(McpError::Unconfigured)?
+                .call(server_name, tool, args)
         }
-        let mut claims = Vec::new();
-        while let Some(res) = set.join_next().await {
-            let claim = res.map_err(|e| researcher::ResearcherMcpError::CallFailed {
-                server: "unknown".into(),
-                tool: "unknown".into(),
-                cause: e.to_string(),
-            })??;
-            claims.push(claim);
-        }
-        Ok(claims)
     }
+
+    // Story 18-8 CR-5 — each server's client and bearer.
+    let client = |server, var: &str| {
+        live_mcp_client(io, secrets, server, std::env::var(var).unwrap_or_default())
+            .map_err(|e| format!("researcher --live MCP client ({var}) failed to build: {e}"))
+    };
+    let client = ResearcherLiveMcpClient {
+        web: client(McpServer::Web, "MAOS_MCP_WEB_URI")?,
+        arxiv: client(McpServer::Arxiv, "MAOS_MCP_ARXIV_URI")?,
+        github: client(McpServer::Github, "MAOS_MCP_GITHUB_URI")?,
+        citation_graph: client(McpServer::CitationGraph, "MAOS_MCP_CITATION_GRAPH_URI")?,
+    };
+    let wired = [
+        &client.web,
+        &client.arxiv,
+        &client.github,
+        &client.citation_graph,
+    ];
+    if wired.iter().all(|c| c.is_none()) {
+        return Ok(None);
+    }
+    let client: Arc<dyn maos_mcp::McpClient + Send + Sync> = Arc::new(client);
+    let (capability, security) = (Arc::downgrade(capability), Arc::downgrade(security));
+    let (tl, telemetry, log_recall) = (
+        Arc::clone(tl),
+        Arc::clone(telemetry),
+        Arc::clone(log_recall),
+    );
+    Ok(Some(Arc::new(
+        move |spirit_id: &str, pid_of: researcher::PidSource| {
+            let gone = || "researcher MCP: the host is shutting down".to_owned();
+            let capability = capability.upgrade().ok_or_else(gone)?;
+            let adapter = Arc::new(maos_kernel_core::api::McpClientAdapter::new(
+                Arc::clone(&client),
+                Arc::clone(&capability),
+                Arc::clone(&tl),
+                Arc::clone(&telemetry),
+            ));
+            // The kernel `McpClientAdapter` verifies against `[0u8; 32]`.
+            let mcp = maos_bin::researcher_root::LiveResearcherMcpPort::new(
+                pid_of,
+                [0; 32],
+                adapter,
+                Arc::clone(&capability),
+                enterprise.clone(),
+                pdp.clone(),
+                Arc::clone(&tl),
+                spirit_id,
+            );
+            let recall = maos_bin::recall_mediation::MediatedLogRecall::new(
+                Arc::clone(&log_recall),
+                capability,
+                security.upgrade().ok_or_else(gone)?,
+                Arc::clone(&tl),
+                enterprise.clone(),
+                pdp.clone(),
+                spirit_id.to_owned(),
+            );
+            let ports: maos_bin::researcher_root::McpPorts = (Arc::new(mcp), Arc::new(recall));
+            Ok(ports)
+        },
+    )))
 }
 
 /// Story 16-6 — `emit_vetter_key_event`, `deployment_operator_id`,
@@ -3416,6 +3270,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let factory_successor_slot = successor_manifest_slot.clone();
     let butler_seam: ButlerSeamSlot = Arc::default();
     let factory_butler_seam = Arc::clone(&butler_seam);
+    let researcher_wiring: ResearcherSlot = Arc::default();
+    let factory_researcher_wiring = Arc::clone(&researcher_wiring);
     let factory_distillate_writer = Arc::clone(&distillate_writer);
     // Story 16-3 (D-16-3-N) — the successor factory's butler arm must set the
     // new adapter's pid binding BEFORE it returns: the factory's signature is
@@ -3464,6 +3320,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     activity_sink: Arc::clone(&factory_activity_sink),
                     butler_seam: Arc::clone(&factory_butler_seam),
                     distillate_writer: Arc::clone(&factory_distillate_writer),
+                    researcher: Arc::clone(&factory_researcher_wiring),
                 },
                 &class.name,
                 factory_successor_slot.peek().as_deref(),
@@ -3628,6 +3485,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 activity_sink: hook_pump.activity_sink(),
                 butler_seam: Arc::clone(&butler_seam),
                 distillate_writer: Arc::clone(&distillate_writer),
+                researcher: Arc::clone(&researcher_wiring),
             }),
             hooks: Arc::clone(&hook_pump),
         });
@@ -4117,6 +3975,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )),
         rollover: !run_args.as_ref().is_some_and(|run| run.once),
     });
+    // Story 18-3 (review rulings D-18-3-R1/R2, BH-1) — what every Researcher
+    // of this root is built with: `--live` surveys MCP (a configured client
+    // that fails to build refuses the BOOT; none configured refuses each
+    // pass), and the legacy cassette arm replays on every construction path.
+    let live = run_args.as_ref().is_some_and(|run| run.live);
+    *researcher_wiring
+        .lock()
+        .unwrap_or_else(|error| error.into_inner()) =
+        Some(maos_bin::researcher_root::ResearcherWiring {
+            live,
+            mcp: match live {
+                true => researcher_mcp_builder(
+                    &io_arc,
+                    secret_store.as_ref(),
+                    &capability,
+                    &security,
+                    &transparency_log,
+                    &telemetry,
+                    &log_recall_adapter,
+                    enterprise_runtime.clone(),
+                    enterprise_pdp_runtime.clone(),
+                )
+                .map_err(|e| format!("maos run: FATAL boot — {e}"))?,
+                false => None,
+            },
+            legacy_cassette: match &inference_mode {
+                ResolvedInferenceMode::Replay {
+                    cassette,
+                    strict,
+                    explicit: false,
+                } => Some((cassette.clone(), *strict)),
+                _ => None,
+            },
+        });
     // Story 8.14a — kernel-rendered shell dispatch.
     if shell_mode {
         if let Some(mode) = inference_mode_value.as_deref() {
@@ -5736,7 +5628,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 spirit_id: spirit_id.clone(),
                             }),
                         );
-                        let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
                         let researcher_collective_ref = collective_port.as_ref().map(|_| {
                             Arc::new(LiveResearcherCollectivePort::new(
                                 Arc::clone(&memory),
@@ -5752,150 +5643,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             researcher_collective_failure =
                                 Some(researcher.collective_route_failure_flag());
                         }
-                        if run.live {
-                            // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
-                            use maos_domain::ports::LogRecallPort;
-                            use maos_mcp::client::McpClientImpl;
-
-                            struct ResearcherLiveMcpClient {
-                                web: Option<McpClientImpl>,
-                                arxiv: Option<McpClientImpl>,
-                                github: Option<McpClientImpl>,
-                                citation_graph: Option<McpClientImpl>,
-                            }
-
-                            impl maos_mcp::McpClient for ResearcherLiveMcpClient {
-                                fn call(
-                                    &self,
-                                    server_name: &str,
-                                    tool: &str,
-                                    args: serde_json::Value,
-                                ) -> Result<
-                                    maos_domain::ports::mcp::McpCallResponse,
-                                    maos_domain::ports::mcp::McpError,
-                                > {
-                                    match server_name {
-                                        "web" => self
-                                            .web
-                                            .as_ref()
-                                            .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                            .call(server_name, tool, args),
-                                        "arxiv" => self
-                                            .arxiv
-                                            .as_ref()
-                                            .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                            .call(server_name, tool, args),
-                                        "github" => self
-                                            .github
-                                            .as_ref()
-                                            .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                            .call(server_name, tool, args),
-                                        "citation-graph" => self
-                                            .citation_graph
-                                            .as_ref()
-                                            .ok_or(maos_domain::ports::mcp::McpError::Unconfigured)?
-                                            .call(server_name, tool, args),
-                                        _ => Err(maos_domain::ports::mcp::McpError::UnknownServer(
-                                            server_name.into(),
-                                        )),
-                                    }
-                                }
-                            }
-
-                            let mcp_io = Arc::clone(&io_arc);
-
-                            // Story 18-8 CR-5 — each server's client and bearer.
-                            use maos_domain::ports::McpServer;
-                            let make_client = |server: McpServer, uri: String| {
-                                live_mcp_client(&mcp_io, secret_store.as_ref(), server, uri)
-                            };
-
-                            let web_uri = std::env::var("MAOS_MCP_WEB_URI").unwrap_or_default();
-                            let arxiv_uri = std::env::var("MAOS_MCP_ARXIV_URI").unwrap_or_default();
-                            let github_uri =
-                                std::env::var("MAOS_MCP_GITHUB_URI").unwrap_or_default();
-                            let citation_graph_uri =
-                                std::env::var("MAOS_MCP_CITATION_GRAPH_URI").unwrap_or_default();
-
-                            let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
-                        let web = make_client(McpServer::Web, web_uri)?;
-                        let arxiv = make_client(McpServer::Arxiv, arxiv_uri)?;
-                        let github = make_client(McpServer::Github, github_uri)?;
-                        let citation_graph = make_client(McpServer::CitationGraph, citation_graph_uri)?;
-
-                        if web.is_some() || arxiv.is_some() || github.is_some() || citation_graph.is_some() {
-                            let client = Arc::new(ResearcherLiveMcpClient {
-                                web,
-                                arxiv,
-                                github,
-                                citation_graph,
-                            }) as Arc<dyn maos_mcp::McpClient + Send + Sync>;
-                            Ok(Some(Arc::new(maos_kernel_core::api::McpClientAdapter::new(
-                                client,
-                                Arc::clone(&capability),
-                                Arc::clone(&transparency_log),
-                                Arc::clone(&telemetry),
-                            )) as Arc<dyn maos_domain::ports::mcp::McpClientPort>))
-                        } else {
-                            Ok(None)
-                        }
-                    })() {
-                        Ok(adapter_opt) => adapter_opt,
-                        Err(e) => {
-                            eprintln!(
-                                "maos run: warning — failed to construct MCP client for --live: {e}. \
-                                 Researcher will survey its seed claims."
-                            );
-                            None
-                        }
-                    };
-
-                            if let Some(adapter) = mcp_adapter {
-                                // Hardcode [0u8;32] to match the kernel McpClientAdapter
-                                // check_capability verification (which also uses [0u8;32]).
-                                let posture_hash = [0u8; 32];
-                                let live_mcp = Arc::new(LiveResearcherMcpPort::new(
-                                    0,
-                                    posture_hash,
-                                    adapter,
-                                    Arc::clone(&capability),
-                                    enterprise_runtime.clone(),
-                                    enterprise_pdp_runtime.clone(),
-                                    Arc::clone(&transparency_log),
-                                    &spirit_id,
-                                ));
-                                researcher = researcher
-                                    .with_mcp_port(Arc::clone(&live_mcp)
-                                        as Arc<dyn researcher::ResearcherMcpPort>)
-                                    .with_log_recall_port(
-                                        Arc::new(
-                                            maos_bin::recall_mediation::MediatedLogRecall::new(
-                                                Arc::clone(&log_recall_adapter),
-                                                Arc::clone(&capability),
-                                                Arc::clone(&security),
-                                                Arc::clone(&transparency_log),
-                                                enterprise_runtime.clone(),
-                                                enterprise_pdp_runtime.clone(),
-                                                spirit_id.clone(),
-                                            ),
-                                        )
-                                            as Arc<dyn LogRecallPort>,
-                                        Arc::clone(&researcher_pid_binding),
-                                    );
-                                researcher_mcp_ref = Some(live_mcp);
-                                eprintln!("maos run: researcher live MCP port wired (--live)");
-                            }
-                        }
-                        // Story 18-3 (CR-1; D-18-3-02 B, 03 A) — `--live` and every
-                        // explicit mode bind the Butler seam's port to the first
-                        // declared provider the router registers (none → boot
-                        // refusal), minting per pass; the legacy cassette arm binds
-                        // its replay port to the first declared provider.
+                        // Story 18-3 (CR-1; D-18-3-02 B, 03 A, 04 A; review
+                        // rulings D-18-3-R1/R2, BH-1) — the ONE Researcher
+                        // construction the door `load` and the successor take too.
                         let seam = butler_seam
                             .lock()
                             .unwrap_or_else(|error| error.into_inner())
                             .clone()
                             .ok_or("maos run: butler seam not ready")?;
+                        let wiring = researcher_wiring
+                            .lock()
+                            .unwrap_or_else(|error| error.into_inner())
+                            .clone()
+                            .unwrap_or_default();
                         let pid_of: researcher::PidSource = {
                             let binding = Arc::clone(&researcher_pid_binding);
                             Arc::new(move || {
@@ -5906,52 +5666,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let host = maos_bin::researcher_root::ResearcherHost::new(
                             Arc::clone(&transparency_log),
                             Arc::clone(&distillate_writer) as _,
+                            wiring.live,
                         );
-                        researcher = match (&seam.inference, &inference_mode) {
-                            (
-                                None,
-                                ResolvedInferenceMode::Replay {
-                                    cassette,
-                                    strict,
-                                    explicit: false,
-                                },
-                            ) => {
-                                // Exact pre-ADR-064 compatibility path: cassette
-                                // presence alone bypasses the shared router only for
-                                // Researcher (17-11: `CassetteReplayPort` contacts no
-                                // provider, so naming the first declared one is not a
-                                // reroute and a keyless box still replays).
-                                let replay = cassette_replay::CassetteReplayPort::from_file(
-                                    cassette, *strict,
-                                )
-                                .map_err(|e| {
-                                    format!("maos run: cassette replay init failed: {e}")
-                                })?;
-                                let provider = first_declared_provider(&gated).ok_or(
-                                    "maos run: cassette replay: the Spirit declares no provider",
-                                )?;
-                                eprintln!(
-                                    "maos run: researcher cassette-replay inference wired ({})",
-                                    cassette.display()
-                                );
-                                maos_bin::researcher_root::bind(
-                                    researcher,
-                                    Arc::new(replay),
-                                    provider,
-                                    &seam,
-                                    pid_of,
-                                    &host,
-                                )
-                            }
-                            _ => maos_bin::researcher_root::attach(
-                                researcher,
-                                &seam,
-                                &declared_providers(&gated),
-                                pid_of,
-                                &host,
-                            )
-                            .map_err(|e| format!("maos run: {e}"))?,
-                        };
+                        researcher = maos_bin::researcher_root::construct(
+                            researcher,
+                            &wiring,
+                            &seam,
+                            &declared_providers(&gated),
+                            &spirit_id,
+                            pid_of,
+                            &host,
+                        )
+                        .map_err(|e| format!("maos run: {e}"))?;
                         if !researcher.is_live() {
                             eprintln!(
                                 "maos run: researcher deterministic survey (no --live; zero network)"
@@ -5962,12 +5688,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let binding = Arc::clone(&researcher_pid_binding);
                             pid_fixups.push(Box::new(move |pid| {
                                 binding.store(pid, std::sync::atomic::Ordering::SeqCst);
-                            }));
-                        }
-                        if let Some(mcp) = researcher_mcp_ref {
-                            pid_fixups.push(Box::new(move |pid| {
-                                mcp.spirit_pid
-                                    .store(pid, std::sync::atomic::Ordering::SeqCst);
                             }));
                         }
                         if let Some(port) = researcher_collective_ref {
@@ -14407,8 +14127,8 @@ mod tests {
         let _reserved = quota.charge(179).unwrap();
         let client = Arc::new(CountingMcpClient::default());
         runtime.block_on(async {
-            let port = LiveResearcherMcpPort::new(
-                179,
+            let port = maos_bin::researcher_root::LiveResearcherMcpPort::new(
+                Arc::new(|| Some(179)),
                 [0; 32],
                 client.clone(),
                 cap,
@@ -14445,8 +14165,8 @@ mod tests {
         let (cap, quota, log) = live_mcp_fixture(4);
         let retained = quota.clone();
         let client = Arc::new(CountingMcpClient::default());
-        let port = LiveResearcherMcpPort::new(
-            179,
+        let port = maos_bin::researcher_root::LiveResearcherMcpPort::new(
+            Arc::new(|| Some(179)),
             [0; 32],
             client.clone(),
             cap,
