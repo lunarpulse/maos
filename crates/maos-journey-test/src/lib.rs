@@ -188,11 +188,87 @@ impl TestClock {
     }
 }
 
-/// A captured request from a [`MockMcp`] server.
+/// A captured request from a [`MockMcp`] or [`ConformantMcp`] server.
+/// Header names are lowercased (Story 18-8 CR-4).
+#[derive(Debug, Clone)]
 pub struct McpRequestCapture {
     pub method: String,
     pub path: String,
+    pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+}
+
+impl McpRequestCapture {
+    /// The value of header `name` (case-insensitive), if sent.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        let name = name.to_ascii_lowercase();
+        self.headers
+            .iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| value.as_str())
+    }
+
+    /// The JSON-RPC body, or `Null` when it is not JSON.
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::from_slice(&self.body).unwrap_or(serde_json::Value::Null)
+    }
+}
+
+/// Read one HTTP/1.1 request: request line, headers, `Content-Length` body.
+fn read_http_request(stream: &mut std::net::TcpStream) -> Option<McpRequestCapture> {
+    let mut bytes = Vec::new();
+    let mut buf = [0u8; 4096];
+    let header_end = loop {
+        if let Some(pos) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
+            break pos + 4;
+        }
+        let n = stream.read(&mut buf).ok().filter(|n| *n > 0)?;
+        bytes.extend_from_slice(&buf[..n]);
+    };
+    let head = String::from_utf8_lossy(&bytes[..header_end]).into_owned();
+    let mut lines = head.lines();
+    let mut request_line = lines.next()?.split_whitespace();
+    let method = request_line.next().unwrap_or("").to_string();
+    let path = request_line.next().unwrap_or("").to_string();
+    let headers: Vec<(String, String)> = lines
+        .filter_map(|line| line.split_once(':'))
+        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_string()))
+        .collect();
+    let length: usize = headers
+        .iter()
+        .find(|(name, _)| name == "content-length")
+        .and_then(|(_, value)| value.parse().ok())
+        .unwrap_or(0);
+    while bytes.len() < header_end + length {
+        let n = stream.read(&mut buf).ok().filter(|n| *n > 0)?;
+        bytes.extend_from_slice(&buf[..n]);
+    }
+    let body = bytes[header_end..header_end + length].to_vec();
+    Some(McpRequestCapture {
+        method,
+        path,
+        headers,
+        body,
+    })
+}
+
+/// Accept one connection, polling `shutdown`; `None` once it is set.
+fn accept_until(listener: &TcpListener, shutdown: &AtomicBool) -> Option<std::net::TcpStream> {
+    loop {
+        if shutdown.load(Ordering::Relaxed) {
+            return None;
+        }
+        match listener.accept() {
+            Ok((stream, _)) => {
+                stream.set_nonblocking(false).ok()?;
+                return Some(stream);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            Err(_) => return None,
+        }
+    }
 }
 
 /// A mock MCP endpoint seeded from fixture JSON responses.
@@ -248,78 +324,20 @@ impl MockMcp {
 
         let handle = std::thread::spawn(move || {
             for resp_body in responses {
-                if shutdown_clone.load(Ordering::Relaxed) {
-                    break;
-                }
-                // Poll accept with a busy-wait; the shutdown flag breaks the loop.
-                let (mut stream, _) = loop {
-                    if shutdown_clone.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    match listener.accept() {
-                        Ok(s) => break s,
-                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                            std::thread::sleep(Duration::from_millis(10));
-                            continue;
-                        }
-                        Err(_) => return,
-                    }
+                // Poll accept; the shutdown flag breaks the loop.
+                let Some(mut stream) = accept_until(&listener, &shutdown_clone) else {
+                    return;
                 };
-                let mut bytes = Vec::new();
-                let mut buf = [0u8; 4096];
-                loop {
-                    let n = match stream.read(&mut buf) {
-                        Ok(n) => n,
-                        Err(_) => break,
-                    };
-                    if n == 0 {
-                        break;
-                    }
-                    bytes.extend_from_slice(&buf[..n]);
-                    if bytes.windows(4).position(|w| w == b"\r\n\r\n").is_some() {
-                        break;
-                    }
-                }
-                if bytes.is_empty() {
+                let Some(capture) = read_http_request(&mut stream) else {
                     break;
-                }
-                let headers = String::from_utf8_lossy(&bytes);
-                let first_line = headers.lines().next().unwrap_or("");
-                let mut parts = first_line.split_whitespace();
-                let method = parts.next().unwrap_or("").to_string();
-                let path = parts.next().unwrap_or("").to_string();
-                let mut content_length = 0usize;
-                for line in headers.lines() {
-                    if let Some((name, value)) = line.split_once(':') {
-                        if name.eq_ignore_ascii_case("content-length") {
-                            content_length = value.trim().parse().unwrap_or(0);
-                        }
-                    }
-                }
-                let header_len = headers.find("\r\n\r\n").unwrap_or(headers.len()) + 4;
-                while bytes.len() - header_len < content_length {
-                    let n = match stream.read(&mut buf) {
-                        Ok(n) => n,
-                        Err(_) => break,
-                    };
-                    if n == 0 {
-                        break;
-                    }
-                    bytes.extend_from_slice(&buf[..n]);
-                }
-                let body = if bytes.len() >= header_len + content_length {
-                    bytes[header_len..header_len + content_length].to_vec()
-                } else {
-                    vec![]
                 };
-
                 let http_response = format!(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
                     resp_body.len(),
                     resp_body
                 );
                 let _ = std::io::Write::write_all(&mut stream, http_response.as_bytes());
-                let _ = tx.send(McpRequestCapture { method, path, body });
+                let _ = tx.send(capture);
             }
         });
         Self {
@@ -349,6 +367,327 @@ impl Drop for MockMcp {
     fn drop(&mut self) {
         self.shutdown.store(true, Ordering::Relaxed);
         if let Some(handle) = self._server_handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+/// The MCP protocol era a [`ConformantMcp`] speaks (Story 18-8 CR-4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum McpEra {
+    /// 2026-07-28: no handshake, no session; versioned headers + `_meta`.
+    Modern,
+    /// 2025-11-25: `initialize` first, then the issued `Mcp-Session-Id`.
+    Legacy,
+    /// Serves both: a request with a session (or the handshake) is legacy.
+    DualEra,
+}
+
+/// The legacy version a [`ConformantMcp`] negotiates.
+pub const CONFORMANT_LEGACY_VERSION: &str = "2025-11-25";
+
+struct ConformantState {
+    era: McpEra,
+    bearer: Option<String>,
+    modern_version: String,
+    supported: Option<Vec<String>>,
+    required_capability: bool,
+    error_padding: usize,
+    issue_sessions: bool,
+    sse: bool,
+    forced: Option<(&'static str, String)>,
+    sessions: Vec<String>,
+    issued: usize,
+    sessions_expire: bool,
+    requests: Vec<McpRequestCapture>,
+}
+
+/// One answer: status line, extra headers, body.
+type Answer = (&'static str, Vec<(&'static str, String)>, String);
+
+impl ConformantState {
+    fn answer(&mut self, request: &McpRequestCapture) -> Answer {
+        let body = request.json();
+        let id = body.get("id").cloned().unwrap_or(serde_json::Value::Null);
+        let padding = "x".repeat(self.error_padding);
+        let error = |status, code: i64, message: &str, mut data: serde_json::Value| -> Answer {
+            if !padding.is_empty() {
+                data["padding"] = padding.clone().into();
+            }
+            let rpc = serde_json::json!({"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message, "data": data}});
+            (status, Vec::new(), rpc.to_string())
+        };
+        let none = serde_json::Value::Null;
+        if let Some(bearer) = &self.bearer {
+            if request.header("authorization") != Some(format!("Bearer {bearer}").as_str()) {
+                let (status, _, body) = error(
+                    "401 Unauthorized",
+                    -32001,
+                    "missing or invalid bearer",
+                    none,
+                );
+                return (status, vec![("WWW-Authenticate", "Bearer".into())], body);
+            }
+        }
+        if let Some((status, body)) = &self.forced {
+            return (*status, Vec::new(), body.clone());
+        }
+        let method = body["method"].as_str().unwrap_or_default();
+        let legacy_shaped = request.header("mcp-session-id").is_some()
+            || matches!(method, "initialize" | "notifications/initialized");
+        let modern = match self.era {
+            McpEra::Modern => true,
+            McpEra::Legacy => false,
+            McpEra::DualEra => !legacy_shaped,
+        };
+        if modern {
+            let version = request.header("mcp-protocol-version");
+            if version.is_none()
+                || version
+                    != body["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"].as_str()
+            {
+                return error(
+                    "400 Bad Request",
+                    -32020,
+                    "HeaderMismatch: MCP-Protocol-Version",
+                    none,
+                );
+            }
+            if version != Some(self.modern_version.as_str()) {
+                // The spec's MUST: the server lists what it supports.
+                let supported =
+                    (self.supported.clone()).unwrap_or_else(|| vec![self.modern_version.clone()]);
+                let data = serde_json::json!({"supported": supported, "requested": version});
+                return error(
+                    "400 Bad Request",
+                    -32022,
+                    "UnsupportedProtocolVersion",
+                    data,
+                );
+            }
+            if request.header("mcp-method") != Some(method)
+                || request.header("mcp-name") != body["params"]["name"].as_str()
+            {
+                return error(
+                    "400 Bad Request",
+                    -32020,
+                    "HeaderMismatch: Mcp-Method/Mcp-Name",
+                    none,
+                );
+            }
+            if self.required_capability {
+                let data = serde_json::json!({"requiredCapabilities": {"elicitation": {}}});
+                return error(
+                    "400 Bad Request",
+                    -32021,
+                    "MissingRequiredClientCapability",
+                    data,
+                );
+            }
+        } else if method == "initialize" {
+            self.issued += 1;
+            let session = format!("legacy-session-{}", self.issued);
+            self.sessions.push(session.clone());
+            let result = serde_json::json!({"jsonrpc": "2.0", "id": id, "result": {
+                "protocolVersion": CONFORMANT_LEGACY_VERSION,
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "conformant-mcp", "version": "18.8"},
+            }});
+            let issued = vec![("Mcp-Session-Id", session)];
+            let headers = if self.issue_sessions {
+                issued
+            } else {
+                Vec::new()
+            };
+            return ("200 OK", headers, result.to_string());
+        } else {
+            let session = request.header("mcp-session-id");
+            if self.issue_sessions && session.is_none() {
+                return error(
+                    "400 Bad Request",
+                    -32600,
+                    "Bad Request: no session, initialize first",
+                    none,
+                );
+            }
+            let unknown = session.is_some_and(|s| !self.sessions.iter().any(|known| known == s));
+            if unknown || (self.sessions_expire && method == "tools/call") {
+                return error("404 Not Found", -32600, "Session not found", none);
+            }
+            if request.header("mcp-protocol-version") != Some(CONFORMANT_LEGACY_VERSION) {
+                return error(
+                    "400 Bad Request",
+                    -32600,
+                    "Bad Request: MCP-Protocol-Version",
+                    none,
+                );
+            }
+            if method == "notifications/initialized" {
+                return ("202 Accepted", Vec::new(), String::new());
+            }
+        }
+        let tool = body["params"]["name"].as_str().unwrap_or_default();
+        let result = serde_json::json!({"jsonrpc": "2.0", "id": id, "result": {
+            "name": tool, "content": [{"type": "text", "text": "ok"}], "isError": false,
+        }});
+        ("200 OK", Vec::new(), result.to_string())
+    }
+}
+
+/// Frame one JSON-RPC response as a `text/event-stream` (review TIA-7c): a
+/// priming event with an empty `data`, a progress notification, a
+/// server-to-client request reusing the id, then the response split across
+/// several `data:` lines.
+fn sse_frame(response: &str) -> String {
+    let value: serde_json::Value = serde_json::from_str(response).expect("a JSON response");
+    let pretty = serde_json::to_string_pretty(&value).expect("re-encode");
+    let data: String = pretty
+        .lines()
+        .map(|line| format!("data: {line}\n"))
+        .collect();
+    let progress = r#"{"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":1,"progress":1}}"#;
+    let ping = serde_json::json!({"jsonrpc": "2.0", "id": value["id"], "method": "ping"});
+    format!("id: prime-1\ndata:\n\nevent: message\ndata: {progress}\n\ndata: {ping}\n\nevent: message\n{data}\n")
+}
+
+/// A strict MCP Streamable-HTTP server (Story 18-8 CR-4): it enforces the
+/// era's headers, handshake, session and bearer, answering 400/401/404 with
+/// JSON-RPC error bodies. Existing [`MockMcp`] users keep the permissive mock.
+pub struct ConformantMcp {
+    url: String,
+    state: Arc<Mutex<ConformantState>>,
+    shutdown: Arc<AtomicBool>,
+    server_handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl ConformantMcp {
+    /// Serve `era`; with `bearer`, every request must carry
+    /// `Authorization: Bearer <bearer>` or is answered 401.
+    pub fn start(era: McpEra, bearer: Option<&str>) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("ConformantMcp: bind");
+        let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+        listener
+            .set_nonblocking(true)
+            .expect("ConformantMcp: set_nonblocking");
+        let state = Arc::new(Mutex::new(ConformantState {
+            era,
+            bearer: bearer.map(str::to_owned),
+            modern_version: "2026-07-28".to_string(),
+            supported: None,
+            required_capability: false,
+            error_padding: 0,
+            issue_sessions: true,
+            sse: false,
+            forced: None,
+            sessions: Vec::new(),
+            issued: 0,
+            sessions_expire: false,
+            requests: Vec::new(),
+        }));
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let (server_state, server_shutdown) = (Arc::clone(&state), Arc::clone(&shutdown));
+        let server_handle = std::thread::spawn(move || {
+            while let Some(mut stream) = accept_until(&listener, &server_shutdown) {
+                let Some(request) = read_http_request(&mut stream) else {
+                    continue;
+                };
+                let mut state = server_state.lock().unwrap();
+                let (status, headers, body) = state.answer(&request);
+                let sse = state.sse && status.starts_with("200");
+                state.requests.push(request);
+                drop(state);
+                let (content_type, body) = match sse {
+                    true => ("text/event-stream", sse_frame(&body)),
+                    false => ("application/json", body),
+                };
+                let extra: String = headers
+                    .iter()
+                    .map(|(k, v)| format!("{k}: {v}\r\n"))
+                    .collect();
+                let response = format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nConnection: close\r\nContent-Length: {}\r\n{extra}\r\n{body}",
+                    body.len()
+                );
+                let _ = std::io::Write::write_all(&mut stream, response.as_bytes());
+            }
+        });
+        Self {
+            url,
+            state,
+            shutdown,
+            server_handle: Some(server_handle),
+        }
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Every request served so far, in arrival order.
+    pub fn requests(&self) -> Vec<McpRequestCapture> {
+        self.state.lock().unwrap().requests.clone()
+    }
+
+    /// Switch the era (an upgraded or downgraded server).
+    pub fn set_era(&self, era: McpEra) {
+        self.state.lock().unwrap().era = era;
+    }
+
+    /// The only modern version accepted (default `2026-07-28`).
+    pub fn set_modern_version(&self, version: &str) {
+        self.state.lock().unwrap().modern_version = version.to_string();
+    }
+
+    /// The `data.supported` list of an `UnsupportedProtocolVersion` answer
+    /// (default: the one modern version accepted).
+    pub fn set_supported(&self, versions: &[&str]) {
+        let versions = versions.iter().map(|v| v.to_string()).collect();
+        self.state.lock().unwrap().supported = Some(versions);
+    }
+
+    /// When set, a modern request is answered 400
+    /// `MissingRequiredClientCapability` (−32021).
+    pub fn set_required_capability(&self, required: bool) {
+        self.state.lock().unwrap().required_capability = required;
+    }
+
+    /// Pad every JSON-RPC error body's `data` with `bytes` of filler.
+    pub fn set_error_padding(&self, bytes: usize) {
+        self.state.lock().unwrap().error_padding = bytes;
+    }
+
+    /// When unset, a legacy `initialize` issues no `Mcp-Session-Id` (the
+    /// spec's MAY) and sessionless legacy requests are served.
+    pub fn set_issue_sessions(&self, issue: bool) {
+        self.state.lock().unwrap().issue_sessions = issue;
+    }
+
+    /// When set, every `200` answer is framed as `text/event-stream`.
+    pub fn set_sse(&self, sse: bool) {
+        self.state.lock().unwrap().sse = sse;
+    }
+
+    /// Answer every authorized request with `status` and `body` verbatim.
+    pub fn set_forced(&self, answer: Option<(&'static str, String)>) {
+        self.state.lock().unwrap().forced = answer;
+    }
+
+    /// Forget every issued session: the next session request is 404.
+    pub fn forget_sessions(&self) {
+        self.state.lock().unwrap().sessions.clear();
+    }
+
+    /// When set, every session-carrying `tools/call` is 404 (the session
+    /// expired); the handshake itself still succeeds.
+    pub fn set_sessions_expire(&self, expire: bool) {
+        self.state.lock().unwrap().sessions_expire = expire;
+    }
+}
+
+impl Drop for ConformantMcp {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.server_handle.take() {
             let _ = handle.join();
         }
     }

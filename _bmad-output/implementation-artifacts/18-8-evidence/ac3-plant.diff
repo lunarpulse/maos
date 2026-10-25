@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/stdio.rs
++++ b/crates/maos-mcp/src/transport/stdio.rs
+@@ -101,7 +101,7 @@
+     };
+     stdin
+         .write_all(frame)
+-        .map_err(|e| McpTransportError::Transport(format!("write: {e}")))?;
++        .unwrap(); // PLANT AC3: unwrap the write
+     drop(stdin);
+     match BufReader::new(stdout).lines().next() {
+         Some(line) => line.map_err(|e| McpTransportError::Transport(format!("read: {e}"))),

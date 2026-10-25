@@ -1053,7 +1053,17 @@ impl LiveButlerMcpPort {
                 other => butler::ButlerMcpError::CallFailed {
                     server: server.into(),
                     tool: tool.into(),
-                    cause: other,
+                    // Story 18-8 AC5 — the kernel adapter flattens the live
+                    // client's `Unconfigured` to its text; restore the variant.
+                    cause: match other {
+                        maos_domain::ports::mcp::McpError::Transport(text)
+                            if text
+                                == maos_domain::ports::mcp::McpError::Unconfigured.to_string() =>
+                        {
+                            maos_domain::ports::mcp::McpError::Unconfigured
+                        }
+                        other => other,
+                    },
                 },
             })?;
         maos_mcp::drivers::butler::extract_content(&response).map_err(|e| {
@@ -1064,6 +1074,63 @@ impl LiveButlerMcpPort {
             }
         })
     }
+}
+
+/// Story 18-8 CR-5 — one `--live` MCP server's client, for Butler and the
+/// Researcher. The JSON-RPC server name and the bearer key both derive from
+/// `server` (review TIA-4: no server is wired under another's name or
+/// bearer). Review ruling D-18-8-R1: a bearer lookup error leaves only THIS
+/// server unconfigured, warned with the error kind — never the value.
+#[cfg(feature = "network")]
+fn live_mcp_client(
+    io: &Arc<dyn maos_domain::ports::IoSubsystemPort>,
+    secrets: &dyn maos_domain::ports::SecretStore,
+    server: maos_domain::ports::McpServer,
+    uri: String,
+) -> Result<Option<maos_mcp::McpClientImpl>, maos_domain::ports::mcp::McpError> {
+    use maos_domain::ports::{mcp::McpTransportId, SecretKey, SecretStoreError};
+    let key = SecretKey::McpBearer(server);
+    let name = key
+        .as_str()
+        .trim_start_matches("mcp-")
+        .trim_end_matches("-bearer");
+    if uri.is_empty() {
+        return Ok(None);
+    }
+    let bearer = match secrets.get(key) {
+        Ok(bearer) => bearer,
+        Err(error) => {
+            let kind = match error {
+                SecretStoreError::Unavailable(_) => "unavailable",
+                SecretStoreError::Access(_) => "access failed",
+                SecretStoreError::InvalidEncoding => "invalid encoding",
+            };
+            eprintln!(
+                "maos run: warning — the {name} MCP bearer lookup failed (secret store: {kind}); \
+                 {name} is unconfigured for this run"
+            );
+            return Ok(None);
+        }
+    };
+    let transport = maos_mcp::transport::streamable_http::StreamableHttpTransport::new(
+        Arc::clone(io),
+        uri,
+        bearer,
+    );
+    let entry = maos_mcp::McpServerEntry {
+        name: name.into(),
+        transport: McpTransportId::StreamableHttp,
+        fallback_transport: None,
+    };
+    maos_mcp::McpClientImpl::new(
+        std::collections::BTreeMap::from([(
+            McpTransportId::StreamableHttp,
+            Arc::new(transport) as Arc<dyn maos_mcp::McpTransport>,
+        )]),
+        McpTransportId::StreamableHttp,
+        std::collections::BTreeMap::from([(name.to_owned(), entry)]),
+    )
+    .map(Some)
 }
 #[cfg(feature = "network")]
 /// Story 8.14c — Live MCP port for Researcher. Wraps the kernel's
@@ -3074,6 +3141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let transport: Arc<dyn McpTransport> = Arc::new(StreamableHttpTransport::new(
                 Arc::clone(&io_arc),
                 registry_cfg.uri.clone(),
+                None, // Story 18-8 CR-5: the registry is not one of the eight bearer servers.
             ));
             let mut transports: BTreeMap<McpTransportId, Arc<dyn McpTransport>> = BTreeMap::new();
             transports.insert(McpTransportId::StreamableHttp, transport);
@@ -3457,7 +3525,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::env::var(key.environment_variable())
                         .ok()
                         .filter(|value| !value.trim().is_empty())
-                        .map(|value| (key, value))
+                        // Story 18-8 review BH-1: a pasted `\r\n` never rides a header.
+                        .map(|value| (key, value.trim().to_owned()))
                 }),
         ));
     // Story 16-4 (D2/D3) — the OS keyring stack is compiled out of non-unix
@@ -5297,11 +5366,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // Story 8.14b FORK 1 — wire LiveButlerMcpPort when --live.
                         let mut butler_mcp_ref: Option<Arc<LiveButlerMcpPort>> = None;
                         if run.live {
-                            use maos_domain::ports::mcp::McpTransportId;
-                            use maos_mcp::client::{McpClientImpl, McpServerEntry};
-                            use maos_mcp::transport::streamable_http::StreamableHttpTransport;
-                            use maos_mcp::transport::McpTransport;
-                            use std::collections::BTreeMap;
+                            use maos_mcp::client::McpClientImpl;
 
                             struct ButlerLiveMcpClient {
                                 calendar: Option<McpClientImpl>,
@@ -5350,36 +5415,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             let mcp_io = Arc::clone(&io_arc);
 
-                            let make_client = |server_name: &str,
-                                               uri: String|
-                             -> Result<
-                                Option<McpClientImpl>,
-                                maos_domain::ports::mcp::McpError,
-                            > {
-                                if uri.is_empty() {
-                                    return Ok(None);
-                                }
-                                let mut transports = BTreeMap::new();
-                                transports.insert(
-                                    McpTransportId::StreamableHttp,
-                                    Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
-                                        as Arc<dyn McpTransport>,
-                                );
-                                let mut servers = BTreeMap::new();
-                                servers.insert(
-                                    server_name.into(),
-                                    McpServerEntry {
-                                        name: server_name.into(),
-                                        transport: McpTransportId::StreamableHttp,
-                                        fallback_transport: None,
-                                    },
-                                );
-                                let client = McpClientImpl::new(
-                                    transports,
-                                    McpTransportId::StreamableHttp,
-                                    servers,
-                                )?;
-                                Ok(Some(client))
+                            // Story 18-8 CR-5 — each server's client and bearer.
+                            use maos_domain::ports::McpServer;
+                            let make_client = |server: McpServer, uri: String| {
+                                live_mcp_client(&mcp_io, secret_store.as_ref(), server, uri)
                             };
 
                             let calendar_uri =
@@ -5390,10 +5429,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let figma_uri = std::env::var("MAOS_MCP_FIGMA_URI").unwrap_or_default();
 
                             let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
-                        let calendar = make_client("calendar", calendar_uri)?;
-                        let slack = make_client("slack", slack_uri)?;
-                        let linear = make_client("linear", linear_uri)?;
-                        let figma = make_client("figma", figma_uri)?;
+                        let calendar = make_client(McpServer::Calendar, calendar_uri)?;
+                        let slack = make_client(McpServer::Slack, slack_uri)?;
+                        let linear = make_client(McpServer::Linear, linear_uri)?;
+                        let figma = make_client(McpServer::Figma, figma_uri)?;
 
                         if calendar.is_some() || slack.is_some() || linear.is_some() || figma.is_some() {
                             let client = Arc::new(ButlerLiveMcpClient {
@@ -5496,12 +5535,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         if run.live {
                             // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
-                            use maos_domain::ports::mcp::McpTransportId;
                             use maos_domain::ports::LogRecallPort;
-                            use maos_mcp::client::{McpClientImpl, McpServerEntry};
-                            use maos_mcp::transport::streamable_http::StreamableHttpTransport;
-                            use maos_mcp::transport::McpTransport;
-                            use std::collections::BTreeMap;
+                            use maos_mcp::client::McpClientImpl;
 
                             struct ResearcherLiveMcpClient {
                                 web: Option<McpClientImpl>,
@@ -5550,36 +5585,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             let mcp_io = Arc::clone(&io_arc);
 
-                            let make_client = |server_name: &str,
-                                               uri: String|
-                             -> Result<
-                                Option<McpClientImpl>,
-                                maos_domain::ports::mcp::McpError,
-                            > {
-                                if uri.is_empty() {
-                                    return Ok(None);
-                                }
-                                let mut transports = BTreeMap::new();
-                                transports.insert(
-                                    McpTransportId::StreamableHttp,
-                                    Arc::new(StreamableHttpTransport::new(mcp_io.clone(), uri))
-                                        as Arc<dyn McpTransport>,
-                                );
-                                let mut servers = BTreeMap::new();
-                                servers.insert(
-                                    server_name.into(),
-                                    McpServerEntry {
-                                        name: server_name.into(),
-                                        transport: McpTransportId::StreamableHttp,
-                                        fallback_transport: None,
-                                    },
-                                );
-                                let client = McpClientImpl::new(
-                                    transports,
-                                    McpTransportId::StreamableHttp,
-                                    servers,
-                                )?;
-                                Ok(Some(client))
+                            // Story 18-8 CR-5 — each server's client and bearer.
+                            use maos_domain::ports::McpServer;
+                            let make_client = |server: McpServer, uri: String| {
+                                live_mcp_client(&mcp_io, secret_store.as_ref(), server, uri)
                             };
 
                             let web_uri = std::env::var("MAOS_MCP_WEB_URI").unwrap_or_default();
@@ -5590,10 +5599,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 std::env::var("MAOS_MCP_CITATION_GRAPH_URI").unwrap_or_default();
 
                             let mcp_adapter = match (|| -> Result<Option<Arc<dyn maos_domain::ports::mcp::McpClientPort>>, maos_domain::ports::mcp::McpError> {
-                        let web = make_client("web", web_uri)?;
-                        let arxiv = make_client("arxiv", arxiv_uri)?;
-                        let github = make_client("github", github_uri)?;
-                        let citation_graph = make_client("citation-graph", citation_graph_uri)?;
+                        let web = make_client(McpServer::Web, web_uri)?;
+                        let arxiv = make_client(McpServer::Arxiv, arxiv_uri)?;
+                        let github = make_client(McpServer::Github, github_uri)?;
+                        let citation_graph = make_client(McpServer::CitationGraph, citation_graph_uri)?;
 
                         if web.is_some() || arxiv.is_some() || github.is_some() || citation_graph.is_some() {
                             let client = Arc::new(ResearcherLiveMcpClient {

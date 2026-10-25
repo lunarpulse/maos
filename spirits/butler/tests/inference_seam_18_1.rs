@@ -545,3 +545,114 @@ fn the_seam_refuses_an_unregistered_declared_provider() {
         "{err}"
     );
 }
+
+// ── Story 18-8 AC5 (review ruling D-18-8-R4) — both MCP fetches failing ──
+
+/// An MCP port whose calendar and comms fetches answer as scripted.
+struct ScriptedMcp {
+    calendar: fn() -> Result<Vec<CalendarEvent>, ButlerMcpError>,
+    comms: fn() -> Result<Vec<butler::CommsMessage>, ButlerMcpError>,
+}
+
+#[async_trait::async_trait]
+impl ButlerMcpPort for ScriptedMcp {
+    async fn calendar_events(&self) -> Result<Vec<CalendarEvent>, ButlerMcpError> {
+        (self.calendar)()
+    }
+    async fn comms_messages(&self) -> Result<Vec<butler::CommsMessage>, ButlerMcpError> {
+        (self.comms)()
+    }
+    async fn write_linear_note(&self, _: &str, _: &str) -> Result<(), ButlerMcpError> {
+        Ok(())
+    }
+    async fn fetch_figma_summary(&self) -> Result<serde_json::Value, ButlerMcpError> {
+        Ok(serde_json::json!({}))
+    }
+}
+
+fn failed(server: &str) -> ButlerMcpError {
+    ButlerMcpError::CallFailed {
+        server: server.into(),
+        tool: "t".into(),
+        cause: maos_domain::ports::mcp::McpError::Transport("unauthorized (401)".into()),
+    }
+}
+
+fn unconfigured() -> ButlerMcpError {
+    ButlerMcpError::CallFailed {
+        server: "slack".into(),
+        tool: "list_messages".into(),
+        cause: maos_domain::ports::mcp::McpError::Unconfigured,
+    }
+}
+
+/// A bound Butler over `mcp`, after one pass, with its model port.
+fn bound_over(mcp: ScriptedMcp) -> (Bound, Arc<ScriptedPort>) {
+    let port = ScriptedPort::answering(GOOD);
+    let mut b = bound_on(Arc::clone(&port), ScenarioInput::default());
+    b.butler = b.butler.clone().with_mcp_port(Arc::new(mcp));
+    drive_on_idle(&b.butler);
+    (b, port)
+}
+
+#[test]
+fn both_mcp_fetches_failing_refuses_the_pass_before_any_model_call() {
+    let (b, port) = bound_over(ScriptedMcp {
+        calendar: || Err(failed("calendar")),
+        comms: || Err(failed("slack")),
+    });
+    let err = b.butler.take_pass_error().expect("the pass is refused");
+    assert!(
+        matches!(err, ButlerError::McpUnavailable { .. }),
+        "typed MCP refusal: {err:?}"
+    );
+    assert!(err.to_string().contains("MCP data unavailable"), "{err}");
+    assert!(port.requests.lock().unwrap().is_empty(), "zero model calls");
+    assert_eq!(b.mints.load(Ordering::SeqCst), 0, "no token minted");
+    assert!(b.butler.last_notification().is_none(), "no notification");
+    assert!(
+        b.channel.lock().unwrap().is_none(),
+        "no output-channel write"
+    );
+    assert!(b.scalars.0.lock().unwrap().is_empty(), "no scalar write");
+}
+
+/// "Both" is two real failures: one unconfigured server plus one failed
+/// fetch, or one failure beside data, proceeds on the partial data.
+#[test]
+fn a_partial_mcp_failure_is_not_both_and_the_pass_proceeds() {
+    let partial: [ScriptedMcp; 3] = [
+        ScriptedMcp {
+            calendar: || Err(failed("calendar")),
+            comms: || Err(unconfigured()),
+        },
+        ScriptedMcp {
+            calendar: || Ok(Vec::new()),
+            comms: || Err(failed("slack")),
+        },
+        ScriptedMcp {
+            calendar: || Err(unconfigured()),
+            comms: || Err(unconfigured()),
+        },
+    ];
+    for mcp in partial {
+        let (b, port) = bound_over(mcp);
+        assert!(b.butler.take_pass_error().is_none(), "not refused");
+        assert_eq!(
+            port.requests.lock().unwrap().len(),
+            1,
+            "the model is called"
+        );
+    }
+}
+
+/// The deterministic (unbound) path is unchanged: no refusal on MCP failure.
+#[test]
+fn an_unbound_butler_does_not_refuse_on_mcp_failure() {
+    let butler = Butler::with_scenario(conflict()).with_mcp_port(Arc::new(ScriptedMcp {
+        calendar: || Err(failed("calendar")),
+        comms: || Err(failed("slack")),
+    }));
+    drive_on_idle(&butler);
+    assert!(butler.take_pass_error().is_none());
+}

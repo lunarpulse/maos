@@ -91,6 +91,17 @@ The keyring is safer for secrets at rest and keeps them out of process
 environment listings. It does not protect a key from another process running as
 your user on the same host.
 
+### MCP server bearers
+
+Each live MCP server (`MAOS_MCP_<SERVER>_URI` for calendar, slack, linear,
+figma, web, arxiv, github and citation-graph) takes its bearer from the same
+secret store, under `MAOS_MCP_<SERVER>_BEARER` (keyring entry
+`mcp-<server>-bearer`). The bearer is sent only as `Authorization: Bearer` to
+that server; with none stored, no `Authorization` header is sent. The client
+speaks MCP 2026-07-28 first and falls back to the `initialize` handshake and
+`Mcp-Session-Id` of a 2025-11-25 server. `maos purge` removes the bearer entries
+with the provider keys.
+
 ### Remove MAOS state
 
 `maos purge` is a dry run unless `--yes` is present. It names each MAOS-owned

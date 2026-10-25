@@ -89,6 +89,16 @@ MAOS_INFERENCE_MODE=live    maos shell
 제외합니다. 같은 호스트에서 동일한 사용자로 실행되는 다른 프로세스로부터 키를
 보호하지는 않습니다.
 
+### MCP 서버 bearer
+
+각 라이브 MCP 서버(calendar, slack, linear, figma, web, arxiv, github,
+citation-graph의 `MAOS_MCP_<SERVER>_URI`)는 같은 시크릿 저장소에서
+`MAOS_MCP_<SERVER>_BEARER`(키링 항목 `mcp-<server>-bearer`)로 bearer를 가져옵니다.
+bearer는 해당 서버에만 `Authorization: Bearer`로 전송되며, 저장된 값이 없으면
+`Authorization` 헤더를 보내지 않습니다. 클라이언트는 먼저 MCP 2026-07-28로
+요청하고, 2025-11-25 서버에는 `initialize` 핸드셰이크와 `Mcp-Session-Id`로
+대체합니다. `maos purge`는 프로바이더 키와 함께 bearer 항목을 삭제합니다.
+
 ### MAOS 상태 제거
 
 `maos purge`는 `--yes`가 없으면 dry run입니다. 제거 전에 MAOS 소유 root와

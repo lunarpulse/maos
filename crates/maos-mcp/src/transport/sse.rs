@@ -4,7 +4,7 @@
 //! per the MCP 2024-11-05 SSE binding.
 
 use maos_domain::ports::io_subsystem::IoSubsystemPort;
-use maos_domain::ports::mcp::{McpAttribution, McpRequest, McpResponse, McpTransportId};
+use maos_domain::ports::mcp::{McpRequest, McpResponse, McpTransportId};
 
 use super::{McpTransport, McpTransportError};
 
@@ -76,30 +76,7 @@ pub fn parse_sse_response(body: &str, server_name: &str) -> Result<McpResponse, 
 
     let value: serde_json::Value = serde_json::from_str(&data)
         .map_err(|e| McpTransportError::Transport(format!("sse parse: {e}")))?;
-
-    if let Some(err) = super::extract_jsonrpc_error(&value) {
-        return Err(err);
-    }
-
-    let content = value
-        .get("result")
-        .cloned()
-        .unwrap_or(serde_json::Value::Null);
-    let name = content
-        .get("name")
-        .and_then(|n| n.as_str())
-        .unwrap_or("unknown")
-        .to_string();
-    let is_error = content
-        .get("isError")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    Ok(McpResponse::new(
-        content,
-        is_error,
-        McpAttribution::new(server_name.into(), McpTransportId::Sse, name),
-    ))
+    super::response_from(&value, server_name, McpTransportId::Sse)
 }
 
 #[cfg(test)]

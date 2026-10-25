@@ -31,6 +31,35 @@ pub trait IoSubsystemPort: Send + Sync {
         body: &[u8],
         headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, IoError>;
+
+    /// Class: data-movement
+    ///
+    /// POST returning the full exchange: status, body and the named
+    /// response header. A non-2xx status is data, not an error; only a
+    /// transport or decode failure is `Err` (Story 18-8 AC4). The default
+    /// serves adapters without a wire as a 200 exchange.
+    fn http_post_exchange(
+        &self,
+        url: &str,
+        body: &[u8],
+        headers: &[(&str, &str)],
+        _response_header: &str,
+    ) -> Result<HttpExchange, IoError> {
+        let body = self.http_post(url, body, headers)?;
+        Ok(HttpExchange {
+            status: 200,
+            body,
+            header: None,
+        })
+    }
+}
+
+/// One HTTP exchange: status, body, and the requested response header.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HttpExchange {
+    pub status: u16,
+    pub body: Vec<u8>,
+    pub header: Option<String>,
 }
 
 /// I/O error type for the I/O Subsystem port.

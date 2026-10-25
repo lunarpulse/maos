@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -107,7 +107,7 @@
+         }
+         let body = &exchange.body[..exchange.body.len().min(MAX_ERROR_BODY)];
+         let body = String::from_utf8_lossy(body).into_owned();
+-        Err(match (exchange.status, modern_code(&exchange.body)) {
++        Err(match (exchange.status, modern_code(body.as_bytes())) { // PLANT EC-5: classify the truncated copy
+             (401, _) => McpTransportError::Unauthorized,
+             (400, Some(code)) => McpTransportError::ModernRejection { code, body },
+             (status, _) => McpTransportError::HttpStatus {

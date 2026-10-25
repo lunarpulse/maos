@@ -86,7 +86,7 @@ pub use registry::{
     YankReceipt,
 }; // NEW — Story 5.5d
 pub use scheduler::SpiritSchedulerPort;
-pub use secret_store::{SecretDeleteStatus, SecretKey, SecretStore, SecretStoreError}; // Story 16-4
+pub use secret_store::{McpServer, SecretDeleteStatus, SecretKey, SecretStore, SecretStoreError}; // Story 16-4; McpServer Story 18-8
 pub use security::SecurityManagerPort;
 pub use self_telemetry::SelfTelemetryPort; // NEW — Story 4.3
 pub use siem_projection::{SiemProjectionError, SiemProjectionPort}; // NEW — Story 11.4c

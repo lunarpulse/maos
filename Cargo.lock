@@ -3028,6 +3028,7 @@ dependencies = [
  "maos-domain",
  "maos-kernel-core",
  "maos-mcp",
+ "maos-secrets",
  "parking_lot",
  "portable-pty",
  "rusqlite",

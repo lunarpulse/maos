@@ -27,7 +27,7 @@ pub use maos_domain::ports::IoSubsystemPort;
 
 use std::io::Read;
 
-use maos_domain::ports::io_subsystem::IoError;
+use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
 
 const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
 
@@ -62,6 +62,21 @@ impl IoSubsystemAdapter {
     }
 }
 
+fn read_capped(response: ureq::Response, method: &str) -> Result<Vec<u8>, IoError> {
+    let mut buf = Vec::new();
+    response
+        .into_reader()
+        .take(MAX_RESPONSE_BYTES as u64 + 1)
+        .read_to_end(&mut buf)
+        .map_err(|e| IoError::Decode(format!("ureq {method} body: {e}")))?;
+    if buf.len() > MAX_RESPONSE_BYTES {
+        return Err(IoError::Decode(format!(
+            "response body exceeds {MAX_RESPONSE_BYTES} byte limit"
+        )));
+    }
+    Ok(buf)
+}
+
 impl Default for IoSubsystemAdapter {
     fn default() -> Self {
         Self::new()
@@ -76,18 +91,7 @@ impl IoSubsystemPort for IoSubsystemAdapter {
         let response = ureq::get(url)
             .call()
             .map_err(|e| IoError::Transport(format!("ureq GET {url}: {e}")))?;
-        let reader = response.into_reader();
-        let mut buf = Vec::new();
-        reader
-            .take(MAX_RESPONSE_BYTES as u64)
-            .read_to_end(&mut buf)
-            .map_err(|e| IoError::Decode(format!("ureq GET body: {e}")))?;
-        if buf.len() > MAX_RESPONSE_BYTES {
-            return Err(IoError::Decode(format!(
-                "response body exceeds {MAX_RESPONSE_BYTES} byte limit"
-            )));
-        }
-        Ok(buf)
+        read_capped(response, "GET")
     }
 
     fn http_post(
@@ -96,27 +100,37 @@ impl IoSubsystemPort for IoSubsystemAdapter {
         body: &[u8],
         headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, IoError> {
+        let exchange = self.http_post_exchange(url, body, headers, "")?;
+        match exchange.status {
+            200..=299 => Ok(exchange.body),
+            s => Err(IoError::Transport(format!("ureq POST {url}: status {s}"))),
+        }
+    }
+
+    fn http_post_exchange(
+        &self,
+        url: &str,
+        body: &[u8],
+        headers: &[(&str, &str)],
+        response_header: &str,
+    ) -> Result<HttpExchange, IoError> {
         #[cfg(feature = "io_call_journal")]
         journal_record("POST", url);
-
         let mut req = ureq::post(url);
         for (k, v) in headers {
             req = req.set(k, v);
         }
-        let response = req
-            .send_bytes(body)
-            .map_err(|e| IoError::Transport(format!("ureq POST {url}: {e}")))?;
-        let reader = response.into_reader();
-        let mut buf = Vec::new();
-        reader
-            .take(MAX_RESPONSE_BYTES as u64)
-            .read_to_end(&mut buf)
-            .map_err(|e| IoError::Decode(format!("ureq POST body: {e}")))?;
-        if buf.len() > MAX_RESPONSE_BYTES {
-            return Err(IoError::Decode(format!(
-                "response body exceeds {MAX_RESPONSE_BYTES} byte limit"
-            )));
-        }
-        Ok(buf)
+        let response = match req.send_bytes(body) {
+            Ok(response) | Err(ureq::Error::Status(_, response)) => response,
+            Err(e) => return Err(IoError::Transport(format!("ureq POST {url}: {e}"))),
+        };
+        let header = response.header(response_header).map(str::to_owned);
+        let status = response.status();
+        let body = read_capped(response, "POST")?;
+        Ok(HttpExchange {
+            status,
+            body,
+            header,
+        })
     }
 }

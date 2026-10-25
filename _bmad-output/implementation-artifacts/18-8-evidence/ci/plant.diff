@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -157,7 +157,7 @@
+                 .as_str()
+                 .unwrap_or(LEGACY_PROTOCOL_VERSION)
+                 .to_owned(),
+-            session_id,
++            session_id: session_id.filter(|_| false), // PLANT AC1: stop storing the session id
+         };
+         let initialized = json!({"jsonrpc": "2.0", "method": "notifications/initialized"});
+         self.legacy_post(&session, &initialized)?;

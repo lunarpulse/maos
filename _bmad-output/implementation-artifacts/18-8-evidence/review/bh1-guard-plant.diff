@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -81,7 +81,7 @@
+         // Review BH-1/EC-1: a byte outside visible ASCII would fail ureq's
+         // header validation with an error that echoes the header line.
+         let authorization = match self.bearer.as_deref() {
+-            Some(bearer) if !bearer.bytes().all(|byte| byte.is_ascii_graphic()) => {
++            Some(bearer) if false && !bearer.bytes().all(|byte| byte.is_ascii_graphic()) => { // PLANT BH-1: no bearer byte check
+                 return Err(McpTransportError::InvalidBearer)
+             }
+             bearer => bearer.map(|bearer| format!("Bearer {bearer}")),

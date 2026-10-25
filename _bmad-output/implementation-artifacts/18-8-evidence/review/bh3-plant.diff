@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/stdio.rs
++++ b/crates/maos-mcp/src/transport/stdio.rs
+@@ -68,7 +68,7 @@
+             .spawn()
+             .map_err(|e| McpTransportError::Transport(format!("spawn failed: {e}")))?;
+         let (stdin, stdout, (tx, rx)) = (child.stdin.take(), child.stdout.take(), mpsc::channel());
+-        std::thread::spawn(move || tx.send(exchange(stdin, stdout, &frame)));
++        let _ = tx.send(exchange(stdin, stdout, &frame)); // PLANT BH-3: write + read outside the bound
+         let line = match rx.recv_timeout(self.read_timeout) {
+             Ok(line) => line,
+             Err(RecvTimeoutError::Timeout) => Err(McpTransportError::Timeout(

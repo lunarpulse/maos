@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -224,7 +224,7 @@
+         .filter(|code| MODERN_ERROR_CODES.contains(code))?;
+     let supported = error["data"]["supported"].as_array();
+     let legacy_ok = supported.is_some_and(|list| list.iter().any(|v| v == LEGACY_PROTOCOL_VERSION));
+-    (code != UNSUPPORTED_PROTOCOL_VERSION || !legacy_ok).then_some(code)
++    let _ = legacy_ok; Some(code) // PLANT R2: -32022 never takes the legacy path
+ }
+ 
+ fn client_info() -> Value {

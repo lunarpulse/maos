@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -1109,7 +1109,7 @@
+                 "maos run: warning — the {name} MCP bearer lookup failed (secret store: {kind}); \
+                  {name} is unconfigured for this run"
+             );
+-            return Ok(None);
++            return Err(maos_domain::ports::mcp::McpError::Unconfigured); // PLANT R1: one lookup error fails every server
+         }
+     };
+     let transport = maos_mcp::transport::streamable_http::StreamableHttpTransport::new(

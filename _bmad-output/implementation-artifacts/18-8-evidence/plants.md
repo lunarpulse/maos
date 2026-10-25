@@ -1,0 +1,50 @@
+# 18-8 proven-red plants
+
+Dev pass 2026-10-25, `anthropic/claude-opus-5-5`, one cargo session, `CARGO_TARGET_DIR=/mnt/build/cargo`, local runs
+`env -u CI -u GITHUB_ACTIONS`. Each plant was made in place in a file that already carried uncommitted 18-8 edits, so
+the file was copied aside first (`/tmp/plants188/*.orig`), planted, run, copied back, checked with `cmp` (`CMP_OK`
+every time) and `touch`ed (the copy-back restores the old mtime; cargo would otherwise keep the planted artifact),
+then re-run green. Diffs: `ac1-plant.diff` … `ac4-plant.diff` in this directory (unified diff against the restored
+file). Wall-clock = plant run (red observed) + restore run (green observed).
+
+4 plants, one per AC (`docs/testing/proof-contract.md:26`); no AC needed a second.
+
+| AC | File · change | Red test → assertion | Restore | Wall-clock |
+|---|---|---|---|---|
+| AC1 | `crates/maos-mcp/src/transport/streamable_http.rs` `initialize` — `session_id,` → `session_id: session_id.filter(\|_\| false),` (the issued `Mcp-Session-Id` is no longer stored) | `cargo nextest run --locked -p maos-journey-test --test mcp_conformance_18_8`: `legacy_two_calls_share_one_initialize_and_one_session` FAIL at `mcp_conformance_18_8.rs:210` ("a legacy server accepts the client: HttpStatus { status: 400, … \"Bad Request: no session, initialize first\" }"); also `legacy_fixture_rejects_unsessioned_and_unknown_sessions_and_the_client_recovers_once` (`:269`) and `a_cached_legacy_origin_re_probes_once_when_the_server_turns_modern` (`:322`). Result: 7 tests run: 4 passed, 3 failed, 0 skipped | copy-back + `cmp` + `touch`; 7/7 green | red 2.9 s, green 2.6 s, total 5.5 s |
+| AC2 | `streamable_http.rs` `post` — `.map(\|value\| ("Authorization", value))` → `….filter(\|_\| false)` (the `Authorization` header is dropped) | same command: the AC1 positive cases red with 401 → typed `Unauthorized`: `modern_two_calls_succeed_without_a_handshake` FAIL at `:129` ("a modern server accepts the client: Unauthorized"), `legacy_two_calls_share_one_initialize_and_one_session` FAIL at `:210`, `a_dual_era_server_is_spoken_to_modern` FAIL at `:313`. Result: 7 tests run: 4 passed, 3 failed, 0 skipped | copy-back + `cmp` + `touch`; 7/7 green | red 2.8 s, green 2.7 s, total 5.4 s |
+| AC3 | `crates/maos-mcp/src/transport/stdio.rs` `exchange` — `.map_err(\|e\| McpTransportError::Transport(format!("write: {e}")))?;` → `.unwrap();` | `cargo nextest run --locked -p maos-mcp --test stdio_transport_test`: `a_server_that_exits_before_the_request_is_written_is_a_typed_write_error` FAIL — panicked at `stdio.rs:85:18`, "called `Result::unwrap()` on an `Err` value: Os { code: 32, kind: BrokenPipe, message: \"Broken pipe\" }". Result: 6 tests run: 5 passed, 1 failed, 0 skipped | copy-back + `cmp` + `touch`; 6/6 green | red 1.4 s, green 1.4 s, total 2.8 s |
+| AC4 ◆ | `crates/maos-kernel-core/src/io/mod.rs` `http_post_exchange` — `Ok(response) \| Err(ureq::Error::Status(_, response)) => response,` → `Ok(response) => response,` (the old non-2xx `Transport` mapping) | `cargo nextest run --locked -p maos-kernel-core --test io_exchange_18_8`: `every_4xx_is_data_carrying_its_status_and_body_never_err` FAIL at `io_exchange_18_8.rs:86` ("400 must be Ok(HttpExchange), got Err(transport error: ureq POST http://127.0.0.1:…/mcp: …: status code 400)"). Result: 4 tests run: 3 passed, 1 failed, 0 skipped | copy-back + `cmp` + `touch`; 4/4 green | red 2.0 s, green 1.6 s, total 3.6 s |
+
+CI: the story names no CI plant. `ci/plant.diff` (= `ac1-plant.diff`, sha256 in `ci/plant.diff.sha256`) is offered for
+the one-image proven-red run if the integrator wants one. **Regenerated at the review patch pass** (the file moved):
+sha256 `9682e3df138220578ab4d9b20346e56aa9d80d001f2fc16a0475773783898e3a`; `git apply --check` clean on the patched
+tree; applied, five `mcp_conformance_18_8` legacy-path tests red (row AC1 below).
+
+## Review patch pass (2026-10-25, `anthropic/claude-opus-5-5`)
+
+Same discipline: one cargo process, `CARGO_TARGET_DIR=/mnt/build/cargo`, `env -u CI -u GITHUB_ACTIONS`; each plant made
+in place after copying the file aside (`/tmp/plants188v2/<label>.orig`), the plant diff written against that copy, the
+focused suite run (red observed), the copy restored, `cmp` (`CMP_OK` every time) and `touch`ed, the suite re-run green.
+Wall-clock = red run, green run (each includes the incremental rebuild). Diffs: `ac1-plant.diff` … `ac3-plant.diff`
+(re-made on the patched tree; AC4's kernel file did not change, its row above stands) and `review/<label>-plant.diff`.
+
+| Label · finding | File · change | Red test → observed | Green | Wall-clock |
+|---|---|---|---|---|
+| AC1 (re-run) | `streamable_http.rs` `initialize` — `session_id,` → `session_id.filter(\|_\| false)` | `-p maos-journey-test --test mcp_conformance_18_8`: 15 run, 10 passed, 5 failed — `legacy_two_calls_share_one_initialize_and_one_session` ("a legacy server accepts the client: HttpStatus { status: 400, … no session, initialize first }"), `legacy_fixture_rejects_unsessioned_…_recovers_once`, `a_cached_legacy_origin_re_probes_once_…`, `an_unsupported_version_listing_the_legacy_one_takes_the_legacy_path`, `an_event_stream_answer_is_parsed_on_both_eras` (Legacy) | 15/15 | red 5.0 s, green 4.4 s |
+| AC2 (re-run) | `streamable_http.rs` `post` — `.map(\|value\| ("Authorization", value))` → `….filter(\|_\| false)` | same command: 15 run, 10 passed, 5 failed — `modern_two_calls_succeed_without_a_handshake`, `legacy_two_calls_…`, `a_dual_era_server_is_spoken_to_modern`, `a_bearer_with_surrounding_whitespace_is_trimmed`, `error_paths_never_carry_the_held_bearer` (401 → `Unauthorized`) | 15/15 | red 3.7 s, green 15.1 s |
+| AC3 (re-run) | `stdio.rs` `exchange` (now on the helper thread) — the write's `map_err(…)?` → `.unwrap()` | `-p maos-mcp --test stdio_transport_test`: 9 run, 8 passed, 1 failed — the helper panics ("called `Result::unwrap()` on an `Err` value: Os { code: 32, kind: BrokenPipe }") and `a_server_that_exits_before_the_request_is_written_is_a_typed_write_error` reds ("expected the write error, got stdio exchange thread died") | 9/9 | red 3.7 s, green 3.1 s |
+| BH-1/EC-1/AA-2 guard | `streamable_http.rs` `post` — the `is_ascii_graphic` refusal arm disabled (`if false && …`) | conformance suite: 14/15 — `a_bearer_with_an_inner_control_or_non_ascii_byte_is_refused_without_leaking`: "expected InvalidBearer, got Err(Transport(\"http_post: transport error: ureq POST …: Bad Header: invalid header 'Authorization: Bearer mcp-bearer-canary-18-8\\nx'\"))" — the leak itself | 15/15 | total 9.4 s (both runs) |
+| BH-1 trim | `streamable_http.rs` `new` — `trim_ascii()` dropped | conformance suite: 14/15 — `a_bearer_with_surrounding_whitespace_is_trimmed`: "the trimmed bearer works: InvalidBearer" | 15/15 | red 3.4 s, green 3.3 s |
+| BH-2/EC-4/AA-1/TIA-1 | `streamable_http.rs` `modern_code` — `&& *code != -32021` (the old `[-32020, -32022]` list) | conformance suite: 14/15 — `a_missing_capability_rejection_stays_modern`: "expected ModernRejection -32021, got Ok(…)" (the dual-era server was forced onto the legacy session) | 15/15 | red 3.3 s, green 3.0 s |
+| EC-5/AA-4/BH-8/TIA-10 | `streamable_http.rs` `post` — `modern_code(&exchange.body)` → `modern_code(body.as_bytes())` (the 4 KiB copy) | conformance suite: 14/15 — `a_long_modern_rejection_body_stays_modern`: "expected ModernRejection -32022, got Err(HttpStatus { status: 400, … -32020 HeaderMismatch … })" (the downgrade, then `initialize` rejected) | 15/15 | red 2.9 s, green 4.1 s |
+| R2 (AA-5, TIA-7a) | `streamable_http.rs` `modern_code` — `(code != UNSUPPORTED_PROTOCOL_VERSION \|\| !legacy_ok).then_some(code)` → `Some(code)` | conformance suite: 14/15 — `an_unsupported_version_listing_the_legacy_one_takes_the_legacy_path`: "the legacy path serves the call: ModernRejection { code: -32022, … \"supported\":[\"2099-01-01\",\"2025-11-25\"] … }" | 15/15 | red 10.6 s, green 3.5 s |
+| TIA-7c (SSE) | `streamable_http.rs` `parse_exchange` — `if true \|\| …starts_with('{')` (only the old sniff) | conformance suite: 14/15 — `an_event_stream_answer_is_parsed_on_both_eras`: "Modern: Transport(\"sse parse: expected value at line 1 column 1\")" | 15/15 | red 3.8 s, green 3.7 s |
+| EC-2/BH-6 | `streamable_http.rs` `invoke` — a `static SERIAL: Mutex<()>` held for the whole call | `-p maos-mcp --test streamable_http_concurrency_18_8`: 0/1 after the 5 s rendezvous bound — "a stalled exchange must not block a second call on the same transport" (left 1, right 2) | 1/1 | red 11.0 s, green 0.9 s |
+| BH-3/AA-3 | `stdio.rs` — the helper thread removed (`let _ = tx.send(exchange(…))` on the caller) | `-p maos-mcp --test stdio_transport_test`: 6/9 after 60 s — `a_blocked_write_to_a_server_that_never_reads_times_out` ("expected Timeout(2000), got Err(Transport(\"write: Broken pipe\"))" once `sleep 60` exits), `a_server_that_never_answers_times_out_and_is_reaped`, `a_timeout_kills_the_wrappers_grandchild` | 9/9 | red 67.3 s, green 4.8 s |
+| BH-4/AA-6 | `stdio.rs` — `process_group(0)` removed | stdio suite: 8/9 (FAIL + LEAK) — `a_timeout_kills_the_wrappers_grandchild`: "the wrapper's grandchild <pid> must be killed" | 9/9 | red 4.0 s, green 3.7 s |
+| R1 (EC-3/BH-5/AA-7) | `crates/maos-bin/src/main.rs` `live_mcp_client` — the lookup-error arm returns `Err(McpError::Unconfigured)` (one error fails every server, the pre-ruling behaviour) | `-p maos-bin --test researcher_8_14c`: 6/7 — `one_bearer_lookup_error_unconfigures_only_that_server`: "the other servers stay wired" | 7/7 | red 13.2 s, green 8.4 s |
+| R4 / AC5 (EC-8, AA-9) | `spirits/butler/src/lib.rs` `idle_pass` — the both-failed guard disabled (`if false && …`) | `-p butler --test inference_seam_18_1`: 19/20 — `both_mcp_fetches_failing_refuses_the_pass_before_any_model_call`: "the pass is refused" | 20/20 | red 1.8 s, green 1.1 s |
+
+Test-only findings (TIA-2, TIA-3, TIA-4, TIA-5, TIA-6, TIA-7b, TIA-8, TIA-9) change no production line, so they carry
+no plant; each new assertion was observed green on the patched tree (focused suites in the story's Review section).

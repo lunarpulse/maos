@@ -10,15 +10,62 @@
 pub enum SecretKey {
     AnthropicApiKey,
     OpenAiApiKey,
+    /// Story 18-8 AC2 — the bearer MAOS sends to one MCP server.
+    McpBearer(McpServer),
+}
+
+/// The eight MCP servers with a `MAOS_MCP_<SERVER>_URI` row (closed, like
+/// [`SecretKey`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum McpServer {
+    Calendar,
+    Slack,
+    Linear,
+    Figma,
+    Web,
+    Arxiv,
+    Github,
+    CitationGraph,
+}
+
+impl McpServer {
+    /// (`as_str`, `environment_variable`) of this server's bearer key.
+    const fn bearer_names(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Calendar => ("mcp-calendar-bearer", "MAOS_MCP_CALENDAR_BEARER"),
+            Self::Slack => ("mcp-slack-bearer", "MAOS_MCP_SLACK_BEARER"),
+            Self::Linear => ("mcp-linear-bearer", "MAOS_MCP_LINEAR_BEARER"),
+            Self::Figma => ("mcp-figma-bearer", "MAOS_MCP_FIGMA_BEARER"),
+            Self::Web => ("mcp-web-bearer", "MAOS_MCP_WEB_BEARER"),
+            Self::Arxiv => ("mcp-arxiv-bearer", "MAOS_MCP_ARXIV_BEARER"),
+            Self::Github => ("mcp-github-bearer", "MAOS_MCP_GITHUB_BEARER"),
+            Self::CitationGraph => (
+                "mcp-citation-graph-bearer",
+                "MAOS_MCP_CITATION_GRAPH_BEARER",
+            ),
+        }
+    }
 }
 
 impl SecretKey {
-    pub const ALL: [Self; 2] = [Self::AnthropicApiKey, Self::OpenAiApiKey];
+    pub const ALL: [Self; 10] = [
+        Self::AnthropicApiKey,
+        Self::OpenAiApiKey,
+        Self::McpBearer(McpServer::Calendar),
+        Self::McpBearer(McpServer::Slack),
+        Self::McpBearer(McpServer::Linear),
+        Self::McpBearer(McpServer::Figma),
+        Self::McpBearer(McpServer::Web),
+        Self::McpBearer(McpServer::Arxiv),
+        Self::McpBearer(McpServer::Github),
+        Self::McpBearer(McpServer::CitationGraph),
+    ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::AnthropicApiKey => "anthropic-api-key",
             Self::OpenAiApiKey => "openai-api-key",
+            Self::McpBearer(server) => server.bearer_names().0,
         }
     }
 
@@ -26,6 +73,7 @@ impl SecretKey {
         match self {
             Self::AnthropicApiKey => "MAOS_ANTHROPIC_API_KEY",
             Self::OpenAiApiKey => "MAOS_OPENAI_API_KEY",
+            Self::McpBearer(server) => server.bearer_names().1,
         }
     }
 }

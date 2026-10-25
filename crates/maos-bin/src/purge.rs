@@ -302,17 +302,17 @@ fn sibling_team_logs(keep_log: bool, audit_path: &Path) -> Vec<PathBuf> {
     logs
 }
 
-fn known_secret_keys() -> [(maos_domain::ports::SecretKey, &'static str); 2] {
-    [
-        (
-            maos_domain::ports::SecretKey::AnthropicApiKey,
-            "Anthropic API credential",
-        ),
-        (
-            maos_domain::ports::SecretKey::OpenAiApiKey,
-            "OpenAI API credential",
-        ),
-    ]
+/// Every MAOS-owned credential, from the closed `SecretKey::ALL` (Story 18-8
+/// AC2: the eight MCP bearers ride the same list).
+fn known_secret_keys() -> [(maos_domain::ports::SecretKey, &'static str); 10] {
+    maos_domain::ports::SecretKey::ALL.map(|key| {
+        let label = match key {
+            maos_domain::ports::SecretKey::AnthropicApiKey => "Anthropic API credential",
+            maos_domain::ports::SecretKey::OpenAiApiKey => "OpenAI API credential",
+            maos_domain::ports::SecretKey::McpBearer(_) => key.as_str(),
+        };
+        (key, label)
+    })
 }
 
 // The keyring stack is unix-only in this build (air-gap doctrine, ADR-067):

@@ -1,0 +1,15 @@
+proven-red	Set up job	2026-10-25T10:12:24.1011816Z Version: 20261021.618
+proven-red	Set up job	2026-10-25T10:12:24.1028057Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-25T10:12:24.1029046Z Version: 20261012.334.1
+proven-red	Provenance	2026-10-25T10:12:38.7569694Z ^[[36;1mgit rev-parse HEAD^[[0m
+proven-red	Provenance	2026-10-25T10:12:38.7750130Z 6cc6332e9b49c0f927e6236090552607da51a023
+proven-red	Provenance	2026-10-25T10:12:38.8071219Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+proven-red	Apply the TIA-1b plant	2026-10-25T10:12:38.8381573Z _bmad-output/implementation-artifacts/18-1-evidence/ci/plant.diff: OK
+proven-red	Apply the TIA-1b plant	2026-10-25T10:12:39.5126250Z          return Err(format!("butler on_idle pass refused: {error}"));
+proven-red	Control — exit line 1 stays green under the plant	2026-10-25T10:14:25.9313470Z ^[[36;1mgrep -q 'butler inference seam wired' line1.err^[[0m
+proven-red	Control — exit line 1 stays green under the plant	2026-10-25T10:14:26.0399913Z butler inference seam wired (provider `anthropic`)
+proven-red	Control — exit line 1 stays green under the plant	2026-10-25T10:14:26.0403403Z maos run: --once complete — exiting cleanly
+proven-red	Planted twin must EXIT 0 (the twin step on main would go RED)	2026-10-25T10:14:26.0442447Z ^[[36;1mecho "::notice title=18-1 TIA-1b PROVEN-RED::refused-pass arm disabled → the missing-options twin exits 0, so epic-18-exit's twin step reds"^[[0m
+proven-red	Planted twin must EXIT 0 (the twin step on main would go RED)	2026-10-25T10:14:26.1534240Z butler inference seam wired (provider `anthropic`)
+proven-red	Planted twin must EXIT 0 (the twin step on main would go RED)	2026-10-25T10:14:26.1534874Z butler: on_idle pass refused: malformed proposal: completion is not a Butler proposal: missing field `options` at line 1 column 182
+proven-red	Planted twin must EXIT 0 (the twin step on main would go RED)	2026-10-25T10:14:26.1536348Z maos run: --once complete — exiting cleanly

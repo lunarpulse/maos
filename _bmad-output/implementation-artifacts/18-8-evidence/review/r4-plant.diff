@@ -1,0 +1,11 @@
+--- a/spirits/butler/src/lib.rs
++++ b/spirits/butler/src/lib.rs
+@@ -811,7 +811,7 @@
+                 // before `complete`. One unconfigured server plus one failed
+                 // fetch (or any partial data) is not "both": it proceeds.
+                 (Err(calendar), Err(comms))
+-                    if self.inference.is_some()
++                    if false && self.inference.is_some() // PLANT AC5: no both-failed guard
+                         && !is_unconfigured(&calendar)
+                         && !is_unconfigured(&comms) =>
+                 {

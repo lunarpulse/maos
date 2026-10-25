@@ -168,6 +168,8 @@ use std::time::{Duration, Instant};
 struct RequestCapture {
     method: String,
     path: String,
+    /// The raw request head (request line + headers) — Story 18-8 review TIA-4.
+    head: String,
     body: Vec<u8>,
 }
 
@@ -225,6 +227,7 @@ fn spawn_mock_mcp_server(responses: Vec<&'static str>) -> (String, mpsc::Receive
                 }
             }
             let header_len = headers.find("\r\n\r\n").unwrap_or(headers.len()) + 4;
+            let head = headers[..header_len.min(headers.len())].to_string();
             while bytes.len() - header_len < content_length {
                 let n = match stream.read(&mut buf) {
                     Ok(n) => n,
@@ -249,7 +252,12 @@ fn spawn_mock_mcp_server(responses: Vec<&'static str>) -> (String, mpsc::Receive
             eprintln!("Mock server loop {} - writing response", i);
             let _ = stream.write_all(http_response.as_bytes());
             eprintln!("Mock server loop {} - response written", i);
-            let _ = tx.send(RequestCapture { method, path, body });
+            let _ = tx.send(RequestCapture {
+                method,
+                path,
+                head,
+                body,
+            });
         }
     });
     (format!("http://{}", addr), rx)
@@ -483,4 +491,122 @@ fn butler_undeclared_tool_returns_capability_denied() {
     let value: serde_json::Value = serde_json::from_slice(payload).unwrap();
     assert_eq!(value["op"], "mcp.call");
     assert_eq!(value["code"], "capability-denied");
+}
+
+/// `maos run butler --live --once` on a keyless runner whose router keeps the
+/// `anthropic` Unconfigured placeholder (so the root boots and the pass runs),
+/// env secret backend, isolated state; `env` applied last.
+fn butler_live_once(tag: &str, env: &[(&str, &str)]) -> (IsolatedDataHome, String) {
+    let home = isolated_data_home(tag);
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command
+        .args(["run", "spirits/butler/manifest.toml", "--live", "--once"])
+        .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_HOME", home.path.clone())
+        .env_remove("MAOS_AUDIT_DB")
+        .env_remove("MAOS_JOURNAL_PATH")
+        .env("MAOS_OLLAMA_URL", "skip")
+        .env_remove("MAOS_ANTHROPIC_API_KEY")
+        .env_remove("MAOS_OPENAI_API_KEY")
+        .env("MAOS_SECRETS_BACKEND", "env")
+        .current_dir(workspace_root())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    for server in ["CALENDAR", "SLACK", "LINEAR", "FIGMA"] {
+        command
+            .env_remove(format!("MAOS_MCP_{server}_URI"))
+            .env_remove(format!("MAOS_MCP_{server}_BEARER"));
+    }
+    for (name, value) in env {
+        command.env(name, value);
+    }
+    let child = command.spawn().expect("maos run butler --live --once");
+    let (_, stdout, stderr) = wait_bounded(child, CHILD_BUDGET);
+    (home, format!("{stdout}{stderr}"))
+}
+
+/// Story 18-8 review TIA-4 — each Butler server's mock sees exactly its own
+/// bearer and no other canary. A pass fetches Calendar and Slack; Linear is
+/// written only on an option pick and Figma has no production caller, so
+/// their mocks see no request in a `--once` pass (asserted, so a wiring that
+/// started calling them would have to meet the same bar).
+#[test]
+fn butler_live_mcp_sends_each_server_its_own_bearer() {
+    let empty = r#"{"jsonrpc":"2.0","result":[],"id":1}"#;
+    let servers = [
+        ("CALENDAR", "canary-calendar-18-8", vec![empty]),
+        ("SLACK", "canary-slack-18-8", vec![empty]),
+        ("LINEAR", "canary-linear-18-8", vec![]),
+        ("FIGMA", "canary-figma-18-8", vec![]),
+    ];
+    let mut env = Vec::new();
+    let mut mocks = Vec::new();
+    for (server, canary, responses) in &servers {
+        let (url, rx) = spawn_mock_mcp_server(responses.clone());
+        env.push((format!("MAOS_MCP_{server}_URI"), url));
+        env.push((format!("MAOS_MCP_{server}_BEARER"), canary.to_string()));
+        mocks.push(rx);
+    }
+    let env: Vec<(&str, &str)> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let (_home, combined) = butler_live_once("18-8-bearers", &env);
+    assert!(
+        combined.contains("butler live MCP port wired (--live)"),
+        "{combined}"
+    );
+    for ((server, own, responses), rx) in servers.iter().zip(&mocks) {
+        let heads: Vec<String> =
+            std::iter::from_fn(|| rx.recv_timeout(Duration::from_millis(300)).ok())
+                .map(|capture| capture.head)
+                .collect();
+        assert_eq!(heads.len(), responses.len(), "{server}: requests seen");
+        for head in &heads {
+            let authorization: Vec<_> = head
+                .lines()
+                .filter(|line| line.to_ascii_lowercase().starts_with("authorization:"))
+                .collect();
+            assert_eq!(authorization, [format!("Authorization: Bearer {own}")]);
+            for (other, canary, _) in &servers {
+                assert!(
+                    other == server || !head.contains(canary),
+                    "{server} saw {other}'s bearer"
+                );
+            }
+        }
+    }
+    for (_, canary, _) in &servers {
+        assert!(!combined.contains(canary), "a bearer reached the output");
+    }
+}
+
+/// Story 18-8 AC5 (review ruling D-18-8-R4) at the composition root: both
+/// fetches fail (refused connections) → the pass is refused typed before
+/// `complete`; with Slack unconfigured instead, the root restores the typed
+/// `Unconfigured` the kernel adapter flattened, so the pass proceeds to the
+/// model (here the keyless placeholder refuses it — an inference refusal).
+#[test]
+fn butler_live_refuses_a_pass_only_when_both_fetches_fail() {
+    let dead = "http://127.0.0.1:9";
+    let both = [
+        ("MAOS_MCP_CALENDAR_URI", dead),
+        ("MAOS_MCP_SLACK_URI", dead),
+    ];
+    let (_home, combined) = butler_live_once("18-8-both-fail", &both);
+    assert!(
+        combined.contains("butler: on_idle pass refused: MCP data unavailable"),
+        "both fetches failing is a typed MCP refusal:\n{combined}"
+    );
+    assert!(
+        !combined.contains("inference failed"),
+        "no model call:\n{combined}"
+    );
+
+    let (_home, combined) = butler_live_once("18-8-one-fail", &both[..1]);
+    assert!(
+        !combined.contains("MCP data unavailable"),
+        "one unconfigured + one failed is not both:\n{combined}"
+    );
+    assert!(
+        combined.contains("butler: on_idle pass refused: inference"),
+        "the pass reached the model:\n{combined}"
+    );
 }

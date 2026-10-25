@@ -25,6 +25,17 @@ step fails ("the planted violation exited 0"). The integrator runs that CI prove
 refused-pass arm only; the twin's missing-`options` completion is refused by `parse_proposal` before the shape arm), sha256
 `943be65d0bfbab1aa48ec86ccea357a0848a9062ac6bb7dac33d531f214204a7`. Simulated locally from the workflow text after the review
 patches: line 1 rc=0 (seam line present); the twin rc=1 naming `options`.
+**CI proven-red DONE 2026-10-25:** run `40183063919` (`ci/18-1-verify` @ `6cc6332e`, job `121138008130`, `ubuntu-24.04`
+image 20261012.334.1; workflow `ci/ci-18-1-verify.yml`): `plant.diff: OK` (sha256 above); control — exit line 1 rc=0 with
+`butler inference seam wired (provider \`anthropic\`)`; the planted twin logged `on_idle pass refused: malformed proposal …
+missing field \`options\`` and still exited 0 (`--once complete — exiting cleanly`), i.e. `epic-18-exit`'s twin step reds
+under the plant. Excerpt `ci/run-40183063919-excerpt.log`; branch deleted. **Landing run `40183021781` @ `08ae68ad`**
+(13.23 job-h, 86.8 min, 182/189 success): `epic-18-exit` and `cargo-deny` green; reds = `cohort_daemon_smoke_13_5c::
+composition_root_does_not_seed_manifest_scopes` (`:1050`, 18-1 added `src/butler_root.rs` unlisted — fixed by listing it,
+carried with 18-8) in `workspace-test-suite`, `check-j1-loopback-delegation`, `check-reza-production-path`,
+`check-multi-tenant-loom` (+ the three fan-in aggregates), and the 20-7-owned 5 s orphan vector
+`root_shutdown_unload_16_3::cohort::ac4_v5…` (`:348`, "host B's hang Worker … still in /proc after 5s"). Workspace:
+4,792 tests, 2 failed.
 
 ## Review pass (2026-10-25, `anthropic/claude-opus-5-5`)
 

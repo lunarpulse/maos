@@ -502,7 +502,21 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26363
+src_lines = 26377
+# HISTORY: Story 18-8-conformant-mcp-client ◆ FLAG-Winston (2026-10-25),
+#          D-18-8-01 A ratified by Lunarpulse 2026-10-25 (grant +15 physical /
+#          +13 tokei over 18-1's landed pin, exact at landing): physical
+#          26363 -> 26377 (+14), tokei 20595 -> 20608 (+13). Driver (AC4, full
+#          exchange): `IoSubsystemAdapter` overrides the new domain default
+#          `IoSubsystemPort::http_post_exchange` -> `HttpExchange { status,
+#          body, header }`, a non-2xx returned as data (`ureq::Error::Status`
+#          read, not mapped to `Transport`); `http_post` now delegates to it
+#          (non-2xx still `Transport("… status N")`), and `http_get`/POST share
+#          `read_capped`, which reads cap + 1 so an over-10-MiB body is `Decode`
+#          instead of a silent truncation; the `io_call_journal` record stays
+#          once per call. Only io/mod.rs changed; all 95 files retained;
+#          digests + set_hash re-emitted via `--emit-pin`; no public kernel
+#          symbol added, removed or moved.
 # HISTORY: Story 18-1-butler-inference-seam-and-conformant-mcp ◆ FLAG-Winston
 #          (2026-10-25), D-18-1-10 A ratified by Lunarpulse 2026-10-25 (grant
 #          +2 physical / +1 tokei, exact at landing): physical 26361 -> 26363
@@ -799,7 +813,7 @@ src_lines = 26363
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "188089021a311771aa36e96a8b1d965e2918b736e2d3a63e6a72b69e904a1eb1"
+set_hash = "7dcbc81ed4ffd55ec8b28d564818b0a8a705636ca96fa31c3bf9c391092be390"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -828,7 +842,7 @@ set_hash = "188089021a311771aa36e96a8b1d965e2918b736e2d3a63e6a72b69e904a1eb1"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
 "inference/mod.rs" = "3c60dd2f871117effa1734baa12563628a703cd69b1ec06a007ecaede065f564"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
-"io/mod.rs" = "1c4c5202c33d39de7dd61d36607015dd07dac01922bd82ac6fd40300a8e72bf6"
+"io/mod.rs" = "5cff233b27aa9d79793bd4fcda34270d2c98439b0c50c47059a0ee4f0718f032"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
 "journal/mod.rs" = "ec7fa9c2b4508a5d339b6ffd6d0aac0030956c7c504ef9042582cc95f14c51bf"

@@ -1,0 +1,50 @@
+# Story 18-8 AC1 — branch-only planted-red run (docs/testing/proof-contract.md:
+# proven-red on ONE image). Copy to `.github/workflows/ci-18-8-verify.yml` on
+# `ci/18-8-verify` ONLY; never merged; the branch is deleted after the run.
+# Applies the one plant (the legacy `Mcp-Session-Id` is no longer stored) and
+# requires `legacy_two_calls_share_one_initialize_and_one_session` to go RED
+# while `modern_two_calls_succeed_without_a_handshake` (the control) stays green.
+name: 18-8-proven-red
+on:
+  push:
+    branches: ["ci/18-8-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Apply the AC1 plant
+        run: |
+          set -euo pipefail
+          echo "9682e3df138220578ab4d9b20346e56aa9d80d001f2fc16a0475773783898e3a  _bmad-output/implementation-artifacts/18-8-evidence/ci/plant.diff" | sha256sum -c -
+          git apply _bmad-output/implementation-artifacts/18-8-evidence/ci/plant.diff
+          git diff --stat
+          git diff
+      - name: Planted run must be RED at the legacy session assertion
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          cargo test --locked -p maos-journey-test --test mcp_conformance_18_8 -- --test-threads=1 2>&1 | tee planted.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          test "$rc" -ne 0 || { echo "::error title=18-8 AC1::planted tree stayed GREEN"; exit 1; }
+          grep -q '^test legacy_two_calls_share_one_initialize_and_one_session \.\.\. FAILED' planted.log
+          grep -q 'no session, initialize first' planted.log
+          grep -q '^test modern_two_calls_succeed_without_a_handshake \.\.\. ok' planted.log
+          echo "::notice title=18-8 AC1 PROVEN-RED::session id not stored reds the legacy two-call witness; the modern control stays green"

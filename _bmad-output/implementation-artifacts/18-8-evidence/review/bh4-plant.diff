@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/stdio.rs
++++ b/crates/maos-mcp/src/transport/stdio.rs
+@@ -63,7 +63,7 @@
+             .stdout(Stdio::piped())
+             .stderr(Stdio::inherit());
+         #[cfg(unix)]
+-        std::os::unix::process::CommandExt::process_group(&mut command, 0);
++        let _ = &mut command; // PLANT BH-4: no own process group
+         let mut child = command
+             .spawn()
+             .map_err(|e| McpTransportError::Transport(format!("spawn failed: {e}")))?;

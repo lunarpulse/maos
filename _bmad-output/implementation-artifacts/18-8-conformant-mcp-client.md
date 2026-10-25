@@ -13,13 +13,13 @@ review: "bmad-code-review under `docs/testing/proof-contract.md`. Reviewer model
 
 # Story 18.8: A conformant (dual-era) MCP client
 
-Status: ready-for-dev
+Status: review
 
 <!-- Created 2026-10-25 at c816c544 by bmad-create-story (lighter creation contract) as the SPLIT of 18-1 ruled by the operator (D-18-1-01 B): 18-1's former AC2 (conformant client) and AC5 (stdio early-close witness) with decisions D-18-1-06/07/12, all three ruled B. D-18-8-01 RULED A the same day (full exchange; kernel +15 / +13, maos-domain +70) → `ready-for-dev`. 18-1 lands first; 18-8 re-measures the kernel pin after it. Prototypes measured and reverted (one cargo process, /mnt/build/cargo). -->
 
 > **The capability:** *Butler's and the Researcher's MCP calls are accepted by a conformant server of either protocol era — modern 2026-07-28 or legacy handshake — carry a bearer the secret store holds, and a stdio server that dies or hangs is a typed error, never a panic or a wedge.*
 
-**Closes:** the conformant-MCP half of S3 / J-Butler that 18-1 carried (epic §18-8 `:206-217`; was §18-1 AC2/AC5) · the CI half of `ops-google-calendar-oauth-mcp` (epic `:30`) · R18-8, R18-P1 (§R, re-anchored to 18-8) · `deferred-work.md` rows owned by this key: none (grep at c816c544; 18-1's only row `:1213` stays 18-1's).
+**Closes:** the conformant-MCP half of S3 / J-Butler that 18-1 carried (epic §18-8 `:206-217`; was §18-1 AC2/AC5) · the CI half of `ops-google-calendar-oauth-mcp` (epic `:30`) · R18-8, R18-P1 (§R, re-anchored to 18-8) · `deferred-work.md` rows owned by this key: **EC-8** "Both MCP fetches failing still calls the model" (`:1234`, re-owned from 18-1's review; closed by AC5, added by review ruling D-18-8-R4 A — fixed-in-tree note `:1235`, `Status` flipped at landing).
 
 **Does NOT close, and says so:**
 - Live Google Calendar with real OAuth acquisition/refresh — operator lane (`ops-google-calendar-oauth-mcp`); CI uses the conformant fixture only. A static bearer in the secret store is this story's credential.
@@ -113,16 +113,24 @@ maos-domain totals with the secret-store keys: (ii) 9743 → **9805 (+62)**, (ii
 3. Kernel figure re-measured at landing against the ruled grant; pin + ceiling re-pinned in one commit.
 4. **Proven red (1 plant):** restore the old non-2xx `Transport` mapping on the new method → the 4xx case reds.
 
+### AC5 — both MCP fetches failing refuses Butler's bound pass (review ruling D-18-8-R4 A, 2026-10-25; closes deferred EC-8)
+
+1. When Butler's inference is bound and BOTH the calendar and the comms fetch return an `Err` that is not `CallFailed { cause: McpError::Unconfigured }`, `Butler::idle_pass` refuses the pass with `ButlerError::McpUnavailable { calendar, comms }` through `pass_error` BEFORE `complete`: zero model calls, no token mint, no notification, no output-channel write, no scalar write (D-18-1-04 A).
+2. **"Both" (ruled definition):** two real failures. One unconfigured server plus one failed fetch, one failure beside data, or two unconfigured servers proceed on the partial data; the unbound (deterministic) path never refuses on MCP failure. The composition root restores the typed `Unconfigured` the kernel MCP adapter flattens to text (`LiveButlerMcpPort::call_mcp`).
+3. Witnesses: `spirits/butler/tests/inference_seam_18_1.rs` (`both_mcp_fetches_failing_refuses_the_pass_before_any_model_call`, `a_partial_mcp_failure_is_not_both_and_the_pass_proceeds`, `an_unbound_butler_does_not_refuse_on_mcp_failure`); `crates/maos-bin/tests/butler_8_14b.rs` `butler_live_refuses_a_pass_only_when_both_fetches_fail` (`--live --once`, both fetches refused → "MCP data unavailable"; Slack unconfigured → the inference refusal).
+4. **Proven red (1 plant):** disable the guard → `both_mcp_fetches_failing_refuses_the_pass_before_any_model_call` reds.
+
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight** — §Decisions reads RULED (all rows, 2026-10-25); story + tracker `ready-for-dev`; Winston's FLAG sign-off recorded before landing. 18-1 lands first: re-measure the kernel pin from 18-1's landed value before claiming the +15 / +13. `git diff --stat c816c544 -- crates/maos-mcp crates/maos-journey-test crates/maos-kernel-core/src/io crates/maos-domain/src/ports crates/maos-secrets crates/maos-bin/src/main.rs crates/maos-bin/src/env_contract.rs crates/maos-bin/src/purge.rs`; drift → Debug Log, re-anchor.
-- [ ] **T1 — IO port** (AC4) — domain default method + adapter override + helpers; `io_exchange_18_8.rs`.
-- [ ] **T2 — Secret store keys** (AC2.1–2.2) — `McpServer`, `McpBearer`, `ALL`; env rows; purge list; `maos-secrets` round-trip tests.
-- [ ] **T3 — Client** (AC1.1–1.2, AC2.3; CR-1/2/3/5) — headers, `_meta`, era cache, legacy handshake + session, typed errors, bearer plumbing at `main.rs:5187,5382`.
-- [ ] **T4 — Fixture + conformance tests** (AC1.3; CR-4).
-- [ ] **T5 — stdio** (AC3; CR-6/7) — early-close witnesses; bounded read.
-- [ ] **T6 — Plants and records** — AC1–AC4 plants recorded once in `18-8-evidence/plants.md` (command, output, wall-clock).
-- [ ] **T7 — Governance** (D-18-8-02) — `cargo fmt --all`; `kloc-check --json`; `check-kernel-baseline`; `check-env-contract`; `check-test-cost`; `check-dev-record-completeness`; measured requests before landing; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule` before the closing commit.
+- [x] **T0 — Preflight** — §Decisions reads RULED (all rows, 2026-10-25); story + tracker `ready-for-dev`; Winston's FLAG sign-off recorded before landing. 18-1 lands first: re-measure the kernel pin from 18-1's landed value before claiming the +15 / +13. `git diff --stat c816c544 -- crates/maos-mcp crates/maos-journey-test crates/maos-kernel-core/src/io crates/maos-domain/src/ports crates/maos-secrets crates/maos-bin/src/main.rs crates/maos-bin/src/env_contract.rs crates/maos-bin/src/purge.rs`; drift → Debug Log, re-anchor.
+- [x] **T1 — IO port** (AC4) — domain default method + adapter override + helpers; `io_exchange_18_8.rs`.
+- [x] **T2 — Secret store keys** (AC2.1–2.2) — `McpServer`, `McpBearer`, `ALL`; env rows; purge list; `maos-secrets` round-trip tests.
+- [x] **T3 — Client** (AC1.1–1.2, AC2.3; CR-1/2/3/5) — headers, `_meta`, era cache, legacy handshake + session, typed errors, bearer plumbing at `main.rs:5187,5382`.
+- [x] **T4 — Fixture + conformance tests** (AC1.3; CR-4).
+- [x] **T5 — stdio** (AC3; CR-6/7) — early-close witnesses; bounded read.
+- [x] **T6 — Plants and records** — AC1–AC4 plants recorded once in `18-8-evidence/plants.md` (command, output, wall-clock).
+- [x] **T8 — Review patches** (2026-10-25; rulings D-18-8-R1…R5; AC5) — see §Review.
+- [x] **T7 — Governance** (D-18-8-02) — `cargo fmt --all`; `kloc-check --json`; `check-kernel-baseline`; `check-env-contract`; `check-test-cost`; `check-dev-record-completeness`; measured requests before landing; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule` before the closing commit.
 
 ## Dev Notes
 
@@ -188,14 +196,119 @@ Created 2026-10-25 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter cr
 ### Agent Model Used
 
 anthropic/claude-opus-5-5 (creation, 2026-10-25)
+anthropic/claude-opus-5-5 (dev, 2026-10-25)
 
 ### Debug Log References
 
+- **T0 (dev HEAD `08ae68ad`, 18-1 landed at `a85673f0`).** §Decisions: every row RULED 2026-10-25; tracker and story read `ready-for-dev` → `in-progress`. `git diff --stat c816c544 -- <the T0 paths>`: only `crates/maos-bin/src/main.rs` drifted (+356 / −120, 18-1's Butler seam) plus 18-1's journey tests/cassette; no drift in maos-mcp, the kernel `io/`, the domain ports, maos-secrets, `env_contract.rs` or `purge.rs`. Re-anchored: the Streamable-HTTP sites are `main.rs:3074` (registry), `:5353` (Butler `--live`) and `:5560` (Researcher `--live`). Kernel re-measured from 18-1's landed pin: physical 26363 (`find … | xargs cat | wc -l`), tokei 20595 (`kloc-check --json`); baseline aggregate 181726.
+- **Kernel trim.** The first AC4 draft (a private `post` helper beside `read_capped`) measured +23 physical; `http_post` now delegates to `http_post_exchange` (a non-2xx still `Transport`, text `ureq POST <url>: status N` — no reader parses the old `status code N` text, grep across `crates/`), giving +14 / +13.
+- **Pre-existing cap defect closed by the AC4 witness.** `take(MAX_RESPONSE_BYTES)` made the `> MAX` check unreachable, so an over-10-MiB body was silently truncated, never `Decode` (red observed first: `a_body_over_ten_mib_is_still_a_decode_error` got `Ok` with 10 MiB). `read_capped` reads cap + 1 for GET and POST.
+- **Journey freshness.** After the maos-bin edits `journey_j0` refused a stale `maosctl` (its documented freshness guard); `cargo build -p maos-bin -p maos-cli`, then 5/5 green.
+- **Cargo.lock** gains one edge, `maos-journey-test` → `maos-secrets` (dev-dependency for AC2.4); no external crate.
+- **deferred-work.md.** `:1234` (18-1 review EC-8, "Both MCP fetches failing still calls the model") was re-owned to this key by 18-1's review after this story was created; it is not in this story's ACs or tasks, so it is left `open` and returned to the operator (amend 18-8 or re-own).
+- No integrator message arrived during the run.
+
 ### Completion Notes List
 
+- **AC4 ◆ (T1).** `IoSubsystemPort::http_post_exchange(url, body, headers, response_header) -> Result<HttpExchange, IoError>` is a default method (a 200 exchange over `http_post`, so the seven provider `MockTransport`s are untouched); `HttpExchange { status, body, header }`. `IoSubsystemAdapter` overrides it: `ureq::Error::Status(_, response)` is read as data, any other failure stays `Transport`; GET/POST share `read_capped`; the `io_call_journal` record runs once per POST. Witness `crates/maos-kernel-core/tests/io_exchange_18_8.rs` (local TCP server): 2xx → status/body/`Mcp-Session-Id`; 400/401/404 → `Ok` with status and body; refused connection → `Transport`; 10 MiB + 1 → `Decode`. 4/4.
+- **FLAG-Winston record.** Kernel grant D-18-8-01 A (operator, 2026-10-25): +15 physical / +13 tokei over 18-1's landed pin. Landed **+14 physical (26363 → 26377) / +13 tokei (20595 → 20608)**, `io/mod.rs` only, 95 files, no public kernel symbol added or moved. Pin (`src_lines`, HISTORY, `set_hash`, `io/mod.rs` digest via `--emit-pin`) and the `maos-kernel-core` ceiling move together; `kernel_pin_content_hash_16_0.rs` (26377) and `recovery_lane_ceiling_rule.rs` `RATIFIED_AT_EASING` (20_608) updated. Winston's sign-off on the diff is the review's (frontmatter `review`).
+- **AC2 (T2, T3).** `SecretKey::McpBearer(McpServer)` over the closed eight-server `McpServer`; `as_str` `mcp-<server>-bearer`, `environment_variable` `MAOS_MCP_<SERVER>_BEARER`; `ALL` 2 → 10. No backend change. Eight `UserFacing` rows in `env_contract.rs`. `maos purge`'s `known_secret_keys` is derived from `SecretKey::ALL` with an exhaustive label match (2 → 10). Env capture and keyring migration iterate `ALL` unchanged. CR-5: both `--live` `make_client` closures read `secret_store.get(SecretKey::McpBearer(server))` (a store error fails that client typed); the registry passes `None`. Tests: `at_rest_seal.rs` env and encrypted-file `McpBearer` round trips (9/9 with `--features encrypted-file`); `maos_uninstall_16_4.rs` asserts the dry run names all eight bearers and the receipt carries all 10 `keyring://maos/<as_str>` roots (23/23 in that binary); `researcher_8_14c.rs::researcher_live_mcp_sends_the_secret_store_bearer_and_never_leaks_it` runs the real `maos run … --live --once` (env backend): the web server receives `Authorization: Bearer <canary>`, the arxiv server (no bearer) none, and the canary is in no stdout/stderr line and no file under the run's state root.
+- **AC1 (T3, T4).** `StreamableHttpTransport::new(io, uri, bearer)`. Every first request is modern: `MCP-Protocol-Version: 2026-07-28`, `Mcp-Method`, `Mcp-Name`, `Content-Type`/`Accept`, `Authorization` when configured, `params._meta` with protocol version, client capabilities and client info. A 400 whose body is not `HeaderMismatch` (−32020) / `UnsupportedProtocolVersion` (−32022) caches the origin legacy (CR-1, per transport = per origin): `initialize` (2025-11-25) → keep the issued `Mcp-Session-Id` → `notifications/initialized`, then every call carries the session id and the negotiated version (CR-2); a 404 on a session re-initializes once and retries once; a modern-shaped 400 on a cached-legacy origin re-probes modern once. CR-3: `McpTransportError::HttpStatus { status, body }` (body truncated to 4 KiB, kept out of `Display`) and `Unauthorized`; no variant carries the bearer; the transport is deliberately not `Debug`. Fixture `ConformantMcp` (`Modern`/`Legacy`/`DualEra`, 400/401/404 with JSON-RPC bodies) beside the permissive `MockMcp`, which now shares one request reader and captures headers. `mcp_conformance_18_8.rs` 7/7: modern two calls without handshake; hand-built missing/mismatched version → 400 −32020, missing `Mcp-Method`/`Mcp-Name` → 400, and an unsupported version surfaced typed from the real client with no fallback; legacy two calls with exactly one `initialize` and one session id; hand-built unsessioned 400 / unknown session 404, a forgotten session recovered once, an always-forgetting server typed 404; missing or wrong bearer → `Unauthorized` on all three eras; dual-era spoken modern; cached-legacy re-probe.
+- **AC3 (T5).** `StdioTransport` gains a per-call read bound (`DEFAULT_READ_TIMEOUT` 30 s, `with_read_timeout` for tests): the read runs on a helper thread under `recv_timeout`; on expiry `Timeout(ms)`. On every error path the child is killed, and on every path it is reaped (the old early returns left it unreaped). `stdio_transport_test.rs` 6/6: 2 MiB request to `sh -c 'exit 0'` → `Transport("write: Broken pipe …")` deterministically; `cat >/dev/null` → `Transport("child produced no output")`; a hung server → `Timeout(500)` in ~0.5 s and its pid gone from `/proc`.
+- **Plants (T6): 4, one per AC**, all red then restored by copy-back + `cmp` (`CMP_OK`) + `touch`, re-run green — `18-8-evidence/plants.md`: AC1 5.5 s, AC2 5.4 s, AC3 2.8 s, AC4 3.6 s. The story names no CI plant; `18-8-evidence/ci/plant.diff` (= AC1, sha256 `8eb5fa10…25a8`) is offered.
+- **kloc (T7), after `cargo fmt --all`, `kloc-check --json` (tokei 14.0.0):** maos-kernel-core 20595 → 20608 (FLAG grant); maos-domain 9743 → 9805 (+62 of +70 ratified); maos-bin 27969 → 28024 (+55 of the Epic-18 remaining 90); maos-mcp 999 → 1166 (ceiling 1194, no raise); maos-journey-test 626 → 823 (ceiling 1104, no raise); maos-secrets 536 unchanged; xtask row unchanged (46363); `_aggregate_hardfail` 181727 → 182221 (measured 182220 + 1). Rows carry HISTORY citing `18-8-conformant-mcp-client`; returned to the operator for ratification before landing.
+- **Focused suites (local, `env -u CI -u GITHUB_ACTIONS`):** `-p maos-mcp` 33/33; `-p maos-domain -p maos-secrets -p maos-providers -p maos-journey-test` 409 run: 407 passed, the 2 `journey_j0` tests refused a stale `maosctl` (freshness guard) and passed 5/5 after the rebuild; 6 skipped; `-p maos-kernel-core` 384/384 (4 skipped) and `cargo test -p maos-kernel-core --lib` 258/258; `cargo check -p maos-kernel-core --features io_call_journal` clean; `-p maos-bin --test researcher_8_14c --test butler_8_14b --test maos_uninstall_16_4` 34/34; `-p maos-bin --bin maos` env-contract/purge units 3/3; xtask `d11_xtask_ceiling_ratchet recovery_lane_ceiling_rule retro_action_items kernel_pin_content_hash_16_0 decision_adrs_and_provisioning diagnostics_20_3a fkcs_oracle gate_honesty_20_3a macos_compile_guard_20_6` 116/116 (6 skipped).
+- **Gates:** `kloc-check` PASSED (aggregate 182220); `check-kernel-baseline` PASSED (26377, 95 files); `check-env-contract` PASS (106 vars, 0 violations); `check-service-boundary` PASSED; `check-exit-commands` PASS; `check-test-cost` PASS; `check-dev-record-completeness` PASSED; `cargo fmt --all -- --check` clean.
+- Docs: `docs-site/docs/run-maos.md`, its mirror `docs/maos.dev/run-maos.md` and the Korean translation gain "MCP server bearers".
+
+### Review (2026-10-25, anthropic/claude-opus-5-5, 4 layers)
+
+Layers: Blind Hunter (BH), Edge Case Hunter (EC), Acceptance Auditor (AA), Test-Infra Auditor (TIA), all `anthropic/claude-opus-5-5`; the security layer ran on opus-5-5 (frontmatter `review`). Patches applied by `anthropic/claude-opus-5-5` the same day; story stays `review`.
+
+**Review rulings (operator Lunarpulse, 2026-10-25):**
+- **D-18-8-R1 = A** (EC-3/BH-5/AA-7): a bearer lookup error unconfigures ONLY that server (client `None`), warned with the server name and the error kind (`unavailable` / `access failed` / `invalid encoding`), never the value; the other servers keep working — Butler and Researcher both, through one `live_mcp_client`.
+- **D-18-8-R2 = A** (AA-5): a −32022 whose `data.supported` lists `2025-11-25` takes the legacy path (spec SHOULD); otherwise typed `ModernRejection`. Fixture −32022 bodies carry `data.supported`/`data.requested` (spec MUST, TIA-7a).
+- **D-18-8-R3 = A** (BH-7): fallback stays 400-only; BH-7 dismissed — 404/405 on a probe belong to the deprecated HTTP+SSE transport, out of scope (§Does NOT close).
+- **D-18-8-R4 = A** (EC-8/AA-9): new AC5 (above); "both" = two non-`Unconfigured` failures.
+- **D-18-8-R5**: maos-bin ≤ 28050 pre-ratified; Epic 18's named maos-bin budget (+250 from 27809) stands at +196 after 18-1 and 18-8 (54 left, below every remaining 18-x forecast) — effectively exhausted; 18-2…18-7 bring measured requests.
+
+**Dispositions:**
+- BH-1 / EC-1 / AA-2 (HIGH) — **patched**: the bearer is trimmed of surrounding ASCII whitespace at load (env capture and `StreamableHttpTransport::new`, which covers every store backend); any byte outside 0x21–0x7E is refused in `post` with `McpTransportError::InvalidBearer` before the port is called (no value in `Display`/`Debug`). Kernel-level `BadHeader` redaction (also the pre-existing provider `Authorization`/`x-api-key` path) **deferred** → `20-4-gemini-driver-and-endpoint-pin` (◆ FLAG-Winston; outside this grant).
+- BH-2 / EC-4 / AA-1 / TIA-1 — **patched**: any MCP-reserved code −32099..=−32020 on a 400 is a modern rejection (`ModernRejection { code, body }`); fixture switch −32021.
+- BH-3 / AA-3 / EC-7(1,2) — **patched**: stdio write AND read on the helper thread under the bound; after an answer the child gets `EXIT_GRACE` (1 s), then is killed and reaped.
+- BH-4 / AA-6 / EC-7(3) — **patched**: the child leads its own process group (`process_group(0)`); timeout/error kills the group (`kill -KILL -- -<pgid>`; `forbid(unsafe_code)` rules out `killpg`) before reaping.
+- BH-5 / EC-3 / AA-7 — **patched per R1**.
+- BH-6 / EC-2 — **patched**: the era/session is copied out under the lock, the exchange runs unlocked, the result is stored after; a rare concurrent duplicate `initialize` is accepted.
+- BH-7 — **dismissed per R3**.
+- BH-8 / EC-5 / AA-4 / TIA-10 — **patched**: the era verdict reads the full 4xx body; only the stored copy is cut to 4 KiB.
+- EC-6 — **deferred** → `20-4-gemini-driver-and-endpoint-pin` (kernel lines; same adapter and FLAG as the BadHeader row).
+- EC-8 / AA-9 — **patched per R4** (AC5); deferred row fixed in tree.
+- AA-5 — **patched per R2**.
+- AA-8 — **ruled R5**.
+- TIA-2 — **patched (test)**: client holds the canary; server answers 404 / non-modern 400 / 500 → no canary in `format!("{e} {e:?}")`.
+- TIA-3 — **patched (fixture + test)**: expiry hits `tools/call` only; exact sequence `tools/call(404), initialize, notifications/initialized, tools/call(404)`.
+- TIA-4 — **patched**: per-server canaries — Researcher (all four servers, each sees exactly its own bearer) and Butler (Calendar, Slack observed; Linear/Figma mocks asserted request-free: a pass never calls them — Linear only on an option pick, Figma has no production caller); the server name and bearer key now derive from one `McpServer` in `live_mcp_client`.
+- TIA-5 — **patched**: `MAOS_HOME` inside the scanned root; `MAOS_AUDIT_DB`/`MAOS_JOURNAL_PATH` removed.
+- TIA-6 — **patched**: full method/header sequence, third call straight to modern.
+- TIA-7a/b/c — **patched** (not deferred): −32022 `data`; sessionless legacy mode + test; SSE — the client now parses an event-stream answer (first event whose JSON-RPC message is the response to the request id; priming/notification/server-request events skipped; multi-line `data:`); the IO port exposes no `Content-Type`, so the body is sniffed (non-`{` ⇒ event stream). Fixture SSE mode + test on both eras.
+- TIA-8 — **patched**: 2 s bound; the `/proc` check is skipped when no pid was written.
+- TIA-9 — **patched (tests only)**: GET at cap + 1 → `Decode`; POST at exactly the cap → `Ok`.
+
+**Plants (review pass):** 13 + AC1–AC3 re-run, all red then restored (`cmp` + `touch`) and green — `18-8-evidence/plants.md` §Review patch pass, diffs `18-8-evidence/review/*.diff`; `ci/plant.diff` regenerated (sha256 `9682e3df…8e3a`).
+
+**Focused suites (local, `env -u CI -u GITHUB_ACTIONS`, one cargo process):** `-p maos-mcp` 37/37 (4 s); `-p maos-journey-test --test mcp_conformance_18_8` 15/15 (5 s); `-p maos-kernel-core --test io_exchange_18_8` 6/6 (3 s); `-p butler` 54/54, 1 skipped (7 s); `-p maos-secrets --test at_rest_seal --features encrypted-file` 9/9 (4 s); `-p maos-providers --lib` 31/31, 3 skipped (5 s); `-p maos-bin --test researcher_8_14c --test butler_8_14b --test maos_uninstall_16_4 --test butler_inference_18_1 --test butler_daemon_18_1 --test cohort_daemon_smoke_13_5c` 54/54, 1 skipped (11 s); `-p maos-bin --bin maos` purge/env-contract/secret units 3/3 (7 s). Kernel `src` untouched (tests only).
+
+**Gates:** `cargo fmt --all -- --check` clean; `kloc-check` PASSED (aggregate 182291); `check-kernel-baseline` PASSED (26377, 95 files); `check-env-contract` PASS (106 vars, 0 violations); `check-service-boundary` PASSED; `check-test-cost` PASS (529 files); `check-dev-record-completeness` PASSED; gates wall-clock 146 s.
+
+**Figures (kloc-check --json, tokei 14.0.0, after `cargo fmt --all`):** maos-bin 28024 → **28005** (exact lower re-pin, `kloc.toml:517`); maos-mcp 1166 → **1174** / 1194 (no raise; the three transports now share `response_from`); maos-journey-test 823 → **905** / 1104 (no raise); maos-kernel-core 20608 (unchanged, physical 26377); maos-domain 9805; xtask 46363; `_aggregate_hardfail` 182221 → **182292** (measured 182291 + 1). HISTORY notes cite `18-8-conformant-mcp-client`.
+
+**Separate (18-1 landing fix, integrator request):** `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs` lists `butler_root.rs` (28 → 29); 18-8 adds no `maos-bin/src` file.
+
 ### File List
+
+- `crates/maos-kernel-core/src/io/mod.rs` (◆ kernel)
+- `crates/maos-kernel-core/tests/io_exchange_18_8.rs` (new)
+- `crates/maos-domain/src/ports/io_subsystem.rs`
+- `crates/maos-domain/src/ports/secret_store.rs`
+- `crates/maos-domain/src/ports/mod.rs`
+- `crates/maos-mcp/src/transport/mod.rs`
+- `crates/maos-mcp/src/transport/streamable_http.rs`
+- `crates/maos-mcp/src/transport/stdio.rs`
+- `crates/maos-mcp/tests/stdio_transport_test.rs`
+- `crates/maos-journey-test/src/lib.rs`
+- `crates/maos-journey-test/Cargo.toml`
+- `crates/maos-journey-test/tests/mcp_conformance_18_8.rs` (new)
+- `crates/maos-secrets/tests/at_rest_seal.rs`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/src/env_contract.rs`
+- `crates/maos-bin/src/purge.rs`
+- `crates/maos-bin/tests/maos_uninstall_16_4.rs`
+- `crates/maos-bin/tests/researcher_8_14c.rs`
+- `Cargo.lock`
+- `docs-site/docs/run-maos.md`
+- `docs/maos.dev/run-maos.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md`
+- `xtask/kernel-core-baseline.toml`
+- `xtask/kloc.toml`
+- `xtask/tests/kernel_pin_content_hash_16_0.rs`
+- `xtask/tests/recovery_lane_ceiling_rule.rs`
+- `_bmad-output/implementation-artifacts/18-8-evidence/plants.md` (new)
+- `_bmad-output/implementation-artifacts/18-8-evidence/ac1-plant.diff`, `ac2-plant.diff`, `ac3-plant.diff`, `ac4-plant.diff` (new)
+- `_bmad-output/implementation-artifacts/18-8-evidence/ci/plant.diff`, `ci/plant.diff.sha256` (new)
+- `_bmad-output/implementation-artifacts/18-8-conformant-mcp-client.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `crates/maos-mcp/src/transport/sse.rs` (review: shared `response_from`)
+- `crates/maos-mcp/tests/streamable_http_concurrency_18_8.rs` (new, review EC-2)
+- `crates/maos-bin/tests/butler_8_14b.rs` (review TIA-4, AC5)
+- `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs` (18-1 landing fix, integrator request)
+- `spirits/butler/src/lib.rs`, `spirits/butler/tests/inference_seam_18_1.rs` (AC5)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (EC-8 fixed-in-tree note; two 18-8 review rows)
+- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md` (§18-8 AC5)
+- `_bmad-output/implementation-artifacts/18-8-evidence/review/*-plant.diff` (new)
 
 ### Change Log
 
 - 2026-10-25 — Story created by the split of 18-1 (operator ruling D-18-1-01 B): old 18-1 AC2 → AC1, AC5 → AC3; D-18-1-06/07/12 ruled B; AC2 (secret-store bearer) and AC4 (IO port) written concretely from measured prototypes; the ratified kernel grant (+7 / +4) does not cover the dual-era 4xx probe (+15 / +13 or +9 / +7) → D-18-8-01 OPEN; status `backlog`.
 - 2026-10-25 — RULED (operator, Lunarpulse): D-18-8-01 **A** full exchange — kernel grant +15 physical / +13 tokei (◆ FLAG-Winston, ADR-069 envelope), maos-domain +70; 18-1 lands first, 18-8 re-measures; AC4 witness written for `HttpExchange`. Status → `ready-for-dev`.
+- 2026-10-25 — DEV (`anthropic/claude-opus-5-5`): T0–T7. Full-exchange IO port (kernel +14 / +13 within the ratified +15 / +13; pin and ceiling re-pinned together); closed `SecretKey::McpBearer(McpServer)` with env rows, purge coverage and secret-store plumbing; dual-era Streamable-HTTP client with typed `HttpStatus`/`Unauthorized`; `ConformantMcp` + `mcp_conformance_18_8.rs`; bounded, always-reaping stdio read; 4 plants proven red; kloc re-pins (maos-domain 9805, maos-bin 28024, aggregate 182221) returned to the operator for ratification. Status → `review`.
+- 2026-10-25 — REVIEW PATCHES (`anthropic/claude-opus-5-5`): 4-layer review dispositions applied; rulings D-18-8-R1…R5 recorded; AC5 added (R4, closes deferred EC-8); bearer byte refusal + trim, MCP-reserved modern range, full-body era verdict with the R2 legacy path, unlocked exchanges, event-stream responses, stdio write+read under the bound with process-group kill; 13 review plants; maos-bin 28005, maos-mcp 1174, maos-journey-test 905, aggregate 182292; two deferred rows → `20-4-gemini-driver-and-endpoint-pin`. Status stays `review`.

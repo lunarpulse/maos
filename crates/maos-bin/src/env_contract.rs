@@ -81,6 +81,48 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         purpose: "OpenAI credential; a present non-empty value marks the live provider eligible (15-6 §A6 review)",
         stability: EnvStability::UserFacing,
     },
+    // Story 18-8 AC2 — MCP bearers, read only through the captured env
+    // `SecretStore` (`SecretKey::McpBearer`); sent as `Authorization: Bearer`.
+    EnvVar {
+        name: "MAOS_MCP_CALENDAR_BEARER",
+        purpose: "Bearer for the MCP calendar server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MCP_SLACK_BEARER",
+        purpose: "Bearer for the MCP Slack server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MCP_LINEAR_BEARER",
+        purpose: "Bearer for the MCP Linear server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MCP_FIGMA_BEARER",
+        purpose: "Bearer for the MCP Figma server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MCP_WEB_BEARER",
+        purpose: "Bearer for the MCP web-search server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MCP_ARXIV_BEARER",
+        purpose: "Bearer for the MCP arXiv server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MCP_GITHUB_BEARER",
+        purpose: "Bearer for the MCP GitHub server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_MCP_CITATION_GRAPH_BEARER",
+        purpose: "Bearer for the MCP citation-graph server (secret store; env backend/fallback)",
+        stability: EnvStability::UserFacing,
+    },
     EnvVar {
         name: "MAOS_MCP_CALENDAR_URI",
         purpose: "Butler MCP calendar server URI",

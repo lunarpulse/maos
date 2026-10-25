@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -221,7 +221,7 @@
+     let error = serde_json::from_slice::<Value>(body).ok()?["error"].take();
+     let code = error["code"]
+         .as_i64()
+-        .filter(|code| MODERN_ERROR_CODES.contains(code))?;
++        .filter(|code| MODERN_ERROR_CODES.contains(code) && *code != -32021)?; // PLANT BH-2: old [-32020, -32022] list
+     let supported = error["data"]["supported"].as_array();
+     let legacy_ok = supported.is_some_and(|list| list.iter().any(|v| v == LEGACY_PROTOCOL_VERSION));
+     (code != UNSUPPORTED_PROTOCOL_VERSION || !legacy_ok).then_some(code)

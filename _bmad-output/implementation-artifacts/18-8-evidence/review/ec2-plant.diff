@@ -1,0 +1,10 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -186,6 +186,7 @@
+ 
+ impl McpTransport for StreamableHttpTransport {
+     fn invoke(&self, request: McpRequest) -> Result<McpResponse, McpTransportError> {
++        static SERIAL: Mutex<()> = Mutex::new(()); let _held = SERIAL.lock(); // PLANT EC-2: a lock held across the exchange
+         let cached = self.cache().clone();
+         if let Some(mut session) = cached {
+             let result = self.legacy_call(&mut session, &request);

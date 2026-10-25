@@ -661,6 +661,13 @@ pub enum ButlerError {
     Inference(InferenceError),
     /// Story 18-1 (D-18-1-03 A) — the completion is not a valid proposal.
     Proposal(String),
+    /// Story 18-8 AC5 (review ruling D-18-8-R4, D-18-1-04 A) — bound, and
+    /// BOTH MCP fetches failed with something other than `Unconfigured`:
+    /// the pass is refused before `complete` (no model call).
+    McpUnavailable {
+        calendar: ButlerMcpError,
+        comms: ButlerMcpError,
+    },
 }
 
 impl std::fmt::Display for ButlerError {
@@ -673,6 +680,12 @@ impl std::fmt::Display for ButlerError {
             ButlerError::Unbound(s) => write!(f, "inference unavailable: {s}"),
             ButlerError::Inference(e) => write!(f, "inference failed: {e}"),
             ButlerError::Proposal(s) => write!(f, "malformed proposal: {s}"),
+            ButlerError::McpUnavailable { calendar, comms } => {
+                write!(
+                    f,
+                    "MCP data unavailable: calendar: {calendar}; comms: {comms}"
+                )
+            }
         }
     }
 }
@@ -789,25 +802,27 @@ impl Butler {
             // MCP calls are low-frequency (once per on_idle cycle), not inner
             // loops. block_on is safe here because on_idle runs inside
             // spawn_blocking and the underlying MCP client is sync.
-            let calendar = match block_on_sync(mcp.calendar_events()) {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("butler: calendar MCP fetch failed: {e}");
-                    vec![]
+            let calendar = block_on_sync(mcp.calendar_events());
+            let comms = block_on_sync(mcp.comms_messages());
+            match (calendar, comms) {
+                // Story 18-8 AC5 (review ruling D-18-8-R4): bound, and BOTH
+                // fetches failed with something other than `Unconfigured` —
+                // the model would reason over nothing, so the pass is refused
+                // before `complete`. One unconfigured server plus one failed
+                // fetch (or any partial data) is not "both": it proceeds.
+                (Err(calendar), Err(comms))
+                    if self.inference.is_some()
+                        && !is_unconfigured(&calendar)
+                        && !is_unconfigured(&comms) =>
+                {
+                    return self.refuse(ButlerError::McpUnavailable { calendar, comms });
                 }
-            };
-            let comms = match block_on_sync(mcp.comms_messages()) {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("butler: comms MCP fetch failed: {e}");
-                    vec![]
-                }
-            };
-            Some(ScenarioInput {
-                calendar,
-                comms,
-                preference_alignment: None,
-            })
+                (calendar, comms) => Some(ScenarioInput {
+                    calendar: fetched("calendar", calendar),
+                    comms: fetched("comms", comms),
+                    preference_alignment: None,
+                }),
+            }
         } else {
             self.pending.clone()
         };
@@ -843,17 +858,7 @@ impl Butler {
                             conflict_summary,
                         })
                     }
-                    Err(error) => {
-                        // Review BH-3: a refused pass leaves no stale
-                        // notification pending from an earlier pass.
-                        eprintln!("butler: on_idle pass refused: {error}");
-                        *self.last_notification.lock() = None;
-                        if let Some(ch) = &self.output_channel {
-                            *ch.lock().unwrap_or_else(|e| e.into_inner()) = None;
-                        }
-                        *self.pass_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
-                        return;
-                    }
+                    Err(error) => return self.refuse(error),
                 },
                 // Story 8.14b FORK 2 — if there are conflicts, store a
                 // notification payload so handle_option_pick can dispatch.
@@ -979,6 +984,18 @@ impl Butler {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .take()
+    }
+
+    /// Refuse this pass typed (D-18-1-04 A): no notification, no output, no
+    /// scalar write. Review BH-3 (18-1): a refused pass leaves no stale
+    /// notification pending from an earlier pass.
+    fn refuse(&self, error: ButlerError) {
+        eprintln!("butler: on_idle pass refused: {error}");
+        *self.last_notification.lock() = None;
+        if let Some(ch) = &self.output_channel {
+            *ch.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        }
+        *self.pass_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
     }
 
     /// Story 18-1 (D-18-1-08 A) — install the hook `on_idle` runs after
@@ -1298,6 +1315,25 @@ impl Butler {
 // ───────────────────────────────────────────────────────────────────────────
 // Story 8.14b — sync/async bridge + stub helpers.
 // ───────────────────────────────────────────────────────────────────────────
+
+/// Story 18-8 AC5 — an unconfigured server is absent data, not a failure.
+fn is_unconfigured(error: &ButlerMcpError) -> bool {
+    matches!(
+        error,
+        ButlerMcpError::CallFailed {
+            cause: McpError::Unconfigured,
+            ..
+        }
+    )
+}
+
+/// A fetch's data, or none (logged) when it failed.
+fn fetched<T>(what: &str, result: Result<Vec<T>, ButlerMcpError>) -> Vec<T> {
+    result.unwrap_or_else(|e| {
+        eprintln!("butler: {what} MCP fetch failed: {e}");
+        vec![]
+    })
+}
 
 /// Minimal single-threaded `block_on` for bridging async-trait futures inside
 /// `on_idle` (which runs in `spawn_blocking`). The underlying MCP calls are

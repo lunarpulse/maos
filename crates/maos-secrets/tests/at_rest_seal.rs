@@ -254,3 +254,61 @@ fn encrypted_file_store_round_trips_ciphertext_and_deletes() {
     );
     assert_eq!(store.get(SecretKey::AnthropicApiKey).unwrap(), None);
 }
+
+/// Story 18-8 AC2 — an MCP bearer is one more closed key: the env backend
+/// materializes it under `MAOS_MCP_<SERVER>_BEARER` and deletes it.
+#[test]
+fn environment_store_round_trips_an_mcp_bearer() {
+    use maos_domain::ports::{McpServer, SecretDeleteStatus, SecretKey, SecretStore};
+
+    let key = SecretKey::McpBearer(McpServer::Calendar);
+    assert_eq!(key.as_str(), "mcp-calendar-bearer");
+    assert_eq!(key.environment_variable(), "MAOS_MCP_CALENDAR_BEARER");
+    assert_eq!(SecretKey::ALL.len(), 10);
+    let store = maos_secrets::EnvSecretStore::new([(key, "mcp-bearer-canary".to_string())]);
+    assert_eq!(
+        store.get(key).unwrap().as_deref(),
+        Some("mcp-bearer-canary")
+    );
+    assert_eq!(
+        store
+            .get(SecretKey::McpBearer(McpServer::CitationGraph))
+            .unwrap(),
+        None,
+        "one server's bearer never answers for another"
+    );
+    assert_eq!(store.delete(key).unwrap(), SecretDeleteStatus::Removed);
+    assert_eq!(store.get(key).unwrap(), None);
+}
+
+/// Story 18-8 AC2 — the encrypted-file backend seals an MCP bearer under
+/// `<as_str>.sealed` without plaintext at rest, reopens and deletes it.
+#[cfg(feature = "encrypted-file")]
+#[test]
+fn encrypted_file_store_round_trips_an_mcp_bearer() {
+    use maos_domain::ports::{McpServer, SecretDeleteStatus, SecretKey, SecretStore};
+    use std::sync::Arc;
+
+    let directory = tempfile::tempdir().expect("encrypted secret fixture");
+    let root = directory.path().join("vault");
+    let store = maos_secrets::EncryptedFileSecretStore::new(
+        root.clone(),
+        Arc::new(kms_from(&MASTER_KEY_A)),
+        Arc::new(crypto()),
+    );
+    let key = SecretKey::McpBearer(McpServer::Github);
+    store.put(key, "mcp-bearer-sealed").expect("seal bearer");
+    let on_disk = std::fs::read(root.join("mcp-github-bearer.sealed")).expect("read sealed bearer");
+    assert!(
+        !on_disk
+            .windows(b"mcp-bearer-sealed".len())
+            .any(|window| window == b"mcp-bearer-sealed"),
+        "encrypted backend must not persist the bearer in plaintext"
+    );
+    assert_eq!(
+        store.get(key).unwrap().as_deref(),
+        Some("mcp-bearer-sealed")
+    );
+    assert_eq!(store.delete(key).unwrap(), SecretDeleteStatus::Removed);
+    assert_eq!(store.get(key).unwrap(), None);
+}

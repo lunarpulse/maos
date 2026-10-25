@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -61,7 +61,7 @@
+         Self {
+             transport_inner,
+             endpoint_url,
+-            bearer: bearer.map(|bearer| bearer.trim_ascii().to_owned()),
++            bearer: bearer.map(|bearer| bearer.to_owned()), // PLANT BH-1: no trim
+             legacy: Mutex::new(None),
+         }
+     }

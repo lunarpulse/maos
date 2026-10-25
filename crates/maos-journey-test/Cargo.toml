@@ -28,4 +28,6 @@ maos-audit = { path = "../maos-audit" }
 maos-domain = { path = "../maos-domain" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-mcp = { path = "../maos-mcp" }
+# Story 18-8 AC2.4 — the conformance tests take the bearer from an `EnvSecretStore`.
+maos-secrets = { path = "../maos-secrets", default-features = false }
 rusqlite = "0.31"

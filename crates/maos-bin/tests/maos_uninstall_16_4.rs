@@ -245,6 +245,16 @@ fn purge_dry_run_is_inert_then_removes_only_maos_owned_state() {
     let dry_stdout = String::from_utf8_lossy(&dry_run.stdout);
     assert!(dry_stdout.contains("would remove credential: Anthropic API credential"));
     assert!(dry_stdout.contains("would remove credential: OpenAI API credential"));
+    // Story 18-8 AC2 — the eight MCP bearers are MAOS-owned entries too.
+    for key in maos_domain::ports::SecretKey::ALL {
+        if let maos_domain::ports::SecretKey::McpBearer(_) = key {
+            assert!(
+                dry_stdout.contains(&format!("would remove credential: {}", key.as_str())),
+                "dry run must name the {} bearer",
+                key.as_str()
+            );
+        }
+    }
     #[cfg(unix)]
     assert_eq!(
         filesystem_identity(root),
@@ -354,9 +364,18 @@ fn purge_dry_run_is_inert_then_removes_only_maos_owned_state() {
         .collect();
     assert_eq!(
         credential_roots.len(),
-        2,
-        "receipt must cover both known credentials"
+        10,
+        "receipt must cover every known credential (two provider keys, eight MCP bearers)"
     );
+    for key in maos_domain::ports::SecretKey::ALL {
+        let path = format!("keyring://maos/{}", key.as_str());
+        assert!(
+            credential_roots
+                .iter()
+                .any(|root| root["path"] == path.as_str()),
+            "receipt must cover {path}"
+        );
+    }
     assert!(credential_roots.iter().all(|root| {
         matches!(
             root["disposition"].as_str(),

@@ -1,0 +1,11 @@
+--- a/crates/maos-kernel-core/src/io/mod.rs
++++ b/crates/maos-kernel-core/src/io/mod.rs
+@@ -121,7 +121,7 @@
+             req = req.set(k, v);
+         }
+         let response = match req.send_bytes(body) {
+-            Ok(response) | Err(ureq::Error::Status(_, response)) => response,
++            Ok(response) => response, // PLANT AC4: a non-2xx is a Transport error again
+             Err(e) => return Err(IoError::Transport(format!("ureq POST {url}: {e}"))),
+         };
+         let header = response.header(response_header).map(str::to_owned);

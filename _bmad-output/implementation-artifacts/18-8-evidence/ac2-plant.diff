@@ -1,0 +1,11 @@
+--- a/crates/maos-mcp/src/transport/streamable_http.rs
++++ b/crates/maos-mcp/src/transport/streamable_http.rs
+@@ -93,7 +93,7 @@
+         headers.extend(
+             authorization
+                 .as_deref()
+-                .map(|value| ("Authorization", value)),
++                .map(|value| ("Authorization", value)).filter(|_| false), // PLANT AC2: drop the Authorization header
+         );
+         headers.extend_from_slice(extra);
+         let bytes = serde_json::to_vec(body)
