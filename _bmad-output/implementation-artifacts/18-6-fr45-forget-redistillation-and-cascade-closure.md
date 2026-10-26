@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. Difficult story 
 
 # Story 18.6: FR45 forget — re-distillation and cascade closure
 
-Status: review
+Status: done
 
 <!-- Created 2026-10-26 at 5495863e by bmad-create-story under the lighter creation contract (no party-mode preflight). 18-0/18-1/18-8/18-2/18-3 done; 18-4 and 18-5 implemented and pushed (landing CI running), their code treated as landed. Direct reads of every decision-bearing range; the host's only cargo process (CARGO_TARGET_DIR=/mnt/build/cargo, `env -u CI -u GITHUB_ACTIONS`) ran `check-kernel-baseline` (PASSED 26418 / 95) and `kloc-check --json` (passed, aggregate 185451) at HEAD, eight throwaway kernel prototypes over one shared out-of-kernel prototype (measured, then reverted), `cargo check --locked --workspace` for the ripple and `check-service-boundary` for the surface. FLAG record `18-6-flag-winston-decision.md`. RULED 2026-10-26 by the operator (Lunarpulse): D-18-6-01…10 all as recommended (01 B, 02–10 A); kernel grant +8 / +17 ratified; maos-bin named budget 28770. Rulings applied docs-only (no cargo). -->
 
@@ -352,7 +352,7 @@ openai-codex/gpt-6.1-sol (development); anthropic/claude-opus-5-5 (creation).
 - **Advisory limits of local gates:** coverage-matrix exits0 while reporting existing NFR-Meta-3 registry/phase warnings. Reza reports PASSED in evidence-advisory mode, but explicitly NOT_PROVEN for four absent live-Postgres successors (persisted datname/live database, collective partition, collective erase, Spirit route/tenant audit stage2). No local live-Postgres product proof is claimed; hosted substrate CI owns those existing legs.
 - **Budget observation, integrator-dispositioned:** optional `check-test-budget` over the partial focused junit reported existing `maos-iac::participant_recall_17_8` Σ34.951s plus absent-binary exception rows. No touched recall SQL and no exception added. Main ruled CI's workspace junit authoritative (baseline landing40273714381 passed); partial-junit absent rows are not findings. See gate log, do not claim this optional local invocation passed.
 - Protected `intent-lineage-coverage-report.md` is byte-identical to its pre-run backup. No commit or push. W1 remains narrowed/re-runnable, true cross-store atomicity owned by `v25-erasure-crash-reconciliation`; other explicit scope limits remain.
-- [ ] **AC5 hosted run:** integrator, at landing — record hosted `ci/18-6-verify` run id at the done flip; no hosted-run claim at review (Main-approved disposition, same as18-1…18-5).
+- [x] **AC5 hosted run:** integrator, at landing — record hosted `ci/18-6-verify` run id at the done flip; no hosted-run claim at review (Main-approved disposition, same as18-1…18-5). Recorded at the done flip 2026-10-26: run `40319842735` (job `121561672561`, `ubuntu-24.04`); branch deleted.
 
 ### Review (2026-10-26, opus Blind/Edge/Acceptance; Test-Infra pending)
 
@@ -519,6 +519,8 @@ Review-patch additions to the development file inventory:
 - `xtask/tests/kernel_pin_content_hash_16_0.rs`
 - `xtask/tests/recovery_lane_ceiling_rule.rs`
 
+**CI (2026-10-26, integrator):** proven-red run `40319842735` (`ci/18-6-verify`, job `121561672561`, `ubuntu-24.04` image 20261012.334.1; excerpt `18-6-evidence/ci/run-40319842735-excerpt.log`; branch deleted): the unplanted process control passed (`1 test run: 1 passed, 1 skipped`), `plant.diff: OK`, and the planted twin FAILED on `canary leakage in researcher:seed_claim … "claim_id":"seed-rag-noisy" …` (`1 test run: 0 passed, 1 failed, 1 skipped`), so the AC1 canary-witness step reds under the plant. TI-2 (`hook_pump_17_4` Σ) was ruled measure-at-landing: `check-test-budget` was green in both landing runs (`40336401565` @ `a2d69a29`, `40396208547` @ `271e2a33`), so no budget exception was needed. Landing green `40396208547` @ `271e2a33` — discipline 189/189 success, attempt 1, 13.71 job-h, 73.9 min wall.
+
 ### Change Log
 
 - 2026-10-26: Story created (backlog; D-18-6-01…10 PROPOSED) at `5495863e`. Kernel priced by reverted prototypes (recommended +8 physical / +17 tokei); epic §18-6, R18-19 and the stories row corrected in place; FLAG record `18-6-flag-winston-decision.md`.
@@ -528,3 +530,4 @@ Review-patch additions to the development file inventory:
 - 2026-10-26: Completed local implementation/proof and exact governance pins after the ratified STOP addendum. Focused2077+94green, kernel lib258, ratchets65; all named gates PASS, AC1–AC4red/restored and AC5local simulationPASS. Approved premise corrections and hosted landing handoff recorded. Story/tracker → `review`; no commit/push.
 - 2026-10-26: Applied review dispositions R1–R4 and authored safety regressions on top of local8fdf497f, without commit/push; restored budget history/reserves and removed premature delivery wording. Mandatory post-fmt measurement STOP: bin29079>28940, IAC8238>8167, domain9975>9907; audit7635/kernel20606 inside grants. Operator disposition required before further production edits/re-pins or acceptance verification. Story remains `review`.
 - 2026-10-26: Review patches completed after ratified measured addenda (bin29113 exact,IAC8270,domain9975,audit7635;kernel26362/20606,95files); full pins and inline history/reserves restored. Focused838+107,kernel258,xtask65 green;29 review controls plus regenerated shared AC1/AC4 plant red/restored; all named local gates green with explicit advisory limits. Story remains `review`; hosted proof/Test-Infra remain integrator-owned; no commit/push.
+- 2026-10-26: **DONE — hosted CI proof and landing.** Proven-red `40319842735` (job `121561672561`, `ubuntu-24.04`; unplanted 1 passed; planted FAILED `canary leakage in researcher:seed_claim … seed-rag-noisy`; excerpt `18-6-evidence/ci/run-40319842735-excerpt.log`; branch deleted); TI-2 `hook_pump_17_4` Σ ruled measure-at-landing — `check-test-budget` green in both landing runs (`40336401565`, `40396208547`), no exception; landing green `40396208547` @ `271e2a33` — 189/189 success, attempt 1, 13.71 job-h, 73.9 min wall. Status → `done`.
