@@ -362,7 +362,8 @@ pub async fn run_admitted_session(
                 pid: admitted.pid, spirit_id: admitted.spirit_id.as_str().into(), window: launch.context_window,
             };
             recall.context = Some(Arc::new(maos_iac::adapter::context_signal::ContextSignalAdapter::new(
-                Arc::clone(deps.capability.context_budget()), &deps.iac,
+                Arc::clone(deps.capability.context_budget()), Arc::downgrade(&deps.iac),
+                Arc::clone(deps.iac.transparency_log()),
                 Arc::new(move || Some(spirit.clone())),
             )));
             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));

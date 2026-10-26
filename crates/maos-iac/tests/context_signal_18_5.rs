@@ -37,7 +37,8 @@ fn bus() -> (Arc<IacBusAdapter>, Arc<TransparencyLogAdapter>) {
 fn adapter(bus: &Arc<IacBusAdapter>, pid: Arc<AtomicU32>) -> ContextSignalAdapter {
     ContextSignalAdapter::new(
         Arc::new(ContextBudget::default()),
-        bus,
+        Arc::downgrade(bus),
+        Arc::clone(bus.transparency_log()),
         Arc::new(move || {
             let pid = pid.load(Ordering::SeqCst);
             (pid != 0).then(|| AdmittedSpirit {

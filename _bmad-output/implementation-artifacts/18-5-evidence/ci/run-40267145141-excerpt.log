@@ -1,0 +1,9 @@
+proven-red	Set up job	2026-10-26T04:15:58.4579111Z Version: 20261021.618
+proven-red	Set up job	2026-10-26T04:15:58.4587804Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-26T04:15:58.4588333Z Version: 20261012.334.1
+proven-red	Green refusal control	2026-10-26T04:18:00.9678051Z      Summary [   0.029s] 1 test run: 1 passed, 0 skipped
+proven-red	Apply the AC5 plant	2026-10-26T04:18:00.9874498Z _bmad-output/implementation-artifacts/18-5-evidence/ci/plant.diff: OK
+proven-red	Planted issuance gate must defeat refusal witness	2026-10-26T04:18:17.1099567Z         FAIL [   0.010s] (1/1) maos-bin::context_refusal_18_5 researcher_context_refusal_is_typed_journaled_and_recovers
+proven-red	Planted issuance gate must defeat refusal witness	2026-10-26T04:18:17.1109922Z      Summary [   0.011s] 1 test run: 0 passed, 1 failed, 0 skipped
+proven-red	Planted issuance gate must defeat refusal witness	2026-10-26T04:18:17.1110802Z         FAIL [   0.010s] (1/1) maos-bin::context_refusal_18_5 researcher_context_refusal_is_typed_journaled_and_recovers
+proven-red	Restore the control and prove green	2026-10-26T04:18:31.8493536Z      Summary [   0.030s] 1 test run: 1 passed, 0 skipped

@@ -1,7 +1,7 @@
 # {{crate_name}}
 
 A TypeScript MAOS Spirit scaffold that builds a `wasm-component` implementing
-`maos:spirit@2.1.0`.
+`maos:spirit@2.2.0`.
 
 ## Requirements
 
@@ -63,7 +63,7 @@ truncated with a marker.
 
 The schema-5 manifest grants `[capabilities.required.log]` with `recall = true`
 and `fetch = true`. During `handleFrame`, the guest imports
-`maos:spirit/recall@2.1.0`, recalls up to 16 entries, then fetches the inbound
+`maos:spirit/recall@2.2.0`, recalls up to 16 entries, then fetches the inbound
 frame id before echoing the frame. These imports are available only during
 `handleFrame`, not lifecycle hooks.
 

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("maos:spirit/recall@2.1.0", () => ({
+vi.mock("maos:spirit/recall@2.2.0", () => ({
   recall: vi.fn(),
   fetch: vi.fn(),
 }));
 
-import { recall, fetch } from "maos:spirit/recall@2.1.0";
+import { recall, fetch } from "maos:spirit/recall@2.2.0";
 import { handleFrame, onShutdown, onStart } from "../src/index.js";
 
 // Imported WIT result errors are wrapped by componentize-js in this shape.

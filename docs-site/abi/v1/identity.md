@@ -59,6 +59,8 @@ pub enum FrameKind {
     RateLimited,
     GatewayInbound,
     GatewayOutbound,
+    ContextPressure,
+    ContextLimit,
 }
 ```
 

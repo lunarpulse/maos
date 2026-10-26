@@ -1,0 +1,46 @@
+18-5 landing repair evidence — discipline run 40267102242 @5495863e
+Source CI logs fetched with gh api --allow-escape-sequences repos/lunarpulse/maos/actions/jobs/<id>/logs.
+
+CI root causes:
+121391781874:2004 abi reference page docs-site/abi/v1/identity.md is stale; regenerate with cargo run -p xtask -- gen-abi-docs
+121391784555:5122 worker_terminal_facts_17_7.rs:426 s3_external_sigkill_requires_pidfd_fact; observer/orphan detection took 5.168960628s (bound 5s, podman4.9.3). Stopwatch runs through root exit; same root audit drain timeout as below.
+121391784687:3687 root_shutdown_unload_16_3.rs:919 root did not exit within3s; v3/v3b/v4 also fail audit drain assertions. This is not the historical NFR-Rel-11 flake.
+121391785909:3124,3171 journey_j0.rs:466,586 audit writer drain; shell stderr audit writer drain timed out after5s.
+121391789646:2300 one_daemon_one_door_16_1.rs:496 idle root took10.023310197s, bound3s.
+121391789682:2702 butler_daemon_18_1.rs:281 no audit-drain stall at shutdown.
+121391789850:13536-13547 4967 tests,4956passed,11failed: butler_daemon18_1; drain_once; one_daemon SIGTERM; root_shutdown v1,v3,v3b,v4,cohort v5; worker_terminal S3; journey_j0 both halt-resolution vectors.
+121391789904:225-228 glossary-lock denylist: forbidden Korean kernel rendering in cookbook/wasm-component-spirit.md and manifest/v5.md. Coverage itself passed.
+121399879291:2006-2012 six budget findings: maos_uninstall16_4=93.064/30s; maosctl_load16_6=95.151/30s; root_shutdown16_3=73.759/30s; worker_completion2a=50.975/30s; worker_supervision16_3=47.629/46s; total1186.302/800s. All five binaries' excessive samples include root teardown waits. No exceptions or threshold increases applied.
+TS source and mocks still targeted2.1 while vendored WIT/type generation targeted2.2.
+
+Cause repair:
+context_binder captured a strong IacBusAdapter in its reusable factory, retaining audit sender owners even when no Butler/Researcher was loaded. ContextSignalAdapter already held a weak bus but the enclosing factory did not. Constructor now accepts weak bus and independent durable journal; factory and session callers migrate. Added regression holding factory and reporter across bus drop, including binding after shutdown, without a panic/fallback. Kernel source untouched.
+
+Local executed checks (env -u CI -u GITHUB_ACTIONS, CARGO_TARGET_DIR=/mnt/build/cargo for every Cargo command):
+- npm ci && npm test && npm run build && npm run componentize, examples/example-spirit-ts: exit0,8/8Vitest; generated2.2 context/frames/recall declarations; componentize success.
+- KO_COVERAGE_MIN=100 npm run gate:ko-coverage:41/41canonical100%; npm run gate:glossary-lock:45files,PASS.
+- cargo run -q --locked -p xtask -- gen-abi-docs: exit0,9pages; --check: exit0.
+- cargo run -q --locked -p xtask -- check-kernel-baseline: exit0.
+- cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 --test drain_once_audit_writer --test butler_daemon_18_1 -- --test-threads=1:18passed,3suites.
+- cargo build --locked debug maos,maosctl,worker-cli-fixture: exit0.
+- cargo test --locked -p maos-journey-test:55passed,3ignored,16suites. Local T3 legs cannot be claimed live.
+- cargo test --locked -p maos-bin --test context_refusal_18_5:2passed; maos-iac --test context_signal_18_5:9passed; maos-wasm-host --test wit_copies_17_3b:2passed.
+- cargo run -q --locked -p xtask -- templates-regen --lang ts --check: exit0.
+- cargo nextest run --locked -p maos-bin --test maos_uninstall_16_4 --test maosctl_load_16_6 --test root_shutdown_unload_16_3 --test worker_completion_2a --test worker_supervision_16_3 --profile ci --no-fail-fast:112passed; measured sums25.798,10.117,0.579,1.721,19.110s respectively. Root/Worker live legs internally return SKIP without signed T3 substrate; these values are NOT a fresh complete-workspace budget proof.
+- cargo test --locked -p maos-bin --test worker_terminal_facts_17_7 -- --nocapture --test-threads=1:31passed,10explicitT3SKIP; real S3 not exercised.
+- release maos,maosctl,worker-cli-fixture build: exit0.
+- cargo test --locked -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort --nocapture:9passed,7explicitT3SKIP; debug cohort3passed with local live-substrate returns.
+- cargo test --locked -p maos-kernel-core --test halt_receipt_production_rate --release:1passed.
+- cargo run -q --locked -p xtask -- check-multi-tenant-loom --json: exit1;17substrateABSENT legs; original butler shutdown assertion passes. Distinct local stub ownership_create_timeout_cleans_the_receipt_cid failed under package parallelism (T3 creation ownership unknown); this same test passed in preceding serial terminal-facts run. No gate weakening or flake classification applied.
+
+Verification blockers:
+Tool execution host is Debian13container,PID1=sleep. Podman initially absent; installed with sudo apt-get, then actual scripts/provision_t3_tests.py fails at podman pull: cannot clone:Operation not permitted / cannot re-exec process,exit125. Delegated cgroup harness fails: System has not been booted with systemd as init system; Failed to connect to system scope bus:Host is down. PostgreSQL not listening. No SSH hosts configured. No full workspace suite run (contract forbids it). Exact live-T3/cgroup steps and fresh full-workspace budget proof require a capable host/CI; not green claims.
+
+Measured pre-pin kloc: kernel20643unchanged,maos-bin28658(+3),maos-iac7984(+5),aggregate185459(+8),required strict hardfail185460. IAC7984exceeds preceding7981ceiling; STOP/request sent to Main before any re-pin. Story stays review; no commit/push.
+
+Operator STOP resolution,2026-10-26 viaMain: IAC7984RATIFIED. Exact pins applied with HISTORY and prior provenance preserved: maos-iac7984,maos-bin28658,_aggregate_hardfail185460=measured185459+1.
+Final requested checks all exit0: kloc-check --json(passed:true,aggregate185459,kernel20643,bin28658,IAC7984); check-kernel-baseline(26418physical,95files,pinned26418); check-serde-error-handling(0violations); check-test-cost(548testfiles,8markedspawn-sites,4cargo-query,7expensivebinaries); check-dev-record-completeness(182done-statusstories); gen-abi-docs --check; cargo fmt --all -- --check. FinalKOcoverage41/41andglossary45filesPASS.
+
+Local stub observation investigation: ownership_create_timeout_cleans_the_receipt_cid calls kernel launch_t3 directly with a stub runtime, not the root/context factory. git diff HEAD~ -- crates/maos-bin/tests/worker_terminal_facts_17_7/stub_scenes.rs crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs crates/maos-kernel-core/src/security/sandbox/t3/child.rs returned no changes. Failed scratch /tmp/maos-terminal-facts-17-7-create-timeout-261517-1792991258522089150 has stub-podman and spirit files, an empty state directory, and no calls log: stub shell did not publish its invocation/receipt before failure. No attributable change on this path; observation only, no deferred-work row or gate weakening. CI must re-sample on capable host.
+
+Host provisioning: sudo -n apt-get update && sudo -n apt-get install -y podman installed40newpackages,0upgrades: aardvark-dns,buildah,catatonit,conmon,containernetworking-plugins,containers-storage,criu,crun,golang-github-containers-common,golang-github-containers-image,iproute2,iptables,libbpf1,libcap2-bin,libcompel1,libcriu2,libelf1t64,libgpgme11t64,libip4tc2,libip6tc2,libmnl0,libnet1,libnetfilter-conntrack3,libnfnetlink0,libnftables1,libnftnl11,libnl-3-200,libpam-cap,libprotobuf-c1,libprotobuf32t64,libtirpc-common,libtirpc3t64,libxtables12,libyajl2,netavark,nftables,passt,podman,python3-protobuf,python3-pycriu.

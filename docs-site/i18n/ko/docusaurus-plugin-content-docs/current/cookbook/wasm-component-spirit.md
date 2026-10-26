@@ -115,7 +115,7 @@ fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 설정 불가능한 예산, 문자열 오류만 제공하는 호출자, 감사 전용 schedule token)를
 확인하세요. 이는 ADR-016의 context-token 신호가 아닙니다. 그 신호는 guest가
 `maos:spirit/context@2.2.0` `report(used-tokens)`로 자기 token 수를 보고한 뒤
-`handle-frame`으로 받는 커널의 `context-pressure` / `context-limit` 프레임이며,
+`handle-frame`으로 받는 kernel의 `context-pressure` / `context-limit` 프레임이며,
 daemon이 pid와 승인된 window를 고정합니다(`18-5-context-token-budget-accounting`).
 
 2.2 runner는 기존 2.0 및 2.1 component를 다시 빌드하지 않고도 받습니다.

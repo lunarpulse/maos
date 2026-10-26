@@ -161,18 +161,21 @@ pub type Scbs = std::sync::RwLock<std::collections::BTreeMap<u32, Arc<SpiritCont
 /// reporter resolves the pid through the resolver the ROOT handed `attach` /
 /// `construct`, and the window and thresholds from that pid's admitted bundle
 /// (no `[budget]` ⇒ window 0, accounting off). Never from the Spirit.
+/// The factory holds the bus weakly so an unused seam cannot retain audit senders.
 pub fn context_binder(
     capability: &CapabilityRegistryAdapter,
     bus: &Arc<IacBusAdapter>,
     scbs: &Arc<Scbs>,
 ) -> butler::ContextBinder {
     let ledger = Arc::clone(capability.context_budget());
-    let (bus, scbs) = (Arc::clone(bus), Arc::downgrade(scbs));
+    let journal = Arc::clone(bus.transparency_log());
+    let (bus, scbs) = (Arc::downgrade(bus), Arc::downgrade(scbs));
     Arc::new(move |pid_of: butler::PidSource| {
         let scbs = scbs.clone();
         Arc::new(ContextSignalAdapter::new(
             Arc::clone(&ledger),
-            &bus,
+            bus.clone(),
+            Arc::clone(&journal),
             Arc::new(move || {
                 let pid = pid_of()?;
                 let scb = scbs.upgrade()?.read().ok()?.get(&pid).cloned()?;

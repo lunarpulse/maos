@@ -1,5 +1,5 @@
-import type { IacFrame } from "maos:spirit/spirit@2.1.0";
-import { recall, fetch } from "maos:spirit/recall@2.1.0";
+import type { IacFrame } from "maos:spirit/spirit@2.2.0";
+import { recall, fetch } from "maos:spirit/recall@2.2.0";
 
 import { halt } from "./halt.js";
 

@@ -120,12 +120,17 @@ fn journal(
 }
 
 impl ContextSignalAdapter {
-    pub fn new(ledger: Arc<ContextBudget>, bus: &Arc<IacBusAdapter>, admitted: Admitted) -> Self {
+    pub fn new(
+        ledger: Arc<ContextBudget>,
+        bus: Weak<IacBusAdapter>,
+        journal: Arc<TransparencyLogAdapter>,
+        admitted: Admitted,
+    ) -> Self {
         Self {
             ledger,
-            bus: Arc::downgrade(bus),
+            bus,
             admitted,
-            journal: Arc::clone(bus.transparency_log()),
+            journal,
             delivery: Mutex::new(None),
         }
     }

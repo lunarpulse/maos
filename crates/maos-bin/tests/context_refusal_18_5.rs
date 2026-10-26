@@ -53,6 +53,39 @@ use researcher::{
 
 const PID: u32 = 185;
 const BOOT_NONCE: u64 = 0x18_05_01;
+
+#[test]
+fn context_factory_and_reporter_do_not_keep_the_root_bus_alive() {
+    let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    let capability = CapabilityRegistryAdapter::new(
+        Arc::new(RingCryptoProvider),
+        Ed25519SigningKey::new([0x18; 32]),
+        BOOT_NONCE,
+        Arc::new(PolicyTable::new()),
+        audit_tx,
+        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+        Arc::new(WorkingMemoryStore::new()),
+        Arc::new(TelemetryStreamAdapter::default()),
+    );
+    let bus = Arc::new(IacBusAdapter::new(
+        Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new()))),
+        Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE)),
+    ));
+    let weak = Arc::downgrade(&bus);
+    let scbs = Arc::new(std::sync::RwLock::new(BTreeMap::new()));
+    let factory = maos_bin::butler_root::context_binder(&capability, &bus, &scbs);
+    let reporter = factory(Arc::new(|| None));
+    assert_eq!(
+        Arc::strong_count(&bus),
+        1,
+        "seams must not retain audit owners"
+    );
+    drop(bus);
+    assert!(weak.upgrade().is_none());
+    assert!(reporter.report_context_used(1).is_err());
+    let after_shutdown = factory(Arc::new(|| None));
+    assert!(after_shutdown.report_context_used(1).is_err());
+}
 const MANIFEST: &str = include_str!("../../../spirits/researcher/manifest.toml");
 const MCP_CORPUS: &str =
     include_str!("../../../spirits/researcher/tests/fixtures/researcher-mcp-corpus-v0.5.jsonl");
@@ -306,7 +339,8 @@ fn researcher_context_refusal_is_typed_journaled_and_recovers() {
     };
     let context = Arc::new(ContextSignalAdapter::new(
         Arc::clone(capability.context_budget()),
-        &bus,
+        Arc::downgrade(&bus),
+        Arc::clone(&tl),
         Arc::new(move || {
             Some(AdmittedSpirit {
                 pid: PID,
