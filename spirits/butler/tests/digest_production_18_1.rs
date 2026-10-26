@@ -182,6 +182,45 @@ fn the_trust_bar_basis_is_the_local_yesterday() {
     assert_eq!((basis.fires, basis.evaluations), (1, 4));
 }
 
+/// Review TIA-4 — frames placed so the UTC yesterday and the +09:00 local
+/// yesterday hold DIFFERENT frames: at 01:00 UTC on TODAY (10:00 local), the
+/// local yesterday is [TODAY-2 15:00, TODAY-1 15:00) UTC. Two evaluations
+/// at TODAY-2 16:00/17:00 UTC are local-only; an evaluation and its fire at
+/// TODAY-1 16:00 UTC are UTC-only; one at TODAY-1 10:00 UTC is in both.
+#[test]
+fn the_trust_bar_basis_differs_between_the_utc_and_the_local_yesterday() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("tl.sqlite");
+    let (before, yesterday) = ((TODAY - 2) * NANOS_PER_DAY, (TODAY - 1) * NANOS_PER_DAY);
+    let bv = evaluated("belief_variance");
+    seed(
+        &db,
+        &[
+            (before + 16 * HOUR_NS, FrameKind::TelemetryEvent, &bv),
+            (before + 17 * HOUR_NS, FrameKind::TelemetryEvent, &bv),
+            (yesterday + 10 * HOUR_NS, FrameKind::TelemetryEvent, &bv),
+            (yesterday + 16 * HOUR_NS, FrameKind::TelemetryEvent, &bv),
+            (
+                yesterday + 16 * HOUR_NS + 1,
+                FrameKind::EpistemicHalt,
+                "belief_variance",
+            ),
+        ],
+    );
+    let now = TODAY * NANOS_PER_DAY + HOUR_NS;
+    let utc = yesterday_predicate_fire_rate(&db, now, 0).unwrap();
+    let local = yesterday_predicate_fire_rate(&db, now, 9 * 3600).unwrap();
+    assert_eq!(
+        (utc.local_day, utc.fires, utc.evaluations),
+        (TODAY - 1, 1, 2)
+    );
+    assert_eq!(
+        (local.local_day, local.fires, local.evaluations),
+        (TODAY - 1, 0, 3),
+        "the +09:00 basis reads the local yesterday, not the UTC day"
+    );
+}
+
 /// Story 18-4 (D-18-4-07 A, AC5.2) — a seeded `anomaly.flagged:` frame at
 /// 0.9 is listed with its frame ref; one at 0.4 is omitted; one outside the
 /// last 24 h is omitted.

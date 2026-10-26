@@ -250,17 +250,19 @@ pub type PidSource = Arc<dyn Fn() -> Option<u32> + Send + Sync>;
 /// once the host's kernel objects are gone.
 pub type PortBuilder = Arc<dyn Fn() -> Option<Arc<dyn InferencePort + Send + Sync>> + Send + Sync>;
 
-/// Story 18-4 (D-18-4-02 A) — builds the principal port the host fuses to
-/// the pid it resolved; the Spirit never names a pid.
-pub type PrincipalPortFor = Arc<dyn Fn(u32) -> Arc<dyn PrincipalMemoryPort> + Send + Sync>;
+/// Story 18-4 (D-18-4-02 A; review TIA-1/BH-2) — the principal port the
+/// HOST fused to the pid its own resolver yields; the Spirit names no pid.
+pub type PrincipalPortFor =
+    Arc<dyn Fn() -> Result<Arc<dyn PrincipalMemoryPort>, String> + Send + Sync>;
 
-/// Story 18-4 (D-18-4-02 A) — the host's TL write of one decision's
-/// non-personal attestation `(pid, payload)`; an error refuses the effect.
-pub type AttestationSink = Arc<dyn Fn(u32, &[u8]) -> Result<(), String> + Send + Sync>;
+/// Story 18-4 (D-18-4-02 A; review TIA-1/BH-2) — the host's TL write of one
+/// decision's non-personal attestation at the pid its own resolver yields;
+/// an error refuses the effect.
+pub type AttestationSink = Arc<dyn Fn(&[u8]) -> Result<(), String> + Send + Sync>;
 
-/// Story 18-4 (CR-4) — what binds a Butler's acceptance record: the
-/// director's principal id (from the scene fixture, D-18-4-05 A), the
-/// pid-fused port factory and the attestation sink.
+/// Story 18-4 (CR-4) — one Butler's acceptance record: the director's
+/// principal id (from the scene fixture, D-18-4-05 A), the pid-fused port
+/// and the attestation sink, both resolved by the host.
 #[derive(Clone)]
 pub struct AcceptanceSeam {
     pub principal: String,
@@ -268,10 +270,15 @@ pub struct AcceptanceSeam {
     pub attest: AttestationSink,
 }
 
-/// A Butler's bound acceptance record: restored once its pid resolves.
+/// Story 18-4 (review TIA-1/BH-2) — the host's binder: fuses an
+/// [`AcceptanceSeam`] to the resolver the host hands [`ButlerSeam::attach`]
+/// (`maos_bin::butler_root::acceptance_binder`). A Butler only ever holds the
+/// bound, pid-free closures.
+pub type AcceptanceBinder = Arc<dyn Fn(PidSource) -> AcceptanceSeam + Send + Sync>;
+
+/// A Butler's bound acceptance record; `restored` once its first read ran.
 struct AcceptanceBinding {
     seam: AcceptanceSeam,
-    pid_of: PidSource,
     restored: std::sync::Mutex<bool>,
 }
 
@@ -296,12 +303,25 @@ pub struct ButlerSeam {
     /// `MAOS_UTC_OFFSET`, or the scene's scenario clock); the renderer reads
     /// the same one.
     pub clock: Arc<dyn Clock>,
-    /// Story 18-4 (D-18-4-02/05 A) — `Some` only when a principal is known
-    /// (the scene fixture's header); a serving daemon has no pick input.
-    pub acceptance: Option<AcceptanceSeam>,
+    /// Story 18-4 (D-18-4-02/05 A; review TIA-1/BH-2) — `Some` only when a
+    /// principal is known (the scene fixture's header): the host's binder; a
+    /// serving daemon has no pick input.
+    pub acceptance: Option<AcceptanceBinder>,
+    /// Story 18-4 (review ruling D-18-4-R3) — the Butler a scene drives: the
+    /// last one attached with an acceptance binder (the boot arm, or a door
+    /// load that replaced it). The host clears it before its audit drain.
+    pub scene_butler: Arc<std::sync::Mutex<Option<Butler>>>,
 }
 
 impl ButlerSeam {
+    /// Review ruling D-18-4-R3 — the Butler a scene drives now.
+    pub fn scene_butler(&self) -> Option<Butler> {
+        self.scene_butler
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
     /// Bind `butler` (D-18-1-02/05 A): its token names its first declared
     /// `ProviderInfer` (`declared`) and the request names the same id; the
     /// mint runs per pass at the pid `pid_of` resolves. Review ruling
@@ -310,8 +330,8 @@ impl ButlerSeam {
     ///
     /// Story 18-4 (CR-4): the clock and the acceptance record bind here too,
     /// so the boot arm, the door load and the hot-swap successor read one
-    /// clock and restore the record from the principal namespace at the pid
-    /// `pid_of` resolves (on the first pass or decision, once it resolves).
+    /// clock and read the record from the principal namespace at the pid the
+    /// HOST's binder resolves through `pid_of` (review TIA-1/BH-2).
     pub fn attach(
         &self,
         mut butler: Butler,
@@ -319,10 +339,9 @@ impl ButlerSeam {
         pid_of: PidSource,
     ) -> Result<Butler, String> {
         butler = butler.with_clock(Arc::clone(&self.clock));
-        if let Some(seam) = &self.acceptance {
+        if let Some(bind) = &self.acceptance {
             butler.acceptance = Some(Arc::new(AcceptanceBinding {
-                seam: seam.clone(),
-                pid_of: Arc::clone(&pid_of),
+                seam: bind(Arc::clone(&pid_of)),
                 restored: std::sync::Mutex::new(false),
             }));
         }
@@ -353,6 +372,9 @@ impl ButlerSeam {
                 digest.render_logged(pid_of().unwrap_or(0));
             }));
         }
+        if self.acceptance.is_some() {
+            *self.scene_butler.lock().unwrap_or_else(|e| e.into_inner()) = Some(butler.clone());
+        }
         Ok(butler)
     }
 }
@@ -372,6 +394,9 @@ pub struct MorningDigestRenderer {
     frame_sink: Arc<dyn Fn(u32, &[u8]) + Send + Sync>,
     clock: Arc<dyn Clock>,
     rendered_day: std::sync::Mutex<Option<u64>>,
+    /// Review ruling D-18-4-R5 — a scene's digest reads this boot's frames
+    /// written since the previous scene digest: `(boot_nonce, since_ns)`.
+    scene: std::sync::Mutex<Option<(u64, u64)>>,
 }
 
 impl MorningDigestRenderer {
@@ -387,7 +412,21 @@ impl MorningDigestRenderer {
             frame_sink,
             clock,
             rendered_day: std::sync::Mutex::new(None),
+            scene: std::sync::Mutex::new(None),
         }
+    }
+
+    /// Review ruling D-18-4-R5 (BH-1) — a compressed scene's day: the
+    /// scenario clock names the day, but the TL stamps frames in wall time,
+    /// so each scene digest selects the frames of boot `boot_nonce` written
+    /// since the previous one (that day's pass) for (a)–(d), never a time
+    /// window around the scenario instant.
+    pub fn render_scene_day(&self, pid: u32, boot_nonce: u64) -> Result<(), String> {
+        self.scene
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get_or_insert((boot_nonce, 0));
+        self.render_if_new_day(pid)
     }
 
     /// Render now (the clock's instant) unless today's digest was already
@@ -416,9 +455,14 @@ impl MorningDigestRenderer {
         if rendered_day.is_some_and(|d| day <= d) {
             return Ok(None);
         }
-        let digest = Butler::new()
-            .production_morning_digest(&self.audit_db, &self.journal_path, now_ns, offset)
+        let scene = *self.scene.lock().unwrap_or_else(|error| error.into_inner());
+        let (digest, read_until) = Butler::new()
+            .digest_value(&self.audit_db, &self.journal_path, now_ns, offset, scene)
             .map_err(|error| format!("butler morning digest: {error}"))?;
+        if let (Some((boot_nonce, _)), Some(until)) = (scene, read_until) {
+            *self.scene.lock().unwrap_or_else(|error| error.into_inner()) =
+                Some((boot_nonce, until + 1));
+        }
         let event = serde_json::json!({
             "event": "morning_digest",
             "now_ns": now_ns,
@@ -561,8 +605,9 @@ pub struct Assessment {
     pub belief_variance: f32,
     pub user_preference_drift: f32,
     /// Story 18-4 (D-18-4-01 A) — the rolling acceptance window, `Some` only
-    /// when it informed `belief_variance` (≥ 7 decided offers); its
-    /// per-work-mode rates are the halt's diagnostic.
+    /// when it informed `belief_variance` (a conflict and ≥ 5 decided offers,
+    /// review ruling D-18-4-R2); its per-work-mode rates are the halt's
+    /// diagnostic.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acceptance: Option<AcceptanceWindow>,
 }
@@ -572,26 +617,26 @@ impl Assessment {
     /// concern. The kernel decides whether it crosses the `[epistemic_policy]`
     /// threshold; Butler does NOT hardcode the thresholds.
     ///
-    /// Returns `(tag, value, derived_from)`. Story 18-4: a ledger-informed
-    /// `belief_variance` is the scalar whenever the window informs it.
+    /// Returns `(tag, value, derived_from)`. Story 18-4 (review EC-2): a
+    /// ledger-informed `belief_variance` replaces the conflict proxy only —
+    /// a conflict-free pass keeps the drift scalar first.
     pub fn primary_scalar(&self) -> (&'static str, f64, String) {
-        if let Some(window) = &self.acceptance {
+        if !self.conflicts.is_empty() {
+            let derived_from = match &self.acceptance {
+                Some(window) => format!("acceptance-window:{}/{}", window.accepted, window.offers),
+                None => format!(
+                    "calendar-conflict:{}",
+                    self.conflicts
+                        .iter()
+                        .map(|c| format!("{}~{}", c.a, c.b))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+            };
             (
                 SCALAR_TAG_BELIEF_VARIANCE,
                 self.belief_variance as f64,
-                format!("acceptance-window:{}/{}", window.accepted, window.offers),
-            )
-        } else if !self.conflicts.is_empty() {
-            let refs = self
-                .conflicts
-                .iter()
-                .map(|c| format!("{}~{}", c.a, c.b))
-                .collect::<Vec<_>>()
-                .join(",");
-            (
-                SCALAR_TAG_BELIEF_VARIANCE,
-                self.belief_variance as f64,
-                format!("calendar-conflict:{refs}"),
+                derived_from,
             )
         } else if self.user_preference_drift < 1.0 {
             (
@@ -733,6 +778,11 @@ pub fn yesterday_predicate_fire_rate(
         },
     )
     .map_err(ButlerError::Audit)?;
+    Ok(fire_rate(&entries, yesterday))
+}
+
+/// FR17 (d)'s count over `entries`, labelled `local_day`.
+fn fire_rate(entries: &[maos_audit::AuditEntry], local_day: u64) -> PredicateFireRate {
     let evaluated: Vec<&str> = entries
         .iter()
         .filter(|e| e.kind == FRAME_KIND_TELEMETRY_EVENT)
@@ -742,11 +792,11 @@ pub fn yesterday_predicate_fire_rate(
         .iter()
         .filter(|e| e.kind == FRAME_KIND_EPISTEMIC_HALT && evaluated.contains(&e.intent.as_str()))
         .count();
-    Ok(PredicateFireRate {
-        local_day: yesterday,
+    PredicateFireRate {
+        local_day,
         fires,
         evaluations: evaluated.len(),
-    })
+    }
 }
 
 /// Errors Butler's digest and (Story 18-1) inference paths can surface.
@@ -858,8 +908,6 @@ pub struct Butler {
     /// Story 18-4 (D-18-4-02 A) — the principal-namespace binding of the
     /// record (`None` ⇒ in-memory only: no principal is known).
     acceptance: Option<Arc<AcceptanceBinding>>,
-    /// Story 18-4 — notifications stored so far (the attestation's ref).
-    notifications: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl std::fmt::Debug for Butler {
@@ -912,7 +960,6 @@ impl Default for Butler {
             clock: Arc::new(SystemClock::UTC),
             ledger: Arc::default(),
             acceptance: None,
-            notifications: Arc::default(),
         }
     }
 }
@@ -920,9 +967,10 @@ impl Default for Butler {
 impl Butler {
     /// The body of [`Butler::on_idle`].
     fn idle_pass(&self) {
-        // Story 18-4 (D-18-4-02 A) — the record is restored before the first
-        // pass reads the window; a failed restore refuses the pass typed.
-        if let Err(error) = self.ensure_restored() {
+        // Story 18-4 (D-18-4-02 A; review EC-1/AA-1) — every pass reads the
+        // record the principal namespace holds now before the window; a failed
+        // read refuses the pass typed.
+        if let Err(error) = self.refresh_record() {
             return self.refuse(error);
         }
         // Story 8.14b — build the scenario from real MCP data when the port
@@ -1009,8 +1057,6 @@ impl Butler {
             };
             if let Some(notification) = notification {
                 *self.last_notification.lock() = Some(notification);
-                self.notifications
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
 
             // JB-5 — serialize the notification to the output channel so the
@@ -1113,93 +1159,86 @@ impl Butler {
             .window(self.today())
     }
 
-    /// The bound record's pid-fused port, once the pid resolved.
-    fn principal_port(binding: &AcceptanceBinding) -> Result<Arc<dyn PrincipalMemoryPort>, String> {
-        let pid = (binding.pid_of)().ok_or("the Spirit has no admitted pid yet")?;
-        Ok((binding.seam.port_for)(pid))
-    }
-
-    /// Story 18-4 (D-18-4-02 A) — restore the record from the principal
-    /// namespace once per binding; prints
-    /// `{"event":"acceptance_ledger_restored","records":N,"pid":p}`. A
-    /// restored day never overwrites one already decided in this process.
-    fn ensure_restored(&self) -> Result<(), ButlerError> {
-        let Some(binding) = &self.acceptance else {
-            return Ok(());
-        };
-        let mut restored = binding.restored.lock().unwrap_or_else(|e| e.into_inner());
-        if *restored {
-            return Ok(());
-        }
-        let port = Self::principal_port(binding).map_err(ButlerError::Ledger)?;
-        let markdown = port
-            .read(
-                &binding.seam.principal,
-                acceptance::ACCEPTANCE_SCHEMA,
-                acceptance::ACCEPTANCE_KEY,
-            )
-            .map_err(ButlerError::Ledger)?;
-        let record = match markdown {
-            Some(markdown) => {
-                AcceptanceLedger::from_markdown(&markdown).map_err(ButlerError::Ledger)?
-            }
-            None => AcceptanceLedger::default(),
-        };
-        println!(
-            "{}",
-            serde_json::json!({
-                "event": "acceptance_ledger_restored",
-                "records": record.len(),
-                "pid": port.pid(),
-            })
-        );
-        self.ledger
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .merge_restored(record);
-        *restored = true;
-        Ok(())
-    }
-
-    /// Write the whole record to the principal namespace (Markdown, the
-    /// durable Private-tier kind).
-    fn persist(&self) -> Result<(), String> {
-        let Some(binding) = &self.acceptance else {
-            return Ok(());
-        };
-        let markdown = self
-            .ledger
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .to_markdown()?;
-        Self::principal_port(binding)?.write(
+    /// Story 18-4 (D-18-4-02 A; review EC-1/AA-1) — read the record from the
+    /// principal namespace, the record of truth, through the host's
+    /// pid-fused port. The first read per binding prints
+    /// `{"event":"acceptance_ledger_restored","records":N,"pid":p}`.
+    fn read_record(binding: &AcceptanceBinding) -> Result<AcceptanceLedger, String> {
+        let port = (binding.seam.port_for)()?;
+        let record = match port.read(
             &binding.seam.principal,
             acceptance::ACCEPTANCE_SCHEMA,
             acceptance::ACCEPTANCE_KEY,
-            &markdown,
-        )
+        )? {
+            Some(markdown) => AcceptanceLedger::from_markdown(&markdown)?,
+            None => AcceptanceLedger::default(),
+        };
+        let mut restored = binding.restored.lock().unwrap_or_else(|e| e.into_inner());
+        if !*restored {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "event": "acceptance_ledger_restored",
+                    "records": record.len(),
+                    "pid": port.pid(),
+                })
+            );
+            *restored = true;
+        }
+        Ok(record)
     }
 
-    /// Story 18-4 (AC2.4, I2) — record one decision in the principal
-    /// namespace and attest it in the TL (decision id, notification ref,
-    /// action kind, scenario time: nothing personal) BEFORE its effect.
+    /// Story 18-4 (review EC-1/AA-1) — every pass reads the window from what
+    /// the principal namespace holds now: an online `forget` since the last
+    /// read empties it, and nothing held in memory survives the forget.
+    fn refresh_record(&self) -> Result<(), ButlerError> {
+        let Some(binding) = &self.acceptance else {
+            return Ok(());
+        };
+        let mut ledger = self.ledger.lock().unwrap_or_else(|e| e.into_inner());
+        *ledger = Self::read_record(binding).map_err(ButlerError::Ledger)?;
+        Ok(())
+    }
+
+    /// Story 18-4 (review EC-1/AA-1, EC-5) — under the ledger lock: read the
+    /// stored record, apply `change`, write it back, and only then hold it in
+    /// memory (a refused write counts nothing). Unbound, memory only.
+    fn update_record(
+        &self,
+        change: impl FnOnce(&mut AcceptanceLedger) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let mut ledger = self.ledger.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(binding) = &self.acceptance else {
+            return change(&mut ledger);
+        };
+        let mut stored = Self::read_record(binding)?;
+        change(&mut stored)?;
+        (binding.seam.port_for)()?.write(
+            &binding.seam.principal,
+            acceptance::ACCEPTANCE_SCHEMA,
+            acceptance::ACCEPTANCE_KEY,
+            &stored.to_markdown()?,
+        )?;
+        *ledger = stored;
+        Ok(())
+    }
+
+    /// Story 18-4 (AC2.4, I2; review ruling D-18-4-R1) — record one decision
+    /// in the principal namespace and attest it in the TL BEFORE its effect.
+    /// The attestation is non-personal: the decision id (its local day) and
+    /// the scenario time — no response, action or work mode.
     fn record_decision(&self, record: AcceptanceRecord) -> Result<(), String> {
-        self.ensure_restored().map_err(|e| e.to_string())?;
         let attestation = serde_json::json!({
             "decision_id": record.local_day,
-            "notification_ref": self.notifications.load(std::sync::atomic::Ordering::SeqCst),
-            "action": record.action,
             "sim_ns": record.sim_ns,
         })
         .to_string();
-        self.ledger
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(record);
-        self.persist()?;
+        self.update_record(|ledger| {
+            ledger.insert(record);
+            Ok(())
+        })?;
         if let Some(binding) = &self.acceptance {
-            let pid = (binding.pid_of)().ok_or("the Spirit has no admitted pid yet")?;
-            (binding.seam.attest)(pid, attestation.as_bytes())?;
+            (binding.seam.attest)(attestation.as_bytes())?;
         }
         Ok(())
     }
@@ -1207,10 +1246,25 @@ impl Butler {
     /// Story 18-4 (CR-3) — seed decisions taken before the scene (history
     /// days ≤ 0, picks indexing [`DETERMINISTIC_OPTIONS`]); written to the
     /// principal namespace, not attested (no notification was offered).
+    ///
+    /// Review BH-6 (operator rule 2026-10-26): a fixture whose first scene
+    /// day is after day 1 resumes a scene, so the restored record's latest
+    /// local day must be at least the day before the previous one (exactly
+    /// one undecided day, a halt day, is tolerated); otherwise it is refused.
     pub fn seed_acceptance_history(&self, fixture: &AcceptanceFixture) -> Result<(), ButlerError> {
-        self.ensure_restored()?;
-        {
-            let mut ledger = self.ledger.lock().unwrap_or_else(|e| e.into_inner());
+        let first = fixture.days.range(1..).next().map(|(day, _)| *day);
+        self.update_record(|ledger| {
+            if let Some(first) = first.filter(|first| *first > 1) {
+                let needed = fixture.local_day(first).saturating_sub(2);
+                if ledger.latest_day().is_none_or(|latest| latest < needed) {
+                    return Err(format!(
+                        "the fixture resumes at day {first}, but the restored record holds no \
+                         decision on or after day {} (latest local day {:?})",
+                        first - 2,
+                        ledger.latest_day()
+                    ));
+                }
+            }
             for day in fixture.history() {
                 let action = match day.response {
                     Response::Ignored => None,
@@ -1220,10 +1274,7 @@ impl Butler {
                             .and_then(|option| parse_option(option).ok())
                             .map(|(action, _)| action)
                             .ok_or_else(|| {
-                                ButlerError::Ledger(format!(
-                                    "history day {}: pick {n} names no seed option",
-                                    day.day
-                                ))
+                                format!("history day {}: pick {n} names no seed option", day.day)
                             })?,
                     ),
                 };
@@ -1236,8 +1287,9 @@ impl Butler {
                     accepted: action.is_some_and(|a| a != OptionAction::Snooze),
                 });
             }
-        }
-        self.persist().map_err(ButlerError::Ledger)
+            Ok(())
+        })
+        .map_err(ButlerError::Ledger)
     }
 
     /// Story 18-4 (CR-2, AC1) — the Spirit-side half of one simulated day,
@@ -1252,12 +1304,19 @@ impl Butler {
         let window = self.acceptance_window();
         if self.last_halt_receipt().is_some() {
             let (tag, _, _) = assessment.primary_scalar();
+            // Review ruling D-18-4-R2 — a window halt and a proxy halt are
+            // told apart on the halt line.
+            let derived_from = match assessment.acceptance {
+                Some(_) => "acceptance_window",
+                None => "conflict_proxy",
+            };
             println!(
                 "{}",
                 serde_json::json!({
                     "event": "halt",
                     "render": halt_screen_line(tag),
                     "day": day.day,
+                    "derived_from": derived_from,
                     "belief_variance": assessment.belief_variance,
                     "diagnostic": {"rate": window.rate, "by_mode": window.by_mode},
                 })
@@ -1505,13 +1564,18 @@ impl Butler {
         } else {
             (0.75 + 0.05 * (conflicts.len().min(5) as f32)).min(0.99)
         };
-        // Story 18-4 (D-18-4-01 A) — once the rolling window holds ≥ 7
-        // decided offers, the uncertainty is about the director: H₂ of the
-        // pooled acceptance rate. Before that the conflict proxy stands.
-        let window = self.acceptance_window();
-        let (belief_variance, acceptance) = match window.belief_variance() {
-            Some(entropy) => (entropy, Some(window)),
-            None => (conflict_proxy, None),
+        // Story 18-4 (D-18-4-01 A, review ruling D-18-4-R2) — once the
+        // rolling window holds ≥ 5 decided offers, the uncertainty about a
+        // conflict is about the director: H₂ of the pooled acceptance rate.
+        // Before that the conflict proxy stands; a conflict-free pass never
+        // reads the window (review EC-2: the drift scalar stays first).
+        let window = (!conflicts.is_empty()).then(|| self.acceptance_window());
+        let (belief_variance, acceptance) = match window {
+            Some(window) if window.belief_variance().is_some() => (
+                window.belief_variance().unwrap_or(conflict_proxy),
+                Some(window),
+            ),
+            _ => (conflict_proxy, None),
         };
 
         // user_preference_drift: the comms-triage alignment signal. Fully
@@ -1564,7 +1628,36 @@ impl Butler {
         predicate_fire_rate_24h: f32,
     ) -> Result<MorningDigest, ButlerError> {
         let range = LogRange::last_24h(now_ns);
+        let entries = query(
+            audit_db,
+            AuditFilter {
+                since_ns: Some(range.since_ns),
+                until_ns: Some(range.until_ns),
+                ..Default::default()
+            },
+        )
+        .map_err(ButlerError::Audit)?;
+        self.digest_over(
+            audit_db,
+            journal_path,
+            range,
+            &entries,
+            anomalies,
+            predicate_fire_rate_24h,
+        )
+    }
 
+    /// The digest over the citeable rows `entries` (they carry
+    /// `frame_id_hex`), cross-checked against the composed view of `range`.
+    fn digest_over(
+        &self,
+        audit_db: &Path,
+        journal_path: &Path,
+        range: LogRange,
+        entries: &[maos_audit::AuditEntry],
+        anomalies: &[NotificationEvent],
+        predicate_fire_rate_24h: f32,
+    ) -> Result<MorningDigest, ButlerError> {
         // Story 3.4 composed view — establishes the narrative window + ordering
         // contract Butler relies on. (Open-halt presence is cross-checked below
         // against the citeable query rows.)
@@ -1575,20 +1668,9 @@ impl Butler {
                 && matches!(&e.payload, ComposedPayload::Frame { frame_kind, .. } if frame_kind == "epistemic.halt")
         });
 
-        // Citeable rows (carry frame_id_hex). Same file, same window.
-        let entries = query(
-            audit_db,
-            AuditFilter {
-                since_ns: Some(range.since_ns),
-                until_ns: Some(range.until_ns),
-                ..Default::default()
-            },
-        )
-        .map_err(ButlerError::Audit)?;
-
         let mut completed = Vec::new();
         let mut open_halts = Vec::new();
-        for e in &entries {
+        for e in entries {
             // Validate the frame id early — a malformed hex here indicates
             // corruption in the audit trail and must not propagate to the
             // distillation request where it would fail later with a less
@@ -1654,11 +1736,66 @@ impl Butler {
         now_ns: u64,
         utc_offset_secs: i32,
     ) -> Result<serde_json::Value, ButlerError> {
-        let basis = yesterday_predicate_fire_rate(audit_db, now_ns, utc_offset_secs)?;
-        let mut digest = self.morning_digest(audit_db, journal_path, now_ns, &[], basis.rate())?;
-        digest.anomalies = anomaly_feed(audit_db, now_ns)?;
+        self.digest_value(audit_db, journal_path, now_ns, utc_offset_secs, None)
+            .map(|(value, _)| value)
+    }
+
+    /// [`Self::production_morning_digest`], or — review ruling D-18-4-R5
+    /// (BH-1) — in a scene (`Some((boot_nonce, since_ns))`) over this boot's
+    /// frames stamped at or after `since_ns` (the day's pass): (a)/(b)/(c) and
+    /// (d)'s basis all read them, labelled the scenario's local day. Returns
+    /// the stamp of the last frame read (the next scene digest starts after it).
+    fn digest_value(
+        &self,
+        audit_db: &Path,
+        journal_path: &Path,
+        now_ns: u64,
+        utc_offset_secs: i32,
+        scene: Option<(u64, u64)>,
+    ) -> Result<(serde_json::Value, Option<u64>), ButlerError> {
+        let (range, entries, basis) = match scene {
+            None => {
+                let range = LogRange::last_24h(now_ns);
+                let entries = query(
+                    audit_db,
+                    AuditFilter {
+                        since_ns: Some(range.since_ns),
+                        until_ns: Some(range.until_ns),
+                        ..Default::default()
+                    },
+                )
+                .map_err(ButlerError::Audit)?;
+                let basis = yesterday_predicate_fire_rate(audit_db, now_ns, utc_offset_secs)?;
+                (range, entries, basis)
+            }
+            Some((boot_nonce, since_ns)) => {
+                let entries = query(
+                    audit_db,
+                    AuditFilter {
+                        boot_nonce: Some(boot_nonce),
+                        since_ns: Some(since_ns),
+                        ..Default::default()
+                    },
+                )
+                .map_err(ButlerError::Audit)?;
+                let stamps = entries.iter().map(|e| e.timestamp_ns);
+                let range = LogRange {
+                    since_ns: stamps.clone().min().unwrap_or(since_ns),
+                    until_ns: stamps.max().unwrap_or(since_ns),
+                };
+                let basis = fire_rate(&entries, local_day(now_ns, utc_offset_secs));
+                (range, entries, basis)
+            }
+        };
+        let mut digest =
+            self.digest_over(audit_db, journal_path, range, &entries, &[], basis.rate())?;
+        digest.anomalies = anomaly_items(&entries)?;
         let mut value = serde_json::to_value(&digest)
             .map_err(|e| ButlerError::Internal(format!("digest encode: {e}")))?;
+        value["frames"] = serde_json::Value::from(match scene {
+            None => "last_24h",
+            Some(_) => "scene_pass",
+        });
         value["anomalies_basis"] = serde_json::json!({
             "wired": ANOMALY_SOURCES_WIRED,
             "unwired": ANOMALY_SOURCES_UNWIRED,
@@ -1666,7 +1803,7 @@ impl Butler {
         value["trust_bar_basis"] = serde_json::to_value(basis)
             .map_err(|e| ButlerError::Internal(format!("trust-bar basis encode: {e}")))?;
         value["utc_offset_secs"] = serde_json::Value::from(utc_offset_secs);
-        Ok(value)
+        Ok((value, entries.iter().map(|e| e.timestamp_ns).max()))
     }
 
     /// Build the I11 distillation request for a digest. `source_log_ref` is the
@@ -1782,21 +1919,12 @@ struct FlaggedPayload {
     confidence: f32,
 }
 
-/// Story 18-4 (D-18-4-07 A) — FR17 (c) on the production path: the last
-/// 24 h's [`INTENT_ANOMALY_FLAGGED`] `telemetry.event` frames, each citing
-/// its frame; a frame whose payload is not the `AnomalyFlagged` fields is a
-/// typed error, never a silent drop.
-fn anomaly_feed(audit_db: &Path, now_ns: u64) -> Result<Vec<AnomalyItem>, ButlerError> {
-    let range = LogRange::last_24h(now_ns);
-    let entries = query(
-        audit_db,
-        AuditFilter {
-            since_ns: Some(range.since_ns),
-            until_ns: Some(range.until_ns),
-            ..Default::default()
-        },
-    )
-    .map_err(ButlerError::Audit)?;
+/// Story 18-4 (D-18-4-07 A) — FR17 (c) on the production path: the
+/// selected frames' [`INTENT_ANOMALY_FLAGGED`] `telemetry.event` frames
+/// (the last 24 h, or a scene day's pass), each citing its frame; a frame
+/// whose payload is not the `AnomalyFlagged` fields is a typed error, never
+/// a silent drop.
+fn anomaly_items(entries: &[maos_audit::AuditEntry]) -> Result<Vec<AnomalyItem>, ButlerError> {
     let mut items = Vec::new();
     for entry in entries.iter().filter(|e| {
         e.kind == FRAME_KIND_TELEMETRY_EVENT && e.intent.starts_with(INTENT_ANOMALY_FLAGGED)

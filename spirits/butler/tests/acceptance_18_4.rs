@@ -9,9 +9,14 @@
 //!   with the model's text through a scripted `ButlerMcpPort`, pick 1 snoozes
 //!   at the clock + 15 min; an out-of-range pick consumes nothing; with no
 //!   MCP port a `linear_note` pick is accepted with its effect refused, typed.
-//! - AC1 (D-18-4-01 A): once the 7-day window holds 7 decided offers,
-//!   `belief_variance` is H₂ of the pooled rate; before that the conflict
-//!   proxy stands.
+//! - AC1 (D-18-4-01 A; review ruling D-18-4-R2): once the 7-day window holds
+//!   5 decided offers, `belief_variance` on a conflict is H₂ of the pooled
+//!   rate; before that the conflict proxy stands; a conflict-free pass keeps
+//!   the drift scalar (review EC-2); a resume after an undecided halt day
+//!   still tunes on the window.
+//! - Review EC-5: a refused principal write counts nothing. BH-5/EC-6:
+//!   out-of-range fixture days are refused at parse. BH-6: a resume needs
+//!   the record to reach the day before the previous one.
 //! - AC3 (D-18-4-02 A, CR-4): the record is written through the pid-fused
 //!   principal port and restored at the pid the host resolves — a Butler at
 //!   another pid (a door reload) restores 0 records; each decision's TL
@@ -25,7 +30,7 @@ use butler::__maos_spirit_vtable_Butler;
 use butler::{
     AcceptanceFixture, AcceptanceSeam, Butler, ButlerInferenceBinding, ButlerMcpError,
     ButlerMcpPort, ButlerSeam, CalendarEvent, CommsMessage, EventStatus, MorningDigestRenderer,
-    OptionAction, ScenarioInput,
+    OptionAction, PidSource, ScenarioInput,
 };
 use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_domain::ports::inference::{
@@ -220,9 +225,10 @@ fn fixture(lines: &[(i64, &str, &str)]) -> AcceptanceFixture {
     AcceptanceFixture::parse(&text).unwrap()
 }
 
-/// AC1 (D-18-4-01 A) — the window takes over once it holds 7 decisions.
+/// AC1 (D-18-4-01 A, review ruling D-18-4-R2) — the window takes over once
+/// it holds 5 decisions: a gap day leaves 6, still informed; 4 is not.
 #[test]
-fn the_window_drives_belief_variance_once_it_holds_seven_offers() {
+fn the_window_drives_belief_variance_once_it_holds_five_offers() {
     let all_accepted: Vec<(i64, &str, &str)> = (-6..=0).map(|d| (d, "deep", "pick:1")).collect();
     let fx = fixture(&all_accepted);
     let clock = Arc::new(ScenarioClock::new(fx.day_ns(1), 0));
@@ -268,6 +274,43 @@ fn the_window_drives_belief_variance_once_it_holds_seven_offers() {
     );
     assert_eq!(window.by_mode["shallow"].rate, 0.0);
     assert_eq!(window.by_mode["deep"].rate, 1.0);
+
+    // Review ruling D-18-4-R2 — undecided days: 5 of 7 still inform the
+    // scalar, 4 do not (the conflict proxy stands).
+    for (days, informed) in [
+        (vec![-6, -5, -4, -2, -1], true),
+        (vec![-6, -4, -2, -1], false),
+    ] {
+        let lines: Vec<(i64, &str, &str)> = days.iter().map(|d| (*d, "deep", "pick:1")).collect();
+        let butler =
+            Butler::with_scenario(conflict()).with_clock(Arc::clone(&clock) as Arc<dyn Clock>);
+        butler.seed_acceptance_history(&fixture(&lines)).unwrap();
+        let assessment = butler.assess(&conflict());
+        assert_eq!(assessment.acceptance.is_some(), informed, "{days:?}");
+        let (_, _, derived_from) = assessment.primary_scalar();
+        assert_eq!(
+            derived_from.starts_with("acceptance-window:"),
+            informed,
+            "{derived_from}"
+        );
+    }
+
+    // Review EC-2 — a conflict-free pass never reads the window: the drift
+    // scalar stays first (the manifest halts on it below 0.6).
+    let drifting = ScenarioInput {
+        preference_alignment: Some(0.3),
+        ..Default::default()
+    };
+    let butler = Butler::with_scenario(conflict()).with_clock(Arc::clone(&clock) as Arc<dyn Clock>);
+    butler.seed_acceptance_history(&fx).unwrap();
+    let assessment = butler.assess(&drifting);
+    assert!(assessment.acceptance.is_none());
+    let (tag, value, derived_from) = assessment.primary_scalar();
+    assert_eq!(
+        (tag, derived_from.as_str()),
+        ("user_preference_drift", "comms-preference-drift")
+    );
+    assert!((value - 0.3).abs() < 1e-6);
 }
 
 /// An in-memory principal store keyed by the FUSED pid.
@@ -311,21 +354,28 @@ fn seam(
         )),
         rollover: false,
         clock: Arc::clone(clock) as Arc<dyn Clock>,
-        acceptance: Some(AcceptanceSeam {
-            principal: "director-ada".into(),
-            port_for: Arc::new(move |pid| {
-                Arc::new(FusedPort {
-                    pid,
-                    store: Arc::clone(&store),
-                }) as Arc<dyn PrincipalMemoryPort>
-            }),
-            attest: Arc::new(move |_, payload| {
-                log.lock()
-                    .unwrap()
-                    .push(format!("attest {}", String::from_utf8_lossy(payload)));
-                Ok(())
-            }),
-        }),
+        // The host's binder: the port and the sink resolve the pid through
+        // the resolver the host hands `attach`.
+        acceptance: Some(Arc::new(move |pid_of: PidSource| {
+            let (store, log) = (Arc::clone(&store), Arc::clone(&log));
+            AcceptanceSeam {
+                principal: "director-ada".into(),
+                port_for: Arc::new(move || {
+                    let pid = pid_of().ok_or("no pid")?;
+                    Ok(Arc::new(FusedPort {
+                        pid,
+                        store: Arc::clone(&store),
+                    }) as Arc<dyn PrincipalMemoryPort>)
+                }),
+                attest: Arc::new(move |payload| {
+                    log.lock()
+                        .unwrap()
+                        .push(format!("attest {}", String::from_utf8_lossy(payload)));
+                    Ok(())
+                }),
+            }
+        })),
+        scene_butler: Arc::default(),
     }
 }
 
@@ -359,18 +409,21 @@ fn the_record_restores_at_the_resolved_pid_and_attests_before_the_effect() {
         "the attestation precedes the effect: {log_now:?}"
     );
     assert_eq!(log_now[1], "effect");
-    for personal in ["deep", "pick:1", "work_mode", "response", "Board"] {
+    for personal in [
+        "deep",
+        "pick:1",
+        "work_mode",
+        "response",
+        "Board",
+        "action",
+        "linear_note",
+    ] {
         assert!(
             !log_now[0].contains(personal),
             "the TL attestation names `{personal}`: {}",
             log_now[0]
         );
     }
-    assert!(
-        log_now[0].contains("\"action\":\"linear_note\""),
-        "{}",
-        log_now[0]
-    );
     let stored = store.0.lock().unwrap();
     let markdown = stored
         .get(&(
@@ -406,4 +459,123 @@ fn the_record_restores_at_the_resolved_pid_and_attests_before_the_effect() {
         0,
         "records: 0 at the new pid"
     );
+}
+
+/// A principal port whose writes the host refuses.
+struct RefusingPort;
+
+impl PrincipalMemoryPort for RefusingPort {
+    fn pid(&self) -> u32 {
+        1
+    }
+    fn write(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), String> {
+        Err("principal port: the host shut down".into())
+    }
+    fn read(&self, _: &str, _: &str, _: &str) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+}
+
+/// Review EC-5 — a decision whose principal write is refused is not
+/// counted, not attested and leaves the notification pending.
+#[test]
+fn a_refused_write_counts_nothing() {
+    let fx = fixture(&[]);
+    let clock = Arc::new(ScenarioClock::new(fx.day_ns(1), 0));
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let mut seam = seam(&Arc::new(Store::default()), &log, &clock);
+    let sink = Arc::clone(&log);
+    seam.acceptance = Some(Arc::new(move |_: PidSource| {
+        let sink = Arc::clone(&sink);
+        AcceptanceSeam {
+            principal: "director-ada".into(),
+            port_for: Arc::new(|| Ok(Arc::new(RefusingPort) as Arc<dyn PrincipalMemoryPort>)),
+            attest: Arc::new(move |_| {
+                sink.lock().unwrap().push("attest".into());
+                Ok(())
+            }),
+        }
+    }));
+    let butler = seam
+        .attach(
+            Butler::with_scenario(conflict()),
+            || None,
+            Arc::new(|| Some(1)),
+        )
+        .unwrap();
+    drive_on_idle(&butler);
+    for _ in 0..2 {
+        let refused = butler.handle_option_pick(1, "deep", None).unwrap_err();
+        assert!(matches!(refused, ButlerMcpError::Ledger(_)), "{refused:?}");
+    }
+    assert!(log.lock().unwrap().is_empty(), "nothing attested");
+    clock.set_ns(fx.day_ns(2));
+    assert_eq!(butler.acceptance_window().offers, 0, "nothing counted");
+}
+
+/// Review BH-6 (operator rule 2026-10-26) — a fixture starting after day 1
+/// resumes a scene: the restored record must reach the day before the
+/// previous one (one undecided day — a halt day — is tolerated).
+#[test]
+fn a_resume_needs_the_record_to_reach_the_day_before_the_previous_one() {
+    let history: Vec<(i64, &str, &str)> = (-6..=0)
+        .map(|d| (d, "deep", "pick:1"))
+        .chain([(1, "deep", "pick:1")])
+        .collect();
+    let fx = fixture(&history);
+    let clock = Arc::new(ScenarioClock::new(fx.day_ns(1), 0));
+    let (store, log) = (Arc::new(Store::default()), Arc::new(Mutex::new(Vec::new())));
+    let seam = seam(&store, &log, &clock);
+    let pid_of: PidSource = Arc::new(|| Some(1));
+    let first = seam
+        .attach(
+            Butler::with_scenario(conflict()),
+            || None,
+            Arc::clone(&pid_of),
+        )
+        .unwrap();
+    first.seed_acceptance_history(&fx).unwrap();
+    drive_on_idle(&first);
+    first.handle_option_pick(1, "deep", None).unwrap();
+
+    let resume = |from: i64| {
+        let lines: Vec<(i64, &str, &str)> =
+            (from..=from + 2).map(|d| (d, "deep", "pick:1")).collect();
+        seam.attach(
+            Butler::with_scenario(conflict()),
+            || None,
+            Arc::clone(&pid_of),
+        )
+        .unwrap()
+        .seed_acceptance_history(&fixture(&lines))
+    };
+    assert!(resume(2).is_ok(), "the next day resumes");
+    assert!(
+        resume(3).is_ok(),
+        "one undecided day (a halt day) is tolerated"
+    );
+    let refused = resume(4).unwrap_err().to_string();
+    assert!(
+        refused.contains("the fixture resumes at day 4"),
+        "{refused}"
+    );
+}
+
+/// Review BH-5/EC-6 — out-of-range fixture days and starts are refused at
+/// parse, typed: never a panic, a wrap or a clamped merge.
+#[test]
+fn fixture_days_out_of_range_are_refused_at_parse() {
+    let header = r#"{"principal":"p","start":"2026-03-02","utc_offset":"+09:00"}"#;
+    let line = |day: i64| format!(r#"{{"day":{day},"work_mode":"deep","response":"pick:1"}}"#);
+    for day in [i64::MIN, i64::MAX, -30_000] {
+        let error = AcceptanceFixture::parse(&format!("{header}\n{}", line(day))).unwrap_err();
+        assert!(
+            error.contains("outside the clock's range"),
+            "{day}: {error}"
+        );
+    }
+    let far = r#"{"principal":"p","start":"9999-01-01","utc_offset":"+00:00"}"#;
+    let error = AcceptanceFixture::parse(&format!("{far}\n{}", line(1))).unwrap_err();
+    assert!(error.contains("past the clock's range"), "{error}");
+    assert!(AcceptanceFixture::parse(&format!("{header}\n{}", line(-6))).is_ok());
 }

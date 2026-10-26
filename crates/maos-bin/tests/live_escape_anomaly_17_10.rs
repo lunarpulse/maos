@@ -306,7 +306,7 @@ async fn run(dir: &Path, forbidden: bool) -> Run {
         NONCE,
         ESCAPE_TAIL_INTERVAL,
         Box::new(StampedLines(tx)),
-        Box::new(|_| {}),
+        maos_bin::escape_detector_consumer::tl_journal(Arc::downgrade(&world.tl)),
     );
     let fault_runner = fixtures::fixture("maos-wasm-runner-fault-inject");
     let artifact = fixtures::fixture("echo_spirit.wasm");
@@ -429,6 +429,16 @@ async fn real_sigsys_surfaces_exactly_one_anomaly_within_bound() {
         .expect("the running tail surfaced no line before the hang guard")
         .expect("tail writer dropped");
     assert_eq!(kill_rows(&world.tl, pid), 1, "exactly one kind-8 row");
+    // Review TIA-2 — the root's production journal wrote the FR17 (c) frame
+    // before the line.
+    let flagged = world
+        .tl
+        .query_frames(FrameFilter::default())
+        .unwrap()
+        .into_iter()
+        .filter(|f| f.intent == maos_bin::escape_detector_consumer::ANOMALY_FLAGGED_INTENT)
+        .count();
+    assert_eq!(flagged, 1, "one anomaly.flagged frame precedes the line");
     let rows = maos_escape_detector::Detector::read_kernel_sandbox_blocks(
         &dir.path().join("transparency.sqlite"),
     )

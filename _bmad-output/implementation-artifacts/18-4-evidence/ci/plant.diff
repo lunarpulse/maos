@@ -1,11 +1,11 @@
 --- a/spirits/butler/src/lib.rs
 +++ b/spirits/butler/src/lib.rs
-@@ -1510,7 +1510,7 @@
-         // pooled acceptance rate. Before that the conflict proxy stands.
-         let window = self.acceptance_window();
-         let (belief_variance, acceptance) = match window.belief_variance() {
--            Some(entropy) => (entropy, Some(window)),
-+            Some(_entropy) => (conflict_proxy, Some(window)), // CI PLANT AC1
-             None => (conflict_proxy, None),
-         };
- 
+@@ -1563,7 +1563,7 @@
+         let window = (!conflicts.is_empty()).then(|| self.acceptance_window());
+         let (belief_variance, acceptance) = match window {
+             Some(window) if window.belief_variance().is_some() => (
+-                window.belief_variance().unwrap_or(conflict_proxy),
++                conflict_proxy, // CI PLANT AC1
+                 Some(window),
+             ),
+             _ => (conflict_proxy, None),

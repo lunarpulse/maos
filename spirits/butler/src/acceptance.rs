@@ -4,17 +4,15 @@
 //!
 //! The record is personal (FR31): it lives in the principal namespace
 //! through the host's pid-fused [`PrincipalMemoryPort`], never in a TL frame;
-//! the TL carries a non-personal attestation per decision (action kind,
-//! scenario time, decision id).
+//! the TL carries a non-personal attestation per decision (decision id and
+//! scenario time; review ruling D-18-4-R1).
 //!
 //! [`PrincipalMemoryPort`]: maos_spirit_sdk::principal::PrincipalMemoryPort
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use maos_spirit_sdk::clock::{
-    local_day_start_ns, parse_utc_offset, ClockSpec, ScenarioClock, NANOS_PER_DAY,
-};
+use maos_spirit_sdk::clock::{parse_utc_offset, ClockSpec, ScenarioClock, NANOS_PER_DAY};
 use serde::{Deserialize, Serialize};
 
 /// The principal-namespace schema the record is written under.
@@ -25,8 +23,10 @@ pub const ACCEPTANCE_KEY: &str = "ledger";
 pub const ACCEPTANCE_INTENT: &str = "butler:acceptance";
 /// The rolling window, in local days before today.
 pub const WINDOW_DAYS: u64 = 7;
-/// Decided offers the window needs before it informs `belief_variance`.
-pub const MIN_WINDOW_OFFERS: usize = 7;
+/// Decided offers the window needs before it informs `belief_variance`
+/// (review ruling D-18-4-R2: 5 of the 7 days, so an undecided day — a halt
+/// day, a conflict-free day — does not hand the next week to the proxy).
+pub const MIN_WINDOW_OFFERS: usize = 5;
 
 /// Story 18-4 (D-18-4-03 A) — the closed action vocabulary an option names
 /// as its `"<action>: <text>"` prefix.
@@ -121,8 +121,9 @@ pub struct AcceptanceWindow {
 
 impl AcceptanceWindow {
     /// D-18-4-01 A — once the window holds [`MIN_WINDOW_OFFERS`], the binary
-    /// entropy of the pooled rate: the unconditioned policy's uncertainty
-    /// about the director (high exactly when acceptance is mixed).
+    /// entropy of the pooled rate (≡ a rate below 0.811 when it is above
+    /// 0.5; review AA-4): the unconditioned policy's uncertainty about the
+    /// director, high exactly when acceptance is mixed.
     pub fn belief_variance(&self) -> Option<f32> {
         (self.offers >= MIN_WINDOW_OFFERS).then(|| binary_entropy(self.rate))
     }
@@ -160,6 +161,11 @@ impl AcceptanceLedger {
     /// Record a decision; a later decision on the same local day replaces it.
     pub fn insert(&mut self, record: AcceptanceRecord) {
         self.records.insert(record.local_day, record);
+    }
+
+    /// The latest decided local day.
+    pub fn latest_day(&self) -> Option<u64> {
+        self.records.keys().next_back().copied()
     }
 
     /// The window `[today - 7, today - 1]`.
@@ -219,13 +225,6 @@ impl AcceptanceLedger {
             ledger.insert(record);
         }
         Ok(ledger)
-    }
-
-    /// Merge restored records under the ones already held.
-    pub fn merge_restored(&mut self, restored: AcceptanceLedger) {
-        for (day, record) in restored.records {
-            self.records.entry(day).or_insert(record);
-        }
     }
 }
 
@@ -357,6 +356,12 @@ impl AcceptanceFixture {
                 header.start
             )
         })?;
+        if day_ns_of(start_local_day, utc_offset_secs).is_none() {
+            return Err(format!(
+                "acceptance fixture header: start `{}` is past the clock's range",
+                header.start
+            ));
+        }
         let mut days = BTreeMap::new();
         for (n, line) in lines {
             let line: FixtureLine = serde_json::from_str(line)
@@ -369,6 +374,18 @@ impl AcceptanceFixture {
             }
             let response = Response::parse(&line.response)
                 .map_err(|e| format!("acceptance fixture line {}: {e}", n + 1))?;
+            // Review BH-5/EC-6 — a day before the epoch or past the clock's
+            // range is refused here, never wrapped, clamped or panicked on.
+            if local_day_of(start_local_day, line.day)
+                .and_then(|local| day_ns_of(local, utc_offset_secs))
+                .is_none()
+            {
+                return Err(format!(
+                    "acceptance fixture line {}: day {} is outside the clock's range",
+                    n + 1,
+                    line.day
+                ));
+            }
             let day = FixtureDay {
                 day: line.day,
                 work_mode: line.work_mode,
@@ -391,15 +408,14 @@ impl AcceptanceFixture {
         })
     }
 
-    /// The local day of scene day `day`.
+    /// The local day of scene day `day` (bounded at parse, review BH-5/EC-6).
     pub fn local_day(&self, day: i64) -> u64 {
-        (self.start_local_day as i64 + day - 1).max(0) as u64
+        local_day_of(self.start_local_day, day).unwrap_or(0)
     }
 
     /// The instant scene day `day`'s pass runs at (08:00 local).
     pub fn day_ns(&self, day: i64) -> u64 {
-        local_day_start_ns(self.local_day(day), self.utc_offset_secs)
-            + SCENE_HOUR * (NANOS_PER_DAY / 24)
+        day_ns_of(self.local_day(day), self.utc_offset_secs).unwrap_or(0)
     }
 
     /// History days (`≤ 0`), oldest first.
@@ -430,6 +446,25 @@ impl AcceptanceFixture {
             })
             .collect()
     }
+}
+
+/// Review BH-5/EC-6 — the local day of scene day `day` (`None` before the
+/// epoch or on overflow).
+fn local_day_of(start_local_day: u64, day: i64) -> Option<u64> {
+    let local = i64::try_from(start_local_day)
+        .ok()?
+        .checked_add(day)?
+        .checked_sub(1)?;
+    u64::try_from(local).ok()
+}
+
+/// Review BH-5/EC-6 — the UTC instant of `local_day`'s 08:00 pass (`None`
+/// past the clock's range).
+fn day_ns_of(local_day: u64, utc_offset_secs: i32) -> Option<u64> {
+    let ns = i128::from(local_day) * i128::from(NANOS_PER_DAY)
+        - i128::from(utc_offset_secs) * 1_000_000_000
+        + i128::from(SCENE_HOUR * (NANOS_PER_DAY / 24));
+    u64::try_from(ns).ok()
 }
 
 /// `YYYY-MM-DD` → days since the epoch (proleptic Gregorian).

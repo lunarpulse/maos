@@ -546,6 +546,7 @@ fn the_root_binding_mints_once_per_pass_on_one_instance() {
         rollover: false,
         clock: Arc::new(maos_spirit_sdk::clock::SystemClock::UTC),
         acceptance: None,
+        scene_butler: Arc::default(),
     };
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(183));
     let host = maos_bin::researcher_root::ResearcherHost::new(

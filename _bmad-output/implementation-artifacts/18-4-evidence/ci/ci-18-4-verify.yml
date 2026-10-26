@@ -1,0 +1,77 @@
+# Story 18-4 AC1 — branch-only planted-red run (docs/testing/proof-contract.md:
+# proven-red on ONE image; review TIA-6/AA-8). Copy to
+# `.github/workflows/ci-18-4-verify.yml` on `ci/18-4-verify` ONLY; never merged;
+# the branch is deleted after the run.
+# Applies the one plant (`assess` keeps the conflict proxy while the acceptance
+# window informs `belief_variance`) and requires the `epic-18-exit` line-4 twin
+# step's condition to FAIL under it — the steady director halts on day 1 —
+# while exit line 4 itself (the control) stays green: under the plant the
+# fixture halts on day 1 at a pooled rate of 1.0 (≥ 0.6), one digest, zero
+# decided days, which line 4's checks accept.
+name: 18-4-proven-red
+on:
+  push:
+    branches: ["ci/18-4-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Apply the AC1 plant
+        run: |
+          set -euo pipefail
+          echo "bfb733616c4c24d615bc15bb1440f2cf993c635a48722c7f8dd006a3cc964dad  _bmad-output/implementation-artifacts/18-4-evidence/ci/plant.diff" | sha256sum -c -
+          git apply _bmad-output/implementation-artifacts/18-4-evidence/ci/plant.diff
+          git diff --stat
+          git diff
+      - name: Build the planted root
+        run: cargo build --locked -p maos-bin --bin maos
+      - name: Control — exit line 4 stays green under the plant
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d.jsonl > line4.out 2> line4.err
+          rc=$?
+          cat line4.out line4.err
+          set -e
+          test "$rc" -eq 0 || { echo "::error title=18-4 control::exit line 4 rc=${rc} under the plant"; exit 1; }
+          grep -q 'butler inference seam wired' line4.err
+          halt_day="$(jq -rs '[.[] | select(.event == "halt" and .render == "halted on belief_variance" and .day <= 21 and .diagnostic.rate >= 0.6) | .day] | if length == 1 then .[0] else "none" end' line4.out)"
+          test "$halt_day" != "none" || { echo "::error title=18-4 control::no single belief_variance halt at rate >= 0.6"; exit 1; }
+          jq -es --argjson d "$halt_day" '([.[] | select(.event == "acceptance_day")] | length) == ($d - 1) and ([.[] | select(.event == "morning_digest")] | length) == $d and ([.[] | select(.event == "scene_complete" and .halt_day == $d)] | length) == 1' line4.out > /dev/null
+          echo "::notice title=18-4 control::exit line 4 green under the plant (halt day ${halt_day})"
+      - name: Planted twin must defeat the twin step (the steady director halts)
+        shell: bash
+        run: |
+          set +e
+          export PATH="$PWD/target/debug:$PATH"
+          scratch="$(mktemp -d)"
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
+          export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d-steady.jsonl > line4-twin.out 2> line4-twin.err
+          rc=$?
+          cat line4-twin.out line4-twin.err
+          if [ "$rc" -eq 0 ] && jq -es '([.[] | select(.event == "halt")] | length) == 0 and ([.[] | select(.event == "acceptance_day")] | length) == 21 and ([.[] | select(.event == "scene_complete" and .halt_day == null)] | length) == 1' line4-twin.out > /dev/null; then
+            echo "::error title=18-4 AC1::planted twin still runs 21 days with no halt — the plant did not restore the conflict proxy"
+            exit 1
+          fi
+          echo "::notice title=18-4 AC1 PROVEN-RED::conflict proxy restored → the steady twin (rc=${rc}) halts, so epic-18-exit's line-4 twin step reds"

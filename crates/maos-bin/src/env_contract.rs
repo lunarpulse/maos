@@ -179,6 +179,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_SCENE_HOLD_FILE",
+        purpose: "Test-only: a Butler scene waits before each day after its first while this file exists, so a process witness can drive the operator door mid-scene (Story 18-4 review ruling D-18-4-R3)",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_SPIRIT_ID",
         purpose: "Spirit identifier for one-shot lifecycle verbs",
         stability: EnvStability::UserFacing,

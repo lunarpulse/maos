@@ -171,7 +171,9 @@ impl ClockSpec {
     pub fn parse(raw: &str) -> Result<Self, ClockError> {
         let error = || ClockError::Spec(raw.to_owned());
         let body = raw.strip_prefix("compressed:").ok_or_else(error)?;
-        let (count, unit) = body.split_at(body.len().saturating_sub(1));
+        // Review BH-4/EC-4/TIA-3 — split on the last CHAR, never a byte: a
+        // multibyte unit is refused typed, not a panic.
+        let (count, unit) = body.split_at(body.char_indices().last().map_or(0, |(i, _)| i));
         let unit = match unit {
             "m" => ClockUnit::Minutes,
             "h" => ClockUnit::Hours,
@@ -257,6 +259,8 @@ mod tests {
             "compressed:-1d",
             "compressed:3w",
             "compressed:1.5d",
+            "compressed:1é",
+            "compressed:2日",
         ] {
             assert!(ClockSpec::parse(bad).is_err(), "{bad:?} must be refused");
         }

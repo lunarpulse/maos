@@ -3926,7 +3926,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     // Story 18-4 (CR-1/CR-2, D-18-4-06 A) — the root's one clock: the scene's
     // scenario clock (from the fixture, never the wall) or the wall clock at
-    // `MAOS_UTC_OFFSET` (read once here; malformed refuses the boot, typed).
+    // `MAOS_UTC_OFFSET`, validated on EVERY boot (malformed refuses typed;
+    // review EC-7) and discarded when a scene supplies its own clock.
+    let system_clock = maos_spirit_sdk::clock::SystemClock::from_env()
+        .map_err(|error| format!("maos run: MAOS_UTC_OFFSET: {error}"))?;
     let butler_scene = match run_args.as_ref().and_then(|run| run.scene.as_ref()) {
         Some(scene) => Some(
             butler::Scene::load(&scene.clock, &scene.acceptance)
@@ -3936,10 +3939,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let butler_clock: Arc<dyn maos_spirit_sdk::clock::Clock> = match &butler_scene {
         Some(scene) => Arc::clone(&scene.clock) as Arc<dyn maos_spirit_sdk::clock::Clock>,
-        None => Arc::new(
-            maos_spirit_sdk::clock::SystemClock::from_env()
-                .map_err(|error| format!("maos run: MAOS_UTC_OFFSET: {error}"))?,
-        ),
+        None => Arc::new(system_clock),
     };
     // Story 18-1 (review ruling D-18-1-R1) — the Butler seam every Butler of
     // this root attaches (boot arm, door load, hot-swap successor): bound
@@ -3995,37 +3995,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .as_ref()
             .is_some_and(|run| run.once || run.scene.is_some()),
         clock: butler_clock,
-        // Story 18-4 (D-18-4-02/05 A) — a principal is known only from the
-        // scene fixture: the record goes through a port fused to the pid the
-        // scheduler resolved, and each decision's non-personal attestation
-        // is a TL frame written before its effect (I2).
-        acceptance: butler_scene.as_ref().map(|scene| butler::AcceptanceSeam {
-            principal: scene.fixture.principal.clone(),
-            port_for: {
-                let memory = Arc::downgrade(&memory);
-                Arc::new(move |pid| {
-                    Arc::new(maos_bin::butler_root::PidBoundPrincipalPort::new(
-                        memory.clone(),
-                        pid,
-                    ))
-                        as Arc<dyn maos_spirit_sdk::principal::PrincipalMemoryPort>
-                })
-            },
-            attest: {
-                let tl = Arc::clone(&transparency_log);
-                Arc::new(move |pid, payload: &[u8]| {
-                    let _ = tl.insert_frame_event(
-                        FrameKind::TelemetryEvent,
-                        pid,
-                        None,
-                        butler::ACCEPTANCE_INTENT,
-                        payload,
-                        maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
-                    );
-                    Ok(())
-                })
-            },
+        // Story 18-4 (D-18-4-02/05 A; review TIA-1/BH-2) — a principal is
+        // known only from the scene fixture: the root's binder fuses each
+        // Butler's port and TL attestation to the pid ITS resolver yields.
+        acceptance: butler_scene.as_ref().map(|scene| {
+            maos_bin::butler_root::acceptance_binder(
+                scene.fixture.principal.clone(),
+                Arc::downgrade(&memory),
+                Arc::downgrade(&transparency_log),
+            )
         }),
+        scene_butler: Arc::default(),
     });
     // Story 18-3 (review rulings D-18-3-R1/R2, BH-1) — what every Researcher
     // of this root is built with: `--live` surveys MCP (a configured client
@@ -4495,35 +4475,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
         // Story 17-10 (D-17-10-FW-01) — the live escape-anomaly consumer, armed
         // before any admission so no kill row of this boot precedes its cursor.
-        // Story 18-4 (D-18-4-07 A) — each anomaly is journaled as an
-        // `anomaly.flagged:escape-detector` frame before its stderr line (the
-        // TL is held weakly: the final scan runs after the audit drain, where
-        // a frame can no longer be written — said, never silent).
+        // Story 18-4 (D-18-4-07 A; review TIA-2) — each anomaly is journaled
+        // by the production `tl_journal` before its stderr line.
         escape_tail = Some(
             maos_bin::escape_detector_consumer::spawn_escape_anomaly_tail(
                 audit_db_path.clone(),
                 boot_nonce,
                 maos_bin::escape_detector_consumer::ESCAPE_TAIL_INTERVAL,
                 Box::new(std::io::stderr()),
-                {
-                    let tl = Arc::downgrade(&transparency_log);
-                    Box::new(move |report| match tl.upgrade() {
-                        Some(tl) => {
-                            let _ = tl.insert_frame_event(
-                                FrameKind::TelemetryEvent,
-                                u32::try_from(report.spirit_pid).unwrap_or(0),
-                                None,
-                                maos_bin::escape_detector_consumer::ANOMALY_FLAGGED_INTENT,
-                                maos_bin::escape_detector_consumer::anomaly_flagged_payload(report)
-                                    .as_bytes(),
-                                maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
-                            );
-                        }
-                        None => eprintln!(
-                            "maos: escape-anomaly not journaled (the Transparency Log is closed)"
-                        ),
-                    })
-                },
+                maos_bin::escape_detector_consumer::tl_journal(Arc::downgrade(&transparency_log)),
             ),
         );
         eprintln!("maos: escape-anomaly consumer wired (Story 17-10, ADR-024)");
@@ -6034,6 +5994,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 once_interrupted = true;
                                 return Ok(());
                             }
+                            // Review ruling D-18-4-R3 — each day's pass goes to
+                            // the Butler loaded now (the door may have replaced
+                            // the boot arm's: CR-4, its own pid and record).
+                            maos_bin::butler_root::scene_hold(day.day > days[0].day).await;
+                            let gone = || format!("maos run: scene day {}: no Butler", day.day);
+                            let pid = scheduler.resolve_pid(&spirit_id).ok_or_else(gone)?;
+                            let scb = scheduler.scbs().read().unwrap().get(&pid).map(Arc::clone);
+                            let butler = butler_seam.lock().unwrap_or_else(|e| e.into_inner()).as_ref().and_then(butler::ButlerSeam::scene_butler);
+                            let (scb, butler) = scb.zip(butler).ok_or_else(gone)?;
                             scene.clock.set_ns(scene.fixture.day_ns(day.day));
                             let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
                             let output = butler_output_ch
@@ -6041,7 +6010,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .unwrap_or_else(|error| error.into_inner())
                                 .take();
                             let halted = maos_bin::butler_root::pass_verdict(
-                                Some(butler),
+                                Some(&butler),
                                 &outcome,
                                 output.as_ref(),
                                 &predicate,
@@ -6050,7 +6019,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .map_err(|error| format!("maos run: {error}"))?;
                             if let Some(digest) = butler_morning_digest.as_ref() {
                                 digest
-                                    .render_if_new_day(pid)
+                                    .render_scene_day(pid, boot_nonce)
                                     .map_err(|error| format!("maos run: {error}"))?;
                             }
                             if halted {
@@ -6238,6 +6207,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Story 18-1 — the Butler handle holds `capability` (and so
                 // `audit_tx`) through its bound port.
                 drop(butler_pass_handle);
+                // Story 18-4 (D-18-4-R3) — so does the seam's scene Butler.
+                drop(butler_seam.lock().unwrap_or_else(|e| e.into_inner()).take());
                 drop(orchestrator);
                 drop(root_worker_supervision);
                 drop(scheduler);

@@ -15,7 +15,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use maos_bin::escape_detector_consumer::{
-    anomaly_flagged_payload, spawn_escape_anomaly_tail, EscapeAnomalyTail, ANOMALY_FLAGGED_INTENT,
+    spawn_escape_anomaly_tail, tl_journal, EscapeAnomalyTail, ANOMALY_FLAGGED_INTENT,
 };
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i9::SandboxTier;
@@ -126,8 +126,9 @@ async fn final_scan_surfaces_a_row_after_the_last_tick_exactly_once() {
 
 /// Story 18-4 (D-18-4-07 A, AC5.2; I2) — each anomaly is journaled as an
 /// `anomaly.flagged:escape-detector` TL frame carrying the `AnomalyFlagged`
-/// fields BEFORE its stderr line: the journal and the line share one ordered
-/// channel, and the frame is in the TL the digest reads.
+/// fields BEFORE its stderr line: review TIA-2 — through the root's
+/// production journal (`tl_journal`, the one `main.rs` passes), wrapped so
+/// the journal and the line share one ordered channel.
 #[tokio::test(flavor = "multi_thread")]
 async fn each_anomaly_is_journaled_before_its_line() {
     let dir = tempfile::tempdir().unwrap();
@@ -135,21 +136,14 @@ async fn each_anomaly_is_journaled_before_its_line() {
     let tl = std::sync::Arc::new(TransparencyLogAdapter::open(&db, NONCE).unwrap());
     let (tx, mut rx) = unbounded_channel();
     let journal_tx = tx.clone();
-    let journal_tl = std::sync::Arc::clone(&tl);
+    let mut production = tl_journal(std::sync::Arc::downgrade(&tl));
     let tail = spawn_escape_anomaly_tail(
         db.clone(),
         NONCE,
         Duration::from_secs(3600),
         Box::new(Lines(tx)),
         Box::new(move |report| {
-            journal_tl.insert_frame_event(
-                FrameKind::TelemetryEvent,
-                report.spirit_pid as u32,
-                None,
-                ANOMALY_FLAGGED_INTENT,
-                anomaly_flagged_payload(report).as_bytes(),
-                FrameOrigin::SpiritAuto,
-            );
+            production(report);
             let _ = journal_tx.send(format!("journaled {}", report.frame_id_hex));
         }),
     );
