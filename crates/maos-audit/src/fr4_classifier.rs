@@ -69,6 +69,8 @@ pub const NON_CALL_KINDS: &[&str] = &[
     "governance.event", // 28
     "cost.attribution", // 29
     "identity.asserted", // 30 — tokenless, minted at the Worker's real pid under enterprise posture (16-3)
+    "context.pressure", // 32 — ADR-016 signal the kernel writes at the reporting Spirit's pid (18-5)
+    "context.limit",    // 33
 ];
 
 /// The payload value type a writer-shape entry pins for one key.
@@ -100,6 +102,8 @@ pub enum PayloadType {
     SpiritPidEqualsRow,
     /// Exact typed T3 container exit record with domain invariants.
     ContainerExit,
+    /// ADR-016's exact nested context envelope, attributed to the row's pid.
+    ContextEnvelope,
 }
 
 /// The intent grammar of one writer site: an exact literal, or a fixed
@@ -522,6 +526,22 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("redacted_distillate_frame_id", PayloadType::Str),
         ]),
     },
+    // Story 18-5: the fallback writer selects kind 32/33 and serializes the
+    // externally tagged FramePayload, not an unwrapped ContextEnvelope.
+    WriterShapeEntry {
+        site: ("context_signal.rs", "journal", 0),
+        kind: 32,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("context.pressure"),
+        shape: Some(&[("ContextPressure", PayloadType::ContextEnvelope)]),
+    },
+    WriterShapeEntry {
+        site: ("context_signal.rs", "journal", 0),
+        kind: 33,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("context.limit"),
+        shape: Some(&[("ContextLimit", PayloadType::ContextEnvelope)]),
+    },
     // ── maos-iac — Call (deliberately NOT exempt) ──────────────────────────
     // 17-3c: `deliver_typed` / DRR `flush_batch` now write the caller's
     // `iac.send` token, so they are token-bearing sites; a row a caller left
@@ -657,6 +677,14 @@ fn payload_matches(
                     )
                     .is_ok_and(|record| record.is_consistent())
             }
+            PayloadType::ContextEnvelope => value.as_object().is_some_and(|object| {
+                object.len() == 4
+                    && object.get("spirit_pid").and_then(serde_json::Value::as_u64)
+                        == Some(u64::from(row_spirit_pid))
+                    && ["context_used", "context_window_size", "threshold_permille"]
+                        .iter()
+                        .all(|key| object.get(*key).is_some_and(serde_json::Value::is_u64))
+            }),
             PayloadType::SpiritPidEqualsRow => value.as_u64() == Some(row_spirit_pid as u64),
         };
         if !ok {
@@ -664,4 +692,40 @@ fn payload_matches(
         }
     }
     true
+}
+
+#[cfg(test)]
+mod context_writer_tests {
+    use super::*;
+
+    #[test]
+    fn fallback_context_writer_shape_pins_tag_fields_and_pid() {
+        for (kind, tag, intent) in [
+            (32, "ContextPressure", "context.pressure"),
+            (33, "ContextLimit", "context.limit"),
+        ] {
+            let writer = WRITER_SHAPES
+                .iter()
+                .find(|writer| {
+                    writer.site == ("context_signal.rs", "journal", 0) && writer.kind == kind
+                })
+                .unwrap();
+            assert_eq!(writer.token, TokenColumn::Absent);
+            assert_eq!(writer.intent, WriterIntent::Exact(intent));
+            let shape = writer.shape.unwrap();
+            let mut payload = serde_json::json!({
+                (tag): {"spirit_pid": 7, "context_used": 3892,
+                    "context_window_size": 4096, "threshold_permille": 950}
+            });
+            assert!(payload_matches(shape, &payload.to_string(), 7, false));
+            assert!(!payload_matches(shape, &payload.to_string(), 8, false));
+            payload[tag]["extra"] = true.into();
+            assert!(!payload_matches(shape, &payload.to_string(), 7, false));
+            payload[tag].as_object_mut().unwrap().remove("extra");
+            payload[tag]["context_used"] = "3892".into();
+            assert!(!payload_matches(shape, &payload.to_string(), 7, false));
+            let wrong_tag = serde_json::json!({"WrongKind": payload[tag]});
+            assert!(!payload_matches(shape, &wrong_tag.to_string(), 7, false));
+        }
+    }
 }

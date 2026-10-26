@@ -1,4 +1,4 @@
-//! Codec between domain `IacFrame` values and the `maos:spirit@2.1.0`
+//! Codec between domain `IacFrame` values and the `maos:spirit@2.2.0`
 //! WIT-generated `IacFrame` the wasmtime guest speaks.
 //!
 //! The runner decodes ADR-032 CBOR bytes into a domain frame, lowers it into
@@ -19,8 +19,6 @@
 use maos_domain::frame as domain;
 use maos_spirit_abi::identity::{FrameKind as DomainFrameKind, HostId, SpiritId, SpiritRole};
 
-use crate::wit_guest::maos::spirit::frames as wit;
-
 /// Error converting between domain and WIT frame shapes.
 #[derive(Debug, thiserror::Error)]
 pub enum BridgeError {
@@ -28,10 +26,18 @@ pub enum BridgeError {
     BadFrameIdLen(usize),
     #[error("argv-prefix-hash is not 32 bytes (was {0})")]
     BadHashLen(usize),
-    #[error("domain {ty} variant is not representable by maos:spirit@2.1.0")]
+    #[error("domain {ty} variant is not representable by the selected Spirit WIT schema")]
     Unrepresentable { ty: &'static str },
 }
 
+// Expand the same lossless codec against both closed-enum export schemas.
+// Only the 2.2 expansion has context cases; legacy lowering refuses them.
+macro_rules! bridge {
+    ($name:ident, $bindings:path $(, $context:ident)?; $($old_kind:literal, $old_payload:literal)?) => {
+pub mod $name {
+use super::*;
+use $bindings as wit;
+$(use $bindings as $context;)?
 fn spirit_role_to_wit(role: SpiritRole) -> String {
     match role {
         SpiritRole::Director => "director",
@@ -68,9 +74,9 @@ fn address_from_wit(a: wit::FrameAddress) -> domain::FrameAddress {
     }
 }
 
-fn frame_kind_to_wit(k: DomainFrameKind) -> wit::FrameKind {
+fn frame_kind_to_wit(k: DomainFrameKind) -> Result<wit::FrameKind, BridgeError> {
     use DomainFrameKind::*;
-    match k {
+    Ok(match k {
         TaskAssign => wit::FrameKind::TaskAssign,
         TaskComplete => wit::FrameKind::TaskComplete,
         DecisionDispatch => wit::FrameKind::DecisionDispatch,
@@ -88,7 +94,10 @@ fn frame_kind_to_wit(k: DomainFrameKind) -> wit::FrameKind {
         RateLimited => wit::FrameKind::RateLimited,
         GatewayInbound => wit::FrameKind::GatewayInbound,
         GatewayOutbound => wit::FrameKind::GatewayOutbound,
-    }
+        $(ContextPressure => $context::FrameKind::ContextPressure,
+        ContextLimit => $context::FrameKind::ContextLimit,)?
+        $(ContextPressure | ContextLimit => return Err(BridgeError::Unrepresentable { ty: $old_kind }),)?
+    })
 }
 
 fn frame_kind_from_wit(k: wit::FrameKind) -> DomainFrameKind {
@@ -111,6 +120,8 @@ fn frame_kind_from_wit(k: wit::FrameKind) -> DomainFrameKind {
         RateLimited => DomainFrameKind::RateLimited,
         GatewayInbound => DomainFrameKind::GatewayInbound,
         GatewayOutbound => DomainFrameKind::GatewayOutbound,
+        $($context::FrameKind::ContextPressure => DomainFrameKind::ContextPressure,
+        $context::FrameKind::ContextLimit => DomainFrameKind::ContextLimit,)?
     }
 }
 
@@ -274,7 +285,7 @@ fn payload_to_wit(p: &domain::FramePayload) -> Result<wit::FramePayload, BridgeE
         Retract(b) => wit::FramePayload::Retract(wit::RetractBody {
             original_frame_id: b.original_frame_id.to_vec(),
             reason: b.reason.clone(),
-            original_kind: b.original_kind.map(frame_kind_to_wit),
+            original_kind: b.original_kind.map(frame_kind_to_wit).transpose()?,
         }),
         BudgetWarning(b) => wit::FramePayload::BudgetWarning(wit::BudgetEnvelope {
             spirit_pid: b.spirit_pid,
@@ -291,7 +302,7 @@ fn payload_to_wit(p: &domain::FramePayload) -> Result<wit::FramePayload, BridgeE
         ConsentRupture(b) => wit::FramePayload::ConsentRupture(wit::ConsentRuptureBody {
             rupture_id: b.rupture_id.to_vec(),
             original_frame_id: b.original_frame_id.to_vec(),
-            original_kind: frame_kind_to_wit(b.original_kind),
+            original_kind: frame_kind_to_wit(b.original_kind)?,
             accepted: b.accepted.iter().map(address_to_wit).collect(),
             rejected: b
                 .rejected
@@ -314,8 +325,31 @@ fn payload_to_wit(p: &domain::FramePayload) -> Result<wit::FramePayload, BridgeE
             refill_per_sec: b.refill_per_sec,
             schedule_id: b.schedule_id.clone(),
         }),
+        $(ContextPressure(b) => $context::FramePayload::ContextPressure(context_to_wit(b)),
+        ContextLimit(b) => $context::FramePayload::ContextLimit(context_to_wit(b)),)?
+        $(ContextPressure(_) | ContextLimit(_) => return Err(BridgeError::Unrepresentable { ty: $old_payload }),)?
     })
 }
+
+$(
+fn context_to_wit(b: &domain::ContextEnvelope) -> $context::ContextEnvelope {
+    $context::ContextEnvelope {
+        spirit_pid: b.spirit_pid,
+        context_used: b.context_used,
+        context_window_size: b.context_window_size,
+        threshold_permille: b.threshold_permille,
+    }
+}
+
+fn context_from_wit(b: $context::ContextEnvelope) -> domain::ContextEnvelope {
+    domain::ContextEnvelope {
+        spirit_pid: b.spirit_pid,
+        context_used: b.context_used,
+        context_window_size: b.context_window_size,
+        threshold_permille: b.threshold_permille,
+    }
+}
+)?
 
 fn frame_id_from_vec(v: Vec<u8>) -> Result<[u8; 16], BridgeError> {
     let len = v.len();
@@ -425,6 +459,8 @@ fn payload_from_wit(p: wit::FramePayload) -> Result<domain::FramePayload, Bridge
             refill_per_sec: b.refill_per_sec,
             schedule_id: b.schedule_id,
         }),
+        $($context::FramePayload::ContextPressure(b) => D::ContextPressure(context_from_wit(b)),
+        $context::FramePayload::ContextLimit(b) => D::ContextLimit(context_from_wit(b)),)?
     })
 }
 
@@ -563,7 +599,7 @@ pub fn lower(frame: &domain::IacFrame) -> Result<wit::IacFrame, BridgeError> {
         logical_clock: frame.logical_clock,
         frame_from: address_to_wit(&frame.from),
         to: frame.to.iter().map(address_to_wit).collect(),
-        kind: frame_kind_to_wit(frame.kind),
+        kind: frame_kind_to_wit(frame.kind)?,
         intent: intent_to_wit(frame.intent),
         payload: payload_to_wit(&frame.payload)?,
         auto_marker: origin_to_wit(frame.auto_marker),
@@ -599,3 +635,9 @@ pub fn lift(frame: wit::IacFrame) -> Result<domain::IacFrame, BridgeError> {
         ),
     })
 }
+}
+    };
+}
+bridge!(current, crate::wit_guest::maos::spirit::frames, context_wit;);
+bridge!(legacy, crate::wit_guest::legacy::maos::spirit::frames; "FrameKind", "FramePayload");
+pub use current::{lift, lower, origin_case_name};

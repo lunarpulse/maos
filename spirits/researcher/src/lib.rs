@@ -48,6 +48,7 @@ use maos_domain::log_recall::{
     FrameKindLabel, LogRecallCursor, LogRecallEntry, LogRecallError, LogRecallFilter,
 };
 use maos_domain::memory::{MemoryEntry, MemoryNamespace, MemoryValue};
+use maos_domain::ports::context_budget::{ContextBudgetPort, ContextStatus};
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
 use maos_domain::ports::{DistillationPort, EpistemicScalarPort, InferencePort, LogRecallPort};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
@@ -109,6 +110,10 @@ pub enum ResearcherMcpError {
     TokenIssuanceFailed(String),
     #[error("unauthorized MCP call")]
     Unauthorized,
+    /// Story 18-5 (ADR-016) — refused: the Researcher's self-reported context
+    /// exceeds its window (at issuance or at use). Never a fallback.
+    #[error("MCP call refused: context exhausted")]
+    ContextExhausted,
     #[error("no results")]
     NoResults,
     #[error("decode error: {0}")]
@@ -550,6 +555,10 @@ pub struct Researcher {
     /// Story 18-3 (D-18-3-09 A) — a surveyed pass writes its primary scalar
     /// here; the kernel owns the `[epistemic_policy]` halt.
     scalar_port: Option<Arc<dyn EpistemicScalarPort>>,
+    /// Story 18-5 (AC2.3) — the host-bound context reporter and the status of
+    /// the most recent report (one per completion).
+    context: Option<Arc<dyn ContextBudgetPort>>,
+    last_context: Arc<Mutex<Option<ContextStatus>>>,
 }
 
 impl std::fmt::Debug for Researcher {
@@ -627,6 +636,8 @@ impl Default for Researcher {
             seed_frames: Arc::new(Mutex::new(None)),
             distillation_port: None,
             scalar_port: None,
+            context: None,
+            last_context: Arc::default(),
         }
     }
 }
@@ -686,6 +697,17 @@ impl Researcher {
     pub fn with_distillation_port(mut self, port: Arc<dyn DistillationPort + Send + Sync>) -> Self {
         self.distillation_port = Some(port);
         self
+    }
+
+    /// Story 18-5 (CR-3) — the root's pid- and window-bound context reporter.
+    pub fn with_context_port(mut self, port: Arc<dyn ContextBudgetPort>) -> Self {
+        self.context = Some(port);
+        self
+    }
+
+    /// Story 18-5 — the status of the most recent context report.
+    pub fn last_context(&self) -> Option<ContextStatus> {
+        *self.last_context.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// Story 18-3 (D-18-3-09 A) — the root's epistemic-scalar write port.
@@ -980,6 +1002,14 @@ impl Researcher {
                 .complete(req)
                 .map_err(ResearcherError::Inference)?;
             live.consumed.fetch_add(1, Ordering::SeqCst);
+            // Story 18-5 (AC2.3) — the Researcher reports its own count.
+            if let Some(port) = &self.context {
+                let usage = &response.usage;
+                let status = port
+                    .report_context_used(usage.input_tokens.saturating_add(usage.output_tokens))
+                    .map_err(|e| ResearcherError::Unbound(e.to_string()))?;
+                *self.last_context.lock().unwrap_or_else(|e| e.into_inner()) = Some(status);
+            }
             // §9.5: the model's text is bounded, so the digest stays smaller
             // than its inputs regardless of model verbosity.
             Ok(summarize(&response.text))

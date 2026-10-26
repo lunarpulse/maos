@@ -502,7 +502,31 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26387
+src_lines = 26414
+# HISTORY: Story 18-5-context-token-budget-accounting ◆ FLAG-Winston
+#          (2026-10-26), D-18-5-02 A + D-18-5-03 B + D-18-5-10 A ratified
+#          by Lunarpulse 2026-10-26: allowance +27 physical / +23 tokei,
+#          ADR-069 envelope. Exact measured landing: physical 26387 -> 26414
+#          (+27), tokei 20617 -> 20639 (+22), ZERO HEADROOM; all 95 files
+#          retained. Driver: capability/mod.rs constructs the ADR-016 context
+#          ledger in every registry, exposes context_budget(), gates issuance
+#          after policy and before quota (ProviderInfer/MemWrite/IacSend exits),
+#          and drops the pid's slot in revoke_all_for_pid; mcp/mod.rs refuses
+#          exhausted context before token verification and wire use;
+#          inference/mod.rs spawns RateLimited delivery instead of dropping its
+#          unpolled future. Digests and set_hash derived with the existing
+#          check_kernel_baseline raw-byte, domain/length-framed SHA-256 algorithm.
+#          Surface removal: struct
+#          maos_kernel_core::capability::CapabilityRegistryAdapter
+#          781e5380efcb4eae263e532bc514115ef0396e40cad63249d4397fe7673e7141;
+#          replacement addition at that same path:
+#          5b920126a50b4b4cf7ef82066c47c69f76c7a375263a86dbdd24fb43c87fedc5.
+#          This is a private context-field reshape, not a public-shape removal.
+#          New addition: use
+#          maos_kernel_core::capability::maos_capability::context_budget
+#          87924bfb3996dd1db5cb3713600ed67e130a5b2e83e216a1a53ab7e03330072c.
+#          Both class rows verified before the surface re-pin:
+#          universal-arithmetic. No other surface additions/removals.
 # HISTORY: Story 18-3-researcher-replay-live-and-judged-five-metric ◆
 #          FLAG-Winston (2026-10-25), review ruling D-18-3-R5 A ratified by
 #          Lunarpulse 2026-10-25 (grant +10 physical / +9 tokei over 18-8's
@@ -826,7 +850,7 @@ src_lines = 26387
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "c8e91bf4b7bb861befce041230f97b5e7584112280e283624127ec01d0269103"
+set_hash = "dc029d9f12e9f2fd21f02467d47b1c9a480583a450ec1c47ec9a2e1d547cef7e"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -835,7 +859,7 @@ set_hash = "c8e91bf4b7bb861befce041230f97b5e7584112280e283624127ec01d0269103"
 "capability/cap_audit/writer_task.rs" = "ae9cdf683e272c954afcfe34d607d38221c4edc6b8f01e1e1c1f37517bf05b35"
 "capability/cap_policy/decision.rs" = "be8b2e5a0b08821f55f019ab85b0a91b953dd60f3a8d3f994bd59e087b409e41"
 "capability/cap_policy/mod.rs" = "6276a69fff48fb56beb0ca7a28f28422145cbb0249ade07b0d5ba5356f9e2a37"
-"capability/mod.rs" = "5e939443d2a48ae0fe53e910e93545af321a15d9bbe764e1e2a6746fac9f8a99"
+"capability/mod.rs" = "e634c495edeae627d3184b9a455df458dd3018f275bef779432954a8543d1c11"
 "capability/working_memory/mod.rs" = "151f1ea71b3b05e575b4771736a65aaaba0503e3a33a20d949d8e5382829892a"
 "capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"
 "capability/working_memory/policy_runtime.rs" = "199858803e69787c8f981c18f4fa22201c8ad0f47d18638623606462e2e374b5"
@@ -853,7 +877,7 @@ set_hash = "c8e91bf4b7bb861befce041230f97b5e7584112280e283624127ec01d0269103"
 "hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
-"inference/mod.rs" = "3c60dd2f871117effa1734baa12563628a703cd69b1ec06a007ecaede065f564"
+"inference/mod.rs" = "5fb06f9062fce48f60b2f9555bc515c00c1a925524b1f161f23c334e0d65e43a"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
 "io/mod.rs" = "5cff233b27aa9d79793bd4fcda34270d2c98439b0c50c47059a0ee4f0718f032"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"
@@ -866,7 +890,7 @@ set_hash = "c8e91bf4b7bb861befce041230f97b5e7584112280e283624127ec01d0269103"
 "lifecycle/cli_wrapper/runtime.rs" = "67276beb65b22dd8a74437819d30420807fbdff81fce39ef19fcd843f6f5d63a"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
-"mcp/mod.rs" = "65689d1501791c3fdd2f413666d7fc0ab0562136bd78e3903eb2972a87b5c233"
+"mcp/mod.rs" = "cc829c41d8494844f6866884a2f2a7e6021621dcf143f4e515709a5987ca1097"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
 "memory/mod.rs" = "2b36b724ab77164c2c425e09c34d85070ecc39f6cf87e582ce62fef4439d73c9"
 "memory/principal.rs" = "c99431b9fd3fbe40b758e22dd54091fae4def4b8700717c9767d7ebc67bd9aac"

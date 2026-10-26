@@ -41,7 +41,10 @@ struct Session {
 }
 impl Session {
     fn start() -> Self {
-        let mut child = command(&PROBE).spawn().unwrap();
+        Self::component(&PROBE)
+    }
+    fn component(component: &Path) -> Self {
+        let mut child = command(component).spawn().unwrap();
         let stdin = child.stdin.take();
         let stdout = child.stdout.take().unwrap();
         let (tx, rx) = mpsc::channel();
@@ -133,6 +136,146 @@ fn frame(script: &str) -> IacFrame {
         intent_lineage: Default::default(),
     }
 }
+#[test]
+fn context_report_returns_typed_status_and_context_frames_reach_handle_frame() {
+    let mut s = Session::start();
+    s.control();
+    s.send(&codec::encode_cbor(&frame("context 3277\ncontext 3892")).unwrap())
+        .unwrap();
+    for (used, level) in [(3277, 1), (3892, 2)] {
+        assert_eq!(s.request(), RecallRequest::Context { used_tokens: used });
+        s.reply(RecallReply::Context {
+            used,
+            window: 4096,
+            level,
+            crossed: Some(level),
+        });
+    }
+    assert_eq!(
+        s.report(),
+        "context ok 3277 4096 ContextLevel::Pressure ContextLevel::Pressure\ncontext ok 3892 4096 ContextLevel::Limit ContextLevel::Limit\n"
+    );
+    s.control();
+    for (kind, name, used, threshold_permille) in [
+        (FrameKind::ContextPressure, "pressure", 3277, 800),
+        (FrameKind::ContextLimit, "limit", 3892, 950),
+    ] {
+        let envelope = maos_domain::frame::ContextEnvelope {
+            spirit_pid: 71,
+            context_used: used,
+            context_window_size: 4096,
+            threshold_permille,
+        };
+        let mut inbound = frame("");
+        inbound.kind = kind;
+        inbound.payload = match kind {
+            FrameKind::ContextPressure => FramePayload::ContextPressure(envelope),
+            _ => FramePayload::ContextLimit(envelope),
+        };
+        s.send(&codec::encode_cbor(&inbound).unwrap()).unwrap();
+        assert_eq!(
+            s.report(),
+            format!("context-frame {name} 71 {used} 4096 {threshold_permille}\n")
+        );
+        s.control();
+    }
+    s.finish(0);
+}
+
+#[test]
+fn context_report_not_admitted_is_typed_and_next_call_recovers() {
+    let mut s = Session::start();
+    s.control();
+    s.send(&codec::encode_cbor(&frame("context 10\ncontext 20")).unwrap())
+        .unwrap();
+    assert_eq!(s.request(), RecallRequest::Context { used_tokens: 10 });
+    s.reply(RecallReply::Error(WireError::CapabilityDenied));
+    assert_eq!(s.request(), RecallRequest::Context { used_tokens: 20 });
+    s.reply(RecallReply::Context {
+        used: 20,
+        window: 4096,
+        level: 0,
+        crossed: None,
+    });
+    assert_eq!(
+        s.report(),
+        "context err ContextError::NotAdmitted\ncontext ok 20 4096 ContextLevel::Within -\n"
+    );
+    s.control();
+    s.finish(0);
+}
+
+// 2.1 added recall, not frame fields. Relabel the frozen guest's frames import
+// in a temporary copy to exercise that exact same closed-enum export schema.
+fn legacy_2_1_fixture(dir: &Path) -> PathBuf {
+    let mut bytes = std::fs::read(&*COMPAT).unwrap();
+    let name = b"maos:spirit/frames@2.0.0";
+    let mut replaced = 0;
+    for offset in 0..=bytes.len() - name.len() {
+        if &bytes[offset..offset + name.len()] == name {
+            bytes[offset + name.len() - 3] = b'1';
+            replaced += 1;
+        }
+    }
+    assert!(
+        replaced > 0,
+        "frozen guest must identify its frames interface"
+    );
+    let path = dir.join("legacy-2.1-export-schema.wasm");
+    std::fs::write(&path, bytes).unwrap();
+    path
+}
+
+#[test]
+fn legacy_2_1_export_schema_echoes_byte_identically() {
+    let dir = tempfile::tempdir().unwrap();
+    let component = legacy_2_1_fixture(dir.path());
+    let mut s = Session::component(&component);
+    s.control();
+    let input = codec::encode_cbor(&frame("legacy-2.1-identity")).unwrap();
+    s.send(&input).unwrap();
+    assert_eq!(s.record(), Some(input));
+    s.control();
+    s.finish(0);
+}
+
+#[test]
+fn legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit() {
+    let dir = tempfile::tempdir().unwrap();
+    let legacy_2_1 = legacy_2_1_fixture(dir.path());
+    for component in [&*COMPAT, &legacy_2_1] {
+        for kind in [FrameKind::ContextPressure, FrameKind::ContextLimit] {
+            let mut s = Session::component(component);
+            s.control();
+            let body = maos_domain::frame::ContextEnvelope {
+                spirit_pid: 71,
+                context_used: 4000,
+                context_window_size: 4096,
+                threshold_permille: 950,
+            };
+            let mut inbound = frame("");
+            inbound.kind = kind;
+            inbound.payload = match kind {
+                FrameKind::ContextPressure => FramePayload::ContextPressure(body),
+                _ => FramePayload::ContextLimit(body),
+            };
+            s.send(&codec::encode_cbor(&inbound).unwrap()).unwrap();
+            s.finish(5);
+            let mut nested = frame("");
+            nested.kind = FrameKind::Retract;
+            nested.payload = FramePayload::Retract(maos_domain::frame::RetractPayload {
+                original_frame_id: [7; 16],
+                reason: "distilled".into(),
+                original_kind: Some(kind),
+            });
+            let mut s = Session::component(component);
+            s.control();
+            s.send(&codec::encode_cbor(&nested).unwrap()).unwrap();
+            s.finish(5);
+        }
+    }
+}
+
 #[test]
 fn recall_probe_maps_filter_page_fetch_and_open_labels() {
     let mut s = Session::start();
@@ -325,14 +468,14 @@ fn wrong_reply_variant_is_protocol_desync() {
     s.finish(6);
 }
 #[test]
-fn frozen_2_0_echo_runs_under_t2_on_2_1_runner_byte_identically() {
+fn frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically() {
     let spec = SandboxSpec {
         tier: SandboxTier::T2,
         resolved_caps: Default::default(),
         declared_scopes: vec![Scope::FsRead {
             subtree: COMPAT.to_string_lossy().into_owned(),
         }],
-        spirit_id: "compat-2-0-on-2-1".into(),
+        spirit_id: "compat-2-0-on-2-2".into(),
         output_shape_predicate: None,
     };
     let mut child = match spawn_sandboxed(&spec, &mut command(&COMPAT)) {

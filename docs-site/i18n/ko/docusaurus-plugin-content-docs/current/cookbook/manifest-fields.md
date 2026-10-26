@@ -103,7 +103,8 @@ window당 60,000회 발급을 허용하며, 한 경계를 가로지르는 burst�
 [발급 할당량 참조](/manifest/v5#capability-issuance-quota)를 확인하세요.
 특히 Spirit 대상 발급 사전 경고가 없고 stable-Spirit, principal 전체 또는
 Worker spawn churn을 제한하지 않습니다. 이는 ADR-016의 context-token 회계를
-설정하거나 구현하지 않습니다. 해당 회계는 17-9가 아닌
-`18-5-context-token-budget-accounting`이 담당합니다.
+설정하지 않습니다. 그 회계는 `[budget]`의 선택적 `context_pressure_threshold` /
+`context_limit_threshold`(기본값 0.80 / 0.95;
+`18-5-context-token-budget-accounting`)로 설정합니다.
 
 전체 필드 수준 명세는 [Manifest 참조](/manifest/latest)를 참조하세요.

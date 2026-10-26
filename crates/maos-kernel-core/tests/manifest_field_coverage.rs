@@ -52,6 +52,8 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("output_shape", "required_fields"),
     ("budget", "context_window_size"),
     ("budget", "time_cap_seconds"),
+    ("budget", "context_pressure_threshold"),
+    ("budget", "context_limit_threshold"),
     ("resources", "cpu_max_pct"),
     ("resources", "memory_max_mb"),
     ("resources", "fd_max"),

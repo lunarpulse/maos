@@ -356,6 +356,22 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             0,
             "distillate.redacted (kind 1)",
         ),
+        (
+            "context.pressure",
+            None,
+            "context.pressure",
+            r#"{"ContextPressure":{"spirit_pid":7,"context_used":3277,"context_window_size":4096,"threshold_permille":800}}"#,
+            7,
+            "context journal pressure (kind 32)",
+        ),
+        (
+            "context.limit",
+            None,
+            "context.limit",
+            r#"{"ContextLimit":{"spirit_pid":7,"context_used":3892,"context_window_size":4096,"threshold_permille":950}}"#,
+            7,
+            "context journal limit (kind 33)",
+        ),
     ];
     let noncall_entries: Vec<&maos_audit::fr4_classifier::WriterShapeEntry> =
         WRITER_SHAPES.iter().filter(|w| w.shape.is_some()).collect();

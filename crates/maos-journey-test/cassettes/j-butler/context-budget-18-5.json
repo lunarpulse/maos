@@ -1,0 +1,82 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
+  "recorded_at": "2026-06-11T00:00:00Z",
+  "model_id": "hand-authored-seed",
+  "spirit_id": "butler",
+  "session": "context-budget-18-5",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 3920,
+          "output_tokens": 80
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-butler/context-budget-18-5",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 6520,
+          "output_tokens": 80
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-butler/context-budget-18-5",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 7720,
+          "output_tokens": 80
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-butler/context-budget-18-5",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "ae8094f6f69789b4060e90b77a99c8ac40d6637b73671e28d43b9ab5348a12e0",
+      "prompt_len": 843,
+      "response": {
+        "text": "{\"pattern\":\"calendar-conflict\",\"confidence\":0.86,\"evidence\":\"Board review (09:00-10:00) overlaps Investor call (09:30-10:30); both are confirmed\",\"options\":[\"linear_note: Create a Linear issue to track the conflict resolution\",\"reminder: Send a Slack reminder to reschedule\",\"snooze: Snooze and revisit later\"],\"user_preference_drift\":0.92}",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 8220,
+          "output_tokens": 80
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-butler/context-budget-18-5",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    }
+  ]
+}

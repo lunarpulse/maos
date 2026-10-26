@@ -426,6 +426,7 @@ fn launch(frame: IacFrame) -> SessionLaunch {
         component_artifact: Some(artifact()),
         turn_budget: Duration::from_secs(30),
         once: false,
+        context_window: Default::default(),
         initial_frame: Some(frame),
     }
 }

@@ -1,0 +1,50 @@
+# Branch-only AC5 proven-red image; copy to .github/workflows only on
+# ci/18-5-verify, never merge that workflow, delete branch after proof.
+# The real registry/MCP refusal leg must fail when issuance loses its gate.
+name: 18-5-proven-red
+on:
+  push:
+    branches: ["ci/18-5-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Green refusal control
+        run: env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test context_refusal_18_5
+      - name: Apply the AC5 plant
+        run: |
+          set -euo pipefail
+          sha256sum -c _bmad-output/implementation-artifacts/18-5-evidence/ci/plant.diff.sha256
+          git apply _bmad-output/implementation-artifacts/18-5-evidence/ci/plant.diff
+          git diff --stat
+          git diff
+      - name: Build planted refusal test separately
+        run: env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test context_refusal_18_5 --no-run
+      - name: Planted issuance gate must defeat refusal witness
+        shell: bash
+        run: |
+          set +e
+          env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test context_refusal_18_5
+          rc=$?
+          set -e
+          test "$rc" -eq 100 || { echo "::error title=18-5 AC5::expected nextest test failure 100, got ${rc}"; exit 1; }
+          echo "::notice title=18-5 AC5 PROVEN-RED::removing issuance gate defeats the real registry/MCP refusal witness"

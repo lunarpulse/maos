@@ -74,6 +74,8 @@ pub struct SessionLaunch {
     /// Only the contained runner receives this read grant. It is not a policy grant.
     pub component_artifact: Option<PathBuf>,
     pub turn_budget: Duration,
+    /// Story 18-5 — the admitted manifest's context window and thresholds.
+    pub context_window: maos_kernel_core::capability::context_budget::ContextWindow,
     pub once: bool,
     pub initial_frame: Option<IacFrame>,
 }
@@ -139,6 +141,7 @@ pub fn manifest_launch(
                 .as_ref()
                 .map_or(30, |budget| budget.time_cap_seconds),
         )),
+        context_window: crate::butler_root::context_window(gated.budget.as_ref()),
         once,
         initial_frame,
     })
@@ -349,11 +352,19 @@ pub async fn run_admitted_session(
             let mut seed_id = None;
             let mut turn = TurnState::default();
             let mut diagnostics = DiagnosticBudget::default();
-            let recall = MediatedLogRecall::new(
+            let mut recall = MediatedLogRecall::new(
                 Arc::clone(&deps.log_recall), Arc::clone(&deps.capability),
                 Arc::clone(&deps.security), Arc::clone(&deps.journal),
                 deps.enterprise.clone(), deps.pdp.clone(), admitted.spirit_id.clone(),
             );
+            // Story 18-5 (CR-3) — the root fixes the session's pid and window.
+            let spirit = maos_iac::adapter::context_signal::AdmittedSpirit {
+                pid: admitted.pid, spirit_id: admitted.spirit_id.as_str().into(), window: launch.context_window,
+            };
+            recall.context = Some(Arc::new(maos_iac::adapter::context_signal::ContextSignalAdapter {
+                ledger: Arc::clone(deps.capability.context_budget()), bus: Arc::downgrade(&deps.iac),
+                admitted: Arc::new(move || Some(spirit.clone())),
+            }));
             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));
             let runtime = tokio::runtime::Handle::current();
             loop {
@@ -744,6 +755,7 @@ fn mint<'a>(
             kernel_verdict: match error {
                 GovernedMintError::KernelPolicyDenied => Some("deny"),
                 GovernedMintError::QuotaExhausted => Some("exhausted"),
+                GovernedMintError::ContextExhausted => Some("context-exhausted"),
                 _ => None,
             },
             refusal: Some(error.to_string()),
@@ -776,6 +788,8 @@ fn frame_refusal(frame: &IacFrame) -> Option<&'static str> {
             | FrameKind::BudgetExceeded
             | FrameKind::ConsentRupture
             | FrameKind::RateLimited
+            | FrameKind::ContextPressure
+            | FrameKind::ContextLimit
     ) {
         return Some("kernel_reserved_kind");
     }
@@ -837,6 +851,8 @@ fn authorize_and_deliver(
         FramePayload::BudgetExceeded(_) => FrameKind::BudgetExceeded,
         FramePayload::ConsentRupture(_) => FrameKind::ConsentRupture,
         FramePayload::RateLimited(_) => FrameKind::RateLimited,
+        FramePayload::ContextPressure(_) => FrameKind::ContextPressure,
+        FramePayload::ContextLimit(_) => FrameKind::ContextLimit,
     };
     if frame.kind != expected_kind {
         return Err(SessionError::Protocol(

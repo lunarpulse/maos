@@ -1,0 +1,4 @@
+context_window_size = 8192
+time_cap_seconds = 30
+context_pressure_threshold = 0.949
+context_limit_threshold = 0.95

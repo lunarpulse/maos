@@ -137,6 +137,10 @@ pub enum McpError {
     #[error("capability denied: scope mismatch on {server}/{tool}")]
     CapabilityDenied { server: String, tool: String },
 
+    /// Story 18-5 (ADR-016) — the caller's context is exhausted at use time.
+    #[error("context exhausted: refused {server}/{tool}")]
+    ContextExhausted { server: String, tool: String },
+
     /// Client is unconfigured (e.g., composition root wired but no
     /// `MAOS_MCP_ENABLE` gate or no transports registered).
     #[error("unconfigured")]

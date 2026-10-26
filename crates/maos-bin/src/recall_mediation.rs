@@ -25,6 +25,8 @@ pub struct MediatedLogRecall {
     enterprise: Option<Arc<EnterpriseRuntime>>,
     pdp: Option<EnterprisePdpRuntime>,
     spirit_id: String,
+    /// Story 18-5 — the session's pid- and window-bound context reporter.
+    pub context: Option<Arc<dyn maos_domain::ports::ContextBudgetPort>>,
 }
 
 /// Field order is part of the operator-only refusal receipt format.
@@ -60,6 +62,7 @@ impl MediatedLogRecall {
             enterprise,
             pdp,
             spirit_id,
+            context: None,
         }
     }
 
@@ -263,6 +266,10 @@ impl MediatedLogRecall {
         let request = wire::decode_request(body)
             .map_err(|_| ProtocolViolation("unknown tag or undecodable recall request"))?;
         let (op, id, result) = match request {
+            RecallRequest::Context { used_tokens } => {
+                let reply = wire::context_reply(self.context.as_deref(), used_tokens);
+                return wire::encode_reply(&reply).map_err(|_| ProtocolViolation("context reply"));
+            }
             RecallRequest::Recall { filter } => {
                 let result = wire_filter(filter).and_then(|filter| self.recall_inner(pid, filter));
                 let result = result

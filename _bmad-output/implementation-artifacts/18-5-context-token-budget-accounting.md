@@ -3,7 +3,7 @@ story_id: '18.5'
 story_key: 18-5-context-token-budget-accounting
 created: 2026-10-25
 context_commit: b50ea844
-baseline_commit: b50ea844
+baseline_commit: 79f49709
 security_sensitive: true
 kernel_grant: "◆ FLAG-Winston, **RATIFIED 2026-10-26 by the operator (Lunarpulse), ADR-069 envelope** (`18-5-flag-winston-decision.md` §Rulings): D-18-5-02 A + 03 B + 10 A = **+27 physical / +23 tokei**: `check-kernel-baseline` 26387 → **≤ 26414** (95 files, unchanged), `maos-kernel-core` 20617 → **≤ 20640**, exact measured figure at landing (after `cargo fmt --all`). Files: `capability/mod.rs` (ADR-016 ledger built inside `CapabilityRegistryAdapter::new`, issuance gate for an exhausted pid outside the distil/hand-off exits, `context_budget()` accessor, slot drop in `revoke_all_for_pid`; +17 / +13), `mcp/mod.rs` (MCP use-time check; +6 / +6), `inference/mod.rs` (the `RateLimited` emitter spawns its delivery; +4 / +4). Any other kernel file or any figure above the grant stops the story and returns as a FLAG request. Each figure was measured at creation by a throwaway prototype at b50ea844 (fmt-clean, `cargo check --locked -p maos-kernel-core` clean), then reverted; after the revert `check-kernel-baseline` PASSED 26387 / 95. Alternatives measured, not taken: the adapter in the kernel +137 / +120; ledger and adapter in the kernel +259 / +214. ADR-069 after the grant: 2,360 to 23,000, 1,360 to the alarm."
 kloc_grant: "RULED 2026-10-26 (operator, Lunarpulse): D-18-5-09 A — **Epic 18's named maos-bin budget 28558 → 28655** (forecast +40–75 [INFERENCE] × 1.3; measured so far +2 for the `hook_cap_override` literal under D-06 A); exact re-pin at landing; above 28655 → re-ask before landing. The other rows over their ceilings are **measured requests returned to the operator at review with exact figures**; the prototype figures are their expected values, and a dev figure **more than +25 % above its prototype value → STOP at dev** and re-ask: maos-capability 1347 → 1442 (+95; `xtask/kloc.toml:265`; STOP above +118); maos-iac 7769 → 7891 (+122 prototype; the unprototyped TL fallback and channels +12–24 [INFERENCE] fit; `:406`; STOP above +152); maos-domain 9805 → 9843 (+38; `:425`; STOP above +47); maos-manifest 4540 → 4572 (+32; `:415`; STOP above +40); maos-audit 7410 (`:409`) +4–8 [INFERENCE, not prototyped] (STOP above +10); maos-spirit-abi 1038 → 1042 (+4; ceiling 3000, `:270`, fits); maos-wasm-host 2255 (`:703`) +30–60 [INFERENCE, not prototyped] under D-05 A (STOP above +75); `_aggregate_hardfail` (`:718`, 184707) = measured + 1 at landing (prototype aggregate 185010). `spirits/*` is ungoverned (`xtask/src/kloc_check.rs:310-311`)."
@@ -12,7 +12,7 @@ review: "bmad-code-review under `docs/testing/proof-contract.md`. Dev and review
 
 # Story 18.5: Context-token budget accounting (ADR-016)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Created 2026-10-25 at b50ea844 by bmad-create-story under the lighter creation contract (no party-mode preflight). 18-0/18-1/18-8/18-2 done; 18-3 patched with landing fixes; 18-4 under review and treated as landing. Three read-only scouts (budget surfaces, report/refusal seams, governance), then direct re-reads of every range a decision rests on. The host's only cargo process (CARGO_TARGET_DIR=/mnt/build/cargo, `env -u CI -u GITHUB_ACTIONS`) ran `check-kernel-baseline` and `kloc-check --json` at HEAD, five throwaway prototypes (measured, then reverted) and `cargo check --locked --workspace` for the ripple. FLAG record `18-5-flag-winston-decision.md`. RULED 2026-10-26 by the operator (Lunarpulse): D-18-5-01…10 all as recommended (01 A, 02 A, 03 B, 04 A, 05 A, 06 A, 07 A, 08 A, 09 A, 10 A); kernel grant +27 / +23 ratified (ADR-069) → `ready-for-dev`. Rulings applied docs-only (no cargo). -->
 
@@ -134,6 +134,16 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 | CR-3 | Construction paths (18-1 / 18-3 lesson) | `ButlerSeam` (`spirits/butler/src/lib.rs:280-303`, attach `:329-349`) gains a context-port factory taking `pid_of`. `ResearcherWiring` (`researcher_root.rs:71-80`) gains the same, bound in `bind` (`:161-181`). The boot arm, the door `load` and the hot-swap successor (`build_spirit_obj`, `main.rs:1035-1044` class arms) bind alike. The window and thresholds come from the admitted bundle, never from the Spirit. | — |
 | CR-4 | Typed refusals per path | `GovernedMintError::ContextExhausted` (`worker_spawn.rs:348-370`, mapping `:426-436`). MCP refusal receipt `mcp.call.refused:context-exhausted` (beside `:517`). Session `kernel_verdict: "context-exhausted"` (`spirit_session.rs:743-749`). CLI-wrapper spawn refuses on both paths (as `worker_spawn.rs:1005-1016`). Butler and Researcher keep the refusal typed (no collapse into `ButlerMcpError::TokenIssuanceFailed`, `main.rs:1214`). Serde results in src are never `.unwrap/.expect/.unwrap_or*`. | — |
 
+**Operator addenda (2026-10-26 finisher hand-off):** D-04 A / D-05 A use **ContextPressure = 32, ContextLimit = 33**, because 30/31 are taken by `identity.asserted` / `run.capture`; D-04 A's other content is unchanged. D-09 A now pre-ratifies **maos-bin ≤ 28700**, exact re-pin at landing; above → STOP and report. Historical 30/31 and 28655 references below describe the original ruling and are superseded by these addenda.
+
+**Dev STOP observation (not an approved ceiling increase):** finisher measured maos-wasm-host **2255 → 2363 (+108)** with `kloc-check --json`, exceeding the approved **+75** STOP line by 33. Main notified; no host production edits or landing re-pins until the operator rules. Frozen-2.0 compatibility repair remains necessary and is not included in this figure. Full addendum: `18-5-flag-winston-decision.md`.
+
+**D-09 A host addendum (operator 2026-10-26, relayed by Main):** the measured **maos-wasm-host 2363 is ratified**, including WIT 2.2.0 `context.report` host-state/wire/runner edits, with **up to +20 further lines (≤ 2383)** during the remaining work. Exact re-pin and HISTORY note must cite `18-5-context-token-budget-accounting` and this ruling. This resolves the preceding STOP up to 2383; it does not authorize exceeding 2383.
+
+**Additional D-09 measured STOP (not ratified):** FR4's required context fallback writer dispositions and nested envelope validator measure **maos-audit 7410 → 7470 (+60)** before final formatting, exceeding the original +10 STOP. The frozen-2.0 export compatibility repair needs legacy closed-enum bindings and shared bridge/pump dispatch, estimated +35–55 host lines [INFERENCE], above the authorized +20. Main notified for both rulings; the frozen guest and its byte-identity assertion remain binding.
+
+**D-09 final operator addenda (2026-10-26, relayed by Main):** **maos-wasm-host ≤ 2420 RATIFIED** for the frozen-2.0 compatibility repair (legacy export bindings plus reused bridge/pump), superseding2383. **maos-audit7470 RATIFIED with +10 finishing allowance, ≤ 7480**; the post-format7473 measurement is covered. Re-pin each final exact figure with HISTORY citing `18-5-context-token-budget-accounting` and these rulings; `_aggregate_hardfail` = final measured+1. The preceding STOP requests are resolved within these ceilings.
+
 ## Acceptance Criteria
 
 *(Epic §18-5 as corrected at creation and ruled 2026-10-26 (D-18-5-01…10 all as recommended). AC6 is D-18-5-10 A's fix at origin. One plant per control AC, `docs/testing/proof-contract.md:26`.)*
@@ -211,19 +221,19 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight at the dev HEAD.** D-18-5-01…10 RULED 2026-10-26 (all as recommended); tracker `ready-for-dev` → `in-progress`. Re-anchor drift after 18-4's landing: `git diff --stat b50ea844 -- crates/maos-kernel-core/src/{capability/mod.rs,mcp/mod.rs,inference/mod.rs} crates/maos-capability crates/maos-iac/src crates/maos-domain/src crates/maos-spirit-abi/src crates/maos-manifest/src/manifest.rs crates/maos-bin/src/{main.rs,worker_spawn.rs,researcher_root.rs,spirit_session.rs,supervision.rs} spirits/butler/src spirits/researcher/src wit crates/maos-wasm-host/src`. Re-measure `kloc-check --json` / `check-kernel-baseline` (expect 26387 / 20617 unless something landed; if the pin moved, the +27 / +23 grant applies over the landed values and is re-stated in the record).
-- [ ] **T1 — Domain, ABI, bus types** (AC3.1): port, `CapError::ContextExhausted`, `McpError::ContextExhausted`, `FramePayload` + `ContextEnvelope`, `FrameKindLabel`; abi kinds 30/31; maos-iac TL enum, span labels, TL map, recall labels, channels.
-- [ ] **T2 — Ledger + kernel** (AC2.2, AC5.1–5.2): `maos-capability::context_budget` (CR-1); registry field, gate, accessor, slot drop; MCP use-time check.
-- [ ] **T3 — Adapter** (AC2.1, AC3.1): `maos_iac::adapter::context_signal` (spawned delivery, TL fallback row).
-- [ ] **T4 — Manifest thresholds** (AC4.1): `Budget`/`RawBudget`, validation, fixtures, fuzz seed, `spirit_test`; the `hook_cap_override` literal.
-- [ ] **T5 — Spirits** (AC2.3): Butler and Researcher report after each completion, keep `ContextStatus`, surface it in the scene line (Butler) and in their pass outcome; typed handling of `ContextExhausted` refusals; seam fields.
-- [ ] **T6 — Root** (AC2.3, AC5.3, CR-3, CR-4): adapter construction on every construction path; `GovernedMintError::ContextExhausted`; MCP receipt; session verdict + `frame_refusal` + payload/kind arms (`--features wasm-host`); CLI-wrapper guard. No new maos-bin src file is expected. If one is added, list it in `SCANNED_SOURCE_FILES` (`crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs:927`, 30 → 31).
-- [ ] **T7 — WASM** (AC3.2, D-05 A): WIT 2.2.0, bridge, linker, component rebuild + provenance re-pin, fixture Spirit.
-- [ ] **T8 — FR4, ABI, docs** (AC3.3–3.4, AC4.2): `NON_CALL_KINDS`, `kind_to_string`, `WRITER_SHAPES`; FR62 ratification record; PRD `:62`, ADR-016 note, §4.6, inventory; docs-site en + ko where 17-9 edited them.
-- [ ] **T9 — Witnesses + data** (AC1, AC2.5, AC3.2, AC5.4–5.5, AC6): `context_budget_18_5.rs` (process leg, door leg, refusal leg), kernel gate test, ledger tests, maos-iac adapter test (one frame per crossing; TL fallback), WASM fixture test; the context cassette; a test pinning its entry count and usages. Σ ≤ 30 s per test binary (`xtask/test-budgets.toml:26`), no exception planned.
-- [ ] **T10 — Plants and records:** one plant per control AC (AC1–AC6) in `18-5-evidence/plants.md` (command, output, wall-clock); a CI plant for AC5's gate (the refusal leg runs in `workspace-test-suite`, `discipline.yml:5569`).
-- [ ] **T11 — Governance:** `cargo fmt --all`; the FLAG record's re-pin set in order (`kernel-core-baseline.toml:952-957`: classes, surface + enumerated diff incl. the `CapabilityRegistryAdapter` private-field reshape, `src_lines` + HISTORY, digests + `set_hash`, pin-test literals, `kloc.toml:264`, `RATIFIED_AT_EASING`). Kernel ≤ 26414 / ≤ 20640 exact (ratified grant). maos-bin exact ≤ 28655 (D-18-5-09 A). The other over-ceiling rows (maos-capability, maos-iac, maos-domain, maos-manifest, maos-audit, maos-wasm-host) are exact measured requests returned to the operator at review; any figure > +25 % above its expected value in `kloc_grant` → STOP and re-ask. Then `check-service-boundary`, `check-kernel-baseline`, `kloc-check`, `check-abi-ratification`, `check-test-cost`, `check-serde-error-handling`, `check-dev-record-completeness`.
-- [ ] **T12 — Regression and record:** the suites below; revert `intent-lineage-coverage-report.md` if a run modifies it; populate the Dev Agent Record; reconcile story and tracker.
+- [x] **T0 — Preflight at the dev HEAD.** D-18-5-01…10 RULED 2026-10-26 (all as recommended); tracker `ready-for-dev` → `in-progress`. Re-anchor drift after 18-4's landing: `git diff --stat b50ea844 -- crates/maos-kernel-core/src/{capability/mod.rs,mcp/mod.rs,inference/mod.rs} crates/maos-capability crates/maos-iac/src crates/maos-domain/src crates/maos-spirit-abi/src crates/maos-manifest/src/manifest.rs crates/maos-bin/src/{main.rs,worker_spawn.rs,researcher_root.rs,spirit_session.rs,supervision.rs} spirits/butler/src spirits/researcher/src wit crates/maos-wasm-host/src`. Re-measure `kloc-check --json` / `check-kernel-baseline` (expect 26387 / 20617 unless something landed; if the pin moved, the +27 / +23 grant applies over the landed values and is re-stated in the record).
+- [x] **T1 — Domain, ABI, bus types** (AC3.1): port, `CapError::ContextExhausted`, `McpError::ContextExhausted`, `FramePayload` + `ContextEnvelope`, `FrameKindLabel`; approved abi kinds 32/33; maos-iac TL enum, span labels, TL map, recall labels, channels.
+- [x] **T2 — Ledger + kernel** (AC2.2, AC5.1–5.2): `maos-capability::context_budget` (CR-1); registry field, gate, accessor, slot drop; MCP use-time check.
+- [x] **T3 — Adapter** (AC2.1, AC3.1): `maos_iac::adapter::context_signal` (spawned delivery, TL fallback row).
+- [x] **T4 — Manifest thresholds** (AC4.1): `Budget`/`RawBudget`, validation, fixtures, fuzz seed, `spirit_test`; the `hook_cap_override` literal.
+- [x] **T5 — Spirits** (AC2.3): Butler and Researcher report after each completion, keep `ContextStatus`, surface it in the scene line (Butler) and in their pass outcome; typed handling of `ContextExhausted` refusals; seam fields.
+- [x] **T6 — Root** (AC2.3, AC5.3, CR-3, CR-4): adapter construction on every construction path; `GovernedMintError::ContextExhausted`; MCP receipt; session verdict + `frame_refusal` + payload/kind arms (`--features wasm-host`); CLI-wrapper guard. No new maos-bin src file added.
+- [x] **T7 — WASM** (AC3.2, D-05 A): WIT2.2.0 report import, bridge/linker, rebuilt provenance-pinned components and fixture Spirit; original closed-enum legacy export bindings selected before instantiation, one shared codec/lifecycle/pump. Frozen2.0/2.1 echo byte-identical; direct and nested context kinds refused with typed exit5.
+- [x] **T8 — FR4, ABI, docs** (AC3.3–3.4, AC4.2): `NON_CALL_KINDS`, `kind_to_string`, measured `WRITER_SHAPES` and nested envelope validation; FR62 ratification record; PRD DELTA, ADR-016 note, §4.6, inventory; docs-site en + ko, including context-before-quota order and legacy compatibility.
+- [x] **T9 — Witnesses + data** (AC1, AC2.5, AC3.2, AC5.4–5.5, AC6): process/door suite and cassette pin, separate real Researcher refusal harness, kernel gate/ledger/adapter/threshold suites, actual T2 WASM typed-report/journal/guest-forgery witnesses. New binaries use the default 30 s budget with no exception.
+- [x] **T10 — Plants and records:** six distinct control mutations, one per AC, recorded in `18-5-evidence/plants.md` with commands, outputs, wall-clock and byte-identical restoration; AC5 CI patch/checksum/recipe simulated locally. AC3's identical mutation was repeated after correcting the fixture's unrelated I13 rejection, explicitly recorded.
+- [x] **T11 — Governance:** formatted exact pins moved together: kernel classes/surface/private-field reshape, physical26414, hash map/set hash, pin tests, tokei20639, `RATIFIED_AT_EASING`; approved crate ceilings and aggregate185373=185372+1. maos-bin28680≤28700, audit7473≤7480, host2412≤2420 under final operator addenda. Service-boundary, kernel-baseline, kloc, ABI, env/exit/test-cost/corpus/coverage/serde/provenance/model/dev-record gates pass; final outputs recorded.
+- [x] **T12 — Regression and record:** full root631passed/14skipped, full WASM119passed/1skipped, affected crates1194passed/3skipped, manifest-reader widening, required kernel lib258passed, tree-bound xtask witnesses, formatter check; Dev Agent Record/File List/Change Log and tracker reconciled. Lineage coverage report not edited. No commit or push.
 
 ## Dev Notes
 
@@ -362,11 +372,32 @@ Created 2026-10-25 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter co
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation, 2026-10-25)
+anthropic/claude-opus-5-5 (creation and first implementation pass); openai-codex/gpt-6.1-sol (finisher, including delegated test and pin slices).
 
 ### Debug Log References
 
+- [Process and door plant evidence](18-5-evidence/process-plants.log).
+- [Threshold, issuance, RateLimited plant evidence and local CI simulation](18-5-evidence/native-plants.log).
+- [Per-AC plant record](18-5-evidence/plants.md).
+- [Governance command outputs](18-5-evidence/gates.log).
+- [Final governance outputs](18-5-evidence/gates-final.log), [regression chronology](18-5-evidence/regression.log), [final exact kloc JSON](18-5-evidence/kloc-measured.json).
+- [Branch-only CI verification recipe](18-5-evidence/ci/ci-18-5-verify.yml), [plant](18-5-evidence/ci/plant.diff), [SHA-256](18-5-evidence/ci/plant.diff.sha256).
+
 ### Completion Notes List
+
+- **Delivered end-to-end, ready for review.** First pass `anthropic/claude-opus-5-5`, finisher `openai-codex/gpt-6.1-sol`; operator addenda recorded in the D-table and FLAG record. No commit/push, deferred implementation or unresolved blocker.
+- **AC1/AC2:** four-day strict-replay process/cassette-pin/door reload suite **3 passed**; real Researcher registry/MCP/refusal/recovery harness **1 passed**. Reports4000/6600/7800/8300 produce within/pressure/limit/exhausted and exact journal kinds32/33. Door binding uses the new pid; reload starts Within. Latch and door-only-binding plants red then restored.
+- **AC3:** actual T2 admission/session/WASM report and guest-forgery witnesses **2 passed**; full WASM **119 passed,1skipped**, including WIT corpus/copies, both legacy versions' byte-identical echo and direct/nested context rejection. Reserved-kind plant produces delivered `(1,1,0)` instead of refused `(1,0,1)`; restored green. Initial plant invocation hit unrelated empty I13 lineage; corrected operator lineage makes the identical mutation expose actual delivery, explicitly recorded rather than claimed as valid proof initially.
+- **Frozen compatibility:** widened2.2 closed input enums cannot instantiate old2.0/2.1 `handle-frame` signatures. Select original legacy export bindings before instantiation and reuse one codec/lifecycle/pump. Legacy context kinds/payloads, including nested original-kind, get typed exit5. Frozen2.0 fixture bytes unchanged;2.1 test explicitly relabels a temporary copy. Atomic outbound lift failure remains exit1 with no partial output. No weakened assertion or fake fallback.
+- **AC4/AC5/AC6:** ledger5, adapter4, threshold3 and kernel accounting4 tests **16 passed**; FR4 classifier **17 passed**. Typed issuance/use-time refusals, exits, recovery and no quota charge witnessed; invalid thresholds rejected;429 reaches mailbox and kind23 journal. Threshold, issuance and dropped-future plants red then restored.
+- **Proof:** six distinct control mutations, one per AC; seven mutant invocations only because AC3's infrastructure correction repeats the identical mutation. Wall-clock AC1 **8.49s**, AC2 **13.06s**, AC3 **6.76s** (diagnostic5.43s), AC4 **1.89s**, AC5 **0.707400s** (original tool-result metadata), AC6 **8.26s**. All copy-back/`cmp`/`touch` restorations pass, backups removed. CI checksum/patch/separate build/nextest exit100/restored-green simulated locally; no hosted Actions run claimed.
+- **Kernel exact:** physical **26387→26414 (+27)**, tokei **20617→20639 (+22)**,95files unchanged, within+27/+23 grant; only three ruled modules changed. Pin set moved together; authoritative hash `dc029d9f12e9f2fd21f02467d47b1c9a480583a450ec1c47ec9a2e1d547cef7e`. Initial aggregate sorting error corrected from `--emit-pin`. Required kernel lib **258 passed**.
+- **Surface:** added universal-arithmetic `maos_kernel_core::capability::maos_capability::context_budget` (`87924bfb…`); replaced `CapabilityRegistryAdapter` hash `781e5380…→5b920126…` for private context-field reshape, not public-shape removal. Accessor implemented; emitted surface changes are that re-export and struct hash.
+- **Final formatted kloc:** capability1347→1432 (+85≤118), IAC7769→7888 (+119≤152), domain9805→9848 (+43≤47), manifest4540→4574 (+34≤40), bin28588→28680 (≤28700), audit7410→7473 (ratified7470+10,≤7480), host2255→2412 (≤2420). First formatted legacy candidate2424 reduced by removing unnecessary pump wrappers/aliases, not minification. Aggregate **184738→185372**, hardfail **184739→185373** = measured+1, zero headroom.
+- **Regression:** final root **631passed/14skipped**, full WASM **119passed/1skipped**; affected capability/IAC/manifest/audit/domain/ABI/SDK/Butler/Researcher **1194passed/3skipped**. Kernel parser readers41passed, other Spirit smoke18passed, eval/journey13passed/1skipped; xtask tree suite64passed. New binaries use default30s, no exception. Existing channel count corrected10→12. Earlier fixture failures and unbounded-run Nash readiness timeout preserved in regression log; final bounded root green.
+- **T2 scope:** new context tests probe actual T2/seccomp/Landlock with fd-only resources, not Story17-2's delegated cgroup envelope; existing preflights unchanged. Local cgroup2 mount measured read-only, truthful undelegated-mode full root run uses `--test-threads4`. Systemd delegated wrapper unavailable (PID1 not systemd); CI's delegated17-2 job covers it. No delegated/image-matrix proof claimed locally.
+- **Governance:** kloc `passed:true`, aggregate185372, `over_budget:[]`; kernel26414/95 PASS; service boundary0 PASS; env110vars PASS; exit12tokens/3owed PASS after maosctl build; test-cost548files PASS; corpus13 PASS; coverage matrix PASS with existing phase deferrals; serde0 PASS; provenance4fixtures PASS; model14pins PASS; ABI PASS; dev-record181done-status stories PASS. Exact outputs/timings linked above; formatter and final tree witnesses in regression log.
+- **Preserved scope:** honest self-report and native mailbox limitations remain stated; no accounting for unbound native Spirits; window0 off. No extra kernel source or unrelated user edits; manifest-reader widening verification-only where no code change needed; lineage report untouched.
 
 ### File List
 
@@ -374,6 +405,117 @@ anthropic/claude-opus-5-5 (creation, 2026-10-25)
 - `_bmad-output/implementation-artifacts/18-5-flag-winston-decision.md` (A)
 - `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md` (M: §18-5 creation corrections, R18-18 re-anchor, stories row)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (M: 18-5 row comment)
+
+**Implementation and finisher files (in addition to creation records above):**
+
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/12-architecture-decision-records.md`
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md`
+- `_bmad-output/planning-artifacts/epics/requirements-inventory.md`
+- `_bmad-output/planning-artifacts/prd/domain-specific-requirements.md`
+- `crates/maos-audit/src/fr4_classifier.rs`
+- `crates/maos-audit/src/lib.rs`
+- `crates/maos-audit/tests/fr4_classifier_16_2.rs`
+- `crates/maos-bin/src/butler_root.rs`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/src/recall_mediation.rs`
+- `crates/maos-bin/src/researcher_root.rs`
+- `crates/maos-bin/src/spirit_session.rs`
+- `crates/maos-bin/src/supervision.rs`
+- `crates/maos-bin/src/worker_spawn.rs`
+- `crates/maos-bin/tests/butler_scene_18_4.rs`
+- `crates/maos-bin/tests/context_budget_18_5.rs`
+- `crates/maos-bin/tests/context_refusal_18_5.rs`
+- `crates/maos-bin/tests/live_escape_anomaly_17_10.rs`
+- `crates/maos-bin/tests/participant_recall_17_8.rs`
+- `crates/maos-bin/tests/recall_17_3d.rs`
+- `crates/maos-bin/tests/researcher_inference_18_3.rs`
+- `crates/maos-bin/tests/spawned_scope_17_3c.rs`
+- `crates/maos-capability/src/context_budget.rs`
+- `crates/maos-capability/src/lib.rs`
+- `crates/maos-capability/tests/context_budget_18_5.rs`
+- `crates/maos-domain/src/frame.rs`
+- `crates/maos-domain/src/log_recall.rs`
+- `crates/maos-domain/src/ports/capability.rs`
+- `crates/maos-domain/src/ports/context_budget.rs`
+- `crates/maos-domain/src/ports/mcp.rs`
+- `crates/maos-domain/src/ports/mod.rs`
+- `crates/maos-iac/src/adapter.rs`
+- `crates/maos-iac/src/adapter/channels.rs`
+- `crates/maos-iac/src/adapter/context_signal.rs`
+- `crates/maos-iac/src/adapter/log_recall.rs`
+- `crates/maos-iac/src/adapter/mailbox.rs`
+- `crates/maos-iac/src/adapter/transparency_log.rs`
+- `crates/maos-iac/tests/context_signal_18_5.rs`
+- `crates/maos-journey-test/cassettes/j-butler/context-budget-18-5.json`
+- `crates/maos-kernel-core/src/capability/mod.rs`
+- `crates/maos-kernel-core/src/inference/mod.rs`
+- `crates/maos-kernel-core/src/mcp/mod.rs`
+- `crates/maos-kernel-core/tests/budget_seam_8_11.rs`
+- `crates/maos-kernel-core/tests/context_budget_gate_18_5.rs`
+- `crates/maos-kernel-core/tests/manifest_field_coverage.rs`
+- `crates/maos-kernel-core/tests/fixtures/manifest/budget/edge-case/context_limit_threshold.toml`
+- `crates/maos-kernel-core/tests/fixtures/manifest/budget/edge-case/context_pressure_threshold.toml`
+- `crates/maos-kernel-core/tests/fixtures/manifest/budget/malformed-rejected/context_limit_threshold.toml`
+- `crates/maos-kernel-core/tests/fixtures/manifest/budget/malformed-rejected/context_pressure_threshold.toml`
+- `crates/maos-kernel-core/tests/fixtures/manifest/budget/well-formed/context_limit_threshold.toml`
+- `crates/maos-kernel-core/tests/fixtures/manifest/budget/well-formed/context_pressure_threshold.toml`
+- `crates/maos-manifest/fuzz/corpus/manifest_parser/seed_budget.toml`
+- `crates/maos-manifest/src/manifest.rs`
+- `crates/maos-manifest/tests/budget_thresholds_18_5.rs`
+- `crates/maos-spirit-abi/src/identity.rs`
+- `crates/maos-spirit-sdk/src/spirit_test/manifest.rs`
+- `crates/maos-wasm-host/guests/echo-spirit/src/lib.rs`
+- `crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs`
+- `crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/src/lib.rs`
+- `crates/maos-wasm-host/guests/recall-probe/src/lib.rs`
+- `crates/maos-wasm-host/src/frame_bridge.rs`
+- `crates/maos-wasm-host/src/host_state.rs`
+- `crates/maos-wasm-host/src/lib.rs`
+- `crates/maos-wasm-host/src/recall_wire.rs`
+- `crates/maos-wasm-host/src/runner.rs`
+- `crates/maos-wasm-host/src/wit_guest.rs`
+- `crates/maos-wasm-host/tests/equiv_harness.rs`
+- `crates/maos-wasm-host/tests/frame_bridge_roundtrip.rs`
+- `crates/maos-wasm-host/tests/recall_runner_17_3d.rs`
+- `crates/maos-wasm-host/tests/wit_corpus.rs`
+- `docs-site/docs/cookbook/manifest-fields.md`
+- `docs-site/docs/cookbook/wasm-component-spirit.md`
+- `docs-site/docs/manifest/v5.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/manifest-fields.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/wasm-component-spirit.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/manifest/v5.md`
+- `docs/ci-baselines/kernel-surface-v0.1-beta.json`
+- `examples/example-spirit-ts/wit/spirit.wit`
+- `spirits/butler/src/lib.rs`
+- `spirits/butler/tests/acceptance_18_4.rs`
+- `spirits/butler/tests/inference_seam_18_1.rs`
+- `spirits/researcher/src/lib.rs`
+- `templates/spirit-ts/wit/spirit.wit`
+- `tests/fixtures/wasm/echo_spirit_component.wasm`
+- `tests/fixtures/wasm/equiv-fixtures.provenance.toml`
+- `tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm`
+- `tests/fixtures/wasm/equiv_divergent_spirit_component.wasm`
+- `tests/fixtures/wasm/equiv_identity_spirit_component.wasm`
+- `wit/spirit.wit`
+- `xtask/abi-ratifications.toml`
+- `xtask/kernel-api-classes.toml`
+- `xtask/kernel-core-baseline.toml`
+- `xtask/tests/kernel_pin_content_hash_16_0.rs`
+- `xtask/tests/recovery_lane_ceiling_rule.rs`
+- `xtask/kloc.toml`
+- `xtask/test-budgets.toml`
+- `_bmad-output/implementation-artifacts/18-5-evidence/ci/ci-18-5-verify.yml`
+- `_bmad-output/implementation-artifacts/18-5-evidence/ci/plant.diff`
+- `_bmad-output/implementation-artifacts/18-5-evidence/ci/plant.diff.sha256`
+- `_bmad-output/implementation-artifacts/18-5-evidence/gates.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/gates-final.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/native-plants.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/plants.md`
+- `_bmad-output/implementation-artifacts/18-5-evidence/process-plants.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/regression.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/kloc-measured.json`
+
+Unrelated `.omp/agents/*.md`, `docs/testing/proof-contract.md`, and the 18-4 CI excerpt are intentionally untouched.
 
 ### Change Log
 
@@ -386,3 +528,5 @@ anthropic/claude-opus-5-5 (creation, 2026-10-25)
 - Kernel priced by five reverted prototypes. Recommended +27 / +23 (26414 / 20640); alternatives +137 / +120 and +259 / +214.
 - Epic §18-5, R18-18 and the stories row re-anchored in place; tracker comment refreshed; FLAG record `18-5-flag-winston-decision.md`.
 - 2026-10-26: RULED (operator, Lunarpulse): D-18-5-01 A, 02 A, 03 B, 04 A, 05 A (WIT 2.1.0 → 2.2.0 with `context.report`, in this story), 06 A, 07 A (one quantity, refuse above 100 %; PRD `:62` amended as a dated DELTA), 08 A, 09 A (Epic 18 named maos-bin budget 28558 → 28655; exact re-pin; above → re-ask), 10 A (`RateLimited` delivery fixed here). ◆ FLAG-Winston kernel grant **+27 physical / +23 tokei** (26387 → ≤ 26414, 20617 → ≤ 20640) ratified, ADR-069 envelope. Out-of-kernel rows over their ceilings: measured requests returned at review (prototype figures = expected values; > +25 % → STOP at dev). AC6 unconditional; AC4.2 PRD amendment as a dated DELTA. Applied docs-only (no cargo). Status → `ready-for-dev`.
+- 2026-10-26: Finisher `openai-codex/gpt-6.1-sol` completed process/door/refusal/cassette and actual T2 typed-frame/forgery witnesses, repaired FR4 fallback classification, proved six controls red/restored, simulated the branch-only CI plant, and moved the authorized kernel pin set to26414/20639. Exact approved crate rows re-pinned; maos-bin28680≤28700. STOP retained for audit7473 and the additional frozen-WIT compatibility implementation beyond host2383; story/tracker intentionally remain in-progress, not falsely review-ready. No commit/push.
+- 2026-10-26: Final operator addenda resolved both STOP requests: host≤2420 for correct frozen2.0/2.1 export-schema dispatch, audit7470+10≤7480. Final exact host2412/audit7473 and aggregate hardfail185373 pinned. Complete WASM119passed (frozen byte identity, nested legacy rejection and atomic invalid-frame failure included); final root631passed, xtask review-state witnesses64passed and formatter check pass. All required governance gates green; story and sprint row→`review`. No unresolved blocker, commit or push.

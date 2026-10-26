@@ -103,7 +103,8 @@ See the [issuance-quota reference](/manifest/v5#capability-issuance-quota) for
 operator-only `cap.quota:*` signals, qualified delivery, all path-specific
 denials and labelled limits. In particular, there is no Spirit-facing issuance
 pre-warning or stable-Spirit/principal-wide/Worker-spawn-churn bound. This does
-not configure or implement ADR-016 context-token accounting, owned by
-`18-5-context-token-budget-accounting`, not 17-9.
+not configure ADR-016 context-token accounting: that is `[budget]`'s optional
+`context_pressure_threshold` / `context_limit_threshold` (defaults 0.80 / 0.95;
+`18-5-context-token-budget-accounting`).
 
 See [Manifest Reference](/manifest/latest) for the complete field-level specification.

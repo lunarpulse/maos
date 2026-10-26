@@ -343,6 +343,91 @@ fn rate_limited_payload_round_trips() {
     assert_eq!(got.schedule_id.as_deref(), Some("sched-3"));
 }
 
+#[test]
+fn context_18_5_pressure_and_limit_keep_typed_envelopes_and_wire_kinds() {
+    assert_eq!(FrameKind::ContextPressure as u8, 32);
+    assert_eq!(FrameKind::ContextLimit as u8, 33);
+    for (kind, threshold_permille) in [
+        (FrameKind::ContextPressure, 800),
+        (FrameKind::ContextLimit, 950),
+    ] {
+        let body = frame::ContextEnvelope {
+            spirit_pid: 19,
+            context_used: 7783,
+            context_window_size: 8192,
+            threshold_permille,
+        };
+        let payload = match kind {
+            FrameKind::ContextPressure => FramePayload::ContextPressure(body),
+            _ => FramePayload::ContextLimit(body),
+        };
+        let original = envelope(kind, payload);
+        let round = round_trip(&original);
+        assert_eq!(round, original);
+        assert_eq!(
+            codec::encode_cbor(&round).unwrap(),
+            codec::encode_cbor(&original).unwrap()
+        );
+    }
+}
+
+#[test]
+fn legacy_export_bridge_preserves_old_frames_and_refuses_context_even_when_nested() {
+    use maos_wasm_host::frame_bridge::legacy;
+    let ordinary = envelope(
+        FrameKind::TaskAssign,
+        FramePayload::TaskAssign(task_assign_defaults()),
+    );
+    assert_eq!(
+        legacy::lift(legacy::lower(&ordinary).unwrap()).unwrap(),
+        ordinary
+    );
+    for kind in [FrameKind::ContextPressure, FrameKind::ContextLimit] {
+        let body = frame::ContextEnvelope {
+            spirit_pid: 19,
+            context_used: 7783,
+            context_window_size: 8192,
+            threshold_permille: 950,
+        };
+        let payload = match kind {
+            FrameKind::ContextPressure => FramePayload::ContextPressure(body),
+            _ => FramePayload::ContextLimit(body),
+        };
+        let direct = envelope(kind, payload);
+        assert!(matches!(
+            legacy::lower(&direct),
+            Err(BridgeError::Unrepresentable { .. })
+        ));
+        let retract = envelope(
+            FrameKind::Retract,
+            FramePayload::Retract(RetractPayload {
+                original_frame_id: FRAME_ID,
+                reason: "distilled".into(),
+                original_kind: Some(kind),
+            }),
+        );
+        assert!(matches!(
+            legacy::lower(&retract),
+            Err(BridgeError::Unrepresentable { ty: "FrameKind" })
+        ));
+        let rupture = envelope(
+            FrameKind::ConsentRupture,
+            FramePayload::ConsentRupture(ConsentRupturePayload {
+                rupture_id: [1; 16],
+                original_frame_id: FRAME_ID,
+                original_kind: kind,
+                accepted: vec![],
+                rejected: vec![],
+                ruptured_at_ns: 42,
+            }),
+        );
+        assert!(matches!(
+            legacy::lower(&rupture),
+            Err(BridgeError::Unrepresentable { ty: "FrameKind" })
+        ));
+    }
+}
+
 // ── Lossless nested-field oracles and hostile guest vectors ─────────────
 
 fn lineage(values: &[&str]) -> IntentLineage {

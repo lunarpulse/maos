@@ -189,10 +189,14 @@ impl InferencePortAdapter {
             intent_lineage,
         };
         let iac = Arc::clone(iac);
-        // Best-effort synchronous delivery on the current runtime. If the
-        // runtime is shutting down, the frame may be dropped — the
-        // synchronous InferenceError::RateLimited is the primary contract.
-        let _ = iac.deliver_typed(frame, 0, None);
+        // Story 18-5 (D-10 A): spawn the delivery on the current runtime so the
+        // frame is journaled and delivered; the synchronous
+        // InferenceError::RateLimited stays the primary contract.
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                let _ = iac.deliver_typed(frame, 0, None).await;
+            });
+        }
     }
 
     /// Parse `retry-after` value from provider response body. Accepts

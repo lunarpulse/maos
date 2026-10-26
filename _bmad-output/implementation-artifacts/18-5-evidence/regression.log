@@ -1,0 +1,87 @@
+18-5 finisher observed regression checks
+All cargo commands prefixed env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo. Serialized cargo only; no workspace suite.
+
+cargo nextest run --locked -p maos-capability --test context_budget_18_5 -p maos-iac --test context_signal_18_5 -p maos-manifest --test budget_thresholds_18_5 -p maos-kernel-core --test context_budget_gate_18_5
+16 passed; execution0.021s; wall12.68s; artifact://3355
+
+cargo nextest run --locked -p maos-bin --test context_refusal_18_5
+1 passed; execution0.027s; wall22.54s; artifact://3357
+
+cargo nextest run --locked -p maos-audit --test fr4_classifier_16_2
+17 passed; execution0.062s; wall10.20s; artifact://3400
+
+cargo test --locked -p maos-kernel-core --lib
+258 passed; execution0.20s; wall3.88s; artifact://3402
+
+cargo nextest run --locked -p maos-capability -p maos-iac -p maos-manifest -p maos-audit -p maos-domain -p maos-spirit-abi -p maos-spirit-sdk -p butler -p researcher
+First broad run found stale mailbox channel-count assertion (10 expected vs12 actual after adding two context channels); 796 passed,1 failed,3 skipped before fail-fast. Updated existing assertion/comment to12; production behavior unchanged. artifact://3404
+
+cargo nextest run --locked --no-fail-fast -p maos-capability -p maos-iac -p maos-manifest -p maos-audit -p maos-domain -p maos-spirit-abi -p maos-spirit-sdk -p butler -p researcher
+1194 passed,3 skipped; execution21.108s; wall33.24s; artifact://3406
+
+cargo nextest run --locked -p maos-kernel-core --test spirit_boundary_invariants --test manifest_field_coverage --test abi_stability_admit --test hook_dispatch_paused_time_18_3 --test lifecycle_all_hooks_hot_swap_17_4 --test provider_switched_journal --test sandbox_admission --test scalar_policy_runtime_test -p mira -p nash -p observer -p orchestrator -p worker --no-fail-fast
+41 passed; execution0.214s; wall13.84s; artifact://3411. Explicit test targets select kernel tests, so other Spirit smoke readers run separately below.
+
+cargo nextest run --locked -p mira -p nash -p observer -p orchestrator -p worker --test spirit_smoke --no-fail-fast
+18 passed; execution0.006s; wall7.57s; artifact://3414
+
+cargo nextest run --locked -p xtask --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule --test retro_action_items --test ci_shape_18_0 --test kernel_pin_content_hash_16_0 --no-fail-fast
+64 passed; execution1.107s; wall3.15s; artifact://3416
+
+cargo nextest run --locked -p maos-eval --test upgrade_policy_corpus -p maos-journey-test --test jb3_self_tuning_halt --test journey_butler --test journey_researcher --no-fail-fast
+13 passed,1 skipped; execution5.616s; wall23.29s; artifact://3418
+
+cargo run -q --locked -p xtask -- check-kernel-baseline && cargo nextest run --locked -p maos-wasm-host --test recall_runner_17_3d --test frame_bridge_roundtrip -E 'test(context_report) | binary(frame_bridge_roundtrip)' --no-fail-fast
+kernel baseline PASSED26414lines/95files/pinned26414;22tests passed,12filtered; combinedwall2.75s; artifact://3431. New runner assertions were corrected to the actual generated Debug prefixes ContextLevel:: and ContextError:: after initial20pass/2fail (artifact://3425).
+
+cargo nextest run --locked -p maos-bin --features network,wasm-host --no-fail-fast
+609passed22failed14skipped; execution23.166s; wall53.18s; artifact://3427. All22 failures in spawned_scope_17_3c: missing MAOS_17_2_CGROUP_MODE or stale maosctl after manifest plant's required touch. maosctl and fault-injection runner subsequently rebuilt with build-test-fixtures.
+
+Actual /proc/self/mountinfo observation: /sys/fs/cgroup mounted ro, cgroup2; /proc/self/cgroup is0::/. Local undelegated-mode selection reflects this measured substrate, not a claimed systemd delegated lane.
+MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked -p maos-bin --features network,wasm-host --no-fail-fast
+630passed1failed14skipped; execution48.918s; wall79.94s; artifact://3460. observer_live_17_4::a_door_loaded_observer_reports_like_the_root_one timed out waiting45s for Nash Running. No broad green is claimed.
+MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked -p maos-bin --features network,wasm-host --test observer_live_17_4 --test-threads1 --no-fail-fast
+Actual option spelling was '--test-threads 1'.3passed; execution2.679s; wall3.92s; artifact://3463. This focused green does not erase the broad readiness timeout.
+
+cargo nextest run --locked -p maos-wasm-host -E 'not test(frozen_2_0)' --no-fail-fast
+107passed8failed3skipped; execution1.469s; wall6.09s; artifact://3435. Excluded known unfixed frozen compatibility tests; this is explicitly a reachable subset, not complete WASM regression proof.7 failures were native-twin/probe fixture missing/freshness issues; remaining e2e_roundtrip::a_turn_with_one_unliftable_frame_emits_nothing has the same unfixed legacy input-enum binding incompatibility.
+
+Fixture recovery:
+cargo run -q --locked -p xtask -- build-test-fixtures --only equiv-native-twin
+Succeeded;2artifacts registered; wall84.81s; artifact://3437.
+cargo build --locked --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml --target-dir /mnt/build/cargo
+Succeeded0.16s. Manual build respects the sole target-dir contract; xtask's standalone helper hardcodes a second source-local target directory, so it was not used. External fixture manifest entry truthfully updated to actual /mnt/build/cargo/release/forbidden-syscall-probe and build timestamp, original input set preserved. An initial pretty-printed JSON registration violated the documented one-entry-per-line fixture parser layout; compact line layout restored before successful checks.
+cargo nextest run --locked -p maos-wasm-host --test equiv_harness --test t2_sandbox_kill --no-fail-fast
+24passed0skipped; execution2.800s; wall3.50s; artifact://3444. Actual seccomp/benign/forbidden probe and equivalence paths exercised.
+
+Actual context-only T2 witnesses:
+cargo nextest run --locked -p maos-bin --features network,wasm-host --test recall_17_3d context_18_5_ --success-output immediate --no-fail-fast
+2passed, no runtime SKIP (16unselected); individual0.792s/1.067s; wall3.89s; artifact://3448. New tests use actual T2 probe and fd-only manifest resources, decoupled from unrelated17-2 cgroup envelope. Earlier absent-lane early-returns are not counted as proof. The asserted systemd wrapper could not run because PID1 is not systemd; no delegated/image matrix claim.
+After AC3 plant restoration, same context selection2passed; execution1.268s; wall8.82s; artifact://3456.
+
+cargo fmt --all && cargo fmt --all -- --check
+Succeeded; combinedwall5.85s. No kernel content changes from final formatting.
+
+Bounded-concurrency full root regression on the unchanged formatted tree:
+MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked -p maos-bin --features network,wasm-host --test-threads 4 --no-fail-fast
+631passed14skipped; execution137.901s; wall144.68s; artifact://3467. The earlier unbounded observer readiness timeout is preserved above; every selected test passes in this bounded full-package invocation.
+
+FINAL COMPATIBILITY IMPLEMENTATION AND REVIEW TREE
+Operator ratified host<=2420 and audit7470+10<=7480. Shared legacy export bindings/codec/pump implemented; final formatted host2412 and audit7473. Removing redundant pump wrapper modules/aliases fixed a first formatted2424 candidate without minification or weaker behavior.
+
+cargo fmt --all && cargo run -q --locked -p xtask -- build-test-fixtures --only maos-wasm-runner,maos-wasm-runner-fault-inject
+Succeeded;2artifacts registered; combinedwall19.82s; artifact://3476.
+
+cargo nextest run --locked -p maos-wasm-host --no-fail-fast
+First full final-implementation run115passed4failed1skipped; all4 native-twin freshness after runner source edits (artifact://3479). Frozen2.0/2.1 and formerly failing unliftable legacy-frame test already green in that invocation.
+
+cargo run -q --locked -p xtask -- build-test-fixtures --only equiv-native-twin && cargo nextest run --locked -p maos-wasm-host --no-fail-fast
+119passed1skipped; execution2.863s; combinedwall9.89s; artifact://3481. Includes frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically, legacy_2_1_export_schema_echoes_byte_identically, direct/nested legacy context typedexit5, e2e unliftable turn atomicity, all WIT corpus and WIT-copy readers.
+
+MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked -p maos-bin --features network,wasm-host --test-threads 4 --no-fail-fast
+FINAL source-tree root package:631passed14skipped; execution125.966s; wall158.44s; artifact://3483.
+
+cargo nextest run --locked -p xtask --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule --test retro_action_items --test ci_shape_18_0 --test kernel_pin_content_hash_16_0 --no-fail-fast && cargo fmt --all -- --check
+FINAL review-state tree witnesses:64passed0skipped; execution1.092s; combinedwall5.62s; artifact://3486. Formatter check exit0. Story and sprint row review; no commit/push.
+
+Final serialized governance gate outputs: gates-final.log. kloc passedtrue, aggregate185372, hardfail185373, over_budget[]; exact measurement kloc-measured.json.

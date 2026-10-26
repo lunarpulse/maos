@@ -1916,6 +1916,8 @@ mod worker {
                     maos_kernel_core::security::manifest::Budget {
                         context_window_size: 0,
                         time_cap_seconds: cap,
+                        context_pressure_permille: 800,
+                        context_limit_permille: 950,
                     }
                 });
                 budget.time_cap_seconds = cap;

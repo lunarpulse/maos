@@ -1211,13 +1211,21 @@ impl LiveButlerMcpPort {
             // Pass [0u8; 32] because the kernel's McpClientAdapter is hardcoded to verify using [0u8; 32]
             [0u8; 32],
         )
-        .map_err(|_| butler::ButlerMcpError::TokenIssuanceFailed)?;
+        .map_err(|e| match e {
+            maos_bin::worker_spawn::GovernedMintError::ContextExhausted => {
+                butler::ButlerMcpError::ContextExhausted
+            }
+            _ => butler::ButlerMcpError::TokenIssuanceFailed,
+        })?;
         let response = self
             .mcp_client
             .call(&token, server, tool, args)
             .map_err(|e| match e {
                 maos_domain::ports::mcp::McpError::CapabilityDenied { .. } => {
                     butler::ButlerMcpError::Unauthorized
+                }
+                maos_domain::ports::mcp::McpError::ContextExhausted { .. } => {
+                    butler::ButlerMcpError::ContextExhausted
                 }
                 other => butler::ButlerMcpError::CallFailed {
                     server: server.into(),
@@ -4006,6 +4014,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         }),
         scene_butler: Arc::default(),
+        context: Some(maos_bin::butler_root::context_binder(
+            &capability,
+            &iac,
+            &scheduler.scbs(),
+        )),
     });
     // Story 18-3 (review rulings D-18-3-R1/R2, BH-1) — what every Researcher
     // of this root is built with: `--live` surveys MCP (a configured client

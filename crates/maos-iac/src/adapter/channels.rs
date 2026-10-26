@@ -38,6 +38,9 @@ pub const CHANNEL_CLASSES: &[(FrameKind, ChannelClass, usize)] = &[
     // Story 6.4 — NFR-Scale-4: per-(provider, credential) rate-limit event.
     // §7.1.1 cardinality matches `consent.request` (1:1 sender ← bus).
     (FrameKind::RateLimited, ChannelClass::Mpsc, 32),
+    // Story 18-5 — ADR-016 context-budget signals to the reporting Spirit.
+    (FrameKind::ContextPressure, ChannelClass::Mpsc, 32),
+    (FrameKind::ContextLimit, ChannelClass::Mpsc, 32),
     // Story 6.5 — FR54: gateway inbound/outbound messaging. Both are Mpsc
     // 1:1 channels matching external messaging cardinality.
     (FrameKind::GatewayInbound, ChannelClass::Mpsc, 64),
@@ -81,6 +84,8 @@ mod tests {
             (FrameKind::BudgetExceeded, ChannelClass::Mpsc, 32),
             (FrameKind::ConsentRupture, ChannelClass::Mpsc, 32),
             (FrameKind::RateLimited, ChannelClass::Mpsc, 32),
+            (FrameKind::ContextPressure, ChannelClass::Mpsc, 32),
+            (FrameKind::ContextLimit, ChannelClass::Mpsc, 32),
             (FrameKind::GatewayInbound, ChannelClass::Mpsc, 64),
             (FrameKind::GatewayOutbound, ChannelClass::Mpsc, 64),
         ];

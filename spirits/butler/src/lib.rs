@@ -36,6 +36,7 @@ use maos_domain::distillation::{DigestPayload, DistillationError, DistillationRe
 use maos_domain::halt::HaltReceipt;
 use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::notification::NotificationEvent;
+use maos_domain::ports::context_budget::{ContextBudgetPort, ContextLevel, ContextStatus};
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
 use maos_domain::ports::mcp::McpError;
 use maos_domain::ports::{EpistemicScalarPort, InferencePort};
@@ -69,6 +70,10 @@ pub enum ButlerMcpError {
     /// Token issuance for the MCP call was denied by the capability registry.
     #[error("token issuance failed for MCP call")]
     TokenIssuanceFailed,
+    /// Story 18-5 (ADR-016) — refused: Butler's self-reported context
+    /// exceeds its window (at issuance or at use).
+    #[error("MCP call refused: context exhausted")]
+    ContextExhausted,
     /// The MCP call was denied because the Spirit's manifest does not declare
     /// the requested server/tool scope.
     #[error("unauthorized MCP call: capability scope mismatch")]
@@ -260,6 +265,11 @@ pub type PrincipalPortFor =
 /// an error refuses the effect.
 pub type AttestationSink = Arc<dyn Fn(&[u8]) -> Result<(), String> + Send + Sync>;
 
+/// Story 18-5 (CR-3) — the host's context binder: a reporter fused to the
+/// pid the host's resolver yields and to that pid's admitted window. A
+/// Butler only ever holds the bound port.
+pub type ContextBinder = Arc<dyn Fn(PidSource) -> Arc<dyn ContextBudgetPort> + Send + Sync>;
+
 /// Story 18-4 (CR-4) — one Butler's acceptance record: the director's
 /// principal id (from the scene fixture, D-18-4-05 A), the pid-fused port
 /// and the attestation sink, both resolved by the host.
@@ -311,6 +321,9 @@ pub struct ButlerSeam {
     /// last one attached with an acceptance binder (the boot arm, or a door
     /// load that replaced it). The host clears it before its audit drain.
     pub scene_butler: Arc<std::sync::Mutex<Option<Butler>>>,
+    /// Story 18-5 (CR-3) — the host's context binder; every Butler and
+    /// Researcher this host builds is bound through it.
+    pub context: Option<ContextBinder>,
 }
 
 impl ButlerSeam {
@@ -339,6 +352,7 @@ impl ButlerSeam {
         pid_of: PidSource,
     ) -> Result<Butler, String> {
         butler = butler.with_clock(Arc::clone(&self.clock));
+        butler.context = self.context.as_ref().map(|bind| bind(Arc::clone(&pid_of)));
         if let Some(bind) = &self.acceptance {
             butler.acceptance = Some(Arc::new(AcceptanceBinding {
                 seam: bind(Arc::clone(&pid_of)),
@@ -908,6 +922,10 @@ pub struct Butler {
     /// Story 18-4 (D-18-4-02 A) — the principal-namespace binding of the
     /// record (`None` ⇒ in-memory only: no principal is known).
     acceptance: Option<Arc<AcceptanceBinding>>,
+    /// Story 18-5 (AC2.3) — the host-bound context reporter and the status
+    /// of Butler's most recent report.
+    context: Option<Arc<dyn ContextBudgetPort>>,
+    last_context: Arc<std::sync::Mutex<Option<ContextStatus>>>,
 }
 
 impl std::fmt::Debug for Butler {
@@ -960,6 +978,8 @@ impl Default for Butler {
             clock: Arc::new(SystemClock::UTC),
             ledger: Arc::default(),
             acceptance: None,
+            context: None,
+            last_context: Arc::default(),
         }
     }
 }
@@ -1124,6 +1144,15 @@ impl Butler {
             Vec::new(),
         );
         let response = live.port.complete(req).map_err(ButlerError::Inference)?;
+        // Story 18-5 (AC2.3) — Butler reports its own count; the kernel never
+        // estimates it.
+        if let Some(port) = &self.context {
+            let usage = &response.usage;
+            let status = port
+                .report_context_used(usage.input_tokens.saturating_add(usage.output_tokens))
+                .map_err(|e| ButlerError::Unbound(e.to_string()))?;
+            *self.last_context.lock().unwrap_or_else(|e| e.into_inner()) = Some(status);
+        }
         parse_proposal(&response.text)
     }
 
@@ -1319,6 +1348,7 @@ impl Butler {
                     "derived_from": derived_from,
                     "belief_variance": assessment.belief_variance,
                     "diagnostic": {"rate": window.rate, "by_mode": window.by_mode},
+                    "context": self.context_line(),
                 })
             );
             return Ok(true);
@@ -1348,6 +1378,7 @@ impl Butler {
                 "effect": effect,
                 "window": window,
                 "belief_variance": assessment.belief_variance,
+                "context": self.context_line(),
             })
         );
         Ok(false)
@@ -1544,6 +1575,30 @@ impl Butler {
     /// Story 8.10 AC1 — the `HaltReceipt` from the most recent `on_idle` scalar
     /// write, if a halt fired. `None` when no port is wired or no halt fired.
     /// Makes the firing observable for the seam test.
+    /// Story 18-5 — the status of Butler's most recent context report.
+    pub fn last_context(&self) -> Option<ContextStatus> {
+        *self.last_context.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Story 18-5 (AC1) — the scene line's `context` field.
+    fn context_line(&self) -> serde_json::Value {
+        let name = |level: ContextLevel| match level {
+            ContextLevel::Within => "within",
+            ContextLevel::Pressure => "pressure",
+            ContextLevel::Limit => "limit",
+            ContextLevel::Exhausted => "exhausted",
+        };
+        match self.last_context() {
+            Some(status) => serde_json::json!({
+                "used": status.used,
+                "window": status.window,
+                "level": name(status.level),
+                "crossed": status.crossed.map(name),
+            }),
+            None => serde_json::Value::Null,
+        }
+    }
+
     pub fn last_halt_receipt(&self) -> Option<HaltReceipt> {
         self.last_halt_receipt
             .lock()

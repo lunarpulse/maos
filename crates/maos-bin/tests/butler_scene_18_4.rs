@@ -549,6 +549,7 @@ fn root_seam(
             Arc::downgrade(tl),
         )),
         scene_butler: Arc::default(),
+        context: None,
     }
 }
 

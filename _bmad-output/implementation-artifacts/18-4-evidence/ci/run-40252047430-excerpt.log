@@ -1,0 +1,9 @@
+proven-red	Set up job	2026-10-26T01:10:44.2959829Z Version: 20261021.618
+proven-red	Set up job	2026-10-26T01:10:44.2969345Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-26T01:10:44.2969926Z Version: 20261012.334.1
+proven-red	Apply the AC1 plant	2026-10-26T01:10:57.2757658Z _bmad-output/implementation-artifacts/18-4-evidence/ci/plant.diff: OK
+proven-red	Control — exit line 4 stays green under the plant	2026-10-26T01:12:42.1253227Z ^[[36;1mhalt_day="$(jq -rs '[.[] | select(.event == "halt" and .render == "halted on belief_variance" and .day <= 21 and .diagnostic.rate >= 0.6) | .day] | if length ==
+proven-red	Control — exit line 4 stays green under the plant	2026-10-26T01:12:42.2365869Z {"event":"halt","render":"halted on belief_variance","day":1,"derived_from":"acceptance_window","belief_variance":0.800000011920929,"diagnostic":{"rate":1.0,"by_mode":{
+proven-red	Control — exit line 4 stays green under the plant	2026-10-26T01:12:42.2384499Z butler inference seam wired (provider `anthropic`)
+proven-red	Planted twin must defeat the twin step (the steady director halts)	2026-10-26T01:12:42.3407401Z {"event":"halt","render":"halted on belief_variance","day":1,"derived_from":"acceptance_window","belief_variance":0.800000011920929,"diagnostic":{"rate":
+proven-red	Planted twin must defeat the twin step (the steady director halts)	2026-10-26T01:12:42.3428173Z butler inference seam wired (provider `anthropic`)

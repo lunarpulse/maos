@@ -83,6 +83,13 @@ pub enum FrameKind {
     /// payload carries the recipient address + opaque message bytes. Gated
     /// by `Scope::GatewaySend` cap-token verification.
     GatewayOutbound = 25,
+    /// Story 18-5 — ADR-016. The Spirit's self-reported context crossed its
+    /// manifest pressure threshold; kernel-written, never guest-sent. (Raw TL
+    /// kinds 30/31 are taken by `identity.asserted` / `run.capture`.)
+    ContextPressure = 32,
+    /// Story 18-5 — ADR-016. The Spirit's self-reported context crossed its
+    /// manifest limit threshold; kernel-written, never guest-sent.
+    ContextLimit = 33,
 }
 
 impl FrameKind {
@@ -115,6 +122,8 @@ impl FrameKind {
             23 => Some(Self::RateLimited),
             24 => Some(Self::GatewayInbound),
             25 => Some(Self::GatewayOutbound),
+            32 => Some(Self::ContextPressure),
+            33 => Some(Self::ContextLimit),
             _ => None,
         }
     }

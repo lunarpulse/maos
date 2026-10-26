@@ -86,6 +86,8 @@ async fn manifest_time_cap_overrides_default() {
         Some(Budget {
             context_window_size: 4096,
             time_cap_seconds: 1,
+            context_pressure_permille: 800,
+            context_limit_permille: 950,
         }),
         2000,
     );
@@ -137,6 +139,8 @@ async fn slow_hook_emits_budget_warning_then_exceeded_at_manifest_cap() {
         Some(Budget {
             context_window_size: 4096,
             time_cap_seconds: 1,
+            context_pressure_permille: 800,
+            context_limit_permille: 950,
         }),
         3000,
     );

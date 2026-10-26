@@ -55,6 +55,17 @@ on one image.**
   `gpt-6.1-sol`. `anthropic/claude-fable-5-1` is reserved for plan review (PRD, architecture, epic, story and
   decision documents) and for code review of a safety- or security-critical change — and every use of it, either
   kind, needs the operator's permission first. 17-9, 17-10 and 17-11 were reviewed on fable-5.1 before this ruling.
+  Layer assignment is superseded by the 2026-10-26 ruling below: gpt-6.1-sol is now the dev model and never reviews
+  code it wrote.
+- **Agent models by role (operator ruling 2026-10-26, token cost).** Story creation runs on
+  `anthropic/claude-opus-5-5` (`.omp/agents/story-creator.md`); dev, finisher and review-patch passes run on
+  `openai-codex/gpt-6.1-sol` (the `task` agent; soft request budget 400); docs-only record work (ruling application,
+  done flips, deferred-work closures, tracker, CI excerpts) runs on `zai/glm-5.3` (`.omp/agents/scribe.md`).
+  Review is tiered by risk. A story is **difficult** when it carries a kernel FLAG-Winston grant, a security-critical
+  AC (auth, secrets, signatures, cross-Spirit isolation), concurrency or a new protocol. Blind and Edge always run on
+  opus-5.5; Acceptance runs on opus-5.5 for difficult stories and on `zai/glm-5.3` (`.omp/agents/review-light.md`)
+  otherwise; Test Infrastructure runs on glm-5.3 on every story. An easy story may merge Blind and Edge into one opus
+  layer. Every story keeps at least one opus layer; glm-5.3 is never a story's only reviewer.
 
 ## Test cost (AC1/AC2)
 

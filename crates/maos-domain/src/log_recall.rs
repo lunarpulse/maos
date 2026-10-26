@@ -94,6 +94,10 @@ pub enum FrameKindLabel {
     GovernanceEvent,
     /// Story 9.3b — FR64 (ADR-046): cost-attribution fact.
     CostAttribution,
+    /// Story 18-5 — ADR-016 context-pressure signal.
+    ContextPressure,
+    /// Story 18-5 — ADR-016 context-limit signal.
+    ContextLimit,
 }
 
 impl LogRecallFilter {

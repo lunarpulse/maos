@@ -18,4 +18,5 @@
 pub mod cap_audit;
 pub mod cap_quota;
 pub mod cap_tokens;
+pub mod context_budget;
 pub mod working_memory;

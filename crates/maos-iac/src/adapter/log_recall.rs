@@ -223,6 +223,8 @@ impl LogRecallAdapter {
             FrameKind::CliWrapperShapeMismatch => DomainFrameKindLabel::CliWrapperShapeMismatch,
             FrameKind::GovernanceEvent => DomainFrameKindLabel::GovernanceEvent,
             FrameKind::CostAttribution => DomainFrameKindLabel::CostAttribution,
+            FrameKind::ContextPressure => DomainFrameKindLabel::ContextPressure,
+            FrameKind::ContextLimit => DomainFrameKindLabel::ContextLimit,
         }
     }
 
@@ -264,6 +266,8 @@ impl LogRecallAdapter {
             }
             DomainFrameKindLabel::GovernanceEvent => Some(FrameKind::GovernanceEvent),
             DomainFrameKindLabel::CostAttribution => Some(FrameKind::CostAttribution),
+            DomainFrameKindLabel::ContextPressure => Some(FrameKind::ContextPressure),
+            DomainFrameKindLabel::ContextLimit => Some(FrameKind::ContextLimit),
             _ => None,
         }
     }

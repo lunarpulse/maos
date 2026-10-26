@@ -777,6 +777,9 @@ fn kind_to_string(kind: i64) -> String {
         // (ZERO kernel delta). Journaled by `maosctl audit record-capture` so a
         // subsequent `sealed-export` signature covers the capture as an audit row.
         31 => "run.capture",
+        // Story 18-5 — ADR-016 context signals (kernel `FrameKind` 32/33).
+        32 => "context.pressure",
+        33 => "context.limit",
         _ => "unknown",
     }
     .to_string()
@@ -814,6 +817,8 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "cost.attribution" | "CostAttribution" => Some(29),
         "identity.asserted" | "IdentityAsserted" => Some(30),
         "run.capture" | "RunCapture" => Some(31),
+        "context.pressure" | "ContextPressure" => Some(32),
+        "context.limit" | "ContextLimit" => Some(33),
         _ => None,
     }
 }

@@ -1113,10 +1113,13 @@ pub enum OutputShapeViolation {
 /// The `[budget]` manifest section — declared inference budget. Enforcement
 /// (rate limits + per-call gating against `time_cap_seconds`) lands at
 /// Epic 5 / Epic 6; v0.1-β parses + statically validates.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Budget {
     pub context_window_size: u32,
     pub time_cap_seconds: u32,
+    /// Story 18-5 (ADR-016) — context thresholds in permille (default 800 / 950).
+    pub context_pressure_permille: u16,
+    pub context_limit_permille: u16,
 }
 
 impl Budget {
@@ -1131,6 +1134,10 @@ impl Budget {
 struct RawBudget {
     context_window_size: u32,
     time_cap_seconds: u32,
+    #[serde(default)]
+    context_pressure_threshold: Option<f64>,
+    #[serde(default)]
+    context_limit_threshold: Option<f64>,
 }
 
 impl RawBudget {
@@ -1159,10 +1166,40 @@ impl RawBudget {
                 &format!("{} > 86400 (1 day)", self.time_cap_seconds),
             )));
         }
+        let pressure = threshold_permille(
+            "budget.context_pressure_threshold",
+            self.context_pressure_threshold,
+            800,
+        )?;
+        let limit = threshold_permille(
+            "budget.context_limit_threshold",
+            self.context_limit_threshold,
+            950,
+        )?;
+        if pressure >= limit {
+            return Err(ManifestError::Toml(validation_msg(
+                "budget.context_pressure_threshold",
+                "must be below budget.context_limit_threshold",
+            )));
+        }
         Ok(Budget {
             context_window_size: self.context_window_size,
             time_cap_seconds: self.time_cap_seconds,
+            context_pressure_permille: pressure,
+            context_limit_permille: limit,
         })
+    }
+}
+
+/// A context threshold in (0, 1] as permille; `None` takes `default`.
+fn threshold_permille(field: &str, value: Option<f64>, default: u16) -> Result<u16, ManifestError> {
+    match value {
+        None => Ok(default),
+        Some(v) if v > 0.0 && v <= 1.0 => Ok((v * 1000.0).round() as u16),
+        Some(v) => Err(ManifestError::Toml(validation_msg(
+            field,
+            &format!("{v} not in (0, 1]"),
+        ))),
     }
 }
 

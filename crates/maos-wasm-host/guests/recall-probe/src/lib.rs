@@ -1,4 +1,4 @@
-//! Scripted `maos:spirit@2.1.0` recall consumer for real runner/session tests.
+//! Scripted `maos:spirit@2.2.0` recall consumer for real runner/session tests.
 //!
 //! Input script is UTF-8 in TaskAssign.goal, TelemetryEvent.data or
 //! TaskComplete.result. One command per line; blank lines are ignored:
@@ -9,6 +9,8 @@
 //! - `fetch self|last|HEX`: inbound id, last returned recall entry id, or an
 //!   explicit id (arbitrary lengths permit validation tests).
 //! - `recalls N`: N recalls with the default filter (including zero).
+//! - `context N`: Story 18-5 — `context.report(N)`; reports
+//!   `context ok USED WINDOW LEVEL CROSSED|-` or `context err CODE`.
 //! - `to SPIRIT`: address the emitted report to this Spirit instead of the input
 //!   recipients. Session send authorization sees these claims; telemetry delivery
 //!   itself uses the bus's broadcast subscription.
@@ -19,6 +21,8 @@
 //! `entry IDHEX NS KIND INTENTHEX PAYLOAD_AVAILABLE` for each entry;
 //! `fetch ok IDHEX NS KIND INTENTHEX PAYLOADHEX ORIGIN`; or
 //! `recall err CODE` / `fetch err CODE`. An empty hex field is `-`.
+//! An inbound kernel `context-pressure`/`context-limit` frame (Story 18-5) is
+//! reported as `context-frame KIND PID USED WINDOW PERMILLE`.
 //! Script syntax errors emit `script err invalid-request` (no host call).
 //! Before Ready and during shutdown the guest also calls recall and asserts
 //! `unavailable`; those calls must produce no transport records.
@@ -139,13 +143,19 @@ fn filter<'a>(
 }
 impl Guest for RecallProbe {
     fn handle_frame(mut frame: IacFrame) -> Result<Vec<IacFrame>, Halt> {
+        let mut report = String::new();
+        if let FramePayload::ContextPressure(e) | FramePayload::ContextLimit(e) = &frame.payload {
+            let kind = if frame.kind == FrameKind::ContextPressure { "pressure" } else { "limit" };
+            let (pid, used, size, permille) =
+                (e.spirit_pid, e.context_used, e.context_window_size, e.threshold_permille);
+            writeln!(report, "context-frame {kind} {pid} {used} {size} {permille}").unwrap();
+        }
         let script = match &frame.payload {
             FramePayload::TaskAssign(body) => body.goal.clone(),
             FramePayload::TelemetryEvent(body) => body.data.clone(),
             FramePayload::TaskComplete(body) => body.result_text.clone(),
             _ => String::new(),
         };
-        let mut report = String::new();
         let mut last = None;
         let mut cursor = None;
         for line in script.lines().filter(|line| !line.trim().is_empty()) {
@@ -175,6 +185,18 @@ impl Guest for RecallProbe {
                             run_recall(default_filter(), &mut report, &mut last, &mut cursor);
                         }
                     }
+                    None => report.push_str("script err invalid-request\n"),
+                },
+                Some("context") => match words.next().and_then(|n| n.parse::<u32>().ok()) {
+                    Some(used) => match maos::spirit::context::report(used) {
+                        Ok(s) => {
+                            let name = |l: maos::spirit::context::ContextLevel| format!("{l:?}");
+                            let crossed = s.crossed.map(name).unwrap_or_else(|| "-".into());
+                            let (used, window, level) = (s.used, s.window, name(s.level));
+                            writeln!(report, "context ok {used} {window} {level} {crossed}").unwrap();
+                        }
+                        Err(e) => writeln!(report, "context err {e:?}").unwrap(),
+                    },
                     None => report.push_str("script err invalid-request\n"),
                 },
                 Some("fetch") => {

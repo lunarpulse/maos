@@ -17,6 +17,7 @@
 // Pure modules — re-exported from maos-capability
 pub use maos_capability::cap_quota;
 pub use maos_capability::cap_tokens;
+pub use maos_capability::context_budget;
 
 // Hybrid modules — types from maos-capability, local extensions for
 // cross-cutting orchestration
@@ -128,6 +129,8 @@ pub struct CapabilityRegistryAdapter {
     working_memory: Arc<WorkingMemoryStore>,
     /// Story 4.2 — telemetry stream for scalar.tap broadcast.
     telemetry: Arc<TelemetryStreamAdapter>,
+    /// Story 18-5 — ADR-016 context-token ledger, built here on every path.
+    context: Arc<context_budget::ContextBudget>,
 }
 
 impl std::fmt::Debug for CapabilityRegistryAdapter {
@@ -168,7 +171,13 @@ impl CapabilityRegistryAdapter {
             quota: Arc::new(quota),
             working_memory,
             telemetry,
+            context: Arc::default(),
         }
+    }
+
+    /// Story 18-5 — the context ledger the root binds pid-fixed reporters to.
+    pub fn context_budget(&self) -> &Arc<context_budget::ContextBudget> {
+        &self.context
     }
 
     /// Primitive process-boundary events use the same supervised audit writer.
@@ -176,7 +185,7 @@ impl CapabilityRegistryAdapter {
         &self.audit
     }
 
-    /// Issue a capability token with full mediation: policy → quota → tokens.
+    /// Issue a capability token with full mediation: policy → context → quota → tokens.
     pub fn issue_with_mediation(
         &self,
         spirit_pid: u32,
@@ -201,7 +210,14 @@ impl CapabilityRegistryAdapter {
             }
         }
 
-        // 2. Reserve quota only after policy allows the scope.
+        // 2. ADR-016: an exhausted pid mints only the exits; never charged.
+        if !self.context.admits(spirit_pid, &scope) {
+            return Err(CapError::ContextExhausted {
+                spirit_id: spirit_pid,
+            });
+        }
+
+        // 3. Reserve quota only after policy allows the scope.
         let budget = self.quota.quota().budget_per_window;
         let charge = match self.quota.charge(spirit_pid) {
             Ok(charge) => charge,
@@ -215,7 +231,7 @@ impl CapabilityRegistryAdapter {
             }
         };
 
-        // 3. Refund failed issuance; commit only successfully issued tokens.
+        // 4. Refund failed issuance; commit only successfully issued tokens.
         let token = match self
             .tokens
             .issue(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
@@ -393,6 +409,7 @@ impl CapabilityRegistryAdapter {
     /// Story 5.1 — revoke all capability tokens for a given spirit_pid.
     /// Called by `SpiritSchedulerAdapter::unload` during graceful teardown.
     pub fn revoke_all_for_pid(&self, spirit_pid: u32) -> usize {
+        self.context.remove(spirit_pid);
         self.tokens.revoke_all(spirit_pid)
     }
 

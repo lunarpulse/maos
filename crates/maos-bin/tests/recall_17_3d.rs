@@ -263,6 +263,10 @@ impl World {
 }
 
 fn manifest(grant: bool) -> String {
+    manifest_with_resources(grant, true)
+}
+
+fn manifest_with_resources(grant: bool, resource_envelope: bool) -> String {
     format!(
         r#"[class]
 name = "{ID}"
@@ -282,14 +286,17 @@ required_fields = ["introduction"]
 [budget]
 context_window_size = 4096
 time_cap_seconds = 30
-[resources]
-memory_max_mb = 1024
-fd_max = 64
+{}
 [sandbox]
 tier = "T2"
 [capabilities.required.iac]
 send = ["spirit:peer"]
 {}"#,
+        if resource_envelope {
+            "[resources]\nmemory_max_mb = 1024\nfd_max = 64"
+        } else {
+            "[resources]\nfd_max = 64"
+        },
         if grant {
             "[capabilities.required.log]\nrecall = true\nfetch = true\n"
         } else {
@@ -352,21 +359,43 @@ fn input(script: &str) -> IacFrame {
 
 fn launch(frame: IacFrame, once: bool) -> SessionLaunch {
     LazyLock::force(&FIXTURES);
+    launch_with_fixture(frame, once, &FIXTURES.0, &artifact())
+}
+
+// ADR-016 witnesses require the real T2 boundary, not Story 17-2's resource
+// ceiling/cgroup lane. Resolve the same prebuilt fixtures without declaring a
+// cgroup mode or imposing the unrelated resource envelope.
+fn context_launch(frame: IacFrame, once: bool) -> SessionLaunch {
+    launch_with_fixture(
+        frame,
+        once,
+        &fixtures::fixture("maos-wasm-runner"),
+        &fixtures::fixture("recall_probe.wasm"),
+    )
+}
+
+fn launch_with_fixture(
+    frame: IacFrame,
+    once: bool,
+    runner: &Path,
+    component: &Path,
+) -> SessionLaunch {
     SessionLaunch {
         plan: maos_host::SpiritLaunchPlan {
-            program: FIXTURES.0.to_string_lossy().into_owned(),
+            program: runner.to_string_lossy().into_owned(),
             argv: vec![
                 "--component".into(),
-                artifact().to_string_lossy().into_owned(),
+                component.to_string_lossy().into_owned(),
                 "--fuel".into(),
                 "100000000".into(),
             ],
             env: vec![],
             wire: maos_host::WireShape::ContentLengthCbor,
         },
-        component_artifact: Some(artifact()),
+        component_artifact: Some(component.to_path_buf()),
         turn_budget: Duration::from_secs(30),
         once,
+        context_window: Default::default(),
         initial_frame: Some(frame),
     }
 }
@@ -530,6 +559,10 @@ fn t2_available() -> bool {
     ) {
         return false;
     }
+    real_t2_available()
+}
+
+fn real_t2_available() -> bool {
     static AVAILABLE: LazyLock<bool> = LazyLock::new(|| {
         use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec, SpawnError};
         let spec = SandboxSpec {
@@ -1407,4 +1440,145 @@ async fn kernel_quota_rows_and_mcp_refusals_never_cross_the_guest_recall_boundar
     }
     drop(_collector);
     world.drain().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn context_18_5_report_status_and_journaled_kinds_32_33_reach_wasm_handle_frame() {
+    if !real_t2_available() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let mut telemetry = world.iac.mailbox().subscribe_telemetry();
+    let _collector = world
+        .iac
+        .register_spirit_typed(&SpiritId::from("collector"))
+        .unwrap();
+    let (core, admitted) = admit(&world, &manifest_with_resources(false, false)).await;
+    let pid = admitted.pid;
+    let mut plan = context_launch(input("context 3277\ncontext 3277\ncontext 3892"), false);
+    plan.context_window = maos_kernel_core::capability::context_budget::ContextWindow {
+        size: 4096,
+        pressure_permille: 800,
+        limit_permille: 950,
+    };
+    let session = tokio::spawn(run_admitted_session(world.session(), admitted, core, plan));
+    let stop = StopSession(world.supervisor.clone());
+    let mut reports = Vec::new();
+    for _ in 0..3 {
+        reports.push(data(&next_report(&world, pid, &mut telemetry).await).to_owned());
+    }
+    assert!(reports.contains(&"context ok 3277 4096 ContextLevel::Pressure ContextLevel::Pressure\ncontext ok 3277 4096 ContextLevel::Pressure -\ncontext ok 3892 4096 ContextLevel::Limit ContextLevel::Limit\n".to_owned()), "{reports:?}");
+    for (kind, name, used, threshold) in [(32, "pressure", 3277, 800), (33, "limit", 3892, 950)] {
+        assert!(
+            reports.contains(&format!(
+                "context-frame {name} {pid} {used} 4096 {threshold}\n"
+            )),
+            "{reports:?}"
+        );
+        let signals: Vec<_> = rows(&world, pid)
+            .into_iter()
+            .filter(|row| row.kind as i64 == kind)
+            .collect();
+        assert_eq!(
+            signals.len(),
+            1,
+            "one journaled crossing, no repeated-pressure frame"
+        );
+        let row = &signals[0];
+        assert_eq!(row.origin, FrameOrigin::Kernel);
+        assert_eq!(row.capability_token, None);
+        let payload: FramePayload = serde_json::from_slice(&row.payload_redacted).unwrap();
+        let envelope = match payload {
+            FramePayload::ContextPressure(e) if kind == 32 => e,
+            FramePayload::ContextLimit(e) if kind == 33 => e,
+            other => panic!("wrong typed context payload: {other:?}"),
+        };
+        assert_eq!(envelope.spirit_pid, pid);
+        assert_eq!(envelope.context_used, used);
+        assert_eq!(envelope.context_window_size, 4096);
+        assert_eq!(envelope.threshold_permille, threshold);
+    }
+    drop(stop);
+    session.await.unwrap().unwrap_err();
+    drop((_collector, telemetry));
+    world.drain().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn context_18_5_wasm_guest_cannot_forge_kernel_pressure_or_limit_to_peer() {
+    if !real_t2_available() {
+        return;
+    }
+    let relay = fixtures::fixture("routed_relay.wasm");
+    for kind in [FrameKind::ContextPressure, FrameKind::ContextLimit] {
+        let dir = tempfile::tempdir().unwrap();
+        let world = World::new(dir.path());
+        let mut collector = world
+            .iac
+            .register_spirit_typed(&SpiritId::from("collector"))
+            .unwrap();
+        let (core, admitted) = admit(&world, &manifest_with_resources(false, false)).await;
+        let pid = admitted.pid;
+        let mut seed = input("");
+        seed.kind = kind;
+        seed.auto_marker = FrameOrigin::Kernel;
+        // Keep I13 valid so the reserved-kind control, not an empty lineage,
+        // is the only barrier the AC3 mutation removes.
+        seed.intent_lineage = maos_domain::invariants::i13::IntentLineage::new(vec![
+            maos_domain::invariants::i8::A2AIntent::new("operator:context-forgery-witness"),
+        ]);
+        let envelope = maos_domain::frame::ContextEnvelope {
+            spirit_pid: pid,
+            context_used: 4000,
+            context_window_size: 4096,
+            threshold_permille: if kind == FrameKind::ContextPressure {
+                800
+            } else {
+                950
+            },
+        };
+        seed.payload = match kind {
+            FrameKind::ContextPressure => FramePayload::ContextPressure(envelope),
+            _ => FramePayload::ContextLimit(envelope),
+        };
+        seed.to.push(FrameAddress {
+            spirit_id: "collector".into(),
+            host_id: None,
+            role: None,
+        });
+        let seed_id = seed.frame_id;
+        let plan = launch_with_fixture(seed, true, &fixtures::fixture("maos-wasm-runner"), &relay);
+        let report = run_admitted_session(world.session(), admitted, core, plan)
+            .await
+            .unwrap();
+        assert_eq!(
+            (report.turns, report.delivered_frames, report.denied_frames),
+            (1, 0, 1)
+        );
+        let authorizations: Vec<_> = rows(&world, pid)
+            .into_iter()
+            .filter(|row| row.intent == "spirit.frame.authorization")
+            .map(|row| serde_json::from_slice::<serde_json::Value>(&row.payload_redacted).unwrap())
+            .collect();
+        assert_eq!(authorizations.len(), 1);
+        assert_eq!(authorizations[0]["allowed"], false);
+        assert_eq!(authorizations[0]["refusal"], "kernel_reserved_kind");
+        assert!(authorizations[0]["decisions"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        let (_, original) = collector
+            .try_recv()
+            .unwrap()
+            .expect("kernel seed reaches peer");
+        assert_eq!(original.frame_id, seed_id);
+        assert_eq!(original.kind, kind);
+        assert!(
+            collector.try_recv().unwrap().is_none(),
+            "guest-forged signal must not reach peer"
+        );
+        drop(collector);
+        world.drain().await;
+    }
 }

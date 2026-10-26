@@ -135,6 +135,9 @@ pub enum CapError {
     /// The Spirit's capability issuance quota for the current window is exhausted.
     #[error("Spirit {spirit_id} capability issuance quota exhausted")]
     IssuanceQuotaExhausted { spirit_id: u32 },
+    /// Story 18-5 (ADR-016) — the Spirit's self-reported context exceeds its window.
+    #[error("Spirit {spirit_id} context exhausted")]
+    ContextExhausted { spirit_id: u32 },
     /// Policy denied capability.
     #[error("policy denied capability")]
     PolicyDenied,

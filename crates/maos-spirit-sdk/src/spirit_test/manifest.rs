@@ -26,6 +26,9 @@ pub struct ManifestSelfCheckReport {
     pub output_shape_required_fields: Vec<String>,
     pub budget_context_window_size: Option<u32>,
     pub budget_time_cap_seconds: Option<u32>,
+    /// Story 18-5 — declared context thresholds, in permille.
+    pub budget_context_pressure_permille: Option<u16>,
+    pub budget_context_limit_permille: Option<u16>,
     pub resources_cpu_max_pct: Option<u32>,
     pub resources_memory_max_mb: Option<u32>,
     pub sandbox_tier: String,
@@ -77,6 +80,8 @@ struct OutputShapeSection {
 struct BudgetSection {
     context_window_size: Option<u32>,
     time_cap_seconds: Option<u32>,
+    context_pressure_threshold: Option<f64>,
+    context_limit_threshold: Option<f64>,
 }
 #[derive(Deserialize)]
 struct ResourcesSection {
@@ -163,9 +168,21 @@ pub fn manifest_self_check(
             .unwrap_or_default(),
         budget_context_window_size: parsed.budget.as_ref().and_then(|b| b.context_window_size),
         budget_time_cap_seconds: parsed.budget.as_ref().and_then(|b| b.time_cap_seconds),
+        budget_context_pressure_permille: parsed
+            .budget
+            .as_ref()
+            .and_then(|b| permille(b.context_pressure_threshold)),
+        budget_context_limit_permille: parsed
+            .budget
+            .as_ref()
+            .and_then(|b| permille(b.context_limit_threshold)),
         resources_cpu_max_pct: parsed.resources.as_ref().and_then(|r| r.cpu_max_pct),
         resources_memory_max_mb: parsed.resources.as_ref().and_then(|r| r.memory_max_mb),
         sandbox_tier: parsed.sandbox.tier,
         warnings,
     })
+}
+
+fn permille(threshold: Option<f64>) -> Option<u16> {
+    threshold.map(|t| (t * 1000.0).round() as u16)
 }

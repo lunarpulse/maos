@@ -271,7 +271,7 @@ impl Mailbox {
         {
             return Err(IacBusError::AlreadyRegistered(spirit_id.to_string()));
         }
-        let mut receivers = Vec::with_capacity(10);
+        let mut receivers = Vec::with_capacity(12);
         let kinds: &[FrameKind] = &[
             FrameKind::TaskAssign,
             FrameKind::TaskComplete,
@@ -287,6 +287,9 @@ impl Mailbox {
             // via 1:1 mpsc with capacity 32 (§7.1.1 cardinality).
             FrameKind::ConsentRupture,
             FrameKind::RateLimited,
+            // Story 18-5 — ADR-016 context signals, 1:1 mpsc-32.
+            FrameKind::ContextPressure,
+            FrameKind::ContextLimit,
         ];
         for &kind in kinds {
             let (class, capacity) =
@@ -856,9 +859,9 @@ mod tests {
         let mailbox = Mailbox::new(metrics);
         let handle = mailbox.register_spirit("test-spirit").unwrap();
         assert_eq!(handle.spirit_id, "test-spirit");
-        // Ten direct channels: six base, two lifecycle-budget, and the
-        // ConsentRupture/RateLimited sender channels.
-        assert_eq!(handle.receivers.len(), 10);
+        // Twelve direct channels: six base, two lifecycle-budget, and
+        // ConsentRupture/RateLimited/ContextPressure/ContextLimit sender channels.
+        assert_eq!(handle.receivers.len(), 12);
     }
 
     #[tokio::test]

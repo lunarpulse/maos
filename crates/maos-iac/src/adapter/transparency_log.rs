@@ -128,6 +128,10 @@ pub enum FrameKind {
     /// `CostAttributionPayload` (RAW dimensional facts — no money field;
     /// money computed read-time in `maos-audit` via `ProviderPricingConfig`).
     CostAttribution = 29,
+    /// Story 18-5 — ADR-016: self-reported context crossed the pressure threshold.
+    ContextPressure = 32,
+    /// Story 18-5 — ADR-016: self-reported context crossed the limit threshold.
+    ContextLimit = 33,
 }
 
 impl FrameKind {
@@ -164,6 +168,8 @@ impl FrameKind {
             27 => Some(Self::CliWrapperShapeMismatch),
             28 => Some(Self::GovernanceEvent),
             29 => Some(Self::CostAttribution),
+            32 => Some(Self::ContextPressure),
+            33 => Some(Self::ContextLimit),
             _ => None,
         }
     }

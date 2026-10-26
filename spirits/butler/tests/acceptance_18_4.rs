@@ -376,6 +376,7 @@ fn seam(
             }
         })),
         scene_butler: Arc::default(),
+        context: None,
     }
 }
 

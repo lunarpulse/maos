@@ -355,6 +355,8 @@ pub enum GovernedMintError {
     /// Story 17-9 — the Spirit's capability issuance quota for the current
     /// window is exhausted (`CapError::IssuanceQuotaExhausted`).
     QuotaExhausted,
+    /// Story 18-5 — the Spirit's context is exhausted (`CapError::ContextExhausted`).
+    ContextExhausted,
     /// Other mediation or identity-persistence failure.
     Mediation(String),
 }
@@ -365,6 +367,7 @@ impl std::fmt::Display for GovernedMintError {
         match self {
             Self::KernelPolicyDenied => write!(f, "kernel policy denied capability issuance"),
             Self::QuotaExhausted => write!(f, "kernel capability issuance quota exhausted"),
+            Self::ContextExhausted => write!(f, "kernel refused issuance: context exhausted"),
             Self::SsoAssertionMissing(m) | Self::PdpDenied(m) | Self::Mediation(m) => {
                 write!(f, "{m}")
             }
@@ -431,6 +434,9 @@ pub fn issue_enterprise_governed_capability(
             }
             maos_domain::ports::capability::CapError::IssuanceQuotaExhausted { .. } => {
                 GovernedMintError::QuotaExhausted
+            }
+            maos_domain::ports::capability::CapError::ContextExhausted { .. } => {
+                GovernedMintError::ContextExhausted
             }
             _ => GovernedMintError::Mediation(format!("kernel capability mediation failed: {e}")),
         })?;
@@ -499,10 +505,14 @@ pub fn issue_governed_mcp_capability(
         posture_hash,
         IntentClass::Standard,
     );
-    if result.is_err() {
+    if let Err(error) = &result {
+        let code = match error {
+            GovernedMintError::ContextExhausted => "context-exhausted",
+            _ => "capability-denied",
+        };
         let payload = serde_json::to_vec(&McpRefusalPayload {
             op: "mcp.call",
-            code: "capability-denied",
+            code,
             server,
             tool,
             boot_nonce: journal.boot_nonce(),
@@ -514,7 +524,7 @@ pub fn issue_governed_mcp_capability(
             spirit_id,
             "",
             None,
-            "mcp.call.refused:capability-denied",
+            &format!("mcp.call.refused:{code}"),
             &payload,
             maos_domain::invariants::i3::FrameOrigin::Kernel,
         );
@@ -1008,7 +1018,7 @@ pub fn run_cli_wrapper_manifest(
             // is spent — proceeding would make exhaustion a tokenless fallback,
             // so it refuses on BOTH paths, through the same guard.
             match &e {
-                GovernedMintError::QuotaExhausted => {
+                GovernedMintError::QuotaExhausted | GovernedMintError::ContextExhausted => {
                     return Err(format!(
                         "maos run: cli_wrapper spawn REFUSED: {e}; a quota refusal never \
                          proceeds without a kernel token (Story 17-9 FW-06)"

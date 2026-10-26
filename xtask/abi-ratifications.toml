@@ -257,6 +257,26 @@ covered_changes = [
 ratified_at = "2026-10-18"
 
 [[ratification]]
+proposal_id = "18-5-AC3-wit-spirit-2.2.0"
+summary = "ADR-016 context-token budget (Story 18-5, D-18-5-04/05 A): kernel-written FrameKind ContextPressure (32) / ContextLimit (33; raw TL kinds 30/31 are taken by identity.asserted / run.capture) with FramePayload ContextEnvelope, never guest-sent (refused kernel_reserved_kind); additive maos:spirit@2.2.0 context import report(used-tokens) -> context-status, pid and admitted window bound by the host; optional [budget] context_pressure_threshold / context_limit_threshold (schema 5, no bump)"
+adr_ref = "ADR-016,ADR-031,ADR-045,ADR-060"
+status = "ratified"
+covered_changes = [
+  "maos:spirit@2.2.0",
+  "ContextPressure",
+  "ContextLimit",
+  "ContextEnvelope",
+  "context-envelope",
+  "context",
+  "context-level",
+  "context-status",
+  "context-error",
+  "Budget",
+  "RawBudget",
+]
+ratified_at = "2026-10-26"
+
+[[ratification]]
 proposal_id = "17-8-consent-recall-policy"
 summary = "Domain-only ConsentEnvelope.recall {Full, HeaderOnly, Withheld}: default Full and omitted from JSON/CBOR when Full (pre-17-8 envelopes byte-identical); any unknown value decodes to Withheld, never an error and never Full; daemon-persisted and enforced at disclosure. Guests observe only its effect (recall-entry.payload-available = false, recall-error::consent-withheld); frame_bridge lowering elides it and lifting sets Full — a documented exception to 17-3b's lossless-frame contract. wit/spirit.wit and the pinned components are unchanged (D-17-8-01 A)"
 adr_ref = "ADR-012,ADR-013,ADR-034"

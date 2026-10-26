@@ -77,6 +77,19 @@ pub enum FramePayload {
     ConsentRupture(ConsentRupturePayload),
     /// Story 6.4 — NFR-Scale-4: per-(provider, credential) bucket-exhaustion event.
     RateLimited(RateLimitedPayload),
+    /// Story 18-5 (ADR-016): self-reported context crossed the pressure threshold.
+    ContextPressure(ContextEnvelope),
+    /// Story 18-5 (ADR-016): self-reported context crossed the limit threshold.
+    ContextLimit(ContextEnvelope),
+}
+
+/// Typed context-budget event shared by the pressure and limit frames.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ContextEnvelope {
+    pub spirit_pid: u32,
+    pub context_used: u32,
+    pub context_window_size: u32,
+    pub threshold_permille: u16,
 }
 
 /// Typed budget event shared by the warning and exceeded ABI frames.

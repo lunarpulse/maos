@@ -1,0 +1,52 @@
+Story 18-5 AC1/AC2 process witnesses
+Finisher model: openai-codex/gpt-6.1-sol
+All cargo commands: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo
+No kernel source changed. Exclusive cargo lane granted by Dev185b.
+
+Prerequisite:
+command: cargo build --locked -p maos-cli
+exit: 0; elapsed: 4.41s
+output: existing workspace warnings; full observed output artifact://3359
+
+Initial process run:
+command: cargo nextest run --locked -p maos-bin --test context_budget_18_5
+exit: 100; elapsed: 2.50s
+output: 1 passed, 2 failed. Both failures: typed-bus journal intent was "standard", not "context.pressure". Corrected the test expectation to the actual typed frame's Standard intent; payload/kind/envelope checks retained.
+full output: artifact://3361
+
+Baseline after correction:
+command: cargo nextest run --locked -p maos-bin --test context_budget_18_5
+exit: 0; elapsed: 2.90s
+output: Summary [1.771s] 3 tests run: 3 passed, 0 skipped
+full output: artifact://3363
+
+AC1 latch plant:
+backup: cp crates/maos-capability/src/context_budget.rs /tmp/18-5-context-process-ledger.rs
+mutation: ContextBudget::report crossing filter changed from `previous < threshold && level >= threshold` to `level >= threshold`.
+command: cargo nextest run --locked -p maos-bin --test context_budget_18_5 four_day_process_reports_context_crossings_and_exact_journal_rows
+exit: 100; elapsed: 8.49s
+output: FAIL [0.584s] four_day_process_reports_context_crossings_and_exact_journal_rows
+assertion at context_budget_18_5.rs:106: left 5, right 2.
+Observed exact rows: pressure(6600), pressure(7800), limit(7800), pressure(8300), limit(8300), all pid 1/window 8192. Test rejects repeated upward signals rather than accepting an unlatched emitter.
+Summary [0.586s] 1 test run: 0 passed, 1 failed, 2 skipped
+full output: artifact://3367
+restore: cp /tmp/18-5-context-process-ledger.rs crates/maos-capability/src/context_budget.rs && cmp /tmp/18-5-context-process-ledger.rs crates/maos-capability/src/context_budget.rs && touch crates/maos-capability/src/context_budget.rs
+restore exit: 0; byte identity confirmed by cmp.
+
+AC2 door-only binding plant:
+backup: cp crates/maos-bin/src/main.rs /tmp/18-5-context-process-main.rs
+mutation: only build_spirit_obj's LoadedSpiritKind::Butler arm: `let seam` -> `let mut seam`, then `seam.context = None;` after cloning the seam. Boot construction is untouched.
+command: cargo nextest run --locked -p maos-bin --test context_budget_18_5 door_loaded_butler_reports_for_its_pid_and_reload_starts_within
+exit: 100; elapsed: 13.06s
+output: FAIL [0.851s] door_loaded_butler_reports_for_its_pid_and_reload_starts_within
+assertion at context_budget_18_5.rs:184: left Null, right {used:6600,window:8192,level:"pressure",crossed:"pressure"}.
+Summary [0.852s] 1 test run: 0 passed, 1 failed, 2 skipped
+full output: artifact://3371
+restore: cp /tmp/18-5-context-process-main.rs crates/maos-bin/src/main.rs && cmp /tmp/18-5-context-process-main.rs crates/maos-bin/src/main.rs && touch crates/maos-bin/src/main.rs
+restore exit: 0; byte identity confirmed by cmp.
+
+Restored green (both plants removed):
+command: cargo nextest run --locked -p maos-bin --test context_budget_18_5
+exit: 0; elapsed: 8.89s
+output: Summary [1.899s] 3 tests run: 3 passed, 0 skipped
+full output: artifact://3374

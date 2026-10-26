@@ -575,7 +575,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::capability::CapabilityRegistryAdapter",
-      "signature_hash": "781e5380efcb4eae263e532bc514115ef0396e40cad63249d4397fe7673e7141"
+      "signature_hash": "5b920126a50b4b4cf7ef82066c47c69f76c7a375263a86dbdd24fb43c87fedc5"
     },
     {
       "kind": "struct",
@@ -1191,6 +1191,11 @@
       "kind": "use",
       "path": "maos_kernel_core::capability::maos_capability::cap_tokens",
       "signature_hash": "320cfb8d2563428dce39f10fa1c54a2dd71a2c684d81e2a03e020dbdd8df2b40"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::capability::maos_capability::context_budget",
+      "signature_hash": "87924bfb3996dd1db5cb3713600ed67e130a5b2e83e216a1a53ab7e03330072c"
     },
     {
       "kind": "use",

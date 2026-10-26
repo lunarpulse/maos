@@ -560,6 +560,7 @@ fn seam(
         clock: Arc::new(SystemClock::UTC),
         acceptance: None,
         scene_butler: Arc::default(),
+        context: None,
     }
 }
 

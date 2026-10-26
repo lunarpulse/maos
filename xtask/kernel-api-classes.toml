@@ -35,6 +35,9 @@
 "maos_kernel_core::memory::MemoryManagerAdapter"                = "data-movement"
 "maos_kernel_core::iac::IacBusAdapter"                          = "data-movement"
 "maos_kernel_core::capability::CapabilityRegistryAdapter"       = "universal-arithmetic"
+# Story 18-5-context-token-budget-accounting (ADR-016): the registry's
+# context-budget re-export exposes the self-reported occupancy ledger.
+"maos_kernel_core::capability::maos_capability::context_budget" = "universal-arithmetic"
 "maos_kernel_core::io::IoSubsystemAdapter"                      = "data-movement"
 "maos_kernel_core::telemetry::TelemetryStreamAdapter"           = "data-movement"
 

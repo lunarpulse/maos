@@ -415,7 +415,7 @@ The two internal modules — I/O Subsystem (§4.4) and Telemetry Stream (§4.7) 
 
 ## 4.6 Capability Registry
 
-**Responsibility:** Mediate every external call. Issue, verify, and revoke capability tokens. Enforce manifest-declared capability surfaces. Validate I11/I12/I13 audit-chain fields on digest writes. Enforce the per-admitted-pid capability-issuance window (17-9). Separately, ADR-016's Spirit-self-reported context-token accounting against manifest `[budget].context_window_size` belongs to `18-5-context-token-budget-accounting`, not 17-9.
+**Responsibility:** Mediate every external call. Issue, verify, and revoke capability tokens. Enforce manifest-declared capability surfaces. Validate I11/I12/I13 audit-chain fields on digest writes. Enforce the per-admitted-pid capability-issuance window (17-9). Separately, ADR-016's Spirit-self-reported context-token accounting against manifest `[budget].context_window_size` is delivered by `18-5-context-token-budget-accounting`, not 17-9.
 
 **Decomposition (round-2 ADR-030).** The Capability Registry is internally split into four sub-services so the hot path does not serialize on the slow path:
 
@@ -431,8 +431,10 @@ The hot path (token verify on every IAC frame and every tool call) goes through 
 **Separate unit:** ADR-016's `ContextPressure`/`ContextLimit`/`EContextExhausted`
 concern Spirit-self-reported context tokens versus manifest
 `[budget].context_window_size`. They are not `cap-quota` issuance signals and
-are not built by 17-9; their owner is `18-5-context-token-budget-accounting`.
-`CapError::ContextExhausted` remains available for context-token exhaustion.
+are not built by 17-9; they are **delivered by 18-5**
+(`18-5-context-token-budget-accounting`, ADR-016 implementation note): the
+registry gates issuance before the 17-9 charge with `CapError::ContextExhausted`
+outside the distil/hand-off exits.
 See ADR-030's 17-9 implementation note for the per-incarnation and delivery
 limits; no Spirit-facing issuance pre-warning is provided.
 

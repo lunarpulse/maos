@@ -4,13 +4,19 @@
 //!
 //! Story 18-4 — the pid-fused principal port and the root's acceptance
 //! binder (D-18-4-02 A; review TIA-1/BH-2: the root, not the Spirit, fixes
-//! the pid). The scene's per-day step is Spirit-side (`butler::Scene`,
+//! the pid). Story 18-5 — the root's context binder (CR-3). The scene's per-day step is Spirit-side (`butler::Scene`,
 //! `Butler::scene_step`; operator ruling 2026-10-25, kloc C).
 
 use std::path::Path;
 use std::sync::{Arc, Weak};
 
+use maos_domain::ports::ContextBudgetPort;
+use maos_iac::adapter::context_signal::{AdmittedSpirit, ContextSignalAdapter};
+use maos_kernel_core::capability::context_budget::ContextWindow;
+use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+use maos_kernel_core::iac::IacBusAdapter;
+use maos_kernel_core::scheduler::control_block::SpiritControlBlock;
 
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_kernel_core::memory::MemoryManagerAdapter;
@@ -145,6 +151,52 @@ pub fn acceptance_binder(
                 Ok(())
             }),
         }
+    })
+}
+
+/// The scheduler's live control blocks, keyed by pid.
+pub type Scbs = std::sync::RwLock<std::collections::BTreeMap<u32, Arc<SpiritControlBlock>>>;
+
+/// Story 18-5 (CR-3; the 18-4 TIA-1 lesson) — the root's context binder: each
+/// reporter resolves the pid through the resolver the ROOT handed `attach` /
+/// `construct`, and the window and thresholds from that pid's admitted bundle
+/// (no `[budget]` ⇒ window 0, accounting off). Never from the Spirit.
+pub fn context_binder(
+    capability: &CapabilityRegistryAdapter,
+    bus: &Arc<IacBusAdapter>,
+    scbs: &Arc<Scbs>,
+) -> butler::ContextBinder {
+    let ledger = Arc::clone(capability.context_budget());
+    let (bus, scbs) = (Arc::downgrade(bus), Arc::downgrade(scbs));
+    Arc::new(move |pid_of: butler::PidSource| {
+        let scbs = scbs.clone();
+        Arc::new(ContextSignalAdapter {
+            ledger: Arc::clone(&ledger),
+            bus: bus.clone(),
+            admitted: Arc::new(move || {
+                let pid = pid_of()?;
+                let scb = scbs.upgrade()?.read().ok()?.get(&pid).cloned()?;
+                let window = context_window(scb.runtime_snapshot().manifest.budget.as_ref());
+                let spirit_id = scb.spirit_id.as_str().into();
+                Some(AdmittedSpirit {
+                    pid,
+                    spirit_id,
+                    window,
+                })
+            }),
+        }) as Arc<dyn ContextBudgetPort>
+    })
+}
+
+/// Story 18-5 — an admitted bundle's window and thresholds (no `[budget]` ⇒
+/// window 0: accounting off).
+pub fn context_window(
+    budget: Option<&maos_kernel_core::security::manifest::Budget>,
+) -> ContextWindow {
+    budget.map_or(ContextWindow::default(), |b| ContextWindow {
+        size: b.context_window_size,
+        pressure_permille: b.context_pressure_permille,
+        limit_permille: b.context_limit_permille,
     })
 }
 

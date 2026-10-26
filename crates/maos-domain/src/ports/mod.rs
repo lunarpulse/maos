@@ -31,7 +31,8 @@
 
 pub mod a2a; // NEW — Story 6.3 A2ARouter port per ADR-003 + ADR-012
 pub mod capability;
-pub mod collective_memory; // NEW — Story 10.4a CollectiveMemoryPort per ADR-006
+pub mod collective_memory;
+pub mod context_budget; // Story 18-5 ContextBudgetPort per ADR-016 // NEW — Story 10.4a CollectiveMemoryPort per ADR-006
 pub mod cross_wall_recall_consent; // Story 13.3b cross-wall log-recall consent
 pub mod distillation; // NEW — Story 4.4 DistillationPort per AC2
 pub mod epistemic_scalar; // NEW — Story 8.10 AC1 cognitive-Spirit scalar-write port
@@ -62,6 +63,7 @@ pub use capability::CapabilityRegistryPort;
 pub use collective_memory::{
     CollectiveEraseReceipt, CollectiveMemoryPort, CollectivePortError, TransportCause,
 }; // Story 10.4a / 13.3 / 13.5b
+pub use context_budget::{ContextBudgetPort, ContextLevel, ContextReportError, ContextStatus};
 pub use cross_wall_recall_consent::{
     CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
 };

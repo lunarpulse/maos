@@ -347,6 +347,7 @@ fn echo_launch(spirit_id: &str) -> SessionLaunch {
         component_artifact: Some(artifact),
         turn_budget: Duration::from_secs(30),
         once: true,
+        context_window: Default::default(),
         initial_frame: Some(IacFrame {
             frame_id: ulid::Ulid::new().to_bytes(),
             timestamp_ns: 1,
@@ -637,6 +638,7 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                         component_artifact: wasm.then_some(artifact),
                         turn_budget: Duration::from_secs(30),
                         once: true,
+                        context_window: Default::default(),
                         initial_frame: Some(seed),
                     },
                 )
@@ -888,6 +890,7 @@ async fn run_hostile_twin_with_quota(
                 component_artifact: None,
                 turn_budget,
                 once: true,
+                context_window: Default::default(),
                 initial_frame: Some(seed),
             },
         ),
@@ -1491,6 +1494,7 @@ async fn assert_hostile_lifting(aliases: bool, count: usize, exhausts: bool) {
             component_artifact: Some(artifact),
             turn_budget: Duration::from_secs(30),
             once: true,
+            context_window: Default::default(),
             initial_frame: Some(seed),
         },
     )
@@ -1615,6 +1619,7 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
                 component_artifact: Some(artifact),
                 turn_budget: Duration::from_secs(30),
                 once: false,
+                context_window: Default::default(),
                 initial_frame: None,
             },
         ));
@@ -1806,6 +1811,7 @@ async fn repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall()
             component_artifact: Some(artifact),
             turn_budget: TURN_BUDGET,
             once: false,
+            context_window: Default::default(),
             initial_frame: Some(seed(1)),
         },
     ));
@@ -2060,6 +2066,7 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                     component_artifact: wasm.then_some(artifact),
                     turn_budget: Duration::from_secs(30),
                     once: true,
+                    context_window: Default::default(),
                     initial_frame: Some(seed),
                 },
             )

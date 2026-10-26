@@ -15,7 +15,7 @@
 //! 1. Parse CLI arguments and create a fuel-metered wasmtime engine.
 //! 2. Compile the component under a watchdog, then reject an incompatible
 //!    `maos:spirit/frames` import before instantiation.
-//! 3. Instantiate it against the `maos:spirit@2.1.0` bindings, call
+//! 3. Instantiate it against the `maos:spirit@2.2.0` bindings, call
 //!    `on-start`, and exchange typed frames with `handle-frame`.
 //! 4. On EOF or a guest-returned `Halt`, call `on-shutdown` and use the
 //!    cause-distinguishing exit codes below.
@@ -42,7 +42,7 @@ use wasmtime::component::{Component, Linker};
 use wasmtime::{Config, Engine, Store};
 
 use maos_wasm_host::host_state::HostState;
-use maos_wasm_host::wit_guest::Spirit;
+use maos_wasm_host::wit_guest::{self, legacy as legacy_guest};
 
 /// Distinguishable exit codes so the parent (kernel) can attribute the kill
 /// cause from the exit status alone, without parsing stderr text. AC4/D6:
@@ -79,7 +79,7 @@ fn main() -> ExitCode {
         Err(RunError::IncompatibleWorld(import)) => {
             eprintln!(
                 "maos-wasm-runner: IncompatibleWorld: component imports {import}; \
-                 this runner implements maos:spirit@2.1.0"
+                 this runner implements maos:spirit@2.2.0"
             );
             ExitCode::from(RunnerExit::IncompatibleWorld as u8)
         }
@@ -247,7 +247,17 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
         wasmtime::component::HasSelf<HostState>,
     >(&mut linker, |state| state)
     .map_err(|e| RunError::Other(format!("recall linker setup: {e}")))?;
-    let spirit = match Spirit::instantiate(&mut store, &component, &linker) {
+    maos_wasm_host::wit_guest::maos::spirit::context::add_to_linker::<
+        _,
+        wasmtime::component::HasSelf<HostState>,
+    >(&mut linker, |state| state)
+    .map_err(|e| RunError::Other(format!("context linker setup: {e}")))?;
+    // 2.0/2.1 have the same export schema, but its input enums are closed:
+    // select their bindings before instantiation rather than widening them.
+    macro_rules! run_guest {
+        ($bindings:path, $pump:ident) => {{
+    use $bindings as bindings;
+    let spirit = match bindings::Spirit::instantiate(&mut store, &component, &linker) {
         Ok(spirit) => spirit,
         Err(error) => {
             let error_message = error.to_string();
@@ -255,7 +265,7 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
                 return Err(RunError::OutOfFuel);
             }
             return Err(RunError::InvalidComponent(format!(
-                "component does not conform to maos:spirit@2.1.0 (instantiate failed): {error_message}"
+                "component does not conform to maos:spirit@2.2.0 (instantiate failed): {error_message}"
             )));
         }
     };
@@ -297,7 +307,7 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
             "forbidden syscall unexpectedly returned".into(),
         ));
     }
-    let result = pump_frames(&mut store, &spirit, args.fuel);
+    let result = $pump(&mut store, &spirit, args.fuel);
 
     // Lifecycle: on-shutdown — best-effort, runs even if the pump errored,
     // mirroring the native form's halt-then-shutdown ordering. A shutdown
@@ -306,6 +316,20 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     let _ = spirit.call_on_shutdown(&mut store);
 
     result
+        }};
+    }
+    let legacy = component
+        .component_type()
+        .imports(&engine)
+        .any(|(name, _)| {
+            name.strip_prefix("maos:spirit/frames@")
+                .is_some_and(|version| matches!(version.split('.').nth(1), Some("0" | "1")))
+        });
+    if legacy {
+        run_guest!(maos_wasm_host::wit_guest::legacy, pump_legacy)
+    } else {
+        run_guest!(maos_wasm_host::wit_guest, pump_frames)
+    }
 }
 
 /// Compile a component on a dedicated thread with a hard wall-clock cap.
@@ -333,7 +357,7 @@ fn compile_with_timeout(engine: &Engine, bytes: Vec<u8>) -> Result<Component, Ru
 }
 
 /// Reject unsupported major versions of either Spirit host interface.
-/// Semver-compatible 2.0 imports resolve against this host's 2.1 definitions.
+/// Semver-compatible 2.0/2.1 imports resolve against this host's 2.2 definitions.
 fn incompatible_spirit_import(component: &Component, engine: &Engine) -> Option<String> {
     component
         .component_type()
@@ -341,7 +365,8 @@ fn incompatible_spirit_import(component: &Component, engine: &Engine) -> Option<
         .find_map(|(name, _)| {
             let version = name
                 .strip_prefix("maos:spirit/frames@")
-                .or_else(|| name.strip_prefix("maos:spirit/recall@"))?;
+                .or_else(|| name.strip_prefix("maos:spirit/recall@"))
+                .or_else(|| name.strip_prefix("maos:spirit/context@"))?;
             let major = version.split('.').next()?.parse::<u64>().ok()?;
             (major != 2).then(|| name.to_owned())
         })
@@ -356,7 +381,11 @@ fn classify_trap(err: wasmtime::Error) -> RunError {
     RunError::Other(format!("guest call failed: {err:#}"))
 }
 
-fn pump_frames(store: &mut Store<HostState>, spirit: &Spirit, fuel: u64) -> Result<(), RunError> {
+// Both versions retain identical fuel, protocol, atomicity and trap handling.
+macro_rules! frame_pump {
+    ($name:ident, $bindings:ident, $bridge:path) => {
+fn $name(store: &mut Store<HostState>, spirit: &$bindings::Spirit, fuel: u64) -> Result<(), RunError> {
+    use $bridge as frame_bridge;
     loop {
         let frame_bytes = match maos_frame_codec::read_frame(&mut store.data_mut().reader) {
             Ok(Some(b)) => b,
@@ -368,7 +397,7 @@ fn pump_frames(store: &mut Store<HostState>, spirit: &Spirit, fuel: u64) -> Resu
             maos_wasm_host::codec::decode_cbor(&frame_bytes)
                 .map_err(|e| RunError::Other(format!("inbound frame decode error: {e}")))?;
         let wit_frame =
-            maos_wasm_host::frame_bridge::lower(&domain_frame).map_err(|error| match error {
+            frame_bridge::lower(&domain_frame).map_err(|error| match error {
                 maos_wasm_host::frame_bridge::BridgeError::Unrepresentable { ty } => {
                     RunError::UnrepresentableFrame(ty)
                 }
@@ -383,7 +412,7 @@ fn pump_frames(store: &mut Store<HostState>, spirit: &Spirit, fuel: u64) -> Resu
         store.data_mut().in_export = false;
         let emitted = match result {
             Ok(Ok(frames)) => frames,
-            Ok(Err(maos_wasm_host::wit_guest::maos::spirit::frames::Halt::Voluntary)) => {
+            Ok(Err($bindings::maos::spirit::frames::Halt::Voluntary)) => {
                 maos_frame_codec::write_frame(&mut store.data_mut().writer, &[])
                     .map_err(|e| RunError::Other(format!("TurnComplete write: {e}")))?;
                 return turn_result(store);
@@ -406,7 +435,7 @@ fn pump_frames(store: &mut Store<HostState>, spirit: &Spirit, fuel: u64) -> Resu
         let encoded = emitted
             .into_iter()
             .map(|wit_out| {
-                let domain_out = maos_wasm_host::frame_bridge::lift(wit_out)
+                let domain_out = frame_bridge::lift(wit_out)
                     .map_err(|e| RunError::Other(format!("outbound frame lift error: {e}")))?;
                 maos_wasm_host::codec::encode_cbor(&domain_out)
                     .map_err(|e| RunError::Other(format!("outbound frame encode error: {e}")))
@@ -421,6 +450,14 @@ fn pump_frames(store: &mut Store<HostState>, spirit: &Spirit, fuel: u64) -> Resu
         turn_result(store)?;
     }
 }
+    };
+}
+frame_pump!(pump_frames, wit_guest, maos_wasm_host::frame_bridge);
+frame_pump!(
+    pump_legacy,
+    legacy_guest,
+    maos_wasm_host::frame_bridge::legacy
+);
 
 fn turn_result(store: &Store<HostState>) -> Result<(), RunError> {
     if store.data().recall_broken {

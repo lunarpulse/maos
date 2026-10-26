@@ -271,6 +271,25 @@ Spirit-facing `ContextPressure`/`ContextLimit`/`EContextExhausted` typed signals
 Issuance exhaustion uses `CapError::IssuanceQuotaExhausted`, leaving
 `CapError::ContextExhausted` available for this context-token accounting.
 
+**Implementation note — Story 18-5 (delivered 2026-10-26):** the ledger is
+`maos_capability::context_budget`, built inside `CapabilityRegistryAdapter::new`
+(one slot per admitted pid = one incarnation; a hot-swap successor keeps it
+until its first report; unload, crash and revocation drop it through
+`revoke_all_for_pid`). Occupancy is absolute: the last report wins, a threshold
+re-arms below itself, and a report back within the window lifts exhaustion.
+Thresholds are optional manifest `[budget].context_pressure_threshold` /
+`context_limit_threshold` (defaults 0.80 / 0.95). The root binds each Spirit's
+`ContextBudgetPort` to its admitted pid and admitted window; one kernel-written
+`ContextPressure` / `ContextLimit` frame (FrameKind 32 / 33) per upward crossing,
+plus the reporter's synchronous typed `ContextStatus`. Above 100 % the registry
+refuses issuance `CapError::ContextExhausted` (policy → context → 17-9 charge;
+a refusal is never charged) for every scope except the **exits** —
+`ProviderInfer` and `MemWrite` (distil) and `IacSend` (hand off) — and the MCP
+adapter refuses a token minted before the crossing at use
+(`McpError::ContextExhausted`). **Limit:** counts are Spirit-self-reported; a
+Spirit that under-reports is never refused, and a Spirit with no port wired
+reports nothing (only Butler and Researcher report in v1).
+
 ## ADR-017 — Hot-swap state-transfer wire format
 
 `Status: binding-v0.3` · `Gate: swap conformance corpus passes; auto-revert ≤30s on post-swap invariant violation` · `Decided: 2026-04-15` · `Revisits: §3.2 invariant I6; §4.1`

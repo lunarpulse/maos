@@ -11,6 +11,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex};
 
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::ports::mcp::McpError;
 use maos_domain::ports::{DistillationPort, InferencePort, LogRecallPort};
 use maos_kernel_core::capability::CapabilityRegistryAdapter;
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
@@ -24,7 +25,7 @@ use sha2::{Digest, Sha256};
 
 use crate::enterprise_identity::EnterpriseRuntime;
 use crate::enterprise_pdp_runtime::EnterprisePdpRuntime;
-use crate::worker_spawn::issue_governed_mcp_capability;
+use crate::worker_spawn::{issue_governed_mcp_capability, GovernedMintError};
 
 /// What a bound Researcher writes into its host: the seed journal (non-`--live`
 /// only, D-18-3-01 A) and the distillate writer.
@@ -101,6 +102,9 @@ pub fn construct(
     pid_of: PidSource,
     host: &ResearcherHost,
 ) -> Result<Researcher, String> {
+    if let Some(bind) = &seam.context {
+        researcher = researcher.with_context_port(bind(Arc::clone(&pid_of)));
+    }
     if let Some(build) = &wiring.mcp {
         let (mcp, recall) = build(spirit_id, Arc::clone(&pid_of))?;
         researcher = researcher
@@ -311,15 +315,17 @@ impl LiveResearcherMcpPort {
                     tool,
                     posture_hash,
                 )
-                .map_err(|e| ResearcherMcpError::TokenIssuanceFailed(e.to_string()))?;
-                let response = client.call(&token, server, tool, args).map_err(|e| {
-                    failed(match e {
-                        maos_domain::ports::mcp::McpError::CapabilityDenied { .. } => {
-                            "unauthorized".into()
-                        }
-                        other => other.to_string(),
-                    })
+                .map_err(|e| match e {
+                    GovernedMintError::ContextExhausted => ResearcherMcpError::ContextExhausted,
+                    e => ResearcherMcpError::TokenIssuanceFailed(e.to_string()),
                 })?;
+                let response = client
+                    .call(&token, server, tool, args)
+                    .map_err(|e| match e {
+                        McpError::ContextExhausted { .. } => ResearcherMcpError::ContextExhausted,
+                        McpError::CapabilityDenied { .. } => failed("unauthorized".into()),
+                        other => failed(other.to_string()),
+                    })?;
                 maos_mcp::drivers::researcher::extract_content(&response)
                     .map_err(|e| failed(e.to_string()))
             })

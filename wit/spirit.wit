@@ -1,4 +1,5 @@
-// `maos:spirit@2.1.0` — lossless frames and participant-scoped log recall.
+// `maos:spirit@2.2.0` — lossless frames, participant-scoped log recall and
+// Spirit-self-reported context budgets.
 //
 // Story 11.1a, ADR-031 §3: this WIT is the typed face a WASM Spirit author
 // binds against (wit-bindgen, `jco guest-types`). The host serializes and
@@ -14,6 +15,8 @@
 // variant) is refused by the host bridge, typed — never mapped.
 // Story 17-3d (ADR-013/031/060) adds the recall import without changing
 // interface frames. The daemon binds identity and grants on the stdio channel.
+// Story 18-5 (ADR-016, `18-5-AC3-wit-spirit-2.2.0`) adds the kernel-written
+// `context-pressure`/`context-limit` frames and the `context` report import.
 //
 // Every byte of this file feeds the four provenance-pinned components'
 // `source_sha256` (`tests/fixtures/wasm/equiv-fixtures.provenance.toml`): an
@@ -24,7 +27,7 @@
 //   FramePayload / IacFrame  — crates/maos-domain/src/frame.rs
 //   Scope                    — crates/maos-domain/src/invariants/i1.rs
 
-package maos:spirit@2.1.0;
+package maos:spirit@2.2.0;
 
 interface frames {
     // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
@@ -48,6 +51,8 @@ interface frames {
         rate-limited,           // 23
         gateway-inbound,        // 24
         gateway-outbound,       // 25
+        context-pressure,       // 32
+        context-limit,          // 33
     }
 
     // ── FrameOrigin (i3) ───────────────────────────────────────────────
@@ -225,6 +230,14 @@ interface frames {
         cap-seconds: u64,
     }
 
+    // ── ContextEnvelope (frame.rs) ──────────────────────────────────────
+    record context-envelope {
+        spirit-pid: u32,
+        context-used: u32,
+        context-window-size: u32,
+        threshold-permille: u16,
+    }
+
     // ── FramePayload (frame.rs:63-75) ──────────────────────────────────
     // Discriminated union — one variant per routed FrameKind.
     variant frame-payload {
@@ -239,6 +252,8 @@ interface frames {
         budget-exceeded(budget-envelope),
         consent-rupture(consent-rupture-body),
         rate-limited(rate-limited-body),
+        context-pressure(context-envelope),
+        context-limit(context-envelope),
     }
 
     // ── IntentClass / ConsentEnvelope / IntentLineage ─────────────────
@@ -333,6 +348,26 @@ interface recall {
     fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
 }
 
+interface context {
+    // ADR-016: the Spirit reports its own context occupancy; the host binds the
+    // pid and the admitted manifest window. Callable only inside `handle-frame`.
+    enum context-level { within, pressure, limit, exhausted }
+
+    record context-status {
+        used: u32,
+        window: u32,
+        level: context-level,
+        crossed: option<context-level>,
+    }
+
+    variant context-error {
+        not-admitted,
+        unavailable,
+    }
+
+    report: func(used-tokens: u32) -> result<context-status, context-error>;
+}
+
 // The Spirit world a WASM-component author implements. The host
 // (maos-wasm-host's `maos-wasm-runner`) drives it: feeds inbound frames decoded
 // from the ADR-032 stdio stream, and writes the guest's emitted frames back to
@@ -343,6 +378,7 @@ interface recall {
 world spirit {
     use frames.{iac-frame, halt};
     import recall;
+    import context;
 
     // host → guest: deliver one inbound frame, get zero-or-more emitted
     // frames. A returned `halt` ends the session (maps to the ADR-032

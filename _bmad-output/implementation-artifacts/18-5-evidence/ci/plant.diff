@@ -1,0 +1,17 @@
+diff --git a/crates/maos-kernel-core/src/capability/mod.rs b/crates/maos-kernel-core/src/capability/mod.rs
+--- a/crates/maos-kernel-core/src/capability/mod.rs
++++ b/crates/maos-kernel-core/src/capability/mod.rs
+@@ -210,13 +210,6 @@ impl CapabilityRegistryAdapter {
+             }
+         }
+ 
+-        // 2. ADR-016: an exhausted pid mints only the exits; never charged.
+-        if !self.context.admits(spirit_pid, &scope) {
+-            return Err(CapError::ContextExhausted {
+-                spirit_id: spirit_pid,
+-            });
+-        }
+-
+         // 3. Reserve quota only after policy allows the scope.
+         let budget = self.quota.quota().budget_per_window;
+         let charge = match self.quota.charge(spirit_pid) {

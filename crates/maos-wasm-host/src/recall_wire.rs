@@ -67,8 +67,16 @@ pub struct WireEntry {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub enum RecallRequest {
-    Recall { filter: WireFilter },
-    Fetch { frame_id: WireBytes },
+    Recall {
+        filter: WireFilter,
+    },
+    Fetch {
+        frame_id: WireBytes,
+    },
+    /// Story 18-5 — `context.report`; the daemon binds the pid and window.
+    Context {
+        used_tokens: u32,
+    },
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WireError {
@@ -112,7 +120,32 @@ pub enum RecallReply {
         /// WIT frame-origin case name, not a separate domain spelling table.
         origin: String,
     },
+    /// Story 18-5 — levels as `ContextLevel` discriminants (within = 0).
+    Context {
+        used: u32,
+        window: u32,
+        level: u8,
+        crossed: Option<u8>,
+    },
     Error(WireError),
+}
+
+/// Story 18-5 — the daemon's reply to a `Context` request: no bound port is
+/// `unavailable`; an unadmitted pid is `capability-denied` (`not-admitted`).
+pub fn context_reply(
+    port: Option<&dyn maos_domain::ports::ContextBudgetPort>,
+    used_tokens: u32,
+) -> RecallReply {
+    match port.map(|port| port.report_context_used(used_tokens)) {
+        Some(Ok(status)) => RecallReply::Context {
+            used: status.used,
+            window: status.window,
+            level: status.level as u8,
+            crossed: status.crossed.map(|level| level as u8),
+        },
+        Some(Err(_)) => RecallReply::Error(WireError::CapabilityDenied),
+        None => RecallReply::Error(WireError::Unavailable),
+    }
 }
 
 /// Dispatch on CBOR major type 6, including unknown tags (which must be refused).

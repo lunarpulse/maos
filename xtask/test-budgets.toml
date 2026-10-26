@@ -26,6 +26,10 @@
 default_seconds = 30
 total_seconds = 800
 
+# Story 18-5-context-token-budget-accounting: context_budget_18_5,
+# context_refusal_18_5, context_signal_18_5, context_budget_gate_18_5 and
+# budget_thresholds_18_5 use default_seconds; no exception or extra budget.
+
 # --- Exceptions (18-0 AC5, ruling R3: ~ CI max Σ x 1.25) ---------------------
 
 [[exception]]

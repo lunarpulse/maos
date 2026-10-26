@@ -1,0 +1,5 @@
+# expect: ManifestError (pressure must be below limit)
+context_window_size = 8192
+time_cap_seconds = 30
+context_pressure_threshold = 0.95
+context_limit_threshold = 0.80

@@ -12,6 +12,7 @@
 use std::io::{BufReader, BufWriter};
 
 use crate::recall_wire::{self as wire, RecallReply, RecallRequest, WireBytes, WireError};
+use crate::wit_guest::maos::spirit::context as ctx;
 use crate::wit_guest::maos::spirit::recall as wit;
 use wasmtime::component::ResourceTable;
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
@@ -173,6 +174,38 @@ impl wit::Host for HostState {
             }
             RecallReply::Error(error) => Err(error.into()),
             _ => Err(self.desync()),
+        }
+    }
+}
+
+impl crate::wit_guest::maos::spirit::context::Host for HostState {
+    fn report(&mut self, used_tokens: u32) -> Result<ctx::ContextStatus, ctx::ContextError> {
+        use ctx::ContextLevel as L;
+        let level = |n: u8| {
+            [L::Within, L::Pressure, L::Limit, L::Exhausted]
+                .get(usize::from(n))
+                .copied()
+        };
+        match self.exchange(RecallRequest::Context { used_tokens }) {
+            Ok(RecallReply::Context {
+                used,
+                window,
+                level: now,
+                crossed,
+            }) => match (level(now), crossed.map(|n| level(n).ok_or(())).transpose()) {
+                (Some(level), Ok(crossed)) => Ok(ctx::ContextStatus {
+                    used,
+                    window,
+                    level,
+                    crossed,
+                }),
+                _ => Err(self.desync()).map_err(|_| ctx::ContextError::Unavailable),
+            },
+            Ok(RecallReply::Error(WireError::CapabilityDenied)) => {
+                Err(ctx::ContextError::NotAdmitted)
+            }
+            Ok(_) => Err(self.desync()).map_err(|_| ctx::ContextError::Unavailable),
+            Err(_) => Err(ctx::ContextError::Unavailable),
         }
     }
 }

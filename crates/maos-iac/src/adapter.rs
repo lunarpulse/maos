@@ -12,6 +12,7 @@
 //! stub.
 
 pub mod channels;
+pub mod context_signal; // Story 18-5 ADR-016 context-budget reporter
 pub mod decision_logger;
 pub mod distillate;
 pub mod drr_scheduler; // NEW — Story 6.1 DRR fairness scheduler
@@ -369,6 +370,8 @@ impl IacBusAdapter {
                 maos_spirit_abi::identity::FrameKind::RateLimited => "rate_limited",
                 maos_spirit_abi::identity::FrameKind::GatewayInbound => "gateway_inbound",
                 maos_spirit_abi::identity::FrameKind::GatewayOutbound => "gateway_outbound",
+                maos_spirit_abi::identity::FrameKind::ContextPressure => "context_pressure",
+                maos_spirit_abi::identity::FrameKind::ContextLimit => "context_limit",
             };
             let intent_label: &'static str = match frame.intent {
                 maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
@@ -556,6 +559,12 @@ impl IacBusAdapter {
             }
             maos_spirit_abi::identity::FrameKind::GatewayOutbound => {
                 transparency_log::FrameKind::GatewayOutbound
+            }
+            maos_spirit_abi::identity::FrameKind::ContextPressure => {
+                transparency_log::FrameKind::ContextPressure
+            }
+            maos_spirit_abi::identity::FrameKind::ContextLimit => {
+                transparency_log::FrameKind::ContextLimit
             }
         };
 
