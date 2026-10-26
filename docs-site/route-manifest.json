@@ -29,6 +29,10 @@
       "content_floor": "link list"
     },
     {
+      "path": "/manifest/v6",
+      "label": "Manifest v6 Reference"
+    },
+    {
       "path": "/manifest/v5",
       "label": "Manifest v5 Reference"
     },
@@ -256,7 +260,7 @@
     }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
-  "expected_distinct_pages": 133,
+  "expected_distinct_pages": 135,
   "error_codes": [
     "EAbiTooNew",
     "EAbiTooOld",
@@ -293,7 +297,22 @@
     "ESkillProposal::EmptyTargetId",
     "ESkillProposal::InvalidTargetIdCharset",
     "ESkillProposal::InvalidTargetVersion",
+    "ESkillQueue::AlreadyDecided",
+    "ESkillQueue::AmbiguousEntry",
+    "ESkillQueue::AuthoredIdTooLong",
+    "ESkillQueue::CapabilityEscalation",
     "ESkillQueue::DuplicateSkillId",
+    "ESkillQueue::EntryNotFound",
+    "ESkillQueue::EvidenceMismatch",
+    "ESkillQueue::ForeignNamespace",
+    "ESkillQueue::InvalidStoredEntry",
+    "ESkillQueue::NonFiniteEvidence",
+    "ESkillQueue::PrincipalDataRefused",
+    "ESkillQueue::Proposal",
+    "ESkillQueue::Schema",
+    "ESkillQueue::StaleTargetVersion",
+    "ESkillQueue::TargetNotOwned",
+    "ESkillQueue::UnknownEntryPath",
     "ESkillSchema::EmptyBody",
     "ESkillSchema::EmptyId",
     "ESkillSchema::EmptyName",
@@ -302,8 +321,11 @@
     "ESkillSchema::MissingFence",
     "ESkillSchema::TomlParse",
     "ESkillSchema::UnknownField",
+    "ESkillStore::InvalidEntry",
     "ESkillStore::Io",
     "ESkillStore::Json",
+    "ESkillStore::MaterializeCollision",
+    "ESkillStore::NoDataHome",
     "ESkillStore::UnknownSchemaVersion",
     "ESubstrateTooOld",
     "ETeamIdInvalid"

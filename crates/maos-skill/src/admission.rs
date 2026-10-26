@@ -1,12 +1,13 @@
 //! Journal-first admission mechanics. Prepare is side-effect free; the root
 //! commits the returned approval row before inserting, materializing or saving.
+use crate::discovery::DiscoveredSkill;
 use crate::errors::ESkillQueue;
 use crate::proposal::{build_proposal, SkillRevisionProposal};
 use crate::schema::{parse_skill, Skill, SkillId};
 use crate::store::{atomic_write, AuthorIdentity, ESkillStore, QueueEntry, SkillPayload};
 use maos_domain::invariants::i4::ApprovalDecision;
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SkillAdmissionState {
@@ -86,6 +87,7 @@ impl SkillAdmissionQueue {
                 if !entry.legacy =>
             {
                 let skill = parse_skill(document).map_err(ESkillQueue::Schema)?;
+                Self::validate_authored_id(&entry.id.0)?;
                 if skill.manifest.skill_id() != entry.id
                     || skill.manifest.skill_version() != entry.version
                     || !entry.id.0.starts_with(&format!("{}.", author.class))
@@ -103,6 +105,7 @@ impl SkillAdmissionQueue {
                     p.telemetry_evidence.clone(),
                 )
                 .map_err(ESkillQueue::Proposal)?;
+                Self::validate_evidence(p)?;
                 if p.target_skill_id != entry.id
                     || p.target_version != entry.version
                     || p.telemetry_evidence.spirit_pid != author.pid
@@ -124,13 +127,16 @@ impl SkillAdmissionQueue {
         Ok(())
     }
 
+    /// `discovered` must contain the root's complete package discovery snapshot.
     pub fn prepare_author(
         &self,
         document: String,
         ctx: &SubmissionContext<'_>,
+        discovered: &[DiscoveredSkill],
     ) -> Result<(QueueEntry, ApprovalDecision), ESkillStore> {
         Self::vet_principals(&document, ctx)?;
         let skill = parse_skill(&document).map_err(ESkillQueue::Schema)?;
+        Self::validate_authored_id(&skill.manifest.id)?;
         if !skill
             .manifest
             .id
@@ -146,12 +152,23 @@ impl SkillAdmissionQueue {
         {
             return Err(ESkillQueue::CapabilityEscalation.into());
         }
-        if let Some(current) = self.current_owned(&skill.manifest.skill_id(), &ctx.author.class) {
-            let next = semver::Version::parse(&skill.manifest.version)
-                .map_err(|_| ESkillQueue::StaleTargetVersion)?;
-            let previous = semver::Version::parse(&current.version.0)
-                .map_err(|_| ESkillQueue::StaleTargetVersion)?;
-            if next <= previous {
+        let next = semver::Version::parse(&skill.manifest.version)
+            .map_err(|_| ESkillQueue::StaleTargetVersion)?;
+        let earlier = self
+            .pending
+            .iter()
+            .filter(|e| e.id.0 == skill.manifest.id && e.entry_path != "revision_proposal")
+            .map(|e| e.version.0.as_str())
+            .chain(
+                discovered
+                    .iter()
+                    .filter(|e| e.skill.manifest.id == skill.manifest.id)
+                    .map(|e| e.skill.manifest.version.as_str()),
+            );
+        for version in earlier {
+            let previous =
+                semver::Version::parse(version).map_err(|_| ESkillQueue::StaleTargetVersion)?;
+            if !next.cmp_precedence(&previous).is_gt() {
                 return Err(ESkillQueue::StaleTargetVersion.into());
             }
         }
@@ -170,6 +187,7 @@ impl SkillAdmissionQueue {
         ctx: &SubmissionContext<'_>,
     ) -> Result<(QueueEntry, ApprovalDecision), ESkillStore> {
         Self::vet_principals(&proposal.proposed_diff, ctx)?;
+        Self::validate_evidence(&proposal)?;
         let proposal = build_proposal(
             proposal.target_skill_id,
             proposal.target_version,
@@ -193,6 +211,25 @@ impl SkillAdmissionQueue {
             Some(ctx.author.clone()),
             Some(SkillPayload::RevisionProposal(proposal)),
         )
+    }
+
+    fn validate_authored_id(id: &str) -> Result<(), ESkillQueue> {
+        if id.len() > 128 {
+            return Err(ESkillQueue::AuthoredIdTooLong);
+        }
+        Ok(())
+    }
+
+    fn validate_evidence(proposal: &SkillRevisionProposal) -> Result<(), ESkillQueue> {
+        if proposal
+            .telemetry_evidence
+            .halt_events
+            .iter()
+            .any(|e| !e.value.is_finite() || e.threshold.is_some_and(|v| !v.is_finite()))
+        {
+            return Err(ESkillQueue::NonFiniteEvidence);
+        }
+        Ok(())
     }
 
     fn vet_principals(text: &str, ctx: &SubmissionContext<'_>) -> Result<(), ESkillQueue> {
@@ -307,15 +344,20 @@ impl SkillAdmissionQueue {
         Ok(entry)
     }
 
+    /// Preflight before journaling; authored approvals require their destination.
     pub fn prepare_decision(
         &self,
         selector: &str,
         admit: bool,
         actor: String,
-    ) -> Result<ApprovalDecision, ESkillQueue> {
+        directory: Option<&Path>,
+    ) -> Result<ApprovalDecision, ESkillStore> {
         let entry = self.show(selector)?;
         if entry.state != SkillAdmissionState::Pending {
-            return Err(ESkillQueue::AlreadyDecided);
+            return Err(ESkillQueue::AlreadyDecided.into());
+        }
+        if admit && matches!(entry.payload, Some(SkillPayload::AuthorSelf(_))) {
+            self.materialize_destination(entry, directory)?;
         }
         Ok(Self::row(
             entry,
@@ -327,6 +369,40 @@ impl SkillAdmissionQueue {
             },
             admit,
         ))
+    }
+
+    /// Side-effect-free filesystem checks; repeat on apply to catch intervening changes.
+    fn materialize_destination(
+        &self,
+        entry: &QueueEntry,
+        directory: Option<&Path>,
+    ) -> Result<PathBuf, ESkillStore> {
+        Self::validate_authored_id(&entry.id.0)?;
+        let directory = directory.ok_or(ESkillStore::NoDataHome)?;
+        for ancestor in directory.ancestors().filter(|p| !p.as_os_str().is_empty()) {
+            match std::fs::metadata(ancestor) {
+                Ok(meta) if meta.is_dir() => break,
+                Ok(_) => return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory).into()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        let dest = directory.join(format!("{}.md", entry.id));
+        match std::fs::read(&dest) {
+            Ok(existing) => {
+                let owned = self.pending.iter().any(|old| {
+                    old.id == entry.id && old.state == SkillAdmissionState::Admitted
+                        && old.author.as_ref().map(|a| &a.class) == entry.author.as_ref().map(|a| &a.class)
+                        && matches!(&old.payload, Some(SkillPayload::AuthorSelf(text)) if text.as_bytes() == existing)
+                });
+                if !owned {
+                    return Err(ESkillStore::MaterializeCollision(dest));
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+        Ok(dest)
     }
 
     /// After journaling, materialize an authored document and transition. The
@@ -343,20 +419,7 @@ impl SkillAdmissionQueue {
         }
         if admit {
             if let Some(SkillPayload::AuthorSelf(document)) = &entry.payload {
-                let directory = directory.ok_or(ESkillStore::NoDataHome)?;
-                let dest = directory.join(format!("{}.md", entry.id));
-                match std::fs::read(&dest) {
-                    Ok(existing) => {
-                        let owned = self.pending.iter().any(|old| old.id == entry.id && old.state == SkillAdmissionState::Admitted
-                            && old.author.as_ref().map(|a| &a.class) == entry.author.as_ref().map(|a| &a.class)
-                            && matches!(&old.payload, Some(SkillPayload::AuthorSelf(text)) if text.as_bytes() == existing));
-                        if !owned {
-                            return Err(ESkillStore::MaterializeCollision(dest));
-                        }
-                    }
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(e) => return Err(e.into()),
-                }
+                let dest = self.materialize_destination(entry, directory)?;
                 atomic_write(&dest, document.as_bytes())?;
             }
         }

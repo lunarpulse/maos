@@ -394,7 +394,15 @@ async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
     // Pass 1: the fan-out replays every recorded exchange once, bounded at 8.
     let (outcome, first) = idle(&dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
-    assert!(researcher.take_pass_error().is_none(), "pass 1 refused");
+    assert!(
+        matches!(
+            researcher.take_pass_error(),
+            Some(researcher::ResearcherError::SkillAuthor(
+                researcher::SkillPortError::QueueUnavailable
+            ))
+        ),
+        "authoring is unavailable without refusing the survey"
+    );
     let out1 = researcher.last_output().expect("pass 1 surveyed");
     let calls = replay.calls.lock().unwrap().clone();
     assert_eq!(calls.len(), 17, "one call per recorded exchange");
@@ -535,7 +543,15 @@ async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
     // Pass 2: the resolution lets the dispatcher run the pass; it surveys.
     let (outcome, second) = idle(&dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
-    assert!(researcher.take_pass_error().is_none(), "pass 2 refused");
+    assert!(
+        matches!(
+            researcher.take_pass_error(),
+            Some(researcher::ResearcherError::SkillAuthor(
+                researcher::SkillPortError::QueueUnavailable
+            ))
+        ),
+        "authoring remains unavailable on pass 2"
+    );
     let out2 = researcher.last_output().expect("pass 2 surveyed");
     assert_eq!(
         replay.calls.lock().unwrap().len(),
@@ -948,7 +964,12 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
     let dispatcher = scheduler.dispatcher_ref();
     let (outcome, _) = idle(dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
-    assert!(researcher.take_pass_error().is_none());
+    assert!(matches!(
+        researcher.take_pass_error(),
+        Some(researcher::ResearcherError::SkillAuthor(
+            researcher::SkillPortError::QueueUnavailable
+        ))
+    ));
     let first = researcher.last_output().unwrap();
     assert_eq!(first.findings.len(), 2);
     let personal = first
@@ -1063,7 +1084,12 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
 
     let (outcome, _) = idle(dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
-    assert!(researcher.take_pass_error().is_none());
+    assert!(matches!(
+        researcher.take_pass_error(),
+        Some(researcher::ResearcherError::SkillAuthor(
+            researcher::SkillPortError::QueueUnavailable
+        ))
+    ));
     let next = researcher.last_output().unwrap();
     assert_eq!(next.findings.len(), 1);
     assert_eq!(next.findings[0].claim_id, "control-18-6");

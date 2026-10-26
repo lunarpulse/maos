@@ -36,9 +36,11 @@ ratifier = "Lunarpulse"
 # RE-PINNED 2026-10-26 — 18-7-live-skill-authoring-and-revisions D-10 A:
 # typed durable v2 reconstruction, ownership/identity vetting and operator-only
 # materialization; operator-ratified admission-path change, review required.
+# RE-PINNED after 18-7-live-skill-authoring-and-revisions review 2026-10-26:
+# all-state/discovered version ceiling, finite evidence and pre-journal destination checks.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "efd0e282000fc138e15ce805e698312bdd383a0bce3cfcee4e6a389cc2f55ca1"
+sha256 = "9b66a40a2d25e4c8fabca5d3cd6185d8eade65c1de8989480d8dd107fd2451d6"

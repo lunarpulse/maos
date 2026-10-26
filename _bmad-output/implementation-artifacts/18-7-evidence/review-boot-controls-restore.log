@@ -1,0 +1,3 @@
+cp /tmp/18-7-review-review-boot-controls-6ezsaa99 /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs -> exit0
+cmp /tmp/18-7-review-review-boot-controls-6ezsaa99 /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs -> exit0
+touch /home/lunarpulse/dev_ws/crates/maos-bin/src/main.rs -> exit0

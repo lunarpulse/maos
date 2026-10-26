@@ -2580,7 +2580,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&transparency_log),
         ),
     );
-    let skill_store = Arc::new(maos_skill::LocalFsSkillQueueStore::new()?);
+    let skill_store = maos_skill::LocalFsSkillQueueStore::new()
+        .map(Arc::new)
+        .map_err(|error| eprintln!("maos: WARNING — skill queue unavailable: {error}"))
+        .ok();
     eprintln!("maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)");
 
     // Story 4.4 / 13.3b — LogRecallAdapter + directional manifest-consent seam.
@@ -4051,16 +4054,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(maos_bin::researcher_root::ResearcherWiring {
             live,
             recall: Some(Arc::clone(&researcher_recall)),
-            skill: Some(maos_bin::skill_authoring::binder(
-                &capability,
-                &security,
-                &transparency_log,
-                &self_telemetry,
-                &scheduler.scbs(),
-                &skill_store,
-                enterprise_runtime.as_ref(),
-                enterprise_pdp_runtime.clone(),
-            )),
+            skill: skill_store.as_ref().map(|store| {
+                maos_bin::skill_authoring::binder(
+                    &capability,
+                    &security,
+                    &transparency_log,
+                    &self_telemetry,
+                    &scheduler.scbs(),
+                    store,
+                    enterprise_runtime.as_ref(),
+                    enterprise_pdp_runtime.clone(),
+                )
+            }),
             mcp: match live {
                 true => researcher_mcp_builder(
                     &io_arc,
@@ -4367,11 +4372,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     // Only discovered rejected documents block startup. Queue-only rejected
     // drafts and decision-only revisions remain durable and inert.
-    if run_args.is_some() {
+    if !offline_durable_child {
         use maos_skill::SkillQueueStore as _;
         let skill_roots = maos_skill::default_search_path();
         let skill_outcome = maos_skill::discover_skills_detailed(&skill_roots);
-        let skill_stored = skill_store.load()?;
+        let skill_stored = skill_store.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |store| {
+                store.migrate_legacy(|row| transparency_log.insert_approval_decision(row).map_err(|e| e.to_string()))?;
+                store.load()
+            },
+        ).unwrap_or_else(|error| {
+            eprintln!("maos: WARNING — skill queue unreadable: {error}; proceeding from discovery + TL");
+            Vec::new()
+        });
         let skill_view = maos_cli::subcommands::admission_view(
             &skill_outcome.discovered,
             skill_stored,
@@ -6254,7 +6268,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 drop(inference);
                 // Story 18-1 — the Butler handle holds `capability` (and so
                 // `audit_tx`) through its bound port.
-                drop(butler_pass_handle);
+                drop((butler_pass_handle, researcher_pass_handle));
                 // Story 18-4 (D-18-4-R3) — so does the seam's scene Butler.
                 drop(butler_seam.lock().unwrap_or_else(|e| e.into_inner()).take());
                 drop(orchestrator);

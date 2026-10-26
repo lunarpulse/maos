@@ -216,7 +216,7 @@ fn exit_line_3_replays_one_completion_per_seed_claim_through_the_declared_provid
 }
 
 #[test]
-fn empty_drifted_and_short_cassettes_exit_1_naming_the_cause() {
+fn survey_cassette_failures_are_fatal_but_authoring_exhaustion_preserves_output() {
     let scratch = tempfile::tempdir().unwrap();
     let cases: [(&str, fn(&mut Value), &str); 3] = [
         (
@@ -243,24 +243,31 @@ fn empty_drifted_and_short_cassettes_exit_1_naming_the_cause() {
         let cassette = variant(&home, edit);
         let out = replay(&home, &cassette);
         let err = stderr(&out);
-        assert_eq!(out.status.code(), Some(1), "{name}: {err}");
+        assert_eq!(
+            out.status.code(),
+            Some(if name == "short" { 0 } else { 1 }),
+            "{name}: {err}"
+        );
         assert!(
             refused_naming(&err, cause),
             "{name}: the refusal line must name `{cause}`: {err}"
         );
         assert!(
-            !events(&out)
+            events(&out)
                 .iter()
-                .any(|e| e["event"] == "researcher_survey"),
-            "{name}: a refused pass prints no survey"
+                .any(|e| e["event"] == "researcher_survey")
+                == (name == "short"),
+            "{name}: only authoring exhaustion retains the completed survey"
         );
     }
 }
 
 /// The root's `--once` refusal line itself names `cause` (review TIA-3).
 fn refused_naming(err: &str, cause: &str) -> bool {
-    err.lines()
-        .any(|l| l.contains("researcher on_idle pass refused") && l.contains(cause))
+    err.lines().any(|l| {
+        (l.contains("researcher on_idle pass refused") || l.contains("skill authoring refused"))
+            && l.contains(cause)
+    })
 }
 
 #[test]
@@ -359,7 +366,7 @@ fn wait_until(what: &str, diagnostics: impl Fn() -> String, mut ready: impl FnMu
 }
 
 fn has_durable_author(scratch: &Path) -> bool {
-    std::fs::read(scratch.join(".local/share/maos/skills/queue.json"))
+    std::fs::read(scratch.join("home/skills/queue.json"))
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
         .is_some_and(|queue| {
@@ -584,7 +591,12 @@ fn the_root_binding_mints_once_per_pass_on_one_instance() {
             MailboxHandle(0),
         ));
         assert!(
-            researcher.take_pass_error().is_none(),
+            matches!(
+                researcher.take_pass_error(),
+                Some(researcher::ResearcherError::SkillAuthor(
+                    researcher::SkillPortError::QueueUnavailable
+                ))
+            ),
             "pass {pass} refused"
         );
         assert!(researcher.last_output().is_some(), "pass {pass} surveyed");

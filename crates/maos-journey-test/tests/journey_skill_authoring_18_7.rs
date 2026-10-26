@@ -95,7 +95,7 @@ impl Drop for Daemon {
     }
 }
 fn queue(home: &Path) -> Vec<Value> {
-    let path = home.join(".local/share/maos/skills/queue.json");
+    let path = home.join("skills/queue.json");
     if !path.exists() {
         return vec![];
     }
@@ -336,4 +336,121 @@ fn undeclared_live_researcher_is_refused_without_queue_mutation() {
             .success()
     );
     daemon.stop();
+}
+
+#[test]
+fn rejected_spirit_authored_draft_does_not_block_the_next_boot() {
+    let (maos, ctl) = binaries();
+    let home = tempfile::tempdir().unwrap();
+    init(&maos, home.path());
+    let mut first = Daemon::start(&maos, home.path(), "spirits/researcher/manifest.toml");
+    first.wait("authored draft", || !queue(home.path()).is_empty());
+    let draft = queue(home.path())
+        .into_iter()
+        .find(|entry| entry["entry_path"] == "author_self")
+        .unwrap();
+    control(
+        &ctl,
+        home.path(),
+        &["skills", "reject", draft["entry_id"].as_str().unwrap()],
+    );
+    assert_eq!(queue(home.path())[0]["state"], "Rejected");
+    first.stop();
+    let mut second = Daemon::start(&maos, home.path(), "spirits/reviewer/manifest.toml");
+    second.wait("boot after rejected draft", || {
+        h::ctl(&ctl, home.path(), &["spirit", "inspect", "reviewer"])
+            .status
+            .success()
+    });
+    assert_eq!(queue(home.path())[0]["state"], "Rejected");
+    second.stop();
+}
+
+#[test]
+fn corrupt_queue_warns_at_boot_and_refuses_door_operations_without_overwrite() {
+    let (maos, ctl) = binaries();
+    let home = tempfile::tempdir().unwrap();
+    init(&maos, home.path());
+    let path = home.path().join("skills/queue.json");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let corrupt = b"{corrupt skill queue";
+    std::fs::write(&path, corrupt).unwrap();
+    let mut daemon = Daemon::start(&maos, home.path(), "spirits/reviewer/manifest.toml");
+    daemon.wait("boot with corrupt queue", || {
+        h::ctl(&ctl, home.path(), &["spirit", "inspect", "reviewer"])
+            .status
+            .success()
+    });
+    assert!(daemon
+        .log
+        .lock()
+        .unwrap()
+        .contains("proceeding from discovery + TL"));
+    for args in [vec!["skills", "show", ID], vec!["skills", "reject", ID]] {
+        assert!(!h::ctl(&ctl, home.path(), &args).status.success());
+        assert_eq!(std::fs::read(&path).unwrap(), corrupt);
+    }
+    daemon.stop();
+}
+
+#[test]
+fn no_data_home_does_not_abort_the_daemon_or_offline_children() {
+    let (maos, _) = binaries();
+    let scratch = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir_in(scratch.path()).unwrap();
+    let mut command = h::command(&maos, home.path());
+    command
+        .args(["run", "spirits/reviewer/manifest.toml", "--once"])
+        .env_remove("HOME")
+        .env_remove("MAOS_HOME")
+        .env(
+            "MAOS_JOURNAL_PATH",
+            home.path().join("journal/lifecycle.ndjson"),
+        )
+        .env("MAOS_ARCHIVE_DIR", home.path().join("archives"))
+        .env("MAOS_ERASURE_PROOFS_DIR", home.path().join("proofs"))
+        .env("MAOS_AUDIT_DB", h::db(home.path()));
+    let output = h::checked(command);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("skill queue unavailable"), "{stderr}");
+    assert!(stderr.contains("HOME is unavailable"), "{stderr}");
+    let mut child = h::command(&maos, home.path());
+    child
+        .env_remove("HOME")
+        .env_remove("MAOS_HOME")
+        .env(
+            "MAOS_JOURNAL_PATH",
+            home.path().join("journal/lifecycle.ndjson"),
+        )
+        .env("MAOS_ARCHIVE_DIR", home.path().join("archives"))
+        .env("MAOS_ERASURE_PROOFS_DIR", home.path().join("proofs"))
+        .env("MAOS_AUDIT_DB", h::db(home.path()))
+        .env("MAOS_ONE_SHOT", "forget");
+    let output = child.output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("Error: HOME is unavailable"), "{stderr}");
+    assert!(
+        stderr.contains("MAOS_FORGET_PRINCIPAL"),
+        "offline child reaches its own argument validation: {stderr}"
+    );
+}
+
+#[test]
+fn rejected_discovered_skill_blocks_even_a_non_run_root() {
+    let (maos, ctl) = binaries();
+    let home = tempfile::tempdir().unwrap();
+    init(&maos, home.path());
+    let path = home.path().join(".maos/skills/package.rejected.md");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, "---\nid='package.rejected'\nversion='1.0.0'\nname='Rejected'\ndescription='d'\n---\nRejected procedure\n").unwrap();
+    control(&ctl, home.path(), &["skills", "reject", "package.rejected"]);
+    let mut command = h::command(&maos, home.path());
+    command.env("MAOS_ONE_SHOT", "hello-spirit");
+    let output = command.output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("rejected skill(s) block daemon startup"),
+        "{stderr}"
+    );
 }

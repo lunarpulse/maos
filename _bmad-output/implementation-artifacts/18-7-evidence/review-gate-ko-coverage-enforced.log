@@ -1,0 +1,21 @@
+command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo node docs-site/scripts/gate-ko-coverage.js
+wall-clock: 0.069 s
+exit: 0
+gate:locale-coverage — KO translation coverage
+
+  Canonical doc deliverables:
+    abi                9/9    100%
+    cookbook          14/14   100%
+    deploy             5/5    100%
+    manifest           7/7    100%
+    migrate            6/6    100%
+    troubleshoot       1/1    100%
+    — canonical total  42/42   100%
+
+  Supporting sections (English fallback acceptable):
+    (root)             4/4    100%
+    community          0/6    0%
+
+  Overall: 46/52 pages have a KO counterpart (88%).
+
+PASS: canonical KO coverage 100.0% >= required 100%.

@@ -136,16 +136,53 @@ pub struct LocalFsSkillQueueStore {
 
 impl LocalFsSkillQueueStore {
     pub fn new() -> Result<Self, ESkillStore> {
-        let home = std::env::var_os("HOME")
-            .filter(|s| !s.is_empty())
+        let home = maos_domain::operator_door::maos_home()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?
             .ok_or(ESkillStore::NoDataHome)?;
-        Ok(Self::at_path(
-            PathBuf::from(home).join(".local/share/maos/skills/queue.json"),
-        ))
+        Ok(Self::at_path(home.join("skills/queue.json")))
     }
 
     pub fn at_path(path: PathBuf) -> Self {
         Self { queue_path: path }
+    }
+
+    /// Called under the canonical home lock, before reading the live queue.
+    /// The old shared location is consumed once, never used as a live store.
+    pub fn migrate_legacy(
+        &self,
+        journal: impl FnOnce(maos_domain::invariants::i4::ApprovalDecision) -> Result<(), String>,
+    ) -> Result<(), ESkillStore> {
+        let Some(home) = std::env::var_os("HOME").filter(|home| !home.is_empty()) else {
+            return Ok(());
+        };
+        let legacy = PathBuf::from(home).join(".local/share/maos/skills/queue.json");
+        if legacy == self.queue_path || !legacy.try_exists()? {
+            return Ok(());
+        }
+        // Different MAOS_HOME values must not migrate the shared old file twice.
+        let lock = fs::File::open(legacy.parent().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "legacy queue has no parent")
+        })?)?;
+        lock.lock()?;
+        if !legacy.try_exists()? {
+            return Ok(());
+        }
+        let old = Self::at_path(legacy.clone()).load()?;
+        if self.queue_path.try_exists()? {
+            return Err(ESkillStore::MaterializeCollision(self.queue_path.clone()));
+        }
+        journal(maos_domain::invariants::i4::ApprovalDecision {
+            actor: "host".into(),
+            target: "skill-queue-v2".into(),
+            capability: "skill.queue.migrate".into(),
+            intent: "legacy-data-home-to-maos-home".into(),
+            decision: true,
+            reasoning: Some("validated legacy queue migration".into()),
+        })
+        .map_err(io::Error::other)?;
+        self.save(&old)?;
+        fs::remove_file(legacy)?;
+        Ok(())
     }
 }
 

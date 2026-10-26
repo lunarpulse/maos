@@ -31,7 +31,8 @@ use maos_spirit_sdk::spirit_test::SpiritTest;
 use researcher::{
     __maos_spirit_vtable_Researcher, declared_provider, seed_claims, synthesis_prompt,
     ClaimPayload, FetchedClaim, RecalledFrame, Researcher, ResearcherError,
-    ResearcherInferenceBinding, ResearcherMcpError, ResearcherMcpPort, SEED_CLAIM_INTENT,
+    ResearcherInferenceBinding, ResearcherMcpError, ResearcherMcpPort, SkillPortError,
+    SEED_CLAIM_INTENT,
 };
 
 const PID: u32 = 18;
@@ -143,7 +144,12 @@ fn a_bound_pass_mints_once_names_its_provider_and_consumes_one_completion_per_cl
         Some(binding("openai", &mints)),
     );
     idle(&r);
-    assert!(r.take_pass_error().is_none());
+    assert!(matches!(
+        r.take_pass_error(),
+        Some(ResearcherError::SkillAuthor(
+            SkillPortError::QueueUnavailable
+        ))
+    ));
     let out = r.last_output().expect("the bound pass surveyed");
     assert_eq!(out.findings.len(), claims.len());
     assert!(out
@@ -153,6 +159,7 @@ fn a_bound_pass_mints_once_names_its_provider_and_consumes_one_completion_per_cl
     assert_eq!(r.completions_consumed(), claims.len());
     assert_eq!(mints.load(Ordering::SeqCst), 1, "one mint per pass");
     let seen = port.seen.lock().unwrap();
+    assert_eq!(seen.len(), claims.len(), "no unwired authoring completion");
     for (req, claim) in seen.iter().zip(&claims) {
         assert_eq!(req.provider_id.as_deref(), Some("openai"));
         assert_eq!(req.spirit_pid, PID);
@@ -303,9 +310,19 @@ fn the_seed_is_journaled_once_halts_on_its_contradiction_and_distills_through_i1
         Arc::new(0u8),
     )));
     idle(&r);
-    assert!(r.take_pass_error().is_none());
+    assert!(matches!(
+        r.take_pass_error(),
+        Some(ResearcherError::SkillAuthor(
+            SkillPortError::QueueUnavailable
+        ))
+    ));
     idle(&r);
-    assert!(r.take_pass_error().is_none());
+    assert!(matches!(
+        r.take_pass_error(),
+        Some(ResearcherError::SkillAuthor(
+            SkillPortError::QueueUnavailable
+        ))
+    ));
     let ids = journaled.lock().unwrap().clone();
     assert_eq!(
         ids.len(),
@@ -390,7 +407,7 @@ fn the_exit_line_3_cassette_pins_real_prompt_hashes_and_no_wildcard() {
     for (finding, entry) in output.findings.iter_mut().zip(entries) {
         finding.statement = entry["response"]["text"].as_str().unwrap().into();
     }
-    let prompt = researcher::skill_author::authoring_prompt(&output, None);
+    let prompt = researcher::skill_author::authoring_prompt(&output, None, None);
     let author = &entries[claims.len()];
     assert_eq!(
         author["prompt_sha256"],

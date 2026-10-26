@@ -83,12 +83,16 @@ pub enum ESkillQueue {
     TargetNotOwned,
     #[error("target version is stale or authored version does not advance")]
     StaleTargetVersion,
+    #[error("authored skill id must not exceed 128 bytes")]
+    AuthoredIdTooLong,
     #[error("skill requires an action absent from the author's declared scopes")]
     CapabilityEscalation,
     #[error("payload contains an indexed principal id")]
     PrincipalDataRefused,
     #[error("telemetry evidence pid differs from the root-fixed author pid")]
     EvidenceMismatch,
+    #[error("telemetry evidence contains a non-finite value or threshold")]
+    NonFiniteEvidence,
     #[error("unknown stored entry path `{0}`")]
     UnknownEntryPath(String),
     #[error("invalid stored entry `{0}`")]
@@ -113,9 +117,11 @@ impl ESkillQueue {
             Self::ForeignNamespace => "foreign-namespace",
             Self::TargetNotOwned => "target-not-owned",
             Self::StaleTargetVersion => "stale-target-version",
+            Self::AuthoredIdTooLong => "authored-id-too-long",
             Self::CapabilityEscalation => "capability-escalation",
             Self::PrincipalDataRefused => "principal-data-refused",
             Self::EvidenceMismatch => "evidence-mismatch",
+            Self::NonFiniteEvidence => "non-finite-evidence",
             Self::UnknownEntryPath(_) => "unknown-entry-path",
             Self::InvalidStoredEntry(_) => "invalid-stored-entry",
             Self::Schema(_) => "skill-schema",

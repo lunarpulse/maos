@@ -20,12 +20,6 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 
 type Scbs = RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>;
 
-pub fn serialization() -> Arc<Mutex<()>> {
-    static LOCK: std::sync::LazyLock<Arc<Mutex<()>>> =
-        std::sync::LazyLock::new(|| Arc::new(Mutex::new(())));
-    Arc::clone(&LOCK)
-}
-
 pub type SkillBuilder =
     Arc<dyn Fn(PidSource, &[Scope]) -> Result<Arc<dyn SkillAuthorPort>, String> + Send + Sync>;
 
@@ -63,7 +57,7 @@ pub fn binder(
             telemetry: telemetry.clone(),
             scbs: scbs.clone(),
             store: store.clone(),
-            serialization: serialization(),
+            serialization: crate::operator_door::skill_serialization(),
             enterprise: enterprise.clone(),
             pdp: pdp.clone(),
             since_ns,
@@ -162,7 +156,12 @@ impl LiveSkillAuthorPort {
             );
             let mut queue = SkillAdmissionQueue::from_stored(stored)?;
             let (entry, row) = match (document, proposal) {
-                (Some(document), None) => queue.prepare_author(document, &context)?,
+                (Some(document), None) => queue.prepare_author(
+                    document,
+                    &context,
+                    &maos_skill::discover_skills_detailed(&maos_skill::default_search_path())
+                        .discovered,
+                )?,
                 (None, Some((id, version, diff))) => {
                     let evidence = telemetry
                         .self_telemetry(pid, Some(self.since_ns))
@@ -189,12 +188,23 @@ impl LiveSkillAuthorPort {
             store.save(&queue.to_stored())?;
             Ok(entry)
         })();
-        if let Err(error) = &result {
+        self.receipt(&journal, pid, &result)?;
+        result
+    }
+
+    fn receipt<T>(
+        &self,
+        journal: &TransparencyLogAdapter,
+        pid: u32,
+        result: &Result<T, SkillPortError>,
+    ) -> Result<(), SkillPortError> {
+        if let Err(error) = result {
             let code = match error {
                 SkillPortError::HostShutDown => "host-shut-down",
                 SkillPortError::CapabilityDenied => "capability-denied",
                 SkillPortError::ContextExhausted => "context-exhausted",
                 SkillPortError::QuotaExhausted => "quota-exhausted",
+                SkillPortError::QueueUnavailable => "queue-unavailable",
                 SkillPortError::Submission(maos_skill::ESkillStore::InvalidEntry(error)) => {
                     error.code()
                 }
@@ -214,11 +224,37 @@ impl LiveSkillAuthorPort {
                 FrameOrigin::SpiritAuto,
             );
         }
-        result
+        Ok(())
     }
 }
 
 impl SkillAuthorPort for LiveSkillAuthorPort {
+    fn preflight(&self, revision: bool) -> Result<String, SkillPortError> {
+        let journal = upgrade(&self.journal)?;
+        let _capability = upgrade(&self.capability)?;
+        let pid = (self.pid)().ok_or(SkillPortError::HostShutDown)?;
+        let result = (|| {
+            if self.declared_actions.contains("skill.author.self") {
+                if !revision {
+                    return Ok(String::new());
+                }
+                let report = upgrade(&self.telemetry)?
+                    .self_telemetry(pid, Some(self.since_ns))
+                    .map_err(|e| SkillPortError::Mediation(e.to_string()))?;
+                Ok(format!(
+                    "successes={} failures={} halts={} distillations={}",
+                    report.success_count,
+                    report.failure_count,
+                    report.halt_events.len(),
+                    report.distillation_outcomes.len()
+                ))
+            } else {
+                Err(SkillPortError::CapabilityDenied)
+            }
+        })();
+        self.receipt(&journal, pid, &result)?;
+        result
+    }
     fn author(&self, document: String) -> Result<QueueEntry, SkillPortError> {
         self.submit(Some(document), None)
     }

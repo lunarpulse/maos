@@ -1,0 +1,664 @@
+proven-red	Set up job	2026-10-26T12:05:16.9453169Z Version: 20261021.618
+proven-red	Set up job	2026-10-26T12:05:16.9462567Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-26T12:05:16.9463190Z Version: 20261012.334.1
+proven-red	Unplanted process control must pass	2026-10-26T12:08:41.5174763Z      Summary [   1.317s] 1 test run: 1 passed, 1 skipped
+proven-red	Apply the single AC1 index-filter plant	2026-10-26T12:08:41.5431590Z _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff: OK
+proven-red	The same process control must find the leaked canary	﻿2026-10-26T12:08:59.2127271Z ##[group]Run set -euo pipefail
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2127649Z set -euo pipefail
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2127889Z set +e
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2128564Z cargo nextest run --locked -p maos-journey-test --test journey_forget_18_6 -E 'test(=live_forget_redistills_and_never_resurrects_then_pending_is_typed)' > planted.log 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2129483Z rc=$?
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2129676Z set -e
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2129876Z cat planted.log
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2131315Z grep -q 'seed-rag-noisy' planted.log
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2194643Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2195032Z env:
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2195232Z   CARGO_HOME: /home/runner/.cargo
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2195493Z   CARGO_INCREMENTAL: 0
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2195712Z   CARGO_TERM_COLOR: always
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2195949Z   CACHE_ON_FAILURE: false
+proven-red	The same process control must find the leaked canary	2026-10-26T12:08:59.2196170Z ##[endgroup]
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1068936Z warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1070254Z   --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1070887Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1071786Z 44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1072742Z    |     ^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1073220Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1074397Z    = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1075733Z    = note: `#[warn(async_fn_in_trait)]` on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1077412Z help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaki
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1079135Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1080052Z 44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1081943Z 44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1082643Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1082767Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1083183Z warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1083815Z   --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1084156Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1084426Z 58 |     async fn retract(
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1084757Z    |     ^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1085028Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1085695Z    = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1087174Z help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaki
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1087918Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1088157Z 58 ~     fn retract(
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1088470Z 59 |         &self,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1089074Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1089686Z 62 |         retracting_spirit: &SpiritId,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1090459Z 63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1091001Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1091125Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1091323Z warning: `maos-domain` (lib) generated 2 warnings
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1091891Z warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1092447Z   --> crates/maos-capability/src/working_memory/mod.rs:19:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1092807Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1093184Z 19 | use maos_domain::invariants::i7::ScalarTapEvent;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1093652Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1093989Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1094392Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1094726Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1095179Z warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1095956Z    Compiling maos-iac v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-iac)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1096505Z warning: unused variable: `on_confidence_below`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1096964Z     --> crates/maos-manifest/src/manifest.rs:1431:21
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1097300Z      |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1097675Z 1431 |                 let on_confidence_below = r.on_confidence_below;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1098441Z      |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1099463Z      |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1099935Z      = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1100299Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1100572Z warning: unused import: `McpResponse`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1101287Z   --> crates/maos-mcp/src/client.rs:15:70
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1101831Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1102614Z 15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1104350Z    |                                                                      ^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1104931Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1105660Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1106191Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1106646Z warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1107486Z warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1108090Z warning: unused import: `DecisionId`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1108481Z   --> crates/maos-acp/src/server.rs:13:45
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1109155Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1109649Z 13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1110395Z    |                                             ^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1110738Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1111147Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1111467Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1111647Z warning: unused variable: `other`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1112025Z    --> crates/maos-acp/src/server.rs:223:25
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1112333Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1112764Z 223 |                         other => {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1113388Z     |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1113884Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1114295Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1114621Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1115035Z warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1115625Z warning: unused variable: `halt_id`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1116052Z   --> crates/maos-director-surface/src/halt_ui.rs:59:9
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1116398Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1116679Z 59 |         halt_id: HaltId,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1117247Z    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1117752Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1118159Z    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1118489Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1119397Z warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1120117Z warning: unused variable: `file_name`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1120591Z    --> crates/maos-eval/src/distillate_corpus.rs:106:17
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1120936Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1121387Z 106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1122137Z     |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1122645Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1123061Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1123390Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1123789Z warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1124403Z warning: unused import: `InferenceOptions`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1124854Z   --> crates/maos-providers/src/anthropic.rs:10:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1125191Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1125717Z 10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1126282Z    |     ^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1126569Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1126981Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1127302Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1127508Z warning: unused import: `InferenceOptions`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1127929Z   --> crates/maos-providers/src/ollama.rs:11:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1128247Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1129070Z 11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1129685Z    |     ^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1129886Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1130272Z warning: unused import: `InferenceOptions`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1130713Z   --> crates/maos-providers/src/openai.rs:11:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1131039Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1131570Z 11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1132134Z    |     ^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1132323Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1132784Z warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1133605Z warning: unused import: `std::sync::Mutex`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1134039Z  --> crates/maos-registry/src/fixture_replay.rs:6:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1134379Z   |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1134667Z 6 | use std::sync::Mutex;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1135007Z   |     ^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1135296Z   |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1135694Z   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1136012Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1136904Z warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritReg
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1137962Z   --> crates/maos-registry/src/fixture_replay.rs:9:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1138305Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1139120Z  9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1140017Z    |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1140821Z 10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1141635Z    |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1142046Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1142238Z warning: unused import: `SignedManifest`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1142688Z  --> crates/maos-registry/src/handlers/manifest.rs:9:36
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1143041Z   |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1143502Z 9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1144044Z   |                                    ^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1144278Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1144463Z warning: unused variable: `server_sig`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1144870Z    --> crates/maos-registry/src/client.rs:149:27
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1145202Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1145520Z 149 |             (server_tier, server_sig) => {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1146205Z     |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1146732Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1147147Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1147491Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1147671Z warning: unused variable: `applied`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1148064Z    --> crates/maos-registry/src/yank.rs:164:16
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1148379Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1148891Z 164 |             Ok(applied) => {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1149672Z     |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1150248Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1150407Z warning: unused variable: `e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1150792Z    --> crates/maos-registry/src/yank.rs:171:28
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1151107Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1151454Z 171 |                 if let Err(e) = poller.save_cursor() {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1152098Z     |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1152671Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1152829Z warning: unused variable: `e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1153203Z    --> crates/maos-registry/src/yank.rs:176:17
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1153514Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1153778Z 176 |             Err(e) => {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1154329Z     |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1154706Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1154865Z warning: unused variable: `e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1155249Z    --> crates/maos-registry/src/yank.rs:189:16
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1155561Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1155883Z 189 |     if let Err(e) = poller.save_cursor() {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1156489Z     |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1156864Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1157305Z warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1157992Z warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1158468Z   --> crates/maos-spirit-cli/src/signing.rs:27:7
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1158966Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1159309Z 27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1159732Z    |       ^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1160028Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1160407Z    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1160714Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1160918Z warning: `maos-spirit-cli` (lib) generated 1 warning
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1161330Z warning: unused import: `Instant`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1161756Z   --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1162114Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1162463Z 18 | use tokio::time::{interval, Instant};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1162873Z    |                             ^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1163180Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1163577Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1163913Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1164089Z warning: unused variable: `referenced`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1164558Z    --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1164936Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1165256Z 122 |     let referenced = match referenced {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1165901Z     |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1166402Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1166808Z     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1167137Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1167403Z warning: hiding a lifetime that's elided elsewhere is confusing
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1167904Z    --> crates/maos-iac/src/adapter/metrics.rs:230:21
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1168235Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1169021Z 230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1169724Z     |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1170232Z     |                     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1170619Z     |                     the lifetime is elided here
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1170956Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1171579Z     = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1172214Z     = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1172633Z help: use `'_` for type paths
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1172913Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1173360Z 230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1173933Z     |                                                              ++++
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1174180Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1174521Z    Compiling maos-cohort v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-cohort)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1175252Z    Compiling maos-kernel-core v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-kernel-core)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1175959Z warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1176585Z   --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1177025Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1177395Z 13 | use maos_domain::frame::EpistemicHaltPayload;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1177857Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1178186Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1178588Z    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1179055Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1179329Z warning: unexpected `cfg` condition value: `test-introspection`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1179855Z    --> crates/maos-kernel-core/src/capability/mod.rs:444:21
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1180215Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1180565Z 444 |     #[cfg(any(test, feature = "test-introspection"))]
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1181040Z     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1181370Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1181978Z     = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1182768Z     = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1183726Z     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1184542Z     = note: `#[warn(unexpected_cfgs)]` on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1184792Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1184971Z warning: unused import: `HaltJournal`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1185394Z   --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1185728Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1186230Z 29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1186819Z    |                                  ^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1187048Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1187279Z warning: private item shadows public glob re-export
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1187715Z   --> crates/maos-kernel-core/src/iac.rs:19:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1188165Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1188537Z 19 | use maos_iac::mailbox::SpiritActivityTracker;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1189314Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1189663Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1190181Z note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1190783Z   --> crates/maos-kernel-core/src/iac.rs:13:9
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1191253Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1191557Z 13 | pub use maos_iac::*;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1191895Z    |         ^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1192249Z note: but the private item here shadows it
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1192631Z   --> crates/maos-kernel-core/src/iac.rs:19:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1192939Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1193305Z 19 | use maos_iac::mailbox::SpiritActivityTracker;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1193769Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1194223Z    = note: `#[warn(hidden_glob_reexports)]` on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1194484Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1194784Z warning: unused import: `crate::capability::WorkingMemoryStore`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1195295Z   --> crates/maos-kernel-core/src/inference/mod.rs:22:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1195639Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1195992Z 22 | use crate::capability::WorkingMemoryStore;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1196429Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1196659Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1196874Z warning: unused import: `std::sync::Arc`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1197324Z   --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1197676Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1197960Z 10 | use std::sync::Arc;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1198293Z    |     ^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1198490Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1198949Z warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1199523Z   --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1199883Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1200323Z 13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1200900Z    |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1201159Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1201453Z warning: unused import: `maos_domain::invariants::i1::TokenId`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1201963Z   --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1202306Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1202652Z 60 | use maos_domain::invariants::i1::TokenId;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1203090Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1203319Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1203508Z warning: unused import: `LifecycleEntry`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1203947Z   --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1204295Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1204852Z 61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1205547Z    |                                                                 ^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1205820Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1206112Z warning: unused import: `maos_domain::halt::TerminationKind`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1206625Z   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1206979Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1207453Z 12 | use maos_domain::halt::TerminationKind;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1207879Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1208123Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1208391Z warning: unused import: `crate::halt::terminate_spirit`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1209203Z   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1209573Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1209908Z 16 | use crate::halt::terminate_spirit;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1210572Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1210791Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1211047Z warning: unused imports: `ClassSection` and `GatewaysSection`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1211571Z   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1212032Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1212473Z 22 | use crate::security::manifest::{ClassSection, GatewaysSection};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1213159Z    |                                 ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1213467Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1213831Z warning: unused import: `TokenId`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1214349Z   --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1214768Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1215387Z 12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1231077Z    |                                                           ^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1231562Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1231917Z warning: unused import: `McpRequest`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1232417Z   --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1232775Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1233342Z 13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1233999Z    |                                                                         ^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1234274Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1234443Z warning: unused import: `Path`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1234883Z   --> crates/maos-kernel-core/src/memory/private.rs:12:17
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1235245Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1235577Z 12 | use std::path::{Path, PathBuf};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1235948Z    |                 ^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1236135Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1236310Z warning: unused import: `AtomicU64`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1236775Z  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1237155Z   |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1237508Z 9 | use std::sync::atomic::{AtomicU64, Ordering};
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1237932Z   |                         ^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1238142Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1238439Z warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1239267Z   --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1239652Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1240013Z 18 | use crate::scheduler::kernel_ctx::KernelCtx;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1240462Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1240696Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1240906Z warning: unused import: `DispositionOutcome`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1241407Z   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1241791Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1242295Z 16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1243332Z    |                 ^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1243748Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1244030Z warning: unreachable pattern
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1244794Z    --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1245227Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1245710Z 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1246453Z     |                     ^^^^^^^^^^^ no value can reach this
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1246819Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1247161Z note: multiple earlier patterns match some of the same values
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1247715Z    --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1248133Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1248577Z 329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1249549Z     |                     ----------------------------- matches some of the same values
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1250298Z 330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1250950Z     |                     --------------- matches some of the same values
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1251550Z 331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1252097Z     |                     ----------- matches some of the same values
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1252739Z 332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1253350Z     |                     ^^^^^^^^^^^ collectively making this unreachable
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1253979Z     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1254321Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1254649Z warning: methods `accept_consent` and `outbound_consent_context` are never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1255184Z    --> crates/maos-cohort/src/state.rs:388:19
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1255503Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1255804Z 206 | impl CohortManifestState {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1256299Z     | ------------------------ methods in this implementation
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1256707Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1257017Z 388 |     pub(crate) fn accept_consent(
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1257419Z     |                   ^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1257723Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1258054Z 408 |     pub(crate) fn outbound_consent_context(
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1258489Z     |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1259107Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1259515Z     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1259830Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1260236Z warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1261191Z warning: use of deprecated method `std::sync::atomic::Atomic::<u32>::fetch_update`: renamed to `try_update` for consistency
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1261940Z   --> crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:69:10
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1262338Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1262772Z 69 |         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1263462Z    |          ^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1263771Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1264075Z    = note: `#[warn(deprecated)]` on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1264488Z help: replace the use of the deprecated method
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1264810Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1265272Z 69 -         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1265940Z 69 +         .try_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1266486Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1266593Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1266890Z    Compiling maos-digest v0.1.0 (/home/runner/work/maos/maos/spirits/digest)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1267523Z    Compiling maos-cli v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-cli)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1268123Z warning: unused import: `maos_providers::Provider`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1268599Z   --> crates/maos-kernel-core/src/inference/mod.rs:28:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1269203Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1269537Z 28 | use maos_providers::Provider;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1269924Z    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1270125Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1270297Z warning: unused variable: `event`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1270821Z   --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1271267Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1271533Z 66 |         let event = self
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1272107Z    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1272580Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1272985Z    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1273318Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1273499Z warning: unused variable: `spirit_id`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1274035Z   --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1274481Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1274740Z 69 |     spirit_id: &str,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1275312Z    |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1275706Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1275886Z warning: unused variable: `spirit_pid`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1276414Z   --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1276859Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1277116Z 70 |     spirit_pid: u32,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1277689Z    |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1278080Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1278287Z warning: variable does not need to be mutable
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1279094Z    --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:619:9
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1279526Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1279878Z 619 |     let mut child = spawn_child(&mut spec, &argv)?;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1280315Z     |         ----^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1280659Z     |         |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1281013Z     |         help: remove this `mut`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1281327Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1281715Z     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1282030Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1282256Z warning: value assigned to `outcome` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1282900Z    --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1283273Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1283672Z 157 |                         outcome = UpgradeOutcome::Failed;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1284143Z     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1284484Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1284805Z     = help: maybe it is overwritten before being read?
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1285499Z     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1285837Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1286059Z warning: value assigned to `outcome` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1286541Z    --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1286901Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1287279Z 229 |                         outcome = UpgradeOutcome::Failed;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1287748Z     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1288090Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1288402Z     = help: maybe it is overwritten before being read?
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1288900Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1289161Z warning: unused variable: `e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1289673Z    --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1290099Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1290396Z 161 |                         Err(e) => {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1291024Z     |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1291422Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1291590Z warning: unused variable: `ctx`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1292092Z    --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1292516Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1292819Z 132 |             let ctx = GatewayCtx {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1293416Z     |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1293799Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1293968Z warning: unused variable: `now_ns`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1294438Z    --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1294839Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1295291Z 196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1295995Z     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1296387Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1296794Z    Compiling maos-journey-test v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-journey-test)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1297441Z warning: value assigned to `owned_guard` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1297978Z    --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:389:27
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1298374Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1298924Z 389 |     let mut owned_guard = None;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1299491Z     |                           ^^^^ this value is reassigned later and never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1299932Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1300335Z 442 |     owned_guard = Some(SandboxedContainerChild::own(
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1300992Z     |     ----------- `owned_guard` is overwritten here before the previous value is read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1301382Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1301553Z warning: unused variable: `total`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1302186Z   --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1302572Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1302881Z 22 |     let total = drained_tasks.len();
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1303478Z    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1303854Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1304048Z warning: field `boot_nonce` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1304606Z    --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1304956Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1305262Z  95 | pub struct KernelHaltResolver {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1305731Z     |            ------------------ field in this struct
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1306112Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1306373Z 101 |     boot_nonce: u64,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1306707Z     |     ^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1307017Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1307400Z     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1307700Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1307916Z warning: field `next_frame_counter` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1308369Z   --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1308954Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1309324Z 77 | pub struct MemoryManagerAdapter {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1309816Z    |            -------------------- field in this struct
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1310196Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1310501Z 82 |     next_frame_counter: AtomicU64,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1310878Z    |     ^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1311068Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1311278Z warning: method `mint_frame_id` is never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1311716Z    --> crates/maos-kernel-core/src/memory/mod.rs:654:8
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1312052Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1312341Z 115 | impl MemoryManagerAdapter {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1312840Z     | ------------------------- method in this implementation
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1313244Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1313563Z 654 |     fn mint_frame_id(&self) -> [u8; 16] {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1313963Z     |        ^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1314154Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1314378Z warning: associated function `now_ns` is never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1314859Z   --> crates/maos-kernel-core/src/memory/principal.rs:51:8
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1315235Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1315541Z 37 | impl PrincipalNamespaceIndex {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1316105Z    | ---------------------------- associated function in this implementation
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1316553Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1316826Z 51 |     fn now_ns() -> u64 {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1317160Z    |        ^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1317340Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1317516Z warning: field `kind` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1317940Z   --> crates/maos-kernel-core/src/memory/private.rs:44:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1318291Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1318558Z 42 | struct DiskCandidate {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1319361Z    |        ------------- field in this struct
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1319779Z 43 |     name: String,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1320120Z 44 |     kind: ValueKind,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1320718Z    |     ^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1320894Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1321096Z warning: field `iac_rt_metrics` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1321583Z   --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1321960Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1322282Z 32 | pub struct SelfTelemetryAggregator {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1322780Z    |            ----------------------- field in this struct
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1323391Z 33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1323763Z    |     ^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1323952Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1324208Z warning: associated function `resolution_label` is never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1324735Z   --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1325108Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1325409Z 38 | impl SelfTelemetryAggregator {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1325969Z    | ---------------------------- associated function in this implementation
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1326418Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1326828Z 60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1327303Z    |        ^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1327500Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1327735Z warning: associated function `kind_to_str` is never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1328215Z   --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1329068Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1329376Z 38 | impl SharedMemoryStore {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1329905Z    | ---------------------- associated function in this implementation
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1330346Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1330693Z 52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1331102Z    |        ^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1331298Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1331510Z warning: method `build_kernel_ctx` is never used
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1332022Z    --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1332406Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1332683Z  70 | impl HookDispatcher {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1333146Z     | ------------------- method in this implementation
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1333532Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1333815Z 141 |     fn build_kernel_ctx<'a>(
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1334176Z     |        ^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1334371Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1334560Z warning: field `attestation` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1335065Z   --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1335467Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1335780Z 34 | pub struct VerifiedImageAttestation {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1336286Z    |            ------------------------ field in this struct
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1336770Z 35 |     attestation: T3ImageAttestation,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1337141Z    |     ^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1337415Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1338117Z    = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1338936Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1339196Z warning: field `notification_dispatcher` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1339772Z   --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1340357Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1340661Z 23 | pub struct ProgressWatchdog {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1341121Z    |            ---------------- field in this struct
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1341490Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1342082Z 27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1342796Z    |     ^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1343001Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1343231Z warning: field `notification_dispatcher` is never read
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1343798Z   --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1344229Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1344536Z 23 | pub struct SilentFailureDetector {
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1345025Z    |            --------------------- field in this struct
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1345412Z ...
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1345966Z 27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1346540Z    |     ^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1346741Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1346932Z warning: `maos-cohort` (lib) generated 1 warning
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1347487Z    Compiling maos-shell v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-shell)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1348159Z    Compiling maos-bench v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-bench)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1348972Z    Compiling maos-control v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-control)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1350065Z warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side cha
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1350907Z   --> crates/maos-control/src/lib.rs:17:11
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1351221Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1351520Z 17 | use ring::constant_time;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1351867Z    |           ^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1352161Z    |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1352461Z    = note: `#[warn(deprecated)]` on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1352703Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1353517Z warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no p
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1354423Z    --> crates/maos-control/src/lib.rs:970:28
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1354735Z     |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1355273Z 970 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1355883Z     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1356126Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1356322Z warning: `maos-control` (lib) generated 2 warnings
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1356860Z    Compiling maos-bin v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-bin)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1357525Z warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1358077Z     --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1358430Z      |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1358947Z 1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1359443Z      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1359788Z      |
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1360340Z      = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1360668Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1361148Z warning: `maos-kernel-core` (lib) generated 44 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 25 suggestions)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1361997Z warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1362664Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 10.47s
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1363196Z ────────────
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1363689Z  Nextest run ID 359aac14-f439-4f6c-8014-9c4c14b4215e with nextest profile: default
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1364371Z     Starting 1 test across 1 binary (1 test skipped)
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1365286Z         FAIL [   0.971s] (1/1) maos-journey-test::journey_forget_18_6 live_forget_redistills_and_never_resurrects_then_pending_is_typed
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1366308Z   stdout ───
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1366519Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1366607Z     running 1 test
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1366946Z     test live_forget_redistills_and_never_resurrects_then_pending_is_typed ... FAILED
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1367265Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1367346Z     failures:
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1367458Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1367531Z     failures:
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1367808Z         live_forget_redistills_and_never_resurrects_then_pending_is_typed
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1368094Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1368351Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.97s
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1368960Z     
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1369215Z   stderr ───
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1369401Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1370085Z     thread 'live_forget_redistills_and_never_resurrects_then_pending_is_typed' (11297) panicked at crates/maos-journey-test/tests/../../../tests/harness/forget_18_6.rs
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1371867Z     canary leakage in researcher:seed_claim: {"claim_id":"seed-rag-noisy","statement":"Retrieval augmentation does not reduce hallucinated citations over a noisy corpu
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1373178Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1373507Z 
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1373674Z   Cancelling due to test failure
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1373988Z ────────────
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1374517Z      Summary [   0.972s] 1 test run: 0 passed, 1 failed, 1 skipped
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1375509Z         FAIL [   0.971s] (1/1) maos-journey-test::journey_forget_18_6 live_forget_redistills_and_never_resurrects_then_pending_is_typed
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1376167Z error: test run failed
+proven-red	The same process control must find the leaked canary	2026-10-26T12:09:11.1393918Z ##[notice]index-pid filtering leaves the live unindexed Researcher canary findable

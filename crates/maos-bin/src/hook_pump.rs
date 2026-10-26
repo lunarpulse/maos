@@ -1,5 +1,3 @@
-#![cfg(feature = "network")]
-
 //! Story 17-4 — the host's two telemetry hook callers.
 //!
 //! [`HookPump`] is the first production caller of `fire_on_telemetry_event`.

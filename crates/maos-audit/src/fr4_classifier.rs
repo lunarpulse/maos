@@ -194,7 +194,7 @@ impl WriterShapeEntry {
 /// `unload` carry `spirit_pid`, not `spirit_id` (validation round 1).
 pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     WriterShapeEntry {
-        site: ("skill_authoring.rs", "submit", 0),
+        site: ("skill_authoring.rs", "receipt", 0),
         kind: 7,
         token: TokenColumn::Absent,
         intent: WriterIntent::Prefix("skill.author.refused:"),

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="59" skipped="0" failures="0" errors="0" uuid="94cb6b9e-4c0d-4976-8fc4-4bbbaffcc5e9" timestamp="2026-10-26T13:26:28.075+00:00" time="15.308">
+    <testsuite name="maos-bin::worker_supervision_16_3" tests="23" skipped="0" errors="0" failures="0">
+        <testcase name="a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.003"/>
+        <testcase name="binding_phase_transitions_cover_every_cell" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.016"/>
+        <testcase name="the_fr4_call_feed_survives_every_worker_row_it_must_omit" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.004"/>
+        <testcase name="the_crash_scene_through_the_real_binary_lands_at_one_real_pid" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.006"/>
+        <testcase name="worker_task_ids_survive_redaction_and_name_their_originator" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.088+00:00" time="0.017"/>
+        <testcase name="a_stop_during_the_mint_never_spawns_the_child" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.147"/>
+        <testcase name="a_worker_that_would_bind_after_stop_workers_is_refused" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.152"/>
+        <testcase name="a_worker_that_exits_zero_is_unloaded_and_never_orphaned" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.157"/>
+        <testcase name="a_supervised_worker_completes_on_a_single_worker_runtime" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.160"/>
+        <testcase name="concurrent_workers_get_distinct_ids_and_their_own_verdicts" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.160"/>
+        <testcase name="a_crash_the_observer_never_saw_is_still_handled_by_finish" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.176"/>
+        <testcase name="an_injected_error_after_watch_leaves_no_bound_worker_behind" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.176"/>
+        <testcase name="a_sigkilled_worker_reaches_handle_crash_at_its_own_pid" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.176"/>
+        <testcase name="an_escalating_manifest_escalates_instead_of_nacking" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.176"/>
+        <testcase name="direct_worker_unload_stops_its_cid_container" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.182"/>
+        <testcase name="stop_before_container_attachment_still_kills_late_cid" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.180"/>
+        <testcase name="container_attachment_before_pidfd_stops_cid_then_late_pidfd" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.180"/>
+        <testcase name="unload_all_loaded_closes_a_live_workers_scb_and_reports_it" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.195"/>
+        <testcase name="abandoning_a_binding_stops_its_cid_container" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.207"/>
+        <testcase name="stopping_a_container_kills_its_cid_and_runtime_client" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.214"/>
+        <testcase name="maos_run_refuses_a_one_shot_mode_in_the_same_process" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="0.376"/>
+        <testcase name="three_workers_that_printed_once_then_hung_all_stall" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.088+00:00" time="6.169"/>
+        <testcase name="failed_cid_kill_is_not_counted_as_a_successful_container_stop" classname="maos-bin::worker_supervision_16_3" timestamp="2026-10-26T13:26:28.076+00:00" time="10.154"/>
+    </testsuite>
+    <testsuite name="maos-bin::worker_terminal_facts_17_7" tests="31" skipped="0" errors="0" failures="0">
+        <testcase name="s2_intentional_exit_137_is_not_a_signal" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.004"/>
+        <testcase name="root_crash::root_crash_retains_stopped_container_and_purge_reports_it" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.005"/>
+        <testcase name="runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.005"/>
+        <testcase name="runtime_scenes::ownership_is_by_cid_never_by_requested_name" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.006"/>
+        <testcase name="s4_oom_marker_is_not_payload_evidence_alone" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.015"/>
+        <testcase name="s1_immediate_exit_terminal_facts" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.015"/>
+        <testcase name="stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.094+00:00" time="0.009"/>
+        <testcase name="runtime_scenes::client_first_stop_snapshots_only_a_terminal_state" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.017"/>
+        <testcase name="s3_external_sigkill_requires_pidfd_fact" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.017"/>
+        <testcase name="stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.092+00:00" time="0.021"/>
+        <testcase name="stub_scenes::deadlines_remove_failure_is_typed" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.094+00:00" time="0.023"/>
+        <testcase name="stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.105+00:00" time="0.016"/>
+        <testcase name="stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="0.034"/>
+        <testcase name="stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.094+00:00" time="0.082"/>
+        <testcase name="unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.228+00:00" time="0.007"/>
+        <testcase name="unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.233+00:00" time="0.006"/>
+        <testcase name="supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.105+00:00" time="0.152"/>
+        <testcase name="supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.117+00:00" time="0.167"/>
+        <testcase name="supervisor_scenes::sandbox_applied_report_survives_journal_reopen" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.122+00:00" time="0.174"/>
+        <testcase name="supervisor_scenes::late_attachment_after_stop_tears_down_once" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.121+00:00" time="0.187"/>
+        <testcase name="supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.114+00:00" time="0.527"/>
+        <testcase name="stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.094+00:00" time="5.008"/>
+        <testcase name="supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.105+00:00" time="5.151"/>
+        <testcase name="supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.105+00:00" time="5.176"/>
+        <testcase name="supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.176+00:00" time="5.149"/>
+        <testcase name="supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.105+00:00" time="5.743"/>
+        <testcase name="startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.088+00:00" time="7.161"/>
+        <testcase name="stub_scenes::deadlines_hung_rm_is_bounded" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.092+00:00" time="10.025"/>
+        <testcase name="stub_scenes::deadlines_hung_exists_is_typed_and_bounded" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.092+00:00" time="10.026"/>
+        <testcase name="stub_scenes::ownership_create_timeout_cleans_the_receipt_cid" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.103+00:00" time="10.023"/>
+        <testcase name="supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault" classname="maos-bin::worker_terminal_facts_17_7" timestamp="2026-10-26T13:26:28.223+00:00" time="15.160"/>
+    </testsuite>
+    <testsuite name="maos-eval::t3_network_escape_executor" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="all_executable_scenarios_are_blocked_inside_verified_t3" classname="maos-eval::t3_network_escape_executor" timestamp="2026-10-26T13:26:28.235+00:00" time="0.004"/>
+        <testcase name="dispatch_accounting_handles_alternations_and_stops_at_match_end" classname="maos-eval::t3_network_escape_executor" timestamp="2026-10-26T13:26:28.235+00:00" time="0.004"/>
+        <testcase name="dispatch_accounting_rejects_removed_arm_retained_in_comment" classname="maos-eval::t3_network_escape_executor" timestamp="2026-10-26T13:26:28.236+00:00" time="0.005"/>
+        <testcase name="the_egress_socket_mount_refuses_0600_and_connects_0666" classname="maos-eval::t3_network_escape_executor" timestamp="2026-10-26T13:26:28.239+00:00" time="0.003"/>
+        <testcase name="executor_accounting_covers_every_versioned_scenario_without_a_runtime" classname="maos-eval::t3_network_escape_executor" timestamp="2026-10-26T13:26:28.239+00:00" time="0.006"/>
+    </testsuite>
+</testsuites>

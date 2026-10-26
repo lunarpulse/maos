@@ -1,0 +1,12 @@
+cp /tmp/18-7-review-review-library-controls-k6gzca6n /home/lunarpulse/dev_ws/crates/maos-skill/src/admission.rs -> exit0
+cmp /tmp/18-7-review-review-library-controls-k6gzca6n /home/lunarpulse/dev_ws/crates/maos-skill/src/admission.rs -> exit0
+touch /home/lunarpulse/dev_ws/crates/maos-skill/src/admission.rs -> exit0
+cp /tmp/18-7-review-review-library-controls-vz4sxpsz /home/lunarpulse/dev_ws/crates/maos-fkcs/src/lib.rs -> exit0
+cmp /tmp/18-7-review-review-library-controls-vz4sxpsz /home/lunarpulse/dev_ws/crates/maos-fkcs/src/lib.rs -> exit0
+touch /home/lunarpulse/dev_ws/crates/maos-fkcs/src/lib.rs -> exit0
+cp /tmp/18-7-review-review-library-controls-lvkijn4o /home/lunarpulse/dev_ws/spirits/researcher/src/lib.rs -> exit0
+cmp /tmp/18-7-review-review-library-controls-lvkijn4o /home/lunarpulse/dev_ws/spirits/researcher/src/lib.rs -> exit0
+touch /home/lunarpulse/dev_ws/spirits/researcher/src/lib.rs -> exit0
+cp /tmp/18-7-review-review-library-controls-h64ed6h3 /home/lunarpulse/dev_ws/spirits/researcher/src/skill_author.rs -> exit0
+cmp /tmp/18-7-review-review-library-controls-h64ed6h3 /home/lunarpulse/dev_ws/spirits/researcher/src/skill_author.rs -> exit0
+touch /home/lunarpulse/dev_ws/spirits/researcher/src/skill_author.rs -> exit0

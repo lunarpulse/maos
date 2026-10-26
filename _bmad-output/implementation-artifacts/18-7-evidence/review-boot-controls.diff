@@ -1,0 +1,47 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -2580,10 +2580,7 @@
+             Arc::clone(&transparency_log),
+         ),
+     );
+-    let skill_store = maos_skill::LocalFsSkillQueueStore::new()
+-        .map(Arc::new)
+-        .map_err(|error| eprintln!("maos: WARNING — skill queue unavailable: {error}"))
+-        .ok();
++    let skill_store = Some(Arc::new(maos_skill::LocalFsSkillQueueStore::new()?));
+     eprintln!("maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)");
+ 
+     // Story 4.4 / 13.3b — LogRecallAdapter + directional manifest-consent seam.
+@@ -4372,7 +4369,7 @@
+     //
+     // Only discovered rejected documents block startup. Queue-only rejected
+     // drafts and decision-only revisions remain durable and inert.
+-    if !offline_durable_child {
++    if !offline_durable_child && run_args.is_some() {
+         use maos_skill::SkillQueueStore as _;
+         let skill_roots = maos_skill::default_search_path();
+         let skill_outcome = maos_skill::discover_skills_detailed(&skill_roots);
+@@ -4382,10 +4379,7 @@
+                 store.migrate_legacy(|row| transparency_log.insert_approval_decision(row).map_err(|e| e.to_string()))?;
+                 store.load()
+             },
+-        ).unwrap_or_else(|error| {
+-            eprintln!("maos: WARNING — skill queue unreadable: {error}; proceeding from discovery + TL");
+-            Vec::new()
+-        });
++        ).expect("skill queue unreadable");
+         let skill_view = maos_cli::subcommands::admission_view(
+             &skill_outcome.discovered,
+             skill_stored,
+@@ -4397,10 +4391,7 @@
+             match entry.state {
+                 maos_skill::SkillAdmissionState::Rejected
+                     if entry.entry_path != "revision_proposal"
+-                        && skill_outcome.discovered.iter().any(|d| {
+-                            d.skill.manifest.skill_id() == entry.id
+-                                && d.skill.manifest.skill_version() == entry.version
+-                        }) =>
++                        && true =>
+                 {
+                     rejected.push(format!("{}@{}", entry.id, entry.version));
+                 }

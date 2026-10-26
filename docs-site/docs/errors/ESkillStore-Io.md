@@ -35,7 +35,7 @@ The skill-queue store encountered a filesystem error reading queue.json or creat
 
 ## Resolution
 
-Inspect the underlying I/O error and the queue path, normally ~/.local/share/maos/skills/queue.json. Restore directory access, writable storage, and available space as appropriate, then retry; preserve the existing queue rather than replacing it with fabricated admission state.
+Inspect the underlying I/O error and `<maos_home>/skills/queue.json` (`MAOS_HOME`, otherwise `$HOME/.maos`). Restore directory access, writable storage, and available space as appropriate; preserve existing queues and journal the one-time validated migration from the former data-home path.
 
 ## Source Location
 

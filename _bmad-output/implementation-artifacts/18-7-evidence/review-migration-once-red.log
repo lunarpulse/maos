@@ -1,0 +1,82 @@
+command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo nextest run --locked -p maos-skill --test admission_store_test -E test(=canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal)
+wall-clock: 1.753 s
+exit: 100
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.39s
+────────────
+ Nextest run ID e1502cf6-e6b2-4168-ad9b-ca46e013e0da with nextest profile: default
+    Starting 1 test across 1 binary (12 tests skipped)
+        FAIL [   0.033s] (1/1) maos-skill::admission_store_test canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal
+  stdout ───
+
+    running 1 test
+    test canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal ... FAILED
+
+    failures:
+
+    failures:
+        canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.03s
+
+  stderr ───
+
+    thread 'canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal' (1183590) panicked at crates/maos-skill/tests/admission_store_test.rs:229:9:
+
+    running 1 test
+    test canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal ... FAILED
+
+    failures:
+
+    ---- canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal stdout ----
+
+    thread 'canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal' (1183592) panicked at crates/maos-skill/tests/admission_store_test.rs:259:5:
+    assertion failed: !legacy.path().exists()
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+    failures:
+        canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.03s
+
+
+
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+  Cancelling due to test failure
+────────────
+     Summary [   0.034s] 1 test run: 0 passed, 1 failed, 12 skipped
+        FAIL [   0.033s] (1/1) maos-skill::admission_store_test canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal
+error: test run failed

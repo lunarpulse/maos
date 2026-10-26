@@ -223,7 +223,8 @@ pub fn pass_verdict(
     let Some(researcher) = researcher.filter(|r| r.is_live()) else {
         return Ok(None);
     };
-    if let Some(error) = researcher.take_pass_error() {
+    let output = researcher.last_output();
+    if let Some(error) = researcher.take_pass_error().filter(|_| output.is_none()) {
         return Err(format!("researcher on_idle pass refused: {error}"));
     }
     if !matches!(
@@ -234,9 +235,7 @@ pub fn pass_verdict(
             "researcher on_idle pass did not complete: {outcome:?}"
         ));
     }
-    let output = researcher
-        .last_output()
-        .ok_or("researcher on_idle pass surveyed nothing")?;
+    let output = output.ok_or("researcher on_idle pass surveyed nothing")?;
     let (consumed, claims) = (researcher.completions_consumed(), output.findings.len());
     if consumed != claims {
         return Err(format!(

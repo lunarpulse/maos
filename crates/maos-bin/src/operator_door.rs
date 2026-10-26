@@ -1792,6 +1792,12 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
     }
 }
 
+pub fn skill_serialization() -> Arc<Mutex<()>> {
+    static LOCK: std::sync::LazyLock<Arc<Mutex<()>>> =
+        std::sync::LazyLock::new(|| Arc::new(Mutex::new(())));
+    Arc::clone(&LOCK)
+}
+
 /// Shared door list/show/decide path, serialized against live Spirit submissions.
 pub fn skill_operation(
     log: &maos_iac::adapter::transparency_log::TransparencyLogAdapter,
@@ -1801,7 +1807,7 @@ pub fn skill_operation(
 ) -> OperatorOutcome {
     use maos_cli::subcommands::{apply_skill_decision, skill_entries, SkillDecisionError};
     use maos_skill::SkillQueueStore;
-    let serialization = crate::skill_authoring::serialization();
+    let serialization = skill_serialization();
     let _guard = match serialization.lock() {
         Ok(guard) => guard,
         Err(error) => {
@@ -1813,6 +1819,7 @@ pub fn skill_operation(
     };
     let result = (|| -> Result<serde_json::Value, SkillDecisionError> {
         let store = maos_skill::LocalFsSkillQueueStore::new()?;
+        store.migrate_legacy(|row| log.insert_approval_decision(row).map_err(|e| e.to_string()))?;
         let roots = if roots.is_empty() {
             maos_skill::default_search_path()
         } else {

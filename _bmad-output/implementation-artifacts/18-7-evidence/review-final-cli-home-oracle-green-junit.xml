@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="6" skipped="0" failures="0" errors="0" uuid="4ec43917-0546-4d95-a75f-cb69e517fd3f" timestamp="2026-10-26T13:48:54.311+00:00" time="0.313">
+    <testsuite name="maos-cli::skills_door_18_7" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="list_preserves_custom_discovery_roots_over_the_door" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T13:48:54.311+00:00" time="0.026"/>
+        <testcase name="list_show_approve_and_reject_use_the_same_authenticated_door" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T13:48:54.312+00:00" time="0.032"/>
+        <testcase name="rejected_bearer_never_falls_back_to_offline_queue_mutation" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T13:48:54.312+00:00" time="0.040"/>
+        <testcase name="corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T13:48:54.311+00:00" time="0.256"/>
+        <testcase name="refused_connection_uses_offline_only_while_the_home_lock_is_free" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T13:48:54.311+00:00" time="0.297"/>
+        <testcase name="offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T13:48:54.311+00:00" time="0.313"/>
+    </testsuite>
+</testsuites>

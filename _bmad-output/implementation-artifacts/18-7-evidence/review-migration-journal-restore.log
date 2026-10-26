@@ -1,0 +1,3 @@
+cp /tmp/18-7-review-review-migration-journal-b_emrdw3 /home/lunarpulse/dev_ws/crates/maos-skill/src/store.rs -> exit0
+cmp /tmp/18-7-review-review-migration-journal-b_emrdw3 /home/lunarpulse/dev_ws/crates/maos-skill/src/store.rs -> exit0
+touch /home/lunarpulse/dev_ws/crates/maos-skill/src/store.rs -> exit0

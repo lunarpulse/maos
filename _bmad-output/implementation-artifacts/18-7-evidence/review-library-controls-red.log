@@ -1,0 +1,988 @@
+command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo nextest run --locked --no-fail-fast -p maos-skill -p researcher -p maos-fkcs -p maos-cli --test live_submission_18_7 --test skill_authoring_18_7 --test fkcs_contract --test skill_queue_integration_test
+wall-clock: 11.088 s
+exit: 100
+   Compiling ring v0.17.14
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+   Compiling researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+   Compiling rustls v0.23.46
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+   Compiling rustls-webpki v0.103.16
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+   Compiling maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:149:27
+    |
+149 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+   Compiling maos-fkcs v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-fkcs)
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+   Compiling maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+   Compiling ureq v2.12.1
+   Compiling maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:444:21
+    |
+444 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:22:5
+   |
+22 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::halt::TerminationKind`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+   |
+12 | use maos_domain::halt::TerminationKind;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::halt::terminate_spirit`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+   |
+16 | use crate::halt::terminate_spirit;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ClassSection` and `GatewaysSection`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+   |
+22 | use crate::security::manifest::{ClassSection, GatewaysSection};
+   |                                 ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:12:17
+   |
+12 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:28:5
+   |
+28 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:619:9
+    |
+619 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+    |
+157 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+    |
+229 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:389:27
+    |
+389 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+442 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: `maos-cohort` (lib) generated 1 warning
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:654:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+654 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: associated function `now_ns` is never used
+  --> crates/maos-kernel-core/src/memory/principal.rs:51:8
+   |
+37 | impl PrincipalNamespaceIndex {
+   | ---------------------------- associated function in this implementation
+...
+51 |     fn now_ns() -> u64 {
+   |        ^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:44:5
+   |
+42 | struct DiskCandidate {
+   |        ------------- field in this struct
+43 |     name: String,
+44 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-kernel-core` (lib) generated 43 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 24 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.38s
+────────────
+ Nextest run ID 476abacd-a5ad-49db-aa90-d0b1948ccc4b with nextest profile: default
+    Starting 44 tests across 4 binaries
+        FAIL [   0.003s] ( 1/44) maos-skill::live_submission_18_7 authored_version_must_exceed_every_non_revision_history_in_every_state
+  stdout ───
+
+    running 1 test
+    test authored_version_must_exceed_every_non_revision_history_in_every_state ... FAILED
+
+    failures:
+
+    failures:
+        authored_version_must_exceed_every_non_revision_history_in_every_state
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'authored_version_must_exceed_every_non_revision_history_in_every_state' (1251210) panicked at crates/maos-skill/tests/live_submission_18_7.rs:63:5:
+    assertion failed: matches!(&result, Err(ESkillStore::InvalidEntry(error)) if error == &expected)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.004s] ( 2/44) maos-fkcs::fkcs_contract cohort_all_freeze_axes_red_hits_per_spirit_floor_but_fails_aggregate_floor
+        PASS [   0.021s] ( 3/44) maos-fkcs::fkcs_contract cohort_green_reconciles_every_spirit_and_clears_the_aggregate_floor
+        PASS [   0.021s] ( 4/44) maos-fkcs::fkcs_contract cohort_with_negative_control_scores_below_floor_and_fails_aggregate
+        FAIL [   0.022s] ( 5/44) maos-skill::live_submission_18_7 authored_ids_have_the_same_128_byte_boundary_as_the_operator_door
+  stdout ───
+
+    running 1 test
+    test authored_ids_have_the_same_128_byte_boundary_as_the_operator_door ... FAILED
+
+    failures:
+
+    failures:
+        authored_ids_have_the_same_128_byte_boundary_as_the_operator_door
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'authored_ids_have_the_same_128_byte_boundary_as_the_operator_door' (1251239) panicked at crates/maos-skill/tests/live_submission_18_7.rs:63:5:
+    assertion failed: matches!(&result, Err(ESkillStore::InvalidEntry(error)) if error == &expected)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.010s] ( 6/44) maos-skill::live_submission_18_7 admission_materializes_only_after_decision_and_foreign_files_never_overwrite
+  stdout ───
+
+    running 1 test
+    test admission_materializes_only_after_decision_and_foreign_files_never_overwrite ... FAILED
+
+    failures:
+
+    failures:
+        admission_materializes_only_after_decision_and_foreign_files_never_overwrite
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'admission_materializes_only_after_decision_and_foreign_files_never_overwrite' (1251246) panicked at crates/maos-skill/tests/live_submission_18_7.rs:281:5:
+    assertion failed: matches!(q.prepare_decision(&key, true, "operator".into(), Some(dir.path())),
+        Err(ESkillStore::MaterializeCollision(_)))
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.008s] ( 7/44) maos-skill::live_submission_18_7 refusal_codes_never_include_dynamic_error_details
+        PASS [   0.023s] ( 8/44) maos-fkcs::fkcs_contract always_admit_blind_harness_proves_the_rejection_is_not_canned
+        FAIL [   0.009s] ( 9/44) maos-skill::live_submission_18_7 decision_preflight_refuses_missing_home_and_non_directory_destinations_without_rows
+  stdout ───
+
+    running 1 test
+    test decision_preflight_refuses_missing_home_and_non_directory_destinations_without_rows ... FAILED
+
+    failures:
+
+    failures:
+        decision_preflight_refuses_missing_home_and_non_directory_destinations_without_rows
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'decision_preflight_refuses_missing_home_and_non_directory_destinations_without_rows' (1251259) panicked at crates/maos-skill/tests/live_submission_18_7.rs:540:5:
+    assertion failed: matches!(q.prepare_decision(&key, true, "operator".into(), None),
+        Err(ESkillStore::NoDataHome))
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.023s] (10/44) maos-fkcs::fkcs_contract empty_cohort_is_na_never_a_vacuous_pass
+        FAIL [   0.024s] (11/44) maos-skill::live_submission_18_7 discovered_package_versions_are_checked_even_without_queue_entries
+  stdout ───
+
+    running 1 test
+    test discovered_package_versions_are_checked_even_without_queue_entries ... FAILED
+
+    failures:
+
+    failures:
+        discovered_package_versions_are_checked_even_without_queue_entries
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'discovered_package_versions_are_checked_even_without_queue_entries' (1251245) panicked at crates/maos-skill/tests/live_submission_18_7.rs:63:5:
+    assertion failed: matches!(&result, Err(ESkillStore::InvalidEntry(error)) if error == &expected)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.024s] (12/44) maos-cli::skill_queue_integration_test no_silent_loss_when_journal_write_fails
+        PASS [   0.024s] (13/44) maos-fkcs::fkcs_contract cohort_checklist_is_itemized_across_categories_not_a_flat_bucket
+        FAIL [   0.024s] (14/44) maos-fkcs::fkcs_contract journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row
+  stdout ───
+
+    running 1 test
+    test journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row ... FAILED
+
+    failures:
+
+    failures:
+        journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row' (1251265) panicked at crates/maos-fkcs/tests/fkcs_contract.rs:79:14:
+    the actual decision receipt must escape the harness
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.025s] (15/44) maos-fkcs::fkcs_contract cohort_one_freeze_axis_red_drops_reconciled_count_while_admission_holds
+        PASS [   0.013s] (16/44) maos-fkcs::fkcs_contract negative_control_rejects_at_real_admit_spirit_while_conformance_proxy_admits
+        PASS [   0.009s] (17/44) maos-skill::live_submission_18_7 prepare_is_side_effect_free_and_enqueue_receipt_addresses_exact_payload
+        FAIL [   0.005s] (18/44) researcher::skill_authoring_18_7 admitted_owned_document_gets_model_diff_with_exact_target_then_pending_proposal_is_inert
+  stdout ───
+
+    running 1 test
+    test admitted_owned_document_gets_model_diff_with_exact_target_then_pending_proposal_is_inert ... FAILED
+
+    failures:
+
+    failures:
+        admitted_owned_document_gets_model_diff_with_exact_target_then_pending_proposal_is_inert
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'admitted_owned_document_gets_model_diff_with_exact_target_then_pending_proposal_is_inert' (1251276) panicked at spirits/researcher/tests/skill_authoring_18_7.rs:416:5:
+    assertion `left == right` failed
+      left: "Propose one improvement to the admitted skill researcher.survey-method@0.1.0. Return only a non-empty unified diff against the document below, without code fences or commentary. Do not change its id, version, or required capabilities. The host attaches telemetry evidence; do not invent evidence.\n\nAdmitted document:\n---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n\n\nSurvey findings:\n- a model finding\n- a model finding\n- a model finding\n\nHost telemetry summary:\n\n"
+     right: "Propose one improvement to the admitted skill researcher.survey-method@0.1.0. Return only a non-empty unified diff against the document below, without code fences or commentary. Do not change its id, version, or required capabilities. The host attaches telemetry evidence; do not invent evidence.\n\nAdmitted document:\n---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n\n\nSurvey findings:\n- a model finding\n- a model finding\n- a model finding\n\nHost telemetry summary:\nsuccesses=0 failures=1 halts=1 distillations=1\n"
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.005s] (19/44) maos-skill::live_submission_18_7 vetting_refuses_foreign_namespace_capability_escalation_and_malformed_document
+        PASS [   0.004s] (20/44) researcher::skill_authoring_18_7 distillation_refusal_prevents_generation_and_host_calls
+        FAIL [   0.004s] (21/44) researcher::skill_authoring_18_7 malformed_model_document_is_nonfatal_to_survey_and_not_replaced_with_template
+  stdout ───
+
+    running 1 test
+    test malformed_model_document_is_nonfatal_to_survey_and_not_replaced_with_template ... FAILED
+
+    failures:
+
+    failures:
+        malformed_model_document_is_nonfatal_to_survey_and_not_replaced_with_template
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+    researcher: on_idle pass refused: skill authoring failed: submission refused: invalid stored skill queue: invalid skill document: missing frontmatter fence: a maos.skill.v1 document must open with `---` and close the frontmatter with `---`
+
+    thread 'malformed_model_document_is_nonfatal_to_survey_and_not_replaced_with_template' (1251280) panicked at spirits/researcher/tests/skill_authoring_18_7.rs:587:10:
+    successful survey retained
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.004s] (22/44) researcher::skill_authoring_18_7 unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback
+  stdout ───
+
+    running 1 test
+    test unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback ... FAILED
+
+    failures:
+
+    failures:
+        unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+    researcher: on_idle pass refused: skill authoring failed: host-shut-down
+
+    thread 'unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback' (1251286) panicked at spirits/researcher/tests/skill_authoring_18_7.rs:551:41:
+    called `Option::unwrap()` on a `None` value
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.003s] (23/44) researcher::skill_authoring_18_7 undeclared_author_refuses_before_generation_and_retains_the_successful_survey
+  stdout ───
+
+    running 1 test
+    test undeclared_author_refuses_before_generation_and_retains_the_successful_survey ... FAILED
+
+    failures:
+
+    failures:
+        undeclared_author_refuses_before_generation_and_retains_the_successful_survey
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+    researcher: on_idle pass refused: skill authoring failed: capability-denied
+
+    thread 'undeclared_author_refuses_before_generation_and_retains_the_successful_survey' (1251285) panicked at spirits/researcher/tests/skill_authoring_18_7.rs:510:5:
+    assertion `left == right` failed
+      left: 4
+     right: 3
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.005s] (24/44) researcher::skill_authoring_18_7 bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admission
+  stdout ───
+
+    running 1 test
+    test bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admission ... FAILED
+
+    failures:
+
+    failures:
+        bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admission
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admission' (1251284) panicked at spirits/researcher/tests/skill_authoring_18_7.rs:342:5:
+    assertion `left == right` failed
+      left: ["survey", "survey", "survey", "distill", "own_entries", "generate", "author"]
+     right: ["survey", "survey", "survey", "distill", "own_entries", "preflight", "generate", "author"]
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.004s] (25/44) researcher::skill_authoring_18_7 strict_seed_fixture_pins_real_prompts_for_author_then_admitted_base_proposal
+  stdout ───
+
+    running 1 test
+    test strict_seed_fixture_pins_real_prompts_for_author_then_admitted_base_proposal ... FAILED
+
+    failures:
+
+    failures:
+        strict_seed_fixture_pins_real_prompts_for_author_then_admitted_base_proposal
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'strict_seed_fixture_pins_real_prompts_for_author_then_admitted_base_proposal' (1251281) panicked at spirits/researcher/tests/skill_authoring_18_7.rs:626:13:
+    assertion `left == right` failed
+      left: String("201199bdc738ae2a2e73245cfc6d0f9420bdcdd5bdde4d80bf62423a0b2e185e")
+     right: "fbe82ee21bbfa5b668f1834a1d4034e51e3d113bb04699618120d214b2b76d53"
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.005s] (26/44) researcher::skill_authoring_18_7 revision_generation_consumes_host_counts_and_changes_hash_when_counts_change
+  stdout ───
+
+    running 1 test
+    test revision_generation_consumes_host_counts_and_changes_hash_when_counts_change ... FAILED
+
+    failures:
+
+    failures:
+        revision_generation_consumes_host_counts_and_changes_hash_when_counts_change
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'revision_generation_consumes_host_counts_and_changes_hash_when_counts_change' (1251283) panicked at spirits/researcher/tests/skill_authoring_18_7.rs:480:9:
+    assertion `left == right` failed
+      left: "Propose one improvement to the admitted skill researcher.survey-method@0.1.0. Return only a non-empty unified diff against the document below, without code fences or commentary. Do not change its id, version, or required capabilities. The host attaches telemetry evidence; do not invent evidence.\n\nAdmitted document:\n---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n\n\nSurvey findings:\n- a model finding\n- a model finding\n- a model finding\n\nHost telemetry summary:\n\n"
+     right: "Propose one improvement to the admitted skill researcher.survey-method@0.1.0. Return only a non-empty unified diff against the document below, without code fences or commentary. Do not change its id, version, or required capabilities. The host attaches telemetry evidence; do not invent evidence.\n\nAdmitted document:\n---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n\n\nSurvey findings:\n- a model finding\n- a model finding\n- a model finding\n\nHost telemetry summary:\nsuccesses=0 failures=1 halts=1 distillations=1\n"
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.004s] (27/44) researcher::skill_authoring_18_7 unbound_deterministic_pass_never_reads_or_submits_even_with_author_port_installed
+        FAIL [   0.024s] (28/44) maos-skill::live_submission_18_7 rejected_authored_text_never_becomes_a_revision_base_or_reusable_version
+  stdout ───
+
+    running 1 test
+    test rejected_authored_text_never_becomes_a_revision_base_or_reusable_version ... FAILED
+
+    failures:
+
+    failures:
+        rejected_authored_text_never_becomes_a_revision_base_or_reusable_version
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'rejected_authored_text_never_becomes_a_revision_base_or_reusable_version' (1251244) panicked at crates/maos-skill/tests/live_submission_18_7.rs:63:5:
+    assertion failed: matches!(&result, Err(ESkillStore::InvalidEntry(error)) if error == &expected)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.026s] (29/44) maos-skill::live_submission_18_7 nonfinite_telemetry_values_and_thresholds_are_typed_submission_refusals
+  stdout ───
+
+    running 1 test
+    test nonfinite_telemetry_values_and_thresholds_are_typed_submission_refusals ... FAILED
+
+    failures:
+
+    failures:
+        nonfinite_telemetry_values_and_thresholds_are_typed_submission_refusals
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'nonfinite_telemetry_values_and_thresholds_are_typed_submission_refusals' (1251242) panicked at crates/maos-skill/tests/live_submission_18_7.rs:63:5:
+    assertion failed: matches!(&result, Err(ESkillStore::InvalidEntry(error)) if error == &expected)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.030s] (30/44) maos-skill::live_submission_18_7 two_revision_authors_coexist_and_one_decision_changes_neither_base_nor_sibling
+        PASS [   0.028s] (31/44) maos-skill::live_submission_18_7 principal_matching_is_token_bounded_in_both_document_and_diff
+        FAIL [   0.032s] (32/44) maos-skill::live_submission_18_7 authored_next_version_replaces_only_known_owned_bytes_and_advances_target
+  stdout ───
+
+    running 1 test
+    test authored_next_version_replaces_only_known_owned_bytes_and_advances_target ... FAILED
+
+    failures:
+
+    failures:
+        authored_next_version_replaces_only_known_owned_bytes_and_advances_target
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'authored_next_version_replaces_only_known_owned_bytes_and_advances_target' (1251279) panicked at crates/maos-skill/tests/live_submission_18_7.rs:63:5:
+    assertion failed: matches!(&result, Err(ESkillStore::InvalidEntry(error)) if error == &expected)
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.030s] (33/44) maos-skill::live_submission_18_7 proposal_requires_owned_current_admitted_author_revision_and_nonempty_diff
+        FAIL [   0.044s] (34/44) maos-skill::live_submission_18_7 decision_preflight_requires_exact_admitted_bytes_and_class_ownership
+  stdout ───
+
+    running 1 test
+    test decision_preflight_requires_exact_admitted_bytes_and_class_ownership ... FAILED
+
+    failures:
+
+    failures:
+        decision_preflight_requires_exact_admitted_bytes_and_class_ownership
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'decision_preflight_requires_exact_admitted_bytes_and_class_ownership' (1251258) panicked at crates/maos-skill/tests/live_submission_18_7.rs:589:5:
+    assertion failed: matches!(q.prepare_decision(&key, true, "operator".into(), Some(root.path())),
+        Err(ESkillStore::MaterializeCollision(_)))
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.048s] (35/44) maos-skill::live_submission_18_7 full_document_diff_evidence_and_provenance_survive_restart
+        PASS [   0.289s] (36/44) maos-cli::skill_queue_integration_test busy_timeout_5000_blocks_then_succeeds_green
+        PASS [   0.294s] (37/44) maos-cli::skill_queue_integration_test queue_save_failure_never_reports_a_committed_decision_as_success
+        PASS [   0.294s] (38/44) maos-cli::skill_queue_integration_test unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten
+        PASS [   0.306s] (39/44) maos-cli::skill_queue_integration_test busy_timeout_zero_reds_immediately_under_contention
+        PASS [   0.313s] (40/44) maos-cli::skill_queue_integration_test discovered_skill_is_approvable_end_to_end
+        FAIL [   0.316s] (41/44) maos-cli::skill_queue_integration_test journal_failure_and_materialization_preflight_refusal_mutate_nothing
+  stdout ───
+
+    running 1 test
+    test journal_failure_and_materialization_preflight_refusal_mutate_nothing ... FAILED
+
+    failures:
+
+    failures:
+        journal_failure_and_materialization_preflight_refusal_mutate_nothing
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.31s
+
+  stderr ───
+
+    thread 'journal_failure_and_materialization_preflight_refusal_mutate_nothing' (1251208) panicked at crates/maos-cli/tests/skill_queue_integration_test.rs:449:5:
+    assertion failed: tl.query_approvals(None).unwrap().is_empty()
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.320s] (42/44) maos-cli::skill_queue_integration_test double_journal_guard_keyed_on_target_capability
+        PASS [   0.343s] (43/44) maos-cli::skill_queue_integration_test authored_decision_journals_before_materializing_and_saving
+        PASS [   0.365s] (44/44) maos-cli::skill_queue_integration_test admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids
+────────────
+     Summary [   0.366s] 44 tests run: 26 passed, 18 failed, 0 skipped
+        FAIL [   0.003s] ( 1/44) maos-skill::live_submission_18_7 authored_version_must_exceed_every_non_revision_history_in_every_state
+        FAIL [   0.022s] ( 5/44) maos-skill::live_submission_18_7 authored_ids_have_the_same_128_byte_boundary_as_the_operator_door
+        FAIL [   0.010s] ( 6/44) maos-skill::live_submission_18_7 admission_materializes_only_after_decision_and_foreign_files_never_overwrite
+        FAIL [   0.009s] ( 9/44) maos-skill::live_submission_18_7 decision_preflight_refuses_missing_home_and_non_directory_destinations_without_rows
+        FAIL [   0.024s] (11/44) maos-skill::live_submission_18_7 discovered_package_versions_are_checked_even_without_queue_entries
+        FAIL [   0.024s] (14/44) maos-fkcs::fkcs_contract journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row
+        FAIL [   0.005s] (18/44) researcher::skill_authoring_18_7 admitted_owned_document_gets_model_diff_with_exact_target_then_pending_proposal_is_inert
+        FAIL [   0.004s] (21/44) researcher::skill_authoring_18_7 malformed_model_document_is_nonfatal_to_survey_and_not_replaced_with_template
+        FAIL [   0.004s] (22/44) researcher::skill_authoring_18_7 unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback
+        FAIL [   0.003s] (23/44) researcher::skill_authoring_18_7 undeclared_author_refuses_before_generation_and_retains_the_successful_survey
+        FAIL [   0.005s] (24/44) researcher::skill_authoring_18_7 bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admission
+        FAIL [   0.004s] (25/44) researcher::skill_authoring_18_7 strict_seed_fixture_pins_real_prompts_for_author_then_admitted_base_proposal
+        FAIL [   0.005s] (26/44) researcher::skill_authoring_18_7 revision_generation_consumes_host_counts_and_changes_hash_when_counts_change
+        FAIL [   0.024s] (28/44) maos-skill::live_submission_18_7 rejected_authored_text_never_becomes_a_revision_base_or_reusable_version
+        FAIL [   0.026s] (29/44) maos-skill::live_submission_18_7 nonfinite_telemetry_values_and_thresholds_are_typed_submission_refusals
+        FAIL [   0.032s] (32/44) maos-skill::live_submission_18_7 authored_next_version_replaces_only_known_owned_bytes_and_advances_target
+        FAIL [   0.044s] (34/44) maos-skill::live_submission_18_7 decision_preflight_requires_exact_admitted_bytes_and_class_ownership
+        FAIL [   0.316s] (41/44) maos-cli::skill_queue_integration_test journal_failure_and_materialization_preflight_refusal_mutate_nothing
+error: test run failed

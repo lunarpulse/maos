@@ -19,7 +19,7 @@ slug: "/errors/ESkillStore::NoDataHome"
 
 ## Summary
 
-The default durable skill queue cannot resolve a nonempty HOME, or authored admission lacks an explicit materialization directory.
+The durable queue cannot resolve a private `MAOS_HOME` or `HOME`, or authored admission lacks an explicit materialization directory.
 
 ## Cause
 
@@ -27,7 +27,7 @@ The process environment does not identify a private user data home. There is del
 
 ## Resolution
 
-Run with the intended user's HOME configured. The queue lives at `$HOME/.local/share/maos/skills/queue.json`; admitted documents materialize under `$HOME/.maos/skills/`. Explicit test paths remain supported.
+Configure an absolute `MAOS_HOME`, otherwise the intended user's `HOME`. The queue lives at `<maos_home>/skills/queue.json`; validated legacy `$HOME/.local/share/maos/skills/queue.json` is migrated once with a journal receipt. Admitted documents still materialize under `$HOME/.maos/skills/`. Boot warns and leaves authoring unavailable instead of blocking the daemon or offline erasure children. Explicit test paths remain supported.
 
 ## Source Location
 

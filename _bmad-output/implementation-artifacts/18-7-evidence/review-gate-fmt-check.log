@@ -1,0 +1,3 @@
+command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo fmt --all -- --check
+wall-clock: 2.678 s
+exit: 0

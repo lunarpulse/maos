@@ -118,3 +118,10 @@ Rationale per row is in the story's §Decisions. Recorded the same day by `anthr
 | maos-control (1286 / 1791), maos-journey-test (946 / 1104), maos-fkcs (491 / 591), maos-spirit-abi (1042 / 3000) | — | — | land exact inside ceiling; reaching a ceiling → STOP |
 
 `_aggregate_hardfail` = measured + 1. All figures are re-stated over the landed values at T0.
+
+## Review landing constraints — 2026-10-26
+
+The resumed D-15 operator addendum supersedes the historical bin29150/skill1138 lines above: **maos-bin ≤29500, maos-skill ≤1350**. Review rulings D-18-7-R1…R5 are recorded in the story. No kernel source change was needed by the review patches: the fully used grant stays **26367 physical / 20610 tokei /95 files**, and `check-kernel-baseline` plus the content-pin readers pass unchanged.
+
+Exact formatted review figures: **bin29443 →29497**, **skill1138 →1234**, CLI6154 →6155, FKCS480 →482; aggregate187284 →187437 and `_aggregate_hardfail`187285 →187438 (=measured+1). All zero-headroom rows remain unchanged; reserved CLI6856/control1791/journey1104/FKCS591/ABI3000 ceilings remain intact. D-10 admission hash was refreshed after review to `9b66a40a2d25e4c8fabca5d3cd6185d8eade65c1de8989480d8dd107fd2451d6`; FKCS8 legs pass.
+

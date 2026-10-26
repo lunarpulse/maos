@@ -1001,8 +1001,8 @@ impl Researcher {
         self
     }
 
-    /// Story 18-3 (D-18-3-05 A) — take the typed refusal of the most recent
-    /// pass, if it was refused.
+    /// Take the latest typed survey or authoring refusal. An authoring refusal
+    /// retains `last_output`; a survey refusal clears it.
     pub fn take_pass_error(&self) -> Option<ResearcherError> {
         self.pass_error
             .lock()
@@ -1318,7 +1318,8 @@ impl Researcher {
     }
 
     /// One bound pass: mint, input, model survey, scalar, distillate, then at
-    /// most one model-authored skill or proposal through the native host port.
+    /// most one model-authored submission. Authoring refusal retains the survey
+    /// and exposes its typed error to the root independently.
     fn bound_pass(&self, live: &LiveInference) -> Result<SurveyOutput, ResearcherError> {
         let (binding, token, pid) = Self::mint(live)?;
         // The minted pid is the admitted one on every construction path (a
@@ -1333,7 +1334,10 @@ impl Researcher {
             return Err(ResearcherError::NoClaims);
         }
         self.persist(&output, pid)?;
-        self.author_after_survey(live, &binding, &token, pid, &output)?;
+        if let Err(error) = self.author_after_survey(live, &binding, &token, pid, &output) {
+            eprintln!("researcher: skill authoring refused: {error}");
+            *self.pass_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+        }
         Ok(output)
     }
 

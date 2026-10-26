@@ -134,13 +134,17 @@ impl SymbolGateResult {
 pub struct AdmissionResult {
     pub spirit_id: String,
     pub admitted: bool,
+    /// True only when `decision_receipt` retains the completed verdict.
+    /// This harness is in-memory; it does not write the durable Transparency Log.
     pub journaled: bool,
+    /// The actual admission decision receipt retained by this in-memory harness.
+    pub decision_receipt: Option<maos_domain::invariants::i4::ApprovalDecision>,
     pub reason: String,
 }
 
 /// FKCS admission harness driving a `ProxySpirit` through the real
-/// `maos_registry::admission::admit_spirit` path and journaling the verdict on
-/// the `SkillAdmissionQueue` audit trail.
+/// `maos_registry::admission::admit_spirit` path and returning the queue's
+/// prepared decision receipt (not a claim of durable Transparency Log storage).
 #[derive(Debug, Clone)]
 pub struct AdmissionHarness {
     /// Test-only §A7.1 falsifier flag (set via [`Self::always_admit_for_test`]).
@@ -194,12 +198,9 @@ impl AdmissionHarness {
             runtime_crypto_provider: Some(CryptoProviderId("none".into())),
         };
 
-        // Story 11.5 AC3 (literal) — the REAL `admit_spirit` verdict drives the
-        // journaled approve/reject on the queue, so the audit trail records the
-        // admission DECISION (not only the FR39 enqueue REQUEST). A
-        // negative-control fourth Spirit declaring `[fkcs].internal_references`
-        // is rejected by `admit_spirit` (`OffFrozenSurface`) → journaled reject;
-        // a conformance proxy admits → journaled approve.
+        // The REAL `admit_spirit` verdict drives the returned approve/reject
+        // receipt, not merely the FR39 enqueue request. An off-surface proxy
+        // receives a reject receipt; a conformance proxy receives an approve.
         //
         // §A7.1 anti-canned reflex: `always_admit_for_test()` short-circuits
         // the real `admit_spirit` to always-admit. Under that blind harness the
@@ -219,21 +220,22 @@ impl AdmissionHarness {
             }
         };
 
-        // The harness retains the prepared decision receipt only after the
-        // genuine admission verdict transitions the package queue entry.
+        // Retain the actual decision receipt only after the genuine verdict
+        // transitions the queue entry; the enqueue audit row is not evidence.
         let decision_receipt = queued.as_ref().ok().and_then(|id| {
             let row = queue
-                .prepare_decision(&id.0, admitted, "fkcs-harness".into())
+                .prepare_decision(&id.0, admitted, "fkcs-harness".into(), None)
                 .ok()?;
             queue.apply_decision(&id.0, admitted, None).ok()?;
             Some(row)
         });
-        let journaled = decision_receipt.is_some() && !queue.audit_trail().is_empty();
+        let journaled = decision_receipt.is_some();
 
         AdmissionResult {
             spirit_id: spirit.id.clone(),
             admitted,
             journaled,
+            decision_receipt,
             reason,
         }
     }

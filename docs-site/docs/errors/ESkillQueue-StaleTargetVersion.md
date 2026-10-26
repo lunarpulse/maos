@@ -19,7 +19,7 @@ slug: "/errors/ESkillQueue::StaleTargetVersion"
 
 ## Summary
 
-A proposal targets an obsolete owned version, or a new authored document does not advance the admitted version.
+A proposal targets an obsolete owned version, or a new authored document does not advance every previously queued non-revision version (in any state) and every discovered package version of the same id.
 
 ## Cause
 
@@ -27,7 +27,7 @@ The target changed after the author selected it, or the submitted version is not
 
 ## Resolution
 
-Read current owned entries and propose against the highest admitted semver. Submit revised documents with an advancing version; revision admission alone never applies a diff.
+Read current owned entries and propose against the highest admitted semver. Submit revised documents with a version strictly above all prior non-revision entries, including rejected drafts, and all discovered packages of that id; revision admission alone never applies a diff.
 
 ## Source Location
 

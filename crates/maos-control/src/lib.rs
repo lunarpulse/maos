@@ -1248,7 +1248,7 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
             },
             _ => method_not_allowed(),
         },
-        ["v1", "skills", "decide"] => {
+        ["v1", "skills", "decide"] if method == "POST" => {
             if let Err(response) = post_guard(method, request) {
                 return response;
             }

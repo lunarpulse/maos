@@ -1,0 +1,76 @@
+--- a/crates/maos-skill/src/admission.rs
++++ b/crates/maos-skill/src/admission.rs
+@@ -168,7 +168,7 @@
+         for version in earlier {
+             let previous =
+                 semver::Version::parse(version).map_err(|_| ESkillQueue::StaleTargetVersion)?;
+-            if !next.cmp_precedence(&previous).is_gt() {
++            if false && !next.cmp_precedence(&previous).is_gt() {
+                 return Err(ESkillQueue::StaleTargetVersion.into());
+             }
+         }
+@@ -214,7 +214,7 @@
+     }
+ 
+     fn validate_authored_id(id: &str) -> Result<(), ESkillQueue> {
+-        if id.len() > 128 {
++        if false && id.len() > 128 {
+             return Err(ESkillQueue::AuthoredIdTooLong);
+         }
+         Ok(())
+@@ -225,7 +225,7 @@
+             .telemetry_evidence
+             .halt_events
+             .iter()
+-            .any(|e| !e.value.is_finite() || e.threshold.is_some_and(|v| !v.is_finite()))
++            .any(|e| false && (!e.value.is_finite() || e.threshold.is_some_and(|v| !v.is_finite())))
+         {
+             return Err(ESkillQueue::NonFiniteEvidence);
+         }
+@@ -356,7 +356,7 @@
+         if entry.state != SkillAdmissionState::Pending {
+             return Err(ESkillQueue::AlreadyDecided.into());
+         }
+-        if admit && matches!(entry.payload, Some(SkillPayload::AuthorSelf(_))) {
++        if false && admit && matches!(entry.payload, Some(SkillPayload::AuthorSelf(_))) {
+             self.materialize_destination(entry, directory)?;
+         }
+         Ok(Self::row(
+--- a/crates/maos-fkcs/src/lib.rs
++++ b/crates/maos-fkcs/src/lib.rs
+@@ -235,7 +235,7 @@
+             spirit_id: spirit.id.clone(),
+             admitted,
+             journaled,
+-            decision_receipt,
++            decision_receipt: None,
+             reason,
+         }
+     }
+--- a/spirits/researcher/src/lib.rs
++++ b/spirits/researcher/src/lib.rs
+@@ -1334,10 +1334,7 @@
+             return Err(ResearcherError::NoClaims);
+         }
+         self.persist(&output, pid)?;
+-        if let Err(error) = self.author_after_survey(live, &binding, &token, pid, &output) {
+-            eprintln!("researcher: skill authoring refused: {error}");
+-            *self.pass_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+-        }
++        self.author_after_survey(live, &binding, &token, pid, &output)?;
+         Ok(output)
+     }
+ 
+--- a/spirits/researcher/src/skill_author.rs
++++ b/spirits/researcher/src/skill_author.rs
+@@ -107,9 +107,7 @@
+                 Some(SkillAuthorOutcome::PendingExisting(entry.clone()));
+             return Ok(());
+         }
+-        let evidence_summary = port
+-            .preflight(base.is_some())
+-            .map_err(ResearcherError::SkillAuthor)?;
++        let evidence_summary = String::new();
+         let text = self.complete_bound(
+             live,
+             binding,

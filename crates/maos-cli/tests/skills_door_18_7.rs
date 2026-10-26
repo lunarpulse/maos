@@ -50,10 +50,7 @@ fn list_show_approve_and_reject_use_the_same_authenticated_door() {
         assert_eq!(body["approve"], approve);
         assert_eq!(body["actor"], actor);
     }
-    assert!(!door
-        .home_dir()
-        .join(".local/share/maos/skills/queue.json")
-        .exists());
+    assert!(!door.maos_home().join("skills/queue.json").exists());
 }
 
 #[test]
@@ -81,9 +78,7 @@ fn list_preserves_custom_discovery_roots_over_the_door() {
 #[test]
 fn rejected_bearer_never_falls_back_to_offline_queue_mutation() {
     let door = FixtureDoor::spawn_replying(401, r#"{"error":"unauthorized"}"#);
-    let store = LocalFsSkillQueueStore::at_path(
-        door.home_dir().join(".local/share/maos/skills/queue.json"),
-    );
+    let store = LocalFsSkillQueueStore::at_path(door.maos_home().join("skills/queue.json"));
     let entry = QueueEntry::package_shipped("skill.auth".into(), "1.0.0".into()).unwrap();
     store.save(&[entry]).unwrap();
     let before = std::fs::read(store.path()).unwrap();
@@ -97,9 +92,7 @@ fn rejected_bearer_never_falls_back_to_offline_queue_mutation() {
 #[test]
 fn refused_connection_uses_offline_only_while_the_home_lock_is_free() {
     let door = FixtureDoor::spawn_dead();
-    let store = LocalFsSkillQueueStore::at_path(
-        door.home_dir().join(".local/share/maos/skills/queue.json"),
-    );
+    let store = LocalFsSkillQueueStore::at_path(door.maos_home().join("skills/queue.json"));
     let entry = QueueEntry::package_shipped("skill.offline".into(), "1.0.0".into()).unwrap();
     store.save(&[entry]).unwrap();
     let home = std::fs::File::open(door.maos_home()).unwrap();
@@ -141,7 +134,7 @@ fn refused_connection_uses_offline_only_while_the_home_lock_is_free() {
 #[test]
 fn corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched() {
     let door = FixtureDoor::spawn_dead();
-    let path = door.home_dir().join(".local/share/maos/skills/queue.json");
+    let path = door.maos_home().join("skills/queue.json");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let bytes = br#"{"schema_version":"maos.skill-queue.v2","pending":[{"payload":null}]}"#;
     std::fs::write(&path, bytes).unwrap();
@@ -160,9 +153,7 @@ fn corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched() {
 fn offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish() {
     use rustix::fs::{flock, FlockOperation};
     let door = FixtureDoor::spawn_dead();
-    let store = LocalFsSkillQueueStore::at_path(
-        door.home_dir().join(".local/share/maos/skills/queue.json"),
-    );
+    let store = LocalFsSkillQueueStore::at_path(door.maos_home().join("skills/queue.json"));
     let entry = QueueEntry::package_shipped("skill.retained".into(), "1.0.0".into()).unwrap();
     store.save(&[entry]).unwrap();
     let path = door.maos_home().join("audit/transparency.sqlite");

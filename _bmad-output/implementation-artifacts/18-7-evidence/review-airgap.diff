@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -1807,7 +1807,7 @@
+ ) -> OperatorOutcome {
+     use maos_cli::subcommands::{apply_skill_decision, skill_entries, SkillDecisionError};
+     use maos_skill::SkillQueueStore;
+-    let serialization = skill_serialization();
++    let serialization = crate::skill_authoring::serialization();
+     let _guard = match serialization.lock() {
+         Ok(guard) => guard,
+         Err(error) => {

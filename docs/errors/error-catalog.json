@@ -591,6 +591,22 @@
     "remediation": "Select an exact entry id from the queue list. Revision approval targets end in #entry_id and never share the base skill's decision target.",
     "docs_url": "https://docs.maos.dev/errors/ESkillQueue::AmbiguousEntry"
   },
+  "ESkillQueue::AuthoredIdTooLong": {
+    "code": "ESkillQueue::AuthoredIdTooLong",
+    "rust_path": "ESkillQueue::AuthoredIdTooLong",
+    "severity": "policy",
+    "recovery_class": "reject",
+    "retryable": false,
+    "cause_chain_semantics": "admission or runtime policy",
+    "owner": "maos-skill",
+    "kernel_or_spirit": "kernel",
+    "since_version": "1.0.0",
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "description": "Authored skill identifier exceeds the shared length limit",
+    "cause": "An authored skill id exceeds the operator door's 128-byte identifier boundary.",
+    "remediation": "Choose a lowercase namespaced id of at most 128 ASCII bytes before submitting; do not truncate an existing identity.",
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::AuthoredIdTooLong"
+  },
   "ESkillQueue::CapabilityEscalation": {
     "code": "ESkillQueue::CapabilityEscalation",
     "rust_path": "ESkillQueue::CapabilityEscalation",
@@ -687,6 +703,22 @@
     "remediation": "Preserve the original file and restore validated data. Do not recompute hashes to legitimize altered content. V1 label-only entries remain explicitly legacy.",
     "docs_url": "https://docs.maos.dev/errors/ESkillQueue::InvalidStoredEntry"
   },
+  "ESkillQueue::NonFiniteEvidence": {
+    "code": "ESkillQueue::NonFiniteEvidence",
+    "rust_path": "ESkillQueue::NonFiniteEvidence",
+    "severity": "policy",
+    "recovery_class": "reject",
+    "retryable": false,
+    "cause_chain_semantics": "admission or runtime policy",
+    "owner": "maos-skill",
+    "kernel_or_spirit": "kernel",
+    "since_version": "1.0.0",
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "description": "Revision evidence cannot be durably represented",
+    "cause": "Revision telemetry contains a non-finite f32 halt value or threshold that cannot round-trip through durable JSON.",
+    "remediation": "Correct the telemetry producer and submit only finite evidence; preserve the existing queue and never replace non-finite measurements with fabricated values.",
+    "docs_url": "https://docs.maos.dev/errors/ESkillQueue::NonFiniteEvidence"
+  },
   "ESkillQueue::PrincipalDataRefused": {
     "code": "ESkillQueue::PrincipalDataRefused",
     "rust_path": "ESkillQueue::PrincipalDataRefused",
@@ -747,8 +779,8 @@
     "since_version": "1.0.0",
     "version_stability": "stable within LTS cycle — no breaking error-code changes",
     "description": "Target version is stale or authored version does not advance",
-    "cause": "A proposal names a version other than the highest admitted owned semver, or a new authored document does not advance that version.",
-    "remediation": "Read current owned entries before proposing. Submit revised documents with an advancing version; approval of an opaque revision alone does not apply a diff.",
+    "cause": "A proposal names a version other than the highest admitted owned semver, or a new authored document does not strictly exceed every same-id non-revision queue entry in any state and every discovered package version.",
+    "remediation": "Read current owned entries before proposing. Submit authored documents above all previous non-revision and discovered versions, including rejected drafts; approval of an opaque revision alone does not apply a diff.",
     "docs_url": "https://docs.maos.dev/errors/ESkillQueue::StaleTargetVersion"
   },
   "ESkillQueue::TargetNotOwned": {
@@ -940,7 +972,7 @@
     "version_stability": "stable within LTS cycle — no breaking error-code changes",
     "description": "Filesystem I/O failure reading or writing the durable skill-queue cache (queue.json)",
     "cause": "The skill-queue store encountered a filesystem error reading queue.json or creating, writing, syncing, or renaming its atomic replacement. A nonexistent queue file alone is treated as an empty queue, not this error.",
-    "remediation": "Inspect the underlying I/O error and the queue path, normally ~/.local/share/maos/skills/queue.json. Restore directory access, writable storage, and available space as appropriate, then retry; preserve the existing queue rather than replacing it with fabricated admission state.",
+    "remediation": "Inspect the underlying I/O error and <maos_home>/skills/queue.json (MAOS_HOME, otherwise HOME/.maos). Restore directory access, writable storage, and available space as appropriate; preserve existing queues and journal the one-time validated migration from the former data-home path.",
     "docs_url": "https://docs.maos.dev/errors/ESkillStore::Io"
   },
   "ESkillStore::Json": {
@@ -987,8 +1019,8 @@
     "since_version": "1.0.0",
     "version_stability": "stable within LTS cycle — no breaking error-code changes",
     "description": "Private skill data home unavailable",
-    "cause": "HOME is absent or empty, or authored admission was called without an explicit materialization directory. Persisted payloads have no tmp fallback.",
-    "remediation": "Configure the intended user's private HOME. The queue uses ~/.local/share/maos/skills/queue.json and admitted documents use ~/.maos/skills; explicit test paths remain supported.",
+    "cause": "Neither MAOS_HOME nor HOME identifies a private home, or authored admission was called without an explicit materialization directory. Persisted payloads have no tmp fallback.",
+    "remediation": "Configure an absolute MAOS_HOME or the intended user's HOME. The queue uses <maos_home>/skills/queue.json; admitted documents use HOME/.maos/skills. Daemon boot warns and leaves authoring unavailable rather than blocking unrelated modes; explicit test paths remain supported.",
     "docs_url": "https://docs.maos.dev/errors/ESkillStore::NoDataHome"
   },
   "ESkillStore::UnknownSchemaVersion": {

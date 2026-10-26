@@ -47,7 +47,6 @@ pub mod escape_detector_consumer;
 /// Observer activity writer: the first production callers of
 /// `fire_on_telemetry_event` and `fire_on_consolidate`. In the library beside
 /// `admission`, so `crates/maos-bin/tests/` drives the real pump.
-#[cfg(feature = "network")]
 pub mod hook_pump;
 /// Story 15-6 — the one authoritative live/record/replay selector. Public so
 /// integration tests execute the production lattice; an in-`src` test module

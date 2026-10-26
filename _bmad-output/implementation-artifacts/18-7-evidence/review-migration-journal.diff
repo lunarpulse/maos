@@ -1,0 +1,11 @@
+--- a/crates/maos-skill/src/store.rs
++++ b/crates/maos-skill/src/store.rs
+@@ -179,7 +179,7 @@
+             decision: true,
+             reasoning: Some("validated legacy queue migration".into()),
+         })
+-        .map_err(io::Error::other)?;
++        .ok();
+         self.save(&old)?;
+         fs::remove_file(legacy)?;
+         Ok(())

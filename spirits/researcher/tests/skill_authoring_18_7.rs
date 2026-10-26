@@ -15,7 +15,9 @@ use maos_domain::ports::inference::{
     TokenUsage,
 };
 use maos_domain::ports::InferencePort;
-use maos_domain::self_telemetry::SelfTelemetryReport;
+use maos_domain::self_telemetry::{
+    DistillationOutcomeEntry, HaltTelemetryEntry, SelfTelemetryReport,
+};
 use maos_skill::{
     AuthorIdentity, ESkillQueue, ESkillStore, QueueEntry, SkillAdmissionQueue, SkillAdmissionState,
     SkillPayload, SubmissionContext,
@@ -29,6 +31,7 @@ use researcher::{
 const PID: u32 = 187;
 const DOCUMENT: &str = "---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n";
 const DIFF: &str = "--- a/researcher.survey-method.md\n+++ b/researcher.survey-method.md\n@@ -9 +9,2 @@\n Compare methodology before combining contradictory findings.\n+Retain uncertainty when the evidence remains contradictory.\n";
+const TELEMETRY_SUMMARY: &str = "successes=0 failures=1 halts=1 distillations=1";
 
 type Events = Arc<Mutex<Vec<&'static str>>>;
 
@@ -79,6 +82,7 @@ impl InferencePort for Model {
 
 struct Host {
     queue: Mutex<SkillAdmissionQueue>,
+    telemetry: Mutex<SelfTelemetryReport>,
     denied: bool,
     reads_fail: bool,
     events: Events,
@@ -114,6 +118,23 @@ impl Host {
     }
 }
 impl SkillAuthorPort for Host {
+    fn preflight(&self, revision: bool) -> Result<String, SkillPortError> {
+        self.events.lock().unwrap().push("preflight");
+        if self.denied {
+            return Err(SkillPortError::CapabilityDenied);
+        }
+        if !revision {
+            return Ok(String::new());
+        }
+        let report = self.telemetry.lock().unwrap();
+        Ok(format!(
+            "successes={} failures={} halts={} distillations={}",
+            report.success_count,
+            report.failure_count,
+            report.halt_events.len(),
+            report.distillation_outcomes.len()
+        ))
+    }
     fn own_entries(&self) -> Result<Vec<QueueEntry>, SkillPortError> {
         self.events.lock().unwrap().push("own_entries");
         if self.reads_fail {
@@ -130,6 +151,7 @@ impl SkillAuthorPort for Host {
         let (entry, _) = queue.prepare_author(
             document,
             &Self::context(&Self::identity(), &BTreeSet::new()),
+            &[],
         )?;
         queue.commit_prepared(entry.clone())?;
         Ok(entry)
@@ -144,8 +166,7 @@ impl SkillAuthorPort for Host {
         if self.denied {
             return Err(SkillPortError::CapabilityDenied);
         }
-        let evidence =
-            SelfTelemetryReport::new(PID, 10, 20, 1, 0, 0, 0, 0, vec![], vec![], 20).unwrap();
+        let evidence = self.telemetry.lock().unwrap().clone();
         let proposal = maos_skill::build_proposal(
             target_id.as_str().into(),
             target_version.as_str().into(),
@@ -249,6 +270,31 @@ fn setup(
     });
     let host = Arc::new(Host {
         queue: Mutex::default(),
+        telemetry: Mutex::new(
+            SelfTelemetryReport::new(
+                PID,
+                10,
+                20,
+                0,
+                1,
+                0,
+                0,
+                0,
+                vec![HaltTelemetryEntry::new(
+                    "survey-conflict",
+                    "methodology_conflict",
+                    "threshold",
+                    1.0,
+                    Some(0.5),
+                    15,
+                    None,
+                )
+                .unwrap()],
+                vec![DistillationOutcomeEntry::new([0x18; 16], 3, 1, 16)],
+                20,
+            )
+            .unwrap(),
+        ),
         denied,
         reads_fail,
         events,
@@ -301,6 +347,7 @@ fn bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admi
             "survey",
             "distill",
             "own_entries",
+            "preflight",
             "generate",
             "author"
         ]
@@ -323,7 +370,7 @@ fn bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admi
     }
     assert_eq!(
         seen[3].prompt,
-        researcher::skill_author::authoring_prompt(&researcher.last_output().unwrap(), None)
+        researcher::skill_author::authoring_prompt(&researcher.last_output().unwrap(), None, None)
     );
     drop(seen);
     assert_eq!(
@@ -368,9 +415,14 @@ fn admitted_owned_document_gets_model_diff_with_exact_target_then_pending_propos
     let seen = model.seen.lock().unwrap();
     assert_eq!(
         seen[7].prompt,
-        researcher::skill_author::authoring_prompt(&reloaded.last_output().unwrap(), Some(&base))
+        researcher::skill_author::authoring_prompt(
+            &reloaded.last_output().unwrap(),
+            Some(&base),
+            Some(TELEMETRY_SUMMARY),
+        )
     );
     assert!(seen[7].prompt.contains(DOCUMENT));
+    assert!(seen[7].prompt.contains(TELEMETRY_SUMMARY));
     drop(seen);
     idle(&reloaded);
     assert!(reloaded.take_pass_error().is_none());
@@ -383,8 +435,71 @@ fn admitted_owned_document_gets_model_diff_with_exact_target_then_pending_propos
 }
 
 #[test]
-fn undeclared_author_still_generates_and_calls_host_then_surfaces_typed_denial_without_enqueue() {
-    let (researcher, model, host, _, _) = setup(true, false, None, false);
+fn revision_generation_consumes_host_counts_and_changes_hash_when_counts_change() {
+    use sha2::{Digest, Sha256};
+    let mut hashes = Vec::new();
+    for (successes, failures, halts, distillations) in [
+        (0, 1, 1, 1),
+        (7, 1, 1, 1),
+        (0, 2, 1, 1),
+        (0, 1, 0, 1),
+        (0, 1, 1, 0),
+    ] {
+        let (researcher, model, host, _, _) = setup(false, false, None, false);
+        host.author(DOCUMENT.into()).unwrap();
+        let base = host.admit_document();
+        {
+            let mut report = host.telemetry.lock().unwrap();
+            report.success_count = successes;
+            report.failure_count = failures;
+            report.halt_events.truncate(halts);
+            report.distillation_outcomes.truncate(distillations);
+        }
+        idle(&researcher);
+        assert!(researcher.take_pass_error().is_none());
+        let Some(SkillAuthorOutcome::Proposed(entry)) = researcher.take_skill_author_outcome()
+        else {
+            panic!("expected revision generated using host telemetry")
+        };
+        let Some(SkillPayload::RevisionProposal(proposal)) = entry.payload else {
+            panic!("missing proposal payload")
+        };
+        assert_eq!(proposal.telemetry_evidence.success_count, successes);
+        assert_eq!(proposal.telemetry_evidence.failure_count, failures);
+        assert_eq!(proposal.telemetry_evidence.halt_events.len(), halts);
+        assert_eq!(
+            proposal.telemetry_evidence.distillation_outcomes.len(),
+            distillations
+        );
+        let summary = format!(
+            "successes={successes} failures={failures} halts={halts} distillations={distillations}"
+        );
+        let output = researcher.last_output().unwrap();
+        let seen = model.seen.lock().unwrap();
+        assert_eq!(seen.len(), 4);
+        assert_eq!(
+            seen[3].prompt,
+            researcher::skill_author::authoring_prompt(&output, Some(&base), Some(&summary))
+        );
+        assert!(seen[3].prompt.contains(summary.as_str()));
+        hashes.push(Sha256::digest(seen[3].prompt.as_bytes()));
+        assert_eq!(
+            researcher::skill_author::authoring_prompt(&output, None, Some(&summary)),
+            researcher::skill_author::authoring_prompt(&output, None, None),
+            "author-only prompt remains independent of revision telemetry"
+        );
+    }
+    for hash in &hashes[1..] {
+        assert_ne!(
+            &hashes[0], hash,
+            "each host count affects the revision prompt"
+        );
+    }
+}
+
+#[test]
+fn undeclared_author_refuses_before_generation_and_retains_the_successful_survey() {
+    let (researcher, model, host, _, context) = setup(true, false, None, false);
     idle(&researcher);
     assert!(matches!(
         researcher.take_pass_error(),
@@ -392,10 +507,22 @@ fn undeclared_author_still_generates_and_calls_host_then_surfaces_typed_denial_w
             SkillPortError::CapabilityDenied
         ))
     ));
-    assert_eq!(model.seen.lock().unwrap().len(), 4);
-    assert_eq!(host.events.lock().unwrap().last(), Some(&"author"));
+    assert_eq!(model.seen.lock().unwrap().len(), 3);
+    assert_eq!(
+        *host.events.lock().unwrap(),
+        [
+            "survey",
+            "survey",
+            "survey",
+            "distill",
+            "own_entries",
+            "preflight"
+        ]
+    );
+    assert_eq!(*context.0.lock().unwrap(), [18; 3]);
+    assert_eq!(researcher.completions_consumed(), 3);
     assert!(host.queue.lock().unwrap().to_stored().is_empty());
-    assert!(researcher.last_output().is_none());
+    assert_eq!(researcher.last_output().unwrap().findings.len(), 3);
     assert!(researcher.take_skill_author_outcome().is_none());
 }
 
@@ -421,6 +548,7 @@ fn unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallb
     ));
     assert_eq!(model.seen.lock().unwrap().len(), 3);
     assert!(host.queue.lock().unwrap().to_stored().is_empty());
+    assert_eq!(researcher.last_output().unwrap().findings.len(), 3);
     let (researcher, model, host, _, _) = setup(
         false,
         false,
@@ -437,11 +565,12 @@ fn unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallb
     assert_eq!(model.seen.lock().unwrap().len(), 4);
     assert_eq!(host.events.lock().unwrap().last(), Some(&"generate"));
     assert!(host.queue.lock().unwrap().to_stored().is_empty());
+    assert_eq!(researcher.last_output().unwrap().findings.len(), 3);
 }
 
 #[test]
-fn malformed_model_document_is_refused_by_vetted_host_not_replaced_with_template() {
-    let (researcher, _, host, _, _) = setup(false, false, None, true);
+fn malformed_model_document_is_nonfatal_to_survey_and_not_replaced_with_template() {
+    let (researcher, model, host, _, context) = setup(false, false, None, true);
     idle(&researcher);
     assert!(matches!(
         researcher.take_pass_error(),
@@ -450,6 +579,18 @@ fn malformed_model_document_is_refused_by_vetted_host_not_replaced_with_template
         )))
     ));
     assert!(host.queue.lock().unwrap().to_stored().is_empty());
+    assert_eq!(model.seen.lock().unwrap().len(), 4);
+    assert_eq!(host.events.lock().unwrap().last(), Some(&"author"));
+    assert_eq!(*context.0.lock().unwrap(), [18; 4]);
+    let output = researcher
+        .last_output()
+        .expect("successful survey retained");
+    assert_eq!(output.findings.len(), 3);
+    assert!(output
+        .findings
+        .iter()
+        .all(|finding| finding.statement == "a model finding"));
+    assert!(researcher.take_skill_author_outcome().is_none());
 }
 
 #[test]
@@ -467,6 +608,7 @@ fn distillation_refusal_prevents_generation_and_host_calls() {
     assert_eq!(model.seen.lock().unwrap().len(), 3);
     assert_eq!(host.events.lock().unwrap().last(), Some(&"distill"));
     assert!(host.queue.lock().unwrap().to_stored().is_empty());
+    assert!(researcher.last_output().is_none());
 }
 
 #[test]

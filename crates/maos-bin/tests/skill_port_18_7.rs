@@ -169,7 +169,7 @@ impl Root {
             telemetry,
             scbs,
             store,
-            serialization: maos_bin::skill_authoring::serialization(),
+            serialization: maos_bin::operator_door::skill_serialization(),
             runtime,
             writer,
         }
@@ -224,7 +224,12 @@ impl Root {
     fn admit(&self, entry: &QueueEntry) {
         let mut queue = SkillAdmissionQueue::from_stored(self.entries()).unwrap();
         let row = queue
-            .prepare_decision(&entry.entry_id, true, "operator".into())
+            .prepare_decision(
+                &entry.entry_id,
+                true,
+                "operator".into(),
+                Some(self.home.path()),
+            )
             .unwrap();
         self.journal.insert_approval_decision(row).unwrap();
         queue
@@ -707,6 +712,10 @@ fn weak_services_shutdown_returns_host_shutdown_for_every_method_and_drains_audi
         Err(SkillPortError::HostShutDown)
     ));
     assert!(matches!(
+        port.preflight(false),
+        Err(SkillPortError::HostShutDown)
+    ));
+    assert!(matches!(
         port.propose(ID.into(), "1.0.0".into(), "+change".into()),
         Err(SkillPortError::HostShutDown)
     ));
@@ -726,4 +735,51 @@ fn weak_services_shutdown_returns_host_shutdown_for_every_method_and_drains_audi
         journal.upgrade().is_none(),
         "port must not keep the root journal alive"
     );
+}
+
+#[test]
+fn binder_captures_declarations_and_a_fresh_telemetry_window() {
+    let root = Root::new(true, false, 100);
+    let builder = maos_bin::skill_authoring::binder(
+        &root.capability,
+        &root.security,
+        &root.journal,
+        &root.telemetry,
+        &root.scbs,
+        &root.store,
+        None,
+        None,
+    );
+    let before = now_ns();
+    let port = builder(Arc::new(|| Some(PID)), &[Scope::SkillAuthorSelf]).unwrap();
+    root.journal.insert_frame_event(
+        FrameKind::TaskComplete,
+        PID,
+        None,
+        "test.task.complete",
+        b"{}",
+        FrameOrigin::SpiritAuto,
+    );
+    assert_eq!(
+        port.preflight(true).unwrap(),
+        "successes=1 failures=0 halts=0 distillations=0"
+    );
+    let base = port.author(valid()).unwrap();
+    root.admit(&base);
+    let proposal = port
+        .propose(ID.into(), "1.0.0".into(), "+fresh evidence".into())
+        .unwrap();
+    let Some(SkillPayload::RevisionProposal(payload)) = proposal.payload else {
+        panic!("expected revision");
+    };
+    assert!(payload.telemetry_evidence.window_start_ns >= before);
+    assert!(payload.telemetry_evidence.window_start_ns <= now_ns());
+    let undeclared = builder(Arc::new(|| Some(PID)), &[]).unwrap();
+    assert!(matches!(
+        undeclared.preflight(false),
+        Err(SkillPortError::CapabilityDenied)
+    ));
+    root.receipt("capability-denied", 1);
+    drop((port, undeclared, builder));
+    root.drain();
 }

@@ -1,0 +1,33 @@
+--- a/crates/maos-skill/src/store.rs
++++ b/crates/maos-skill/src/store.rs
+@@ -139,7 +139,7 @@
+         let home = maos_domain::operator_door::maos_home()
+             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?
+             .ok_or(ESkillStore::NoDataHome)?;
+-        Ok(Self::at_path(home.join("skills/queue.json")))
++        Ok(Self::at_path(home.join(".local/share/maos/skills/queue.json")))
+     }
+ 
+     pub fn at_path(path: PathBuf) -> Self {
+--- a/crates/maos-control/src/lib.rs
++++ b/crates/maos-control/src/lib.rs
+@@ -1248,7 +1248,7 @@
+             },
+             _ => method_not_allowed(),
+         },
+-        ["v1", "skills", "decide"] if method == "POST" => {
++        ["v1", "skills", "decide"] => {
+             if let Err(response) = post_guard(method, request) {
+                 return response;
+             }
+--- a/crates/maos-bin/src/skill_authoring.rs
++++ b/crates/maos-bin/src/skill_authoring.rs
+@@ -60,7 +60,7 @@
+             serialization: crate::operator_door::skill_serialization(),
+             enterprise: enterprise.clone(),
+             pdp: pdp.clone(),
+-            since_ns,
++            since_ns: 0,
+             declared_actions: scopes
+                 .iter()
+                 .map(|scope| scope_action_key(scope).to_owned())

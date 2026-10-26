@@ -1,0 +1,9 @@
+command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo node docs-site/scripts/gate-glossary-lock.js
+wall-clock: 0.089 s
+exit: 0
+Loaded 42 locked terms, 3 denylist entries from DENYLIST
+[docs] scanned 110 en files; checked 37 ko counterparts
+[abi] scanned 18 en files; checked 9 ko counterparts
+Checked 46 ko translation files total
+
+PASS: ko glossary-lock gate — all locked terms present, no denylist violations

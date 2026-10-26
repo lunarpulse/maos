@@ -137,6 +137,7 @@ fn no_data_home_is_typed_without_mutating_shared_environment() {
         ])
         .env(MARKER, "1")
         .env_remove("HOME")
+        .env_remove("MAOS_HOME")
         .status()
         .unwrap();
     assert!(status.success());
@@ -207,4 +208,74 @@ fn actors_are_not_persisted_with_package_metadata() {
 fn explicit_path_does_not_need_a_home_resolver() {
     let path = PathBuf::from("private/queue.json");
     assert_eq!(LocalFsSkillQueueStore::at_path(path.clone()).path(), path);
+}
+
+#[test]
+fn canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal() {
+    const MARKER: &str = "MAOS_SKILL_HOME_MIGRATION_PROBE";
+    if std::env::var_os(MARKER).is_none() {
+        let scratch = tempfile::tempdir().unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "canonical_home_isolates_queues_and_migrates_legacy_once_with_a_journal",
+            ])
+            .env_clear()
+            .env(MARKER, "1")
+            .env("HOME", scratch.path().join("home"))
+            .env("MAOS_HOME", scratch.path().join("canonical"))
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap());
+    let canonical = std::path::PathBuf::from(std::env::var_os("MAOS_HOME").unwrap());
+    let store = LocalFsSkillQueueStore::new().unwrap();
+    assert_eq!(store.path(), canonical.join("skills/queue.json"));
+    let legacy = LocalFsSkillQueueStore::at_path(home.join(".local/share/maos/skills/queue.json"));
+    let entries = vec![package("pkg.migrate", SkillAdmissionState::Rejected)];
+    legacy.save(&entries).unwrap();
+    let before = fs::read(legacy.path()).unwrap();
+    assert!(matches!(
+        store.migrate_legacy(|_| Err("journal unavailable".into())),
+        Err(ESkillStore::Io(_))
+    ));
+    assert_eq!(fs::read(legacy.path()).unwrap(), before);
+    assert!(!store.path().exists());
+    let mut receipts = vec![];
+    store
+        .migrate_legacy(|row| {
+            receipts.push(row);
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(store.load().unwrap(), entries);
+    assert!(!legacy.path().exists());
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].capability, "skill.queue.migrate");
+    assert_eq!(receipts[0].intent, "legacy-data-home-to-maos-home");
+    store
+        .migrate_legacy(|_| panic!("migration must be one-time"))
+        .unwrap();
+    let other = LocalFsSkillQueueStore::at_path(
+        canonical.with_extension("other").join("skills/queue.json"),
+    );
+    assert!(other.load().unwrap().is_empty());
+    other
+        .migrate_legacy(|_| panic!("another home cannot consume the old queue again"))
+        .unwrap();
+    fs::create_dir_all(legacy.path().parent().unwrap()).unwrap();
+    fs::write(legacy.path(), b"corrupt").unwrap();
+    assert!(matches!(
+        other.migrate_legacy(|_| panic!("corruption must refuse before journaling")),
+        Err(ESkillStore::Json(_))
+    ));
+    assert_eq!(fs::read(legacy.path()).unwrap(), b"corrupt");
+    assert!(!other.path().exists());
 }

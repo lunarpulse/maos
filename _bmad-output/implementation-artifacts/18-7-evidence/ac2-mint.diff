@@ -1,6 +1,6 @@
 --- a/crates/maos-bin/src/skill_authoring.rs
 +++ b/crates/maos-bin/src/skill_authoring.rs
-@@ -110,32 +110,11 @@
+@@ -109,30 +109,6 @@
              .ok_or(SkillPortError::HostShutDown)?;
          let result = (|| {
              let enterprise = self.enterprise.as_ref().map(upgrade).transpose()?;
@@ -22,14 +22,21 @@
 -                | GovernedMintError::SsoAssertionMissing(_) => SkillPortError::CapabilityDenied,
 -                error => SkillPortError::Mediation(error.to_string()),
 -            })?;
-             let snapshot = security.policy().inner().load_full();
-             let granted = snapshot
-                 .manifest_scopes
-                 .get(&pid)
-                 .ok_or(SkillPortError::CapabilityDenied)?;
+-            let tier = security
+-                .effective_sandbox_tier(pid)
+-                .ok_or(SkillPortError::CapabilityDenied)?;
 -            capability
--                .verify_and_audit(&token, [0; 32], granted.declared_tier)
+-                .verify_and_audit(&token, [0; 32], tier)
 -                .map_err(|_| SkillPortError::CapabilityDenied)?;
-             let declared_actions: BTreeSet<String> = granted
-                 .scopes
-                 .iter()
+             let principals = journal
+                 .principal_ids_for_spirit_pid(pid)
+                 .map_err(|error| SkillPortError::Journal(error.to_string()))?;
+@@ -234,7 +210,7 @@
+         let _capability = upgrade(&self.capability)?;
+         let pid = (self.pid)().ok_or(SkillPortError::HostShutDown)?;
+         let result = (|| {
+-            if self.declared_actions.contains("skill.author.self") {
++            if true {
+                 if !revision {
+                     return Ok(String::new());
+                 }

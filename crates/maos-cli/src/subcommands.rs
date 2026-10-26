@@ -977,6 +977,7 @@ fn skills_offline(
         }
         let tl = TransparencyLogAdapter::open(&tl_path, 0)
             .map_err(|e| SkillDecisionError::Journal(e.to_string()))?;
+        store.migrate_legacy(|row| tl.insert_approval_decision(row).map_err(|e| e.to_string()))?;
         let roots = if roots.is_empty() {
             maos_skill::default_search_path()
         } else {
@@ -1170,7 +1171,7 @@ pub fn apply_skill_decision(
     if state != SkillAdmissionState::Pending {
         return Ok(state);
     }
-    let row = queue.prepare_decision(selector, approve, actor.into())?;
+    let row = queue.prepare_decision(selector, approve, actor.into(), directory)?;
     journal(row).map_err(SkillDecisionError::Journal)?;
     queue.apply_decision(selector, approve, directory)?;
     store.save(queue.entries())?;

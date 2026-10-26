@@ -22,7 +22,7 @@ fn enqueue(queue: &mut SkillAdmissionQueue, name: &str) -> String {
         principal_ids: &[],
     };
     let document = format!("---\nid='researcher.{name}'\nversion='1.0.0'\nname='Skill'\ndescription='d'\n---\nBody for {name}\n");
-    let (entry, _) = queue.prepare_author(document, &context).unwrap();
+    let (entry, _) = queue.prepare_author(document, &context, &[]).unwrap();
     let id = entry.entry_id.clone();
     queue.commit_prepared(entry).unwrap();
     id
@@ -69,10 +69,10 @@ fn live_submission_and_door_decision_share_one_lock_without_lost_updates() {
             let mut queue = SkillAdmissionQueue::new();
             let first = enqueue(&mut queue, "first");
             store.save(queue.entries()).unwrap();
-            let serialization = maos_bin::skill_authoring::serialization();
+            let serialization = maos_bin::operator_door::skill_serialization();
             assert!(Arc::ptr_eq(
                 &serialization,
-                &maos_bin::skill_authoring::serialization()
+                &maos_bin::operator_door::skill_serialization()
             ));
             let held = serialization.lock().unwrap();
             let (started_tx, started_rx) = std::sync::mpsc::channel();

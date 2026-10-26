@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="6" skipped="0" failures="0" errors="0" uuid="15a8d942-0136-4b89-a4b4-7fa9115bc133" timestamp="2026-10-26T13:32:50.065+00:00" time="2.492">
+    <testsuite name="maos-journey-test::journey_skill_authoring_18_7" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="corrupt_queue_warns_at_boot_and_refuses_door_operations_without_overwrite" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T13:32:50.065+00:00" time="0.221"/>
+        <testcase name="live_author_revision_restart_and_rejection_preserve_the_payload" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T13:32:50.286+00:00" time="1.247"/>
+        <testcase name="no_data_home_does_not_abort_the_daemon_or_offline_children" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T13:32:51.533+00:00" time="0.034"/>
+        <testcase name="rejected_discovered_skill_blocks_even_a_non_run_root" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T13:32:51.567+00:00" time="0.028"/>
+        <testcase name="rejected_spirit_authored_draft_does_not_block_the_next_boot" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T13:32:51.595+00:00" time="0.530"/>
+        <testcase name="undeclared_live_researcher_is_refused_without_queue_mutation" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T13:32:52.125+00:00" time="0.432"/>
+    </testsuite>
+</testsuites>

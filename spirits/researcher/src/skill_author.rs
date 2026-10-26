@@ -14,9 +14,14 @@ pub enum SkillAuthorOutcome {
 }
 
 /// Stable model prompt shared by the live pass and strict replay witnesses.
-/// Only model findings enter the prompt, never boot-local frame ids or pids.
+/// Findings and host telemetry counts enter the prompt, never boot-local ids.
 /// `base` is an admitted, owned `AuthorSelf` entry returned by the host.
-pub fn authoring_prompt(output: &SurveyOutput, base: Option<&QueueEntry>) -> String {
+/// The host supplies `evidence_summary`; it is only used for revision prompts.
+pub fn authoring_prompt(
+    output: &SurveyOutput,
+    base: Option<&QueueEntry>,
+    evidence_summary: Option<&str>,
+) -> String {
     let mut prompt = match base {
         Some(base) => {
             let mut prompt = format!(
@@ -48,6 +53,11 @@ pub fn authoring_prompt(output: &SurveyOutput, base: Option<&QueueEntry>) -> Str
         prompt.push_str(&finding.statement);
         prompt.push('\n');
     }
+    if let (Some(_), Some(summary)) = (base, evidence_summary) {
+        prompt.push_str("\nHost telemetry summary:\n");
+        prompt.push_str(summary);
+        prompt.push('\n');
+    }
     prompt
 }
 
@@ -61,7 +71,9 @@ impl Researcher {
         output: &SurveyOutput,
     ) -> Result<(), ResearcherError> {
         let Some(port) = &self.skill_author_port else {
-            return Ok(());
+            return Err(ResearcherError::SkillAuthor(
+                SkillPortError::QueueUnavailable,
+            ));
         };
         let entries = port.own_entries().map_err(ResearcherError::SkillAuthor)?;
         let base = entries
@@ -95,12 +107,15 @@ impl Researcher {
                 Some(SkillAuthorOutcome::PendingExisting(entry.clone()));
             return Ok(());
         }
+        let evidence_summary = port
+            .preflight(base.is_some())
+            .map_err(ResearcherError::SkillAuthor)?;
         let text = self.complete_bound(
             live,
             binding,
             token,
             pid,
-            authoring_prompt(output, base),
+            authoring_prompt(output, base, Some(&evidence_summary)),
             2048,
         )?;
         let outcome = match base {
@@ -122,6 +137,8 @@ impl Researcher {
 pub enum SkillPortError {
     #[error("host-shut-down")]
     HostShutDown,
+    #[error("queue-unavailable")]
+    QueueUnavailable,
     #[error("capability-denied")]
     CapabilityDenied,
     #[error("context-exhausted")]
@@ -137,6 +154,10 @@ pub enum SkillPortError {
 }
 
 pub trait SkillAuthorPort: Send + Sync {
+    /// Refuse undeclared authoring before spending a model completion and return
+    /// a trusted telemetry summary for revision generation. The host journals
+    /// refusals; submission still performs capability mediation.
+    fn preflight(&self, revision: bool) -> Result<String, SkillPortError>;
     fn author(&self, document: String) -> Result<maos_skill::QueueEntry, SkillPortError>;
     fn propose(
         &self,

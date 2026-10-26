@@ -810,6 +810,8 @@ coverage:
       Story 18-7 journey_skill_authoring_18_7 exercises live revisions carrying
       target id/version, model diff and root-attached pid/bind-scoped telemetry,
       durable payload hashes, independent approval targets and restart.
+      The root supplies a pid/bind-scoped telemetry summary before the model
+      generates the diff, and attaches the scoped report to the queued proposal.
       skill_port_18_7 and live_submission_18_7 cover evidence provenance and
       owned-current-target controls. Revisions are decision-only, not auto-applied.
   FR58:

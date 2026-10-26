@@ -1491,10 +1491,9 @@ fn skill_routes_require_bearer_and_keep_reads_and_decisions_distinct() {
         status_of(&request(&server, "POST", "/v1/skills", TOKEN)),
         405
     );
-    assert_eq!(
-        status_of(&request(&server, "GET", "/v1/skills/decide", TOKEN)),
-        405
-    );
+    let named_decide = request(&server, "GET", "/v1/skills/decide", TOKEN);
+    assert_eq!(status_of(&named_decide), 200);
+    assert_eq!(json_of(&named_decide)["entry"], "decide");
     let body = r#"{"entry":"0123456789abcdef","approve":false,"actor":"alice"}"#;
     let response = exchange(&server, &format!(
         "POST /v1/skills/decide HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()));

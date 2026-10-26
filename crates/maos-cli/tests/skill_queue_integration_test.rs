@@ -356,7 +356,7 @@ fn authored_queue() -> (maos_skill::SkillAdmissionQueue, String, String) {
     };
     let document = "---\nid='researcher.core'\nversion='1.0.0'\nname='Core'\ndescription='d'\n---\nOriginal body\n".to_string();
     let mut queue = SkillAdmissionQueue::new();
-    let (entry, _) = queue.prepare_author(document.clone(), &ctx).unwrap();
+    let (entry, _) = queue.prepare_author(document.clone(), &ctx, &[]).unwrap();
     let id = entry.entry_id.clone();
     queue.commit_prepared(entry).unwrap();
     (queue, id, document)
@@ -406,7 +406,7 @@ fn authored_decision_journals_before_materializing_and_saving() {
 }
 
 #[test]
-fn journal_failure_mutates_nothing_and_materialization_failure_is_reported_after_commit() {
+fn journal_failure_and_materialization_preflight_refusal_mutate_nothing() {
     use maos_cli::subcommands::{apply_skill_decision, SkillDecisionError};
     let dir = tempfile::tempdir().unwrap();
     let store = LocalFsSkillQueueStore::at_path(dir.path().join("queue.json"));
@@ -446,7 +446,7 @@ fn journal_failure_mutates_nothing_and_materialization_failure_is_reported_after
             maos_skill::ESkillStore::MaterializeCollision(_)
         ))
     ));
-    assert_eq!(tl.query_approvals(None).unwrap().len(), 1);
+    assert!(tl.query_approvals(None).unwrap().is_empty());
     assert_eq!(fs::read(store.path()).unwrap(), before);
     assert_eq!(fs::read_to_string(destination).unwrap(), "foreign document");
 }

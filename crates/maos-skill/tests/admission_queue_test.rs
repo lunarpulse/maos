@@ -27,7 +27,7 @@ fn package_lands_pending_with_non_admitting_enqueue_receipt() {
 fn preparing_approval_does_not_activate_and_apply_is_terminal() {
     let mut q = queue();
     let row = q
-        .prepare_decision("pkg.core", true, "operator".into())
+        .prepare_decision("pkg.core", true, "operator".into(), None)
         .unwrap();
     assert!(row.decision);
     assert_eq!(
@@ -37,15 +37,15 @@ fn preparing_approval_does_not_activate_and_apply_is_terminal() {
     q.apply_decision("pkg.core", true, None).unwrap();
     assert_eq!(q.pending_count(), 0);
     assert!(matches!(
-        q.prepare_decision("pkg.core", false, "operator".into()),
-        Err(ESkillQueue::AlreadyDecided)
+        q.prepare_decision("pkg.core", false, "operator".into(), None),
+        Err(ESkillStore::InvalidEntry(ESkillQueue::AlreadyDecided))
     ));
 }
 #[test]
 fn rejection_is_terminal() {
     let mut q = queue();
     let row = q
-        .prepare_decision("pkg.core", false, "operator".into())
+        .prepare_decision("pkg.core", false, "operator".into(), None)
         .unwrap();
     assert_eq!(row.capability, "skill.admission.reject");
     q.apply_decision("pkg.core", false, None).unwrap();

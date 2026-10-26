@@ -3360,12 +3360,12 @@ jobs:
       # journey_skill_authoring_18_7 (live author/revise, door admission, restart).
       - name: Hermetic journey suite (replay mode — cognitive production paths)
         run: cargo test -p maos-journey-test --locked
-      - name: Live skill port security witnesses (18-7, nine tests)
+      - name: Live skill port security witnesses (18-7, ten tests)
         shell: bash
         run: |
           set -euo pipefail
           cargo nextest run --locked -p maos-bin --test skill_port_18_7 2>&1 | tee skill-port-18-7.log
-          grep -q '9 tests run: 9 passed' skill-port-18-7.log
+          grep -q '10 tests run: 10 passed' skill-port-18-7.log
 
   smoke-discipline-7-1-5:
     runs-on: ubuntu-latest

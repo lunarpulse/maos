@@ -62,6 +62,44 @@ fn negative_control_rejects_at_real_admit_spirit_while_conformance_proxy_admits(
     );
 }
 
+#[test]
+fn journaled_flag_requires_a_returned_decision_receipt_not_only_the_enqueue_row() {
+    let harness = AdmissionHarness::default();
+    for (spirit, expected) in [
+        (ProxySpirit::conformance("receipt-approved"), true),
+        (
+            ProxySpirit::negative_control("receipt-rejected", OFF_SURFACE_INTERNAL),
+            false,
+        ),
+    ] {
+        let result = harness.admit(&spirit);
+        let receipt = result
+            .decision_receipt
+            .as_ref()
+            .expect("the actual decision receipt must escape the harness");
+        assert!(result.journaled);
+        assert_eq!(result.admitted, expected);
+        assert_eq!(receipt.decision, expected);
+        assert_eq!(receipt.actor, "fkcs-harness");
+        assert_eq!(receipt.target, format!("{}@0.1.0", spirit.id));
+        assert_eq!(receipt.intent, "package_shipped");
+        assert_eq!(
+            receipt.capability,
+            if expected {
+                "skill.admission.approve"
+            } else {
+                "skill.admission.reject"
+            },
+        );
+        assert_ne!(receipt.capability, "skill.admission.enqueue");
+        assert!(receipt
+            .reasoning
+            .as_ref()
+            .unwrap()
+            .contains("payload_sha256="));
+    }
+}
+
 /// §A7.1 anti-canned reflex: an always-admit (blind) harness ADMITS the
 /// negative control, proving the rejection above is bound to the genuine
 /// `OffFrozenSurface` arm of `admit_spirit` rather than a canned assertion. A
