@@ -4112,10 +4112,12 @@ jobs:
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 16 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 16 passed;'"; fail=1; }
+          grep -q '^test result: ok\. 18 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 18 passed;'"; fail=1; }
           required=()
           for name in checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4 \
                       configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted \
+                      context_18_5_report_status_and_journaled_kinds_32_33_reach_wasm_handle_frame \
+                      context_18_5_wasm_guest_cannot_forge_kernel_pressure_or_limit_to_peer \
                       cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation \
                       empty_page_has_one_token_bearing_call_and_no_receipt \
                       exhausted_quota_has_receipt_without_tokenless_fallback_call \
@@ -4142,7 +4144,7 @@ jobs:
             echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
           done
           echo "::notice title=17-3d recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' recall-17-3d.log)"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 16 "${required[@]}" recall-17-3d.log || fail=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 18 "${required[@]}" recall-17-3d.log || fail=1
           exit "$fail"
       # Story 17-8 — participant recall and consent envelopes for BOTH forms
       # (native Researcher through MediatedLogRecall, WASM recall-probe through
@@ -5768,7 +5770,7 @@ jobs:
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser + fuzz_exec_deps_parse_elf) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
-          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host + native-twin fixture tests + 17-3c spawned_scope_17_3c gate (23 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (16 passed, every name present, no SKIP) |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host + native-twin fixture tests + 17-3c spawned_scope_17_3c gate (23 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (18 passed, every name present, no SKIP) |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"

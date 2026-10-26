@@ -7,23 +7,21 @@
 //! admitted manifest bundle — never chosen by the Spirit. A report moves the
 //! kernel registry's ledger and returns a typed [`ContextStatus`]; each upward
 //! threshold crossing becomes one kernel-written `ContextPressure` (32) /
-//! `ContextLimit` (33) frame. Delivery is spawned on the current runtime (the
-//! port is sync); the bus journals the frame before delivery, and a frame the
-//! bus could not journal is written as a direct TL row, so no crossing goes
-//! unrecorded.
+//! `ContextLimit` (33) frame. Reports journal synchronously, even after the
+//! bus is gone; a single ordered task per adapter handles mailbox delivery.
 
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex, Weak};
 
 use maos_capability::context_budget::{ContextBudget, ContextWindow, Crossing};
 use maos_domain::frame::{ContextEnvelope, FrameAddress, FramePayload, IacFrame};
-use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::ports::context_budget::{
     ContextBudgetPort, ContextLevel, ContextReportError, ContextStatus,
 };
 use maos_spirit_abi::identity::{FrameKind, SpiritId};
 
-use super::transparency_log::FrameKind as TlKind;
+use super::mailbox::PreparedDelivery;
+use super::transparency_log::{FrameKind as TlKind, TransparencyLogAdapter};
 use super::IacBusAdapter;
 
 /// The Spirit's admitted incarnation, as the root resolves it.
@@ -40,12 +38,19 @@ pub type Admitted = Arc<dyn Fn() -> Option<AdmittedSpirit> + Send + Sync>;
 /// The root-fixed context reporter for one Spirit. `bus` is held weakly: a
 /// Spirit never keeps the host's bus alive.
 pub struct ContextSignalAdapter {
-    pub ledger: Arc<ContextBudget>,
-    pub bus: Weak<IacBusAdapter>,
-    pub admitted: Admitted,
+    ledger: Arc<ContextBudget>,
+    bus: Weak<IacBusAdapter>,
+    admitted: Admitted,
+    journal: Arc<TransparencyLogAdapter>,
+    delivery: Mutex<Option<tokio::sync::mpsc::UnboundedSender<(IacFrame, PreparedDelivery)>>>,
 }
 
-fn frame(bus: &IacBusAdapter, spirit: &AdmittedSpirit, used: u32, crossing: Crossing) -> IacFrame {
+fn frame(
+    tl: &TransparencyLogAdapter,
+    spirit: &AdmittedSpirit,
+    used: u32,
+    crossing: Crossing,
+) -> IacFrame {
     let envelope = ContextEnvelope {
         spirit_pid: spirit.pid,
         context_used: used,
@@ -68,7 +73,7 @@ fn frame(bus: &IacBusAdapter, spirit: &AdmittedSpirit, used: u32, crossing: Cros
         role: None,
     };
     IacFrame {
-        frame_id: bus.transparency_log().mint_frame_id(),
+        frame_id: tl.mint_frame_id(),
         timestamp_ns: maos_capability::cap_tokens::monotonic_now_ns(),
         logical_clock: 0,
         from: address(super::mailbox::KERNEL_SENDER_SPIRIT_ID.into()),
@@ -82,44 +87,80 @@ fn frame(bus: &IacBusAdapter, spirit: &AdmittedSpirit, used: u32, crossing: Cros
     }
 }
 
-/// The direct TL row for a crossing the bus could not journal.
-fn journal(bus: &IacBusAdapter, pid: u32, frame: &IacFrame) {
+/// Journal before enqueueing; mailbox errors can never create a second row.
+fn journal(
+    tl: &TransparencyLogAdapter,
+    bus: Option<&IacBusAdapter>,
+    pid: u32,
+    frame: &IacFrame,
+) -> PreparedDelivery {
     let (kind, intent) = match frame.kind {
         FrameKind::ContextPressure => (TlKind::ContextPressure, "context.pressure"),
         _ => (TlKind::ContextLimit, "context.limit"),
     };
+    let prepared = bus.map_or_else(PreparedDelivery::default, |bus| {
+        bus.mailbox.prepare(frame, tl.recipient_resolver())
+    });
     if let Ok(payload) = serde_json::to_vec(&frame.payload) {
-        let tl = bus.transparency_log();
-        let _ = tl.insert_frame_event(kind, pid, None, intent, &payload, FrameOrigin::Kernel);
+        if bus.is_some() {
+            let _ = tl.insert_routed_frame(
+                frame,
+                kind,
+                pid,
+                None,
+                "standard",
+                &payload,
+                prepared.recipients(),
+            );
+        } else {
+            let _ = tl.insert_frame_event(kind, pid, None, intent, &payload, FrameOrigin::Kernel);
+        }
     }
+    prepared
 }
 
-/// Deliver the crossings in order (pressure before limit) on one task.
-async fn deliver(bus: Arc<IacBusAdapter>, pid: u32, frames: Vec<IacFrame>) {
-    for frame in frames {
-        match bus.deliver_typed(frame.clone(), pid, None).await {
-            // Journaled; `UnknownSpirit` = no mailbox registered (native
-            // in-proc Spirits): the row is the record.
-            Ok(_) | Err(IacBusError::UnknownSpirit(_)) => {}
-            Err(_) => journal(&bus, pid, &frame),
+impl ContextSignalAdapter {
+    pub fn new(ledger: Arc<ContextBudget>, bus: &Arc<IacBusAdapter>, admitted: Admitted) -> Self {
+        Self {
+            ledger,
+            bus: Arc::downgrade(bus),
+            admitted,
+            journal: Arc::clone(bus.transparency_log()),
+            delivery: Mutex::new(None),
         }
     }
 }
 
 impl ContextBudgetPort for ContextSignalAdapter {
     fn report_context_used(&self, used_tokens: u32) -> Result<ContextStatus, ContextReportError> {
+        // Serialize ledger transitions, synchronous writes and enqueue order.
+        let mut delivery = self.delivery.lock().unwrap_or_else(|e| e.into_inner());
         let spirit = (self.admitted)().ok_or(ContextReportError::NotAdmitted)?;
         let (status, crossings) = self.ledger.report(spirit.pid, spirit.window, used_tokens);
-        let Some(bus) = self.bus.upgrade().filter(|_| !crossings.is_empty()) else {
+        if crossings.is_empty() {
             return Ok(status);
-        };
-        let frames: Vec<_> = crossings
-            .into_iter()
-            .map(|crossing| frame(&bus, &spirit, used_tokens, crossing))
-            .collect();
-        match tokio::runtime::Handle::try_current() {
-            Ok(runtime) => drop(runtime.spawn(deliver(bus, spirit.pid, frames))),
-            Err(_) => frames.iter().for_each(|f| journal(&bus, spirit.pid, f)),
+        }
+        let bus = self.bus.upgrade();
+        if delivery.is_none() {
+            if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+                let (sender, mut receiver) =
+                    tokio::sync::mpsc::unbounded_channel::<(IacFrame, PreparedDelivery)>();
+                let bus = self.bus.clone();
+                drop(runtime.spawn(async move {
+                    while let Some((frame, prepared)) = receiver.recv().await {
+                        let Some(bus) = bus.upgrade() else { break };
+                        let _ = bus.mailbox.deliver_prepared(frame, prepared).await;
+                    }
+                }));
+                *delivery = Some(sender);
+            }
+        }
+        for crossing in crossings {
+            let frame = frame(&self.journal, &spirit, used_tokens, crossing);
+            let prepared = journal(&self.journal, bus.as_deref(), spirit.pid, &frame);
+            if let Some(sender) = delivery.as_ref() {
+                let _ = sender.send((frame, prepared));
+            }
         }
         Ok(status)
     }

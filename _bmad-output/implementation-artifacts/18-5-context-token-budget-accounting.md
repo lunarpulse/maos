@@ -7,7 +7,7 @@ baseline_commit: 79f49709
 security_sensitive: true
 kernel_grant: "◆ FLAG-Winston, **RATIFIED 2026-10-26 by the operator (Lunarpulse), ADR-069 envelope** (`18-5-flag-winston-decision.md` §Rulings): D-18-5-02 A + 03 B + 10 A = **+27 physical / +23 tokei**: `check-kernel-baseline` 26387 → **≤ 26414** (95 files, unchanged), `maos-kernel-core` 20617 → **≤ 20640**, exact measured figure at landing (after `cargo fmt --all`). Files: `capability/mod.rs` (ADR-016 ledger built inside `CapabilityRegistryAdapter::new`, issuance gate for an exhausted pid outside the distil/hand-off exits, `context_budget()` accessor, slot drop in `revoke_all_for_pid`; +17 / +13), `mcp/mod.rs` (MCP use-time check; +6 / +6), `inference/mod.rs` (the `RateLimited` emitter spawns its delivery; +4 / +4). Any other kernel file or any figure above the grant stops the story and returns as a FLAG request. Each figure was measured at creation by a throwaway prototype at b50ea844 (fmt-clean, `cargo check --locked -p maos-kernel-core` clean), then reverted; after the revert `check-kernel-baseline` PASSED 26387 / 95. Alternatives measured, not taken: the adapter in the kernel +137 / +120; ledger and adapter in the kernel +259 / +214. ADR-069 after the grant: 2,360 to 23,000, 1,360 to the alarm."
 kloc_grant: "RULED 2026-10-26 (operator, Lunarpulse): D-18-5-09 A — **Epic 18's named maos-bin budget 28558 → 28655** (forecast +40–75 [INFERENCE] × 1.3; measured so far +2 for the `hook_cap_override` literal under D-06 A); exact re-pin at landing; above 28655 → re-ask before landing. The other rows over their ceilings are **measured requests returned to the operator at review with exact figures**; the prototype figures are their expected values, and a dev figure **more than +25 % above its prototype value → STOP at dev** and re-ask: maos-capability 1347 → 1442 (+95; `xtask/kloc.toml:265`; STOP above +118); maos-iac 7769 → 7891 (+122 prototype; the unprototyped TL fallback and channels +12–24 [INFERENCE] fit; `:406`; STOP above +152); maos-domain 9805 → 9843 (+38; `:425`; STOP above +47); maos-manifest 4540 → 4572 (+32; `:415`; STOP above +40); maos-audit 7410 (`:409`) +4–8 [INFERENCE, not prototyped] (STOP above +10); maos-spirit-abi 1038 → 1042 (+4; ceiling 3000, `:270`, fits); maos-wasm-host 2255 (`:703`) +30–60 [INFERENCE, not prototyped] under D-05 A (STOP above +75); `_aggregate_hardfail` (`:718`, 184707) = measured + 1 at landing (prototype aggregate 185010). `spirits/*` is ungoverned (`xtask/src/kloc_check.rs:310-311`)."
-review: "bmad-code-review under `docs/testing/proof-contract.md`. Dev and reviewer model `anthropic/claude-opus-5-5` only (fable only with operator permission, `proof-contract.md:57`). Security-critical: AC2 (the report port is fixed to the admitted pid and the manifest window; a Spirit cannot report for another pid or choose its own window), AC3 (guest-forged kernel kinds refused; the new kinds are an ABI extension) and AC5 (the issuance gate and the MCP use-time check: the exits set, the order policy → context → quota, typed refusal on every governed path). The review record names a security-focused layer on opus-5-5 for all three. FLAG-Winston sign-off on the kernel diff."
+review: "bmad-code-review under docs/testing/proof-contract.md. Creation and first implementation: anthropic/claude-opus-5-5; finisher: openai-codex/gpt-6.1-sol. Review tiering follows the proof contract, with a security-focused layer for AC2 (pid/window binding), AC3 (guest forgery/ABI) and AC5 (issuance, MCP use-time refusal, exits and policy → context → quota). FLAG-Winston signs off the kernel diff. Review rulings and E1-A below supersede historical creation assumptions."
 ---
 
 # Story 18.5: Context-token budget accounting (ADR-016)
@@ -144,6 +144,24 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 
 **D-09 final operator addenda (2026-10-26, relayed by Main):** **maos-wasm-host ≤ 2420 RATIFIED** for the frozen-2.0 compatibility repair (legacy export bindings plus reused bridge/pump), superseding2383. **maos-audit7470 RATIFIED with +10 finishing allowance, ≤ 7480**; the post-format7473 measurement is covered. Re-pin each final exact figure with HISTORY citing `18-5-context-token-budget-accounting` and these rulings; `_aggregate_hardfail` = final measured+1. The preceding STOP requests are resolved within these ceilings.
 
+### Review patch rulings — 2026-10-26
+
+Story remains **review**. D18-5-R1…R5 supersede conflicting creation-era text and historical measurements; final review-patch measurements and verification belong to the parent landing record.
+
+- **D18-5-R1 — lifecycle:** remove a context slot only at real unload, crash or WASM session end. Capability revocation alone must preserve occupancy; a same-pid hot-swap inherits the slot until its next report.
+- **D18-5-R2 — pre-exhaustion tokens:** accept already-issued non-exit tokens until their normal TTL expires, except MCP, whose explicit use-time context check refuses after exhaustion. This is not universal use-time revocation.
+- **D18-5-R3 — BH6/EC7:** issuance-time and use-time context refusals produce the same `mcp.call.refused:context-exhausted` journal row before wire invocation. TaskAssign handoff permits exit scopes (`ProviderInfer`, `MemWrite`, `IacSend`) only.
+- **D18-5-R4 — AA7:** restore nine inline PRIOR chains in kloc; parent owns provenance repair and final pins.
+- **D18-5-R5 — TI5:** the 2.1 witness byte-relabels a temporary 2.0 fixture, not an independently built frozen 2.1 guest or coverage of 2.1-only imports.
+
+Every admitted WIT 2.2 session binds `context.report`; native Butler/Researcher self-report completion usage and learn synchronously. Per proof-contract's 2026-10-26 tiering, finisher/review-patch model `openai-codex/gpt-6.1-sol` never reviews its own code; this difficult story uses opus-5.5 Blind/Edge/Acceptance and glm-5.3 Test Infrastructure. Any fable use requires operator permission.
+
+**E1-A preauthorization:** the operator authorizes up to **+4 physical / +4 tokei** beyond the landed **26414 / 20639**, a maximum of **26418 / 20643**. This is a ceiling, not a measurement; the parent inserts final exact kernel/crate/aggregate figures and evidence after the review patch. No check was run by the documentation worker.
+
+**D18-5-R3 / D-09 operator STOP-resolution addendum (2026-10-26, via Main):** unchanged kernel maximum **26418 physical / 20643 tokei**, genuine relocation not minification; IAC7971+10≤7981 and manifest4583+10≤4593 ratified. Final kernel**26418/20643**,95files; IAC**7979**, manifest**4583**, bin**28655**, capability1432/domain9848/audit7473/host2412, aggregate**185451**/hardfail**185452**. Exact pins/nine PRIOR chains restored; hash `3637ab6a50eba9541baed94120c2a42462f7b40b044c88756d67299153b60878`. Prior STOP resolved; all11requested gates green, xtask65/65/kernel integration6/6 (`review-gates-final.log`,`review-focused.log`). Status **review**.
+
+**Deferred limits:** EC5 RateLimited no-runtime/prewrite fallback belongs to `20-3c-audit-truth-and-halt-receipt-residuals`. First18-4 loom unload route-budget flaky observation run`40251998973` belongs to `20-7-stable-runner-perf-gates`; same run's workspace-test-suite passed. Attributed18-4 report said package codegen-units1 release maos-bin remained32MiB. Parent local `cargo build -p maos-bin --release --locked` plus strip measures **29,864,312B**, **3,690,120B below32MiB**, SHA256 `a74d019fd0900e701a75c57d207d2b4f323dc1605c441cfa6aa61b0629a661fb`. Build-only **47.59s** is not a cold-build or latency measurement.
+
 ## Acceptance Criteria
 
 *(Epic §18-5 as corrected at creation and ruled 2026-10-26 (D-18-5-01…10 all as recommended). AC6 is D-18-5-10 A's fix at origin. One plant per control AC, `docs/testing/proof-contract.md:26`.)*
@@ -157,8 +175,8 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
    - The cassette is re-authored from the scene's day 1–4 prompts as 18-4 CR-3 did: real hashes, `provenance: seed`, and `usage` totals 4000 / 6600 / 7800 / 8300.
    - Each simulated day's line carries `"context": {"used", "window": 8192, "level", "crossed"}`, emitted Spirit-side.
    - Exactly one `crossed: "pressure"` (day 2), one `"limit"` (day 3) and one `"exhausted"` (day 4) appear.
-   - `maos audit query` lists exactly one kind-30 row and one kind-31 row for the Butler pid, each a `ContextEnvelope`.
-2. Refusal leg, `crates/maos-bin/tests/context_budget_18_5.rs`. It uses the `j_researcher_survey_18_3.rs` harness: a real `CapabilityRegistryAdapter`, `McpClientAdapter` over the replay MCP fixture, `LiveResearcherMcpPort`, and the maos-iac adapter.
+   - `maos audit query` lists exactly one kind-32 row and one kind-33 row for the Butler pid, each a `ContextEnvelope`.
+2. Refusal leg, `crates/maos-bin/tests/context_refusal_18_5.rs`. The separate process/door suite is `context_budget_18_5.rs`. The refusal harness uses a real `CapabilityRegistryAdapter`, `McpClientAdapter` over the replay MCP fixture, `LiveResearcherMcpPort`, and the maos-iac adapter.
    - After the Researcher reports 17204 / 16384, its next MCP mint is refused `CapError::ContextExhausted`. The Researcher returns a typed error (no fallback), and `mcp.call.refused:context-exhausted` is journaled.
    - A token minted before the report is refused at use with `McpError::ContextExhausted`.
    - `ProviderInfer`, `MemWrite` and `IacSend` still issue for that pid.
@@ -168,7 +186,7 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 ### AC2 — Spirit-self-reported, kernel-held, bound on every construction path (D-01, D-02, D-08, CR-3; security-critical)
 
 1. `ContextBudgetPort` (maos-domain, `/// Class: universal-arithmetic`); ledger `maos_capability::context_budget` (CR-1); `maos_iac::adapter::context_signal::ContextSignalAdapter`, fixed to `pid_of`, window and thresholds. An unresolved pid → `ContextReportError::NotAdmitted`.
-2. `CapabilityRegistryAdapter::new` builds the ledger (constructor unchanged); `context_budget()` exposes it; `revoke_all_for_pid` drops the slot.
+2. `CapabilityRegistryAdapter::new` builds the ledger (constructor unchanged); `context_budget()` exposes it. Only real unload/crash/WASM session end removes a slot; `revoke_all_for_pid` alone preserves it.
 3. Butler and Researcher report `input_tokens + output_tokens` after every completion (Butler `lib.rs:1080`; Researcher per claim, `:979-981`) and keep the last `ContextStatus`. Both are bound on the boot arm, the door `load` and the hot-swap successor (CR-3).
 4. The kernel adds no read of `InferenceResponse.usage` for this purpose; the `CostAttribution` read (`inference/mod.rs:431-455`) is unchanged.
 5. Witnesses:
@@ -178,11 +196,12 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 
 ### AC3 — the signal reaches the Spirit, typed, and cannot be forged (D-04, D-05; security-critical)
 
-1. New kinds `FrameKind::ContextPressure = 30` and `ContextLimit = 31` in maos-spirit-abi, the maos-iac TL enum, the span labels, the TL mapping and the recall labels. The payloads are `FramePayload::ContextPressure` / `ContextLimit` (`ContextEnvelope`). Per-kind mailbox channels (Mpsc, 32) sit beside `RateLimited` (`adapter/channels.rs:40`, `adapter/mailbox.rs:288-290`). Delivery is spawned on the current runtime; with no registered mailbox, the same payload is written as a TL row.
+1. New kinds `FrameKind::ContextPressure = 32` and `ContextLimit = 33` in maos-spirit-abi, the maos-iac TL enum, span labels, TL mapping and recall labels. The payloads are `FramePayload::ContextPressure` / `ContextLimit` (`ContextEnvelope`). Per-kind mailbox channels carry the signals; native reporters receive synchronous typed status and the crossing is journaled.
 2. WASM (D-05 A):
    - WIT `2.2.0`: `frame-kind` + `frame-payload` variants and the `context` import. Bridge both directions (`frame_bridge.rs:71-114,224-320`); linker (`crates/maos-wasm-host/src/runner.rs:242-249`).
    - The four provenance-pinned components are rebuilt and re-pinned (`tests/fixtures/wasm/equiv-fixtures.provenance.toml`).
    - A WASM fixture Spirit reports through `context.report` and receives `context-pressure` through `handle-frame`.
+   - Every admitted WIT 2.2 session binds `context.report`, not just the fixture. The legacy 2.1 witness byte-relabels a temporary 2.0 fixture; it does not prove independently compiled 2.1 behavior or 2.1-only imports.
 3. A guest-sent `ContextPressure`/`ContextLimit` is refused `kernel_reserved_kind` (`spirit_session.rs:773-780`), and the payload/kind match (`:828-840`) gains both arms. The kinds are recorded as an FR62 ABI extension (governance record; `check-abi-ratification` green).
 4. FR4: `context.pressure` / `context.limit` are added to `NON_CALL_KINDS` and `kind_to_string`, and any new `insert_frame_event` site gets a `WRITER_SHAPES` disposition (the doorbell test `fr4_classifier_16_2.rs:838` is green).
 5. **Proven red (1 plant):** remove the two kinds from `frame_refusal` → a WASM guest's forged `ContextPressure` reaches its peer → red.
@@ -203,13 +222,13 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 ### AC5 — new tool calls above 100 % are refused, typed, on every governed path (D-03 B, CR-2, CR-4; security-critical)
 
 1. `issue_with_mediation`: policy → context → charge → tokens. An exhausted pid is refused `CapError::ContextExhausted { spirit_id }` for every scope except `ProviderInfer`, `MemWrite` and `IacSend`. A refused mint leaves the 17-9 window untouched.
-2. `McpClientAdapter::check_capability` refuses `McpError::ContextExhausted` before the wire, so no `McpInvocation` row is written.
+2. `McpClientAdapter::check_capability` refuses `McpError::ContextExhausted` before the wire, so no `McpInvocation` row is written. The caller journals the same `mcp.call.refused:context-exhausted` receipt as an issuance refusal. Other pre-exhaustion non-exit tokens retain their normal TTL; TaskAssign handoff permits exit scopes only.
 3. CR-4 holds on every path: governed mint, MCP receipt, session verdict, CLI-wrapper spawn, Butler and Researcher.
 4. Kernel witness `crates/maos-kernel-core/tests/context_budget_gate_18_5.rs`:
    - An exhausted pid is refused for `McpCall`, `FsRead`, `NetHttps`, `ProcExec` and `CliSubprocessSpawn`.
    - The exits issue.
    - The quota usage is unchanged by refusals.
-   - `revoke_all_for_pid` clears the slot.
+   - Revocation preserves the slot; real unload/crash/WASM end clears it.
    - Another pid is unaffected.
 5. Ledger tests `crates/maos-capability/tests/context_budget_18_5.rs`: ⌈⌉ thresholds at 8192 / 16384, re-arm, clear, window 0.
 6. **Proven red (1 plant):** delete the issuance gate → AC1.2's MCP mint issues → red.
@@ -267,7 +286,7 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 - The port is fixed to the pid and window at the root. A Spirit never receives the ledger or the registry.
 - No silent loss: a frame that cannot be delivered is journaled; a refusal is typed on every path; no proceed-on-refusal (17-9 FW-06 posture).
 - Kernel diff exactly the ruled files and figure; anything else returns as a FLAG request.
-- One target dir; `env -u CI -u GITHUB_ACTIONS`; no cargo inside a `#[test]`; plants restored with `git checkout -- <file>`.
+- One target dir; `env -u CI -u GITHUB_ACTIONS`; no cargo inside a `#[test]`; restore plants from byte-identical backups preserving shared-tree changes, not `git checkout`.
 
 ### Proven-red controls (rule 11; proof contract)
 
@@ -284,9 +303,12 @@ Measured at `b50ea844` by direct reads, scout maps re-verified by hand, `kloc-ch
 
 ```bash
 # local; one cargo process; CARGO_TARGET_DIR=/mnt/build/cargo
+# Root witnesses: MAOS_17_2_CGROUP_MODE=undelegated (local cgroup2 read-only); no delegated proof.
 env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-capability -p maos-domain -p maos-spirit-abi -p maos-manifest -p maos-iac -p maos-audit
-env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-kernel-core --test context_budget_gate_18_5 && cargo test --locked -p maos-kernel-core --lib
-env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test context_budget_18_5 --test butler_scene_18_4 --test j_researcher_survey_18_3 --test butler_daemon_18_1 --test cli_wrapper_exhaustion_17_9
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-kernel-core --test context_budget_gate_18_5
+# Explicit Main exception authorized this kernel lib verification:
+env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --lib
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test context_budget_18_5 --test context_refusal_18_5 --test butler_scene_18_4 --test j_researcher_survey_18_3 --test butler_daemon_18_1 --test cli_wrapper_exhaustion_17_9
 env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --features wasm-host -p maos-wasm-host
 env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p butler -p researcher
 cargo run -q --locked -p xtask -- check-kernel-baseline && cargo run -q --locked -p xtask -- check-service-boundary && cargo run -q --locked -p xtask -- kloc-check --json
@@ -296,12 +318,12 @@ cargo fmt --all -- --check
 
 ### Review plan (proof contract `:31-57`)
 
-- **Model:** `anthropic/claude-opus-5-5` (fable only with operator permission).
+- **Models/tiering:** creation and first implementation `anthropic/claude-opus-5-5`; finisher `openai-codex/gpt-6.1-sol`. Review tiers follow `docs/testing/proof-contract.md`, including the security-focused AC2/AC3/AC5 layer; do not misattribute finisher work to the creation model.
 - **Security layer (AC2, AC3, AC5):**
   - The exits set and its default-deny for new scopes.
   - Gate order and quota accounting.
   - Pid/window fusion and the unadmitted-pid refusal.
-  - Guest forgery of kinds 30/31.
+  - Guest forgery of kinds 32/33.
   - The MCP use-time path.
   - Typed refusals with no fallback.
   - No personal content in envelopes.
@@ -382,6 +404,7 @@ anthropic/claude-opus-5-5 (creation and first implementation pass); openai-codex
 - [Governance command outputs](18-5-evidence/gates.log).
 - [Final governance outputs](18-5-evidence/gates-final.log), [regression chronology](18-5-evidence/regression.log), [final exact kloc JSON](18-5-evidence/kloc-measured.json).
 - [Branch-only CI verification recipe](18-5-evidence/ci/ci-18-5-verify.yml), [plant](18-5-evidence/ci/plant.diff), [SHA-256](18-5-evidence/ci/plant.diff.sha256).
+- **TI-2 disposition:** **patch — hosted proven-red run by the integrator at landing**. The integrator commits and runs `ci/18-5-verify` on ubuntu-24.04; local simulation is not accepted as its replacement. Recipe/checksum/applicability are current, with separate mutant compile and copy-back/`cmp`/`touch` restored-green. No hosted pass is claimed here.
 
 ### Completion Notes List
 
@@ -515,6 +538,27 @@ anthropic/claude-opus-5-5 (creation and first implementation pass); openai-codex
 - `_bmad-output/implementation-artifacts/18-5-evidence/regression.log`
 - `_bmad-output/implementation-artifacts/18-5-evidence/kloc-measured.json`
 
+**Additional review-patch files:**
+- `.github/workflows/discipline.yml`
+- `Cargo.toml`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `crates/maos-kernel-core/tests/on_revocation_three_actions.rs`
+- `crates/maos-kernel-core/tests/crash_detector_in_process_panic.rs`
+- `xtask/tests/ci_shape_18_0.rs`
+- `tests/integration/onb_nfr2_timing.sh`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-focused.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-gates.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-gates-final.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-kernel-pin.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-kloc-measured.json`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-fixtures.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-patches.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-plants.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/review-release-size.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/ac3-original-red.log`
+- `_bmad-output/implementation-artifacts/18-5-evidence/ac3-original-restored.log`
+
+
 Unrelated `.omp/agents/*.md`, `docs/testing/proof-contract.md`, and the 18-4 CI excerpt are intentionally untouched.
 
 ### Change Log
@@ -530,3 +574,7 @@ Unrelated `.omp/agents/*.md`, `docs/testing/proof-contract.md`, and the 18-4 CI 
 - 2026-10-26: RULED (operator, Lunarpulse): D-18-5-01 A, 02 A, 03 B, 04 A, 05 A (WIT 2.1.0 → 2.2.0 with `context.report`, in this story), 06 A, 07 A (one quantity, refuse above 100 %; PRD `:62` amended as a dated DELTA), 08 A, 09 A (Epic 18 named maos-bin budget 28558 → 28655; exact re-pin; above → re-ask), 10 A (`RateLimited` delivery fixed here). ◆ FLAG-Winston kernel grant **+27 physical / +23 tokei** (26387 → ≤ 26414, 20617 → ≤ 20640) ratified, ADR-069 envelope. Out-of-kernel rows over their ceilings: measured requests returned at review (prototype figures = expected values; > +25 % → STOP at dev). AC6 unconditional; AC4.2 PRD amendment as a dated DELTA. Applied docs-only (no cargo). Status → `ready-for-dev`.
 - 2026-10-26: Finisher `openai-codex/gpt-6.1-sol` completed process/door/refusal/cassette and actual T2 typed-frame/forgery witnesses, repaired FR4 fallback classification, proved six controls red/restored, simulated the branch-only CI plant, and moved the authorized kernel pin set to26414/20639. Exact approved crate rows re-pinned; maos-bin28680≤28700. STOP retained for audit7473 and the additional frozen-WIT compatibility implementation beyond host2383; story/tracker intentionally remain in-progress, not falsely review-ready. No commit/push.
 - 2026-10-26: Final operator addenda resolved both STOP requests: host≤2420 for correct frozen2.0/2.1 export-schema dispatch, audit7470+10≤7480. Final exact host2412/audit7473 and aggregate hardfail185373 pinned. Complete WASM119passed (frozen byte identity, nested legacy rejection and atomic invalid-frame failure included); final root631passed, xtask review-state witnesses64passed and formatter check pass. All required governance gates green; story and sprint row→`review`. No unresolved blocker, commit or push.
+- 2026-10-26: Recorded review rulings D18-5-R1…R5 and E1-A (+4/+4 beyond26414/20639, maximum26418/20643), corrected AC1.2 refusal harness/command, lifecycle and token-TTL semantics, MCP receipt and TaskAssign exits, every-session WASM reporting, model tiering and the byte-relabeled2.1 fixture limitation. Filed EC5 and first-observed loom residuals with named owners; final review-patch measurements/verification remain the parent's record. Status stays `review`.
+- 2026-10-26: **Current review-patch STOP — not ratified.** Parent reports `cargo fmt --all` + `kloc-check`: kernel **26424 physical / 20649 tokei**, exceeding E1-A authorized26418/20643 by **6/+6**; IAC **7971**, baseline7769 +202 versus +152 STOP (**50 over**); manifest **4583**, baseline4540 +43 versus +40 STOP (**3 over**). Other measured rows: bin28655, audit7473, host2412, domain9848, capability1432. Aggregate **185449**; strict hardfail would be **185450 only after ruling**. Main notified; **no re-pins or ceiling changes**. Evidence: `18-5-evidence/review-gates.log`. This current STOP supersedes historical “no blocker” completion claims until the operator rules; story stays **review**.
+- 2026-10-26: Operator via Main ratified IAC7971+10≤7981 and manifest4583+10≤4593, exact re-pins required; kernel ceiling remains26418/20643, requiring genuine code relocation rather than minification. Parent's formatted relocation measures kernel20643/IAC7979/manifest4583/bin28655/aggregate185451; physical26418 expected but not yet checked. Prior STOP resolved only within limits; final verification pending, status **review**.
+- 2026-10-26: Parent confirms final26418physical/20643tokei,95files, hash3637ab6a50eba9541baed94120c2a42462f7b40b044c88756d67299153b60878; IAC7979/manifest4583/bin28655/capability1432/domain9848/audit7473/host2412, aggregate185451/hardfail185452. Pins/9PRIOR restored. Affected1106passed/1skipped; root54passed/1skipped including recall18 in explicit undelegated mode; kernel lib258passed under Main exception. Nine new controls exit100red/0green (`review-plants.log`); originalAC3 red/green recovered (`ac3-original-*.log`). No-op duplicate green mutant diagnostic, not counted. Final reruns after crash serializer repair/re-pin: formatter0, serde0violations, kernelbaseline26418/95PASS, xtask65/65(all6requested targets), kernel integration6/6PASS. All11requested gates green (`review-gates-final.log`,`review-focused.log`); initial61passed/4hash-only failures remain diagnostic history. Status **review**.

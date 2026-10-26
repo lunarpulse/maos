@@ -42,6 +42,7 @@ use maos_domain::frame::{ConsentEnvelope, ConsentRecall};
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
+use maos_domain::ports::mcp::McpError;
 use maos_domain::ports::IacBusPort;
 use rusqlite::{Connection, OptionalExtension};
 
@@ -881,6 +882,53 @@ impl TransparencyLogAdapter {
             .lock()
             .expect("TransparencyLogAdapter inner poisoned")
             .boot_nonce
+    }
+
+    /// Operator-only MCP refusal receipt shared by issuance and use-time mediation.
+    pub fn record_mcp_refusal(
+        &self,
+        pid: u32,
+        spirit_id: Option<&str>,
+        server: &str,
+        tool: &str,
+        code: &str,
+    ) {
+        // Field order is part of the receipt format.
+        #[derive(serde::Serialize)]
+        struct Payload<'a> {
+            op: &'a str,
+            code: &'a str,
+            server: &'a str,
+            tool: &'a str,
+            boot_nonce: u64,
+        }
+        let payload = serde_json::to_vec(&Payload {
+            op: "mcp.call",
+            code,
+            server,
+            tool,
+            boot_nonce: self.boot_nonce(),
+        })
+        .expect("MCP refusal receipt contains only serializable scalar fields");
+        let _ = self.insert_frame_event_with_sender(
+            FrameKind::GovernanceEvent,
+            pid,
+            spirit_id.unwrap_or(""),
+            "",
+            None,
+            &format!("mcp.call.refused:{code}"),
+            &payload,
+            FrameOrigin::Kernel,
+        );
+    }
+
+    /// Journal an authenticated MCP context refusal and keep its error typed.
+    pub fn refuse_context_mcp(&self, pid: u32, server: &str, tool: &str) -> McpError {
+        self.record_mcp_refusal(pid, None, server, tool, "context-exhausted");
+        McpError::ContextExhausted {
+            server: server.into(),
+            tool: tool.into(),
+        }
     }
 
     /// Generate a unique 16-byte frame ID using ULID.

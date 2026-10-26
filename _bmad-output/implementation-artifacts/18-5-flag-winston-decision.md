@@ -104,3 +104,35 @@ Prototype diffs are not committed; that would add files outside this story's doc
 - **Authorized landing pins already moved:** kernel physical26414/tokei20639, capability1432, IAC7888, domain9848, manifest4574, maos-bin28680, host2363. Kernel `--emit-pin` authoritative set hash `dc029d9f12e9f2fd21f02467d47b1c9a480583a450ec1c47ec9a2e1d547cef7e`, 95 files; kernel baseline and service-boundary gates pass. Frozen-WIT implementation, audit/aggregate ratification and review transition remain blocked.
 - **Final operator rulings 2026-10-26, relayed by Main:** maos-wasm-host **≤ 2420 RATIFIED** specifically for frozen-2.0 compatibility (legacy export bindings with reused bridge/pump), exact re-pin at landing with this story/ruling in HISTORY. This supersedes host2383. maos-audit **7470 RATIFIED with +10 finishing allowance (≤ 7480)**; post-format7473 is covered, exact final re-pin required. Both preceding STOP requests are resolved within these limits. `_aggregate_hardfail` must be final measured aggregate+1; no speculative headroom.
 - **Final landing measurement and resolution:** after final `cargo fmt --all`, host **2412≤2420**, audit **7473≤7480**, bin **28680≤28700**; aggregate **185372**, exact strict hardfail **185373**. The first formatted compatibility candidate2424 was reduced through removal of redundant pump wrapper modules/aliases, not compressed formatting or reduced behavior. Kernel remains **26414physical/20639tokei**,95files. Frozen2.0/2.1 byte identity, direct/nested legacy context rejection and atomic outbound failure pass in the full **119-test WASM suite**; final root **631passed**. Final gates green, exact HISTORY pins recorded; story/tracker **review**. All prior STOP observations above are resolved by the dated operator addenda and these measured figures; no new allowance request remains.
+
+## Review patch rulings — 2026-10-26
+
+Story stays **review**. These supersede conflicting creation assumptions; earlier landing figures are historical, not review-patch measurements.
+
+- **D18-5-R1 (BH2/EC1):** clear slots only on actual unload, crash or WASM session end, not capability revocation. Same-pid hot-swap preserves occupancy until its next report.
+- **D18-5-R2 (BH5):** accepted bounded-TTL exposure: pre-exhaustion non-exit tokens retain normal expiry, except MCP's explicit use-time context check.
+- **D18-5-R3 (BH6/EC7):** MCP use-time refusal journals the same `mcp.call.refused:context-exhausted` row as issuance refusal, before wire invocation. TaskAssign handoff permits exit scopes (`ProviderInfer`, `MemWrite`, `IacSend`) only.
+- **D18-5-R4 (AA7):** restore nine inline PRIOR chains in kloc; parent owns provenance repair and final pins.
+- **D18-5-R5 (TI5):** the legacy 2.1 witness byte-relabels a temporary 2.0 fixture, not an independently built frozen 2.1 component or coverage of 2.1-only imports.
+
+**E1-A preauthorization:** up to **+4 physical / +4 tokei** beyond **26414 / 20639**, maximum **26418 / 20643**. This is a ceiling, not a measurement. Parent inserts final kernel/crate/aggregate measurements and verification evidence.
+
+**Reporting/review truth:** every admitted WIT 2.2 session binds `context.report`; native Butler/Researcher self-report completion usage and receive synchronous typed status, not a native mailbox pump. Under proof-contract's 2026-10-26 tiering finisher/review-patch model `openai-codex/gpt-6.1-sol` never reviews its own code; this difficult story uses opus-5.5 Blind/Edge/Acceptance and glm-5.3 Test Infrastructure. Fable requires operator permission.
+
+**Residual ownership:** EC5 RateLimited no-runtime/prewrite fallback remains open under `20-3c-audit-truth-and-halt-receipt-residuals`; normal-runtime delivery remains delivered. First18-4 loom unload route-budget flaky observation run40251998973 belongs to `20-7-stable-runner-perf-gates`; same run's workspace-test-suite passed. Attributed18-4 release report was unchanged32MiB with package codegen-units1; exact parent local measurement follows below.
+
+### Current review-patch STOP — unratified, 2026-10-26
+
+Parent reports `cargo fmt --all` + `kloc-check` in `18-5-evidence/review-gates.log`: kernel **26424 physical / 20649 tokei** versus E1-A authorized **26418 / 20643**, **6/+6 over**. IAC **7971** = baseline7769 +202 versus +152 STOP, **50 over**. Manifest **4583** = baseline4540 +43 versus +40 STOP, **3 over**. Other measured rows: bin**28655**, audit**7473**, host**2412**, domain**9848**, capability**1432**. Aggregate **185449**; strict hardfail would be **185450 only after ruling**.
+
+**Main notified; no re-pins and no ceiling changes.** These are measured requests, not ratifications. This STOP supersedes historical “no blocker” completion claims for the current review patch until the operator rules. Story remains **review**.
+
+### Operator STOP-resolution addendum — 2026-10-26, via Main
+
+**D18-5-R3 / D-09:** kernel maximum **26418 physical / 20643 tokei is unchanged**; genuinely move extraneous code out, never minify. **IAC7971 RATIFIED plus10 finishing allowance, ≤7981; manifest4583 RATIFIED plus10, ≤4593**. Re-pin final exact measurements only within those limits.
+
+Parent confirms genuine relocation into maos-iac TL `refuse_context_mcp`, with kernel retaining the check and delegating the typed error. Final kernel **26418 physical / 20643 tokei**,95files; set hash `3637ab6a50eba9541baed94120c2a42462f7b40b044c88756d67299153b60878`. IAC**7979≤7981**, manifest**4583≤4593**, bin**28655≤28700**, capability1432/domain9848/audit7473/host2412; aggregate**185451**, strict hardfail**185452**. Exact pins and nine inline PRIOR chains restored. The STOP is resolved within limits; story stays **review**.
+
+**Parent-reported review evidence:** affected1106passed/1skipped; root54passed/1skipped including recall18, `MAOS_17_2_CGROUP_MODE=undelegated` on read-only cgroup2 (no delegated proof); Main exception kernel lib258passed. Nine new controls exit100red/0green (`review-plants.log`); originalAC3 red/green recovered (`ac3-original-*.log`); initial no-op duplicate green mutant diagnostic, not counted. Final reruns: formatter0, serde0violations, kernelbaseline26418/95PASS, xtask65/65(all6requested targets), kernel integration6/6PASS. **All11requested gates green** (`review-gates-final.log`,`review-focused.log`); initial61passed/4hash-only failures remain diagnostic history. Story stays **review**.
+
+**Local release measurement, parent-reported:** `cargo build -p maos-bin --release --locked` plus strip: **29,864,312B**,32MiB margin**3,690,120B**, SHA256 `a74d019fd0900e701a75c57d207d2b4f323dc1605c441cfa6aa61b0629a661fb`. Build47.59s is build-only, not cold-build/latency evidence; package codegen-units1 unchanged.

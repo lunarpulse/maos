@@ -34,6 +34,8 @@ struct Fixture {
     scheduler: Arc<SpiritSchedulerAdapter>,
     applier: RevocationApplier,
     tl: Arc<TransparencyLogAdapter>,
+    capability: Arc<CapabilityRegistryAdapter>,
+    policy: Arc<PolicyTable>,
     _tmp: tempfile::TempDir,
 }
 
@@ -44,11 +46,12 @@ fn fixture() -> Fixture {
     let telemetry = Arc::new(IacRtMetrics::new());
     let (audit_tx, mut audit_rx) = cap_audit::channel();
     std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
+    let policy = Arc::new(PolicyTable::new());
     let capability = Arc::new(CapabilityRegistryAdapter::new(
         Arc::new(RingCryptoProvider),
         Ed25519SigningKey::new([0u8; 32]),
         0xAC71,
-        Arc::new(PolicyTable::new()),
+        Arc::clone(&policy),
         audit_tx,
         CapQuotaTracker::new(),
         Arc::new(WorkingMemoryStore::new()),
@@ -89,7 +92,7 @@ fn fixture() -> Fixture {
     );
     let applier = RevocationApplier::new(
         scheduler.scbs(),
-        capability,
+        Arc::clone(&capability),
         Arc::clone(&scheduler),
         iac,
         halt_registry,
@@ -101,6 +104,8 @@ fn fixture() -> Fixture {
         scheduler,
         applier,
         tl,
+        capability,
+        policy,
         _tmp: tmp,
     }
 }
@@ -174,6 +179,28 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
             .expect("start action fixture");
         pids.push(pid);
     }
+    let scope = maos_domain::invariants::i1::Scope::FsRead {
+        subtree: "/tmp".into(),
+    };
+    let mut policy = maos_kernel_core::capability::cap_policy::PolicyTableInner::default();
+    policy.manifest_scopes.insert(
+        pids[1],
+        maos_kernel_core::capability::cap_policy::ManifestCapabilityScope {
+            scopes: vec![scope.clone()],
+            declared_tier: maos_domain::invariants::i9::SandboxTier(0),
+            trust_tier: maos_kernel_core::capability::cap_policy::decision::TrustTier::Verified,
+        },
+    );
+    fixture.policy.update(policy);
+    fixture.capability.context_budget().report(
+        pids[1],
+        maos_capability::context_budget::ContextWindow {
+            size: 16384,
+            pressure_permille: 800,
+            limit_permille: 950,
+        },
+        20_000,
+    );
 
     let report = fixture
         .applier
@@ -183,6 +210,18 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
     assert_eq!(report.matched_count, 3);
     assert_eq!(report.revoked_count, 3);
     assert_eq!(report.per_spirit.len(), 3);
+    assert!(fixture.capability.context_budget().exhausted(pids[1]));
+    assert_eq!(
+        fixture.capability.issue_with_mediation(
+            pids[1],
+            scope.clone(),
+            60,
+            [0; 32],
+            maos_domain::invariants::i1::IntentClass::Standard
+        ),
+        Err(maos_domain::ports::capability::CapError::ContextExhausted { spirit_id: pids[1] }),
+        "DrainThenTerminate revocation cannot restore non-exit issuance"
+    );
     assert_eq!(report.halt_receipts_produced, 1);
     for action in [
         RevocationAction::TerminateImmediately,
@@ -247,6 +286,20 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
             "quarantine must unload at deadline"
         );
     }
+    assert!(
+        !fixture.capability.context_budget().exhausted(pids[1]),
+        "actual deferred unload clears the incarnation's slot"
+    );
+    fixture
+        .capability
+        .issue_with_mediation(
+            pids[1],
+            scope,
+            60,
+            [0; 32],
+            maos_domain::invariants::i1::IntentClass::Standard,
+        )
+        .expect("fresh incarnation has no exhausted context slot");
     for pid in pids {
         assert!(
             fixture

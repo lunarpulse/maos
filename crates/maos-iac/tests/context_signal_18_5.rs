@@ -35,10 +35,10 @@ fn bus() -> (Arc<IacBusAdapter>, Arc<TransparencyLogAdapter>) {
 }
 
 fn adapter(bus: &Arc<IacBusAdapter>, pid: Arc<AtomicU32>) -> ContextSignalAdapter {
-    ContextSignalAdapter {
-        ledger: Arc::new(ContextBudget::default()),
-        bus: Arc::downgrade(bus),
-        admitted: Arc::new(move || {
+    ContextSignalAdapter::new(
+        Arc::new(ContextBudget::default()),
+        bus,
+        Arc::new(move || {
             let pid = pid.load(Ordering::SeqCst);
             (pid != 0).then(|| AdmittedSpirit {
                 pid,
@@ -46,7 +46,7 @@ fn adapter(bus: &Arc<IacBusAdapter>, pid: Arc<AtomicU32>) -> ContextSignalAdapte
                 window: BUTLER,
             })
         }),
-    }
+    )
 }
 
 fn rows(tl: &TransparencyLogAdapter, kind: TlKind) -> Vec<u32> {
@@ -149,5 +149,108 @@ fn an_unadmitted_pid_is_refused_and_moves_nothing() {
         port.report_context_used(100).unwrap().level,
         ContextLevel::Within,
         "the refused report left no slot behind"
+    );
+}
+
+#[tokio::test]
+async fn closed_registered_mailbox_does_not_duplicate_crossing_rows() {
+    let (bus, tl) = bus();
+    drop(
+        bus.register_spirit_typed(&SpiritId::from("butler"))
+            .unwrap(),
+    );
+    let port = adapter(&bus, Arc::new(AtomicU32::new(45)));
+    port.report_context_used(9000).unwrap();
+    assert_eq!(rows(&tl, TlKind::ContextPressure), [45]);
+    assert_eq!(rows(&tl, TlKind::ContextLimit), [45]);
+    // Run the mailbox attempt, including its ChannelClosed error.
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(rows(&tl, TlKind::ContextPressure), [45]);
+    assert_eq!(rows(&tl, TlKind::ContextLimit), [45]);
+}
+
+#[test]
+fn a_dead_bus_still_records_crossings_synchronously() {
+    let (bus, tl) = bus();
+    let port = adapter(&bus, Arc::new(AtomicU32::new(46)));
+    drop(bus);
+    port.report_context_used(9000).unwrap();
+    assert_eq!(rows(&tl, TlKind::ContextPressure), [46]);
+    assert_eq!(rows(&tl, TlKind::ContextLimit), [46]);
+}
+
+#[test]
+fn runtime_shutdown_cannot_erase_a_reported_crossing() {
+    let (bus, tl) = bus();
+    let port = adapter(&bus, Arc::new(AtomicU32::new(47)));
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    {
+        let _entered = runtime.enter();
+        port.report_context_used(9000).unwrap();
+        // No executor poll has happened: journaling belongs to report, not its task.
+        assert_eq!(rows(&tl, TlKind::ContextPressure), [47]);
+        assert_eq!(rows(&tl, TlKind::ContextLimit), [47]);
+    }
+    drop(runtime);
+    assert_eq!(rows(&tl, TlKind::ContextPressure), [47]);
+    assert_eq!(rows(&tl, TlKind::ContextLimit), [47]);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn one_delivery_queue_preserves_report_order_under_backpressure() {
+    let (bus, tl) = bus();
+    let mut mailbox = bus
+        .register_spirit_typed(&SpiritId::from("butler"))
+        .unwrap();
+    let port = adapter(&bus, Arc::new(AtomicU32::new(48)));
+    // Exceed the mailbox's 32-frame capacity before the receiver is polled.
+    for used in 6600..6664 {
+        port.report_context_used(0).unwrap();
+        port.report_context_used(used).unwrap();
+    }
+    assert_eq!(rows(&tl, TlKind::ContextPressure).len(), 64);
+    for used in 6600..6664 {
+        let (kind, frame) = tokio::time::timeout(Duration::from_secs(5), mailbox.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(kind, FrameKind::ContextPressure);
+        let FramePayload::ContextPressure(envelope) = frame.payload else {
+            panic!("wrong payload")
+        };
+        assert_eq!(
+            envelope.context_used, used,
+            "reports may not overtake each other"
+        );
+    }
+    assert_eq!(rows(&tl, TlKind::ContextPressure).len(), 64);
+}
+
+#[tokio::test]
+async fn mixed_context_kinds_are_received_in_report_order() {
+    let (bus, _) = bus();
+    let mut mailbox = bus
+        .register_spirit_typed(&SpiritId::from("butler"))
+        .unwrap();
+    let port = adapter(&bus, Arc::new(AtomicU32::new(49)));
+    port.report_context_used(7900).unwrap(); // Pressure, Limit.
+    port.report_context_used(4000).unwrap();
+    port.report_context_used(7000).unwrap(); // Re-armed Pressure.
+                                             // Let all three deliveries reach their channels before either receive API.
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(
+        mailbox.try_recv().unwrap().unwrap().0,
+        FrameKind::ContextPressure
+    );
+    assert_eq!(mailbox.recv().await.unwrap().0, FrameKind::ContextLimit);
+    assert_eq!(
+        mailbox.try_recv().unwrap().unwrap().0,
+        FrameKind::ContextPressure
     );
 }

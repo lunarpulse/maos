@@ -95,6 +95,16 @@ async fn panic_hook_triggers_crash_detector() {
         .load("crash-detector-panic-test", manifest, PanicSpirit, 12345)
         .await
         .unwrap();
+    capability.context_budget().report(
+        pid,
+        maos_kernel_core::capability::context_budget::ContextWindow {
+            size: 4096,
+            pressure_permille: 800,
+            limit_permille: 950,
+        },
+        5000,
+    );
+    assert!(capability.context_budget().exhausted(pid));
 
     // start() catches the panic and spawns the crash handler
     let _ = scheduler_mut.start(pid).await;
@@ -106,6 +116,10 @@ async fn panic_hook_triggers_crash_detector() {
     let map = spirits.read().unwrap();
     assert!(map.get(&pid).is_none(), "SCB must be removed after panic");
     drop(map);
+    assert!(
+        !capability.context_budget().exhausted(pid),
+        "crash teardown removes the context slot with the incarnation"
+    );
 
     // At least one EpistemicHalt frame (halt receipt) should exist
     let receipts = tl

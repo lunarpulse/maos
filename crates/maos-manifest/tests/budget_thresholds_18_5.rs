@@ -74,3 +74,28 @@ fn pressure_at_or_above_limit_and_out_of_range_thresholds_are_rejected() {
         );
     }
 }
+
+#[test]
+fn thresholds_rounding_to_zero_permille_are_rejected() {
+    let base = "context_window_size = 8192\ntime_cap_seconds = 30\n";
+    for field in ["context_pressure_threshold", "context_limit_threshold"] {
+        for value in ["0.0004", "0.000499999"] {
+            let err = Budget::from_toml_str(&format!("{base}{field} = {value}\n"))
+                .expect_err("positive threshold must not round to zero permille");
+            let message = err.to_string();
+            assert!(message.contains(&format!("budget.{field}")), "{message}");
+            assert!(message.contains("rounds to zero permille"), "{message}");
+        }
+    }
+}
+
+#[test]
+fn thresholds_rounding_to_positive_permille_are_admitted() {
+    let budget = Budget::from_toml_str(
+        "context_window_size = 8192\ntime_cap_seconds = 30\n\
+         context_pressure_threshold = 0.0005\ncontext_limit_threshold = 0.0015\n",
+    )
+    .expect("half-permille threshold rounds up to one permille");
+    assert_eq!(budget.context_pressure_permille, 1);
+    assert_eq!(budget.context_limit_permille, 2);
+}

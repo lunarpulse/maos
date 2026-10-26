@@ -361,10 +361,10 @@ pub async fn run_admitted_session(
             let spirit = maos_iac::adapter::context_signal::AdmittedSpirit {
                 pid: admitted.pid, spirit_id: admitted.spirit_id.as_str().into(), window: launch.context_window,
             };
-            recall.context = Some(Arc::new(maos_iac::adapter::context_signal::ContextSignalAdapter {
-                ledger: Arc::clone(deps.capability.context_budget()), bus: Arc::downgrade(&deps.iac),
-                admitted: Arc::new(move || Some(spirit.clone())),
-            }));
+            recall.context = Some(Arc::new(maos_iac::adapter::context_signal::ContextSignalAdapter::new(
+                Arc::clone(deps.capability.context_budget()), &deps.iac,
+                Arc::new(move || Some(spirit.clone())),
+            )));
             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));
             let runtime = tokio::runtime::Handle::current();
             loop {
@@ -522,6 +522,7 @@ pub async fn run_admitted_session(
         let exit = live.bridge.wait_and_finalize(&deps.journal, admitted.pid,
             Some(deps.capability.audit_sender()), |_| {
                 deps.capability.revoke_all_for_pid(admitted.pid);
+                deps.capability.context_budget().remove(admitted.pid);
             });
         let writer_result = match writer_thread {
             Some(thread) => thread.join()

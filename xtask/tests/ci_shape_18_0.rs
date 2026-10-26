@@ -98,6 +98,42 @@ fn assert_no_continue_on_error(value: &Value, what: &str) {
     }
 }
 
+fn recall_context_gate_is_complete(run: &str) -> bool {
+    runs_test(run, "recall_17_3d")
+        && run.contains("^test result: ok\\. 18 passed;")
+        && run.contains("missing 'test result: ok. 18 passed;'")
+        && run.contains("--expected-count 18")
+        && run.contains(
+            "context_18_5_report_status_and_journaled_kinds_32_33_reach_wasm_handle_frame",
+        )
+        && run.contains("context_18_5_wasm_guest_cannot_forge_kernel_pressure_or_limit_to_peer")
+}
+
+#[test]
+fn recall_gate_enrolls_both_context_vectors_and_pins_18_passes() {
+    let workflow = workflow();
+    let job = key(key(&workflow, "jobs"), "wasm-host-tests");
+    let step = &steps(job)[step_index(
+        job,
+        "In-band recall through the admitted session (Story 17-3d)",
+    )];
+    let run = str_of(step, "run").expect("recall gate run");
+    assert!(recall_context_gate_is_complete(run));
+    // Plants: each stale count and each missing context name must independently red.
+    for token in [
+        "^test result: ok\\. 18 passed;",
+        "missing 'test result: ok. 18 passed;'",
+        "--expected-count 18",
+        "context_18_5_report_status_and_journaled_kinds_32_33_reach_wasm_handle_frame",
+        "context_18_5_wasm_guest_cannot_forge_kernel_pressure_or_limit_to_peer",
+    ] {
+        assert!(
+            !recall_context_gate_is_complete(&run.replace(token, "REMOVED")),
+            "gate must reject missing {token}"
+        );
+    }
+}
+
 #[test]
 fn proven_red_steps_run_after_a_red_gate_step() {
     let workflow = workflow();

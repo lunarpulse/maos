@@ -1191,11 +1191,20 @@ impl RawBudget {
     }
 }
 
-/// A context threshold in (0, 1] as permille; `None` takes `default`.
+/// A context threshold in (0, 1] rounding to nonzero permille; `None` takes `default`.
 fn threshold_permille(field: &str, value: Option<f64>, default: u16) -> Result<u16, ManifestError> {
     match value {
         None => Ok(default),
-        Some(v) if v > 0.0 && v <= 1.0 => Ok((v * 1000.0).round() as u16),
+        Some(v) if v > 0.0 && v <= 1.0 => {
+            let permille = (v * 1000.0).round() as u16;
+            if permille == 0 {
+                return Err(ManifestError::Toml(validation_msg(
+                    field,
+                    "rounds to zero permille",
+                )));
+            }
+            Ok(permille)
+        }
         Some(v) => Err(ManifestError::Toml(validation_msg(
             field,
             &format!("{v} not in (0, 1]"),

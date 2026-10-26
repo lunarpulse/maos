@@ -207,6 +207,8 @@ fn context_report_not_admitted_is_typed_and_next_call_recovers() {
 
 // 2.1 added recall, not frame fields. Relabel the frozen guest's frames import
 // in a temporary copy to exercise that exact same closed-enum export schema.
+// Limitation: this byte-relabeled 2.0 component is not an independently built
+// 2.1 guest and does not prove compatibility with genuine 2.1 recall imports.
 fn legacy_2_1_fixture(dir: &Path) -> PathBuf {
     let mut bytes = std::fs::read(&*COMPAT).unwrap();
     let name = b"maos:spirit/frames@2.0.0";

@@ -102,11 +102,11 @@ fn task_assign_defaults() -> TaskAssignPayload {
     }
 }
 
-// ── FrameKind discriminator: all 15 variants ────────────────────────────
+// ── FrameKind discriminator: all 19 variants ────────────────────────────
 
 #[test]
-fn all_15_frame_kinds_round_trip_through_lower_lift() {
-    // Only TaskAssign was covered by the e2e suite; the other 14 discriminants
+fn all_19_frame_kinds_round_trip_through_lower_lift() {
+    // Only TaskAssign was covered by the e2e suite; the other 18 discriminants
     // (including the 6 payload-less audit/gateway kinds) must also survive the
     // WIT kind enum round-trip — a new WIT variant or a renumbering would
     // otherwise hide here.
@@ -131,8 +131,10 @@ fn all_15_frame_kinds_round_trip_through_lower_lift() {
         FrameKind::RateLimited,
         FrameKind::GatewayInbound,
         FrameKind::GatewayOutbound,
+        FrameKind::ContextPressure,
+        FrameKind::ContextLimit,
     ];
-    assert_eq!(all.len(), 17, "sanity: the frame set has 17 kinds");
+    assert_eq!(all.len(), 19, "sanity: the frame set has 19 kinds");
 
     for kind in all {
         let frame = envelope(kind, dummy.clone());

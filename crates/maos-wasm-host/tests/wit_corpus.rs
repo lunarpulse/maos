@@ -322,6 +322,8 @@ fn k_encode_all_payload_variants_canonical() {
         build_retract_frame(),
         build_consent_rupture_frame(),
         build_rate_limited_frame(),
+        build_context_pressure_frame(),
+        build_context_limit_frame(),
     ];
 
     for (i, payload) in payloads.iter().enumerate() {
@@ -335,6 +337,26 @@ fn k_encode_all_payload_variants_canonical() {
             enc1, reenc,
             "payload variant {i} decode→re-encode must be identical"
         );
+    }
+}
+
+#[test]
+fn context_payload_builders_preserve_every_field_and_detect_mutation() {
+    for (body, threshold) in [
+        (build_context_pressure_frame(), 800),
+        (build_context_limit_frame(), 950),
+    ] {
+        assert_eq!(body.len(), wit_ast::field_count("context-envelope"));
+        assert_eq!(body["spirit_pid"], serde_json::json!(19));
+        assert_eq!(body["context_used"], serde_json::json!(7783));
+        assert_eq!(body["context_window_size"], serde_json::json!(8192));
+        assert_eq!(body["threshold_permille"], serde_json::json!(threshold));
+        let original = codec::encode_cbor(&body).unwrap();
+        for field in body.keys() {
+            let mut mutated = body.clone();
+            mutated.insert(field.clone(), serde_json::json!(0));
+            assert_ne!(original, codec::encode_cbor(&mutated).unwrap(), "{field}");
+        }
     }
 }
 
@@ -498,6 +520,26 @@ fn dropper_omits_optional_detected_red() {
 }
 
 // ── Frame builders (hand-written independent ADR-032→WIT mapping) ──────
+
+fn build_context_pressure_frame() -> BTreeMap<String, serde_json::Value> {
+    build_context_frame(800)
+}
+
+fn build_context_limit_frame() -> BTreeMap<String, serde_json::Value> {
+    build_context_frame(950)
+}
+
+fn build_context_frame(threshold_permille: u16) -> BTreeMap<String, serde_json::Value> {
+    BTreeMap::from([
+        ("spirit_pid".to_string(), serde_json::json!(19)),
+        ("context_used".to_string(), serde_json::json!(7783)),
+        ("context_window_size".to_string(), serde_json::json!(8192)),
+        (
+            "threshold_permille".to_string(),
+            serde_json::json!(threshold_permille),
+        ),
+    ])
+}
 
 fn build_task_assign_frame() -> BTreeMap<String, serde_json::Value> {
     let mut m = BTreeMap::new();

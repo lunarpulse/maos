@@ -273,22 +273,28 @@ Issuance exhaustion uses `CapError::IssuanceQuotaExhausted`, leaving
 
 **Implementation note — Story 18-5 (delivered 2026-10-26):** the ledger is
 `maos_capability::context_budget`, built inside `CapabilityRegistryAdapter::new`
-(one slot per admitted pid = one incarnation; a hot-swap successor keeps it
-until its first report; unload, crash and revocation drop it through
-`revoke_all_for_pid`). Occupancy is absolute: the last report wins, a threshold
-re-arms below itself, and a report back within the window lifts exhaustion.
+(one slot per admitted pid = one incarnation; a same-pid hot-swap successor
+keeps it until its first report). Only actual unload, crash or WASM session
+end removes the slot; capability revocation alone preserves it (D18-5-R1).
+Occupancy is absolute: last report wins, thresholds re-arm below themselves,
+and reporting back within the window lifts exhaustion.
 Thresholds are optional manifest `[budget].context_pressure_threshold` /
-`context_limit_threshold` (defaults 0.80 / 0.95). The root binds each Spirit's
-`ContextBudgetPort` to its admitted pid and admitted window; one kernel-written
-`ContextPressure` / `ContextLimit` frame (FrameKind 32 / 33) per upward crossing,
-plus the reporter's synchronous typed `ContextStatus`. Above 100 % the registry
-refuses issuance `CapError::ContextExhausted` (policy → context → 17-9 charge;
-a refusal is never charged) for every scope except the **exits** —
-`ProviderInfer` and `MemWrite` (distil) and `IacSend` (hand off) — and the MCP
-adapter refuses a token minted before the crossing at use
-(`McpError::ContextExhausted`). **Limit:** counts are Spirit-self-reported; a
-Spirit that under-reports is never refused, and a Spirit with no port wired
-reports nothing (only Butler and Researcher report in v1).
+`context_limit_threshold` (defaults 0.80 / 0.95). Native Butler and Researcher
+read completion `input_tokens + output_tokens` and self-report through the
+root-bound `ContextBudgetPort`, fixed to admitted pid/window. Every admitted
+WIT 2.2 session binds `context.report`. Reporters learn synchronously through
+typed `ContextStatus`; native mailbox delivery is not claimed. Crossings
+journal kernel-written `ContextPressure` / `ContextLimit` (kinds 32 / 33).
+Above 100 % issuance fails `CapError::ContextExhausted` (policy → context →
+17-9 charge; refusal never charged) except exits `ProviderInfer`, `MemWrite`
+(distil) and `IacSend` (hand off). TaskAssign handoff permits exit scopes only.
+Already-issued non-exit tokens retain normal TTL except MCP's explicit
+use-time check, which refuses `McpError::ContextExhausted` and journals the
+same `mcp.call.refused:context-exhausted` receipt as an issuance refusal.
+**Limits:** counts remain self-reported; under-reporting is not detected,
+and an unbound native Spirit reports nothing. The legacy 2.1 witness
+byte-relabels a temporary 2.0 fixture, not an independently built frozen
+2.1 guest or coverage of 2.1-only imports.
 
 ## ADR-017 — Hot-swap state-transfer wire format
 

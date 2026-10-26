@@ -271,7 +271,7 @@ impl Mailbox {
         {
             return Err(IacBusError::AlreadyRegistered(spirit_id.to_string()));
         }
-        let mut receivers = Vec::with_capacity(12);
+        let mut receivers = Vec::with_capacity(11);
         let kinds: &[FrameKind] = &[
             FrameKind::TaskAssign,
             FrameKind::TaskComplete,
@@ -287,15 +287,18 @@ impl Mailbox {
             // via 1:1 mpsc with capacity 32 (§7.1.1 cardinality).
             FrameKind::ConsentRupture,
             FrameKind::RateLimited,
-            // Story 18-5 — ADR-016 context signals, 1:1 mpsc-32.
+            // Both context kinds share one ordered MPSC-32 stream.
             FrameKind::ContextPressure,
-            FrameKind::ContextLimit,
         ];
         for &kind in kinds {
             let (class, capacity) =
                 channel_class_for(kind).expect("IAC frame kind must be routable");
             assert_eq!(class, ChannelClass::Mpsc, "all 1:1 kinds must use mpsc");
             let (tx, rx) = mpsc::channel(capacity);
+            if kind == FrameKind::ContextPressure {
+                self.mpsc_senders
+                    .insert((spirit_id.to_string(), FrameKind::ContextLimit), tx.clone());
+            }
             self.mpsc_senders.insert((spirit_id.to_string(), kind), tx);
             receivers.push((kind, rx));
         }
@@ -721,19 +724,19 @@ impl SpiritMailboxHandle {
         }
         loop {
             // Fair non-blocking drain: try all receivers in round-robin order
-            for (kind, rx) in &mut self.receivers {
+            for (_, rx) in &mut self.receivers {
                 match rx.try_recv() {
                     Ok(frame) => {
-                        self.metrics.dec_pending(&self.spirit_id, *kind);
-                        return Some((*kind, frame));
+                        self.metrics.dec_pending(&self.spirit_id, frame.kind);
+                        return Some((frame.kind, frame));
                     }
                     Err(mpsc::error::TryRecvError::Empty) => continue,
                     Err(mpsc::error::TryRecvError::Disconnected) => {
                         // F20: drain remaining receivers before returning None
-                        for (k2, rx2) in &mut self.receivers {
+                        for (_, rx2) in &mut self.receivers {
                             if let Ok(f) = rx2.try_recv() {
-                                self.metrics.dec_pending(&self.spirit_id, *k2);
-                                return Some((*k2, f));
+                                self.metrics.dec_pending(&self.spirit_id, f.kind);
+                                return Some((f.kind, f));
                             }
                         }
                         return None;
@@ -746,11 +749,11 @@ impl SpiritMailboxHandle {
     }
 
     pub fn try_recv(&mut self) -> Result<Option<(FrameKind, IacFrame)>, mpsc::error::TryRecvError> {
-        for (kind, rx) in &mut self.receivers {
+        for (_, rx) in &mut self.receivers {
             match rx.try_recv() {
                 Ok(frame) => {
-                    self.metrics.dec_pending(&self.spirit_id, *kind);
-                    return Ok(Some((*kind, frame)));
+                    self.metrics.dec_pending(&self.spirit_id, frame.kind);
+                    return Ok(Some((frame.kind, frame)));
                 }
                 Err(mpsc::error::TryRecvError::Empty) => continue,
                 Err(e) => return Err(e),
@@ -859,9 +862,8 @@ mod tests {
         let mailbox = Mailbox::new(metrics);
         let handle = mailbox.register_spirit("test-spirit").unwrap();
         assert_eq!(handle.spirit_id, "test-spirit");
-        // Twelve direct channels: six base, two lifecycle-budget, and
-        // ConsentRupture/RateLimited/ContextPressure/ContextLimit sender channels.
-        assert_eq!(handle.receivers.len(), 12);
+        // Eleven streams: the two context kinds share one ordered stream.
+        assert_eq!(handle.receivers.len(), 11);
     }
 
     #[tokio::test]

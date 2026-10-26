@@ -54,12 +54,6 @@ impl McpClientAdapter {
         // InferencePortAdapter (inference/mod.rs) which uses the same pattern.
         // Real posture-hash and tier will be wired when the kernel tracks per-call posture state.
         let posture_hash = [0u8; 32];
-        if self.capability.context_budget().exhausted(token.spirit_pid) {
-            return Err(McpError::ContextExhausted {
-                server: server.into(),
-                tool: tool.into(),
-            });
-        }
         self.capability
             .verify_and_audit(
                 token,
@@ -73,7 +67,16 @@ impl McpClientAdapter {
 
         let scope = self.capability.get_token_scope(&token.token_id);
         match scope {
-            Some(Scope::McpCall { server: s, tool: t }) if s == server && t == tool => Ok(()),
+            Some(Scope::McpCall { server: s, tool: t }) if s == server && t == tool => {
+                if self.capability.context_budget().exhausted(token.spirit_pid) {
+                    return Err(self.transparency_log.refuse_context_mcp(
+                        token.spirit_pid,
+                        server,
+                        tool,
+                    ));
+                }
+                Ok(())
+            }
             _ => Err(McpError::CapabilityDenied {
                 server: server.into(),
                 tool: tool.into(),

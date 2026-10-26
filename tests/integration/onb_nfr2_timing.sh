@@ -168,6 +168,11 @@ bin_size=$(stat -c%s target/release/maos)
 #    refused four times.
 # Slimming still requires opt-level="z"/fat-LTO (which regresses the §13.1 latency
 # benches) or splitting reference Spirits out of the default binary.
+# 2026-10-26: 18-4 landing run 40251998973 breached this unchanged ceiling:
+# 33,666,176 B > 33,554,432 B. Growth is attributed to Butler behavior and its
+# serialization/collection monomorphisations, not a new dependency; see
+# _bmad-output/implementation-artifacts/18-4-evidence/binary-size-attribution.md.
+# No re-base: use the maos-bin-only release codegen-units=1 override instead.
 max_size=33554432  # 32 MiB — Epic-16 retrospective measured re-baseline (2026-09-20)
 echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
 if [ "$bin_size" -gt "$max_size" ]; then

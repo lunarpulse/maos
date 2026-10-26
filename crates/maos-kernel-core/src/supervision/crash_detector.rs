@@ -125,6 +125,7 @@ impl CrashDetector {
 
         // Step 3: Revoke all capability tokens for the PID
         let actual_tokens_revoked = self.capability.revoke_all_for_pid(spirit_pid);
+        self.capability.context_budget().remove(spirit_pid);
 
         // Step 4: Produce halt-receipts via terminate_spirit
         let receipts = terminate_spirit(
@@ -164,7 +165,7 @@ impl CrashDetector {
                 spirit_pid,
                 None,
                 "task.orphaned",
-                &serde_json::to_vec(&payload).unwrap_or_default(),
+                payload.to_string().as_bytes(),
                 FrameOrigin::Kernel,
             );
         }

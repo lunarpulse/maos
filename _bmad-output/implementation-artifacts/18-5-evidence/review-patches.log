@@ -1,0 +1,9 @@
+$ env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo fmt --all
+
+EXIT 0; elapsed 2.496s
+$ env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo fmt --all
+
+EXIT 0; elapsed 2.294s
+$ env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo fmt --all
+
+EXIT 0; elapsed 2.183s

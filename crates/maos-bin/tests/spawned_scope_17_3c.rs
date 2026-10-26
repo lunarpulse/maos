@@ -1963,7 +1963,12 @@ async fn a_new_turn_after_idle_restarts_the_progress_window() {
 async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_forms() {
     LazyLock::force(&FIXTURES);
     for wasm in [false, true] {
-        for case in ["enterprise_denied", "policy_mixed", "unmediated"] {
+        for case in [
+            "enterprise_denied",
+            "policy_mixed",
+            "unmediated",
+            "context_exhausted",
+        ] {
             let enterprise_denied = case == "enterprise_denied";
             let dir = tempfile::tempdir().unwrap();
             let world = World::new(dir.path());
@@ -1985,6 +1990,17 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
             .await
             .unwrap();
             let pid = admitted.pid;
+            if case == "context_exhausted" {
+                world.capability.context_budget().report(
+                    pid,
+                    maos_kernel_core::capability::context_budget::ContextWindow {
+                        size: 4096,
+                        pressure_permille: 800,
+                        limit_permille: 950,
+                    },
+                    5000,
+                );
+            }
             let address = |name: &str| FrameAddress {
                 spirit_id: SpiritId::from(name),
                 host_id: None,
@@ -2075,6 +2091,12 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
             assert_eq!(report.turns, 1);
             assert_eq!(report.delivered_frames, 0);
             assert_eq!(report.denied_frames, 1);
+            if case == "context_exhausted" {
+                assert!(
+                    !world.capability.context_budget().exhausted(pid),
+                    "session-end teardown clears the exhausted incarnation"
+                );
+            }
             let (_, original) = receiver
                 .try_recv()
                 .unwrap()
@@ -2129,6 +2151,18 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                     assert!(
                         issued.is_empty(),
                         "no token minted under an enterprise deny"
+                    );
+                }
+                "context_exhausted" => {
+                    assert_eq!(
+                        authorization["send"]["kernel_verdict"], "allow",
+                        "the exit IacSend remains available for handoff"
+                    );
+                    assert_eq!(decisions.len(), 1);
+                    assert_eq!(decisions[0]["kernel_verdict"], "context-exhausted");
+                    assert!(
+                        issued.is_empty(),
+                        "TaskAssign cannot delegate non-exit MCP authority"
                     );
                 }
                 "policy_mixed" => {

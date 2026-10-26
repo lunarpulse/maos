@@ -4,7 +4,7 @@
 //!
 //! AC5.4: `issue_with_mediation` refuses an exhausted pid every scope but the
 //! exits (`ProviderInfer`, `MemWrite`, `IacSend`), a refusal consumes no 17-9
-//! issuance, another pid is unaffected and `revoke_all_for_pid` drops the slot.
+//! issuance, another pid is unaffected and revocation preserves the slot until teardown.
 //! AC5.2: `McpClientAdapter` refuses a token minted before the crossing at use
 //! time, before the wire, so no `McpInvocation` row is written.
 //! AC6 (D-18-5-10 A): a provider 429 leaves one kind-23 `RateLimited` row and
@@ -186,11 +186,17 @@ fn an_exhausted_pid_mints_only_the_exits_and_refusals_are_never_charged() {
 }
 
 #[test]
-fn revoke_all_for_pid_drops_the_slot() {
+fn revocation_preserves_the_exhausted_slot_until_teardown() {
     let registry = registry(64);
     registry.context_budget().report(P, RESEARCHER, 20_000);
     assert!(registry.context_budget().exhausted(P));
     registry.revoke_all_for_pid(P);
+    assert!(registry.context_budget().exhausted(P));
+    assert_eq!(
+        mint(&registry, P, governed()[0].clone()),
+        Err(CapError::ContextExhausted { spirit_id: P })
+    );
+    registry.context_budget().remove(P);
     assert!(!registry.context_budget().exhausted(P));
     mint(&registry, P, governed()[0].clone()).expect("a fresh incarnation starts within");
 }
@@ -227,6 +233,40 @@ fn an_mcp_token_minted_before_the_crossing_is_refused_at_use() {
     );
     let token = mint(&registry, P, governed()[0].clone()).expect("minted while within");
     registry.context_budget().report(P, RESEARCHER, 17_204);
+    let mut invalid = token.clone();
+    invalid.token_id.0[0] ^= 1;
+    assert!(
+        matches!(
+            mcp.call(&invalid, "replay", "search", serde_json::json!({})),
+            Err(McpError::CapabilityDenied { .. })
+        ),
+        "invalid tokens cannot probe context state"
+    );
+    assert!(
+        matches!(
+            mcp.call(&token, "replay", "other", serde_json::json!({})),
+            Err(McpError::CapabilityDenied { .. })
+        ),
+        "a mismatched tool cannot probe context state"
+    );
+    let wrong_scope = mint(&registry, Q, exits()[0].clone()).expect("unrelated scope");
+    registry.context_budget().report(Q, RESEARCHER, 17_204);
+    assert!(
+        matches!(
+            mcp.call(&wrong_scope, "replay", "search", serde_json::json!({})),
+            Err(McpError::CapabilityDenied { .. })
+        ),
+        "a non-MCP scope cannot probe context state"
+    );
+    assert!(
+        tl.query_frames(FrameFilter {
+            kind: Some(FrameKind::GovernanceEvent),
+            ..Default::default()
+        })
+        .unwrap()
+        .is_empty(),
+        "unauthorized calls cannot journal context refusals"
+    );
 
     let err = mcp
         .call(&token, "replay", "search", serde_json::json!({}))
@@ -243,6 +283,21 @@ fn an_mcp_token_minted_before_the_crossing_is_refused_at_use() {
         })
         .expect("query");
     assert!(rows.is_empty(), "no McpInvocation row for a refused call");
+    let receipts = tl
+        .query_frames(FrameFilter {
+            kind: Some(FrameKind::GovernanceEvent),
+            ..Default::default()
+        })
+        .expect("refusal receipts");
+    assert_eq!(receipts.len(), 1);
+    let row = &receipts[0];
+    assert_eq!(row.spirit_pid, P);
+    assert_eq!(row.boot_nonce, 0x18_05);
+    assert_eq!(row.intent, "mcp.call.refused:context-exhausted");
+    assert_eq!(row.origin, maos_domain::invariants::i3::FrameOrigin::Kernel);
+    assert!(row.capability_token.is_none());
+    assert_eq!(row.payload_redacted,
+        br#"{"op":"mcp.call","code":"context-exhausted","server":"replay","tool":"search","boot_nonce":6149}"#);
 
     registry.context_budget().report(P, RESEARCHER, 8_000);
     mcp.call(&token, "replay", "search", serde_json::json!({}))

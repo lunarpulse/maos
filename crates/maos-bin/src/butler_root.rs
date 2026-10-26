@@ -167,13 +167,13 @@ pub fn context_binder(
     scbs: &Arc<Scbs>,
 ) -> butler::ContextBinder {
     let ledger = Arc::clone(capability.context_budget());
-    let (bus, scbs) = (Arc::downgrade(bus), Arc::downgrade(scbs));
+    let (bus, scbs) = (Arc::clone(bus), Arc::downgrade(scbs));
     Arc::new(move |pid_of: butler::PidSource| {
         let scbs = scbs.clone();
-        Arc::new(ContextSignalAdapter {
-            ledger: Arc::clone(&ledger),
-            bus: bus.clone(),
-            admitted: Arc::new(move || {
+        Arc::new(ContextSignalAdapter::new(
+            Arc::clone(&ledger),
+            &bus,
+            Arc::new(move || {
                 let pid = pid_of()?;
                 let scb = scbs.upgrade()?.read().ok()?.get(&pid).cloned()?;
                 let window = context_window(scb.runtime_snapshot().manifest.budget.as_ref());
@@ -184,7 +184,7 @@ pub fn context_binder(
                     window,
                 })
             }),
-        }) as Arc<dyn ContextBudgetPort>
+        )) as Arc<dyn ContextBudgetPort>
     })
 }
 

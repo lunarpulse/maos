@@ -304,17 +304,17 @@ fn researcher_context_refusal_is_typed_journaled_and_recovers() {
         pressure_permille: budget.context_pressure_permille,
         limit_permille: budget.context_limit_permille,
     };
-    let context = Arc::new(ContextSignalAdapter {
-        ledger: Arc::clone(capability.context_budget()),
-        bus: Arc::downgrade(&bus),
-        admitted: Arc::new(move || {
+    let context = Arc::new(ContextSignalAdapter::new(
+        Arc::clone(capability.context_budget()),
+        &bus,
+        Arc::new(move || {
             Some(AdmittedSpirit {
                 pid: PID,
                 spirit_id: RESEARCHER_SPIRIT_ID.into(),
                 window,
             })
         }),
-    });
+    ));
     let replay = Arc::new(Replay::from_corpus());
     assert_eq!(replay.exchanges.len(), 17);
     let client = Arc::new(McpClientAdapter::new(
@@ -391,12 +391,25 @@ fn researcher_context_refusal_is_typed_journaled_and_recovers() {
         })
         .unwrap();
     assert!(
-        !receipts.is_empty(),
+        receipts
+            .iter()
+            .any(|row| row.from_spirit_id == RESEARCHER_SPIRIT_ID),
         "the production governed mint journals the refusal"
+    );
+    assert_eq!(
+        receipts
+            .iter()
+            .filter(|row| row.from_spirit_id.is_empty())
+            .count(),
+        1,
+        "one authenticated use-time refusal uses the kernel PID-attribution convention"
     );
     for receipt in &receipts {
         assert_eq!(receipt.origin, FrameOrigin::Kernel);
-        assert_eq!(receipt.from_spirit_id, RESEARCHER_SPIRIT_ID);
+        assert!(
+            receipt.from_spirit_id.is_empty() || receipt.from_spirit_id == RESEARCHER_SPIRIT_ID,
+            "issuance keeps its trusted Spirit identity; use-time is bound by authenticated PID"
+        );
         assert_eq!(receipt.boot_nonce, BOOT_NONCE);
         let payload: serde_json::Value = serde_json::from_slice(&receipt.payload_redacted).unwrap();
         assert_eq!(payload["op"], "mcp.call");

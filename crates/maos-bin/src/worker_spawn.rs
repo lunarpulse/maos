@@ -461,21 +461,10 @@ pub fn issue_enterprise_governed_capability(
     Ok(token)
 }
 
-/// Field order is part of the operator-only MCP refusal receipt format.
-#[cfg(feature = "network")]
-#[derive(serde::Serialize)]
-struct McpRefusalPayload<'a> {
-    op: &'static str,
-    code: &'static str,
-    server: &'a str,
-    tool: &'a str,
-    boot_nonce: u64,
-}
-
 /// Story 17-9 CR-5 — the governed mint of one `McpCall` token for a Spirit's
-/// MCP call. On ANY governed refusal (SSO, PDP, kernel policy, issuance-quota
+/// MCP call. On ANY governed refusal (SSO, PDP, kernel policy, issuance/context
 /// exhaustion, identity-persistence rollback) it writes exactly one kind-28
-/// `mcp.call.refused:capability-denied` receipt at the Spirit's pid and
+/// `mcp.call.refused:<code>` receipt at the Spirit's pid and
 /// trusted id before returning the typed error; a success writes no receipt.
 /// Callers return before `McpClientPort::call` on `Err`. Receipts are kind 28,
 /// outside the Spirit-disclosable raw kinds, so a Spirit never recalls them.
@@ -510,24 +499,7 @@ pub fn issue_governed_mcp_capability(
             GovernedMintError::ContextExhausted => "context-exhausted",
             _ => "capability-denied",
         };
-        let payload = serde_json::to_vec(&McpRefusalPayload {
-            op: "mcp.call",
-            code,
-            server,
-            tool,
-            boot_nonce: journal.boot_nonce(),
-        })
-        .expect("MCP refusal receipt contains only serializable scalar fields");
-        let _ = journal.insert_frame_event_with_sender(
-            maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
-            spirit_pid,
-            spirit_id,
-            "",
-            None,
-            &format!("mcp.call.refused:{code}"),
-            &payload,
-            maos_domain::invariants::i3::FrameOrigin::Kernel,
-        );
+        journal.record_mcp_refusal(spirit_pid, Some(spirit_id), server, tool, code);
     }
     result
 }

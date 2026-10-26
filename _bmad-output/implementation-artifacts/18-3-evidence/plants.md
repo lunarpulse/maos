@@ -16,6 +16,20 @@ Wall-clock: plant → red observed (incl. rebuild), restore → green observed.
 CI plant (`ci/plant.diff`, sha256 `c59ac2191e4d889ae5483e8c1f947ecb27095d7401aed07d59ab35fb536213f2` in `ci/plant.diff.sha256`): the AC1 diff (restored
 fallback), which reds the `epic-18-exit` line-3 twin through its `researcher on_idle pass refused` assertion. `git apply --check`: all six diffs (ac1–ac5, ci) apply at the dev tree.
 
+**CI proven-red DONE 2026-10-26:** run `40237276846` (`ci/18-3-verify` @ `90eaa26c`, job `121301416295`, `ubuntu-24.04`
+image 20261012.334.1; workflow `ci/ci-18-3-verify.yml`): `plant.diff: OK` (sha256 above); control — exit line 3 rc=0 with
+`researcher inference seam wired (provider \`anthropic\`)` and `maos run: --once complete — exiting cleanly`; the planted
+empty-cassette twin printed only `maos: CASSETTE EXHAUSTED — cassette replay: exhausted (0 entries consumed, no more
+available)` — no `researcher on_idle pass refused: … exhausted` refusal — so `epic-18-exit`'s line-3 twin step reds under
+the plant. Excerpt `ci/run-40237276846-excerpt.log`; branch deleted. **Landing run 1 `40237233599` @ `b96d123a`** reds:
+`fr4_classifier_16_2` (doorbell scanner misread the `insert_frame_event_with_id` kind) and `check-test-budget`
+(`researcher_inference_18_3` 37.341 s > 30 s) — both fixed in `b50ea844` (kind argument read; 47 s budget exception) — and
+`cap_token_verify_p99_under_5us_hot_path` 5670 ns (shared-runner timing; owner `20-7-stable-runner-perf-gates`,
+`deferred-work.md:1266`). **Landing run 2 `40251998973` @ `79f49709`:** `workspace-test-suite`, `epic-18-exit` (exit
+lines 1–4 + both twins), `check-test-budget`, `check-serde-error-handling` green; the only reds are `onb-nfr2-timing`
+(binary size, 18-4's) and `check-multi-tenant-loom` `root_shutdown_unload_16_3::ac3_operator_door_unload_stops_a_live_worker_once`
+route-budget timing (passed in the same run's `workspace-test-suite`; owner 20-7).
+
 ## Review patch pass (2026-10-25, `anthropic/claude-opus-5-5`, rulings D-18-3-R1…R5)
 
 Same protocol: file copied to `/tmp/plants183/`, planted in place with the edit tool, focused `cargo nextest run --locked
