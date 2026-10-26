@@ -32,6 +32,9 @@ use crate::worker_spawn::{issue_governed_mcp_capability, GovernedMintError};
 pub struct ResearcherHost {
     pub seed_sink: Option<researcher::SeedSink>,
     pub distill: Arc<dyn DistillationPort + Send + Sync>,
+    pub recall: Arc<dyn LogRecallPort>,
+    pub boot_nonce: [u8; 16],
+    pub redistill_sink: Option<researcher::RedistillSink>,
 }
 
 impl ResearcherHost {
@@ -44,6 +47,10 @@ impl ResearcherHost {
         distill: Arc<dyn DistillationPort + Send + Sync>,
         live: bool,
     ) -> Self {
+        let recall = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
+            Arc::clone(&tl),
+        ));
+        let boot_nonce = (tl.boot_nonce() as u128).to_le_bytes();
         let seed_sink: researcher::SeedSink = Arc::new(move |pid, payload| {
             let digest = Sha256::new()
                 .chain_update(b"maos.researcher.seed/v1")
@@ -66,7 +73,13 @@ impl ResearcherHost {
             Ok(id)
         });
         let seed_sink = (!live).then_some(seed_sink);
-        Self { seed_sink, distill }
+        Self {
+            seed_sink,
+            distill,
+            recall,
+            boot_nonce,
+            redistill_sink: None,
+        }
     }
 }
 
@@ -102,14 +115,26 @@ pub fn construct(
     pid_of: PidSource,
     host: &ResearcherHost,
 ) -> Result<Researcher, String> {
+    if let Some(sink) = &host.redistill_sink {
+        researcher = researcher.with_forget_route(
+            Arc::clone(&pid_of),
+            host.boot_nonce,
+            Arc::clone(sink),
+            Arc::clone(&host.recall),
+        );
+    }
     if let Some(bind) = &seam.context {
         researcher = researcher.with_context_port(bind(Arc::clone(&pid_of)));
     }
     if let Some(build) = &wiring.mcp {
-        let (mcp, recall) = build(spirit_id, Arc::clone(&pid_of))?;
+        drop(build(spirit_id, Arc::clone(&pid_of))?);
+        let (build, id, pid) = (Arc::clone(build), spirit_id.to_owned(), Arc::clone(&pid_of));
+        let ports = Arc::new(researcher::DeferredMcpPorts::new(Arc::new(move || {
+            build(&id, Arc::clone(&pid))
+        })));
         researcher = researcher
-            .with_mcp_port(mcp)
-            .with_log_recall_port(recall, Arc::new(AtomicU32::new(0)));
+            .with_mcp_port(ports.clone())
+            .with_log_recall_port(ports, Arc::new(AtomicU32::new(0)));
         eprintln!("maos run: researcher live MCP port wired (--live)");
     }
     match (&seam.inference, &wiring.legacy_cassette) {

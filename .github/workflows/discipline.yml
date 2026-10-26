@@ -3351,7 +3351,9 @@ jobs:
       # a defensive pre-build.)
       - name: Build the maos binary + worker-cli-fixture (debug — journey tests spawn target/debug)
         run: cargo build --locked -p maos-bin --bin maos && cargo build --locked -p maos-cli --bin maosctl && cargo build --locked -p worker --bin worker-cli-fixture
-      - name: Hermetic journey suite (replay mode — JB-7 guards + deterministic floors)
+      # Includes journey_forget_18_6: daemon seed replay → door forget/redistill;
+      # same-instance MCP next-pass proof runs in the GDPR root-library leg.
+      - name: Hermetic journey suite (replay mode — JB-7 guards + deterministic floors + FR45 live cascade)
         run: cargo test -p maos-journey-test --locked
 
   smoke-discipline-7-1-5:
@@ -4032,7 +4034,7 @@ jobs:
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
           grep -q '^test result: ok\. 23 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 23 passed;'"; fail=1; }
-          for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :6' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
+          for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :8' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
                       'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
                       'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
                       'HOSTILE-IAC-SEND :1' 'WASM-IAC-SEND :1'; do
@@ -4934,6 +4936,14 @@ jobs:
         run: cargo test --locked -p maos-audit --test gdpr_cascade_test
       - name: GDPR deterministic cascade corpus
         run: cargo test --locked -p maos-audit --test gdpr_cascade_corpus_test
+      - name: Build operator binaries for production-door forget floors
+        run: cargo build --locked -p maos-bin --bin maos && cargo build --locked -p maos-cli --bin maosctl
+      - name: GDPR any-writer and derived-cascade library witnesses (18-6)
+        run: cargo test --locked -p maos-kernel-core --test forget_cascade_18_6
+      - name: GDPR production-door 50-removal 100-probe floors (18-6)
+        run: cargo test --locked -p maos-bin --test forget_floors_18_6
+      - name: GDPR same-instance MCP re-distillation and cache purge (18-6)
+        run: cargo test --locked -p maos-bin --test j_researcher_survey_18_3 mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live -- --exact
       # 13.5b review: the operator-facing terminals (daemon JSON + exit codes)
       # and the maosctl forwarding wrapper had no CI invocation either — the
       # corpus suite above only replays kernel `ForgetOutcome`s.

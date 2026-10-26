@@ -86,3 +86,41 @@ Prototype diffs are not committed. sha256: shared `ca9f056e65602568b232aed0de91c
 **Kernel grant (E16-A7, ADR-069), ratified with these rulings:** D-01 B + D-02 A + D-04 A = **+8 physical / +17 tokei** — `src_lines` 26418 → **≤ 26426** (`xtask/kernel-core-baseline.toml:505`), `maos-kernel-core` 20643 → **≤ 20660** (`xtask/kloc.toml:264`; `RATIFIED_AT_EASING` `xtask/tests/recovery_lane_ceiling_rule.rs:279`), exact measured figure at landing after `cargo fmt --all`, file `crates/maos-kernel-core/src/memory/mod.rs` **only**; the re-pin set above applies. Any other kernel file or a figure above the grant returns as a FLAG request. Envelope after landing at the grant: 2,340 to 23,000, 1,340 to the alarm; no `ENVELOPE ALARM`.
 
 **Out-of-kernel rows (RECOVERY-LANE rule) — measured requests at landing; STOP at dev above expected + 25 %** (expected = prototype measurement + creation forecast; above the line → stop and report the exact `kloc-check --json` figure before further production edits or re-pins): maos-bin ≤ **28770** (D-08 A); maos-iac 7979, expected up to +150 → **STOP above +188 (8167)**; maos-domain 9848, expected up to +47 → **STOP above +59 (9907)**; maos-audit 7473, expected +54–105 → **STOP above +131 (7604)**; maos-cli (6104 / 6856) and maos-journey-test (915 / 1104) land exact inside their ceilings; `_aggregate_hardfail` = measured + 1.
+
+## Measured development addendum — operator ruling 2026-10-26
+
+The developer stopped after formatting and measuring: maos-bin 28658 → 28916
+(+258), above the original 28770 STOP; maos-audit 7473 → 7623 (+150), above 7604.
+The operator selected **A**, relayed by Main: **maos-bin ≤ 28940** and
+**maos-audit ≤ 7640**, exact measured re-pins at landing with no unused allowance.
+Epic 18's named maos-bin budget is **28770 → exact landed figure**. The kernel
+grant, IAC/domain STOP lines, and measured+1 aggregate rule remain unchanged.
+
+Formatted maos-bin per-file attribution: `hook_pump.rs` 778 → 937 (+159),
+`main.rs` 12552 → 12601 (+49), `operator_door.rs` 1653 → 1678 (+25),
+`researcher_root.rs` 352 → 377 (+25), sum +258. These are root-owned dispatch,
+writer identity verification, all-path binding/terminal accounting, and lazy
+operation-scoped MCP/recall adapters that do not retain audit-channel owners.
+No production edit or re-pin occurred between the STOP measurement and ruling.
+
+## Exact development landing candidate
+
+After `cargo fmt --all`: kernel **26418 → 26407 physical (-11)**,
+**20643 → 20650 tokei (+7)**, 95 files, `memory/mod.rs` only. The full pin set
+(baseline line505/HISTORY, emitted set_hash and memory digest, four reader
+literals, kloc ceiling and `RATIFIED_AT_EASING`) moves together. Kernel public
+surface/classification artifacts remain unchanged; `check-service-boundary`
+passes with zero violations.
+
+Exact governed figures: maos-bin **28658 → 28914 (+256)**, maos-audit
+**7473 → 7625 (+152)**, maos-iac **7984 → 8080 (+96)**, maos-domain
+**9848 → 9887 (+39)**, maos-journey-test **915 → 946 (+31)**, maos-cli **6104**
+(unchanged, ceiling lowered to exact). Aggregate **185459 → 186040**,
+strict hardfail **186041 = measured + 1**. The +2-line drop from the STOP root
+candidate reuses the existing compact/colon frame-id decoder; audit's +2-line
+finisher gives v1 JSON fields stable lexical order under serde feature unification.
+All are inside the ratified grants; `kloc-check` passes with no over-budget rows.
+
+Story and sprint row: `review`. Hosted proven-red execution belongs to the
+integrator at landing; local checksum/apply/build/expected-red/restore/green
+simulation passed, with no hosted-run claim here.

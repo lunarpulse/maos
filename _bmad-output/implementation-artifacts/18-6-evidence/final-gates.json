@@ -1,0 +1,74 @@
+[
+  {
+    "gate": "kloc-check --json",
+    "exit": 0,
+    "wall_seconds": 0.23,
+    "last": "passed:true; aggregate186040; over_budget:[]"
+  },
+  {
+    "gate": "check-kernel-baseline",
+    "exit": 0,
+    "wall_seconds": 0.2,
+    "last": "check-kernel-baseline: PASSED (maos-kernel-core/src = 26407 lines, 95 files, pinned 26407)"
+  },
+  {
+    "gate": "check-env-contract",
+    "exit": 0,
+    "wall_seconds": 0.54,
+    "last": "check-env-contract: PASS (110 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml \u2014 D-I)"
+  },
+  {
+    "gate": "check-exit-commands",
+    "exit": 0,
+    "wall_seconds": 0.43,
+    "last": "check-exit-commands: PASS (4 epics, 4 blocks, 12 tokens resolved, 3 owed)"
+  },
+  {
+    "gate": "check-service-boundary",
+    "exit": 0,
+    "wall_seconds": 1.26,
+    "last": "check-service-boundary: PASSED (0 violations)"
+  },
+  {
+    "gate": "check-test-cost",
+    "exit": 0,
+    "wall_seconds": 0.4,
+    "last": "check-test-cost: PASS (553 test files, 8 marked spawn site(s) of which 4 cargo-query, 7 expensive binaries)"
+  },
+  {
+    "gate": "check-corpus",
+    "exit": 0,
+    "wall_seconds": 0.3,
+    "last": "check-corpus: PASSED (15 corpus entries checked)"
+  },
+  {
+    "gate": "coverage-matrix",
+    "exit": 0,
+    "wall_seconds": 0.21,
+    "last": "exit0; existing NFR-Meta-3 registry/phase warnings; deferred rows (advisory)"
+  },
+  {
+    "gate": "check-serde-error-handling",
+    "exit": 0,
+    "wall_seconds": 0.41,
+    "last": "check-serde-error-handling: PASSED (0 violations)"
+  },
+  {
+    "gate": "check-dev-record-completeness",
+    "exit": 0,
+    "wall_seconds": 0.25,
+    "last": "check-dev-record-completeness: PASSED (183 done-status stories checked)"
+  },
+  {
+    "gate": "check-reza-production-path",
+    "exit": 0,
+    "wall_seconds": 87.46,
+    "last": "check-reza-production-path: PASSED (evidence advisory; product_claim=NOT_PROVEN(tl-phase-b-persisted-datname-vs-live-current-database=ABSENT, gdpr-collective-partition-live=ABSENT, gdpr-collective-erase-live=ABSENT, spirit-route-and-tenant-audit-stage2-refusal-live=ABSENT); 4 ABSENT successor(s) derived)"
+  },
+  {
+    "gate": "gen-abi-docs --check",
+    "exit": 0,
+    "wall_seconds": 12.26,
+    "last": "exit0 (--check)"
+  }
+]

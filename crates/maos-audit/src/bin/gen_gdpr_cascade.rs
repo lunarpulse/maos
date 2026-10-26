@@ -9,6 +9,8 @@
 //! Usage:
 //!   cargo run --quiet -p maos-audit --bin gen_gdpr_cascade -- corpus <out>
 //!   cargo run --quiet -p maos-audit --bin gen_gdpr_cascade -- probe <out>
+//!   cargo run --quiet -p maos-audit --bin gen_gdpr_cascade -- corpus-v1 <out>
+//!   cargo run --quiet -p maos-audit --bin gen_gdpr_cascade -- probe-v1 <out>
 
 use std::io::{BufWriter, Write};
 
@@ -200,19 +202,110 @@ fn generate_probe(out_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Story 18-6: erased-only production-door floors; v0 remains byte-identical.
+fn generate_v1(out_path: &str, probes: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let mut writer = BufWriter::new(std::fs::File::create(out_path)?);
+    let strata = [
+        "indexed-private",
+        "unindexed-distillate",
+        "raw-mcp",
+        "derived-distillate",
+        "cross-boot-pid-reuse",
+        "multi-writer",
+    ];
+    for i in 0..if probes { 100 } else { 50 } {
+        let subject = i % 50;
+        let principal = if subject == 0 {
+            "director-ada".into()
+        } else {
+            format!("floor-{subject:03}@example.org")
+        };
+        let canary = format!("CANARY-forget-18-6-{subject:03}");
+        let row = if probes {
+            serde_json::json!({
+                "canary": canary,
+                "control_principal": format!("control-{subject:03}@example.org"),
+                "principal": principal,
+                "probe_id": format!("gdpr-probe-v1-{i:03}"),
+                "query_type": if i < 50 { "erased-principal" } else { "erased-canary" }
+            })
+        } else {
+            serde_json::json!({
+                "boot_nonce": 1806 + i as u64,
+                "canary": canary,
+                "control_principal": format!("control-{subject:03}@example.org"),
+                "expected_outcome": "erased",
+                "principal": principal,
+                "scenario_id": format!("gdpr-cascade-v1-{i:03}"),
+                "secondary_spirit_pid": 19000 + i as u32,
+                "spirit_pid": 18000 + i as u32,
+                "stratum": strata[i % strata.len()]
+            })
+        };
+        serde_json::to_writer(&mut writer, &row)?;
+        writer.write_all(b"\n")?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {
-        eprintln!("Usage: gen_gdpr_cascade <corpus|probe> <out_path>");
+        eprintln!("Usage: gen_gdpr_cascade <corpus|probe|corpus-v1|probe-v1> <out_path>");
         std::process::exit(2);
     }
 
     match args[1].as_str() {
         "corpus" => generate_cascade(&args[2]),
         "probe" => generate_probe(&args[2]),
+        "corpus-v1" => generate_v1(&args[2], false),
+        "probe-v1" => generate_v1(&args[2], true),
         other => {
             eprintln!("unknown mode: {other}");
             std::process::exit(2);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_v1;
+
+    #[test]
+    fn v1_generation_reproduces_the_frozen_erased_only_corpora() {
+        let dir = tempfile::tempdir().unwrap();
+        for (probes, frozen, count) in [
+            (
+                false,
+                include_str!("../../../../tests/corpora/gdpr-cascade-v1.jsonl"),
+                50,
+            ),
+            (
+                true,
+                include_str!("../../../../tests/corpora/gdpr-cascade-probe-v1.jsonl"),
+                100,
+            ),
+        ] {
+            let path = dir.path().join(if probes { "probes" } else { "scenarios" });
+            generate_v1(path.to_str().unwrap(), probes).unwrap();
+            let bytes = std::fs::read_to_string(path).unwrap();
+            assert_eq!(
+                bytes, frozen,
+                "the manifest pins the generator's exact bytes"
+            );
+            assert_eq!(bytes.lines().count(), count);
+            if !probes {
+                let strata: std::collections::BTreeSet<_> = bytes
+                    .lines()
+                    .map(|line| {
+                        let row: serde_json::Value = serde_json::from_str(line).unwrap();
+                        assert_eq!(row["expected_outcome"], "erased");
+                        row["stratum"].as_str().unwrap().to_owned()
+                    })
+                    .collect();
+                assert_eq!(strata.len(), 6);
+            }
         }
     }
 }

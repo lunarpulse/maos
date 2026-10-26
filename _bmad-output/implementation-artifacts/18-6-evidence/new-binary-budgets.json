@@ -1,0 +1,32 @@
+[
+  [
+    "maos-bin::hook_pump_17_4",
+    18,
+    20.083
+  ],
+  [
+    "maos-bin::j_researcher_survey_18_3",
+    2,
+    1.785
+  ],
+  [
+    "maos-bin::forget_floors_18_6",
+    1,
+    15.239
+  ],
+  [
+    "maos-domain::forget_cascade_18_6",
+    2,
+    0.006
+  ],
+  [
+    "maos-journey-test::journey_forget_18_6",
+    2,
+    5.342
+  ],
+  [
+    "maos-kernel-core::forget_cascade_18_6",
+    7,
+    3.178
+  ]
+]

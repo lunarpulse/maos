@@ -120,6 +120,28 @@ the resolved team's log — and the dry run and receipt name every sibling team
 log with its row counts. This retention is an operator-chosen, documented
 exception to FR2's clean-uninstall guarantee; deletion is the default.
 
+### Forget a principal
+
+`maosctl forget --principal <id>` erases the principal's Private namespace and
+index, scrubs Transparency Log frames naming the token-bounded id across all
+writers, and redacts distillates derived from those frames. Its JSON result
+includes scrubbed frame ids, redacted distillate ids, re-distillation requests
+with surviving source references, and each request's outcome.
+
+In a running daemon, live compiled-in Spirits receive a forget notice to purge
+their cached frames. A live, bound Researcher regenerates its redacted summaries
+through its own distillation path. Otherwise the request is recorded as typed
+pending (`writer-not-live`, `no-distillation-path`, `no-surviving-sources`,
+`form-unsupported`, or `refused:<typed>`); pending does not resume across boots.
+Offline forget and uninstall record `writer-not-live` rather than silently
+skipping regeneration.
+
+`maosctl forget --principal <id> --reason legal-hold` records a durable hold and
+exits 3 without scrubbing or regeneration. A prior hold also blocks erasure.
+Shared and Loom retain non-principal coordination data by partition. Detection
+is id-based, not semantic: copied content without the id, transformed or escaped
+ids, and later collection from an external source are outside this guarantee.
+
 ## Operate
 
 The kernel composition root lives in `crates/maos-bin`. Operational surfaces — the transparency log, capability mediation, sandbox tiers, ComplianceClaim admission, the registry, and yank propagation — are documented in the reference guides:

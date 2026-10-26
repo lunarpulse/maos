@@ -42,6 +42,7 @@ use maos_domain::frame::{ConsentEnvelope, ConsentRecall};
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i4::ApprovalDecision;
+use maos_domain::memory::{principal_id_occurs, RedistillOutcome, RedistillRequest};
 use maos_domain::ports::mcp::McpError;
 use maos_domain::ports::IacBusPort;
 use rusqlite::{Connection, OptionalExtension};
@@ -214,6 +215,15 @@ pub struct TransparencyLogEntry {
     pub correlation_id: Option<String>,
     pub payload_redacted: Vec<u8>,
     pub origin: FrameOrigin,
+}
+
+/// Cascade metadata only; candidate bodies are streamed and never retained.
+pub struct ForgetFrame {
+    pub frame_id: [u8; 16],
+    pub kind: i64,
+    pub spirit_pid: u32,
+    pub boot_nonce: u64,
+    pub source_log_ref: Vec<String>,
 }
 
 /// Payload-free row metadata. The raw kind is deliberately not decoded through
@@ -1500,114 +1510,190 @@ impl TransparencyLogAdapter {
         Ok(out)
     }
 
-    /// Story 9.2 — return every Distillate frame authored by a Spirit in
-    /// `writer_spirit_pids`, with its `payload_redacted` body.  Used by the
-    /// forget cascade to find candidate distillates for body-scrub (P3).
-    /// The cascade then applies a content-based filter so only distillates
-    /// that actually reference the forgotten principal are scrubbed.
-    pub fn distillate_frames_for_pids(
+    /// Any writer, any boot, any kind, with token-bounded confirmation.
+    pub fn principal_bearing_frames(
         &self,
-        writer_spirit_pids: &std::collections::HashSet<u32>,
-    ) -> Result<Vec<([u8; 16], Vec<u8>)>, AuditError> {
-        if writer_spirit_pids.is_empty() {
-            return Ok(Vec::new());
-        }
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        let placeholders = (0..writer_spirit_pids.len())
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(",");
-        let sql = format!(
-            "SELECT frame_id, payload_redacted FROM transparency_log \
-             WHERE kind = ?1 AND spirit_pid IN ({placeholders}) \
-             ORDER BY timestamp_ns ASC",
-        );
-        let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
-        let pid_params: Vec<Box<dyn rusqlite::types::ToSql>> = std::iter::once(Box::new(
-            FrameKind::Distillate as i64,
-        )
-            as Box<dyn rusqlite::types::ToSql>)
-        .chain(
-            writer_spirit_pids
-                .iter()
-                .map(|p| Box::new(*p as i64) as Box<dyn rusqlite::types::ToSql>),
-        )
-        .collect();
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
-            pid_params.iter().map(|p| p.as_ref()).collect();
-        let rows = stmt
-            .query_map(param_refs.as_slice(), |row| {
-                let fid_bytes: Vec<u8> = row.get(0)?;
-                let payload: Vec<u8> = row.get(1)?;
-                let mut arr = [0u8; 16];
-                if fid_bytes.len() == 16 {
-                    arr.copy_from_slice(&fid_bytes);
-                }
-                Ok((arr, payload))
-            })
-            .map_err(AuditError::SqliteRead)?;
-        let mut out = Vec::new();
-        for row in rows {
-            out.push(row.map_err(AuditError::SqliteRead)?);
-        }
-        Ok(out)
+        principal: &str,
+    ) -> Result<Vec<ForgetFrame>, AuditError> {
+        self.forget_frames(Some(principal), &std::collections::HashSet::new())
     }
 
-    /// Story 9.3b (SR-3) — return every cost-attribution or governance frame
-    /// authored by a Spirit in `writer_spirit_pids` that embeds a principal_id.
-    /// Used by the forget cascade to find candidates for body-scrub.
-    ///
-    /// Unlike distillate frames (which require a content-based body scan),
-    /// cost/governance frames carry principal_id as a STRUCTURED field,
-    /// so discovery is a clean indexed query.
-    pub fn principal_bearing_frames_for_pids(
+    /// Effective source refs are flattened by DistillateWriter, so one pass closes derivation.
+    pub fn distillates_citing(
         &self,
-        writer_spirit_pids: &std::collections::HashSet<u32>,
-    ) -> Result<Vec<([u8; 16], Vec<u8>)>, AuditError> {
-        if writer_spirit_pids.is_empty() {
-            return Ok(Vec::new());
-        }
+        scrubbed: &std::collections::HashSet<String>,
+    ) -> Result<Vec<ForgetFrame>, AuditError> {
+        self.forget_frames(None, scrubbed)
+    }
+
+    fn forget_frames(
+        &self,
+        principal: Option<&str>,
+        scrubbed: &std::collections::HashSet<String>,
+    ) -> Result<Vec<ForgetFrame>, AuditError> {
         let inner = self
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
-        let placeholders = (0..writer_spirit_pids.len())
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(",");
-        // FrameKind 28 = GovernanceEvent, 29 = CostAttribution
-        let sql = format!(
-            "SELECT frame_id, payload_redacted FROM transparency_log \
-             WHERE kind IN (28, 29) AND spirit_pid IN ({placeholders}) \
-             ORDER BY timestamp_ns ASC",
-        );
-        let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
-        let pids: Vec<i64> = writer_spirit_pids.iter().map(|&p| p as i64).collect();
-        let params_ref: Vec<&dyn rusqlite::types::ToSql> = pids
-            .iter()
-            .map(|p| p as &dyn rusqlite::types::ToSql)
-            .collect();
-        let rows = stmt
-            .query_map(rusqlite::params_from_iter(params_ref), |row| {
-                let fid: Vec<u8> = row.get(0)?;
-                let body: Vec<u8> = row.get(1)?;
-                Ok((fid, body))
-            })
+        // A failed earlier cascade may already have scrubbed a raw source.
+        // Flattened references still close that derivation on the re-run.
+        let mut tombstones = inner
+            .conn
+            .prepare(
+                "SELECT lower(hex(frame_id)) FROM transparency_log \
+             WHERE CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
+             THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 ELSE 0 END",
+            )
             .map_err(AuditError::SqliteRead)?;
-        let mut out = Vec::new();
-        for row in rows {
-            let (fid_vec, body) = row.map_err(AuditError::SqliteRead)?;
-            if fid_vec.len() != 16 {
-                return Err(AuditError::MalformedFrameId(fid_vec.len()));
+        let prior = tombstones
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(AuditError::SqliteRead)?
+            .collect::<Result<std::collections::HashSet<_>, _>>()
+            .map_err(AuditError::SqliteRead)?;
+        let mut stmt = inner.conn.prepare(
+            "SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted \
+             FROM transparency_log WHERE \
+             ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) \
+             OR (?1 IS NULL AND kind = 11)) \
+             AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') \
+             ORDER BY timestamp_ns ASC, frame_id ASC"
+        ).map_err(AuditError::SqliteRead)?;
+        let mut rows = stmt
+            .query(rusqlite::params![principal])
+            .map_err(AuditError::SqliteRead)?;
+        let mut found = Vec::new();
+        while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
+            let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
+            if let Some(id) = principal {
+                if !principal_id_occurs(&body, id) {
+                    continue;
+                }
             }
-            let mut fid = [0u8; 16];
-            fid.copy_from_slice(&fid_vec);
-            out.push((fid, body));
+            let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
+            let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
+                Self::distillate_source_refs(&body)?
+            } else {
+                Vec::new()
+            };
+            if principal.is_none()
+                && !source_log_ref
+                    .iter()
+                    .any(|id| scrubbed.contains(id) || prior.contains(id))
+            {
+                continue;
+            }
+            source_log_ref.retain(|id| !prior.contains(id));
+            let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
+            let frame_id = bytes
+                .try_into()
+                .map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?;
+            found.push(ForgetFrame {
+                frame_id,
+                kind,
+                spirit_pid: row.get::<_, i64>(2).map_err(AuditError::SqliteRead)? as u32,
+                boot_nonce: row.get::<_, i64>(3).map_err(AuditError::SqliteRead)? as u64,
+                source_log_ref,
+            });
         }
-        Ok(out)
+        Ok(found)
+    }
+
+    /// Canonical plain-hex ids, shared with forget receipts and notices.
+    pub fn distillate_source_refs(body: &[u8]) -> Result<Vec<String>, AuditError> {
+        let value: serde_json::Value =
+            serde_json::from_slice(body).map_err(|e| AuditError::Serialization(e.to_string()))?;
+        if value.get("redacted").and_then(|v| v.as_bool()) == Some(true) {
+            return Ok(Vec::new());
+        }
+        value
+            .get("source_log_ref")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| AuditError::Serialization("missing distillate source_log_ref".into()))?
+            .iter()
+            .map(|value| {
+                let id = value
+                    .as_str()
+                    .ok_or_else(|| AuditError::Serialization("non-string source id".into()))?;
+                let id = id.replace(':', "");
+                if id.len() != 32 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return Err(AuditError::Serialization("invalid source frame id".into()));
+                }
+                Ok(id.to_ascii_lowercase())
+            })
+            .collect()
+    }
+
+    /// Other frame kinds lose their whole payload; the marker contains no subject.
+    pub fn scrub_frame_body(
+        &self,
+        frame_id: [u8; 16],
+        kind: i64,
+        reason: &str,
+    ) -> Result<(), AuditError> {
+        let tombstone =
+            serde_json::json!({"redacted": true, "reason": reason, "original_kind": kind});
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let changed = inner
+            .conn
+            .execute(
+                "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
+                rusqlite::params![tombstone.to_string().as_bytes(), &frame_id[..]],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        if changed == 0 {
+            return Err(AuditError::SqliteRead(rusqlite::Error::QueryReturnedNoRows));
+        }
+        drop(inner);
+        let payload = serde_json::json!({"redacted_frame_id": format_frame_id_hex(&frame_id), "original_kind": kind});
+        self.insert_frame_event(
+            FrameKind::TaskComplete,
+            0,
+            None,
+            "frame.redacted",
+            payload.to_string().as_bytes(),
+            FrameOrigin::Kernel,
+        );
+        Ok(())
+    }
+
+    pub fn insert_redistill_request(&self, request: &RedistillRequest) -> Result<(), AuditError> {
+        let payload = serde_json::to_vec(&serde_json::json!({"request": request}))
+            .map_err(|e| AuditError::Serialization(e.to_string()))?;
+        self.insert_frame_event(
+            FrameKind::TaskComplete,
+            0,
+            None,
+            "distillate.redistill.requested",
+            &payload,
+            FrameOrigin::Kernel,
+        );
+        Ok(())
+    }
+
+    pub fn insert_redistill_outcome(
+        &self,
+        request: &RedistillRequest,
+        outcome: &RedistillOutcome,
+    ) -> Result<(), AuditError> {
+        let intent = match outcome {
+            RedistillOutcome::Redistilled { .. } => "distillate.redistilled",
+            RedistillOutcome::Pending { .. } => "distillate.redistill.pending",
+        };
+        let payload =
+            serde_json::to_vec(&serde_json::json!({"request": request, "outcome": outcome}))
+                .map_err(|e| AuditError::Serialization(e.to_string()))?;
+        self.insert_frame_event(
+            FrameKind::TaskComplete,
+            0,
+            None,
+            intent,
+            &payload,
+            FrameOrigin::Kernel,
+        );
+        Ok(())
     }
 
     /// Story 9.3b (SR-3) — scrub a principal-bearing cost/governance frame's
@@ -1616,13 +1702,14 @@ impl TransparencyLogAdapter {
     pub fn scrub_principal_bearing_frame(
         &self,
         frame_id: [u8; 16],
+        principal_id: &str,
         reason: &str,
     ) -> Result<(), AuditError> {
         let inner = self
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
-        // Try to parse the existing payload and redact only the principal_id field.
+        // Preserve dimensional facts, including nested SR-3 principal attribution.
         let existing: Vec<u8> = inner
             .conn
             .query_row(
@@ -1633,13 +1720,25 @@ impl TransparencyLogAdapter {
             .map_err(AuditError::SqliteRead)?;
         let redacted_bytes = match serde_json::from_slice::<serde_json::Value>(&existing) {
             Ok(mut val) => {
-                if let Some(obj) = val.as_object_mut() {
-                    if obj.contains_key("principal_id") {
-                        obj.insert(
-                            "principal_id".to_string(),
-                            serde_json::Value::String("[REDACTED]".to_string()),
-                        );
+                fn scrub(value: &mut serde_json::Value, principal: &str) {
+                    match value {
+                        serde_json::Value::String(text)
+                            if principal_id_occurs(text.as_bytes(), principal) =>
+                        {
+                            *text = "[REDACTED]".into()
+                        }
+                        serde_json::Value::Array(values) => {
+                            values.iter_mut().for_each(|v| scrub(v, principal))
+                        }
+                        serde_json::Value::Object(values) => {
+                            values.retain(|key, _| !principal_id_occurs(key.as_bytes(), principal));
+                            values.values_mut().for_each(|v| scrub(v, principal));
+                        }
+                        _ => {}
                     }
+                }
+                scrub(&mut val, principal_id);
+                if let Some(obj) = val.as_object_mut() {
                     // Also record redaction metadata
                     obj.insert("redacted".to_string(), serde_json::Value::Bool(true));
                     obj.insert(
@@ -1665,10 +1764,7 @@ impl TransparencyLogAdapter {
                 "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
                 rusqlite::params![&redacted_bytes[..], &frame_id[..]],
             )
-            .map_err(|e| {
-                panic!("MAOS kernel panic — principal-bearing frame scrub failed: {e}. I2.");
-            })
-            .unwrap();
+            .map_err(AuditError::SqliteWriteFatal)?;
 
         Ok(())
     }

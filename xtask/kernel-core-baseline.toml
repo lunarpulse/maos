@@ -502,7 +502,12 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26418
+src_lines = 26407
+# HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, FLAG-Winston
+#          D-18-6-01 B / 02 A / 04 A, operator 2026-10-26: exact formatted
+#          26418 -> 26407 physical (-11), 20643 -> 20650 tokei (+7), 95 files.
+#          Any-writer/id-bounded scan, derived closure, pre-scrub requests;
+#          memory/mod.rs only, within <=26426 / <=20660 grant, ZERO HEADROOM.
 # HISTORY: 18-5-context-token-budget-accounting review rulings R1/R3 and E1-A,
 #          operator 2026-10-26: exact formatted 26414 -> 26418 physical (+4),
 #          20639 -> 20643 tokei (+4), within the pre-authorized +4/+4 addendum.
@@ -859,7 +864,7 @@ src_lines = 26418
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "3637ab6a50eba9541baed94120c2a42462f7b40b044c88756d67299153b60878"
+set_hash = "8400cd23000b0bd75c38aae063c357e7d158fca517b8f5abf947561699cd89bf"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -901,7 +906,7 @@ set_hash = "3637ab6a50eba9541baed94120c2a42462f7b40b044c88756d67299153b60878"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
 "mcp/mod.rs" = "a16d0937ba2e1f5e08169d6a2ed84e93dfe6a96a1f0ef028f3149cacd95d1da4"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
-"memory/mod.rs" = "2b36b724ab77164c2c425e09c34d85070ecc39f6cf87e582ce62fef4439d73c9"
+"memory/mod.rs" = "028f5932a3f0f46de60e99a32f40329b89241528713a0492ba53c87c1c655bbf"
 "memory/principal.rs" = "c99431b9fd3fbe40b758e22dd54091fae4def4b8700717c9767d7ebc67bd9aac"
 "memory/private.rs" = "9b149278ed9128b4edb38601e5f0d0b88948283e10d4fd693aeee50024f40e5c"
 "memory/read_entry_point.rs" = "0528ce87453ef4a10b4bbe4a360f557769be412fc091df4734495482d551dda1"

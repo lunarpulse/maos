@@ -239,6 +239,7 @@ struct DoorInner {
     spirit_locks: SpiritCommandLocks,
     command_tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
     post_unload_stop: Mutex<Option<Arc<dyn Fn(u32) + Send + Sync>>>,
+    forget_pump: Mutex<Option<std::sync::Weak<crate::hook_pump::HookPump>>>,
 }
 
 /// `maosctl`-visible director identity on every approval-log row (FR42 keeps
@@ -303,7 +304,12 @@ impl OperatorDoor {
             spirit_locks: SpiritCommandLocks::default(),
             command_tasks: Mutex::new(Vec::new()),
             post_unload_stop: Mutex::new(None),
+            forget_pump: Mutex::default(),
         }))
+    }
+
+    pub fn set_forget_pump(&self, pump: &Arc<crate::hook_pump::HookPump>) {
+        *self.0.forget_pump.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::downgrade(pump));
     }
 
     /// The per-Spirit serialization lock (D-16-1-R). Exposed so the in-process
@@ -1344,12 +1350,32 @@ impl DoorInner {
                 detail: error.to_string(),
             },
             Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) => {
-                OperatorOutcome::Completed(serde_json::json!({
-                    "principal_id": principal,
-                    "outcome": "erased",
-                    "forget": outcome,
-                    "terminal_code": 0,
-                }))
+                let pump = self
+                    .forget_pump
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .as_ref()
+                    .and_then(std::sync::Weak::upgrade);
+                let mut body = match crate::hook_pump::HookPump::finish_forget(
+                    &self.transparency_log,
+                    &outcome,
+                    pump.as_deref(),
+                )
+                .await
+                {
+                    Ok(body) => body,
+                    Err(detail) => {
+                        return OperatorOutcome::Failed {
+                            code: "redistill_failed".into(),
+                            detail,
+                        }
+                    }
+                };
+                body["principal_id"] = serde_json::json!(principal);
+                body["outcome"] = serde_json::json!("erased");
+                body["forget"] = serde_json::json!(outcome);
+                body["terminal_code"] = serde_json::json!(0);
+                OperatorOutcome::Completed(body)
             }
             Ok(outcome @ maos_domain::memory::ForgetOutcome::Suspended { .. }) => {
                 // P29-cli: a legal-hold suspension is NOT a success — the

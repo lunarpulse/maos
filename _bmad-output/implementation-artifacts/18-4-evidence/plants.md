@@ -31,7 +31,7 @@ place with the editor, the one test run, then `cp … && cmp … && touch …` a
 | R5 (BH-1) — scene digest reads the day's pass | `lib.rs` `digest_value` scene arm: `since_ns: Some(since_ns.min(0))` (every frame of the boot, not the day's pass) | `exit_line_4_halts_upstream_on_the_variance_led_rule` | FAIL `:251` `left: 2 right: 1` (day 2's digest counts day 1's evaluation) | Summary 1 passed | red 6 s / green 5 s |
 | R5 (label) | `render_at` passes `None` (wall-clock window in the scene) | same | FAIL `:244` (`frames` is `last_24h`, not `scene_pass`) | Summary 1 passed | red 7 s / green 6 s |
 
-## CI plant (AC1, line-4 steady twin) — PREPARED and simulated locally
+## CI plant (AC1, line-4 steady twin) — PROVEN-RED in CI
 
 - `ci/plant.diff` regenerated at the review pass against the new `assess` arm (review EC-2 moved the line):
   sha256 `bfb733616c4c24d615bc15bb1440f2cf993c635a48722c7f8dd006a3cc964dad` (`ci/plant.diff.sha256`; the dev
@@ -42,3 +42,5 @@ place with the editor, the one test run, then `cp … && cmp … && touch …` a
   sha OK, plant applied, build OK; **control** rc=0, `butler inference seam wired`, halt day 1 at rate 1.0, line-4
   checks GREEN; **twin** rc=0 with `{"event":"halt",…,"day":1,"derived_from":"acceptance_window","belief_variance":0.8,…}`
   → the twin step reds (PROVEN-RED). Restored by `cp /tmp/p184/lib.rs.sim-orig … && cmp && touch`. Wall-clock 19 s.
+
+**CI proven-red DONE 2026-10-26:** run `40252047430` (`ci/18-4-verify` @ `8a6801cc`, job `121345884398`, `ubuntu-24.04` image 20261012.334.1; plant `ci/plant.diff` sha `bfb73361…`, `plant.diff: OK`); control exit line 4 green; the steady twin halted on day 1 (`"render":"halted on belief_variance","day":1`), so the twin step reds. Excerpt `18-4-evidence/ci/run-40252047430-excerpt.log`; branch deleted. **Landing run 1 `40251998973` @ `79f49709`:** reds: `onb-nfr2-timing` binary size 33,666,176 B > 33,554,432 B (attributed in `18-4-evidence/binary-size-attribution.md`; fixed by `[profile.release.package.maos-bin] codegen-units = 1` in `5495863e`, local stripped 29,864,312 B, limit unchanged) and `check-multi-tenant-loom` `ac3_operator_door_unload_stops_a_live_worker_once` route-budget timing (deferred row owner `20-7-stable-runner-perf-gates`). **Landing run 2 `40267102242` @ `5495863e`:** reds were 18-5's (context factory strong IAC bus, TS WIT 2.1 imports, ABI docs, ko glossary); fixed in `3aad2f4c`. **Landing run 3 `40273714381` @ `3aad2f4c`:** `onb-nfr2-timing` (binary size + §13.1 latency) GREEN, workspace-test-suite, epic-18-exit, check-test-budget, check-multi-tenant-loom GREEN; the only reds were `wasm-host-tests` ×4 on an 18-5 CI marker pin (`GOVERNED-ATOMIC` 8 vs pinned 6; 18-5 added the `context_exhausted` case) and the three fan-in gates. 18-4 kloc C addendum: maos-bin **28588** landed (later stories moved it further).

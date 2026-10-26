@@ -416,6 +416,52 @@ pub struct LegalHoldRecord {
     pub status: String,
 }
 
+/// Non-personal regeneration input captured before the distillate is scrubbed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RedistillRequest {
+    pub redacted_distillate_frame_id: String,
+    pub writer_spirit_pid: u32,
+    /// Canonical little-endian u128 encoding of the log's u64 boot nonce.
+    pub writer_boot_nonce: [u8; 16],
+    pub surviving_source_log_ref: Vec<String>,
+}
+
+/// Purge reaches every live Spirit; requests are routed only to their writer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ForgetNotice {
+    pub scrubbed_frame_ids: Vec<String>,
+    pub redistill: Vec<RedistillRequest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RedistillPendingReason {
+    WriterNotLive,
+    NoDistillationPath,
+    NoSurvivingSources,
+    FormUnsupported,
+    Refused(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "kebab-case")]
+pub enum RedistillOutcome {
+    Redistilled { new_distillate_frame_id: String },
+    Pending { reason: RedistillPendingReason },
+}
+
+/// Match an id without erasing a longer email/id sharing its substring.
+pub fn principal_id_occurs(body: &[u8], principal_id: &str) -> bool {
+    let needle = principal_id.as_bytes();
+    let token = |b: u8| b.is_ascii_alphanumeric() || b"@._+-".contains(&b);
+    !needle.is_empty()
+        && body.windows(needle.len()).enumerate().any(|(i, window)| {
+            window == needle
+                && (i == 0 || !token(body[i - 1]))
+                && (i + needle.len() == body.len() || !token(body[i + needle.len()]))
+        })
+}
+
 /// Result of `MemoryManagerAdapter::forget_with_reason`.
 /// Either the cascade erased the principal, or a legal hold suspended it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -425,6 +471,8 @@ pub enum ForgetOutcome {
         receipt: ForgetReceipt,
         redacted_distillate_frame_ids: Vec<String>,
         redacted_principal_frame_ids: Vec<String>,
+        #[serde(default)]
+        redistill: Vec<RedistillRequest>,
     },
     Suspended {
         hold: LegalHoldRecord,

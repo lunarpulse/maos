@@ -64,7 +64,12 @@ impl World {
         static CLOCK: std::sync::Once = std::sync::Once::new();
         CLOCK.call_once(maos_kernel_core::capability::cap_tokens::init_monotonic_base);
         let tl = Arc::new(
-            TransparencyLogAdapter::open(&dir.path().join("transparency.sqlite"), NONCE).unwrap(),
+            TransparencyLogAdapter::open_with_global_legal_holds(
+                &dir.path().join("transparency.sqlite"),
+                &dir.path().join("transparency.sqlite"),
+                NONCE,
+            )
+            .unwrap(),
         );
         let metrics = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
         let policy = Arc::new(PolicyTable::new());
@@ -1290,4 +1295,201 @@ fn a_queued_hook_invokes_and_accounts_the_validated_runtime() {
         );
         world.pump.shutdown().await;
     });
+}
+
+struct ForgetProbe {
+    notices: Arc<Mutex<Vec<maos_domain::memory::ForgetNotice>>>,
+    sink: Option<researcher::RedistillSink>,
+    result_frame: String,
+}
+
+impl Spirit for ForgetProbe {
+    fn on_consolidate(&self, _ctx: &mut Ctx, payload: &ConsolidatePayload<'_>) {
+        let notice: maos_domain::memory::ForgetNotice =
+            serde_json::from_slice(payload.batch_data).unwrap();
+        if let Some(sink) = &self.sink {
+            for request in &notice.redistill {
+                sink(
+                    request,
+                    maos_domain::memory::RedistillOutcome::Redistilled {
+                        new_distillate_frame_id: self.result_frame.clone(),
+                    },
+                );
+            }
+        }
+        self.notices.lock().unwrap().push(notice);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn forget_notice_broadcast_binds_boot_and_pid_and_rejects_another_writer() {
+    use maos_domain::memory::{ForgetOutcome, RedistillRequest};
+    let world = World::new();
+    let notices = Arc::new(Mutex::new(Vec::new()));
+    let sink = world.pump.redistill_sink();
+    let wrong_source = world.tl.insert_kernel_event_returning_id(
+        EMITTER_PID,
+        FrameKind::TaskComplete,
+        None,
+        "fixture.source",
+        b"{}",
+    );
+    let wrong_frame = {
+        use maos_domain::distillation::{DigestPayload, DistillationRequest};
+        use maos_domain::ports::DistillationPort;
+        maos_kernel_core::iac::distillate::DistillateWriter::new(world.tl.clone(), Arc::new(()))
+            .write_distillate(
+                EMITTER_PID,
+                DistillationRequest::new(
+                    vec![wrong_source],
+                    1,
+                    DigestPayload::Text("wrong writer".into()),
+                    None,
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .digest_frame_id
+    };
+    let pid = world
+        .admit(
+            OBSERVER_MANIFEST,
+            make_spirit_obj(ForgetProbe {
+                notices: notices.clone(),
+                sink: Some(sink.clone()),
+                result_frame: hex::encode(wrong_frame),
+            }),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    let mut forgotten = world
+        .memory
+        .forget_with_reason("root-forget-18-6", None)
+        .unwrap();
+    let scrubbed = hex::encode([0xA1; 16]);
+    if let ForgetOutcome::Erased {
+        redistill,
+        redacted_principal_frame_ids,
+        ..
+    } = &mut forgotten
+    {
+        redacted_principal_frame_ids.push(scrubbed.clone());
+        for (id, nonce) in [(0x11, NONCE), (0x22, NONCE - 1)] {
+            redistill.push(RedistillRequest {
+                redacted_distillate_frame_id: hex::encode([id; 16]),
+                writer_spirit_pid: pid,
+                writer_boot_nonce: (nonce as u128).to_le_bytes(),
+                surviving_source_log_ref: vec![hex::encode([0xB2; 16])],
+            });
+        }
+    } else {
+        panic!("unheld forget must erase");
+    }
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump))
+        .await
+        .unwrap();
+    assert_eq!(report["pending_count"], 2);
+    assert_eq!(report["redistilled_count"], 0);
+    assert_eq!(
+        report["redistill_outcomes"][0]["outcome"]["reason"]["refused"],
+        "writer-mismatch"
+    );
+    assert_eq!(
+        report["redistill_outcomes"][1]["outcome"]["reason"],
+        "writer-not-live"
+    );
+    let received = notices.lock().unwrap();
+    assert_eq!(received.len(), 1);
+    assert_eq!(received[0].scrubbed_frame_ids, [scrubbed]);
+    assert_eq!(
+        received[0].redistill.len(),
+        1,
+        "boot-local pid reuse must not route"
+    );
+    assert_eq!(received[0].redistill[0].writer_spirit_pid, pid);
+    drop(received);
+    let rows = world
+        .tl
+        .query_frames(FrameFilter {
+            intent: Some("distillate.redistill.pending".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(rows.len(), 2, "each request must be journaled exactly once");
+
+    let held = world
+        .memory
+        .forget_with_reason("held-root-18-6", Some("legal-hold"))
+        .unwrap();
+    assert!(matches!(held, ForgetOutcome::Suspended { .. }));
+    HookPump::finish_forget(&world.tl, &held, Some(&world.pump))
+        .await
+        .unwrap();
+    assert_eq!(
+        notices.lock().unwrap().len(),
+        1,
+        "legal hold sends no notice"
+    );
+
+    let offline = HookPump::finish_forget(&world.tl, &forgotten, None)
+        .await
+        .unwrap();
+    assert_eq!(offline["pending_count"], 2);
+    for row in offline["redistill_outcomes"].as_array().unwrap() {
+        assert_eq!(row["outcome"]["reason"], "writer-not-live");
+    }
+    let weak_capability = Arc::downgrade(&world.capability);
+    world.pump.shutdown().await;
+    drop(world);
+    assert!(
+        weak_capability.upgrade().is_none(),
+        "a retained result sink must not pin the audit-channel owner"
+    );
+    drop(sink);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn forget_curates_a_live_spirit_even_when_it_has_no_redistillation_path() {
+    use maos_domain::memory::{ForgetOutcome, RedistillRequest};
+    let world = World::new();
+    let notices = Arc::new(Mutex::new(Vec::new()));
+    let pid = world
+        .admit(
+            OBSERVER_MANIFEST,
+            make_spirit_obj(ForgetProbe {
+                notices: notices.clone(),
+                sink: None,
+                result_frame: String::new(),
+            }),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    let mut forgotten = world
+        .memory
+        .forget_with_reason("unsupported-root-18-6", None)
+        .unwrap();
+    if let ForgetOutcome::Erased { redistill, .. } = &mut forgotten {
+        redistill.push(RedistillRequest {
+            redacted_distillate_frame_id: hex::encode([0x33; 16]),
+            writer_spirit_pid: pid,
+            writer_boot_nonce: (NONCE as u128).to_le_bytes(),
+            surviving_source_log_ref: vec![hex::encode([0x44; 16])],
+        });
+    }
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump))
+        .await
+        .unwrap();
+    assert_eq!(report["pending_count"], 1);
+    assert_eq!(
+        report["redistill_outcomes"][0]["outcome"]["reason"],
+        "form-unsupported"
+    );
+    assert_eq!(
+        notices.lock().unwrap().len(),
+        1,
+        "curation is not conditional on a distillation port"
+    );
+    world.pump.shutdown().await;
 }

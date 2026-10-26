@@ -353,6 +353,40 @@ impl MockMcp {
         }
     }
 
+    /// Serve request-dependent answers until dropped. A fixture can remove a
+    /// subject after its first fetch, without reconnect failures or re-ingestion.
+    pub fn from_handler(
+        mut answer: impl FnMut(&McpRequestCapture) -> String + Send + 'static,
+    ) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).expect("MockMcp nonblocking");
+        let (tx, rx) = mpsc::channel();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&shutdown);
+        let handle = std::thread::spawn(move || {
+            while let Some(mut stream) = accept_until(&listener, &flag) {
+                let Some(capture) = read_http_request(&mut stream) else {
+                    continue;
+                };
+                let body = answer(&capture);
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(), body
+                );
+                let _ = std::io::Write::write_all(&mut stream, response.as_bytes());
+                let _ = tx.send(capture);
+            }
+        });
+        Self {
+            _fixture: String::new(),
+            url: format!("http://{addr}"),
+            writes_rx: Mutex::new(rx),
+            shutdown,
+            _server_handle: Some(handle),
+        }
+    }
+
     pub fn url(&self) -> &str {
         &self.url
     }

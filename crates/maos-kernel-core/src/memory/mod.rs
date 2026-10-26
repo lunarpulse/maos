@@ -57,8 +57,6 @@ use parking_lot::Mutex;
 use crate::capability::cap_audit::VerifyOutcome;
 use crate::capability::CapabilityRegistryAdapter;
 use crate::iac::transparency_log::TransparencyLogAdapter;
-use maos_domain::cost::{CostAttributionPayload, PrincipalRef};
-use maos_domain::governance::GovernanceEventPayload;
 use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::memory::{
     CollectiveErrorKind, ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord,
@@ -542,74 +540,64 @@ impl MemoryManagerAdapter {
             hook();
         }
 
-        // 1. Snapshot index rows (needed to identify affected Spirits/distillates).
-        let rows = self.principal_index.lookup(principal_id)?;
-        let writer_pids: HashSet<u32> = rows.iter().map(|r| r.writer_spirit_pid).collect();
-
-        // 2. Body-scrub for distillates that REFERENCE the forgotten principal.
-        //    P3: only distillates whose body embeds the principal_id are
-        //    scrubbed — not every distillate by any writer Spirit (which would
-        //    destroy unrelated principals' data).
-        //    P5: a query error is propagated, not silently dropped.
-        //    P4: scrub failure is propagated; the append-only redaction marker
-        //    is best-effort and does not determine whether the scrubbed frame is attested.
-        let mut redacted_distillate_frame_ids: Vec<String> = Vec::new();
-        if !writer_pids.is_empty() {
-            let distillates = self
-                .transparency_log
-                .distillate_frames_for_pids(&writer_pids)
-                .map_err(|e| MemoryError::Storage(e.to_string()))?;
-            let needle = principal_id.as_bytes();
-            for (frame_id, body) in distillates {
-                if !body.windows(needle.len()).any(|w| w == needle) {
-                    continue;
-                }
-                self.transparency_log
-                    .scrub_distillate_body(frame_id, "gdpr-forget")
-                    .map_err(|e| MemoryError::Storage(e.to_string()))?;
-                let _ = self
-                    .transparency_log
-                    .insert_distillate_redaction_marker(principal_id, frame_id);
-                redacted_distillate_frame_ids.push(hex::encode(frame_id));
+        // Scan all writers before deleting either principal store (re-runnable W1).
+        let mut frames = self
+            .transparency_log
+            .principal_bearing_frames(principal_id)
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        let mut scrubbed: HashSet<String> =
+            frames.iter().map(|f| hex::encode(f.frame_id)).collect();
+        let derived = self
+            .transparency_log
+            .distillates_citing(&scrubbed)
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        for frame in derived {
+            if scrubbed.insert(hex::encode(frame.frame_id)) {
+                frames.push(frame);
             }
         }
-
-        // SR-3 (Story 9.3b) — scrub cost/governance frames that embed the
-        // forgotten principal. Unlike distillates (content-based body scan),
-        // these frames carry principal_id as a structured JSON field.
-        let mut redacted_principal_frame_ids: Vec<String> = Vec::new();
-        if !writer_pids.is_empty() && !principal_id.is_empty() {
-            let principal_frames = self
-                .transparency_log
-                .principal_bearing_frames_for_pids(&writer_pids)
-                .map_err(|e| MemoryError::Storage(e.to_string()))?;
-            for (frame_id, body) in principal_frames {
-                // Structured match: parse as typed cost/governance payloads
-                // instead of fragile byte-substring scan (SR-3 review fix).
-                let frame_matches = if let Ok(cost) =
-                    serde_json::from_slice::<CostAttributionPayload>(&body)
-                {
-                    match &cost.principal {
-                        PrincipalRef::Resolved { principal_id: pid } => pid == principal_id,
-                        _ => false,
-                    }
-                } else if let Ok(_gov) = serde_json::from_slice::<GovernanceEventPayload>(&body) {
-                    // Governance frames do not carry a principal_id field;
-                    // they are never principal-bearing for forget purposes.
-                    false
-                } else {
-                    // Unknown frame schema — fall back to byte scan so
-                    // future frame kinds are not silently skipped.
-                    body.windows(principal_id.len())
-                        .any(|w| w == principal_id.as_bytes())
-                };
-                if !frame_matches {
-                    continue;
+        let mut redacted_distillate_frame_ids = Vec::new();
+        let mut redacted_principal_frame_ids = Vec::new();
+        let mut redistill = Vec::new();
+        for frame in frames {
+            let frame_id = frame.frame_id;
+            let id = hex::encode(frame_id);
+            match frame.kind {
+                11 => {
+                    let request = maos_domain::memory::RedistillRequest {
+                        redacted_distillate_frame_id: id.clone(),
+                        writer_spirit_pid: frame.spirit_pid,
+                        writer_boot_nonce: (frame.boot_nonce as u128).to_le_bytes(),
+                        surviving_source_log_ref: frame
+                            .source_log_ref
+                            .into_iter()
+                            .filter(|id| !scrubbed.contains(id))
+                            .collect(),
+                    };
+                    self.transparency_log
+                        .insert_redistill_request(&request)
+                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                    self.transparency_log
+                        .scrub_distillate_body(frame_id, "gdpr-forget")
+                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                    let _ = self
+                        .transparency_log
+                        .insert_distillate_redaction_marker(principal_id, frame_id);
+                    redacted_distillate_frame_ids.push(id);
+                    redistill.push(request);
                 }
-                self.transparency_log
-                    .scrub_principal_bearing_frame(frame_id, "gdpr-forget")
-                    .map_err(|e| MemoryError::Storage(e.to_string()))?;
-                redacted_principal_frame_ids.push(hex::encode(frame_id));
+                28 | 29 => {
+                    self.transparency_log
+                        .scrub_principal_bearing_frame(frame_id, principal_id, "gdpr-forget")
+                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                    redacted_principal_frame_ids.push(id);
+                }
+                kind => {
+                    self.transparency_log
+                        .scrub_frame_body(frame_id, kind, "gdpr-forget")
+                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                    redacted_principal_frame_ids.push(id);
+                }
             }
         }
 
@@ -658,6 +646,7 @@ impl MemoryManagerAdapter {
             receipt,
             redacted_distillate_frame_ids,
             redacted_principal_frame_ids,
+            redistill,
         })
     }
 

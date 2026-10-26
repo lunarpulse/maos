@@ -160,3 +160,19 @@ item_count = 16
 valid_until = "2027-10-25"
 prompt_version_hash = "56bebf0beca733ffd335a4d175704aa71c56f18367b1a4b62ee002d9dd42be4c"
 description = "Story 18-3 NFR-Aud-7 Researcher distillation corpus (symlink to spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl): 16 scenarios (12 clean, 4 negative-control rows: hedge-drop, fabricated-cite, planted-secret, dropped-claim) of source claims journaled as TL frames, each with its frozen survey and frozen judge verdicts (provenance seed; the hedge-drop and planted-secret rows freeze `false` verdicts for their rubric-breaking findings — the fifth, unfaithful-finding control). Completions in crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.json (33 real-hash entries, provenance seed). Floors recall >= 0.90, faithfulness >= 0.98, hedge preservation >= 0.95 (word-boundary hedge match), traceability = 100%, secret leakage = 0% over the clean rows; every control must miss its metric. Also scored hermetically by crates/maos-eval/tests/distillate_five_metrics_floor.rs."
+
+[corpus."gdpr-cascade-v1"]
+sha256 = "6542c0b2e6a96397fabb42b48c15822b3b4168145611a96a2413d3d51d745500"
+schema_version = 1
+item_count = 50
+valid_until = "2027-10-26"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Story 18-6 erased-only production-door cascade floors: 50 scenarios across indexed Private, unindexed Distillate, raw MCP, derived Distillate, cross-boot pid reuse and multi-writer strata. gen_gdpr_cascade corpus-v1; real adapter seeding and maosctl forget in forget_floors_18_6. v0 remains the held/failed/not-found regression."
+
+[corpus."gdpr-cascade-probe-v1"]
+sha256 = "11cc1002c0e78db2559a08c4488da806ba29142db0761253a5dfea8b0f1fff41"
+schema_version = 1
+item_count = 100
+valid_until = "2027-10-26"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Story 18-6 gen_gdpr_cascade probe-v1: 100 principal/canary probes across raw TL payloads, Shared values, Private spills and principal index, plus subject-access queries and untouched controls. director-ada subset is also consumed by journey_forget_18_6."

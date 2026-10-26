@@ -687,7 +687,7 @@ pub fn to_fr4_ndjson<W: Write>(
     let mut line_no = 0usize;
     for mut entry in entries.into_iter() {
         line_no += 1;
-        if classify_fr4_row(&entry) == Fr4RowDisposition::NonCallKernelEvent {
+        if classify_fr4_row(&entry) != Fr4RowDisposition::Call {
             let kind = std::mem::take(&mut entry.kind);
             *omitted.entry(kind).or_insert(0) += 1;
             continue;
@@ -937,7 +937,7 @@ pub fn to_fr4_plain<W: Write>(
     let mut line_no = 0usize;
     for entry in entries.into_iter() {
         line_no += 1;
-        if classify_fr4_row(&entry) == Fr4RowDisposition::NonCallKernelEvent {
+        if classify_fr4_row(&entry) != Fr4RowDisposition::Call {
             writeln!(
                 out,
                 "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",

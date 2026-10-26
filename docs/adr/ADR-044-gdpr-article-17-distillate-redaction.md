@@ -45,6 +45,29 @@ marker alone does not remove embedded plaintext.
 - The canary gate closes the false-clean risk where embedded content survives.
 - Re-distillation is tracked as a named follow-up; it does not block v1.0.
 
+## Story 18-6 implementation
+
+Story `18-6-fr45-forget-redistillation-and-cascade-closure` supersedes Decision 3
+and the re-distillation follow-up above. The kernel scans every writer and frame
+kind for token-bounded principal ids, excluding the three erasure lifecycle
+intents, and closes distillates derived from scrubbed sources. It captures
+surviving source references before overwriting bodies and journals non-personal
+`distillate.redistill.requested` records.
+
+The daemon root dispatches a typed forget notice to live compiled-in Spirits.
+The owning Researcher purges cached sources before regenerating through its
+bound distillation path; the root checks the new frame's writer pid. Every
+request ends in `distillate.redistilled` or typed `distillate.redistill.pending`.
+Offline and cross-boot writers are pending, not resumed. Legal holds still
+refuse without mutation. Non-distillate tombstones have `frame.redacted`
+markers; cost attribution retains its numerical fields.
+
+Detection remains content-blind and id-based: content copied without the id,
+escaped or transformed ids, external re-ingestion, and non-principal Shared or
+Loom coordination data are explicit limits. Cross-store atomicity remains
+`v25-erasure-crash-reconciliation`; scrubs precede deletions and the any-writer
+scan makes a failed scrub re-runnable independently of the principal index.
+
 ## Compliance
 
 - `xtask check-kernel-baseline` re-pinned from 21197 to 21276 lines.

@@ -47,10 +47,14 @@ use maos_domain::invariants::i7::ScalarTapEvent;
 use maos_domain::log_recall::{
     FrameKindLabel, LogRecallCursor, LogRecallEntry, LogRecallError, LogRecallFilter,
 };
-use maos_domain::memory::{MemoryEntry, MemoryNamespace, MemoryValue};
+use maos_domain::memory::{
+    ForgetNotice, MemoryEntry, MemoryNamespace, MemoryValue, RedistillOutcome,
+    RedistillPendingReason, RedistillRequest,
+};
 use maos_domain::ports::context_budget::{ContextBudgetPort, ContextStatus};
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
 use maos_domain::ports::{DistillationPort, EpistemicScalarPort, InferencePort, LogRecallPort};
+use maos_spirit_sdk::ConsolidatePayload;
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
 
@@ -135,6 +139,46 @@ pub trait ResearcherMcpPort: Send + Sync {
     /// Fan out (≤ [`RESEARCHER_PARALLELISM`] concurrent) over the four declared
     /// servers for `query`, and return the parsed claims with their source keys.
     fn survey_literature(&self, query: &str) -> Result<Vec<FetchedClaim>, ResearcherMcpError>;
+}
+
+/// Lazy participant ports: a Spirit stores the root's weak builder, not the
+/// capability/audit-channel-owning adapters it creates for one operation.
+pub type McpPortPair = (Arc<dyn ResearcherMcpPort>, Arc<dyn LogRecallPort>);
+pub struct DeferredMcpPorts {
+    build: Arc<dyn Fn() -> Result<McpPortPair, String> + Send + Sync>,
+}
+
+impl DeferredMcpPorts {
+    pub fn new(build: Arc<dyn Fn() -> Result<McpPortPair, String> + Send + Sync>) -> Self {
+        Self { build }
+    }
+}
+
+impl ResearcherMcpPort for DeferredMcpPorts {
+    fn survey_literature(&self, query: &str) -> Result<Vec<FetchedClaim>, ResearcherMcpError> {
+        let (mcp, _) = (self.build)().map_err(ResearcherMcpError::TokenIssuanceFailed)?;
+        mcp.survey_literature(query)
+    }
+}
+
+impl LogRecallPort for DeferredMcpPorts {
+    fn recall(
+        &self,
+        pid: u32,
+        filter: LogRecallFilter,
+    ) -> Result<maos_domain::log_recall::LogRecallPage, LogRecallError> {
+        let (_, recall) = (self.build)().map_err(LogRecallError::Storage)?;
+        recall.recall(pid, filter)
+    }
+
+    fn fetch(
+        &self,
+        pid: u32,
+        id: [u8; 16],
+    ) -> Result<maos_domain::log_recall::LogFetchResponse, LogRecallError> {
+        let (_, recall) = (self.build)().map_err(LogRecallError::Storage)?;
+        recall.fetch(pid, id)
+    }
 }
 
 /// Story 13.5d — synchronous, mediated collective-memory boundary owned by
@@ -353,6 +397,22 @@ impl std::fmt::Display for ResearcherError {
 }
 impl std::error::Error for ResearcherError {}
 
+impl ResearcherError {
+    /// Stable non-personal reasons for lifecycle outcome rows.
+    fn refusal_code(&self) -> &'static str {
+        match self {
+            Self::Recall(_) => "recall",
+            Self::Distillation(_) => "distillation",
+            Self::BadFrameIdHex(_) => "malformed-source-id",
+            Self::Internal(_) => "malformed-payload",
+            Self::Unbound(_) => "unbound",
+            Self::Inference(_) => "inference",
+            Self::McpSurvey(_) => "mcp-survey",
+            Self::NoClaims => "no-claims",
+        }
+    }
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // The Researcher Spirit.
 // ───────────────────────────────────────────────────────────────────────────
@@ -504,6 +564,19 @@ pub fn synthesis_prompt(statement: &str) -> String {
 struct McpRecallState {
     cursor: Option<LogRecallCursor>,
     frames: Vec<RecalledFrame>,
+    /// Joined claims keep the semantic payload the invocation's args cite.
+    claims: Vec<RecalledFrame>,
+}
+
+/// Root-owned, request-keyed hook results. The callback holds this weakly:
+/// neither a cached Spirit nor a timed-out hook keeps the root alive.
+pub type RedistillSink = Arc<dyn Fn(&RedistillRequest, RedistillOutcome) + Send + Sync>;
+
+#[derive(Clone)]
+struct ForgetRoute {
+    pid: PidSource,
+    boot_nonce: [u8; 16],
+    sink: RedistillSink,
 }
 
 /// Researcher reference Spirit. Optionally holds the frames its `on_idle`
@@ -515,7 +588,7 @@ pub struct Researcher {
     posture_set: Vec<ResearcherPosture>,
     /// Frames to survey on the next `on_idle` (seeded by the walker / fixture).
     /// When `mcp_port` is `Some`, `on_idle` uses the MCP fan-out instead.
-    pending: Option<Vec<RecalledFrame>>,
+    pending: Arc<Mutex<Option<Vec<RecalledFrame>>>>,
     /// The most recent survey output. `Arc<Mutex<...>>` so Researcher stays
     /// `Sync` as required by the `#[spirit]` macro.
     last_output: Arc<Mutex<Option<SurveyOutput>>>,
@@ -559,6 +632,9 @@ pub struct Researcher {
     /// the most recent report (one per completion).
     context: Option<Arc<dyn ContextBudgetPort>>,
     last_context: Arc<Mutex<Option<ContextStatus>>>,
+    forget_route: Option<ForgetRoute>,
+    /// Serializes curation against a scheduled pass, including cloned hooks.
+    pass_lock: Arc<Mutex<()>>,
 }
 
 impl std::fmt::Debug for Researcher {
@@ -583,6 +659,7 @@ impl Researcher {
     /// Survey idle pass. Cancellation-aware; bounded (a single linear pass over
     /// the pending frames, well within `time_cap_seconds`).
     fn on_idle(&self, ctx: &mut Ctx) {
+        let _pass = self.pass_lock.lock().unwrap_or_else(|e| e.into_inner());
         if ctx.cancellation().is_cancelled() {
             return;
         }
@@ -615,13 +692,24 @@ impl Researcher {
             Err(error) => self.refuse(error),
         }
     }
+
+    /// Empty watchdog batches retain the existing no-op. Forget curation is
+    /// synchronous: purge first, then regenerate only from surviving sources.
+    fn on_consolidate(&self, _ctx: &mut Ctx, payload: &ConsolidatePayload) {
+        if payload.batch_data.is_empty() {
+            return;
+        }
+        if let Err(error) = self.consolidate_forget(payload.batch_data) {
+            self.refuse(error);
+        }
+    }
 }
 
 impl Default for Researcher {
     fn default() -> Self {
         Self {
             posture_set: vec![ResearcherPosture::Survey, ResearcherPosture::Hypothesize],
-            pending: None,
+            pending: Arc::default(),
             last_output: Arc::new(Mutex::new(None)),
             inference: None,
             mcp_port: None,
@@ -638,6 +726,8 @@ impl Default for Researcher {
             scalar_port: None,
             context: None,
             last_context: Arc::default(),
+            forget_route: None,
+            pass_lock: Arc::default(),
         }
     }
 }
@@ -648,10 +738,148 @@ impl Researcher {
         Self::default()
     }
 
+    /// The composition root supplies only this Spirit's pid resolver, never a
+    /// writer-selecting callback. Every construction path installs the route.
+    pub fn with_forget_route(
+        mut self,
+        pid: PidSource,
+        boot_nonce: [u8; 16],
+        sink: RedistillSink,
+        recall: Arc<dyn LogRecallPort>,
+    ) -> Self {
+        self.forget_route = Some(ForgetRoute {
+            pid,
+            boot_nonce,
+            sink,
+        });
+        if self.log_recall_port.is_none() {
+            self.log_recall_port = Some(recall);
+        }
+        self
+    }
+
+    /// Decode errors are typed and never echo untrusted notice bytes.
+    pub fn consolidate_forget(&self, payload: &[u8]) -> Result<(), ResearcherError> {
+        let notice: ForgetNotice = serde_json::from_slice(payload)
+            .map_err(|_| ResearcherError::Internal("malformed-forget-notice".into()))?;
+        let _pass = self.pass_lock.lock().unwrap_or_else(|e| e.into_inner());
+        let scrubbed_ids: Vec<_> = notice
+            .scrubbed_frame_ids
+            .iter()
+            .map(|id| decode_frame_id_hex(id))
+            .collect::<Result<_, _>>()?;
+        let scrubbed = |id: &[u8; 16]| scrubbed_ids.contains(id);
+        let mut recalled = self.mcp_recall.lock().unwrap_or_else(|e| e.into_inner());
+        recalled.frames.retain(|frame| !scrubbed(&frame.frame_id));
+        recalled.claims.retain(|frame| !scrubbed(&frame.frame_id));
+        drop(recalled);
+        if let Some(frames) = self
+            .seed_frames
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_mut()
+        {
+            frames.retain(|frame| !scrubbed(&frame.frame_id));
+        }
+        if let Some(frames) = self
+            .pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_mut()
+        {
+            frames.retain(|frame| !scrubbed(&frame.frame_id));
+        }
+        let mut last = self.last_output.lock().unwrap_or_else(|e| e.into_inner());
+        if last.as_ref().is_some_and(|output| {
+            output.bibliography.iter().any(|entry| {
+                decode_frame_id_hex(&entry.source_log_ref).is_ok_and(|id| scrubbed(&id))
+            })
+        }) {
+            *last = None;
+        }
+        drop(last);
+        if let Some(route) = &self.forget_route {
+            let pid = (route.pid)();
+            for request in &notice.redistill {
+                if Some(request.writer_spirit_pid) != pid
+                    || request.writer_boot_nonce != route.boot_nonce
+                {
+                    continue;
+                }
+                let outcome = match self.redistill(request) {
+                    Ok(outcome) => outcome,
+                    Err(error) => RedistillOutcome::Pending {
+                        reason: RedistillPendingReason::Refused(error.refusal_code().into()),
+                    },
+                };
+                (route.sink)(request, outcome);
+            }
+        }
+        Ok(())
+    }
+
+    /// Reuse the bound survey path, but never survey MCP or seed data here:
+    /// the kernel's surviving references are the entire input authority.
+    pub fn redistill(
+        &self,
+        request: &RedistillRequest,
+    ) -> Result<RedistillOutcome, ResearcherError> {
+        let pending = |reason| Ok(RedistillOutcome::Pending { reason });
+        if request.surviving_source_log_ref.is_empty() {
+            return pending(RedistillPendingReason::NoSurvivingSources);
+        }
+        let (Some(live), Some(port), Some(recall)) = (
+            &self.inference,
+            &self.distillation_port,
+            &self.log_recall_port,
+        ) else {
+            return pending(RedistillPendingReason::NoDistillationPath);
+        };
+        let (binding, token, pid) = Self::mint(live)?;
+        if self.forget_route.as_ref().is_none_or(|route| {
+            (route.pid)() != Some(pid)
+                || request.writer_spirit_pid != pid
+                || request.writer_boot_nonce != route.boot_nonce
+        }) {
+            return pending(RedistillPendingReason::Refused("writer-mismatch".into()));
+        }
+        let mut frames = Vec::with_capacity(request.surviving_source_log_ref.len());
+        for source in &request.surviving_source_log_ref {
+            let frame = recall
+                .fetch(pid, decode_frame_id_hex(source)?)
+                .map_err(ResearcherError::Recall)?;
+            // MCP journals invocation arguments, not response bodies. Reuse
+            // only the surviving, source-bound claim already held by this
+            // Spirit, after the authoritative fetch has rechecked visibility.
+            let cached = self
+                .mcp_recall
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .claims
+                .iter()
+                .find(|claim| claim.frame_id == frame.frame_id)
+                .cloned();
+            frames.push(cached.unwrap_or(RecalledFrame {
+                frame_id: frame.frame_id,
+                intent: frame.intent,
+                payload: frame.payload_redacted,
+            }));
+        }
+        let output = self.survey_bound(live, &binding, &token, pid, &frames)?;
+        if output.findings.is_empty() {
+            return Err(ResearcherError::NoClaims);
+        }
+        let receipt = self.distill_through(port.as_ref(), pid, &output, 1)?;
+        *self.last_output.lock().unwrap_or_else(|e| e.into_inner()) = Some(output);
+        Ok(RedistillOutcome::Redistilled {
+            new_distillate_frame_id: encode_frame_id_hex(&receipt.digest_frame_id),
+        })
+    }
+
     /// A Researcher whose `on_idle` will survey `frames` (e.g. fixture-seeded).
     pub fn with_frames(frames: Vec<RecalledFrame>) -> Self {
         Self {
-            pending: Some(frames),
+            pending: Arc::new(Mutex::new(Some(frames))),
             ..Self::default()
         }
     }
@@ -897,7 +1125,7 @@ impl Researcher {
         &self,
         claims: &[FetchedClaim],
         mcp_frames: &[RecalledFrame],
-    ) -> Vec<RecalledFrame> {
+    ) -> Result<Vec<RecalledFrame>, ResearcherError> {
         let mut result = Vec::new();
         for claim in claims {
             for frame in mcp_frames {
@@ -920,14 +1148,15 @@ impl Researcher {
                         result.push(RecalledFrame {
                             frame_id: frame.frame_id,
                             intent: frame.intent.clone(),
-                            payload: serde_json::to_vec(&claim.claim).unwrap_or_default(),
+                            payload: serde_json::to_vec(&claim.claim)
+                                .map_err(|_| ResearcherError::Internal("claim-encode".into()))?,
                         });
                         break;
                     }
                 }
             }
         }
-        result
+        Ok(result)
     }
 
     // ── survey cognition (the deterministic seeded compressor) ───────────────
@@ -1039,7 +1268,11 @@ impl Researcher {
     /// frames; `None` when neither is wired.
     fn input_frames(&self) -> Result<Option<Vec<RecalledFrame>>, ResearcherError> {
         let Some(mcp_port) = &self.mcp_port else {
-            return Ok(self.pending.clone());
+            return Ok(self
+                .pending
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone());
         };
         // v0.5 fixture placeholder — production derives query from Spirit's
         // pending research context or operator configuration.
@@ -1067,7 +1300,19 @@ impl Researcher {
             state.frames.push(frame);
             state.cursor = Some(LogRecallCursor::new(entry.timestamp_ns, entry.frame_id));
         }
-        Ok(Some(self.join_claims_to_frames(&fetched, &state.frames)))
+        let joined = self.join_claims_to_frames(&fetched, &state.frames)?;
+        for claim in &joined {
+            if let Some(cached) = state
+                .claims
+                .iter_mut()
+                .find(|cached| cached.frame_id == claim.frame_id)
+            {
+                *cached = claim.clone();
+            } else {
+                state.claims.push(claim.clone());
+            }
+        }
+        Ok(Some(joined))
     }
 
     /// Story 18-3 (D-18-3-01 A) — the seed claims, journaled once through the
@@ -1725,7 +1970,9 @@ mod unit_tests {
             intent: "mcp:arxiv/get_paper".into(),
             payload: serde_json::to_vec(&serde_json::json!({"arxiv_id": "2501.12345"})).unwrap(),
         }];
-        let joined = Researcher::new().join_claims_to_frames(&fetched, &mcp_frames);
+        let joined = Researcher::new()
+            .join_claims_to_frames(&fetched, &mcp_frames)
+            .unwrap();
         assert_eq!(joined.len(), 1);
         assert_eq!(joined[0].frame_id, [0xAB; 16]);
         assert_eq!(
@@ -1782,6 +2029,246 @@ mod unit_tests {
         assert_eq!(output.findings.len(), 1);
     }
 
+    fn redistill_request(sources: Vec<String>) -> RedistillRequest {
+        RedistillRequest {
+            redacted_distillate_frame_id: encode_frame_id_hex(&[0xEE; 16]),
+            writer_spirit_pid: 42,
+            writer_boot_nonce: (186u128).to_le_bytes(),
+            surviving_source_log_ref: sources,
+        }
+    }
+
+    #[test]
+    fn forget_purges_all_shared_caches_before_the_next_pass() {
+        let personal = claim_frame(
+            0xA1,
+            &claim("director-ada-CANARY-18-6", "t", 0.8, 0.9, true, false),
+        );
+        let safe = claim_frame(0xB2, &claim("control", "t", 0.8, 0.9, true, false));
+        let researcher = Researcher::with_frames(vec![personal.clone(), safe.clone()]);
+        *researcher.seed_frames.lock().unwrap() = Some(vec![personal.clone(), safe.clone()]);
+        {
+            let mut state = researcher.mcp_recall.lock().unwrap();
+            state.frames = vec![personal.clone(), safe.clone()];
+            state.claims = vec![personal.clone(), safe.clone()];
+        }
+        researcher.on_idle(&mut Ctx::mock());
+        assert!(serde_json::to_string(&researcher.last_output())
+            .unwrap()
+            .contains("CANARY-18-6"));
+        let clone = researcher.clone();
+        let bytes = serde_json::to_vec(&ForgetNotice {
+            scrubbed_frame_ids: vec![encode_frame_id_hex(&personal.frame_id).replace(':', "")],
+            redistill: Vec::new(),
+        })
+        .unwrap();
+        clone.on_consolidate(
+            &mut Ctx::mock(),
+            &ConsolidatePayload {
+                batch_data: &bytes,
+                batch_len: 1,
+            },
+        );
+        assert!(researcher.last_output().is_none());
+        let state = researcher.mcp_recall.lock().unwrap();
+        assert_eq!(
+            state.frames.iter().map(|f| f.frame_id).collect::<Vec<_>>(),
+            [safe.frame_id]
+        );
+        assert_eq!(
+            state.claims.iter().map(|f| f.frame_id).collect::<Vec<_>>(),
+            [safe.frame_id]
+        );
+        drop(state);
+        assert_eq!(
+            researcher
+                .seed_frames
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .len(),
+            1
+        );
+        clone.on_idle(&mut Ctx::mock());
+        let output = researcher.last_output().unwrap();
+        assert_eq!(output.findings.len(), 1);
+        assert_eq!(
+            output.findings[0].source_log_ref,
+            encode_frame_id_hex(&safe.frame_id)
+        );
+        assert!(!serde_json::to_string(&output)
+            .unwrap()
+            .contains("CANARY-18-6"));
+    }
+
+    #[test]
+    fn forget_pending_and_malformed_notices_are_typed_and_empty_watchdog_is_noop() {
+        let researcher = Researcher::with_frames(vec![claim_frame(
+            1,
+            &claim("control", "t", 0.8, 0.9, true, false),
+        )]);
+        researcher.on_idle(&mut Ctx::mock());
+        let before = researcher.last_output();
+        researcher.on_consolidate(
+            &mut Ctx::mock(),
+            &ConsolidatePayload {
+                batch_data: &[],
+                batch_len: 0,
+            },
+        );
+        assert_eq!(researcher.last_output(), before);
+        assert_eq!(
+            researcher
+                .redistill(&redistill_request(Vec::new()))
+                .unwrap(),
+            RedistillOutcome::Pending {
+                reason: RedistillPendingReason::NoSurvivingSources
+            }
+        );
+        assert_eq!(
+            researcher
+                .redistill(&redistill_request(vec![encode_frame_id_hex(&[1; 16])]))
+                .unwrap(),
+            RedistillOutcome::Pending {
+                reason: RedistillPendingReason::NoDistillationPath
+            }
+        );
+        let error = researcher
+            .consolidate_forget(b"{secret malformed")
+            .unwrap_err();
+        assert_eq!(error.refusal_code(), "malformed-payload");
+        assert!(!error.to_string().contains("secret"));
+    }
+
+    struct RedistillInference(AtomicUsize);
+    impl InferencePort for RedistillInference {
+        fn complete(
+            &self,
+            request: InferenceRequest,
+        ) -> Result<maos_domain::ports::inference::InferenceResponse, InferenceError> {
+            use maos_domain::ports::inference::{
+                InferenceResponse, ProviderAttribution, StopReason, TokenUsage,
+            };
+            assert_eq!(request.spirit_pid, 42);
+            assert!(request.prompt.contains("control"));
+            assert!(!request.prompt.contains("CANARY"));
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(InferenceResponse {
+                text: "a surviving control claim".into(),
+                stop_reason: StopReason::StopSequence,
+                usage: TokenUsage {
+                    input_tokens: 1,
+                    output_tokens: 1,
+                },
+                provider_attribution: ProviderAttribution {
+                    provider_id: "stub".into(),
+                    endpoint_url: "stub://".into(),
+                    model_id: None,
+                },
+            })
+        }
+    }
+
+    #[derive(Default)]
+    struct RedistillWriter(Mutex<Vec<(u32, DistillationRequest)>>);
+    impl DistillationPort for RedistillWriter {
+        fn write_distillate(
+            &self,
+            pid: u32,
+            request: DistillationRequest,
+        ) -> Result<DistillationReceipt, DistillationError> {
+            let receipt = DistillationReceipt::new(
+                [0xCC; 16],
+                Default::default(),
+                request.source_log_ref.clone(),
+                1,
+                0,
+            );
+            self.0.lock().unwrap().push((pid, request));
+            Ok(receipt)
+        }
+        fn admit_for_consumer(
+            &self,
+            _digest_frame_id: [u8; 16],
+            _allowed: &maos_domain::invariants::i13::AllowedPromotionSet,
+        ) -> Result<(), DistillationError> {
+            panic!("re-distillation must not perform consumer admission")
+        }
+    }
+
+    #[test]
+    fn redistill_fetches_only_survivors_infers_cached_claim_and_keeps_bound_pid() {
+        use maos_domain::invariants::i1::TokenId;
+        let safe = claim_frame(0xB2, &claim("control", "t", 0.8, 0.9, true, false));
+        let raw = RecalledFrame {
+            frame_id: safe.frame_id,
+            intent: "mcp:web/fetch".into(),
+            payload: br#"{"url":"https://example.org/control"}"#.to_vec(),
+        };
+        let inference = Arc::new(RedistillInference(AtomicUsize::new(0)));
+        let writer = Arc::new(RedistillWriter::default());
+        let results = Arc::new(Mutex::new(Vec::new()));
+        let sink_results = results.clone();
+        let researcher = Researcher::new()
+            .with_inference_port(
+                inference.clone(),
+                "stub",
+                CapabilityToken::new(TokenId([1; 16]), 42, u64::MAX, [0; 64]),
+                42,
+            )
+            .with_distillation_port(writer.clone())
+            .with_forget_route(
+                Arc::new(|| Some(42)),
+                (186u128).to_le_bytes(),
+                Arc::new(move |_, outcome| sink_results.lock().unwrap().push(outcome)),
+                Arc::new(FakeLogRecallPort { frames: vec![raw] }),
+            );
+        researcher
+            .mcp_recall
+            .lock()
+            .unwrap()
+            .claims
+            .push(safe.clone());
+        let request = redistill_request(vec![encode_frame_id_hex(&safe.frame_id)]);
+        let notice = ForgetNotice {
+            scrubbed_frame_ids: vec![encode_frame_id_hex(&[0xA1; 16]).replace(':', "")],
+            redistill: vec![request.clone()],
+        };
+        researcher
+            .consolidate_forget(&serde_json::to_vec(&notice).unwrap())
+            .unwrap();
+        assert_eq!(
+            *results.lock().unwrap(),
+            [RedistillOutcome::Redistilled {
+                new_distillate_frame_id: encode_frame_id_hex(&[0xCC; 16])
+            }]
+        );
+        assert_eq!(inference.0.load(Ordering::SeqCst), 1);
+        let writes = writer.0.lock().unwrap();
+        assert_eq!(writes[0].0, 42);
+        assert_eq!(writes[0].1.source_log_ref, [safe.frame_id]);
+        drop(writes);
+        let mut foreign = request.clone();
+        foreign.writer_spirit_pid = 43;
+        assert_eq!(
+            researcher.redistill(&foreign).unwrap(),
+            RedistillOutcome::Pending {
+                reason: RedistillPendingReason::Refused("writer-mismatch".into())
+            }
+        );
+        foreign = request;
+        foreign.writer_boot_nonce = (185u128).to_le_bytes();
+        assert_eq!(
+            researcher.redistill(&foreign).unwrap(),
+            RedistillOutcome::Pending {
+                reason: RedistillPendingReason::Refused("writer-mismatch".into())
+            }
+        );
+        assert_eq!(inference.0.load(Ordering::SeqCst), 1);
+        assert_eq!(writer.0.lock().unwrap().len(), 1);
+    }
+
     /// W5 — Negative falsifiability: a fabricated source_key that never appeared
     /// in any McpInvocation frame joins to nothing → survey produces empty findings.
     #[test]
@@ -1804,7 +2291,9 @@ mod unit_tests {
             intent: "mcp:arxiv/get_paper".into(),
             payload: serde_json::to_vec(&serde_json::json!({"arxiv_id": "real-paper-id"})).unwrap(),
         }];
-        let joined = Researcher::new().join_claims_to_frames(&vec![fabricated], &mcp_frames);
+        let joined = Researcher::new()
+            .join_claims_to_frames(&vec![fabricated], &mcp_frames)
+            .unwrap();
         assert!(joined.is_empty(), "fabricated key must not match any frame");
         let output = Researcher::new().survey(&joined);
         assert!(output.findings.is_empty(), "empty join → empty findings");

@@ -1,0 +1,7 @@
+AC2 derived closure plant: crates/maos-kernel-core/src/memory/mod.rs:556, replaced frames.push(frame) with comment omitting derived-distillate closure extension.
+Command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo nextest run --locked -p maos-kernel-core --test forget_cascade_18_6 -E 'test(=digest_of_digest_closes_for_unindexed_writer_and_captures_only_surviving_sources)'
+Exit100, test failed at tests/forget_cascade_18_6.rs:75:5:
+assertion left == right failed; left:1, right:2.
+Summary [0.260s] 1 test run:0 passed,1 failed,6 skipped. Tool wall2.67s.
+Restore: cp /tmp/18-6-ac2-memory.rs crates/maos-kernel-core/src/memory/mod.rs && cmp /tmp/18-6-ac2-memory.rs crates/maos-kernel-core/src/memory/mod.rs && touch crates/maos-kernel-core/src/memory/mod.rs
+Restore exit0, byte-identical.

@@ -115,6 +115,27 @@ tenant 모드에서는 확인된 팀의 로그만이 아니라 `teams/` 하위 �
 dry run과 receipt는 각 형제 팀 로그를 row 개수와 함께 표시합니다. 이 보존은 FR2의
 전체 제거 보장에 대한 운영자가 선택한 문서화된 예외이며, 삭제가 기본 동작입니다.
 
+### principal 잊기
+
+`maosctl forget --principal <id>`는 principal의 Private namespace와 index를
+삭제하고, 작성자와 관계없이 토큰 경계로 식별된 id가 있는 Transparency Log
+프레임을 지우며, 해당 프레임에서 파생된 distillate도 redaction 처리합니다.
+JSON 결과에는 지워진 프레임 id, redaction된 distillate id, 살아남은 source
+reference가 있는 재증류 요청, 각 요청의 결과가 포함됩니다.
+
+실행 중인 daemon은 live compiled-in Spirit에 forget notice를 전달하여 캐시된
+프레임을 제거합니다. 바인딩된 live Researcher는 자신의 distillation 경로로
+요약을 다시 생성합니다. 그 외에는 `writer-not-live`, `no-distillation-path`,
+`no-surviving-sources`, `form-unsupported`, `refused:<typed>` 중 하나로 typed
+pending을 기록합니다. pending은 다음 boot에서 재개하지 않습니다. offline forget과
+uninstall은 재생성을 조용히 건너뛰지 않고 `writer-not-live`를 기록합니다.
+
+`maosctl forget --principal <id> --reason legal-hold`는 durable hold를 기록하고
+삭제나 재생성 없이 종료 코드 3을 반환합니다. 기존 hold도 삭제를 차단합니다.
+Shared와 Loom의 non-principal 조정 데이터는 partition 규칙에 따라 유지됩니다.
+감지는 의미가 아닌 id 기준이므로 id 없는 복사본, 변환되거나 escape된 id,
+외부 source에서 나중에 다시 수집된 데이터는 이 보장의 범위 밖입니다.
+
 ## 운영
 
 kernel composition root는 `crates/maos-bin`에 있습니다. 운영 표면 — 투명성 로그, capability 중재, sandbox 티어, ComplianceClaim 승인, 레지스트리, yank 전파 — 는 참조 가이드에 문서화되어 있습니다:

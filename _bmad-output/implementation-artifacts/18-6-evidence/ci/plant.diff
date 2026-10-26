@@ -1,0 +1,19 @@
+diff --git a/crates/maos-kernel-core/src/memory/mod.rs b/crates/maos-kernel-core/src/memory/mod.rs
+--- a/crates/maos-kernel-core/src/memory/mod.rs
++++ b/crates/maos-kernel-core/src/memory/mod.rs
+@@ -556,6 +556,15 @@
+                 frames.push(frame);
+             }
+         }
++        let indexed_writers: HashSet<u32> = self
++            .principal_index
++            .lookup(principal_id)
++            .map_err(|e| MemoryError::Storage(e.to_string()))?
++            .into_iter()
++            .map(|row| row.writer_spirit_pid)
++            .collect();
++        frames.retain(|frame| indexed_writers.contains(&frame.spirit_pid));
++        // PLANT AC1: restore the old index-pid erasure reach, including closure.
+         let mut redacted_distillate_frame_ids = Vec::new();
+         let mut redacted_principal_frame_ids = Vec::new();
+         let mut redistill = Vec::new();

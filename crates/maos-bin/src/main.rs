@@ -941,6 +941,7 @@ struct SpiritBuildDeps {
     distillate_writer: Arc<maos_kernel_core::iac::distillate::DistillateWriter>,
     /// Story 18-3 (review rulings D-18-3-R1/R2, BH-1) — the Researcher wiring.
     researcher: ResearcherSlot,
+    redistill_sink: researcher::RedistillSink,
 }
 
 /// Story 18-1 — the root's late-filled [`butler::ButlerSeam`].
@@ -1033,11 +1034,12 @@ fn build_spirit_obj(
                 .unwrap_or_else(|error| error.into_inner())
                 .clone()
                 .ok_or("researcher wiring not ready")?;
-            let host = maos_bin::researcher_root::ResearcherHost::new(
+            let mut host = maos_bin::researcher_root::ResearcherHost::new(
                 Arc::clone(&deps.transparency_log),
                 Arc::clone(&deps.distillate_writer) as _,
                 wiring.live,
             );
+            host.redistill_sink = Some(Arc::clone(&deps.redistill_sink));
             make_spirit_obj(maos_bin::researcher_root::construct(
                 ::researcher::Researcher::new().with_scalar_port(scalar),
                 &wiring,
@@ -3292,6 +3294,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `create`, so this lookup cannot deadlock.
     let factory_scheduler = Arc::clone(&scheduler);
     let factory_activity_sink = hook_pump.activity_sink();
+    let factory_redistill_sink = hook_pump.redistill_sink();
     let successor_factory: Arc<dyn maos_kernel_core::lifecycle::SuccessorSpiritFactory> = Arc::new(
         move |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
             let class = manifest.class.as_ref().ok_or_else(|| {
@@ -3329,6 +3332,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     butler_seam: Arc::clone(&factory_butler_seam),
                     distillate_writer: Arc::clone(&factory_distillate_writer),
                     researcher: Arc::clone(&factory_researcher_wiring),
+                    redistill_sink: Arc::clone(&factory_redistill_sink),
                 },
                 &class.name,
                 factory_successor_slot.peek().as_deref(),
@@ -3494,6 +3498,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 butler_seam: Arc::clone(&butler_seam),
                 distillate_writer: Arc::clone(&distillate_writer),
                 researcher: Arc::clone(&researcher_wiring),
+                redistill_sink: hook_pump.redistill_sink(),
             }),
             hooks: Arc::clone(&hook_pump),
         });
@@ -3518,6 +3523,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             private_ops,
             successor_manifest_slot,
         ));
+        door.set_forget_pump(&hook_pump);
         operator_door_port = Some(door);
         if let Some(config) = operator_http_config {
             let server = match maos_control::OperatorHttpServer::bind_with_commands(
@@ -5726,11 +5732,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .filter(|pid| *pid != 0)
                             })
                         };
-                        let host = maos_bin::researcher_root::ResearcherHost::new(
+                        let mut host = maos_bin::researcher_root::ResearcherHost::new(
                             Arc::clone(&transparency_log),
                             Arc::clone(&distillate_writer) as _,
                             wiring.live,
                         );
+                        host.redistill_sink = Some(hook_pump.redistill_sink());
                         researcher = maos_bin::researcher_root::construct(
                             researcher,
                             &wiring,
@@ -6484,14 +6491,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
             let spirit_id =
                 std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "hello-spirit".into());
-            let mut terminal = run_uninstall_cascade(
+            let (mut terminal, redistillation) = run_uninstall_cascade(
                 &spirit_id,
                 memory.as_ref(),
                 capability.as_ref(),
                 &transparency_log,
                 &audit_db_path,
                 &memory_db_path,
-            );
+                None,
+            )
+            .await;
             // ADR-059 Decision 6 — only a successful erase writes the
             // uninstall lifecycle success. 13.5b review: a journal failure
             // on that path becomes the terminal, never a bare exit 1 hiding
@@ -6508,11 +6517,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             let exit_code = terminal.exit_code();
-            println!(
-                "{}",
-                serde_json::to_string(&terminal)
-                    .map_err(|error| format!("uninstall terminal encode failed: {error}"))?
-            );
+            let mut body = serde_json::to_value(&terminal)
+                .map_err(|error| format!("uninstall terminal encode failed: {error}"))?;
+            body["redistillation"] = redistillation;
+            println!("{body}");
             std::io::Write::flush(&mut std::io::stdout())
                 .map_err(|error| format!("uninstall terminal flush failed: {error}"))?;
             // Always exit explicitly: the terminal receipt on stdout and the
@@ -6529,9 +6537,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let outcome = memory
                 .forget_with_reason(&principal, reason.as_deref())
                 .map_err(|e| format!("forget cascade failed: {e}"))?;
-            let json = serde_json::to_string(&outcome)
+            let mut body = serde_json::to_value(&outcome)
                 .map_err(|e| format!("failed to serialize ForgetOutcome: {e}"))?;
-            println!("{json}");
+            if let Some(fields) =
+                maos_bin::hook_pump::HookPump::finish_forget(&transparency_log, &outcome, None)
+                    .await?
+                    .as_object()
+            {
+                body.as_object_mut()
+                    .ok_or("ForgetOutcome must be object")?
+                    .extend(fields.clone());
+            }
+            println!("{body}");
             // P29-cli: a legal-hold suspension is NOT a success — exit 3 so
             // automation scripts can distinguish erased (0) from held (3).
             if matches!(
@@ -9189,14 +9206,16 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         &self,
         spirit_id: &str,
     ) -> maos_bin::operator_door::UninstallOutcome {
-        let terminal = run_uninstall_cascade(
+        let (terminal, redistillation) = run_uninstall_cascade(
             spirit_id,
             self.memory.as_ref(),
             self.capability.as_ref(),
             &self.transparency_log,
             &self.audit_db_path,
             &self.memory_db_path,
-        );
+            Some(&self.hooks),
+        )
+        .await;
         let terminal_code = terminal.exit_code();
         let mut body = /* // xtask-serde-allow: error handled, closure builds the failure body */ serde_json::to_value(&terminal).unwrap_or_else(|error| {
             serde_json::json!({
@@ -9207,6 +9226,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         });
         body["spirit_id"] = serde_json::json!(spirit_id);
         body["terminal_code"] = serde_json::json!(terminal_code);
+        body["redistillation"] = redistillation;
         maos_bin::operator_door::UninstallOutcome {
             body,
             terminal_code,
@@ -9363,14 +9383,16 @@ fn append_lifecycle_journal(
 }
 
 #[cfg(feature = "network")]
-fn run_uninstall_cascade(
+async fn run_uninstall_cascade(
     spirit_id: &str,
     memory: &maos_kernel_core::memory::MemoryManagerAdapter,
     capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
     memory_db_path: &std::path::Path,
-) -> UninstallCascadeTerminal {
+    pump: Option<&maos_bin::hook_pump::HookPump>,
+) -> (UninstallCascadeTerminal, serde_json::Value) {
+    let mut redistillation = Vec::new();
     let terminal = match run_uninstall_cascade_inner(
         spirit_id,
         memory,
@@ -9378,16 +9400,30 @@ fn run_uninstall_cascade(
         transparency_log,
         audit_db_path,
         memory_db_path,
-    ) {
+        pump,
+        &mut redistillation,
+    )
+    .await
+    {
         Ok(terminal) => terminal,
         Err(error) => UninstallCascadeTerminal::Failed {
             spirit_id: spirit_id.to_string(),
             error: error.to_string(),
         },
     };
-    let payload = match serde_json::to_vec(&terminal) {
+    let mut payload = match serde_json::to_value(&terminal) {
         Ok(payload) => payload,
-        Err(error) => panic!("serialize uninstall cascade terminal for durable audit: {error}"),
+        Err(error) => panic!("serialize uninstall terminal for durable audit: {error}"),
+    };
+    let redistilled_count = redistillation
+        .iter()
+        .filter(|row| row["outcome"]["status"] == "redistilled")
+        .count();
+    let report = serde_json::json!({ "pending_count": redistillation.len() - redistilled_count, "redistilled_count": redistilled_count, "redistill_outcomes": redistillation });
+    payload["redistillation"] = report.clone();
+    let payload = match serde_json::to_vec(&payload) {
+        Ok(payload) => payload,
+        Err(error) => panic!("serialize uninstall report for durable audit: {error}"),
     };
     // Trap 4: this append remains a fail-fast audit commit point. The adapter
     // panics on durable journal failure; catching unwind after partial erasure
@@ -9399,7 +9435,7 @@ fn run_uninstall_cascade(
         terminal.intent(),
         &payload,
     );
-    terminal
+    (terminal, report)
 }
 
 #[cfg(feature = "network")]
@@ -9409,13 +9445,15 @@ fn run_uninstall_cascade(
 /// namespace associated with those pids, revokes all capability tokens,
 /// builds a signed Merkle proof, and persists the bundle to the
 /// `MAOS_ERASURE_PROOFS_DIR` / XDG default.
-fn run_uninstall_cascade_inner(
+async fn run_uninstall_cascade_inner(
     spirit_id: &str,
     memory: &maos_kernel_core::memory::MemoryManagerAdapter,
     capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
     memory_db_path: &std::path::Path,
+    pump: Option<&maos_bin::hook_pump::HookPump>,
+    redistillation: &mut Vec<serde_json::Value>,
 ) -> Result<UninstallCascadeTerminal, Box<dyn std::error::Error>> {
     use maos_audit::erasure::proof::{
         build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
@@ -9489,12 +9527,23 @@ fn run_uninstall_cascade_inner(
         // it left an uninstalled identity holding live capability tokens. The
         // inner loop over an empty vec is already a no-op.
         for principal_id in &principal_ids {
-            match memory.forget_with_reason(principal_id, None) {
+            let forgotten = memory.forget_with_reason(principal_id, None);
+            if let Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) = &forgotten {
+                let report =
+                    maos_bin::hook_pump::HookPump::finish_forget(transparency_log, outcome, pump)
+                        .await?;
+                if let Some(rows) = report["redistill_outcomes"].as_array() {
+                    redistillation.extend(rows.iter().cloned());
+                }
+            }
+            match forgotten {
                 Ok(maos_domain::memory::ForgetOutcome::Erased {
                     receipt,
                     redacted_distillate_frame_ids,
                     redacted_principal_frame_ids,
+                    redistill,
                 }) => {
+                    drop(redistill); // Already dispatched above, before proof construction.
                     total_deleted_entries += receipt.deleted_entries;
                     total_deleted_index_rows += receipt.deleted_index_rows;
                     all_principal_ids.push(principal_id.clone());

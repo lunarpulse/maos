@@ -1,0 +1,11 @@
+Mutation: spirits/researcher/src/lib.rs scrubbed predicate changed from scrubbed_ids.contains(id) to always false.
+Command prefix: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo
+Red: cargo nextest run --locked -p researcher -E 'test(forget_purges_all_shared_caches_before_the_next_pass)'
+Exit100. researcher unit_tests::forget_purges_all_shared_caches_before_the_next_pass FAILED at lib.rs:2080:9:
+assertion failed: researcher.last_output().is_none()
+Summary [0.017s] 1 test run:0 passed,1 failed,59 skipped.
+A previous exact selector used tests:: instead of unit_tests:: and ran0tests (exit4); excluded from proof.
+Restore: cp /tmp/18-6-ac3-researcher.rs spirits/researcher/src/lib.rs && cmp /tmp/18-6-ac3-researcher.rs spirits/researcher/src/lib.rs && touch spirits/researcher/src/lib.rs
+Restore exit0, byte-identical.
+Same control restored: Summary [0.003s] 1 test run:1 passed,59 skipped; command wall4.04s.
+Full-cycle exact timing not captured; conservative backup-mtime1792994711 to evidence-capture1792996660 upper bound1949s includes intervening work. See plants.md.

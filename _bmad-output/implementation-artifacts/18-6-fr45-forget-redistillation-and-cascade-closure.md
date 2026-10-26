@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. Difficult story 
 
 # Story 18.6: FR45 forget — re-distillation and cascade closure
 
-Status: ready-for-dev
+Status: review
 
 <!-- Created 2026-10-26 at 5495863e by bmad-create-story under the lighter creation contract (no party-mode preflight). 18-0/18-1/18-8/18-2/18-3 done; 18-4 and 18-5 implemented and pushed (landing CI running), their code treated as landed. Direct reads of every decision-bearing range; the host's only cargo process (CARGO_TARGET_DIR=/mnt/build/cargo, `env -u CI -u GITHUB_ACTIONS`) ran `check-kernel-baseline` (PASSED 26418 / 95) and `kloc-check --json` (passed, aggregate 185451) at HEAD, eight throwaway kernel prototypes over one shared out-of-kernel prototype (measured, then reverted), `cargo check --locked --workspace` for the ripple and `check-service-boundary` for the surface. FLAG record `18-6-flag-winston-decision.md`. RULED 2026-10-26 by the operator (Lunarpulse): D-18-6-01…10 all as recommended (01 B, 02–10 A); kernel grant +8 / +17 ratified; maos-bin named budget 28770. Rulings applied docs-only (no cargo). -->
 
@@ -78,6 +78,14 @@ Measured at `5495863e` by direct reads, `check-kernel-baseline`, `kloc-check --j
 - R18-19 NEW gains the same re-anchors (forget block `:545-641` → `:545-662`). The stories row `:115` and the Kernel-Δ note `:40` carry the figure (ratified 2026-10-26).
 - Routing audit `:103` (`epic-18:118-121`) → `:223-237`, not edited (outside the doc set).
 
+**Dev-head correction, AC3.5 (integrator-approved 2026-10-26):** the live MCP cache contains invocation argument frames, not the old fetched claims. `input_frames` fetches the current claims and joins them to cached source keys on each pass. With the specified serve-once MCP fixture removing the canary, merely skipping cache purge cannot make the next live pass's body contain that old canary. The honest purge falsifier therefore asserts that scrubbed frame ids/source references no longer remain in the Researcher's cache; a unit-seeded pending cached claim also witnesses next-pass non-resurrection where reachable. Production semantics are not changed to manufacture a resurrection path. The live serve-once process leg remains required.
+
+**Dev-head correction, AC1.2 (integrator-approved 2026-10-26):** `DistillateWriter::write_distillate` rejects effective raw sources whose writer pid differs from the citer (`adapter/distillate.rs:337-358`), even when the citer is a recipient. New cross-pid digest-of-digest authoring is therefore not a valid fixture. The lineage witness uses (1) a genuine same-pid digest-of-digest through `DistillateWriter`, and (2) a persisted historical cross-writer TL row inserted through the real TL adapter, explicitly labelled “historical row, not new valid authoring”, to prove the any-writer sweep reaches it. The citation authorization rule is unchanged.
+
+**Dev-head correction, AC1 process composition (integrator-approved 2026-10-26):** ADR-064's existing selector refuses `MAOS_INFERENCE_MODE=replay` together with `--live` (`inference_mode.rs`, `ReplayLiveConflict`). The mandated combined command is therefore unreachable. ADR-064 remains unchanged: the real daemon-door journey uses the non-`--live`, bound seed-claim replay path (D-18-3-01); a separate root-library witness composes real mock MCP transport, replay inference, real TL/`DistillateWriter` and the door command adapter in-process for the MCP-sourced live re-distillation leg. No flag or production selector exception is introduced.
+
+**Dev-head correction, next-pass proof (integrator-approved 2026-10-26):** no scheduled-repeat process claim — the idle watchdog fires once per quiet period, and a door reload reseeds the fixed seed claims. The daemon witness ends after real door forget/re-distillation and typed pending/hold checks; the root-library MCP witness and Researcher purge unit test prove the same instance's subsequent pass is clean. The process principal deliberately collides with built-in seed vocabulary (`noisy corpus.`; canary `seed-rag-noisy`); reloading re-journals compiled constant text, which forget cannot and need not erase. Main assessed this as a fixture artifact, not recreation of principal-derived data.
+
 ## Kernel and kloc pricing (E16-A7) — measured at creation
 
 **Prototypes (throwaway, at `5495863e`, `cargo fmt --all`, reverted):** one shared out-of-kernel prototype (maos-domain `RedistillRequest`, the `ForgetOutcome::Erased.redistill` field, `principal_id_occurs`; maos-iac `principal_bearing_frames`, `distillates_citing`, `scrub_frame_body`, `insert_redistill_request`, `distillate_source_refs`) under eight kernel variants. Full figures and diff hashes: `18-6-flag-winston-decision.md` §Measured figures.
@@ -121,6 +129,10 @@ Measured at `5495863e` by direct reads, `check-kernel-baseline`, `kloc-check --j
 - **maos-audit** (7473, zero headroom): expected +54–105 [INFERENCE] → **STOP above +131 (7604)**.
 - **maos-cli** (6104 / 6856) and **maos-journey-test** (915 / 1104): land exact inside their ceilings; reaching a ceiling → STOP.
 - `_aggregate_hardfail` = final measured aggregate + 1; no speculative headroom.
+
+**D-18-6-08 measured addendum, operator ruling 2026-10-26 (A, relayed by Main):** the formatted STOP was observed and reported before further production edits or re-pins. Exact figures are ratified with finishing allowance: **maos-bin ≤ 28940**, **maos-audit ≤ 7640**; Epic 18's named maos-bin budget **28770 → exact landed figure** (28916 measured at this ruling). Other STOP lines and the kernel grant are unchanged. Final pins remain exact, without unused allowance.
+
+**maos-bin growth attribution, HEAD → formatted candidate (+258):** `hook_pump.rs` 778 → 937 (**+159**: `redistill_sink`, `finish_forget`, typed result storage, boot/pid selection, broadcast hook delivery, writer verification and outcome journaling); `main.rs` 12552 → 12601 (**+49**: bindings on boot/load/successor, offline forget/uninstall, daemon uninstall dispatch, terminal accounting); `operator_door.rs` 1653 → 1678 (**+25**: pump binding and daemon forget terminal dispatch/counts); `researcher_root.rs` 352 → 377 (**+25**: lazy `DeferredMcpPorts` lifetime wrapper, dropping operation-scoped adapters so audit drain is not pinned). Measured with the gate's per-file `tokei --output json --types Rust` `reports[].stats.code`; sum 159 + 49 + 25 + 25 = 258 (28658 → 28916).
 
 | ID | Question | Options | Recommendation and evidence | Status |
 |---|---|---|---|---|
@@ -189,18 +201,18 @@ Measured at `5495863e` by direct reads, `check-kernel-baseline`, `kloc-check --j
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight at the dev HEAD.** D-18-6-01…10 RULED 2026-10-26 (all as recommended); tracker `ready-for-dev` → `in-progress`. Re-anchor: `git diff --stat 5495863e -- crates/maos-kernel-core/src/memory crates/maos-iac/src/adapter/{transparency_log.rs,distillate.rs} crates/maos-domain/src/memory.rs crates/maos-bin/src/{operator_door.rs,hook_pump.rs,researcher_root.rs,main.rs} spirits/researcher/src crates/maos-audit/src`. Re-measure `check-kernel-baseline` / `kloc-check --json` (expect 26418 / 20643 unless something landed; if the pin moved, the +8 / +17 grant applies over the landed values and is re-stated, never widened). Confirm the Researcher pid is registered with the hook pump on the boot arm, door `load` and successor. Watch the STOP lines in §Decisions throughout dev.
-- [ ] **T1 — Domain** (AC3.1): `RedistillRequest`, `ForgetNotice`, `RedistillOutcome`, `principal_id_occurs`, the `redistill` field.
-- [ ] **T2 — Bus** (AC1, AC2): maos-iac streamed `principal_bearing_frames` (CR-1), `distillates_citing`, `scrub_frame_body` (+ `frame.redacted` marker), `distillate_source_refs`, request and outcome writers; FR4 `WRITER_SHAPES` for every new `insert_frame_event` site (`crates/maos-audit/tests/fr4_classifier_16_2.rs` doorbell) and the tombstone disposition (CR-6).
-- [ ] **T3 — Kernel** (AC2.1, AC3.1): `forget_with_reason` per the ruled D-01/02/04 rows; exactly the ruled file and figure.
-- [ ] **T4 — Root** (AC3.2, CR-3, CR-4): door forget and door uninstall dispatch through the hook pump; one-shot forget/uninstall pending; uninstall pattern binds `redistill`; terminal JSON counts.
-- [ ] **T5 — Researcher** (AC3.3, CR-5, CR-7): `on_consolidate` handler, purge, re-distillation, typed outcomes.
-- [ ] **T6 — Corpus** (AC4.1): `gen_gdpr_cascade` v1 modes; files; MANIFEST; coverage matrix.
-- [ ] **T7 — Witnesses** (AC1–AC4): journey process leg + cassette (`provenance: seed`, real hashes, as 18-4 CR-3) + MockMcp serve-once; door/one-shot pending legs; kernel library legs; floors binary. Each binary ≤ 30 s Σ (`xtask/test-budgets.toml` default; no exception requested).
-- [ ] **T8 — Plants and CI** (AC1.3, AC2.4, AC3.5, AC4.5, AC5): four plants, one per control AC, restored from byte-identical backups; hosted `ci/18-6-verify` run id recorded.
-- [ ] **T9 — Docs:** ADR-044 implementation note; inventory `:563`; coverage-matrix notes; `deferred-work.md:449` annotation per D-18-6-10; docs-site en + ko for `maosctl forget` output and re-distillation.
-- [ ] **T10 — Governance:** kernel re-pin set (FLAG record §Re-pin), crate ceilings exact, `_aggregate_hardfail` = measured + 1; `check-service-boundary`, `check-kernel-baseline`, `kloc-check`, `check-serde-error-handling`, `check-test-cost`, `check-corpus`, `check-reza-production-path`; release binary < 32 MiB.
-- [ ] **T11 — Regression and record:** focused suites (below), `cargo test -p maos-kernel-core --lib`; Dev Agent Record, File List, Change Log; tracker. Do not edit `intent-lineage-coverage-report.md` (revert if a run modifies it). No commit or push.
+- [x] **T0 — Preflight at the dev HEAD.** D-18-6-01…10 RULED 2026-10-26 (all as recommended); tracker `ready-for-dev` → `in-progress`. Re-anchor: `git diff --stat 5495863e -- crates/maos-kernel-core/src/memory crates/maos-iac/src/adapter/{transparency_log.rs,distillate.rs} crates/maos-domain/src/memory.rs crates/maos-bin/src/{operator_door.rs,hook_pump.rs,researcher_root.rs,main.rs} spirits/researcher/src crates/maos-audit/src`. Re-measure `check-kernel-baseline` / `kloc-check --json` (expect 26418 / 20643 unless something landed; if the pin moved, the +8 / +17 grant applies over the landed values and is re-stated, never widened). Confirm the Researcher pid is registered with the hook pump on the boot arm, door `load` and successor. Watch the STOP lines in §Decisions throughout dev.
+- [x] **T1 — Domain** (AC3.1): `RedistillRequest`, `ForgetNotice`, `RedistillOutcome`, `principal_id_occurs`, the `redistill` field.
+- [x] **T2 — Bus** (AC1, AC2): maos-iac streamed `principal_bearing_frames` (CR-1), `distillates_citing`, `scrub_frame_body` (+ `frame.redacted` marker), `distillate_source_refs`, request and outcome writers; FR4 `WRITER_SHAPES` for every new `insert_frame_event` site (`crates/maos-audit/tests/fr4_classifier_16_2.rs` doorbell) and the tombstone disposition (CR-6).
+- [x] **T3 — Kernel** (AC2.1, AC3.1): `forget_with_reason` per the ruled D-01/02/04 rows; exactly the ruled file and figure.
+- [x] **T4 — Root** (AC3.2, CR-3, CR-4): door forget and door uninstall dispatch through the hook pump; one-shot forget/uninstall pending; uninstall pattern binds `redistill`; terminal JSON counts.
+- [x] **T5 — Researcher** (AC3.3, CR-5, CR-7): `on_consolidate` handler, purge, re-distillation, typed outcomes.
+- [x] **T6 — Corpus** (AC4.1): `gen_gdpr_cascade` v1 modes; files; MANIFEST; coverage matrix.
+- [x] **T7 — Witnesses** (AC1–AC4): journey process leg + cassette (`provenance: seed`, real hashes, as 18-4 CR-3) + MockMcp serve-once; door/one-shot pending legs; kernel library legs; floors binary. Each binary ≤ 30 s Σ (`xtask/test-budgets.toml` default; no exception requested). Approved split process/root-library proof and historical-row correction recorded above.
+- [x] **T8 — Plants and CI local deliverables** (AC1.3, AC2.4, AC3.5, AC4.5, AC5): every control proven red and byte-restored; checked-in hosted diff + checksum + workflow; local expected-red simulation passed. Integrator-approved handoff: hosted `ci/18-6-verify` run is the integrator's landing obligation, no hosted-run claim at review (checkbox in Dev Agent Record).
+- [x] **T9 — Docs:** ADR-044 implementation note; inventory `:563`; coverage-matrix notes; `deferred-work.md:449` annotation per D-18-6-10; docs-site en + ko for `maosctl forget` output and re-distillation.
+- [x] **T10 — Governance:** kernel re-pin set (FLAG record §Re-pin), crate ceilings exact, `_aggregate_hardfail` = measured + 1; `check-service-boundary`, `check-kernel-baseline`, `kloc-check`, `check-serde-error-handling`, `check-test-cost`, `check-corpus`, `check-reza-production-path`; release binary < 32 MiB.
+- [x] **T11 — Regression and record:** focused suites (below), `cargo test -p maos-kernel-core --lib`; Dev Agent Record, File List, Change Log; tracker. Do not edit `intent-lineage-coverage-report.md` (revert if a run modifies it). No commit or push.
 
 ## Dev Notes
 
@@ -310,15 +322,77 @@ Created 2026-10-26 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter co
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+openai-codex/gpt-6.1-sol (development); anthropic/claude-opus-5-5 (creation).
 
 ### Debug Log References
 
+- Preflight at dev HEAD: `check-kernel-baseline` PASSED, 26418 physical / 95 files; `kloc-check --json` passed, aggregate 185459, kernel 20643, maos-bin 28658, maos-iac 7984, maos-domain 9848, maos-audit 7473. Landed 18-5 differences preserve the ratified kernel grant.
+- **Historical STOP, lifted before continuing:** formatted candidate maos-bin 28916 > original28770 and audit7623 > original7604; exact evidence `18-6-evidence/kloc-stop.log`. Operator A ruling2026-10-26 ratified bin≤28940/audit≤7640. No production edit or re-pin occurred between STOP and ruling.
+- Initial fixture/compile corrections are recorded, not misrepresented as control reds: cross-pid citation was unauthorized; a test writer missed `admit_for_consumer`; SQLite JSON must cast payload BLOBs to TEXT; compact/colon frame ids must compare through the existing decoder; v1 JSON key order must remain stable under serde feature unification. All corrected; v0 corpus unchanged. Final proof: `broad-final-green.log`, `extra-reader-regressions.log`, `kernel-lib.log`, `xtask-ratchets.log`.
+- STOP lifted by the operator's 2026-10-26 A ruling relayed by Main: maos-bin ≤28940, audit ≤7640; exact re-pins at landing. Formatted maos-bin +258 attribution: hook_pump +159, main +49, operator_door +25, researcher_root +25 (functions and old/new figures in D-18-6-08 measured addendum). Test fixture API corrections applied after this ruling, using a genuine DistillateWriter receipt for the wrong-writer witness.
+
 ### Completion Notes List
 
+- **AC1:** process `live_forget_redistills_and_never_resurrects_then_pending_is_typed`, root-library `mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live`, and 7 kernel cascade controls green. Any-writer index-filter plant red on real seed canary; byte-restored green. Approved process/root-library/seed-vocabulary proof split is explicit above, not a claim of repeated daemon idle.
+- **AC2:** any-kind/unindexed, same-pid flattened digest chain, labelled historical cross-writer attribution, SR-3 figures, token-boundary over-erasure, injected scrub-failure retry, Shared partition, and legal-hold controls green. Derived-closure plant red (1 vs2 redactions), restored green.
+- **AC3:** all four caller routes, boot/load/successor bindings, boot/pid fixing and wrong-writer refusal, weak result sink/audit drain, no-distillation-path/no-survivors/malformed notice outcomes, live purge and same-instance next pass green. Cache-purge plant red, restored green; actual kernel compact ids covered.
+- **AC4:** `fifty_door_cascades_and_one_hundred_all_store_probes` green:50/50 removal,50/50 markers,0/100 leakage; SHA-pinned v1 generator reproduces frozen bytes, v0 held/failed/not-found regression green. Shared index-filter plant fails fast on first unindexed leak (not a fabricated49/50 aggregate).
+- **AC5 local:** checksum/apply/build/expected-red/restore/green simulation PASS; workflow/diff/sha checked in. Four AC control proofs, three distinct mutations (AC1/AC4 share identical scan filter). Shared scan/CI full wall171.16s; AC2/AC3 command runtimes and conservative full-cycle timing bounds, including setup-selector failures, are honestly recorded in `18-6-evidence/plants.md`.
+- **Final focused regressions:**2077 passed/23 skipped (9 focused crates incl.kernel;76.489s nextest,135.34s command wall); remaining keyword-reader set94 passed/38 skipped (32.88s wall); kernel lib258 passed (4.99s wall); xtask ratchets65 passed. New/expanded binary Σtimes: hook_pump20.083s, root-library1.785s, floors15.239s, journey5.342s, kernel cascade3.178s, domain0.006s, all≤30s.
+- **Exact governance:** kernel26418 →26407 physical (-11),20643 →20650 tokei (+7),95files, memory/mod.rs only; full baseline/HISTORY/set_hash/digest/literals/ceiling/RATIFIED set moved together. Bin28658 →28914 (+256; hook_pump+157/main+49/operator_door+25/researcher_root+25), audit7473 →7625, IAC7984 →8080, domain9848 →9887, journey915 →946, CLI6104 unchanged; aggregate185459 →186040, hardfail186041. Operator allowance is not unused headroom. Kernel surface/class table unchanged.
+- **Gates:** kloc-check, check-kernel-baseline, check-env-contract, check-exit-commands, check-service-boundary, check-test-cost, check-corpus, coverage-matrix, check-serde-error-handling, check-dev-record-completeness, check-reza-production-path, gen-abi-docs --check and fmt check PASS; Korean canonical coverage100% and glossary PASS through their exact node scripts (npm executable absent, no packages installed). Release+strip29,968,248B<32MiB (3,586,184B headroom).
+- **Advisory limits of local gates:** coverage-matrix exits0 while reporting existing NFR-Meta-3 registry/phase warnings. Reza reports PASSED in evidence-advisory mode, but explicitly NOT_PROVEN for four absent live-Postgres successors (persisted datname/live database, collective partition, collective erase, Spirit route/tenant audit stage2). No local live-Postgres product proof is claimed; hosted substrate CI owns those existing legs.
+- **Budget observation, integrator-dispositioned:** optional `check-test-budget` over the partial focused junit reported existing `maos-iac::participant_recall_17_8` Σ34.951s plus absent-binary exception rows. No touched recall SQL and no exception added. Main ruled CI's workspace junit authoritative (baseline landing40273714381 passed); partial-junit absent rows are not findings. See gate log, do not claim this optional local invocation passed.
+- Protected `intent-lineage-coverage-report.md` is byte-identical to its pre-run backup. No commit or push. W1 remains narrowed/re-runnable, true cross-store atomicity owned by `v25-erasure-crash-reconciliation`; other explicit scope limits remain.
+- [ ] **AC5 hosted run:** integrator, at landing — record hosted `ci/18-6-verify` run id at the done flip; no hosted-run claim at review (Main-approved disposition, same as18-1…18-5).
+
 ### File List
+
+- `.github/workflows/discipline.yml`
+- `_bmad-output/implementation-artifacts/18-6-fr45-forget-redistillation-and-cascade-closure.md`
+- `_bmad-output/implementation-artifacts/18-6-evidence/`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/epics/requirements-inventory.md`
+- `_bmad-output/implementation-artifacts/18-6-flag-winston-decision.md`
+- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md`
+- `crates/maos-domain/src/memory.rs`
+- `crates/maos-domain/tests/forget_cascade_18_6.rs`
+- `crates/maos-iac/src/adapter/transparency_log.rs`
+- `crates/maos-kernel-core/src/memory/mod.rs`
+- `crates/maos-kernel-core/tests/forget_cascade_18_6.rs`
+- `crates/maos-audit/src/bin/gen_gdpr_cascade.rs`
+- `crates/maos-audit/src/fr4_classifier.rs`
+- `crates/maos-audit/src/lib.rs`
+- `crates/maos-audit/tests/fr4_classifier_16_2.rs`
+- `crates/maos-bin/src/hook_pump.rs`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/src/operator_door.rs`
+- `crates/maos-bin/src/researcher_root.rs`
+- `crates/maos-bin/tests/hook_pump_17_4.rs`
+- `crates/maos-bin/tests/forget_floors_18_6.rs`
+- `crates/maos-bin/tests/j_researcher_survey_18_3.rs`
+- `crates/maos-journey-test/src/lib.rs`
+- `crates/maos-journey-test/tests/journey_forget_18_6.rs`
+- `crates/maos-journey-test/cassettes/j-researcher/forget-redistill-18-6.json`
+- `spirits/researcher/src/lib.rs`
+- `tests/harness/forget_18_6.rs`
+- `tests/corpora/gdpr-cascade-v1.jsonl`
+- `tests/corpora/gdpr-cascade-probe-v1.jsonl`
+- `tests/corpora/MANIFEST.toml`
+- `tests/coverage-matrix.yaml`
+- `docs/adr/ADR-044-gdpr-article-17-distillate-redaction.md`
+- `docs-site/docs/run-maos.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md`
+- `xtask/kernel-core-baseline.toml`
+- `xtask/kloc.toml`
+- `xtask/tests/kernel_pin_content_hash_16_0.rs`
+- `xtask/tests/recovery_lane_ceiling_rule.rs`
 
 ### Change Log
 
 - 2026-10-26: Story created (backlog; D-18-6-01…10 PROPOSED) at `5495863e`. Kernel priced by reverted prototypes (recommended +8 physical / +17 tokei); epic §18-6, R18-19 and the stories row corrected in place; FLAG record `18-6-flag-winston-decision.md`.
 - 2026-10-26: RULED by the operator (Lunarpulse), relayed by Main: D-18-6-01 B, 02–10 A (all as recommended); kernel grant +8 physical / +17 tokei ratified (`memory/mod.rs` only); maos-bin named budget 28700 → 28770; out-of-kernel STOP lines written into §Decisions. Status → `ready-for-dev`. Docs only, no cargo.
+- 2026-10-26: Development by openai-codex/gpt-6.1-sol; implementation and witnesses authored, domain 2/2 intermediate green, AC2 closure control proven red and byte-restored. Mandatory formatted kloc STOP: maos-bin 28916 > 28770 and maos-audit 7623 > 7604. No re-pin or completion claim; status remains `in-progress` pending operator ruling.
+- 2026-10-26: Operator A ruling lifts the measured STOP: maos-bin ≤28940 / maos-audit ≤7640, exact landing pins, per-file +258 root attribution recorded; implementation verification resumes.
+- 2026-10-26: Completed local implementation/proof and exact governance pins after the ratified STOP addendum. Focused2077+94green, kernel lib258, ratchets65; all named gates PASS, AC1–AC4red/restored and AC5local simulationPASS. Approved premise corrections and hosted landing handoff recorded. Story/tracker → `review`; no commit/push.

@@ -560,7 +560,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR35/FR36 publish to a real registry, verified install (PARTIAL) | 20-1 |
 | FR37 vetter-side issuance (PARTIAL: zero callers) | 20-1 |
 | FR39/FR57 skill.author.self + revision proposals (CANNED) | follow-on at Epic 18 preflight |
-| FR45 re-distillation trigger + cross-Spirit cascade (PARTIAL: no trigger; Shared tier and unindexed distillates escape forget) | `18-6-fr45-forget-redistillation-and-cascade-closure` (operator ruling D-17-9-PF-R5 A, 2026-10-22; was mis-routed to 21-4, the instrument/env-registry story; ADR-044's unnamed "follow-up") |
+| FR45 re-distillation trigger + cross-Spirit cascade | Delivered by `18-6-fr45-forget-redistillation-and-cascade-closure`: any-writer/id-bounded TL scrub, derived closure, live cache purge and Spirit-authored regeneration; typed pending for unavailable writers. Shared/Loom principal partition stands; id-free copies, transformed ids and cross-boot resume remain explicit limits. |
 | FR48 operator-selectable crypto provider (PARTIAL) | later (post-v1.0) |
 | FR54 gateway connectors (CANNED) | parked v2.5 — **RULED 2026-10-25** (audit DECIDE-3): kept v2.5; PRD v1.0 phase entry retagged by DELTA-2026-10-25 |
 | FR55 hook firers (CLOSED for compiled-in Spirits) | 17-4 — done 2026-10-20: live telemetry and idle-quiescent consolidation callers, Observer activity corpus and reviewed shutdown ordering. Spawned forms remain explicitly outside this story. |

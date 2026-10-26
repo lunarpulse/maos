@@ -52,6 +52,9 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::Duration;
 
 use maos_domain::invariants::i7::ScalarTapEvent;
+use maos_domain::memory::{
+    ForgetNotice, ForgetOutcome, RedistillOutcome, RedistillPendingReason as Pending,
+};
 use maos_kernel_core::capability::cap_tokens::monotonic_now_ns;
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::scheduler::control_block::{
@@ -206,6 +209,7 @@ struct Shared {
     registry: Mutex<BTreeMap<u32, Subscriber>>,
     counters: Counters,
     stopped: AtomicBool,
+    redistill_results: Mutex<BTreeMap<String, RedistillOutcome>>,
 }
 
 fn same_object(weak: &Weak<dyn AnySpiritObj>, live: &Arc<dyn AnySpiritObj>) -> bool {
@@ -481,6 +485,7 @@ impl HookPump {
             registry: Mutex::new(BTreeMap::new()),
             counters: Counters::default(),
             stopped: AtomicBool::new(false),
+            redistill_results: Mutex::default(),
         });
         let (flush_tx, flush_rx) = mpsc::unbounded_channel();
         let cancel = CancellationToken::new();
@@ -502,6 +507,162 @@ impl HookPump {
     /// The sink every compiled-in Observer is constructed with.
     pub fn activity_sink(&self) -> Arc<dyn ActivitySink> {
         self.writer.sink()
+    }
+
+    pub fn redistill_sink(&self) -> researcher::RedistillSink {
+        let shared = Arc::downgrade(&self.shared);
+        Arc::new(move |request, outcome| {
+            if let Some(shared) = shared.upgrade() {
+                if let Some(result) = shared
+                    .redistill_results
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get_mut(&request.redacted_distillate_frame_id)
+                {
+                    *result = outcome;
+                }
+            }
+        })
+    }
+
+    /// Synchronous forget completion: every live registered runtime is curated;
+    /// absent/offline writers are terminal pending, never silently omitted.
+    pub async fn finish_forget(
+        tl: &TransparencyLogAdapter,
+        forget: &ForgetOutcome,
+        pump: Option<&Self>,
+    ) -> Result<serde_json::Value, String> {
+        let ForgetOutcome::Erased {
+            redacted_distillate_frame_ids,
+            redacted_principal_frame_ids,
+            redistill,
+            ..
+        } = forget
+        else {
+            return Ok(serde_json::json!({}));
+        };
+        let mut outcomes = BTreeMap::new();
+        if let Some(pump) = pump {
+            let pids: Vec<_> = pump.shared.registry().keys().copied().collect();
+            for pid in pids {
+                let Some(scb) = pump.shared.scb(pid) else {
+                    continue;
+                };
+                let snapshot = scb.runtime_snapshot();
+                let object = Arc::clone(&snapshot.spirit_obj);
+                let (target, quarantined) = {
+                    let mut registry = pump.shared.registry();
+                    let Some(entry) = registry.get_mut(&pid) else {
+                        continue;
+                    };
+                    pump.shared.sync(pid, entry, &snapshot);
+                    (entry.dispatch_target(&scb, snapshot), entry.quarantined)
+                };
+                let addressed: Vec<_> = redistill
+                    .iter()
+                    .filter(|r| {
+                        r.writer_spirit_pid == pid
+                            && r.writer_boot_nonce == (scb.boot_nonce as u128).to_le_bytes()
+                    })
+                    .cloned()
+                    .collect();
+                for request in &addressed {
+                    pump.shared
+                        .redistill_results
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .insert(
+                            request.redacted_distillate_frame_id.clone(),
+                            RedistillOutcome::Pending {
+                                reason: Pending::FormUnsupported,
+                            },
+                        );
+                }
+                let notice = ForgetNotice {
+                    scrubbed_frame_ids: redacted_distillate_frame_ids
+                        .iter()
+                        .chain(redacted_principal_frame_ids)
+                        .cloned()
+                        .collect(),
+                    redistill: addressed.clone(),
+                };
+                let bytes = serde_json::to_vec(&notice).map_err(|e| e.to_string())?;
+                let hook = match (quarantined, pump.shared.dispatcher.upgrade()) {
+                    (false, Some(dispatcher)) => {
+                        Some(dispatcher.fire_on_consolidate(&target, &bytes).await)
+                    }
+                    _ => None,
+                };
+                let completed = matches!(
+                    hook,
+                    Some(
+                        HookOutcome::Fired { .. }
+                            | HookOutcome::BudgetWarning80 { fired: true, .. }
+                    )
+                );
+                if let Some(hook) = &hook {
+                    pump.shared
+                        .account(pid, &object, Hook::Consolidate, None, hook);
+                }
+                for request in addressed {
+                    let result = pump
+                        .shared
+                        .redistill_results
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .remove(&request.redacted_distillate_frame_id);
+                    let outcome = if completed {
+                        result.unwrap_or(RedistillOutcome::Pending {
+                            reason: Pending::FormUnsupported,
+                        })
+                    } else {
+                        RedistillOutcome::Pending {
+                            reason: Pending::Refused("consolidate-hook".into()),
+                        }
+                    };
+                    outcomes.insert(request.redacted_distillate_frame_id, outcome);
+                }
+            }
+        }
+        let mut rows = Vec::new();
+        let mut redistilled_count = 0;
+        for request in redistill {
+            let mut outcome = outcomes
+                .remove(&request.redacted_distillate_frame_id)
+                .unwrap_or(RedistillOutcome::Pending {
+                    reason: Pending::WriterNotLive,
+                });
+            if let RedistillOutcome::Redistilled {
+                new_distillate_frame_id,
+            } = &outcome
+            {
+                let id = researcher::decode_frame_id_hex(new_distillate_frame_id).ok();
+                let row = id
+                    .map(|id| tl.query_frame_by_id(id))
+                    .transpose()
+                    .map_err(|e| e.to_string())?
+                    .flatten();
+                if !row.is_some_and(|row| {
+                    row.spirit_pid == request.writer_spirit_pid
+                        && row.boot_nonce == tl.boot_nonce()
+                        && row.kind
+                            == maos_kernel_core::iac::transparency_log::FrameKind::Distillate
+                        && hex::encode(row.frame_id) != request.redacted_distillate_frame_id
+                }) {
+                    outcome = RedistillOutcome::Pending {
+                        reason: Pending::Refused("writer-mismatch".into()),
+                    };
+                }
+            }
+            tl.insert_redistill_outcome(request, &outcome)
+                .map_err(|e| e.to_string())?;
+            redistilled_count +=
+                usize::from(matches!(outcome, RedistillOutcome::Redistilled { .. }));
+            rows.push(serde_json::json!({ "request": request, "outcome": outcome }));
+        }
+        Ok(
+            serde_json::json!({ "redistill_outcomes": rows, "redistilled_count": redistilled_count, "pending_count": redistill.len() - redistilled_count }),
+        )
     }
 
     /// Register an admitted compiled-in pid (`load_admit_start`, after the

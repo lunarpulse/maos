@@ -1,0 +1,4 @@
+Command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo nextest run --locked -p maos-domain --test forget_cascade_18_6
+Summary [   0.004s] 2 tests run: 2 passed, 0 skipped
+Tool wall time: 6.54 seconds
+Intermediate domain contract check; not final-tree proof.

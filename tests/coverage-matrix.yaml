@@ -695,9 +695,11 @@ coverage:
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
+    - gdpr-cascade-v1
+    - gdpr-cascade-probe-v1
     phase: v1.0
     valid_until: '2027-06-12'
-    notes: Story 9.2 ships maosctl forget + legal-hold + distillate redaction-marker/body-scrub; replayed by gdpr-cascade-v0 (50 scenarios) and leakage probe gdpr-cascade-probe-v0
+    notes: Delivered by 18-6 — any-writer, any-kind erasure and derived closure; live Spirit-authored re-distillation through the daemon door (journey_forget_18_6); 50 erased-only production-door scenarios and 100 all-store probes (forget_floors_18_6). v0 retains held/failed/not-found regression.
   FR46:
     gates: []
     enforcement: advisory-until-engagement
@@ -915,9 +917,11 @@ coverage:
     corpora:
     - gdpr-cascade-v0
     - gdpr-cascade-probe-v0
+    - gdpr-cascade-v1
+    - gdpr-cascade-probe-v1
     phase: v1.0
     valid_until: '2027-06-12'
-    notes: Story 9.2 50/50 clean-removal + 0/100 leakage floor over separate probe; structural replay, no live judge
+    notes: Delivered by 18-6 — forget_floors_18_6 seeds real adapters and uses one daemon door for 50/50 clean removals, 50/50 redaction markers and 0/100 leakage over every named readable store; no live judge. v0 retains held/failed/not-found regression.
   NFR-Aud-11:
     gates:
     - check-enterprise-identity

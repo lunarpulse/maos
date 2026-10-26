@@ -357,6 +357,38 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "distillate.redacted (kind 1)",
         ),
         (
+            "task.complete",
+            None,
+            "frame.redacted",
+            r#"{"redacted_frame_id":"01ab:01ab:01ab:01ab:01ab:01ab:01ab:01ab","original_kind":18}"#,
+            0,
+            "generic frame redaction (18-6)",
+        ),
+        (
+            "task.complete",
+            None,
+            "distillate.redistill.requested",
+            r#"{"request":{"redacted_distillate_frame_id":"01ab01ab01ab01ab01ab01ab01ab01ab","writer_spirit_pid":7,"writer_boot_nonce":[42,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"surviving_source_log_ref":[]}}"#,
+            0,
+            "redistill requested (18-6)",
+        ),
+        (
+            "task.complete",
+            None,
+            "distillate.redistilled",
+            r#"{"request":{"redacted_distillate_frame_id":"01ab01ab01ab01ab01ab01ab01ab01ab","writer_spirit_pid":7,"writer_boot_nonce":[42,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"surviving_source_log_ref":["02020202020202020202020202020202"]},"outcome":{"status":"redistilled","new_distillate_frame_id":"03030303030303030303030303030303"}}"#,
+            0,
+            "redistilled (18-6)",
+        ),
+        (
+            "task.complete",
+            None,
+            "distillate.redistill.pending",
+            r#"{"request":{"redacted_distillate_frame_id":"01ab01ab01ab01ab01ab01ab01ab01ab","writer_spirit_pid":7,"writer_boot_nonce":[42,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"surviving_source_log_ref":[]},"outcome":{"status":"pending","reason":"no-surviving-sources"}}"#,
+            0,
+            "redistill pending (18-6)",
+        ),
+        (
             "context.pressure",
             None,
             "context.pressure",
@@ -1011,5 +1043,94 @@ fn shared_recall_fetch_writers_have_call_dispositions() {
             writer.shape.is_none(),
             "recall/fetch can never be exempted as non-calls"
         );
+    }
+}
+
+#[test]
+fn forget_tombstones_are_typed_redacted_rows_not_fr4_schema_failures() {
+    for (kind, payload) in [
+        (
+            "mcp.invocation",
+            r#"{"redacted":true,"reason":"gdpr-forget","original_kind":18}"#,
+        ),
+        (
+            "capability.invocation",
+            r#"{"redacted":true,"reason":"gdpr-forget","original_kind":7}"#,
+        ),
+        (
+            "distillate",
+            r#"{"redacted":true,"reason":"gdpr-forget","original_kind":"Distillate"}"#,
+        ),
+    ] {
+        let row = tokenless(kind, "fixture", 7, payload);
+        assert_eq!(classify_fr4_row(&row), Fr4RowDisposition::Redacted);
+        let mut ndjson = Vec::new();
+        to_fr4_ndjson(vec![row.clone()], &mut ndjson).unwrap();
+        let mut plain = Vec::new();
+        to_fr4_plain(vec![row], &mut plain).unwrap();
+        assert!(!plain.is_empty());
+    }
+    let fake = tokenless(
+        "capability.invocation",
+        "fixture",
+        7,
+        r#"{"redacted":false,"reason":"gdpr-forget","original_kind":7}"#,
+    );
+    assert_eq!(classify_fr4_row(&fake), Fr4RowDisposition::Call);
+}
+
+#[test]
+fn real_forget_tombstones_survive_replay_sealed_and_trajectory_export() {
+    use maos_audit::sealed_export::{
+        build_bundle, build_trajectory_bundle, sign_bundle, verify_bundle, CoveredWindow,
+        FreshnessMetadata,
+    };
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("audit.sqlite");
+    {
+        let log = TransparencyLogAdapter::open(&db, 42).unwrap();
+        log.insert_frame_event(
+            FrameKind::McpInvocation,
+            7,
+            None,
+            "fixture",
+            b"director-ada CANARY",
+            FrameOrigin::Kernel,
+        );
+        let id = log.last_frame_id();
+        log.scrub_frame_body(id, FrameKind::McpInvocation as i64, "gdpr-forget")
+            .unwrap();
+    }
+    let entries =
+        maos_audit::query_with_redaction(&db, maos_audit::AuditFilter::default()).unwrap();
+    let tombstone = entries.iter().find(|row| row.intent == "fixture").unwrap();
+    assert_eq!(classify_fr4_row(tombstone), Fr4RowDisposition::Redacted);
+    assert!(tombstone.redaction.is_some());
+    assert!(!tombstone.payload.contains("CANARY"));
+    let freshness = FreshnessMetadata {
+        export_timestamp_ns: 1,
+        covered_window: CoveredWindow {
+            since_ns: 0,
+            until_ns: 1,
+        },
+        export_seq: 1,
+    };
+    let seed = [7; 32];
+    for unsigned in [
+        build_bundle(entries.clone(), vec![], vec![], freshness.clone()),
+        build_trajectory_bundle(
+            entries,
+            vec![],
+            vec![],
+            freshness,
+            true,
+            "gdpr-forget".into(),
+        ),
+    ] {
+        let signed = sign_bundle(unsigned, &seed).unwrap();
+        verify_bundle(&signed, &maos_audit::sealed_export::derive_pubkey(&seed)).unwrap();
+        assert!(!serde_json::to_string(&signed).unwrap().contains("CANARY"));
     }
 }

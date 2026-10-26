@@ -1,0 +1,67 @@
+# Branch-only Story 18-6 AC1/AC5 proof. Copy to .github/workflows on
+# ci/18-6-verify only; never merge this workflow or a planted production tree.
+name: 18-6-proven-red
+on:
+  push:
+    branches: ["ci/18-6-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: 18-6-proven-red
+      - name: Record provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          rustc -Vv
+          uname -a
+          cat /etc/os-release
+      - name: Build real operator processes
+        run: cargo build --locked -p maos-bin --bin maos && cargo build --locked -p maos-cli --bin maosctl
+      - name: Unplanted process control must pass
+        run: cargo nextest run --locked -p maos-journey-test --test journey_forget_18_6 -E 'test(=live_forget_redistills_and_never_resurrects_then_pending_is_typed)'
+      - name: Apply the single AC1 index-filter plant
+        run: |
+          set -euo pipefail
+          sha256sum -c _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff.sha256
+          git apply --check _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff
+          git apply _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff
+          git diff -- crates/maos-kernel-core/src/memory/mod.rs
+      - name: Rebuild the planted daemon
+        run: cargo build --locked -p maos-bin --bin maos
+      - name: The same process control must find the leaked canary
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          cargo nextest run --locked -p maos-journey-test --test journey_forget_18_6 -E 'test(=live_forget_redistills_and_never_resurrects_then_pending_is_typed)' > planted.log 2>&1
+          rc=$?
+          set -e
+          cat planted.log
+          test "$rc" -ne 0 || { echo '::error::AC1 plant survived'; exit 1; }
+          grep -q 'canary leakage' planted.log || { echo '::error::red was not the AC1 canary oracle'; exit 1; }
+          grep -q 'seed-rag-noisy' planted.log
+          echo '::notice title=18-6 AC1 PROVEN-RED::index-pid filtering leaves the live unindexed Researcher canary findable'
+      - name: Upload plant evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 18-6-proven-red
+          path: |
+            planted.log
+            _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff
+            _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff.sha256

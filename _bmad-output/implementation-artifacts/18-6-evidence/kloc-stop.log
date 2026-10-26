@@ -1,0 +1,33 @@
+Command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo run -q --locked -p xtask -- kloc-check --json
+After: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo fmt --all (exit0;2.56s)
+Gate exit1; wall26.97s.
+Observed JSON excerpt:
+{
+  "passed": false,
+  "alarm": true,
+  "aggregate": 186040,
+  "per_crate": {
+    "maos-audit": 7623,
+    "maos-bin": 28916,
+    "maos-domain": 9887,
+    "maos-iac": 8080,
+    "maos-journey-test": 946,
+    "maos-kernel-core": 20650,
+    "maos-cli": 6104
+  },
+  "over_budget": [
+    "aggregate 186040 >= 185460",
+    "maos-audit 7623 > 7473",
+    "maos-bin 28916 > 28658",
+    "maos-domain 9887 > 9848",
+    "maos-iac 8080 > 7984",
+    "maos-kernel-core 20650 > 20643"
+  ]
+}
+kloc-check failed
+
+Binding story STOP breaches (not merely unlanded exact pins):
+maos-bin 28916 >28770 by146.
+maos-audit 7623 >7604 by19.
+Kernel20650≤20660, IAC8080≤8167, domain9887≤9907; journey946<1104; CLI6104<6856.
+No production edits or pin changes after this measurement. Reported to integrator Main for operator ruling. Story remains in-progress, not review. Gates/plants/process/broad validation not claimed complete.

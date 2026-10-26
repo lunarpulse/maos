@@ -32,9 +32,13 @@
 //!   `OutputShapePredicate`; ≥ 95 % of findings' `source_log_ref`s resolve via
 //!   `LogRecallAdapter::fetch` (`prd/user-journeys.md:104`); each pass finishes
 //!   inside the manifest's `[budget] time_cap_seconds` (wall-clock printed).
+//!
+//! Story 18-6 adds an MCP-sourced live-writer forget witness below. It uses
+//! the root's library construction and the door's `HookPump::finish_forget`
+//! adapter, not the forbidden CLI combination of replay mode and `--live`.
 
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -93,6 +97,11 @@ const HOLD: Duration = Duration::from_millis(120);
 const MANIFEST: &str = include_str!("../../../spirits/researcher/manifest.toml");
 const MCP_CORPUS: &str =
     include_str!("../../../spirits/researcher/tests/fixtures/researcher-mcp-corpus-v0.5.jsonl");
+
+fn init_survey_clock() {
+    static CLOCK: std::sync::Once = std::sync::Once::new();
+    CLOCK.call_once(init_monotonic_base);
+}
 
 type Exchange = (String, String, String);
 
@@ -254,7 +263,7 @@ async fn idle(dispatcher: &HookDispatcher, scb: &SpiritControlBlock) -> (HookOut
 
 #[tokio::test(flavor = "multi_thread")]
 async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
-    init_monotonic_base();
+    init_survey_clock();
     let manifest: toml::Value = toml::from_str(MANIFEST).unwrap();
     let policy =
         EpistemicPolicySection::from_toml_str(&section(&manifest, &["epistemic_policy"])).unwrap();
@@ -584,4 +593,471 @@ async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
         first < cap && second < cap,
         "a survey pass exceeded the cap"
     );
+}
+
+const FORGET_PRINCIPAL: &str = "director-ada-18-6";
+const FORGET_CANARY: &str = "CANARY_MCP_18_6_f81a9";
+const PERSONAL_SOURCE: &str = "https://example.test/director-ada-18-6/CANARY_MCP_18_6_f81a9";
+const CONTROL_SOURCE: &str = "https://example.test/control-18-6";
+
+/// Only the remote service is mocked. The personal source is offered and
+/// fetched once; subsequent surveys offer the same surviving control source.
+struct ForgetMcp {
+    personal_fetched: AtomicBool,
+    calls: AtomicUsize,
+}
+
+impl maos_mcp::McpClient for ForgetMcp {
+    fn call(
+        &self,
+        server: &str,
+        tool: &str,
+        args: serde_json::Value,
+    ) -> Result<McpCallResponse, McpError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let content = match (server, tool) {
+            ("web", "search") => {
+                let mut results = vec![serde_json::json!({ "url": CONTROL_SOURCE })];
+                if !self.personal_fetched.load(Ordering::SeqCst) {
+                    results.push(serde_json::json!({ "url": PERSONAL_SOURCE }));
+                }
+                serde_json::json!({ "results": results })
+            }
+            ("arxiv", "search") => serde_json::json!({ "papers": [] }),
+            ("github", "search_code") => serde_json::json!({ "results": [] }),
+            ("citation-graph", "traverse") => serde_json::json!({ "edges": [], "clusters": [] }),
+            ("web", "fetch") => {
+                let source = args["url"].as_str().expect("web fetch URL");
+                let (claim_id, statement) = if source == PERSONAL_SOURCE {
+                    assert!(
+                        !self.personal_fetched.swap(true, Ordering::SeqCst),
+                        "the remote canary must be fetched only once"
+                    );
+                    (
+                        format!("{FORGET_PRINCIPAL}/{FORGET_CANARY}"),
+                        format!(
+                            "{FORGET_PRINCIPAL} supplied {FORGET_CANARY} as personal evidence."
+                        ),
+                    )
+                } else {
+                    assert_eq!(source, CONTROL_SOURCE);
+                    (
+                        "control-18-6".into(),
+                        "Independent control evidence survives.".into(),
+                    )
+                };
+                serde_json::json!({
+                    "source_key": source,
+                    "claim": {
+                        "claim_id": claim_id,
+                        "statement": statement,
+                        "topic": "positional-bias",
+                        "methodology_strength": 0.8,
+                        "confidence": 0.9,
+                        "load_bearing": true,
+                        "polarity": true,
+                        "hedges": ["observed"]
+                    }
+                })
+            }
+            _ => panic!("unexpected MCP call {server}/{tool}: {args}"),
+        };
+        Ok(McpResponse::new(
+            content,
+            false,
+            McpAttribution::new(server.into(), McpTransportId::StreamableHttp, tool.into()),
+        ))
+    }
+}
+
+/// The production cassette port supplies every completion. This observer also
+/// verifies the real root-issued token and records whether a later prompt
+/// reintroduces forgotten material from the Spirit's shared caches.
+struct ForgetInference {
+    replay: maos_bin::cassette_replay::CassetteReplayPort,
+    capability: Arc<CapabilityRegistryAdapter>,
+    pid: Arc<AtomicU32>,
+    provider: String,
+    prompts: Mutex<Vec<String>>,
+}
+
+impl InferencePort for ForgetInference {
+    fn complete(&self, req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
+        assert_eq!(req.spirit_pid, self.pid.load(Ordering::Acquire));
+        assert_eq!(req.provider_id.as_deref(), Some(self.provider.as_str()));
+        assert!(matches!(
+            self.capability.get_token_scope(&req.capability_token.token_id),
+            Some(Scope::ProviderInfer { provider }) if provider == self.provider
+        ));
+        self.capability
+            .verify_and_audit(&req.capability_token, [0; 32], SandboxTier(0))
+            .expect("the root binding must mint an admitted inference token");
+        self.prompts.lock().unwrap().push(req.prompt.clone());
+        self.replay.complete(req)
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
+    use maos_bin::admission::{
+        gate_manifest, load_admit_start, AdmissionDeps, StartPolicy, KNOWN_CLASS_NAMES,
+    };
+    use maos_bin::hook_pump::HookPump;
+    use maos_bin::researcher_root::{construct, ResearcherHost, ResearcherWiring};
+    use maos_domain::memory::ForgetOutcome;
+    use maos_domain::ports::MemoryManagerPort;
+    use maos_kernel_core::iac::{IacBusAdapter, Mailbox};
+    use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
+    use maos_kernel_core::security::SecurityManagerAdapter;
+    use std::sync::RwLock;
+
+    // Both tests in this binary may run together: initialize the shared
+    // monotonic base through the same once-only helper.
+    init_survey_clock();
+    let tmp = tempfile::tempdir().unwrap();
+    let database = tmp.path().join("transparency.sqlite");
+    let nonce = 0x18_06_01;
+    let tl = Arc::new(
+        TransparencyLogAdapter::open_with_global_legal_holds(&database, &database, nonce).unwrap(),
+    );
+    let metrics = Arc::new(IacRtMetrics::new());
+    let policy = Arc::new(PolicyTable::new());
+    let security = Arc::new(SecurityManagerAdapter::new(Arc::clone(&policy)));
+    let telemetry = Arc::new(TelemetryStreamAdapter::default());
+    let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    let capability = Arc::new(CapabilityRegistryAdapter::new(
+        Arc::new(RingCryptoProvider),
+        Ed25519SigningKey::new([0x86; 32]),
+        nonce,
+        policy,
+        audit_tx,
+        maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+        Arc::new(WorkingMemoryStore::new()),
+        Arc::clone(&telemetry),
+    ));
+    let memory = Arc::new(MemoryManagerAdapter::new(
+        Arc::new(PrivateMemoryStore::new(tmp.path().join("private"), 4)),
+        Arc::new(SharedMemoryStore::open(&database).unwrap()),
+        Arc::new(PrincipalNamespaceIndex::open(&database).unwrap()),
+        Arc::clone(&tl),
+    ));
+    let bus = Arc::new(IacBusAdapter::new(
+        Arc::new(Mailbox::new(Arc::clone(&metrics))),
+        Arc::clone(&tl),
+    ));
+    let scheduler = Arc::new(SpiritSchedulerAdapter::new(
+        Arc::clone(&tl),
+        Arc::clone(&capability),
+        Arc::clone(&memory),
+        bus,
+        Arc::new(HaltRegistry::new()),
+        Arc::clone(&metrics),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ));
+    let pump = HookPump::new(&scheduler, &telemetry, Arc::clone(&tl));
+    let journal = Arc::new(JournalAdapter::open(&tmp.path().join("lifecycle.ndjson")).unwrap());
+    let lookup = Arc::new(RwLock::new(BTreeMap::new()));
+    let pid = Arc::new(AtomicU32::new(0));
+    let resolve_pid: researcher::PidSource = {
+        let pid = Arc::clone(&pid);
+        Arc::new(move || match pid.load(Ordering::Acquire) {
+            0 => None,
+            pid => Some(pid),
+        })
+    };
+    let manifest: toml::Value = toml::from_str(MANIFEST).unwrap();
+    let declared = capabilities_required_to_scopes(
+        &CapabilitiesRequired::from_toml_str(&section(&manifest, &["capabilities", "required"]))
+            .unwrap(),
+    );
+    let provider = declared
+        .iter()
+        .find_map(|scope| match scope {
+            Scope::ProviderInfer { provider } => Some(provider.clone()),
+            _ => None,
+        })
+        .unwrap();
+
+    // The seed cassette convention's all-zero hash permits either order of
+    // the two concurrent MCP claims. Four real replay entries cover the first
+    // two claims, one surviving-source redistillation, and the next idle pass.
+    let cassette = tmp.path().join("forget-inference.json");
+    std::fs::write(
+        &cassette,
+        serde_json::to_vec(&serde_json::json!({
+            "schema_version": "maos.journey.cassette/v1",
+            "provenance": "seed",
+            "entries": (0..4).map(|_| serde_json::json!({
+                "prompt_sha256": "0".repeat(64),
+                "response": {
+                    "text": "Observed evidence summarized.",
+                    "provider_attribution": {
+                        "provider_id": provider,
+                        "endpoint_url": "cassette://forget-18-6"
+                    }
+                }
+            })).collect::<Vec<_>>()
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let inference = Arc::new(ForgetInference {
+        replay: maos_bin::cassette_replay::CassetteReplayPort::from_file(&cassette, true).unwrap(),
+        capability: Arc::clone(&capability),
+        pid: Arc::clone(&pid),
+        provider: provider.clone(),
+        prompts: Mutex::new(Vec::new()),
+    });
+    let build_inference = Arc::clone(&inference);
+    let mint_capability = Arc::clone(&capability);
+    let seam = butler::ButlerSeam {
+        inference: Some((
+            Arc::new(move || {
+                Some(Arc::clone(&build_inference) as Arc<dyn InferencePort + Send + Sync>)
+            }),
+            vec![provider.clone()],
+        )),
+        mint: Arc::new(move |pid, provider| {
+            mint_capability
+                .issue_with_mediation(
+                    pid,
+                    Scope::ProviderInfer {
+                        provider: provider.into(),
+                    },
+                    60,
+                    [0; 32],
+                    IntentClass::Standard,
+                )
+                .map_err(|e| e.to_string())
+        }),
+        digest: Arc::new(butler::MorningDigestRenderer::new(
+            tmp.path().join("digest"),
+            tmp.path().join("digest-state"),
+            Arc::new(|_, _| {}),
+            Arc::new(maos_spirit_sdk::clock::SystemClock::UTC),
+        )),
+        rollover: false,
+        clock: Arc::new(maos_spirit_sdk::clock::SystemClock::UTC),
+        acceptance: None,
+        scene_butler: Arc::default(),
+        context: None,
+    };
+    let remote = Arc::new(ForgetMcp {
+        personal_fetched: AtomicBool::new(false),
+        calls: AtomicUsize::new(0),
+    });
+    let client = Arc::new(McpClientAdapter::new(
+        remote.clone(),
+        Arc::clone(&capability),
+        Arc::clone(&tl),
+        Arc::clone(&metrics),
+    ));
+    let (mcp_capability, mcp_tl) = (Arc::clone(&capability), Arc::clone(&tl));
+    let wiring = ResearcherWiring {
+        live: true,
+        mcp: Some(Arc::new(move |spirit_id, pid_of| {
+            Ok((
+                Arc::new(LiveResearcherMcpPort::new(
+                    pid_of,
+                    [0; 32],
+                    client.clone(),
+                    Arc::clone(&mcp_capability),
+                    None,
+                    None,
+                    Arc::clone(&mcp_tl),
+                    spirit_id,
+                )),
+                Arc::new(LogRecallAdapter::new(Arc::clone(&mcp_tl))),
+            ))
+        })),
+        legacy_cassette: None,
+    };
+    let mut host = ResearcherHost::new(
+        Arc::clone(&tl),
+        Arc::new(DistillateWriter::new(Arc::clone(&tl), Arc::new(()))),
+        true,
+    );
+    host.redistill_sink = Some(pump.redistill_sink());
+    let researcher = construct(
+        Researcher::new(),
+        &wiring,
+        &seam,
+        &[provider],
+        RESEARCHER_SPIRIT_ID,
+        resolve_pid,
+        &host,
+    )
+    .unwrap();
+    let gated = gate_manifest(MANIFEST, &|name| KNOWN_CLASS_NAMES.contains(&name)).unwrap();
+    let admitted = load_admit_start(
+        &AdmissionDeps {
+            scheduler: &scheduler,
+            security: &security,
+            transparency_log: &tl,
+            journal: &journal,
+            memory: &memory,
+            pid_by_spirit_id: &lookup,
+            hooks: Some(&pump),
+        },
+        &gated,
+        make_spirit_obj(researcher.clone()),
+        nonce,
+        StartPolicy::LeaveLoaded,
+        &mut |_| {},
+    )
+    .await
+    .unwrap();
+    pid.store(admitted.pid, Ordering::Release);
+    scheduler.start(admitted.pid).await.unwrap();
+    let scb = scheduler.scbs().read().unwrap()[&admitted.pid].clone();
+    let dispatcher = scheduler.dispatcher_ref();
+    let (outcome, _) = idle(dispatcher, &scb).await;
+    assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
+    assert!(researcher.take_pass_error().is_none());
+    let first = researcher.last_output().unwrap();
+    assert_eq!(first.findings.len(), 2);
+    let personal = first
+        .findings
+        .iter()
+        .find(|f| f.claim_id.contains(FORGET_CANARY))
+        .unwrap();
+    let control = first
+        .findings
+        .iter()
+        .find(|f| f.claim_id == "control-18-6")
+        .unwrap();
+    let personal_id = decode_frame_id_hex(&personal.source_log_ref).unwrap();
+    let control_id = decode_frame_id_hex(&control.source_log_ref).unwrap();
+    assert_eq!(remote.calls.load(Ordering::SeqCst), 6);
+    assert_eq!(inference.prompts.lock().unwrap().len(), 2);
+    assert!(
+        memory.subject_access(FORGET_PRINCIPAL).unwrap().is_empty(),
+        "this writer has never made a principal-namespace write"
+    );
+    let old = tl
+        .query_frames(FrameFilter {
+            kind: Some(FrameKind::Distillate),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(old.len(), 1);
+    assert!(String::from_utf8_lossy(&old[0].payload_redacted).contains(FORGET_CANARY));
+    let raw = tl.query_frame_by_id(personal_id).unwrap().unwrap();
+    assert_eq!(raw.kind, FrameKind::McpInvocation);
+    assert!(raw.capability_token.is_some());
+    assert!(String::from_utf8_lossy(&raw.payload_redacted).contains(FORGET_CANARY));
+
+    // OperatorDoor::forget_command invokes exactly these two operations.
+    // The daemon process/HTTP door leg has its separate seed-claim witness;
+    // this library leg exercises MCP authority without changing ADR-064.
+    let forgotten = memory.forget_with_reason(FORGET_PRINCIPAL, None).unwrap();
+    let ForgetOutcome::Erased {
+        redacted_principal_frame_ids,
+        redacted_distillate_frame_ids,
+        redistill,
+        ..
+    } = &forgotten
+    else {
+        panic!("an unheld principal must be erased")
+    };
+    assert_eq!(redacted_principal_frame_ids, &[hex::encode(personal_id)]);
+    assert_eq!(
+        redacted_distillate_frame_ids,
+        &[hex::encode(old[0].frame_id)]
+    );
+    assert_eq!(redistill.len(), 1);
+    assert_eq!(redistill[0].writer_spirit_pid, admitted.pid);
+    assert_eq!(
+        redistill[0].writer_boot_nonce,
+        (nonce as u128).to_le_bytes()
+    );
+    assert_eq!(
+        redistill[0].surviving_source_log_ref,
+        [hex::encode(control_id)]
+    );
+    let report = HookPump::finish_forget(&tl, &forgotten, Some(&pump))
+        .await
+        .unwrap();
+    assert_eq!(report["redistilled_count"], 1, "{report}");
+    assert_eq!(report["pending_count"], 0, "{report}");
+    assert_eq!(
+        remote.calls.load(Ordering::SeqCst),
+        6,
+        "redistillation must not reacquire the remote canary"
+    );
+    assert!(researcher.take_pass_error().is_none());
+    for id in [personal_id, old[0].frame_id] {
+        let row = tl.query_frame_by_id(id).unwrap().unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&row.payload_redacted).unwrap();
+        assert_eq!(body["redacted"], true);
+    }
+    let new_id = decode_frame_id_hex(
+        report["redistill_outcomes"][0]["outcome"]["new_distillate_frame_id"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_ne!(new_id, old[0].frame_id);
+    let new = tl.query_frame_by_id(new_id).unwrap().unwrap();
+    assert_eq!(new.kind, FrameKind::Distillate);
+    assert_eq!(new.spirit_pid, admitted.pid);
+    assert_eq!(new.boot_nonce, nonce);
+    let body: serde_json::Value = serde_json::from_slice(&new.payload_redacted).unwrap();
+    assert_eq!(
+        body["source_log_ref"],
+        serde_json::json!([researcher::encode_frame_id_hex(&control_id)])
+    );
+    assert!(!String::from_utf8_lossy(&new.payload_redacted).contains(FORGET_PRINCIPAL));
+    assert!(!String::from_utf8_lossy(&new.payload_redacted).contains(FORGET_CANARY));
+    assert_eq!(
+        researcher.last_output().unwrap().findings[0].claim_id,
+        "control-18-6"
+    );
+    assert_eq!(inference.prompts.lock().unwrap().len(), 3);
+    assert!(!inference.prompts.lock().unwrap()[2].contains(FORGET_CANARY));
+
+    let (outcome, _) = idle(dispatcher, &scb).await;
+    assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
+    assert!(researcher.take_pass_error().is_none());
+    let next = researcher.last_output().unwrap();
+    assert_eq!(next.findings.len(), 1);
+    assert_eq!(next.findings[0].claim_id, "control-18-6");
+    assert_eq!(next.findings[0].source_log_ref, control.source_log_ref);
+    assert_eq!(remote.calls.load(Ordering::SeqCst), 11);
+    let prompts = inference.prompts.lock().unwrap();
+    assert_eq!(prompts.len(), 4);
+    assert_eq!(
+        prompts[..2]
+            .iter()
+            .filter(|p| p.contains(FORGET_CANARY))
+            .count(),
+        1
+    );
+    assert!(prompts[2..]
+        .iter()
+        .all(|p| !p.contains(FORGET_CANARY) && !p.contains(FORGET_PRINCIPAL)));
+    drop(prompts);
+    assert!(!serde_json::to_string(&next)
+        .unwrap()
+        .contains(FORGET_CANARY));
+
+    // Read the durable BLOBs, not just LogRecall's redacted presentation.
+    // Audit rows may retain the principal identity, but no raw or digest row
+    // may retain the separate canary after forget or the following pass.
+    let conn = rusqlite::Connection::open(&database).unwrap();
+    let mut statement = conn
+        .prepare("SELECT payload_redacted FROM transparency_log")
+        .unwrap();
+    let payloads = statement
+        .query_map([], |row| row.get::<_, Vec<u8>>(0))
+        .unwrap();
+    for payload in payloads {
+        assert!(!String::from_utf8_lossy(&payload.unwrap()).contains(FORGET_CANARY));
+    }
+    pump.shutdown().await;
 }

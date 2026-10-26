@@ -52,6 +52,8 @@ pub enum Fr4RowDisposition {
     /// (which has no token column), omitted from the NDJSON feed (whose
     /// per-line schema requires the token).
     NonCallKernelEvent,
+    /// GDPR whole-body tombstone, not a malformed capability-call payload.
+    Redacted,
 }
 
 /// Kinds that are never an external call by their `FrameKind` definition
@@ -104,6 +106,8 @@ pub enum PayloadType {
     ContainerExit,
     /// ADR-016's exact nested context envelope, attributed to the row's pid.
     ContextEnvelope,
+    RedistillRequest,
+    RedistillOutcome,
 }
 
 /// The intent grammar of one writer site: an exact literal, or a fixed
@@ -526,6 +530,43 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("redacted_distillate_frame_id", PayloadType::Str),
         ]),
     },
+    WriterShapeEntry {
+        site: ("transparency_log.rs", "scrub_frame_body", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("frame.redacted"),
+        shape: Some(&[
+            ("redacted_frame_id", PayloadType::Str),
+            ("original_kind", PayloadType::Num),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("transparency_log.rs", "insert_redistill_request", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redistill.requested"),
+        shape: Some(&[("request", PayloadType::RedistillRequest)]),
+    },
+    WriterShapeEntry {
+        site: ("transparency_log.rs", "insert_redistill_outcome", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redistilled"),
+        shape: Some(&[
+            ("request", PayloadType::RedistillRequest),
+            ("outcome", PayloadType::RedistillOutcome),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("transparency_log.rs", "insert_redistill_outcome", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redistill.pending"),
+        shape: Some(&[
+            ("request", PayloadType::RedistillRequest),
+            ("outcome", PayloadType::RedistillOutcome),
+        ]),
+    },
     // Story 18-5: the fallback writer selects kind 32/33 and serializes the
     // externally tagged FramePayload, not an unwrapped ContextEnvelope.
     WriterShapeEntry {
@@ -554,6 +595,23 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
 
 /// Classify one row for the FR4 projection: call, or non-call kernel event.
 pub fn classify_fr4_row(entry: &AuditEntry) -> Fr4RowDisposition {
+    if serde_json::from_str::<serde_json::Value>(&entry.payload).is_ok_and(|value| {
+        value.as_object().is_some_and(|object| {
+            object.len() == 3
+                && object.get("redacted").and_then(|v| v.as_bool()) == Some(true)
+                && object
+                    .get("reason")
+                    .is_some_and(serde_json::Value::is_string)
+                && (object
+                    .get("original_kind")
+                    .is_some_and(|v| v.is_string() || v.is_i64())
+                    || object
+                        .get("original_frame_id")
+                        .is_some_and(serde_json::Value::is_string))
+        })
+    }) {
+        return Fr4RowDisposition::Redacted;
+    }
     // (a) kinds that are never an external call by definition.
     if NON_CALL_KINDS.contains(&entry.kind.as_str()) {
         return Fr4RowDisposition::NonCallKernelEvent;
@@ -652,6 +710,14 @@ fn payload_matches(
         };
         let ok = match ty {
             PayloadType::Str => value.is_string(),
+            PayloadType::RedistillRequest => {
+                serde_json::from_value::<maos_domain::memory::RedistillRequest>(value.clone())
+                    .is_ok()
+            }
+            PayloadType::RedistillOutcome => {
+                serde_json::from_value::<maos_domain::memory::RedistillOutcome>(value.clone())
+                    .is_ok()
+            }
             PayloadType::StrEq(expected) => value.as_str() == Some(*expected),
             PayloadType::Num => value.is_number(),
             PayloadType::NumOrNull => value.is_number() || value.is_null(),

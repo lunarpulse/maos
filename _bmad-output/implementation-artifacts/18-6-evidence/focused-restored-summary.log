@@ -1,0 +1,14 @@
+Command: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo nextest run --locked -p maos-kernel-core --test forget_cascade_18_6 -p maos-bin --test forget_floors_18_6 --no-fail-fast
+Summary [10.522s] 8 tests run:8 passed,0 skipped. Command wall50.07s (includes compilation).
+The kernel binary comprises7 tests; production-door floor binary1 test. Final broader proof is broad-final-green.log.
+
+Korean docs gates (npm executable unavailable; ran exact underlying scripts directly, no packages installed):
+env KO_COVERAGE_MIN=100 LOCALE=ko node scripts/gate-ko-coverage.js
+env LOCALE=ko node scripts/gate-glossary-lock.js
+cwd: docs-site
+PASS: canonical KO coverage100.0% >=required100% (41/41 canonical;45/51 overall supporting sections)
+PASS: ko glossary-lock gate — all locked terms present,no denylist violations;45KOtranslationfiles.
+
+Release build: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo build --locked --release -p maos-bin --bin maos; exit0;53.39s wall.
+cp /mnt/build/cargo/release/maos /tmp/18-6-maos-stripped && strip /tmp/18-6-maos-stripped && wc -c /tmp/18-6-maos-stripped
+Observed29,968,248bytes <33,554,432 (32MiB), headroom3,586,184bytes.
