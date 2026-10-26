@@ -394,9 +394,10 @@ async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
     // Pass 1: the fan-out replays every recorded exchange once, bounded at 8.
     let (outcome, first) = idle(&dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
+    assert!(researcher.take_pass_error().is_none());
     assert!(
         matches!(
-            researcher.take_pass_error(),
+            researcher.take_skill_author_error(),
             Some(researcher::ResearcherError::SkillAuthor(
                 researcher::SkillPortError::QueueUnavailable
             ))
@@ -543,9 +544,10 @@ async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
     // Pass 2: the resolution lets the dispatcher run the pass; it surveys.
     let (outcome, second) = idle(&dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
+    assert!(researcher.take_pass_error().is_none());
     assert!(
         matches!(
-            researcher.take_pass_error(),
+            researcher.take_skill_author_error(),
             Some(researcher::ResearcherError::SkillAuthor(
                 researcher::SkillPortError::QueueUnavailable
             ))
@@ -964,8 +966,9 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
     let dispatcher = scheduler.dispatcher_ref();
     let (outcome, _) = idle(dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
+    assert!(researcher.take_pass_error().is_none());
     assert!(matches!(
-        researcher.take_pass_error(),
+        researcher.take_skill_author_error(),
         Some(researcher::ResearcherError::SkillAuthor(
             researcher::SkillPortError::QueueUnavailable
         ))
@@ -1084,8 +1087,9 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
 
     let (outcome, _) = idle(dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
+    assert!(researcher.take_pass_error().is_none());
     assert!(matches!(
-        researcher.take_pass_error(),
+        researcher.take_skill_author_error(),
         Some(researcher::ResearcherError::SkillAuthor(
             researcher::SkillPortError::QueueUnavailable
         ))

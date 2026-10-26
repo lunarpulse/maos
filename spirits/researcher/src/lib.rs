@@ -604,6 +604,7 @@ pub struct Researcher {
     /// Native host boundary; unused by the deterministic, unbound pass.
     skill_author_port: Option<Arc<dyn SkillAuthorPort>>,
     skill_author_outcome: Arc<Mutex<Option<SkillAuthorOutcome>>>,
+    skill_author_error: Arc<Mutex<Option<ResearcherError>>>,
     /// Story 8.14c — `None` (default) ⇒ byte-identical v0.5 path. `Some` ⇒
     /// `on_idle` fans out over real MCP servers, walks the participant-scoped
     /// log for McpInvocation frames, joins by `source_key`, then surveys.
@@ -675,6 +676,10 @@ impl Researcher {
             .skill_author_outcome
             .lock()
             .unwrap_or_else(|error| error.into_inner()) = None;
+        *self
+            .skill_author_error
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = None;
         match self.ensure_collective_route() {
             Ok(()) => self.collective_probe_failed.store(false, Ordering::Release),
             Err(error) => {
@@ -726,6 +731,7 @@ impl Default for Researcher {
             inference: None,
             skill_author_port: None,
             skill_author_outcome: Arc::default(),
+            skill_author_error: Arc::default(),
             mcp_port: None,
             log_recall_port: None,
             mcp_recall: Arc::new(Mutex::new(McpRecallState::default())),
@@ -984,6 +990,14 @@ impl Researcher {
             .take()
     }
 
+    /// Take the latest non-fatal authoring refusal, separate from survey failure.
+    pub fn take_skill_author_error(&self) -> Option<ResearcherError> {
+        self.skill_author_error
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
+    }
+
     /// Story 18-5 (CR-3) — the root's pid- and window-bound context reporter.
     pub fn with_context_port(mut self, port: Arc<dyn ContextBudgetPort>) -> Self {
         self.context = Some(port);
@@ -1001,8 +1015,7 @@ impl Researcher {
         self
     }
 
-    /// Take the latest typed survey or authoring refusal. An authoring refusal
-    /// retains `last_output`; a survey refusal clears it.
+    /// Take the latest survey refusal. Authoring uses `take_skill_author_error`.
     pub fn take_pass_error(&self) -> Option<ResearcherError> {
         self.pass_error
             .lock()
@@ -1336,7 +1349,10 @@ impl Researcher {
         self.persist(&output, pid)?;
         if let Err(error) = self.author_after_survey(live, &binding, &token, pid, &output) {
             eprintln!("researcher: skill authoring refused: {error}");
-            *self.pass_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+            *self
+                .skill_author_error
+                .lock()
+                .unwrap_or_else(|error| error.into_inner()) = Some(error);
         }
         Ok(output)
     }

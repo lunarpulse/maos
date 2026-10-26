@@ -3364,7 +3364,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo nextest run --locked -p maos-bin --test skill_port_18_7 2>&1 | tee skill-port-18-7.log
+          cargo nextest run --locked --color never -p maos-bin --test skill_port_18_7 2>&1 | tee skill-port-18-7.log
           grep -q '10 tests run: 10 passed' skill-port-18-7.log
 
   smoke-discipline-7-1-5:

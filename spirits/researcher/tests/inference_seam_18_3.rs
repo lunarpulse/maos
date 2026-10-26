@@ -144,8 +144,9 @@ fn a_bound_pass_mints_once_names_its_provider_and_consumes_one_completion_per_cl
         Some(binding("openai", &mints)),
     );
     idle(&r);
+    assert!(r.take_pass_error().is_none());
     assert!(matches!(
-        r.take_pass_error(),
+        r.take_skill_author_error(),
         Some(ResearcherError::SkillAuthor(
             SkillPortError::QueueUnavailable
         ))
@@ -310,15 +311,17 @@ fn the_seed_is_journaled_once_halts_on_its_contradiction_and_distills_through_i1
         Arc::new(0u8),
     )));
     idle(&r);
+    assert!(r.take_pass_error().is_none());
     assert!(matches!(
-        r.take_pass_error(),
+        r.take_skill_author_error(),
         Some(ResearcherError::SkillAuthor(
             SkillPortError::QueueUnavailable
         ))
     ));
     idle(&r);
+    assert!(r.take_pass_error().is_none());
     assert!(matches!(
-        r.take_pass_error(),
+        r.take_skill_author_error(),
         Some(ResearcherError::SkillAuthor(
             SkillPortError::QueueUnavailable
         ))

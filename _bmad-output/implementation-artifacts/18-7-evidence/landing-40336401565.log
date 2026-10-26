@@ -1,0 +1,77 @@
+Landing 40336401565 @ a2d69a29 — local repair proof, 2026-10-26
+Every cargo command below used: env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo
+Full local outputs: /tmp/l1565/fix-*.log. No workspace build/test.
+
+cargo tree --workspace -i zstd
+  exit 101 (expected): error: package ID specification `zstd` did not match any packages
+cargo tree --locked --workspace -i zstd
+  exit 101 (expected): error: package ID specification `zstd` did not match any packages
+cargo deny check
+  exit 101: error: no such command: `deny`
+  cargo-deny unavailable; no local advisory-scan pass claimed.
+deny.toml: no zstd or wasmtime-internal-cache suppression matches.
+Both locks: no zstd/zstd-safe/zstd-sys/wasmtime-internal-cache package records.
+Workspace lock: 10 packages removed /117 lines removed. Native-twin:21 packages /196 lines removed. No upgrades.
+
+cargo tree --offline --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml -i zstd
+  exit101, expected not found; refreshes the affected standalone lock.
+cargo run -q --locked -p xtask -- build-test-fixtures --only equiv-native-twin --only maos-wasm-runner
+  exit0: build-test-fixtures: 3 artefact(s) → /mnt/build/cargo/maos-fixtures/manifest.json
+  Rebuilds real fixtures after the host manifest invalidated their input mtimes.
+
+cargo nextest run --locked --color never --no-fail-fast -p maos-wasm-host -p researcher -p maos-spirit-abi -p maos-bin -E 'package(maos-wasm-host) | package(researcher) | package(maos-spirit-abi) | binary(wasm_form_admission_17_3b) | binary(context_refusal_18_5) | binary(researcher_inference_18_3) | binary(j_researcher_survey_18_3) | binary(skill_port_18_7) | binary(skill_door_18_7)' -j 1
+  exit0: Summary [34.178s] 251 tests run: 251 passed, 1 skipped
+cargo build --locked -p maos-bin -p maos-cli
+  exit0: Finished `dev` profile
+cargo rustc --locked -p maos-cli --bin maosctl -- -C incremental=no
+  exit0: Finished `dev` profile
+  The journey guard scans both packages for both binaries; force a genuine CLI relink after the independent maos-bin source change.
+TMPDIR=/dev/shm cargo nextest run --locked --color never --no-fail-fast -p maos-journey-test --test journey_skill_authoring_18_7 --test journey_forget_18_6 -j 1
+  exit0: Summary [3.482s] 8 tests run: 8 passed, 0 skipped
+MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked --color never --no-fail-fast -p maos-bin
+  exit0: Summary [21.327s] 602 tests run: 602 passed, 14 skipped
+CARGO_TERM_COLOR=always cargo nextest run --locked --color never -p maos-bin --test skill_port_18_7 2>&1 | tee /tmp/l1565/fix-color.log | grep -q '10 tests run: 10 passed'
+  pipefail enabled, exit0: count-pin proof PASSED with CARGO_TERM_COLOR=always
+  No xtask test contained skill_port_18_7 /skill-port-18-7 /'10 tests run' pins before the repair.
+
+cargo run -q --locked -p xtask -- stability-matrix
+  exit0: stability-matrix: wrote STABILITY.md from workspace state
+  Delta is only manifest current5→6, supported1..=5→1..=6, N-1=5, and future>6; ABI version stays1. No new error-code rows generated.
+cargo run -q --locked -p xtask -- stability-matrix --check --json
+  exit0: {"passed":true,"in_sync":true,"deprecation_issues":[],"export_issue":null}
+cargo fmt --all -- --check
+  exit0, no output
+cargo run -q --locked -p xtask -- kloc-check
+  exit0: kloc-check: PASSED (aggregate=187437 LOC)
+  Existing aggregate alarm158608 unchanged. No governed row changes, re-pin or HISTORY amendment.
+cargo run -q --locked -p xtask -- check-serde-error-handling
+  exit0: check-serde-error-handling: PASSED (0 violations)
+cargo run -q --locked -p xtask -- error-catalog-check
+  exit0: error-catalog-check: PASS — 67 E* items registered, 67 discovered in source
+cargo run -q --locked -p xtask -- check-dependency-closure
+  exit0: check-dependency-closure: maos-kernel-core PASSED (0 violations)
+         check-dependency-closure: maos-domain PASSED (0 violations)
+cargo run -q --locked -p xtask -- check-kernel-baseline
+  exit0: check-kernel-baseline: PASSED (maos-kernel-core/src = 26367 lines, 95 files, pinned 26367)
+cargo nextest run --locked --color never --no-fail-fast -p xtask --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule --test retro_action_items --test ci_shape_18_0 --test error_catalog_20_3a -j 1
+  exit0: Summary [3.929s] 43 tests run: 43 passed, 0 skipped
+
+Fresh budget source command:
+TMPDIR=/dev/shm MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked --color never --no-fail-fast -p maos-wasm-host -p researcher -p maos-spirit-abi -p maos-bin -p maos-journey-test -p xtask -p maos-control -p maos-eval -E 'package(maos-wasm-host) | package(researcher) | package(maos-spirit-abi) | binary(wasm_form_admission_17_3b) | binary(context_refusal_18_5) | binary(researcher_inference_18_3) | binary(j_researcher_survey_18_3) | binary(skill_port_18_7) | binary(skill_door_18_7) | binary(journey_skill_authoring_18_7) | binary(journey_forget_18_6) | binary(worker_terminal_facts_17_7) | binary(worker_supervision_16_3) | binary(post_surface_16_1) | binary(t3_network_escape_executor) | binary(d11_xtask_ceiling_ratchet) | binary(recovery_lane_ceiling_rule) | binary(retro_action_items) | binary(ci_shape_18_0) | binary(error_catalog_20_3a)' -j 1
+  Initial substrate mistake: /dev/shm scratch prevents executable runtime stubs; 374 passed /25 failed /1 skipped. All failures confined to the two runtime binaries below. Failed supervision delays also exceeded its budget. No product/test/budget edit made for this local substrate issue.
+  Retain the complete successful suites; replace BOTH affected binaries' complete reports with the following normal-executable-scratch run:
+MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --locked --color never --no-fail-fast -p maos-bin --test worker_supervision_16_3 --test worker_terminal_facts_17_7 -j 1
+  exit0: Summary [97.563s] 54 tests run: 54 passed, 0 skipped
+  Merged XML contains399 actual passed testcases, zero failures/errors; no handwritten durations. All five budget exception binaries are present. Root summary recomputed from the merged complete suites.
+cargo run -q --locked -p xtask -- check-test-budget --junit /tmp/l1565/fix-budget-junit.xml
+  exit0: check-test-budget: PASS (41 binaries, 196.278 s test time, budget 800.000 s)
+  Preserved report: landing-40336401565-junit.xml alongside this log.
+
+cargo build --locked --release -p maos-bin --bin maos
+  exit0: Finished `release` profile [optimized] target(s) in57.16s
+strip /mnt/build/cargo/release/maos
+  exit0
+  Actual size30,458,744 B; limit33,554,432 B; margin3,095,688 B.
+
+Downloaded loom.log: only failed test is researcher_context_refusal_is_typed_journaled_and_recovers at context_refusal_18_5.rs:488, matching workspace red. No other failing test in the maos-bin-whole-package-parallel-isolation leg.
+Protected intent-lineage-coverage-report.md untouched; story remains review; no kernel changes, commit or push.

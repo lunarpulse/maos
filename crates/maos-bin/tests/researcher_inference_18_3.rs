@@ -591,8 +591,12 @@ fn the_root_binding_mints_once_per_pass_on_one_instance() {
             MailboxHandle(0),
         ));
         assert!(
+            researcher.take_pass_error().is_none(),
+            "pass {pass} surveyed"
+        );
+        assert!(
             matches!(
-                researcher.take_pass_error(),
+                researcher.take_skill_author_error(),
                 Some(researcher::ResearcherError::SkillAuthor(
                     researcher::SkillPortError::QueueUnavailable
                 ))

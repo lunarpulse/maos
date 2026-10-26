@@ -224,7 +224,7 @@ pub fn pass_verdict(
         return Ok(None);
     };
     let output = researcher.last_output();
-    if let Some(error) = researcher.take_pass_error().filter(|_| output.is_none()) {
+    if let Some(error) = researcher.take_pass_error() {
         return Err(format!("researcher on_idle pass refused: {error}"));
     }
     if !matches!(

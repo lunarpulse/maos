@@ -501,8 +501,9 @@ fn revision_generation_consumes_host_counts_and_changes_hash_when_counts_change(
 fn undeclared_author_refuses_before_generation_and_retains_the_successful_survey() {
     let (researcher, model, host, _, context) = setup(true, false, None, false);
     idle(&researcher);
+    assert!(researcher.take_pass_error().is_none());
     assert!(matches!(
-        researcher.take_pass_error(),
+        researcher.take_skill_author_error(),
         Some(ResearcherError::SkillAuthor(
             SkillPortError::CapabilityDenied
         ))
@@ -542,8 +543,9 @@ fn unbound_deterministic_pass_never_reads_or_submits_even_with_author_port_insta
 fn unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback() {
     let (researcher, model, host, _, _) = setup(false, true, None, false);
     idle(&researcher);
+    assert!(researcher.take_pass_error().is_none());
     assert!(matches!(
-        researcher.take_pass_error(),
+        researcher.take_skill_author_error(),
         Some(ResearcherError::SkillAuthor(SkillPortError::HostShutDown))
     ));
     assert_eq!(model.seen.lock().unwrap().len(), 3);
@@ -556,8 +558,9 @@ fn unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallb
         false,
     );
     idle(&researcher);
+    assert!(researcher.take_pass_error().is_none());
     assert!(matches!(
-        researcher.take_pass_error(),
+        researcher.take_skill_author_error(),
         Some(ResearcherError::Inference(
             InferenceError::MalformedResponse(_)
         ))
@@ -572,8 +575,9 @@ fn unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallb
 fn malformed_model_document_is_nonfatal_to_survey_and_not_replaced_with_template() {
     let (researcher, model, host, _, context) = setup(false, false, None, true);
     idle(&researcher);
+    assert!(researcher.take_pass_error().is_none());
     assert!(matches!(
-        researcher.take_pass_error(),
+        researcher.take_skill_author_error(),
         Some(ResearcherError::SkillAuthor(SkillPortError::Submission(
             ESkillStore::InvalidEntry(ESkillQueue::Schema(_))
         )))

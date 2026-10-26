@@ -141,8 +141,9 @@ fn generations_preserve_all_metadata_and_match_committed_bytes() {
     let catalog: toml::Value =
         toml::from_str(&fs::read_to_string(tree.path().join("xtask/error-catalog.toml")).unwrap())
             .unwrap();
-    assert_eq!(generated.as_object().unwrap().len(), 49);
-    for entry in catalog["error"].as_array().unwrap() {
+    let entries = catalog["error"].as_array().unwrap();
+    assert_eq!(generated.as_object().unwrap().len(), entries.len());
+    for entry in entries {
         let code = entry["code"].as_str().unwrap();
         for field in ["cause", "remediation"] {
             let expected = entry[field].as_str().unwrap();
@@ -151,5 +152,5 @@ fn generations_preserve_all_metadata_and_match_committed_bytes() {
         }
     }
     assert_eq!(check(&tree)["passed"], true);
-    eprintln!("two generations byte-identical; 49 entries preserve cause/remediation; committed JSON matches");
+    eprintln!("two generations byte-identical; {} entries preserve cause/remediation; committed JSON matches", entries.len());
 }

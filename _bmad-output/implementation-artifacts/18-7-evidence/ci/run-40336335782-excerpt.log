@@ -1,0 +1,262 @@
+proven-red	Set up job	﻿2026-10-26T14:05:11.5859709Z Current runner version: '2.338.0'
+proven-red	Set up job	2026-10-26T14:05:11.5880789Z ##[group]Runner Image Provisioner
+proven-red	Set up job	2026-10-26T14:05:11.5881869Z Hosted Compute Agent
+proven-red	Set up job	2026-10-26T14:05:11.5882358Z Version: 20261021.618
+proven-red	Set up job	2026-10-26T14:05:11.5882853Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+proven-red	Set up job	2026-10-26T14:05:11.5883517Z Build Date: 2026-10-21T00:45:21Z
+proven-red	Set up job	2026-10-26T14:05:11.5884378Z Worker ID: {6b523f04-08e1-4871-adcb-e605f4921ca0}
+proven-red	Set up job	2026-10-26T14:05:11.5884999Z Region: centralus
+proven-red	Set up job	2026-10-26T14:05:11.5885461Z Cloud: Azure
+proven-red	Set up job	2026-10-26T14:05:11.5885892Z ##[endgroup]
+proven-red	Set up job	2026-10-26T14:05:11.5887092Z ##[group]Operating System
+proven-red	Set up job	2026-10-26T14:05:11.5887616Z Ubuntu
+proven-red	Set up job	2026-10-26T14:05:11.5888095Z 24.04.5
+proven-red	Set up job	2026-10-26T14:05:11.5888537Z LTS
+proven-red	Set up job	2026-10-26T14:05:11.5888969Z ##[endgroup]
+proven-red	Set up job	2026-10-26T14:05:11.5889464Z ##[group]Runner Image
+proven-red	Set up job	2026-10-26T14:05:11.5890029Z Image: ubuntu-24.04
+proven-red	Set up job	2026-10-26T14:05:11.5890517Z Version: 20261012.334.1
+proven-red	Set up job	2026-10-26T14:05:11.5891393Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+proven-red	Set up job	2026-10-26T14:05:11.5892798Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+proven-red	Unplanted process control must pass	2026-10-26T14:07:16.8388721Z    Compiling reviewer v0.1.0 (/home/runner/work/maos/maos/spirits/reviewer)
+proven-red	Unplanted process control must pass	2026-10-26T14:07:16.8835234Z    Compiling maos-escape-detector v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-escape-detector)
+proven-red	Unplanted process control must pass	2026-10-26T14:07:16.9705480Z    Compiling rcgen v0.13.2
+proven-red	Unplanted process control must pass	2026-10-26T14:07:17.1425652Z    Compiling maos-journey-test v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-journey-test)
+proven-red	Unplanted process control must pass	2026-10-26T14:07:17.5475811Z    Compiling cedar-policy-formatter v4.11.2
+proven-red	Unplanted process control must pass	2026-10-26T14:07:18.6165316Z    Compiling cedar-policy v4.11.2
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.1370229Z    Compiling maos-pdp v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-pdp)
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.3746207Z    Compiling maos-bin v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-bin)
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5667693Z warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5694720Z     --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5724573Z      |
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5725478Z 1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5754844Z      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5784545Z      |
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5814753Z      = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+proven-red	Unplanted process control must pass	2026-10-26T14:07:21.5815496Z 
+proven-red	Unplanted process control must pass	2026-10-26T14:07:24.7376557Z warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+proven-red	Unplanted process control must pass	2026-10-26T14:07:25.0667900Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 35.48s
+proven-red	Unplanted process control must pass	2026-10-26T14:07:25.1051029Z ────────────
+proven-red	Unplanted process control must pass	2026-10-26T14:07:25.1051734Z  Nextest run ID 15a09f2d-d233-4822-bb4c-936dd0a3247c with nextest profile: default
+proven-red	Unplanted process control must pass	2026-10-26T14:07:25.1052546Z     Starting 1 test across 1 binary (5 tests skipped)
+proven-red	Unplanted process control must pass	2026-10-26T14:07:26.3711635Z         PASS [   1.266s] (1/1) maos-journey-test::journey_skill_authoring_18_7 live_author_revision_restart_and_rejection_preserve_the_payload
+proven-red	Unplanted process control must pass	2026-10-26T14:07:26.3712464Z ────────────
+proven-red	Unplanted process control must pass	2026-10-26T14:07:26.3712946Z      Summary [   1.266s] 1 test run: 1 passed, 5 skipped
+proven-red	Apply the single AC1 persisted-payload plant	﻿2026-10-26T14:07:26.3799004Z ##[group]Run set -euo pipefail
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3799399Z set -euo pipefail
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3799926Z sha256sum -c _bmad-output/implementation-artifacts/18-7-evidence/ci/plant.diff.sha256
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3800724Z git apply --check _bmad-output/implementation-artifacts/18-7-evidence/ci/plant.diff
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3801498Z git apply _bmad-output/implementation-artifacts/18-7-evidence/ci/plant.diff
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3802056Z git diff -- crates/maos-skill/src/store.rs
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3857740Z shell: /usr/bin/bash -e {0}
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3857945Z env:
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3858113Z   CARGO_HOME: /home/runner/.cargo
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3858325Z   CARGO_INCREMENTAL: 0
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3858499Z   CARGO_TERM_COLOR: always
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3858678Z   CACHE_ON_FAILURE: false
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3858853Z ##[endgroup]
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.3939452Z _bmad-output/implementation-artifacts/18-7-evidence/ci/plant.diff: OK
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.4000653Z diff --git a/crates/maos-skill/src/store.rs b/crates/maos-skill/src/store.rs
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.4001015Z index 914650f..a6bf01b 100644
+proven-red	Apply the single AC1 persisted-payload plant	2026-10-26T14:07:26.4001220Z --- a/crates/maos-skill/src/store.rs
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:34.8006295Z warning: function `lookup` is never used
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:34.8006762Z    --> crates/maos-bin/src/env_contract.rs:593:8
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:34.8007110Z     |
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:34.8007529Z 593 | pub fn lookup(name: &str) -> Option<&'static EnvVar> {
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:34.8008022Z     |        ^^^^^^
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:34.8008220Z 
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:37.3954085Z warning: `maos-bin` (bin "maos") generated 5 warnings
+proven-red	Rebuild the planted operator processes	2026-10-26T14:07:37.3955076Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.95s
+proven-red	Same process witness must find missing persisted diff and evidence	﻿2026-10-26T14:07:37.4316227Z ##[group]Run set -euo pipefail
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4316501Z set -euo pipefail
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4316683Z set +e
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4317208Z cargo nextest run --locked -p maos-journey-test --test journey_skill_authoring_18_7 -E 'test(=live_author_revision_restart_and_rejection_preserve_the_payload)' > planted.log 2>&1
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4317784Z rc=$?
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4317943Z set -e
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4318105Z cat planted.log
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4318380Z test "$rc" -ne 0 || { echo '::error::AC1 payload plant survived'; exit 1; }
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4318924Z grep -q 'durable proposal payload: diff missing' planted.log || { echo '::error::red was not the durable payload oracle'; exit 1; }
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4319574Z echo '::notice title=18-7 AC1 PROVEN-RED::dropping persisted revision payload is detected by the real daemon witness'
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4374476Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4374785Z env:
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4374953Z   CARGO_HOME: /home/runner/.cargo
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4375164Z   CARGO_INCREMENTAL: 0
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4375339Z   CARGO_TERM_COLOR: always
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4375522Z   CACHE_ON_FAILURE: false
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:37.4375695Z ##[endgroup]
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0363331Z warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0563205Z warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0563793Z    Compiling maos-journey-test v0.1.0-alpha.1 (/home/runner/work/maos/maos/crates/maos-journey-test)
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0564434Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 5.38s
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0564766Z ────────────
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0565163Z  Nextest run ID 4551c8af-6579-40c2-ab71-ca337c319f57 with nextest profile: default
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0565683Z     Starting 1 test across 1 binary (5 tests skipped)
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0566400Z         FAIL [   0.863s] (1/1) maos-journey-test::journey_skill_authoring_18_7 live_author_revision_restart_and_rejection_preserve_the_payload
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0567398Z   stdout ───
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0567574Z 
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0567641Z     running 1 test
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0567906Z     test live_author_revision_restart_and_rejection_preserve_the_payload ... FAILED
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0568147Z 
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0568211Z     failures:
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0568304Z 
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0568370Z     failures:
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0568588Z         live_author_revision_restart_and_rejection_preserve_the_payload
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0568797Z 
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0569001Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.86s
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0569477Z     
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0569676Z   stderr ───
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0569846Z 
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0570336Z     thread 'live_author_revision_restart_and_rejection_preserve_the_payload' (9430) panicked at crates/maos-journey-test/tests/journey_skill_authoring_18_7.rs:207:5:
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0571841Z     durable proposal payload: diff missing: {"id":"researcher.survey-method","version":"0.1.0","entry_path":"revision_proposal","state":"Pending","entry_id":"c8fbbaf6a6d16049","author":{"class":"researcher","pid":2,"boot_nonce":"6047646835616622843"},"payload":null,"payload_sha256":"c8fbbaf6a6d160494f1eaf80d5e09464e1bd36971be43a1fcd02d42d49adf987","legacy":false}
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0572973Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0573332Z 
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0573476Z   Cancelling due to test failure
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0573730Z ────────────
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0574304Z      Summary [   0.864s] 1 test run: 0 passed, 1 failed, 5 skipped
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0575080Z         FAIL [   0.863s] (1/1) maos-journey-test::journey_skill_authoring_18_7 live_author_revision_restart_and_rejection_preserve_the_payload
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0575593Z error: test run failed
+proven-red	Same process witness must find missing persisted diff and evidence	2026-10-26T14:07:44.0589982Z ##[notice]dropping persisted revision payload is detected by the real daemon witness
+proven-red	Upload plant evidence	﻿2026-10-26T14:07:44.0656454Z ##[group]Run actions/upload-artifact@v4
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0656698Z with:
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0656861Z   name: 18-7-proven-red
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0657381Z   path: planted.log
+proven-red	Upload plant evidence	_bmad-output/implementation-artifacts/18-7-evidence/ci/plant.diff
+proven-red	Upload plant evidence	_bmad-output/implementation-artifacts/18-7-evidence/ci/plant.diff.sha256
+proven-red	Upload plant evidence	
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0657926Z   if-no-files-found: warn
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0658114Z   compression-level: 6
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0658285Z   overwrite: false
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0658456Z   include-hidden-files: false
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0658642Z env:
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0658800Z   CARGO_HOME: /home/runner/.cargo
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0659002Z   CARGO_INCREMENTAL: 0
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0659177Z   CARGO_TERM_COLOR: always
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0659362Z   CACHE_ON_FAILURE: false
+proven-red	Upload plant evidence	2026-10-26T14:07:44.0659539Z ##[endgroup]
+proven-red	Upload plant evidence	2026-10-26T14:07:44.1919017Z (node:9457) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+proven-red	Upload plant evidence	2026-10-26T14:07:44.1919770Z (Use `node --trace-deprecation ...` to show where the warning was created)
+proven-red	Upload plant evidence	2026-10-26T14:07:44.1976092Z Multiple search paths detected. Calculating the least common ancestor of all paths
+proven-red	Upload plant evidence	2026-10-26T14:07:44.1977756Z The least common ancestor is /home/runner/work/maos/maos. This will be the root directory of the artifact
+proven-red	Upload plant evidence	2026-10-26T14:07:44.1978457Z With the provided path, there will be 3 files uploaded
+proven-red	Upload plant evidence	2026-10-26T14:07:44.1980326Z Artifact name is valid!
+proven-red	Upload plant evidence	2026-10-26T14:07:44.1981000Z Root directory input is valid!
+proven-red	Upload plant evidence	2026-10-26T14:07:44.4692337Z Beginning upload of artifact content to blob storage
+proven-red	Upload plant evidence	2026-10-26T14:07:44.4899071Z (node:9457) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+proven-red	Upload plant evidence	2026-10-26T14:07:44.6096642Z Uploaded bytes 8113
+proven-red	Upload plant evidence	2026-10-26T14:07:44.6476555Z Finished uploading artifact content to blob storage!
+proven-red	Upload plant evidence	2026-10-26T14:07:44.6478422Z SHA256 digest of uploaded artifact zip is 6f5ca8adac88089455784e8210d972ec2d1507172d2a014ee6aad15ffbcf5d87
+proven-red	Upload plant evidence	2026-10-26T14:07:44.6479806Z Finalizing artifact upload
+proven-red	Upload plant evidence	2026-10-26T14:07:45.0972556Z Artifact 18-7-proven-red.zip successfully finalized. Artifact ID 12656104885
+proven-red	Upload plant evidence	2026-10-26T14:07:45.0973550Z Artifact 18-7-proven-red has been successfully uploaded! Final size is 8113 bytes. Artifact ID is 12656104885
+proven-red	Upload plant evidence	2026-10-26T14:07:45.0979467Z Artifact download URL: https://github.com/lunarpulse/maos/actions/runs/40336335782/artifacts/12656104885
+proven-red	Post Run Swatinem/rust-cache@v2	﻿2026-10-26T14:07:45.1133657Z Post job cleanup.
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2087459Z ##[group]Cache Configuration
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2087841Z Cache Provider:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2088081Z     github
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2088316Z Workspaces:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2088570Z     /home/runner/work/maos/maos
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2088886Z Cache Paths:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2089143Z     /home/runner/.cargo/bin
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2089459Z     /home/runner/.cargo/.crates.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2089808Z     /home/runner/.cargo/.crates2.json
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2090139Z     /home/runner/.cargo/registry
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2090439Z     /home/runner/.cargo/git
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2090735Z     /home/runner/work/maos/maos/target
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2091071Z Restore Key:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2091761Z     v0-rust-18-7-proven-red-proven-red-Linux-x64-01b81e85
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2092160Z Cache Key:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2092523Z     v0-rust-18-7-proven-red-proven-red-Linux-x64-01b81e85-1d481bc2
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2092962Z .. Prefix:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2093253Z   - v0-rust-18-7-proven-red-proven-red-Linux-x64
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2093687Z .. Environment considered:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2094130Z   - Rust Versions:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2094522Z     - 1.99.1 x86_64-unknown-linux-gnu 58cf8f9c35b355199727627d07ae34a4e2846d67
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2094982Z   - CARGO_HOME
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2095223Z   - CARGO_INCREMENTAL
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2095501Z   - CARGO_TERM_COLOR
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2095760Z .. Lockfiles considered:
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2096055Z   - /home/runner/work/maos/maos/Cargo.lock
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2096480Z   - /home/runner/work/maos/maos/crates/maos-a2a-core/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2096972Z   - /home/runner/work/maos/maos/crates/maos-a2a-tcp/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2097498Z   - /home/runner/work/maos/maos/crates/maos-a2a/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2097942Z   - /home/runner/work/maos/maos/crates/maos-acp/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2098393Z   - /home/runner/work/maos/maos/crates/maos-attrs/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2098842Z   - /home/runner/work/maos/maos/crates/maos-audit/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2099289Z   - /home/runner/work/maos/maos/crates/maos-bench/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2099657Z   - /home/runner/work/maos/maos/crates/maos-bin/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2099972Z   - /home/runner/work/maos/maos/crates/maos-capability/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2100278Z   - /home/runner/work/maos/maos/crates/maos-cli/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2100565Z   - /home/runner/work/maos/maos/crates/maos-cohort/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2100870Z   - /home/runner/work/maos/maos/crates/maos-compliance/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2101183Z   - /home/runner/work/maos/maos/crates/maos-control/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2101487Z   - /home/runner/work/maos/maos/crates/maos-corpus-gen/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2101830Z   - /home/runner/work/maos/maos/crates/maos-director-surface/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2102162Z   - /home/runner/work/maos/maos/crates/maos-domain/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2102450Z   - /home/runner/work/maos/maos/crates/maos-egress/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2102769Z   - /home/runner/work/maos/maos/crates/maos-escape-detector/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2103106Z   - /home/runner/work/maos/maos/crates/maos-eval/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2103415Z   - /home/runner/work/maos/maos/crates/maos-exec-deps/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2103714Z   - /home/runner/work/maos/maos/crates/maos-fkcs/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2104208Z   - /home/runner/work/maos/maos/crates/maos-frame-codec/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2104512Z   - /home/runner/work/maos/maos/crates/maos-host/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2104790Z   - /home/runner/work/maos/maos/crates/maos-iac/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2105109Z   - /home/runner/work/maos/maos/crates/maos-journey-test/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2105478Z   - /home/runner/work/maos/maos/crates/maos-kernel-core/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2105801Z   - /home/runner/work/maos/maos/crates/maos-loom-lite/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2106111Z   - /home/runner/work/maos/maos/crates/maos-manifest/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2106617Z   - /home/runner/work/maos/maos/crates/maos-mcp/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2106927Z   - /home/runner/work/maos/maos/crates/maos-notify-push/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2107238Z   - /home/runner/work/maos/maos/crates/maos-pdp/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2107536Z   - /home/runner/work/maos/maos/crates/maos-persistence/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2107848Z   - /home/runner/work/maos/maos/crates/maos-providers/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2108152Z   - /home/runner/work/maos/maos/crates/maos-registry/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2108461Z   - /home/runner/work/maos/maos/crates/maos-secrets/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2108761Z   - /home/runner/work/maos/maos/crates/maos-shell/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2109152Z   - /home/runner/work/maos/maos/crates/maos-siem/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2109437Z   - /home/runner/work/maos/maos/crates/maos-skill/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2109742Z   - /home/runner/work/maos/maos/crates/maos-spirit-abi/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2110061Z   - /home/runner/work/maos/maos/crates/maos-spirit-cli/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2110385Z   - /home/runner/work/maos/maos/crates/maos-spirit-derive/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2110719Z   - /home/runner/work/maos/maos/crates/maos-spirit-hello/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2111101Z   - /home/runner/work/maos/maos/crates/maos-spirit-sdk/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2111508Z   - /home/runner/work/maos/maos/crates/maos-sso/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2111927Z   - /home/runner/work/maos/maos/crates/maos-telemetry/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2112343Z   - /home/runner/work/maos/maos/crates/maos-wasm-host/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2112778Z   - /home/runner/work/maos/maos/examples/example-spirit/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2113196Z   - /home/runner/work/maos/maos/rust-toolchain.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2113617Z   - /home/runner/work/maos/maos/spirits/architect/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2114203Z   - /home/runner/work/maos/maos/spirits/butler/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2114657Z   - /home/runner/work/maos/maos/spirits/digest/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2115081Z   - /home/runner/work/maos/maos/spirits/mira/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2115496Z   - /home/runner/work/maos/maos/spirits/nash/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2115899Z   - /home/runner/work/maos/maos/spirits/observer/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2116351Z   - /home/runner/work/maos/maos/spirits/orchestrator/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2116829Z   - /home/runner/work/maos/maos/spirits/researcher/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2117279Z   - /home/runner/work/maos/maos/spirits/reviewer/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2117713Z   - /home/runner/work/maos/maos/spirits/worker/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2118127Z   - /home/runner/work/maos/maos/xtask/Cargo.toml
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2118674Z ##[endgroup]
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:45.2118807Z 
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:47.0704171Z ... Cleaning /home/runner/work/maos/maos/target ...
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:47.6170222Z ... Cleaning cargo registry (cache-all-crates: false) ...
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:49.7341171Z ... Cleaning cargo/bin ...
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:49.7411628Z ... Cleaning cargo git cache ...
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:49.7415539Z ... Saving cache ...
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:49.7549147Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/maos/maos --files-from manifest.txt --use-compress-program zstdmt
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:54.1712584Z Sent 0 of 539651879 (0.0%), 0.0 MBs/sec
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:55.1715586Z Sent 136998695 of 539651879 (25.4%), 65.3 MBs/sec
+proven-red	Post Run Swatinem/rust-cache@v2	2026-10-26T14:07:56.1751415Z Sent 539651879 of 539651879 (100.0%), 171.3 MBs/sec
+proven-red	Post Run actions/checkout@v5	﻿2026-10-26T14:07:56.4078136Z Post job cleanup.
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.4758804Z [command]/usr/bin/git version
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.4794316Z git version 2.55.0
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.4821961Z Temporarily overriding HOME='/home/runner/work/_temp/fab4cd8c-c636-43db-babb-db74d5809f9c' before making global git config changes
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.4823033Z Adding repository directory to the temporary git global config as a safe directory
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.4826383Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.4891550Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.4921612Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.5142017Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.5171139Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.5400503Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+proven-red	Post Run actions/checkout@v5	2026-10-26T14:07:56.5432521Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+proven-red	Complete job	﻿2026-10-26T14:07:56.5768354Z Cleaning up orphan processes
+proven-red	Complete job	2026-10-26T14:07:56.6042666Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
