@@ -9,7 +9,7 @@
 - [v2 → v3 Migration](/migrate/v2-to-v3) — what changed at manifest schema version 3
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 5*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 6*
 
 
 ## Constants {#maos-spirit-abi-constants}
@@ -69,6 +69,10 @@ Bumped to `5` in Story 17-3b (D-17-3b-H) for the `wasm-component` form
 and its required `[class].artifact` path. Schema 4 remains supported as
 the N-1 manifest floor.
 
+Bumped to `6` in Story 18-7-live-skill-authoring-and-revisions (D-02 A)
+for `[capabilities.required.skill].author_self`. Below schema 6 the
+declaration degrades away; the supported floor remains 1.
+
 This constant is the single authoritative source consumed by
 `maos-manifest::ClassSection` validation and by the `xtask
 check-manifest-schema-version` gate. Story 7.5a's ABI Stability Triple
@@ -80,12 +84,12 @@ constant directly.
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 
-assert_eq!(MANIFEST_SCHEMA_VERSION, 5);
+assert_eq!(MANIFEST_SCHEMA_VERSION, 6);
 ```
 
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 5u32;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 6u32;
 ```
 
 ### `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-manifest-schema-version}
@@ -146,5 +150,5 @@ assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 
 
 ```rust
-pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 5u32;
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 6u32;
 ```

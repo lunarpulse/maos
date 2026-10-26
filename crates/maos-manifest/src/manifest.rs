@@ -334,7 +334,7 @@ const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
 /// gate reports the constant as missing. Keep the declaration on one physical
 /// line and out of doc comments above it.
 #[rustfmt::skip]
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log"];
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log", "capabilities.required.skill"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -606,6 +606,7 @@ pub struct CapabilitiesRequired {
     pub loom: LoomCapabilities,
     pub iac: IacCapabilities,
     pub log: LogCapabilities,
+    pub skill: SkillCapabilities,
 }
 
 /// Story 17-3c — `[capabilities.required.iac].send`: peer classes from the
@@ -620,6 +621,14 @@ pub struct IacCapabilities {
 pub struct LogCapabilities {
     pub recall: bool,
     pub fetch: bool,
+}
+
+/// Schema v6 runtime skill authoring; admission remains operator-only.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SkillCapabilities {
+    #[serde(default)]
+    pub author_self: bool,
 }
 
 /// `"broadcast"` = frame with empty `to`; `"spirit:peer"` = frame addressed to
@@ -679,6 +688,9 @@ impl CapabilitiesRequired {
             self.iac = IacCapabilities::default();
             self.log = LogCapabilities::default();
         }
+        if declared_schema < 6 {
+            self.skill = SkillCapabilities::default();
+        }
         self
     }
 }
@@ -696,6 +708,8 @@ struct RawCapabilitiesRequired {
     iac: RawIacCapabilities,
     #[serde(default)]
     log: RawLogCapabilities,
+    #[serde(default)]
+    skill: SkillCapabilities,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, Default)]
@@ -858,6 +872,7 @@ impl RawCapabilitiesRequired {
                 recall: self.log.recall,
                 fetch: self.log.fetch,
             },
+            skill: self.skill,
         })
     }
 }
@@ -912,6 +927,9 @@ pub fn capabilities_required_to_scopes(
     }
     if caps.log.fetch {
         scopes.push(maos_domain::invariants::i1::Scope::LogFetch);
+    }
+    if caps.skill.author_self {
+        scopes.push(maos_domain::invariants::i1::Scope::SkillAuthorSelf);
     }
     scopes
 }
@@ -2918,9 +2936,13 @@ description = "MAOS reference Spirit"
     fn class_section_rejects_above_max_schema_version() {
         // Anything beyond MAX_SUPPORTED is hard-rejected — the kernel does not
         // gamble on future schemas it has not been compiled against.
-        // Story 17-3b bumped MAX_SUPPORTED 4→5, so the above-max probe is 6.
-        let s =
-            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 6");
+        let s = class_toml_full().replace(
+            "manifest_schema_version = 1",
+            &format!(
+                "manifest_schema_version = {}",
+                maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION + 1
+            ),
+        );
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(
             matches!(&err, ManifestError::Toml(msg) if msg.contains("class.manifest_schema_version"))

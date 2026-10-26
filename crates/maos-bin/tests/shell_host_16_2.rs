@@ -176,6 +176,10 @@ impl maos_control::OperatorCommandPort for NoDoor {
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {
         Vec::new()
     }
+
+    fn skills_status(&self, _: Option<&str>, _: &[String]) -> maos_control::OperatorOutcome {
+        panic!("NoDoor: unexpected skill read");
+    }
 }
 
 fn host_for(world: &KernelWorld, spirit_pid: u32, boot_nonce: u64) -> ShellHost {

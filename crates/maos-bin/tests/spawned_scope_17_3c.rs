@@ -1967,6 +1967,7 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
             "enterprise_denied",
             "policy_mixed",
             "unmediated",
+            "nondelegable",
             "context_exhausted",
         ] {
             let enterprise_denied = case == "enterprise_denied";
@@ -2018,7 +2019,11 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                 }),
                 // An ABI scope the kernel cannot mediate refuses the frame
                 // before any mint.
-                "unmediated" => scopes.push(Scope::SkillAuthorSelf),
+                "unmediated" => scopes.push(Scope::GatewaySend {
+                    gateway_id: "scope".into(),
+                    recipient: "peer".into(),
+                }),
+                "nondelegable" => scopes.push(Scope::SkillAuthorSelf),
                 _ => {}
             }
             let seed = IacFrame {
@@ -2181,9 +2186,30 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                 }
                 _ => {
                     assert_eq!(decisions.len(), 1);
-                    assert_eq!(decisions[0]["kernel_verdict"], "unmediated");
-                    assert_eq!(decisions[0]["scope"], "SkillAuthorSelf");
-                    assert!(issued.is_empty(), "an unmediated scope mints nothing first");
+                    assert_eq!(
+                        decisions[0]["kernel_verdict"],
+                        if case == "nondelegable" {
+                            "nondelegable"
+                        } else {
+                            "unmediated"
+                        }
+                    );
+                    let expected_scope = if case == "nondelegable" {
+                        Scope::SkillAuthorSelf
+                    } else {
+                        Scope::GatewaySend {
+                            gateway_id: "scope".into(),
+                            recipient: "peer".into(),
+                        }
+                    };
+                    assert_eq!(
+                        decisions[0]["scope"],
+                        serde_json::to_value(expected_scope).unwrap()
+                    );
+                    assert!(
+                        issued.is_empty(),
+                        "a nondelegable or unmediated scope mints nothing"
+                    );
                 }
             }
             let terminal: serde_json::Value = serde_json::from_slice(

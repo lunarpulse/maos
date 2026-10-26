@@ -359,9 +359,9 @@ fn the_deterministic_survey_is_unchanged_by_the_unbound_infer_path() {
         .all(|f| f.statement != "a model digest sentence"));
 }
 
-/// CR-2 — exit line 3's cassette: one entry per seed claim, each pinning the
-/// real SHA-256 and length of that claim's synthesis prompt (never the
-/// wildcard, which strict replay does not catch), `provenance: seed`.
+/// The root-bound cassette pins each seed synthesis prompt and the following
+/// model-authored skill prompt. Library passes without a skill port still
+/// consume only the first three entries.
 #[test]
 fn the_exit_line_3_cassette_pins_real_prompt_hashes_and_no_wildcard() {
     use sha2::{Digest, Sha256};
@@ -374,7 +374,11 @@ fn the_exit_line_3_cassette_pins_real_prompt_hashes_and_no_wildcard() {
     assert_eq!(cassette["provenance"], "seed");
     let entries = cassette["entries"].as_array().unwrap();
     let claims = seed_claims();
-    assert_eq!(entries.len(), claims.len(), "one entry per seed claim");
+    assert_eq!(
+        entries.len(),
+        claims.len() + 1,
+        "survey followed by skill generation"
+    );
     for (entry, claim) in entries.iter().zip(&claims) {
         let prompt = synthesis_prompt(&claim.statement);
         let hash = format!("{:x}", Sha256::digest(prompt.as_bytes()));
@@ -382,4 +386,16 @@ fn the_exit_line_3_cassette_pins_real_prompt_hashes_and_no_wildcard() {
         assert_eq!(entry["prompt_sha256"], hash.as_str(), "{}", claim.claim_id);
         assert_eq!(entry["prompt_len"], prompt.len());
     }
+    let mut output = Researcher::new().survey(&frames(&claims));
+    for (finding, entry) in output.findings.iter_mut().zip(entries) {
+        finding.statement = entry["response"]["text"].as_str().unwrap().into();
+    }
+    let prompt = researcher::skill_author::authoring_prompt(&output, None);
+    let author = &entries[claims.len()];
+    assert_eq!(
+        author["prompt_sha256"],
+        format!("{:x}", Sha256::digest(prompt.as_bytes()))
+    );
+    assert_eq!(author["prompt_len"], prompt.len());
+    maos_skill::parse_skill(author["response"]["text"].as_str().unwrap()).unwrap();
 }

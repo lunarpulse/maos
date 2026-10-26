@@ -24,5 +24,5 @@ pub use manifest::{
     OnRevocationSection, OutputShape, OutputShapePredicate, OutputShapeViolation, Posture,
     PostureSection, ProviderCapabilities, ProviderConfig, ProvidersSection, ResolvedCaps,
     ResourceCaps, SandboxConfig, ScalarPredicate, ScheduleEntry, SchedulesSection,
-    SchedulingSection, SupervisionSection,
+    SchedulingSection, SkillCapabilities, SupervisionSection,
 };

@@ -629,17 +629,16 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   FR39:
-    gates: [check-skill-schema, smoke-skill-7-4]
+    gates: [check-skill-schema, journey-hermetic-tier-1]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-31'
     notes: |
-      Story 7.4 stands up the skill ecosystem in the new maos-skill crate:
-      maos.skill.v1 schema (deny_unknown_fields), filesystem discovery, and the
-      operator-admission queue with three entry paths (package-shipped,
-      skill.author.self, FR57 revision proposal). Every path lands Pending — no
-      auto-admit. check-skill-schema asserts the schema posture; smoke-skill-7-4
-      demonstrates discovery + capability-gated authoring into the pending queue.
+      Story 18-7 production witnesses: journey_skill_authoring_18_7 exercises
+      model-authored native Researcher submissions, capability mint/verify,
+      authenticated operator admission and durable restart; skill_port_18_7
+      and live_submission_18_7 cover typed refusal and ownership controls.
+      No auto-admit; admitted discovery is not skill execution.
   FR4:
     gates:
       - audit_spine_integration
@@ -803,18 +802,16 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   FR57:
-    gates: [smoke-skill-7-4]
+    gates: [journey-hermetic-tier-1]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-31'
     notes: |
-      Story 7.4 delivers FR57 (reconciled forward from v0.8): a Spirit reads its
-      OWN telemetry via the existing Story 4.3 SelfTelemetryPort/SelfTelemetryReport
-      and emits a SkillRevisionProposal carrying (a) target skill id+version,
-      (b) proposed diff, (c) telemetry evidence. The proposal enters the SAME
-      operator-admission queue (FR39) under the same vetting/audit obligations.
-      No new telemetry plumbing — Story 7.4 CONSUMES FR56. smoke-skill-7-4 step 4
-      demonstrates the proposal entering the queue Pending with evidence.
+      Story 18-7 journey_skill_authoring_18_7 exercises live revisions carrying
+      target id/version, model diff and root-attached pid/bind-scoped telemetry,
+      durable payload hashes, independent approval targets and restart.
+      skill_port_18_7 and live_submission_18_7 cover evidence provenance and
+      owned-current-target controls. Revisions are decision-only, not auto-applied.
   FR58:
     gates:
     - check-service-boundary

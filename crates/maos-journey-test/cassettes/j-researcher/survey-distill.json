@@ -59,6 +59,24 @@
           "model_id": "hand-authored-seed"
         }
       }
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "19af179fca4a31d80ea3845cf1264e70d37a0c446f130063a5faf394e18a3814",
+      "prompt_len": 716,
+      "response": {
+        "text": "---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 180,
+          "output_tokens": 65
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/survey-distill",
+          "model_id": "hand-authored-seed"
+        }
+      }
     }
   ]
 }

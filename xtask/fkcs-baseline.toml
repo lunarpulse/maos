@@ -33,9 +33,12 @@ ratifier = "Lunarpulse"
 # the reviewed admission diff adds form policy in `frozen_surface_gate` and a
 # structural FKCS read. The §A6(e)/(h) review covers the shared gate, attested
 # path, structural TOML shapes, and independent hash recomputation.
+# RE-PINNED 2026-10-26 — 18-7-live-skill-authoring-and-revisions D-10 A:
+# typed durable v2 reconstruction, ownership/identity vetting and operator-only
+# materialization; operator-ratified admission-path change, review required.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "62d99cfa327700e6cfe58037818521d03a58c91aec07cd25af36113b15df8e8e"
+sha256 = "efd0e282000fc138e15ce805e698312bdd383a0bce3cfcee4e6a389cc2f55ca1"

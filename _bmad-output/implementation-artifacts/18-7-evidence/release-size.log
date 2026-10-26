@@ -1,0 +1,5 @@
+env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo build --release --locked -p maos-bin --bin maos: exit0
+strip /mnt/build/cargo/release/maos: exit0
+stat -c "%s bytes %n" /mnt/build/cargo/release/maos:
+30445560 bytes /mnt/build/cargo/release/maos
+30445560 < 33554432; headroom=3108872 bytes; previous18-6=29968248; delta=+477312 bytes

@@ -18,7 +18,7 @@ use crate::schema::{SkillId, SkillVersion};
 /// it (§4.0.7). `telemetry_evidence` is the EXISTING Story 4.3 report shape,
 /// carried verbatim (the known v0.3-β limitations — latency quantiles may be
 /// `(0,0,0)`, principal-namespace filtering best-effort — are INHERITED).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SkillRevisionProposal {
     /// (a) the target skill id.
     pub target_skill_id: SkillId,

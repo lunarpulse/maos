@@ -151,6 +151,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "capability.invocation",
             None,
+            "skill.author.refused:capability-denied",
+            r#"{"spirit_pid":7,"reason":"capability-denied"}"#,
+            7,
+            "root-bound native skill author refusal (18-7)",
+        ),
+        (
+            "capability.invocation",
+            None,
             "cap.quota:pressure",
             r#"{"window":0,"used":48000,"budget":60000}"#,
             1,

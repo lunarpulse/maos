@@ -481,6 +481,16 @@ impl DoorInner {
             OperatorCommand::AdmitGovernanceSchema { schema } => {
                 self.admit_governance_schema_command(schema).await
             }
+            OperatorCommand::SkillDecision {
+                entry,
+                approve,
+                actor,
+            } => skill_operation(
+                &self.transparency_log,
+                Some(&entry),
+                Some((approve, &actor)),
+                &[],
+            ),
             #[cfg(feature = "network")]
             OperatorCommand::Load { manifest } => self.load_command(&manifest, pread).await,
             // Air-gap build: the load verb needs the provenance gate, and the
@@ -1726,6 +1736,10 @@ impl OperatorCommandPort for OperatorDoor {
         })
     }
 
+    fn skills_status(&self, entry: Option<&str>, roots: &[String]) -> OperatorOutcome {
+        skill_operation(&self.0.transparency_log, entry, None, roots)
+    }
+
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {
         let reports =
             self.0.crl_reports.lock().expect(
@@ -1767,6 +1781,7 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         OperatorCommand::ForgetMemory { .. } => "forget",
         OperatorCommand::ReleaseLegalHold { .. } => "legal-hold-release",
         OperatorCommand::AdmitGovernanceSchema { .. } => "governance-admit",
+        OperatorCommand::SkillDecision { .. } => "skill-decision",
         // ⚠ Not cosmetic. This is the machine label written into the
         // completion TL row's intent as
         // `operator.{verb}.{operation_id}:{outcome}` — it is what the audit
@@ -1774,6 +1789,76 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         // nothing proves the label is right, so AC4 asserts the row reads
         // `operator.load.<operation_id>:completed`.
         OperatorCommand::Load { .. } => "load",
+    }
+}
+
+/// Shared door list/show/decide path, serialized against live Spirit submissions.
+pub fn skill_operation(
+    log: &maos_iac::adapter::transparency_log::TransparencyLogAdapter,
+    entry: Option<&str>,
+    decision: Option<(bool, &str)>,
+    roots: &[String],
+) -> OperatorOutcome {
+    use maos_cli::subcommands::{apply_skill_decision, skill_entries, SkillDecisionError};
+    use maos_skill::SkillQueueStore;
+    let serialization = crate::skill_authoring::serialization();
+    let _guard = match serialization.lock() {
+        Ok(guard) => guard,
+        Err(error) => {
+            return OperatorOutcome::Failed {
+                code: "skill_serialization".into(),
+                detail: error.to_string(),
+            }
+        }
+    };
+    let result = (|| -> Result<serde_json::Value, SkillDecisionError> {
+        let store = maos_skill::LocalFsSkillQueueStore::new()?;
+        let roots = if roots.is_empty() {
+            maos_skill::default_search_path()
+        } else {
+            roots.iter().map(PathBuf::from).collect()
+        };
+        let discovered = maos_skill::discover_skills_detailed(&roots);
+        let approvals = log
+            .query_approvals(None)
+            .map_err(|e| SkillDecisionError::Journal(e.to_string()))?;
+        let mut queue = skill_entries(&discovered.discovered, store.load()?, &approvals)?;
+        if let Some((approve, actor)) = decision {
+            let directory = std::env::var_os("HOME")
+                .filter(|h| !h.is_empty())
+                .map(|h| PathBuf::from(h).join(".maos/skills"));
+            apply_skill_decision(
+                &mut queue,
+                &store,
+                entry.unwrap_or(""),
+                approve,
+                actor,
+                directory.as_deref(),
+                |row| log.insert_approval_decision(row).map_err(|e| e.to_string()),
+            )?;
+        }
+        let value = match entry {
+            Some(id) => maos_cli::subcommands::skill_json(queue.show(id)?),
+            None => maos_cli::subcommands::skill_json(queue.entries()),
+        };
+        value.map_err(|e| SkillDecisionError::Store(e.into()))
+    })();
+    match result {
+        Ok(value) => OperatorOutcome::Completed(value),
+        Err(SkillDecisionError::Queue(maos_skill::ESkillQueue::EntryNotFound)) => {
+            OperatorOutcome::NotFound {
+                code: "skill_entry_not_found".into(),
+                detail: "unknown skill entry".into(),
+            }
+        }
+        Err(SkillDecisionError::Queue(error)) => OperatorOutcome::Conflict {
+            code: "skill_queue_refused".into(),
+            detail: error.to_string(),
+        },
+        Err(error) => OperatorOutcome::Failed {
+            code: "skill_decision_failed".into(),
+            detail: error.to_string(),
+        },
     }
 }
 
@@ -1939,9 +2024,7 @@ pub fn acquire_store_lock_set(
                 source: std::io::Error::new(std::io::ErrorKind::InvalidInput, error),
             }
         })? {
-            if home.exists() {
-                candidates.push(home);
-            }
+            candidates.push(home);
         }
         candidates.push(store_dir(audit_db_path));
         candidates.push(store_dir(&maos_audit::default_transparency_log_path()));

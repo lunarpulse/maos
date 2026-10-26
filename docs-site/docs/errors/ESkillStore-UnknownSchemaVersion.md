@@ -27,15 +27,15 @@ queue.json carries an unknown/absent schema_version (hard error — no best-effo
 
 ## Cause
 
-queue.json parsed as a QueueFile, but its schema_version differs from maos.skill-queue.v1. The store refuses the unknown version instead of interpreting its entries as the current schema.
+The queue declares neither `maos.skill-queue.v2` nor the supported v1 migration format, or has no version. The store refuses it instead of interpreting its entries as the current schema.
 
 ## Triggers
 
-- A structurally valid QueueFile declares a schema_version other than maos.skill-queue.v1. A missing version instead fails JSON deserialization.
+- `schema_version` is missing or does not identify v1 or v2.
 
 ## Resolution
 
-Check which MAOS version wrote queue.json and use compatible software. Preserve the old file for diagnosis; maosctl skills list can rebuild its view from discovery and the transparency log. Do not merely relabel an unknown schema as maos.skill-queue.v1.
+Check which MAOS version wrote queue.json and use compatible software. Preserve the original payload file and restore a valid backup if necessary. Do not relabel an unknown schema as v2, discard payloads or rebuild an empty queue over an unreadable file. V1 files migrate explicitly and save as v2.
 
 ## Source Location
 

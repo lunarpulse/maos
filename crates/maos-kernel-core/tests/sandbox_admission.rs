@@ -62,6 +62,7 @@ fn empty_caps_required() -> CapabilitiesRequired {
         loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
         iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
         log: maos_manifest::LogCapabilities::default(),
+        skill: maos_manifest::SkillCapabilities::default(),
     }
 }
 

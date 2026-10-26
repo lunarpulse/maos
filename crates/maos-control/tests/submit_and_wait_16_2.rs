@@ -64,6 +64,10 @@ impl OperatorCommandPort for RiggedPort {
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {
         Vec::new()
     }
+
+    fn skills_status(&self, _: Option<&str>, _: &[String]) -> OperatorOutcome {
+        unreachable!("submit-and-wait tests never read skills")
+    }
 }
 
 fn pause_command() -> OperatorCommand {

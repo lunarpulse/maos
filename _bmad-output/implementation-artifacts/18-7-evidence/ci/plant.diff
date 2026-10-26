@@ -1,0 +1,17 @@
+--- a/crates/maos-skill/src/store.rs
++++ b/crates/maos-skill/src/store.rs
+@@ -203,10 +203,13 @@
+         // A malformed existing file must never be replaced with a fresh queue.
+         self.load()?;
+         SkillAdmissionQueue::from_stored(entries.to_vec())?;
+-        let file = QueueFile {
++        let mut file = QueueFile {
+             schema_version: SCHEMA_VERSION.into(),
+             pending: entries.to_vec(),
+         };
++        for entry in &mut file.pending {
++            if entry.entry_path == "revision_proposal" { entry.payload = None; }
++        }
+         atomic_write(&self.queue_path, &serde_json::to_vec_pretty(&file)?)?;
+         Ok(())
+     }

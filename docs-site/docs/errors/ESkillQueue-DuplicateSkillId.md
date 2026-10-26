@@ -19,7 +19,7 @@ slug: "/errors/ESkillQueue::DuplicateSkillId"
 
 ## Summary
 
-A Pending entry with this SkillId already exists in the admission queue
+A conflicting pending submission or an already-recorded canonical entry identity exists.
 
 ## Rust Path
 
@@ -27,11 +27,11 @@ A Pending entry with this SkillId already exists in the admission queue
 
 ## Cause
 
-A skill with the same `SkillId` already exists in the Pending state within the admission queue. The queue enforces uniqueness to prevent duplicate processing.
+New documents are bounded to one Pending entry per skill id. Revision proposals are bounded to one Pending entry per target and full author provenance (class, pid, boot nonce), so different live author instances may submit distinct revisions. Exact canonical entry ids cannot be replayed as new entries, even after a terminal decision.
 
 ## Resolution
 
-Wait for the existing pending entry to be processed (admitted or rejected) before re-submitting. If the pending entry is stale, cancel it first with `maos skill cancel <skill_id>`, then re-submit.
+Wait for the pending entry's operator decision before submitting a distinct payload. Use a new advancing document version or a new revision payload rather than replaying the same entry. Select exact entry ids when showing or deciding coexisting revisions; no cancel command is required or implied.
 
 ## Source Location
 

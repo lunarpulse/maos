@@ -300,7 +300,7 @@ pub enum LegalHoldOp {
     },
 }
 
-/// Story 7.4 — `maosctl skills <list|approve|reject>`.
+/// Discover, inspect and decide durable skill admission entries.
 #[derive(clap::Args, Debug)]
 pub struct SkillsArgs {
     #[command(subcommand)]
@@ -319,9 +319,11 @@ pub enum SkillsOp {
         #[arg(long)]
         root: Vec<String>,
     },
+    /// Show the complete durable payload by entry id (or an unambiguous skill id).
+    Show { skill_id: String },
     /// Operator-admit a pending skill by id (FR39 admission exit).
     Approve {
-        /// The skill id (`maosctl skills list` shows ids).
+        /// Entry id, or a skill id when it names exactly one entry.
         skill_id: String,
         /// Operator identity recorded in the audit journal (AC-3 `actor`).
         /// Defaults to `$USER`, then `operator`.
@@ -330,7 +332,7 @@ pub enum SkillsOp {
     },
     /// Operator-reject a pending skill by id (FR39 admission exit).
     Reject {
-        /// The skill id (`maosctl skills list` shows ids).
+        /// Entry id, or a skill id when it names exactly one entry.
         skill_id: String,
         /// Operator identity recorded in the audit journal (AC-3 `actor`).
         /// Defaults to `$USER`, then `operator`.

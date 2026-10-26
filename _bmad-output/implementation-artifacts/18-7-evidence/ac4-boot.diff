@@ -1,0 +1,17 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -4378,13 +4378,7 @@
+         let mut pending: Vec<String> = Vec::new();
+         for entry in &skill_view.entries {
+             match entry.state {
+-                maos_skill::SkillAdmissionState::Rejected
+-                    if entry.entry_path != "revision_proposal"
+-                        && skill_outcome.discovered.iter().any(|d| {
+-                            d.skill.manifest.skill_id() == entry.id
+-                                && d.skill.manifest.skill_version() == entry.version
+-                        }) =>
+-                {
++                maos_skill::SkillAdmissionState::Rejected => {
+                     rejected.push(format!("{}@{}", entry.id, entry.version));
+                 }
+                 maos_skill::SkillAdmissionState::Pending => {

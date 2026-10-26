@@ -61,6 +61,8 @@ pub enum Intent {
     LogFetch,
     /// Distillate write (I11 audit chain) — Story 4.4.
     DistillateWrite,
+    /// Spirit-authored skills awaiting operator admission.
+    SkillAuthorSelf,
     /// MCP tool invocation — Story 5.5c.
     McpCall { server: String, tool: String },
     /// Story 10.4a — collective-tier (Loom-lite) read/scan mediation.

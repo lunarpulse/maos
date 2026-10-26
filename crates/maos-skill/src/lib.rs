@@ -38,7 +38,7 @@ pub mod proposal;
 pub mod schema;
 pub mod store;
 
-pub use admission::{PendingEntry, SkillAdmissionQueue, SkillAdmissionState, SkillEntryPath};
+pub use admission::{SkillAdmissionQueue, SkillAdmissionState, SkillEntryPath, SubmissionContext};
 pub use anthropic_adapter::parse_anthropic_skill;
 pub use discovery::{
     default_search_path, discover_skills, discover_skills_detailed, DiscoveredSkill,
@@ -47,4 +47,6 @@ pub use discovery::{
 pub use errors::{ESkillProposal, ESkillQueue, ESkillSchema};
 pub use proposal::{build_proposal, SkillRevisionProposal};
 pub use schema::{parse_skill, validate_manifest, Skill, SkillId, SkillManifest, SkillVersion};
-pub use store::{ESkillStore, LocalFsSkillQueueStore, QueueEntry, SkillQueueStore};
+pub use store::{
+    AuthorIdentity, ESkillStore, LocalFsSkillQueueStore, QueueEntry, SkillPayload, SkillQueueStore,
+};

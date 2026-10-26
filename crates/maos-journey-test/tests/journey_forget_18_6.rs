@@ -117,7 +117,11 @@ fn live_forget_redistills_and_never_resurrects_then_pending_is_typed() {
         "{}",
         String::from_utf8_lossy(&butler_forget.stderr)
     );
-    h::assert_absent(home.path(), "director-ada", "CANARY-forget-18-6-000");
+    h::assert_absent(
+        home.path(),
+        "director-ada",
+        "# Butler acceptance record (butler.acceptance/v1)",
+    );
     for args in [
         &["load", "spirits/researcher/manifest.toml"][..],
         &["start", "researcher"][..],
@@ -338,16 +342,29 @@ fn seed_cassette_has_only_real_prompt_hashes() {
     ))
     .unwrap();
     assert_eq!(cassette["provenance"], "seed");
-    // Three initial seed prompts, then the redistill survivors in the
-    // DistillateWriter's flattened (reverse) order, then scheduled passes
-    // over the surviving seed cache in its original order.
-    assert_eq!(cassette["entries"].as_array().unwrap().len(), 133);
+    // Three initial seed prompts, one authoring prompt, then the redistill
+    // survivors in flattened (reverse) order, then scheduled survivor surveys.
+    // The pending owned draft suppresses duplicate generation on later passes.
+    assert_eq!(cassette["entries"].as_array().unwrap().len(), 134);
     for (i, entry) in cassette["entries"].as_array().unwrap().iter().enumerate() {
+        if i == 3 {
+            assert_eq!(entry["sequence"], i);
+            assert_eq!(
+                entry["prompt_sha256"],
+                "19af179fca4a31d80ea3845cf1264e70d37a0c446f130063a5faf394e18a3814"
+            );
+            assert_eq!(entry["prompt_len"], 716);
+            assert!(entry["response"]["text"]
+                .as_str()
+                .unwrap()
+                .contains("researcher.survey-method"));
+            continue;
+        }
         let claim = match i {
             0..=2 => i,
-            3 => 2,
-            4 => 0,
-            _ => [0, 2][(i - 5) % 2],
+            4 => 2,
+            5 => 0,
+            _ => [0, 2][(i - 6) % 2],
         };
         let prompt = format!("Summarize this research claim in one sentence for a digest. Preserve any hedges; add no facts.\n\nClaim: {}", SEED_STATEMENTS[claim]);
         assert_eq!(entry["sequence"], i);

@@ -2425,18 +2425,20 @@ jobs:
           rc=$?
           cat line3.out line3.err
           entries="$(jq '.entries | length' crates/maos-journey-test/cassettes/j-researcher/survey-distill.json)"
+          # 18-7 adds one authoring completion after the three survey claims.
+          survey_entries=$((entries - 1))
           if [ "$rc" -eq 0 ] && ! grep -q 'researcher inference seam wired' line3.err; then
             rc=1
             echo "::error title=Epic-18 exit line 3::exit 0 but the Researcher never bound the Inference Port"
           fi
-          if [ "$rc" -eq 0 ] && ! jq -Rse --argjson n "$entries" '[split("\n")[] | fromjson? | select(type == "object" and .event == "researcher_survey")] | length == 1 and $n > 0 and (.[0] | has("findings") and has("open_questions") and has("confidence_map") and has("bibliography") and .completions_consumed == $n)' line3.out > /dev/null; then
+          if [ "$rc" -eq 0 ] && ! jq -Rse --argjson n "$survey_entries" '[split("\n")[] | fromjson? | select(type == "object" and .event == "researcher_survey")] | length == 1 and $n > 0 and (.[0] | has("findings") and has("open_questions") and has("confidence_map") and has("bibliography") and .completions_consumed == $n)' line3.out > /dev/null; then
             rc=1
-            echo "::error title=Epic-18 exit line 3::exit 0 without one researcher_survey event carrying findings/open_questions/confidence_map/bibliography and completions_consumed == ${entries} (the cassette's entries)"
+            echo "::error title=Epic-18 exit line 3::exit 0 without one researcher_survey event carrying findings/open_questions/confidence_map/bibliography and completions_consumed == ${survey_entries} (${entries} total including authoring)"
           fi
           if [ "$rc" -ne 0 ]; then
             echo "::error title=Epic-18 exit line 3::rc=${rc} $(tail -n 3 line3.err | paste -sd' ' -)"
           else
-            echo "::notice title=Epic-18 exit line 3::rc=0, completions_consumed=${entries}"
+            echo "::notice title=Epic-18 exit line 3::rc=0, completions_consumed=${survey_entries}, total_completions=${entries}"
           fi
           exit "$rc"
       - name: Epic-18 exit line 3 twin — an empty cassette must exit non-zero (Story 18-3)
@@ -3332,6 +3334,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
@@ -3351,10 +3356,16 @@ jobs:
       # a defensive pre-build.)
       - name: Build the maos binary + worker-cli-fixture (debug — journey tests spawn target/debug)
         run: cargo build --locked -p maos-bin --bin maos && cargo build --locked -p maos-cli --bin maosctl && cargo build --locked -p worker --bin worker-cli-fixture
-      # Includes journey_forget_18_6: daemon seed replay → door forget/redistill;
-      # same-instance MCP next-pass proof runs in the GDPR root-library leg.
-      - name: Hermetic journey suite (replay mode — JB-7 guards + deterministic floors + FR45 live cascade)
+      # Includes journey_forget_18_6 (FR45 cascade) and
+      # journey_skill_authoring_18_7 (live author/revise, door admission, restart).
+      - name: Hermetic journey suite (replay mode — cognitive production paths)
         run: cargo test -p maos-journey-test --locked
+      - name: Live skill port security witnesses (18-7, nine tests)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo nextest run --locked -p maos-bin --test skill_port_18_7 2>&1 | tee skill-port-18-7.log
+          grep -q '9 tests run: 9 passed' skill-port-18-7.log
 
   smoke-discipline-7-1-5:
     runs-on: ubuntu-latest
@@ -3451,7 +3462,7 @@ jobs:
       - run: cargo build -p maos-bin -p maos-spirit-cli
       - run: MAOS_ONE_SHOT=smoke-compliance-7-3 cargo run -p maos-bin
 
-  # Story 7.4 AC6 — skill ecosystem observability smoke (6 deterministic JSON lines)
+  # Story 18-7 — library-only skill smoke (4 deterministic JSON lines).
   smoke-skill-7-4:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -3464,12 +3475,12 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - run: cargo build -p maos-bin
-      - name: Run smoke-skill-7-4 and assert 6 JSON lines + exit 0
+      - name: Run smoke-skill-7-4 and assert 4 JSON lines + exit 0
         run: |
           out="$(MAOS_ONE_SHOT=smoke-skill-7-4 cargo run -q -p maos-bin)"
           echo "$out"
           lines="$(printf '%s\n' "$out" | grep -c '"step"')"
-          test "$lines" -eq 6 || { echo "expected 6 JSON step lines, got $lines"; exit 1; }
+          test "$lines" -eq 4 || { echo "expected 4 JSON step lines, got $lines"; exit 1; }
           printf '%s\n' "$out" | grep -q '"total":210' || { echo "LCAS total != 210"; exit 1; }
 
   # Story 7.4 AC6 — maos.skill.v1 schema posture gate
@@ -4034,7 +4045,7 @@ jobs:
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
           grep -q '^test result: ok\. 23 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 23 passed;'"; fail=1; }
-          for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :8' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
+          for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :10' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
                       'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
                       'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
                       'HOSTILE-IAC-SEND :1' 'WASM-IAC-SEND :1'; do

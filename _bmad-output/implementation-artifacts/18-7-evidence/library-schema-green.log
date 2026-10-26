@@ -1,0 +1,1241 @@
+   Compiling ring v0.17.14
+   Compiling maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi)
+   Compiling rustls v0.23.46
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+   Compiling maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk)
+   Compiling rustls-webpki v0.103.16
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+   Compiling maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest)
+   Compiling maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill)
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+   Compiling maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp)
+   Compiling maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit)
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+   Compiling maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+   Compiling maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+   Compiling maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+   Compiling ureq v2.12.1
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+   Compiling maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+   Compiling maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-manifest` (lib test) generated 1 warning (1 duplicate)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+   Compiling maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:149:27
+    |
+149 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+   Compiling maos-fkcs v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-fkcs)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+   Compiling maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+warning: `maos-cohort` (lib) generated 1 warning
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:444:21
+    |
+444 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:22:5
+   |
+22 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::halt::TerminationKind`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+   |
+12 | use maos_domain::halt::TerminationKind;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::halt::terminate_spirit`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+   |
+16 | use crate::halt::terminate_spirit;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ClassSection` and `GatewaysSection`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+   |
+22 | use crate::security::manifest::{ClassSection, GatewaysSection};
+   |                                 ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:12:17
+   |
+12 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:28:5
+   |
+28 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:619:9
+    |
+619 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+    |
+157 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+    |
+229 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:389:27
+    |
+389 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+442 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:654:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+654 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: associated function `now_ns` is never used
+  --> crates/maos-kernel-core/src/memory/principal.rs:51:8
+   |
+37 | impl PrincipalNamespaceIndex {
+   | ---------------------------- associated function in this implementation
+...
+51 |     fn now_ns() -> u64 {
+   |        ^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:44:5
+   |
+42 | struct DiskCandidate {
+   |        ------------- field in this struct
+43 |     name: String,
+44 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+   Compiling maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+warning: `maos-kernel-core` (lib) generated 43 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 24 suggestions)
+warning: function `repo_root` is never used
+  --> crates/maos-cli/tests/credential_posture_2c.rs:29:4
+   |
+29 | fn repo_root() -> PathBuf {
+   |    ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> crates/maos-control/src/lib.rs:970:28
+    |
+970 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-control` (lib) generated 2 warnings (2 duplicates)
+warning: `maos-control` (lib test) generated 2 warnings
+warning: `maos-cli` (test "credential_posture_2c") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.96s
+────────────
+ Nextest run ID 3b03e26a-2de8-4993-a1b5-9bfadb2d88f2 with nextest profile: default
+    Starting 594 tests across 63 binaries
+        PASS [   0.005s] (  1/594) maos-cli accessibility::tests::no_color_wins_over_term_dumb
+        PASS [   0.005s] (  2/594) maos-cli accessibility::tests::no_env_falls_through_to_auto
+        PASS [   0.005s] (  3/594) maos-cli subcommands::tests::capture_validation_requires_verified_redaction
+        PASS [   0.005s] (  4/594) maos-cli subcommands::tests::capture_validation_refuses_unenforced_egress
+        PASS [   0.006s] (  5/594) maos-cli accessibility::tests::term_xterm_falls_through_to_auto
+        PASS [   0.006s] (  6/594) maos-cli accessibility::tests::no_color_env_with_any_value_disables_color
+        PASS [   0.006s] (  7/594) maos-cli accessibility::tests::plain_flag_wins_over_no_color_set
+        PASS [   0.006s] (  8/594) maos-cli accessibility::tests::plain_flag_overrides_everything
+        PASS [   0.006s] (  9/594) maos-cli subcommands::tests::cost_report_reads_payload_not_intent
+        PASS [   0.006s] ( 10/594) maos-cli accessibility::tests::term_dumb_disables_color_when_no_color_unset
+        PASS [   0.007s] ( 11/594) maos-cli subcommands::tests::audit_query_accepts_plain_format
+        PASS [   0.007s] ( 12/594) maos-cli subcommands::tests::audit_query_accepts_spirit_and_format_flags
+        PASS [   0.007s] ( 13/594) maos-cli subcommands::tests::audit_query_defaults_format_to_ndjson
+        PASS [   0.007s] ( 14/594) maos-cli subcommands::tests::audit_keygen_parses
+        PASS [   0.007s] ( 15/594) maos-cli accessibility::tests::no_color_env_empty_string_does_not_disable_color
+        PASS [   0.007s] ( 16/594) maos-cli subcommands::tests::audit_sealed_export_parses
+        PASS [   0.007s] ( 17/594) maos-cli subcommands::tests::capture_tripwire_refuses_a_pasted_api_key
+        PASS [   0.007s] ( 18/594) maos-cli subcommands::tests::audit_query_intent_contains_parses
+        PASS [   0.007s] ( 19/594) maos-cli subcommands::tests::audit_verify_bundle_parses
+        PASS [   0.007s] ( 20/594) maos-cli subcommands::tests::capture_validation_refuses_adapter_only_fs_jail
+        PASS [   0.007s] ( 21/594) maos-cli subcommands::tests::audit_query_range_parses
+        PASS [   0.007s] ( 22/594) maos-cli subcommands::tests::audit_query_capability_parses
+        PASS [   0.007s] ( 23/594) maos-cli subcommands::tests::audit_subject_access_parses
+        PASS [   0.008s] ( 24/594) maos-cli subcommands::tests::audit_query_spirit_all_boots_parses
+        PASS [   0.008s] ( 25/594) maos-cli subcommands::tests::capture_validation_rejects_missing_signer
+        PASS [   0.009s] ( 26/594) maos-cli subcommands::tests::audit_posture_delta_parses
+        PASS [   0.010s] ( 27/594) maos-cli subcommands::tests::capture_tripwire_allows_hex_tl_refs
+        PASS [   0.010s] ( 28/594) maos-cli subcommands::tests::capture_validation_requires_at_least_one_audit_ref
+        PASS [   0.005s] ( 29/594) maos-cli subcommands::tests::dispatch_forget_rejects_empty_principal
+        PASS [   0.005s] ( 30/594) maos-cli subcommands::tests::dispatch_unknown_spirit_run
+        PASS [   0.005s] ( 31/594) maos-cli subcommands::tests::dispatch_unknown_spirit_install
+        PASS [   0.011s] ( 32/594) maos-cli subcommands::tests::audit_query_tag_parses_but_handler_errors
+        PASS [   0.006s] ( 33/594) maos-cli subcommands::tests::dispatch_run_hello_spirit
+        PASS [   0.006s] ( 34/594) maos-cli subcommands::tests::forget_parses_principal_and_reason
+        PASS [   0.006s] ( 35/594) maos-cli subcommands::tests::dispatch_stop_unload_parse_with_no_args
+        PASS [   0.007s] ( 36/594) maos-cli subcommands::tests::dispatch_start_parses_hello_spirit_globally_with_plain
+        PASS [   0.007s] ( 37/594) maos-cli subcommands::tests::dispatch_install
+        PASS [   0.006s] ( 38/594) maos-cli subcommands::tests::record_capture_parses_flags
+        PASS [   0.013s] ( 39/594) maos-cli subcommands::tests::capture_validation_refuses_the_two_host_overclaim_directions
+        PASS [   0.007s] ( 40/594) maos-cli subcommands::tests::forget_reason_is_optional
+        PASS [   0.030s] ( 41/594) maos-cli subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl
+        PASS [   0.057s] ( 42/594) maos-cli subcommands::tests::install_verify_local_release_artifact
+        PASS [   0.104s] ( 43/594) maos-cli subcommands::tests::install_verify_missing_sig_fails
+        PASS [   0.100s] ( 44/594) maos-cli::benchmark_sidecar_18_2 a_dev_seed_sidecar_verifies_and_prints_its_body
+        PASS [   0.099s] ( 45/594) maos-cli::benchmark_sidecar_18_2 a_missing_sidecar_exits_five_typed
+        PASS [   0.100s] ( 46/594) maos-cli::benchmark_sidecar_18_2 a_dev_seed_signature_claiming_the_producer_exits_one
+        PASS [   0.102s] ( 47/594) maos-cli::benchmark_sidecar_18_2 a_non_utf8_pubkey_refuses_and_never_falls_back
+        PASS [   0.102s] ( 48/594) maos-cli::benchmark_sidecar_18_2 a_producer_signature_verifies_only_against_the_producer_pubkey
+        PASS [   0.106s] ( 49/594) maos-cli::benchmark_sidecar_18_2 without_a_version_the_highest_benchmarked_version_is_read
+        PASS [   0.113s] ( 50/594) maos-cli subcommands::tests::install_verify_tampered_artifact_rejected
+        PASS [   0.083s] ( 51/594) maos-cli::cohort_sign_2e cohort_sign_has_no_environment_key_fallback
+        PASS [   0.107s] ( 52/594) maos-cli::cohort_sign_2e cohort_sign_happy_path_and_validate_before_write
+        PASS [   0.109s] ( 53/594) maos-cli::benchmark_sidecar_18_2 a_malformed_pubkey_refuses_without_echoing_it
+        PASS [   0.110s] ( 54/594) maos-cli::benchmark_sidecar_18_2 a_float_that_does_not_round_trip_verifies_byte_exact
+        PASS [   0.109s] ( 55/594) maos-cli::benchmark_sidecar_18_2 a_tampered_body_exits_one_and_prints_nothing
+        PASS [   0.003s] ( 56/594) maos-cli::door_response_framing successful_response_must_match_its_content_length
+        PASS [   0.005s] ( 57/594) maos-cli::door_response_framing response_larger_than_the_client_cap_is_refused
+        PASS [   0.119s] ( 58/594) maos-cli::accessibility_test start_cascade_emits_zero_ansi_bytes
+        PASS [   0.119s] ( 59/594) maos-cli::accessibility_test unload_cascade_emits_zero_ansi_bytes
+        PASS [   0.003s] ( 60/594) maos-cli::halt_record_16_5 serde_failure_termination_receipt_is_not_reported_as_raised
+        PASS [   0.021s] ( 61/594) maos-cli::cohort_sign_2e cohort_sign_refuses_output_aliasing_the_authority_key
+        PASS [   0.125s] ( 62/594) maos-cli::accessibility_test install_cascade_emits_zero_ansi_bytes
+        PASS [   0.125s] ( 63/594) maos-cli::accessibility_test stop_cascade_refuses_with_exit_two_and_zero_ansi
+        PASS [   0.328s] ( 64/594) maos-cli::dep_kernel_core_free_test maos_cli_dep_tree_excludes_kernel_core
+        PASS [   0.601s] ( 65/594) maos-cli::cohort_sign_2e cohort_sign_refuses_a_key_absent_from_authority_keys
+        PASS [   1.058s] ( 66/594) maos-cli::accessibility_test run_cascade_emits_zero_ansi_bytes
+        PASS [   0.405s] ( 67/594) maos-cli::import_rust_inproc_refusal_17_3b import_refuses_rust_inproc_form_through_the_real_binary
+        PASS [   1.098s] ( 68/594) maos-cli::benchmark_sidecar_18_2 a_sidecar_of_another_class_version_or_schema_exits_one
+        PASS [   0.009s] ( 69/594) maos-cli::legal_hold_cli_13_5b unix::release_forwards_the_offline_one_shot_contract
+        PASS [   3.072s] ( 70/594) maos-cli::halt_resolve_test provided_context_carries_the_text_as_rationale
+        PASS [   3.088s] ( 71/594) maos-cli::halt_resolve_test accepted_halt_sends_post_with_spirit_id_in_the_body
+        PASS [   3.211s] ( 72/594) maos-cli::accessibility_test door_error_output_is_ansi_free
+        PASS [   3.091s] ( 73/594) maos-cli::halt_resolve_test authorized_override_carries_the_policy_ref_as_rationale
+        PASS [   3.093s] ( 74/594) maos-cli::forget_reason_test forget_reason_is_preserved_in_the_live_door_body
+        PASS [   3.089s] ( 75/594) maos-cli::halt_resolve_test invalid_ids_refused_locally_without_a_round_trip
+        PASS [   4.153s] ( 76/594) maos-cli subcommands::tests::resolve_spirit_pid_rejects_unknown_names_with_clear_diagnostic
+        PASS [   1.052s] ( 77/594) maos-cli::load_test load_refuses_a_missing_manifest_without_touching_the_door
+        PASS [   4.180s] ( 78/594) maos-cli::halt_resolve_test provided_context_without_text_refused_before_the_round_trip
+        PASS [   1.130s] ( 79/594) maos-cli::orchestrator_queue_test empty_instruction_refused_locally_without_a_round_trip
+        PASS [   3.403s] ( 80/594) maos-cli::legal_hold_cli_13_5b unix::list_reports_an_empty_list_when_no_hold_is_held
+        PASS [   1.268s] ( 81/594) maos-cli::orchestrator_queue_test invalid_spirit_id_refused_locally_without_a_round_trip
+        PASS [   1.306s] ( 82/594) maos-cli::load_test load_posts_the_canonical_manifest_to_the_collection_route
+        PASS [   4.551s] ( 83/594) maos-cli subcommands::tests::resolve_spirit_pid_reads_from_tl
+        PASS [   4.481s] ( 84/594) maos-cli::credential_posture_2c both_classes_in_one_row_are_reported_separately
+        PASS [   4.481s] ( 85/594) maos-cli::credential_posture_2c an_uppercase_hex_run_is_reported_as_an_escape
+        PASS [   4.487s] ( 86/594) maos-cli::credential_posture_2c a_stored_provider_prefix_credential_is_reported_as_a_prefix_escape
+        PASS [   4.481s] ( 87/594) maos-cli::credential_posture_2c overlapping_prefix_classes_are_each_reported_once
+        PASS [   4.490s] ( 88/594) maos-cli::credential_posture_2c a_stored_hex_run_is_reported_as_its_own_distinct_escape_class
+        PASS [   4.489s] ( 89/594) maos-cli::credential_posture_2c a_too_long_hex_run_under_clause_sources_is_still_an_escape
+        PASS [   5.531s] ( 90/594) maos-cli::credential_posture_2c a_digest_clause_sources_row_is_not_an_escape
+        PASS [   0.005s] ( 91/594) maos-cli::release_pubkey release_pubkey_prints_exact_lowercase_embedded_key
+        PASS [   3.305s] ( 92/594) maos-cli::pause_resume_test pause_sends_bare_post_and_prints_the_door_body
+        PASS [   3.225s] ( 93/594) maos-cli::posture_shift_test posture_sends_the_shifted_value_in_the_json_body
+        PASS [   3.267s] ( 94/594) maos-cli::posture_shift_test invalid_spirit_id_refused_locally_without_a_round_trip
+        PASS [   3.522s] ( 95/594) maos-cli::pause_resume_test pause_and_resume_spawn_no_child_process
+        PASS [   3.271s] ( 96/594) maos-cli::posture_shift_test autonomous_posture_rejected_by_clap_without_a_round_trip
+        PASS [   7.865s] ( 97/594) maos-cli subcommands::tests::record_capture_row_round_trips_through_audit_query
+        PASS [   9.114s] ( 98/594) maos-cli::audit_no_color_test fr4_schema_violation_exits_two_with_diagnostic
+        PASS [   9.002s] ( 99/594) maos-cli::credential_posture_2c the_scan_never_echoes_the_offending_bytes
+        PASS [   4.888s] (100/594) maos-cli::orchestrator_queue_test queue_sends_the_instruction_as_the_text_field
+        PASS [   4.563s] (101/594) maos-cli::pause_resume_test resume_sends_bare_post_and_prints_the_door_body
+        PASS [   9.134s] (102/594) maos-cli::legal_hold_cli_13_5b unix::list_reads_the_real_holds_table_in_process_and_spawns_nothing
+        PASS [   4.612s] (103/594) maos-cli::revocations_import_test list_sends_get_and_renders_the_door_crl_id
+        PASS [   4.644s] (104/594) maos-cli::revoke_token_test repeated_revoke_maps_409_revoked_to_exit_1
+        PASS [   8.211s] (105/594) maos-cli::orchestrator_queue_test status_sends_get_and_renders_the_door_occupancy
+        PASS [   4.698s] (106/594) maos-cli::revocations_import_test import_missing_file_refused_locally
+        PASS [   4.700s] (107/594) maos-cli::revocations_import_test import_sends_the_crl_bytes_verbatim
+        PASS [   4.659s] (108/594) maos-cli::revoke_token_test invalid_token_ids_refused_locally_without_a_round_trip
+        PASS [   4.506s] (109/594) maos-cli::revoke_token_test unknown_token_maps_404_to_exit_1
+        PASS [   4.519s] (110/594) maos-cli::revoke_token_test revoke_sends_bare_post_to_the_token_route
+        PASS [  13.558s] (111/594) maos-cli::halt_resolve_test resolve_discovery_failures_map_to_typed_exits
+        PASS [  12.611s] (112/594) maos-cli::load_test load_discovery_failures_map_to_typed_exits
+        PASS [  14.681s] (113/594) maos-cli::orchestrator_queue_test queue_discovery_failures_map_to_typed_exits
+        PASS [  17.954s] (114/594) maos-cli::credential_posture_2c a_correctly_redacted_log_reports_no_escape
+        PASS [  20.731s] (115/594) maos-cli::audit_no_color_test unknown_spirit_exits_two_with_clear_diagnostic
+        PASS [  16.411s] (116/594) maos-cli::pause_resume_test pause_discovery_failures_map_to_typed_exits
+        PASS [  16.321s] (117/594) maos-cli::posture_shift_test posture_discovery_failures_map_to_typed_exits
+        PASS [  10.732s] (118/594) maos-cli::signing_identity_2c sealed_export_prints_the_base_key_when_no_region_resolves
+        PASS [   0.049s] (119/594) maos-cli::skill_queue_integration_test no_silent_loss_when_journal_write_fails
+        PASS [  22.196s] (120/594) maos-cli::audit_no_color_test plain_with_no_color_emits_zero_ansi_bytes
+        PASS [  22.205s] (121/594) maos-cli::audit_no_color_test ndjson_with_term_dumb_emits_zero_ansi_bytes
+        PASS [  10.889s] (122/594) maos-cli::signing_identity_2c verify_bundle_requires_exactly_one_key_source
+        PASS [  15.571s] (123/594) maos-cli::revocations_import_test revocations_discovery_failures_map_to_typed_exits
+        PASS [  12.859s] (124/594) maos-cli::signing_identity_2c stdout_mode_export_prints_its_pubkey_to_stderr_and_keeps_stdout_pure
+        PASS [  12.898s] (125/594) maos-cli::signing_identity_2c sealed_export_prints_the_region_key_it_actually_signed_with
+        PASS [  12.847s] (126/594) maos-cli::signing_identity_2c verify_bundle_seed_path_refuses_a_region_tampered_bundle
+        PASS [  12.856s] (127/594) maos-cli::signing_identity_2c trajectory_export_prints_the_region_key_it_actually_signed_with
+        PASS [  25.447s] (128/594) maos-cli::audit_no_color_test plain_with_term_dumb_emits_zero_ansi_bytes
+        PASS [  25.448s] (129/594) maos-cli::audit_no_color_test ndjson_with_no_color_emits_zero_ansi_bytes
+        PASS [   0.099s] (130/594) maos-cli::skills_door_18_7 list_show_approve_and_reject_use_the_same_authenticated_door
+        PASS [  12.964s] (131/594) maos-cli::signing_identity_2c verify_bundle_derives_the_region_key_from_a_base_seed
+        PASS [  16.369s] (132/594) maos-cli::revoke_token_test revoke_discovery_failures_map_to_typed_exits
+        PASS [   2.382s] (133/594) maos-cli::skills_door_18_7 list_preserves_custom_discovery_roots_over_the_door
+        PASS [   4.153s] (134/594) maos-cli::spirit_upgrade_test attestation_and_keyring_travel_in_the_body
+        PASS [   4.231s] (135/594) maos-cli::spirit_upgrade_test cold_swap_reaches_the_door_and_409_cold_swap_unsupported_maps_to_1
+        SLOW [> 30.000s] (───────) maos-cli backup::tests::validate_restore_target_team_refuses_cross_team_planting
+        SLOW [> 30.000s] (───────) maos-cli backup::tests::tenant_backup_round_trip_rejects_wrong_team
+        SLOW [> 30.000s] (───────) maos-cli::halt_resolve_test resolve_maps_typed_responses_to_d16_1_p_exits
+        PASS [   2.934s] (136/594) maos-cli::spirit_upgrade_test from_and_candidates_require_plan_locally
+        PASS [   3.133s] (137/594) maos-cli::spirit_upgrade_test manifest_not_found_refused_locally
+        SLOW [> 30.000s] (───────) maos-cli::load_test load_maps_typed_responses_to_d16_1_p_exits
+        PASS [   4.174s] (138/594) maos-cli::spirit_upgrade_test migrator_policy_refused_locally_without_a_round_trip
+        PASS [   8.421s] (139/594) maos-cli::skills_door_18_7 rejected_bearer_never_falls_back_to_offline_queue_mutation
+        SLOW [> 30.000s] (───────) maos-cli::orchestrator_queue_test queue_maps_typed_responses_to_d16_1_p_exits
+        SLOW [> 30.000s] (───────) maos-cli::pause_resume_test pause_maps_typed_responses_to_d16_1_p_exits
+        SLOW [> 30.000s] (───────) maos-cli::pause_resume_test resume_maps_typed_responses_to_d16_1_p_exits
+        SLOW [> 30.000s] (───────) maos-cli::posture_shift_test posture_maps_typed_responses_to_d16_1_p_exits
+        PASS [   4.315s] (140/594) maos-cli::spirit_upgrade_test plan_mode_carries_create_plan_from_and_absolute_candidates
+        SLOW [> 30.000s] (───────) maos-cli::revocations_import_test import_maps_typed_responses_to_d16_1_p_exits
+        PASS [   4.070s] (141/594) maos-cli::spirit_upgrade_test upgrade_sends_absolute_manifest_and_default_policy
+        PASS [  33.846s] (142/594) maos-cli::orchestrator_queue_test queue_maps_typed_responses_to_d16_1_p_exits
+        SLOW [> 30.000s] (───────) maos-cli::revoke_token_test revoke_maps_typed_responses_to_d16_1_p_exits
+        PASS [  37.642s] (143/594) maos-cli::pause_resume_test resume_maps_typed_responses_to_d16_1_p_exits
+        PASS [  41.770s] (144/594) maos-cli::halt_resolve_test resolve_maps_typed_responses_to_d16_1_p_exits
+        PASS [  40.063s] (145/594) maos-cli::load_test load_maps_typed_responses_to_d16_1_p_exits
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test authored_decision_journals_before_materializing_and_saving
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test busy_timeout_5000_blocks_then_succeeds_green
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test busy_timeout_zero_reds_immediately_under_contention
+        PASS [  42.035s] (146/594) maos-cli::pause_resume_test pause_maps_typed_responses_to_d16_1_p_exits
+        PASS [  41.920s] (147/594) maos-cli::posture_shift_test posture_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.019s] (148/594) maos-cli::two_host_reconcile_2c the_python_twin_verifies_the_committed_non_ascii_tier2_bundle
+        PASS [   0.019s] (149/594) maos-cli::two_host_reconcile_2c the_python_twin_verifies_a_host_stamped_bundle
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test discovered_skill_is_approvable_end_to_end
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test double_journal_guard_keyed_on_target_capability
+        PASS [  11.800s] (150/594) maos-cli::two_host_reconcile_2c an_empty_host_tag_is_refused_at_export
+        PASS [   0.014s] (151/594) maos-cli::uninstall_exit_codes_13_5b uninstall_forwards_erased_held_not_found_and_failed_codes
+        PASS [  17.022s] (152/594) maos-cli::spirit_upgrade_test upgrade_discovery_failures_map_to_typed_exits
+        PASS [   0.134s] (153/594) maos-control::post_surface_16_1 a_bearer_hidden_in_the_body_does_not_authenticate
+        PASS [  41.351s] (154/594) maos-cli::revoke_token_test revoke_maps_typed_responses_to_d16_1_p_exits
+        PASS [  12.569s] (155/594) maos-cli::two_host_reconcile_2c an_unstamped_half_is_refused
+        PASS [   7.313s] (156/594) maos-cli::two_host_reconcile_2c one_root_signing_both_halves_is_refused
+        PASS [  45.039s] (157/594) maos-cli::revocations_import_test import_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.124s] (158/594) maos-control::post_surface_16_1 a_post_without_content_length_is_411
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test journal_failure_mutates_nothing_and_materialization_failure_is_reported_after_commit
+        PASS [   0.178s] (159/594) maos-control::post_surface_16_1 a_panicking_port_is_500_and_the_next_request_still_succeeds
+        PASS [  15.818s] (160/594) maos-cli::two_host_reconcile_2c a_seed_and_the_seeds_own_derived_pubkey_are_one_root
+        PASS [   0.134s] (161/594) maos-control::post_surface_16_1 an_oversized_body_is_413_without_being_read
+        PASS [   0.185s] (162/594) maos-control::post_surface_16_1 ambiguous_or_overlong_request_framing_is_rejected
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test queue_save_failure_never_reports_a_committed_decision_as_success
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_integration_test unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_never_fabricated
+        PASS [   0.306s] (163/594) maos-control::post_surface_16_1 a_principal_scoped_verb_accepts_an_email_shaped_principal
+        PASS [   0.125s] (164/594) maos-control::post_surface_16_1 an_unknown_spirit_verb_is_404_not_a_silent_success
+        PASS [   0.215s] (165/594) maos-control::post_surface_16_1 an_unknown_spirit_is_404_typed_and_an_illegal_transition_is_409_typed
+        PASS [   0.266s] (166/594) maos-control::post_surface_16_1 eight_idle_connections_do_not_block_a_ninth_request
+        PASS [   0.064s] (167/594) maos-control::post_surface_16_1 forget_reason_reaches_the_command_port
+        PASS [   0.317s] (168/594) maos-control::post_surface_16_1 error_bodies_are_valid_json
+        PASS [   0.134s] (169/594) maos-control::post_surface_16_1 halt_body_spirit_id_uses_the_route_identifier_rules
+        PASS [   0.188s] (170/594) maos-control::post_surface_16_1 loopback_server_requires_bearer_and_returns_exact_live_report
+        PASS [   0.186s] (171/594) maos-control::post_surface_16_1 malformed_json_is_400_and_valid_json_is_not
+        PASS [   0.547s] (172/594) maos-control::post_surface_16_1 identifiers_outside_the_allowed_class_are_400_and_sandbox_still_routes
+        PASS [  51.935s] (173/594) maos-cli backup::tests::validate_restore_target_team_refuses_cross_team_planting
+        PASS [   9.728s] (174/594) maos-cli::two_host_reconcile_2c one_base_seed_under_two_claimed_regions_is_refused
+        PASS [   0.076s] (175/594) maos-control::post_surface_16_1 overload_does_not_bypass_authentication
+        PASS [   9.834s] (176/594) maos-cli::two_host_reconcile_2c disjoint_logs_are_refused
+        PASS [   0.135s] (177/594) maos-control::post_surface_16_1 peer_versions_route_distinguishes_absent_state_from_no_declarations
+        PASS [   5.566s] (178/594) maos-cli::two_host_reconcile_2c the_two_host_receipt_is_written_and_verifies_under_the_operator_key
+        PASS [   0.074s] (179/594) maos-control::post_surface_16_1 peer_versions_route_reports_an_unhealthy_source_as_503
+        PASS [   0.316s] (180/594) maos-control::post_surface_16_1 malformed_skill_decision_never_submits_and_custom_roots_reach_the_read_port
+        PASS [   0.065s] (181/594) maos-control::post_surface_16_1 rotation_windows_route_reports_an_unhealthy_control_as_503
+        PASS [   0.195s] (182/594) maos-control::post_surface_16_1 peer_versions_route_is_authenticated_and_distinguishes_peers_by_version
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_package_shipped_9_7_boundary
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_reconcile_test discovered_skill_with_no_tl_row_is_pending
+        PASS [   0.134s] (183/594) maos-control::post_surface_16_1 rotation_windows_route_distinguishes_absent_control_from_empty_window_set
+        PASS [   0.074s] (184/594) maos-control::post_surface_16_1 self_identity_route_reports_an_unhealthy_source_as_503
+        PASS [   0.134s] (185/594) maos-control::post_surface_16_1 self_identity_route_distinguishes_absent_state_from_unconfirmable
+        PASS [   0.198s] (186/594) maos-control::post_surface_16_1 rotation_windows_route_is_authenticated_read_only_and_reports_the_live_set
+        PASS [   0.186s] (187/594) maos-control::post_surface_16_1 self_identity_route_is_authenticated_read_only_and_reports_divergence
+        PASS [   0.487s] (188/594) maos-control::post_surface_16_1 no_post_route_exists_under_the_cohort_or_a2a_namespaces
+        PASS [   1.562s] (189/594) maos-control::post_surface_16_1 anonymous_requests_are_401_whatever_the_method_or_path
+        PASS [   0.005s] (190/594) maos-control::submit_and_wait_16_2 completed_arrives_unchanged
+        PASS [   0.003s] (191/594) maos-control::submit_and_wait_16_2 disconnected_is_internal
+        PASS [   0.053s] (192/594) maos-control::submit_and_wait_16_2 queued_at_deadline_is_spirit_busy
+        PASS [   0.239s] (193/594) maos-control::post_surface_16_1 the_daemon_and_orchestrator_and_revocations_reads_report_the_ports_values
+        PASS [   0.004s] (194/594) maos-fkcs::fkcs_contract always_admit_blind_harness_proves_the_rejection_is_not_canned
+        PASS [   0.003s] (195/594) maos-fkcs::fkcs_contract cohort_all_freeze_axes_red_hits_per_spirit_floor_but_fails_aggregate_floor
+        PASS [   0.003s] (196/594) maos-fkcs::fkcs_contract cohort_checklist_is_itemized_across_categories_not_a_flat_bucket
+        PASS [   0.005s] (197/594) maos-fkcs::fkcs_contract cohort_green_reconciles_every_spirit_and_clears_the_aggregate_floor
+        PASS [   0.005s] (198/594) maos-fkcs::fkcs_contract cohort_one_freeze_axis_red_drops_reconciled_count_while_admission_holds
+        PASS [   0.054s] (199/594) maos-control::submit_and_wait_16_2 started_at_deadline_is_handler_still_running_with_the_ports_id
+        PASS [   0.005s] (200/594) maos-fkcs::fkcs_contract cohort_with_negative_control_scores_below_floor_and_fails_aggregate
+        PASS [   0.003s] (201/594) maos-fkcs::fkcs_contract empty_cohort_is_na_never_a_vacuous_pass
+        PASS [   0.003s] (202/594) maos-fkcs::fkcs_contract negative_control_rejects_at_real_admit_spirit_while_conformance_proxy_admits
+        PASS [   0.003s] (203/594) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_accepts_without_shutdown_signal
+        PASS [   0.003s] (204/594) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_full_with_argv_prefix_and_recovery
+        PASS [   0.003s] (205/594) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_minimal_round_trip
+        PASS [   0.003s] (206/594) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_rejects_empty_command
+        PASS [   0.003s] (207/594) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_rejects_invalid_shutdown_signal
+        PASS [   0.003s] (208/594) maos-manifest manifest::cli_wrapper_tests::schedule_cadence_out_of_range_rejected
+        PASS [   0.003s] (209/594) maos-manifest manifest::cli_wrapper_tests::schedule_compliance_claim_ref_hex_invalid_length
+        PASS [   0.003s] (210/594) maos-manifest manifest::cli_wrapper_tests::schedule_compliance_claim_ref_hex_valid_with_sha256_prefix
+        PASS [   0.003s] (211/594) maos-manifest manifest::cli_wrapper_tests::schedule_deny_unknown_field_rejected
+        PASS [   0.003s] (212/594) maos-manifest manifest::cli_wrapper_tests::schedule_duplicate_id_rejected
+        PASS [   0.003s] (213/594) maos-manifest manifest::cli_wrapper_tests::schedule_empty_section_default
+        PASS [   0.003s] (214/594) maos-manifest manifest::cli_wrapper_tests::schedule_id_regex_rejects_bad_chars
+        PASS [   0.003s] (215/594) maos-manifest manifest::cli_wrapper_tests::schedule_payload_b64_round_trip
+        PASS [   0.003s] (216/594) maos-manifest manifest::cli_wrapper_tests::schedule_rate_limit_out_of_range_rejected
+        PASS [   0.003s] (217/594) maos-manifest manifest::cli_wrapper_tests::schedule_side_effect_scopes_round_trip
+        PASS [   0.003s] (218/594) maos-manifest manifest::cli_wrapper_tests::schedule_two_entries_distinct_ids
+        PASS [   0.003s] (219/594) maos-manifest manifest::cli_wrapper_tests::schedule_well_formed_round_trip
+        PASS [   0.003s] (220/594) maos-manifest manifest::gateway_tests::gateway_backoff_too_high_rejected
+        PASS [   0.003s] (221/594) maos-manifest manifest::gateway_tests::gateway_backoff_zero_rejected
+        PASS [   0.003s] (222/594) maos-manifest manifest::gateway_tests::gateway_bare_credential_rejected
+        PASS [   0.003s] (223/594) maos-manifest manifest::gateway_tests::gateway_deny_unknown_fields
+        PASS [   0.003s] (224/594) maos-manifest manifest::gateway_tests::gateway_empty_allowlist_parses
+        PASS [   0.003s] (225/594) maos-manifest manifest::gateway_tests::gateway_duplicate_id_rejected
+        PASS [   0.003s] (226/594) maos-manifest manifest::gateway_tests::gateway_empty_section_defaults
+        PASS [   0.003s] (227/594) maos-manifest manifest::gateway_tests::gateway_id_empty_rejected
+        PASS [   0.003s] (228/594) maos-manifest manifest::gateway_tests::gateway_max_message_bytes_too_high_rejected
+        PASS [   0.003s] (229/594) maos-manifest manifest::gateway_tests::gateway_id_regex_rejects_space
+        PASS [   0.003s] (230/594) maos-manifest manifest::gateway_tests::gateway_two_entries_distinct_ids
+        PASS [   0.003s] (231/594) maos-manifest manifest::gateway_tests::gateway_max_message_bytes_too_low_rejected
+        PASS [   0.003s] (232/594) maos-manifest manifest::gateway_tests::gateway_well_formed_defaults
+        PASS [   0.003s] (233/594) maos-manifest manifest::gateway_tests::gateway_unknown_type_rejected
+        PASS [   0.003s] (234/594) maos-manifest manifest::hot_swap_manifest_tests::halt_protocol_compat_rejects_zero
+        PASS [   0.003s] (235/594) maos-manifest manifest::gateway_tests::gateway_well_formed_telegram
+        PASS [   0.003s] (236/594) maos-manifest manifest::hot_swap_manifest_tests::halt_protocol_compat_well_formed
+        PASS [   0.003s] (237/594) maos-manifest manifest::hot_swap_manifest_tests::hot_swap_rejects_zero_schema_version
+        PASS [   0.004s] (238/594) maos-manifest manifest::hot_swap_manifest_tests::hot_swap_well_formed
+        PASS [   0.004s] (239/594) maos-manifest manifest::hot_swap_manifest_tests::migrates_from_rejects_empty_version
+        PASS [   0.004s] (240/594) maos-manifest manifest::model_provenance_tests::absent_section_is_none_optional_on_read_ac11
+        PASS [   0.005s] (241/594) maos-manifest manifest::hot_swap_manifest_tests::migrates_from_well_formed
+        PASS [   0.004s] (242/594) maos-manifest manifest::model_provenance_tests::empty_lineage_rejected
+        PASS [   0.005s] (243/594) maos-manifest manifest::model_provenance_tests::canonical_content_bytes_are_deterministic_and_field_sensitive
+        PASS [   0.004s] (244/594) maos-manifest manifest::model_provenance_tests::free_text_lineage_is_rejected_not_admitted
+        PASS [   0.004s] (245/594) maos-manifest manifest::model_provenance_tests::leap_year_feb_29_accepted
+        PASS [   0.004s] (246/594) maos-manifest manifest::model_provenance_tests::malformed_timestamp_rejected
+        PASS [   0.004s] (247/594) maos-manifest manifest::model_provenance_tests::present_section_extracted_from_full_manifest
+        PASS [   0.004s] (248/594) maos-manifest manifest::model_provenance_tests::staleness_rejects_old_eval
+        PASS [   0.003s] (249/594) maos-manifest manifest::model_provenance_tests::unknown_field_rejected_deny_unknown_fields
+        PASS [   0.003s] (250/594) maos-manifest manifest::model_provenance_tests::valid_section_parses_and_derives_unix_secs
+        PASS [   0.003s] (251/594) maos-manifest manifest::on_revocation_tests::on_revocation_default_terminate_immediately
+        PASS [   0.003s] (252/594) maos-manifest manifest::on_revocation_tests::on_revocation_drain_then_terminate
+        PASS [   0.003s] (253/594) maos-manifest manifest::on_revocation_tests::on_revocation_quarantine
+        PASS [   0.003s] (254/594) maos-manifest manifest::on_revocation_tests::on_revocation_rejects_unknown_policy
+        PASS [   0.003s] (255/594) maos-manifest manifest::on_revocation_tests::providers_accepts_valid_pin
+        PASS [   0.003s] (256/594) maos-manifest manifest::on_revocation_tests::providers_fallback_validated_independently
+        PASS [   0.003s] (257/594) maos-manifest manifest::on_revocation_tests::providers_rejects_bad_pin
+        PASS [   0.003s] (258/594) maos-manifest manifest::on_revocation_tests::providers_rejects_empty_endpoint_url
+        PASS [   0.003s] (259/594) maos-manifest manifest::on_revocation_tests::providers_rejects_unsupported_id
+        PASS [   0.004s] (260/594) maos-manifest manifest::on_revocation_tests::providers_well_formed_anthropic_no_fallback
+        PASS [   0.003s] (261/594) maos-manifest manifest::on_revocation_tests::providers_well_formed_ollama_air_gapped
+        PASS [   0.003s] (262/594) maos-manifest manifest::on_revocation_tests::providers_well_formed_openai_with_anthropic_fallback
+        PASS [   0.003s] (263/594) maos-manifest manifest::supervision_manifest_tests::on_crash_default_nack
+        PASS [   0.003s] (264/594) maos-manifest manifest::supervision_manifest_tests::on_crash_explicit_reassign
+        PASS [   0.003s] (265/594) maos-manifest manifest::supervision_manifest_tests::on_crash_explicit_escalate
+        PASS [   0.003s] (266/594) maos-manifest manifest::supervision_manifest_tests::on_crash_rejects_unknown_action
+        PASS [   0.004s] (267/594) maos-manifest manifest::supervision_manifest_tests::supervision_defaults
+        PASS [   0.003s] (268/594) maos-manifest manifest::supervision_manifest_tests::supervision_explicit_values
+        PASS [   0.003s] (269/594) maos-manifest manifest::supervision_manifest_tests::supervision_rejects_heartbeat_too_low
+        PASS [   0.004s] (270/594) maos-manifest manifest::supervision_manifest_tests::supervision_rejects_progress_too_high
+        PASS [   0.004s] (271/594) maos-manifest manifest::supervision_manifest_tests::supervision_rejects_silent_failure_too_low
+        PASS [   0.004s] (272/594) maos-manifest manifest::tests::author_rejects_empty_name
+        PASS [   0.004s] (273/594) maos-manifest manifest::tests::author_rejects_bad_homepage_scheme
+        PASS [   0.409s] (274/594) maos-control::post_surface_16_1 spirit_collection_load_route_has_the_standard_post_guards
+        PASS [   0.004s] (275/594) maos-manifest manifest::tests::author_well_formed_without_homepage
+        PASS [   0.005s] (276/594) maos-manifest manifest::tests::author_well_formed_with_homepage
+        PASS [   0.004s] (277/594) maos-manifest manifest::tests::budget_rejects_excessive_time_cap
+        PASS [   0.003s] (278/594) maos-manifest manifest::tests::budget_rejects_zero_context_window_size
+        PASS [   0.003s] (279/594) maos-manifest manifest::tests::budget_rejects_zero_time_cap_seconds
+        PASS [   0.003s] (280/594) maos-manifest manifest::tests::budget_well_formed
+        PASS [   0.003s] (281/594) maos-manifest manifest::tests::capabilities_required_loom_defaults_false_and_rejects_unknown_fields
+        PASS [   0.003s] (282/594) maos-manifest manifest::tests::capabilities_required_loom_degrades_before_schema_v4
+        PASS [   0.003s] (283/594) maos-manifest manifest::tests::capabilities_required_loom_false_fields_emit_no_loom_scopes
+        PASS [   0.003s] (284/594) maos-manifest manifest::tests::capabilities_required_loom_maps_each_field_exactly
+        PASS [   0.004s] (285/594) maos-manifest manifest::tests::capabilities_required_loom_rejects_malformed_fields
+        PASS [   0.003s] (286/594) maos-manifest manifest::tests::capabilities_required_rejects_empty_complete
+        PASS [   0.003s] (287/594) maos-manifest manifest::tests::capabilities_required_rejects_overlong_entry
+        PASS [   0.003s] (288/594) maos-manifest manifest::tests::capabilities_required_rejects_unknown_field
+        PASS [   0.003s] (289/594) maos-manifest manifest::tests::capabilities_required_well_formed
+        PASS [   0.003s] (290/594) maos-manifest manifest::tests::class_section_accepts_public_vetted_tier
+        PASS [   0.003s] (291/594) maos-manifest manifest::tests::class_section_accepts_v2_schema_version
+        PASS [   0.003s] (292/594) maos-manifest manifest::tests::class_section_accepts_wasm_component_with_artifact_at_schema_v5
+        PASS [   0.003s] (293/594) maos-manifest manifest::tests::class_section_rejects_above_max_schema_version
+        PASS [   0.003s] (294/594) maos-manifest manifest::tests::class_section_rejects_bad_abi
+        PASS [   0.004s] (295/594) maos-manifest manifest::tests::class_section_rejects_artifact_for_rust_inproc
+        PASS [   0.003s] (296/594) maos-manifest manifest::tests::class_section_rejects_empty_name
+        PASS [   0.003s] (297/594) maos-manifest manifest::tests::class_section_rejects_typo_field
+        PASS [   0.004s] (298/594) maos-manifest manifest::tests::class_section_rejects_non_semver_version
+        PASS [   0.003s] (299/594) maos-manifest manifest::tests::class_section_rejects_unknown_form
+        PASS [   0.004s] (300/594) maos-manifest manifest::tests::class_section_rejects_unknown_trust_tier
+        PASS [   0.005s] (301/594) maos-manifest manifest::tests::class_section_rejects_wasm_component_before_schema_v5
+        PASS [   0.008s] (302/594) maos-manifest manifest::tests::class_section_rejects_unsafe_wasm_component_artifacts
+        PASS [   0.005s] (303/594) maos-manifest manifest::tests::class_section_rejects_wasm_component_with_another_form
+        PASS [   0.005s] (304/594) maos-manifest manifest::tests::class_section_rejects_wasm_component_without_artifact
+        PASS [   0.004s] (305/594) maos-manifest manifest::tests::class_section_still_accepts_v1_schema_version
+        PASS [   0.006s] (306/594) maos-manifest manifest::tests::class_section_rejects_zero_schema_version
+        PASS [   0.004s] (307/594) maos-manifest manifest::tests::class_section_still_accepts_v4_rust_inproc_manifest
+        PASS [   0.004s] (308/594) maos-manifest manifest::tests::class_section_well_formed
+        PASS [   0.004s] (309/594) maos-manifest manifest::tests::epistemic_policy_default_action_defaults_to_verbalize_only_when_omitted
+        PASS [   0.003s] (310/594) maos-manifest manifest::tests::epistemic_policy_edge_case_multi_rule_no_qualifiers
+        PASS [   0.003s] (311/594) maos-manifest manifest::tests::epistemic_policy_malformed_fixture_default_action_is_rejected
+        PASS [   0.003s] (312/594) maos-manifest manifest::tests::epistemic_policy_malformed_fixture_rules_is_rejected
+        PASS [   0.004s] (313/594) maos-manifest manifest::tests::epistemic_policy_rejects_duplicate_tag
+        PASS [   0.003s] (314/594) maos-manifest manifest::tests::epistemic_policy_rejects_empty_tag
+        PASS [   0.376s] (315/594) maos-control::post_surface_16_1 upgrade_options_reject_present_values_of_the_wrong_type
+        PASS [   0.003s] (316/594) maos-manifest manifest::tests::epistemic_policy_rejects_threshold_above_one
+        PASS [   0.003s] (317/594) maos-manifest manifest::tests::epistemic_policy_rejects_threshold_below_zero
+        PASS [   0.003s] (318/594) maos-manifest manifest::tests::epistemic_policy_rejects_whitespace_in_tag
+        PASS [   0.003s] (319/594) maos-manifest manifest::tests::lifecycle_edge_all_11_hooks
+        PASS [   0.003s] (320/594) maos-manifest manifest::tests::epistemic_policy_well_formed_parses
+        PASS [   0.003s] (321/594) maos-manifest manifest::tests::lifecycle_edge_empty_means_all_allowed
+        PASS [   0.003s] (322/594) maos-manifest manifest::tests::lifecycle_malformed_duplicate_rejected
+        PASS [   0.003s] (323/594) maos-manifest manifest::tests::lifecycle_malformed_unknown_hook_rejected
+        PASS [   0.003s] (324/594) maos-manifest manifest::tests::lifecycle_well_formed
+        PASS [   0.003s] (325/594) maos-manifest manifest::tests::mcp_section_rejects_duplicate_names
+        PASS [   0.003s] (326/594) maos-manifest manifest::tests::mcp_section_rejects_empty_name
+        PASS [   0.003s] (327/594) maos-manifest manifest::tests::mcp_section_rejects_fallback_equals_primary
+        PASS [   0.003s] (328/594) maos-manifest manifest::tests::mcp_section_rejects_empty_uri
+        PASS [   0.003s] (329/594) maos-manifest manifest::tests::mcp_section_rejects_glob_in_allowed_tools
+        PASS [   0.003s] (330/594) maos-manifest manifest::tests::mcp_section_rejects_public_vetted_tier
+        PASS [   0.003s] (331/594) maos-manifest manifest::tests::mcp_section_well_formed_parse
+        PASS [   0.003s] (332/594) maos-manifest manifest::tests::output_shape_edge_single_field
+        PASS [   0.003s] (333/594) maos-manifest manifest::tests::output_shape_rejects_duplicate_field_name
+        PASS [   0.003s] (334/594) maos-manifest manifest::tests::output_shape_rejects_empty
+        PASS [   0.003s] (335/594) maos-manifest manifest::tests::output_shape_rejects_overlong_list
+        PASS [   0.003s] (336/594) maos-manifest manifest::tests::output_shape_rejects_whitespace_in_field_name
+        PASS [   0.003s] (337/594) maos-manifest manifest::tests::output_shape_well_formed
+        PASS [   0.003s] (338/594) maos-manifest manifest::tests::posture_section_edge_autonomous_with_halt_lt_autonomous
+        PASS [   0.004s] (339/594) maos-manifest manifest::tests::posture_section_rejects_max_below_default
+        PASS [   0.480s] (340/594) maos-control::post_surface_16_1 skill_routes_require_bearer_and_keep_reads_and_decisions_distinct
+        PASS [   0.005s] (341/594) maos-manifest manifest::tests::posture_section_rejects_unknown_variant
+        PASS [   0.004s] (342/594) maos-manifest manifest::tests::posture_section_well_formed
+        PASS [   0.005s] (343/594) maos-manifest manifest::tests::predicate_3_2_shape_backward_compat_unchanged
+        PASS [   0.004s] (344/594) maos-manifest manifest::tests::predicate_accepts_empty_object_for_empty_required_fields
+        PASS [   0.006s] (345/594) maos-manifest manifest::tests::predicate_hits_on_hello_spirit_four_fields
+        PASS [   0.004s] (346/594) maos-manifest manifest::tests::predicate_on_value_above_well_formed_parses
+        PASS [   0.004s] (347/594) maos-manifest manifest::tests::predicate_on_confidence_below_desugars_to_below_predicate
+        PASS [   0.007s] (348/594) maos-manifest manifest::tests::predicate_misses_first_field
+        PASS [   0.008s] (349/594) maos-manifest manifest::tests::predicate_misses_second_field
+        PASS [   0.003s] (350/594) maos-manifest manifest::tests::predicate_on_value_within_well_formed_parses
+        PASS [   0.003s] (351/594) maos-manifest manifest::tests::predicate_on_value_outside_well_formed_parses
+        PASS [   0.004s] (352/594) maos-manifest manifest::tests::predicate_on_value_below_well_formed_parses
+        PASS [   0.004s] (353/594) maos-manifest manifest::tests::predicate_rejects_both_confidence_below_and_on_value
+        PASS [   0.004s] (354/594) maos-manifest manifest::tests::predicate_rejects_inverted_bounds_outside
+        PASS [   0.004s] (355/594) maos-manifest manifest::tests::predicate_rejects_both_forms_set
+        PASS [   0.004s] (356/594) maos-manifest manifest::tests::predicate_rejects_inverted_bounds_within
+        PASS [   0.004s] (357/594) maos-manifest manifest::tests::predicate_rejects_nan_threshold_in_above
+        PASS [   0.004s] (358/594) maos-manifest manifest::tests::predicate_rejects_nan_threshold_in_below
+        PASS [   0.003s] (359/594) maos-manifest manifest::tests::predicate_rejects_nan_threshold_in_outside
+        PASS [   0.003s] (360/594) maos-manifest manifest::tests::resolve_caps_manifest_wins_when_tighter
+        PASS [   0.003s] (361/594) maos-manifest manifest::tests::resolve_caps_both_none_none
+        PASS [   0.003s] (362/594) maos-manifest manifest::tests::predicate_rejects_null_field
+        PASS [   0.003s] (363/594) maos-manifest manifest::tests::resolve_caps_none_falls_through
+        PASS [   0.003s] (364/594) maos-manifest manifest::tests::resource_caps_edge_missing_all_optional
+        PASS [   0.003s] (365/594) maos-manifest manifest::tests::resolve_caps_operator_wins_when_tighter
+        PASS [   0.003s] (366/594) maos-manifest manifest::tests::resource_caps_malformed_zero_rejected
+        PASS [   0.004s] (367/594) maos-manifest manifest::tests::resource_caps_partial_present
+        PASS [   0.004s] (368/594) maos-manifest manifest::tests::resource_caps_well_formed
+        PASS [   0.004s] (369/594) maos-manifest manifest::tests::sandbox_config_malformed_rejected
+        PASS [   0.005s] (370/594) maos-manifest manifest::tests::sandbox_config_edge_missing_uses_default
+        PASS [   0.005s] (371/594) maos-manifest manifest::tests::sandbox_config_t3_parseable
+        PASS [   0.005s] (372/594) maos-manifest manifest::tests::sandbox_config_well_formed
+        PASS [   0.005s] (373/594) maos-manifest manifest::tests::scheduling_malformed_idle_window_too_high
+        PASS [   0.005s] (374/594) maos-manifest manifest::tests::scheduling_malformed_idle_window_too_low
+        PASS [   0.006s] (375/594) maos-manifest manifest::tests::scheduling_default_trait
+        PASS [   0.006s] (376/594) maos-manifest manifest::tests::scheduling_edge_empty_defaults
+        PASS [   0.004s] (377/594) maos-manifest manifest::tests::scheduling_malformed_priority_rejected
+        PASS [   0.004s] (378/594) maos-manifest manifest::tests::scheduling_malformed_yield_too_high
+        PASS [   0.004s] (379/594) maos-manifest manifest::tests::scheduling_malformed_priority_too_high
+        PASS [   0.005s] (380/594) maos-manifest manifest::tests::scheduling_malformed_yield_too_low
+        PASS [   0.005s] (381/594) maos-manifest manifest::tests::scheduling_well_formed
+        PASS [   0.005s] (382/594) maos-manifest manifest::tests::trust_tier_parser_handles_valid_toml_syntax
+        PASS [   0.003s] (383/594) maos-manifest manifest::tests::trust_tier_parser_rejects_unknown_values
+        PASS [   0.003s] (384/594) maos-manifest::budget_thresholds_18_5 defaults_are_800_and_950_permille
+        PASS [   0.003s] (385/594) maos-manifest::budget_thresholds_18_5 pressure_at_or_above_limit_and_out_of_range_thresholds_are_rejected
+        PASS [   0.003s] (386/594) maos-manifest::budget_thresholds_18_5 thresholds_rounding_to_zero_permille_are_rejected
+        PASS [   0.003s] (387/594) maos-manifest::budget_thresholds_18_5 thresholds_rounding_to_positive_permille_are_admitted
+        PASS [   0.003s] (388/594) maos-manifest::budget_thresholds_18_5 well_formed_and_edge_thresholds_are_admitted_as_permille
+        PASS [   0.003s] (389/594) maos-manifest::cli_wrapper_egress_17_1 absent_egress_denies_all_and_valid_destinations_keep_their_exact_ports
+        PASS [   0.004s] (390/594) maos-manifest::cli_wrapper_egress_17_1 destination_grammar_is_strict_at_the_manifest_boundary
+        PASS [   0.003s] (391/594) maos-manifest::cli_wrapper_egress_17_1 duplicate_destinations_are_refused
+        PASS [   0.003s] (392/594) maos-manifest::cli_wrapper_egress_17_1 unknown_wrapper_and_posture_fields_are_refused
+        PASS [   0.003s] (393/594) maos-manifest::iac_send_capability_17_3c each_closed_set_entry_parses_and_maps_to_iac_send_scope
+        PASS [   0.003s] (394/594) maos-manifest::iac_send_capability_17_3c provider_section_is_optional_but_refused_when_present_and_empty
+        PASS [   0.003s] (395/594) maos-manifest::iac_send_capability_17_3c schema_below_v5_drops_iac
+        PASS [   0.003s] (396/594) maos-manifest::iac_send_capability_17_3c unknown_empty_and_duplicate_entries_are_refused_naming_the_field
+        PASS [   0.003s] (397/594) maos-manifest::iac_send_capability_17_3c unmatchable_selectors_are_refused_at_admission
+        PASS [   0.003s] (398/594) maos-manifest::lifecycle_hook_parity_17_4 manifest_accepts_every_abi_hook_and_rejects_a_non_hook
+        PASS [   0.003s] (399/594) maos-manifest::log_capability_17_3d log_grants_map_independently_and_default_to_denied
+        PASS [   0.003s] (400/594) maos-manifest::log_capability_17_3d schema_five_retains_both_log_grants
+        PASS [   0.003s] (401/594) maos-manifest::log_capability_17_3d schema_four_drops_both_log_grants
+        PASS [   0.003s] (402/594) maos-manifest::log_capability_17_3d unknown_log_keys_and_non_boolean_grants_are_refused
+        PASS [   0.003s] (403/594) maos-manifest::manifest_n_minus_1_compat above_max_schema_version_rejected
+        PASS [   0.003s] (404/594) maos-manifest::manifest_n_minus_1_compat n_minus_1_emits_warn_degradation_per_post_v1_section
+        PASS [   0.003s] (405/594) maos-manifest::manifest_n_minus_1_compat current_schema_version_manifest_loads
+        PASS [   0.003s] (406/594) maos-manifest::manifest_n_minus_1_compat n_minus_1_load_covers_every_class_field
+        PASS [   0.003s] (407/594) maos-manifest::manifest_n_minus_1_compat v1_manifest_loads_on_current_kernel
+        PASS [   0.003s] (408/594) maos-manifest::manifest_n_minus_1_compat v2_manifest_loads_on_v2_kernel
+        PASS [   0.003s] (409/594) maos-manifest::resources_pid_17_2 pid_cap_resolution_is_independent_from_fd_and_uses_strictest_of
+        PASS [   0.003s] (410/594) maos-manifest::manifest_n_minus_1_compat zero_schema_version_rejected
+        PASS [   0.003s] (411/594) maos-manifest::skill_capability_18_7 older_schema_never_acquires_skill_authority
+        PASS [   0.003s] (412/594) maos-manifest::skill_capability_18_7 schema_six_declares_skill_author_self_only_when_requested
+        PASS [   0.003s] (413/594) maos-manifest::skill_capability_18_7 unknown_skill_keys_and_non_boolean_authority_are_refused
+        PASS [   0.003s] (414/594) maos-skill anthropic_adapter::tests::parse_anthropic_skill_empty_body
+        PASS [   0.003s] (415/594) maos-skill anthropic_adapter::tests::parse_anthropic_skill_missing_fence
+        PASS [   0.003s] (416/594) maos-skill anthropic_adapter::tests::parse_anthropic_skill_missing_name
+        PASS [   0.003s] (417/594) maos-skill anthropic_adapter::tests::parse_invalid_fixture_is_red
+        PASS [   0.003s] (418/594) maos-skill anthropic_adapter::tests::parse_real_fixture
+        PASS [   0.003s] (419/594) maos-skill anthropic_adapter::tests::parse_valid_anthropic_skill
+        PASS [   0.003s] (420/594) maos-skill approval_target::tests::formats_id_at_version
+        PASS [   0.003s] (421/594) maos-skill::admission_queue_test package_lands_pending_with_non_admitting_enqueue_receipt
+        PASS [   0.003s] (422/594) maos-skill::admission_queue_test duplicate_package_identity_refuses_even_after_resolution
+        PASS [   0.003s] (423/594) maos-skill::admission_queue_test preparing_approval_does_not_activate_and_apply_is_terminal
+        PASS [   0.003s] (424/594) maos-skill::admission_queue_test rejection_is_terminal
+        PASS [   0.003s] (425/594) maos-skill::admission_queue_test unknown_entry_refuses_without_mutation
+        PASS [   0.003s] (426/594) maos-skill::admission_store_test explicit_path_does_not_need_a_home_resolver
+        PASS [   0.004s] (427/594) maos-skill::admission_store_test no_data_home_is_typed_without_mutating_shared_environment
+        PASS [   0.026s] (428/594) maos-skill::admission_store_test absent_file_is_empty_but_not_other_io_errors
+        PASS [   1.809s] (429/594) maos-control::post_surface_16_1 every_read_route_answers_405_to_a_non_get_with_a_byte_equal_body
+        PASS [   0.004s] (430/594) maos-skill::admission_store_test unknown_and_missing_versions_are_hard_errors_and_never_overwritten
+        PASS [   0.003s] (431/594) maos-skill::admission_store_test unknown_labels_refuse_without_package_fallback
+        PASS [   0.003s] (432/594) maos-skill::admission_store_test unreadable_or_corrupt_v2_refuses_load_and_save
+        PASS [   0.738s] (433/594) maos-control::post_surface_16_1 the_mutating_routes_answer_404_when_no_command_port_is_installed
+        PASS [   0.004s] (434/594) maos-skill::discovery_test discovers_multiple_skills_from_a_temp_root
+        PASS [   0.004s] (435/594) maos-skill::discovery_test discovery_is_deterministic_sorted_by_path
+        PASS [   0.004s] (436/594) maos-skill::discovery_test malformed_skill_is_skipped_with_observable_reason
+        PASS [   0.004s] (437/594) maos-skill::discovery_test missing_root_is_not_an_error
+        PASS [   0.464s] (438/594) maos-skill::admission_store_test actors_are_not_persisted_with_package_metadata
+        PASS [   0.171s] (439/594) maos-skill::live_submission_18_7 admission_materializes_only_after_decision_and_foreign_files_never_overwrite
+        PASS [   0.463s] (440/594) maos-skill::admission_store_test invalid_digest_refuses_and_preserves_existing_file
+        PASS [   0.456s] (441/594) maos-skill::admission_store_test restart_round_trip_recovers_typed_states_and_identity
+        PASS [   0.463s] (442/594) maos-skill::admission_store_test atomic_write_failure_preserves_prior_valid_queue_and_leaks_no_temp
+        PASS [   0.423s] (443/594) maos-skill::admission_store_test v1_label_only_entries_migrate_without_label_loss_and_write_v2
+        PASS [   0.439s] (444/594) maos-skill::admission_store_test stray_partial_temp_does_not_replace_valid_queue
+        PASS [   0.003s] (445/594) maos-skill::live_submission_18_7 refusal_codes_never_include_dynamic_error_details
+        PASS [   0.004s] (446/594) maos-skill::live_submission_18_7 prepare_is_side_effect_free_and_enqueue_receipt_addresses_exact_payload
+        PASS [   0.003s] (447/594) maos-skill::live_submission_18_7 vetting_refuses_foreign_namespace_capability_escalation_and_malformed_document
+        PASS [   0.003s] (448/594) maos-skill::proposal_test build_proposal_rejects_empty_diff
+        PASS [   0.002s] (449/594) maos-skill::proposal_test build_proposal_rejects_empty_target_id
+        PASS [   0.002s] (450/594) maos-skill::proposal_test build_proposal_rejects_invalid_charset_target_id
+        PASS [   0.003s] (451/594) maos-skill::proposal_test build_proposal_rejects_non_semver_target_version
+        PASS [   0.003s] (452/594) maos-skill::proposal_test proposal_carries_the_three_fr57_fields
+        PASS [   0.003s] (453/594) maos-skill::proposal_test proposal_payload_round_trips_verbatim
+        PASS [   0.003s] (454/594) maos-skill::schema_test empty_body_is_rejected
+        PASS [   0.003s] (455/594) maos-skill::schema_test empty_id_is_rejected
+        PASS [   0.003s] (456/594) maos-skill::schema_test invalid_id_charset_is_rejected
+        PASS [   0.003s] (457/594) maos-skill::schema_test leading_blank_lines_before_fence_are_tolerated
+        PASS [   0.003s] (458/594) maos-skill::schema_test minimal_skill_without_optional_fields_parses
+        PASS [   0.003s] (459/594) maos-skill::schema_test missing_closing_fence_is_rejected
+        PASS [   0.003s] (460/594) maos-skill::schema_test missing_opening_fence_is_rejected
+        PASS [   0.004s] (461/594) maos-skill::schema_test missing_required_field_is_a_toml_parse_error
+        PASS [   0.003s] (462/594) maos-skill::schema_test non_semver_version_is_rejected
+        PASS [   0.027s] (463/594) maos-skill::live_submission_18_7 two_revision_authors_coexist_and_one_decision_changes_neither_base_nor_sibling
+        PASS [   0.004s] (464/594) maos-skill::schema_test unknown_frontmatter_field_is_rejected_not_defaulted
+        PASS [   0.004s] (465/594) maos-skill::schema_test valid_skill_parses_with_all_fields
+        PASS [   0.003s] (466/594) maos-spirit-abi cancellation::tests::never_cancel_is_always_false
+        PASS [   0.003s] (467/594) maos-spirit-abi cancellation::tests::never_cancel_trait_object_dispatch
+        PASS [   0.003s] (468/594) maos-spirit-abi compliance::tests::additive_fields_and_unknown_variants_no_bump
+        PASS [   0.004s] (469/594) maos-spirit-abi cancellation::tests::never_cancel_is_zst
+        PASS [   0.036s] (470/594) maos-skill::live_submission_18_7 proposal_requires_owned_current_admitted_author_revision_and_nonempty_diff
+        PASS [   0.037s] (471/594) maos-skill::live_submission_18_7 principal_matching_is_token_bounded_in_both_document_and_diff
+        PASS [   0.003s] (472/594) maos-spirit-abi compliance::tests::envelope_construction_roundtrip
+        PASS [   0.003s] (473/594) maos-spirit-abi compliance::tests::claim_json_snapshot_is_unchanged
+        PASS [   0.003s] (474/594) maos-spirit-abi compliance::tests::enum_discriminants_are_stable
+        PASS [   0.003s] (475/594) maos-spirit-abi compliance::tests::evidence_kind_variants_distinct
+        PASS [   0.003s] (476/594) maos-spirit-abi compliance::tests::provider_endpoint_pin_model_id_is_optional
+        PASS [   0.003s] (477/594) maos-spirit-abi ctx::tests::ctx_handles_are_copy
+        PASS [   0.003s] (478/594) maos-spirit-abi compliance::tests::uuid_constructor_pair
+        PASS [   0.003s] (479/594) maos-spirit-abi ctx::tests::ctx_is_clone
+        PASS [   0.003s] (480/594) maos-spirit-abi ctx::tests::ctx_mock_deprecation_warnings_empty
+        PASS [   0.003s] (481/594) maos-spirit-abi ctx::tests::ctx_mock_has_cancellation_not_cancelled
+        PASS [   0.002s] (482/594) maos-spirit-abi ctx::tests::ctx_mock_with_deprecation_warnings
+        PASS [   0.003s] (483/594) maos-spirit-abi ctx::tests::ctx_mock_has_zero_handles
+        PASS [   0.003s] (484/594) maos-spirit-abi lifecycle::tests::const_assert_hook_count_matches_fr55
+        PASS [   0.003s] (485/594) maos-spirit-abi lifecycle::tests::default_no_ops_are_unit
+        PASS [   0.002s] (486/594) maos-spirit-abi lifecycle::tests::hook_budget_key_variants_exist
+        PASS [   0.002s] (487/594) maos-spirit-abi lifecycle::tests::kernel_invocation_allowed_subset_filters
+        PASS [   0.003s] (488/594) maos-spirit-abi lifecycle::tests::kernel_invocation_allowed_empty_permits_all
+        PASS [   0.003s] (489/594) maos-spirit-abi lifecycle::tests::payload_types_exist
+        PASS [   0.003s] (490/594) maos-spirit-abi lifecycle::tests::trait_dispatch_smoke
+        PASS [   0.003s] (491/594) maos-spirit-abi lifecycle::tests::vtable_smoke
+        PASS [   0.003s] (492/594) maos-spirit-abi::manifest_n_minus_1_test manifest_schema_version_pinned_at_epic_6_addition_count
+        PASS [   0.002s] (493/594) maos-spirit-abi::manifest_n_minus_1_test max_supported_admits_current
+        PASS [   0.003s] (494/594) maos-spirit-abi::manifest_n_minus_1_test min_supported_does_not_exceed_current
+        PASS [   0.002s] (495/594) maos-spirit-abi::manifest_n_minus_1_test n_minus_1_supported_floor_in_effect
+        PASS [   0.002s] (496/594) maos-spirit-abi::manifest_n_minus_1_test n_minus_2_hard_refusal_posture
+        PASS [   0.003s] (497/594) researcher unit_tests::collective_readiness_failure_is_observable
+        PASS [   0.003s] (498/594) researcher unit_tests::cache_revalidation_failure_drops_stale_bytes_and_reports_typed_pending
+        PASS [   0.003s] (499/594) researcher unit_tests::collective_route_is_fail_closed_until_wired_then_reaches_port
+        PASS [   0.003s] (500/594) researcher unit_tests::distillation_request_dedups_and_requires_nonempty
+        PASS [   0.003s] (501/594) researcher unit_tests::fabricated_cite_replays_empty
+        PASS [   0.003s] (502/594) researcher unit_tests::forget_pending_and_malformed_notices_are_typed_and_empty_watchdog_is_noop
+        PASS [   0.003s] (503/594) researcher unit_tests::forget_purges_all_shared_caches_before_the_next_pass
+        PASS [   0.003s] (504/594) researcher unit_tests::hex_roundtrip
+        PASS [   0.003s] (505/594) researcher unit_tests::incorporate_scalar_folds_observation_in
+        PASS [   0.003s] (506/594) researcher unit_tests::mcp_fan_out_joins_claims_to_invocation_frames
+        PASS [   0.003s] (507/594) researcher unit_tests::on_idle_falls_back_to_pending_when_mcp_port_is_none
+        PASS [   0.003s] (508/594) researcher unit_tests::opposing_strong_methodology_is_a_conflict
+        PASS [   0.003s] (509/594) researcher unit_tests::on_idle_surveys_via_mcp_port_when_wired
+        PASS [   0.003s] (510/594) researcher unit_tests::output_serializes_with_required_fields
+        PASS [   0.003s] (511/594) researcher unit_tests::posture_set_declares_hypothesize_but_active_is_survey
+        PASS [   0.003s] (512/594) researcher unit_tests::redistill_fetches_only_tl_survivors_and_keeps_bound_pid
+        PASS [   0.003s] (513/594) researcher unit_tests::response_only_principal_is_not_resurrected_from_surviving_mcp_arguments
+        PASS [   0.003s] (514/594) researcher unit_tests::retry_notice_rechecks_tombstones_missing_from_its_scrubbed_ids
+        PASS [   0.003s] (515/594) researcher unit_tests::survey_over_fixed_frames_is_deterministic
+        PASS [   0.003s] (516/594) researcher unit_tests::survey_preserves_hedges_and_cites_frames
+        PASS [   0.003s] (517/594) researcher unit_tests::weak_load_bearing_confidence_drives_the_second_rule
+        PASS [   0.003s] (518/594) researcher::distillation_i11 empty_survey_is_rejected_at_the_request_layer
+        PASS [   0.004s] (519/594) researcher::distillation_i11 fabricated_source_ref_fails_loud
+        PASS [   0.004s] (520/594) researcher::distillation_i11 missing_audit_chain_is_rejected_kernel_side
+        PASS [   0.006s] (521/594) researcher::distillation_i11 digest_of_digest_flattens_to_original_raw_frames
+        PASS [   0.003s] (522/594) researcher::five_metric_live_8_11 digest_secret_leakage_hard_gate_fires_on_fixture
+        PASS [   0.006s] (523/594) researcher::distillation_i11 researcher_distillate_resolves_the_i11_chain_with_kernel_intent_lineage
+        PASS [   0.003s] (524/594) researcher::five_metric_self_verify planted_secret_in_a_digest_fires_redaction
+        PASS [   0.006s] (525/594) researcher::five_metric_live_8_11 digest_secret_leakage_hard_gate_fires_on_live_digest
+        PASS [   0.007s] (526/594) researcher::five_metric_live_8_11 traceability_and_leakage_hard_gate_pass_on_both_fixture_and_live_paths
+        PASS [   0.006s] (527/594) researcher::five_metric_self_verify researcher_digest_payload_has_zero_secret_leakage
+        PASS [   0.005s] (528/594) researcher::five_metric_self_verify tl_write_time_redaction_scrubs_secrets_before_the_survey
+        PASS [   0.007s] (529/594) researcher::five_metric_self_verify researcher_distillate_is_100pct_traceable
+        PASS [   0.003s] (530/594) researcher::halt_corpus_18_2 researcher_halt_corpus_sha_is_pinned
+        PASS [   0.004s] (531/594) researcher::halt_corpus_18_2 rows_are_thirty_with_fifteen_expected_halts_from_the_manifest_rules
+        PASS [   0.003s] (532/594) researcher::incremental_recall on_idle_incremental_walk_preserves_recall_all_page_cap
+        PASS [   0.080s] (533/594) maos-skill::live_submission_18_7 authored_next_version_replaces_only_known_owned_bytes_and_advances_target
+        PASS [   0.006s] (534/594) researcher::incremental_recall on_idle_fetch_failure_keeps_successful_prefix_and_retries_remaining_rows
+        PASS [   0.003s] (535/594) researcher::inference_seam_18_3 a_bound_mcp_failure_is_a_typed_refusal_and_unbound_stays_a_no_op
+        PASS [   0.003s] (536/594) researcher::inference_seam_18_3 a_bound_pass_mints_once_names_its_provider_and_consumes_one_completion_per_claim
+        PASS [   0.085s] (537/594) maos-skill::live_submission_18_7 full_document_diff_evidence_and_provenance_survive_restart
+        PASS [   0.003s] (538/594) researcher::inference_seam_18_3 a_bound_pass_without_mcp_or_seed_journal_refuses_unconfigured
+        PASS [   0.004s] (539/594) researcher::inference_seam_18_3 a_zero_claim_bound_pass_refuses_typed_and_writes_no_scalar
+        PASS [   0.004s] (540/594) researcher::inference_seam_18_3 an_inference_error_refuses_the_pass_with_no_output_scalar_or_distillate
+        PASS [   0.003s] (541/594) researcher::inference_seam_18_3 an_unbound_binding_refuses_the_pass_typed
+        PASS [   0.003s] (542/594) researcher::inference_seam_18_3 the_declared_provider_rule_prefers_the_first_registered_and_refuses_none
+        PASS [   0.004s] (543/594) researcher::inference_seam_18_3 the_deterministic_survey_is_unchanged_by_the_unbound_infer_path
+        PASS [   0.003s] (544/594) researcher::inference_seam_18_3 the_exit_line_3_cassette_pins_real_prompt_hashes_and_no_wildcard
+        PASS [   0.003s] (545/594) researcher::inference_seam_8_11 deterministic_path_is_byte_identical_to_v05_survey
+        PASS [   0.003s] (546/594) researcher::inference_seam_8_11 live_error_is_a_typed_refusal_never_a_fallback
+        PASS [   0.006s] (547/594) researcher::inference_seam_18_3 the_seed_is_journaled_once_halts_on_its_contradiction_and_distills_through_i11
+        PASS [   0.003s] (548/594) researcher::inference_seam_8_11 live_path_uses_inference_port_text_with_token_and_pid
+        PASS [   0.005s] (549/594) researcher::recall_walker cross_spirit_fetch_is_a_scope_violation
+        PASS [   0.004s] (550/594) researcher::recall_walker empty_log_walks_to_empty
+        PASS [   6.848s] (551/594) maos-cli::two_host_reconcile_2c two_hosts_with_independent_roots_reconcile_on_the_shared_frame_id
+        PASS [  19.493s] (552/594) maos-cli::spirit_upgrade_test upgrade_maps_typed_responses_to_d16_1_p_exits
+        PASS [   0.007s] (553/594) researcher::recall_walker walker_is_participant_scoped_and_paginates
+        PASS [   0.004s] (554/594) researcher::scalar_tap researcher_subscribes_receives_and_incorporates_a_scalar
+        PASS [   0.006s] (555/594) researcher::scalar_tap researcher_distillate_is_consumable_in_the_fr17_digest_pattern
+        PASS [   0.004s] (556/594) researcher::skill_authoring_18_7 admitted_owned_document_gets_model_diff_with_exact_target_then_pending_proposal_is_inert
+        PASS [   0.003s] (557/594) researcher::skill_authoring_18_7 bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admission
+        PASS [   0.003s] (558/594) researcher::skill_authoring_18_7 distillation_refusal_prevents_generation_and_host_calls
+        PASS [   0.003s] (559/594) researcher::skill_authoring_18_7 malformed_model_document_is_refused_by_vetted_host_not_replaced_with_template
+        PASS [   0.003s] (560/594) researcher::skill_authoring_18_7 unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback
+        PASS [   0.004s] (561/594) researcher::skill_authoring_18_7 strict_seed_fixture_pins_real_prompts_for_author_then_admitted_base_proposal
+        PASS [   0.003s] (562/594) researcher::skill_authoring_18_7 unbound_deterministic_pass_never_reads_or_submits_even_with_author_port_installed
+        PASS [   0.003s] (563/594) researcher::skill_authoring_18_7 undeclared_author_still_generates_and_calls_host_then_surfaces_typed_denial_without_enqueue
+        PASS [   0.003s] (564/594) researcher::spirit_smoke manifest_self_check_is_well_formed
+        PASS [   0.003s] (565/594) researcher::spirit_smoke on_idle_fires_once_and_surveys_within_budget
+        PASS [   0.003s] (566/594) researcher::spirit_smoke on_idle_with_no_pending_is_no_op
+        PASS [   0.006s] (567/594) researcher::spirit_smoke manifest_sections_parse_with_authoritative_validators
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_reconcile_test plain_approve_with_no_re_enqueue_keeps_entry_decided
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_reconcile_test re_enqueue_after_reject_demotes_decided_entry_to_pending
+        SLOW [> 30.000s] (───────) maos-cli::skill_queue_reconcile_test reconcile_pending_proven_red_set_equality
+        SLOW [> 30.000s] (───────) maos-cli::skills_door_18_7 corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched
+        SLOW [> 30.000s] (───────) maos-cli::skills_door_18_7 refused_connection_uses_offline_only_while_the_home_lock_is_free
+        SLOW [> 30.000s] (───────) maos-cli::skills_door_18_7 offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish
+        PASS [   5.674s] (568/594) maos-control::post_surface_16_1 a_byte_dripping_client_is_cut_at_the_read_deadline
+        PASS [  43.054s] (569/594) maos-cli::skill_queue_integration_test busy_timeout_zero_reds_immediately_under_contention
+        PASS [  43.257s] (570/594) maos-cli::skill_queue_integration_test busy_timeout_5000_blocks_then_succeeds_green
+        PASS [   4.737s] (571/594) researcher::incremental_recall on_idle_recall_and_fetch_scale_with_new_rows_across_ticks
+        PASS [  37.682s] (572/594) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_never_fabricated
+        PASS [   6.521s] (573/594) maos-control::post_surface_16_1 sixteen_idle_connections_make_the_seventeenth_503_busy
+        PASS [  37.255s] (574/594) maos-cli::skill_queue_reconcile_test discovered_skill_with_no_tl_row_is_pending
+        PASS [  38.584s] (575/594) maos-cli::skill_queue_integration_test unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten
+        PASS [  38.779s] (576/594) maos-cli::skill_queue_integration_test journal_failure_mutates_nothing_and_materialization_failure_is_reported_after_commit
+        PASS [  34.143s] (577/594) maos-cli::skills_door_18_7 corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched
+        SLOW [> 60.000s] (───────) maos-cli backup::tests::tenant_backup_round_trip_rejects_wrong_team
+        PASS [  37.324s] (578/594) maos-cli::skill_queue_reconcile_test re_enqueue_after_reject_demotes_decided_entry_to_pending
+        PASS [  39.937s] (579/594) maos-cli::skill_queue_integration_test queue_save_failure_never_reports_a_committed_decision_as_success
+        PASS [  48.517s] (580/594) maos-cli::skill_queue_integration_test authored_decision_journals_before_materializing_and_saving
+        PASS [  44.295s] (581/594) maos-cli::skill_queue_integration_test discovered_skill_is_approvable_end_to_end
+        PASS [  44.145s] (582/594) maos-cli::skill_queue_integration_test double_journal_guard_keyed_on_target_capability
+        PASS [  40.004s] (583/594) maos-cli::skill_queue_reconcile_test discovered_skill_entry_path_is_package_shipped_9_7_boundary
+        PASS [  48.558s] (584/594) maos-cli::skill_queue_integration_test admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids
+        PASS [  38.813s] (585/594) maos-cli::skill_queue_reconcile_test plain_approve_with_no_re_enqueue_keeps_entry_decided
+        PASS [  36.911s] (586/594) maos-cli::skill_queue_reconcile_test reconcile_pending_proven_red_set_equality
+        PASS [  36.873s] (587/594) maos-cli::skills_door_18_7 refused_connection_uses_offline_only_while_the_home_lock_is_free
+        PASS [   9.498s] (588/594) researcher::halt_corpus_18_2 observed_halts_are_self_validating_against_the_real_kernel
+        PASS [  38.621s] (589/594) maos-cli::skills_door_18_7 offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish
+        PASS [  20.136s] (590/594) maos-control::post_surface_16_1 a_command_still_queued_at_the_deadline_is_withdrawn_and_reported_as_spirit_busy
+        PASS [  16.837s] (591/594) researcher::halt_corpus_18_2 fr15_a_researcher_halt_resolves_once_per_kind_journaled
+        PASS [  22.066s] (592/594) maos-control::post_surface_16_1 a_command_that_overruns_its_budget_is_503_with_the_ports_operation_id
+        PASS [  74.760s] (593/594) maos-cli backup::tests::tenant_backup_round_trip_rejects_wrong_team
+        PASS [  22.580s] (594/594) researcher::incremental_recall on_idle_recalls_later_inserts_across_backward_clock_adjustments
+────────────
+     Summary [  75.945s] 594 tests run: 594 passed (28 slow), 0 skipped

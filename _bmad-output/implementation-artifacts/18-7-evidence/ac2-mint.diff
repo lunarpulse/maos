@@ -1,0 +1,35 @@
+--- a/crates/maos-bin/src/skill_authoring.rs
++++ b/crates/maos-bin/src/skill_authoring.rs
+@@ -110,32 +110,11 @@
+             .ok_or(SkillPortError::HostShutDown)?;
+         let result = (|| {
+             let enterprise = self.enterprise.as_ref().map(upgrade).transpose()?;
+-            let token = issue_enterprise_governed_capability(
+-                &capability,
+-                enterprise.as_deref(),
+-                self.pdp.as_ref(),
+-                pid,
+-                Scope::SkillAuthorSelf,
+-                300,
+-                [0; 32],
+-                IntentClass::Standard,
+-            )
+-            .map_err(|error| match error {
+-                GovernedMintError::ContextExhausted => SkillPortError::ContextExhausted,
+-                GovernedMintError::QuotaExhausted => SkillPortError::QuotaExhausted,
+-                GovernedMintError::KernelPolicyDenied
+-                | GovernedMintError::PdpDenied(_)
+-                | GovernedMintError::SsoAssertionMissing(_) => SkillPortError::CapabilityDenied,
+-                error => SkillPortError::Mediation(error.to_string()),
+-            })?;
+             let snapshot = security.policy().inner().load_full();
+             let granted = snapshot
+                 .manifest_scopes
+                 .get(&pid)
+                 .ok_or(SkillPortError::CapabilityDenied)?;
+-            capability
+-                .verify_and_audit(&token, [0; 32], granted.declared_tier)
+-                .map_err(|_| SkillPortError::CapabilityDenied)?;
+             let declared_actions: BTreeSet<String> = granted
+                 .scopes
+                 .iter()

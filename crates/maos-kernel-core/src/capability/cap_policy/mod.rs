@@ -418,6 +418,7 @@ fn intent_action_key(intent: &Intent) -> &'static str {
         Intent::LogRecall => "log.recall",
         Intent::LogFetch => "log.fetch",
         Intent::DistillateWrite => "distillate.write",
+        Intent::SkillAuthorSelf => "skill.author.self",
         Intent::McpCall { .. } => "mcp.call",
         Intent::LoomRead => "loom.read",
         Intent::LoomWrite => "loom.write",

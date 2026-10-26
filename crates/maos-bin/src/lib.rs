@@ -67,6 +67,8 @@ pub mod recall_mediation;
 #[cfg(feature = "network")]
 pub mod researcher_root;
 pub mod shell_host;
+#[cfg(feature = "network")]
+pub mod skill_authoring;
 #[cfg(all(feature = "network", feature = "wasm-host"))]
 pub mod spirit_session;
 /// Story 16-3 — Worker supervision (the Worker's SCB, its exit observer, its

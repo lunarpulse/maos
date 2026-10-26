@@ -1,0 +1,9 @@
+Baseline d155f08f; tokei14.0.0; formatted source. Single temporary baseline.rs used serially for counting and deleted; no workspace copy.
+crates/maos-bin/src/admission.rs: 612 -> 613 (+1)
+crates/maos-bin/src/lib.rs: 44 -> 46 (+2)
+crates/maos-bin/src/main.rs: 12617 -> 12600 (-17)
+crates/maos-bin/src/operator_door.rs: 1669 -> 1749 (+80)
+crates/maos-bin/src/researcher_root.rs: 377 -> 384 (+7)
+crates/maos-bin/src/skill_authoring.rs: 0 -> 249 (+249)
+crates/maos-bin/src/spirit_session.rs: 946 -> 954 (+8)
+Total delta: 330

@@ -27,7 +27,7 @@
 name = "researcher"
 version = "0.5.0"
 abi = "1.0"
-manifest_schema_version = 5
+manifest_schema_version = 6
 min_substrate_version = "0.1.0-alpha"
 forms = ["rust-inproc"]
 trust_tier = "local"
@@ -56,6 +56,9 @@ scan = false
 [capabilities.required.log]
 recall = true
 fetch = true
+
+[capabilities.required.skill]
+author_self = true
 
 # Decision B — declare the McpCall { server, tool } capability scopes Researcher
 # WOULD exercise against real web/arXiv/GitHub/citation-graph drivers. At v0.5

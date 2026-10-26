@@ -30,7 +30,7 @@
 //! | `compliance` | Story 1b.4 | Frozen schema, ABI_VERSION bump trigger |
 //! | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
 //! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
-//! | `MANIFEST_SCHEMA_VERSION = 5` | Story 17-3b | `wasm-component` form and `[class].artifact` |
+//! | `MANIFEST_SCHEMA_VERSION = 6` | Story 18-7 | Runtime `[capabilities.required.skill]` |
 //!
 //! ## Modules
 //! | Module | Description | Introduced |
@@ -102,6 +102,10 @@ pub const ABI_VERSION: u32 = 1;
 /// and its required `[class].artifact` path. Schema 4 remains supported as
 /// the N-1 manifest floor.
 ///
+/// Bumped to `6` in Story 18-7-live-skill-authoring-and-revisions (D-02 A)
+/// for `[capabilities.required.skill].author_self`. Below schema 6 the
+/// declaration degrades away; the supported floor remains 1.
+///
 /// This constant is the single authoritative source consumed by
 /// `maos-manifest::ClassSection` validation and by the `xtask
 /// check-manifest-schema-version` gate. Story 7.5a's ABI Stability Triple
@@ -113,9 +117,9 @@ pub const ABI_VERSION: u32 = 1;
 /// ```rust
 /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 ///
-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 5);
+/// assert_eq!(MANIFEST_SCHEMA_VERSION, 6);
 /// ```
-pub const MANIFEST_SCHEMA_VERSION: u32 = 5;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 6;
 
 /// Lowest manifest schema version this kernel accepts at admission.
 ///

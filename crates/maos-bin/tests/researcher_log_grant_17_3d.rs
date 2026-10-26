@@ -59,7 +59,7 @@ fn admit(gated: &GatedManifest) -> Vec<Scope> {
 fn checked_in_researcher_admission_preserves_both_schema_five_log_scopes() {
     let gated = gate_manifest(MANIFEST, &|class| class == "researcher")
         .expect("checked-in researcher passes production structural admission");
-    assert_eq!(gated.class_section.manifest_schema_version, 5);
+    assert_eq!(gated.class_section.manifest_schema_version, 6);
     assert_eq!(
         gated.caps_required.log,
         LogCapabilities {
@@ -67,15 +67,16 @@ fn checked_in_researcher_admission_preserves_both_schema_five_log_scopes() {
             fetch: true
         }
     );
-    let degraded = gated.caps_required.clone().degrade_for_schema_version(5);
+    let degraded = gated.caps_required.clone().degrade_for_schema_version(6);
     assert_eq!(
         degraded, gated.caps_required,
-        "schema-five degradation is lossless"
+        "schema-six degradation is lossless"
     );
     let scopes = admit(&gated);
     assert_eq!(scopes, capabilities_required_to_scopes(&degraded));
     assert!(scopes.contains(&Scope::LogRecall));
     assert!(scopes.contains(&Scope::LogFetch));
+    assert!(scopes.contains(&Scope::SkillAuthorSelf));
     assert!(scopes.contains(&Scope::ProviderInfer {
         provider: "anthropic".into()
     }));
@@ -106,8 +107,8 @@ fn checked_in_researcher_admission_preserves_both_schema_five_log_scopes() {
         .any(|scope| matches!(scope, Scope::IacSend { .. })));
     assert_eq!(
         scopes.len(),
-        14,
-        "only the existing eleven grants plus recall/fetch plus the 17-11 openai provider"
+        15,
+        "existing grants plus recall/fetch, the 17-11 openai provider and 18-7 self-authoring"
     );
 }
 
@@ -115,7 +116,7 @@ fn checked_in_researcher_admission_preserves_both_schema_five_log_scopes() {
 fn researcher_schema_four_degradation_drops_log_but_preserves_existing_capabilities() {
     let current = gate_manifest(MANIFEST, &|class| class == "researcher").unwrap();
     let legacy_text =
-        MANIFEST.replace("manifest_schema_version = 5", "manifest_schema_version = 4");
+        MANIFEST.replace("manifest_schema_version = 6", "manifest_schema_version = 4");
     assert_ne!(legacy_text, MANIFEST, "exercise the actual previous schema");
     let legacy = gate_manifest(&legacy_text, &|class| class == "researcher")
         .expect("previous schema remains structurally admissible");
@@ -131,7 +132,12 @@ fn researcher_schema_four_degradation_drops_log_but_preserves_existing_capabilit
     assert!(!scopes.contains(&Scope::LogFetch));
     let existing: Vec<_> = capabilities_required_to_scopes(&current.caps_required)
         .into_iter()
-        .filter(|scope| !matches!(scope, Scope::LogRecall | Scope::LogFetch))
+        .filter(|scope| {
+            !matches!(
+                scope,
+                Scope::LogRecall | Scope::LogFetch | Scope::SkillAuthorSelf
+            )
+        })
         .collect();
     assert_eq!(scopes, existing);
 }

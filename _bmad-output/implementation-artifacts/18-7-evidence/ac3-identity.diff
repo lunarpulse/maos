@@ -1,0 +1,11 @@
+--- a/crates/maos-skill/src/store.rs
++++ b/crates/maos-skill/src/store.rs
+@@ -71,7 +71,7 @@
+     pub fn approval_target(&self) -> String {
+         let base = crate::approval_target::approval_target(&self.id, &self.version);
+         if self.entry_path == "revision_proposal" {
+-            format!("{base}#{}", self.entry_id)
++            base
+         } else {
+             base
+         }

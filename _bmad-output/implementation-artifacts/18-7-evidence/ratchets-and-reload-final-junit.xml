@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="64" skipped="0" failures="0" errors="0" uuid="f3a951e1-b868-4255-b51f-dc0b638ea79c" timestamp="2026-10-26T11:42:35.721+00:00" time="41.977">
+    <testsuite name="maos-bin::researcher_inference_18_3" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="a_legacy_cassette_root_binds_a_door_loaded_researcher" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:42:35.721+00:00" time="1.135"/>
+        <testcase name="a_live_pass_without_an_mcp_server_is_refused_typed_never_seeded" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:42:36.856+00:00" time="5.258"/>
+        <testcase name="a_serving_root_mints_per_pass_and_binds_a_door_loaded_researcher" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:42:42.114+00:00" time="1.323"/>
+        <testcase name="an_unregistered_declared_provider_refuses_boot_and_mints_nothing" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:42:43.436+00:00" time="0.213"/>
+        <testcase name="empty_drifted_and_short_cassettes_exit_1_naming_the_cause" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:42:43.650+00:00" time="15.995"/>
+        <testcase name="exit_line_3_replays_one_completion_per_seed_claim_through_the_declared_provider" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:42:59.645+00:00" time="5.424"/>
+        <testcase name="mode_unset_stays_deterministic_and_touches_no_model" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:43:05.069+00:00" time="5.260"/>
+        <testcase name="the_legacy_cassette_arm_refuses_an_exhausted_cassette_typed" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:43:10.329+00:00" time="5.288"/>
+        <testcase name="the_root_binding_mints_once_per_pass_on_one_instance" classname="maos-bin::researcher_inference_18_3" timestamp="2026-10-26T11:43:15.618+00:00" time="0.007"/>
+    </testsuite>
+    <testsuite name="xtask::ci_shape_18_0" tests="10" skipped="0" errors="0" failures="0">
+        <testcase name="cargo_deny_is_its_own_blocking_job_in_aggregate" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.624+00:00" time="0.030"/>
+        <testcase name="epic_18_exit_runs_line_1_verbatim_and_its_proven_red_twin" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.654+00:00" time="0.029"/>
+        <testcase name="epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.683+00:00" time="0.029"/>
+        <testcase name="epic_18_exit_runs_line_3_verbatim_and_its_empty_cassette_twin" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.712+00:00" time="0.025"/>
+        <testcase name="epic_18_exit_runs_line_4_verbatim_and_its_steady_twin" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.738+00:00" time="0.028"/>
+        <testcase name="expensive_tests_uploads_its_junit_and_builds_no_fixtures" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.765+00:00" time="0.031"/>
+        <testcase name="nfr_aud_7_runs_maos_eval_distill_for_the_researcher" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.796+00:00" time="0.030"/>
+        <testcase name="proven_red_steps_run_after_a_red_gate_step" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.826+00:00" time="0.030"/>
+        <testcase name="recall_gate_enrolls_both_context_vectors_and_pins_18_passes" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.856+00:00" time="0.029"/>
+        <testcase name="unregistered_jobs_are_enrolled_in_aggregate_only" classname="xtask::ci_shape_18_0" timestamp="2026-10-26T11:43:15.885+00:00" time="0.028"/>
+    </testsuite>
+    <testsuite name="xtask::d11_xtask_ceiling_ratchet" tests="8" skipped="0" errors="0" failures="0">
+        <testcase name="ceiling_raise_after_every_numbered_epic_is_done_reds" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:15.913+00:00" time="0.005"/>
+        <testcase name="ceiling_raise_citing_a_done_story_reds" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:15.918+00:00" time="0.004"/>
+        <testcase name="ceiling_raise_citing_an_open_story_passes" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:15.922+00:00" time="0.003"/>
+        <testcase name="ceiling_raise_without_a_story_citation_reds" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:15.925+00:00" time="0.003"/>
+        <testcase name="planted_current_row_raises_cannot_borrow_historical_or_done_grants" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:15.928+00:00" time="0.310"/>
+        <testcase name="the_ceiling_is_not_frozen_while_a_numbered_epic_is_open" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:16.239+00:00" time="0.005"/>
+        <testcase name="the_live_xtask_ceiling_cites_a_real_sprint_story" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:16.243+00:00" time="0.027"/>
+        <testcase name="the_tree_bound_inputs_exist" classname="xtask::d11_xtask_ceiling_ratchet" timestamp="2026-10-26T11:43:16.271+00:00" time="0.004"/>
+    </testsuite>
+    <testsuite name="xtask::kernel_pin_content_hash_16_0" tests="25" skipped="0" errors="0" failures="0">
+        <testcase name="a_composite_gates_json_stdout_is_machine_clean" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.275+00:00" time="0.005"/>
+        <testcase name="a_deleted_file_is_named_not_absorbed" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.280+00:00" time="0.018"/>
+        <testcase name="a_line_neutral_kernel_edit_reds_the_gate_and_names_the_file" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.298+00:00" time="0.046"/>
+        <testcase name="a_mismatch_is_ok_passed_false_and_never_err" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.344+00:00" time="0.018"/>
+        <testcase name="a_reflow_moves_the_hash_and_rustfmt_restores_it" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.362+00:00" time="0.056"/>
+        <testcase name="a_self_inconsistent_pin_is_a_parse_error_not_a_policy_red" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.418+00:00" time="0.011"/>
+        <testcase name="an_added_file_is_named_not_absorbed" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.429+00:00" time="0.021"/>
+        <testcase name="an_empty_tree_is_a_failure_never_a_pass" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.450+00:00" time="0.005"/>
+        <testcase name="emit_pin_prints_a_parseable_block_and_refuses_json" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.456+00:00" time="0.016"/>
+        <testcase name="every_one_of_the_pinned_files_reds_a_line_neutral_mutation" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:16.471+00:00" time="1.001"/>
+        <testcase name="falsifier_tag_is_annotated_and_peels_to_the_pinned_commit" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.473+00:00" time="0.006"/>
+        <testcase name="io_and_parse_failures_stay_err" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.479+00:00" time="0.006"/>
+        <testcase name="live_tree_matches_the_committed_pin" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.484+00:00" time="0.009"/>
+        <testcase name="no_key_before_src_lines_begins_with_src_lines" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.494+00:00" time="0.003"/>
+        <testcase name="non_regular_entries_are_refused_not_skipped" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.497+00:00" time="0.021"/>
+        <testcase name="paths_that_cannot_roundtrip_through_toml_are_refused" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.518+00:00" time="0.015"/>
+        <testcase name="the_digests_are_distinct_per_file" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.534+00:00" time="0.005"/>
+        <testcase name="the_gate_carries_no_hold_or_waiver_constant" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.538+00:00" time="0.003"/>
+        <testcase name="the_hash_is_independent_of_directory_creation_order" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.541+00:00" time="0.034"/>
+        <testcase name="the_non_rs_trust_anchor_is_inside_the_pinned_set" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.576+00:00" time="0.005"/>
+        <testcase name="the_pin_block_is_emitted_byte_sorted" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.581+00:00" time="0.006"/>
+        <testcase name="the_pin_is_readable_by_a_real_toml_parser" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.586+00:00" time="0.007"/>
+        <testcase name="the_real_kernel_leg_emits_a_parseable_json_stdout" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.593+00:00" time="0.018"/>
+        <testcase name="the_reflow_vector_left_the_tracked_tree_untouched" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.611+00:00" time="0.010"/>
+        <testcase name="the_three_other_readers_still_resolve_the_pin" classname="xtask::kernel_pin_content_hash_16_0" timestamp="2026-10-26T11:43:17.621+00:00" time="0.004"/>
+    </testsuite>
+    <testsuite name="xtask::recovery_lane_ceiling_rule" tests="12" skipped="0" errors="0" failures="0">
+        <testcase name="a_raise_citing_a_shipped_story_is_refused" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.625+00:00" time="0.003"/>
+        <testcase name="a_raise_citing_an_absent_story_is_refused" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.628+00:00" time="0.004"/>
+        <testcase name="a_raise_with_no_cited_story_is_refused" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.632+00:00" time="0.004"/>
+        <testcase name="crossing_the_adr_069_alarm_is_acknowledged_in_the_row" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.636+00:00" time="0.003"/>
+        <testcase name="kernel_core_ceiling_has_not_moved_under_the_easing" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.639+00:00" time="0.005"/>
+        <testcase name="kernel_core_ceiling_stays_inside_the_adr_069_envelope" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.644+00:00" time="0.003"/>
+        <testcase name="kernel_core_is_outside_the_easing" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.647+00:00" time="0.003"/>
+        <testcase name="lowering_is_always_allowed_even_for_kernel_core_and_even_when_sealed" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.650+00:00" time="0.003"/>
+        <testcase name="the_easing_is_real_any_crate_may_raise_citing_an_open_story" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.653+00:00" time="0.003"/>
+        <testcase name="the_lane_is_not_sealed_while_a_numbered_epic_is_open" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.655+00:00" time="0.018"/>
+        <testcase name="the_lane_seals_when_every_numbered_epic_is_done" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.674+00:00" time="0.003"/>
+        <testcase name="the_tree_bound_inputs_exist" classname="xtask::recovery_lane_ceiling_rule" timestamp="2026-10-26T11:43:17.677+00:00" time="0.021"/>
+    </testsuite>
+</testsuites>

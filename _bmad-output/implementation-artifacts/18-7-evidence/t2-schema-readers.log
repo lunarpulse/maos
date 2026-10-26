@@ -1,0 +1,339 @@
+ Downloading crates ...
+  Downloaded futures-macro v0.3.34
+  Downloaded zerocopy-derive v0.8.57
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling typenum v1.20.1
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.151
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling libc v0.2.189
+   Compiling zeroize v1.9.0
+   Compiling rustix v1.1.5
+   Compiling thiserror v2.0.21
+   Compiling bitflags v2.13.2
+   Compiling indexmap v2.14.2
+   Compiling generic-array v0.14.7
+   Compiling getrandom v0.3.4
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling syn v3.0.6
+   Compiling syn v2.0.119
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling async-trait v0.1.92
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling tracing-attributes v0.1.31
+   Compiling maos-attrs v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-attrs)
+   Compiling curve25519-dalek v4.1.3
+   Compiling tracing v0.1.44
+   Compiling maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi)
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling smallvec v1.16.2
+   Compiling ed25519-dalek v2.2.0
+   Compiling toml_edit v0.22.27
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+   Compiling toml v0.8.23
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-manifest` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 46.76s
+────────────
+ Nextest run ID 3a2a4d03-646d-4b38-89e0-f57e902b982f with nextest profile: default
+    Starting 237 tests across 11 binaries
+        PASS [   0.004s] (  1/237) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_rejects_empty_command
+        PASS [   0.004s] (  2/237) maos-manifest manifest::cli_wrapper_tests::schedule_empty_section_default
+        PASS [   0.004s] (  3/237) maos-manifest manifest::gateway_tests::gateway_bare_credential_rejected
+        PASS [   0.004s] (  4/237) maos-manifest manifest::gateway_tests::gateway_unknown_type_rejected
+        PASS [   0.005s] (  5/237) maos-manifest manifest::cli_wrapper_tests::schedule_compliance_claim_ref_hex_valid_with_sha256_prefix
+        PASS [   0.005s] (  6/237) maos-manifest manifest::cli_wrapper_tests::schedule_deny_unknown_field_rejected
+        PASS [   0.005s] (  7/237) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_accepts_without_shutdown_signal
+        PASS [   0.005s] (  8/237) maos-manifest manifest::gateway_tests::gateway_empty_allowlist_parses
+        PASS [   0.005s] (  9/237) maos-manifest manifest::cli_wrapper_tests::schedule_payload_b64_round_trip
+        PASS [   0.005s] ( 10/237) maos-manifest manifest::gateway_tests::gateway_well_formed_telegram
+        PASS [   0.005s] ( 11/237) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_minimal_round_trip
+        PASS [   0.005s] ( 12/237) maos-manifest manifest::cli_wrapper_tests::schedule_duplicate_id_rejected
+        PASS [   0.005s] ( 13/237) maos-manifest manifest::cli_wrapper_tests::schedule_cadence_out_of_range_rejected
+        PASS [   0.005s] ( 14/237) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_full_with_argv_prefix_and_recovery
+        PASS [   0.005s] ( 15/237) maos-manifest manifest::gateway_tests::gateway_deny_unknown_fields
+        PASS [   0.005s] ( 16/237) maos-manifest manifest::gateway_tests::gateway_backoff_too_high_rejected
+        PASS [   0.005s] ( 17/237) maos-manifest manifest::gateway_tests::gateway_well_formed_defaults
+        PASS [   0.005s] ( 18/237) maos-manifest manifest::cli_wrapper_tests::schedule_side_effect_scopes_round_trip
+        PASS [   0.005s] ( 19/237) maos-manifest manifest::cli_wrapper_tests::schedule_compliance_claim_ref_hex_invalid_length
+        PASS [   0.005s] ( 20/237) maos-manifest manifest::gateway_tests::gateway_two_entries_distinct_ids
+        PASS [   0.006s] ( 21/237) maos-manifest manifest::cli_wrapper_tests::schedule_well_formed_round_trip
+        PASS [   0.006s] ( 22/237) maos-manifest manifest::cli_wrapper_tests::cli_wrapper_rejects_invalid_shutdown_signal
+        PASS [   0.006s] ( 23/237) maos-manifest manifest::gateway_tests::gateway_backoff_zero_rejected
+        PASS [   0.006s] ( 24/237) maos-manifest manifest::cli_wrapper_tests::schedule_id_regex_rejects_bad_chars
+        PASS [   0.007s] ( 25/237) maos-manifest manifest::cli_wrapper_tests::schedule_two_entries_distinct_ids
+        PASS [   0.004s] ( 26/237) maos-manifest manifest::hot_swap_manifest_tests::migrates_from_well_formed
+        PASS [   0.004s] ( 27/237) maos-manifest manifest::model_provenance_tests::absent_section_is_none_optional_on_read_ac11
+        PASS [   0.004s] ( 28/237) maos-manifest manifest::hot_swap_manifest_tests::migrates_from_rejects_empty_version
+        PASS [   0.004s] ( 29/237) maos-manifest manifest::hot_swap_manifest_tests::halt_protocol_compat_rejects_zero
+        PASS [   0.004s] ( 30/237) maos-manifest manifest::model_provenance_tests::free_text_lineage_is_rejected_not_admitted
+        PASS [   0.004s] ( 31/237) maos-manifest manifest::model_provenance_tests::malformed_timestamp_rejected
+        PASS [   0.004s] ( 32/237) maos-manifest manifest::hot_swap_manifest_tests::hot_swap_well_formed
+        PASS [   0.004s] ( 33/237) maos-manifest manifest::on_revocation_tests::on_revocation_rejects_unknown_policy
+        PASS [   0.004s] ( 34/237) maos-manifest manifest::model_provenance_tests::present_section_extracted_from_full_manifest
+        PASS [   0.005s] ( 35/237) maos-manifest manifest::model_provenance_tests::staleness_rejects_old_eval
+        PASS [   0.004s] ( 36/237) maos-manifest manifest::on_revocation_tests::providers_rejects_empty_endpoint_url
+        PASS [   0.010s] ( 37/237) maos-manifest manifest::cli_wrapper_tests::schedule_rate_limit_out_of_range_rejected
+        PASS [   0.006s] ( 38/237) maos-manifest manifest::model_provenance_tests::canonical_content_bytes_are_deterministic_and_field_sensitive
+        PASS [   0.006s] ( 39/237) maos-manifest manifest::model_provenance_tests::leap_year_feb_29_accepted
+        PASS [   0.006s] ( 40/237) maos-manifest manifest::model_provenance_tests::empty_lineage_rejected
+        PASS [   0.006s] ( 41/237) maos-manifest manifest::on_revocation_tests::on_revocation_drain_then_terminate
+        PASS [   0.006s] ( 42/237) maos-manifest manifest::on_revocation_tests::providers_rejects_bad_pin
+        PASS [   0.013s] ( 43/237) maos-manifest manifest::gateway_tests::gateway_duplicate_id_rejected
+        PASS [   0.009s] ( 44/237) maos-manifest manifest::model_provenance_tests::unknown_field_rejected_deny_unknown_fields
+        PASS [   0.005s] ( 45/237) maos-manifest manifest::on_revocation_tests::providers_well_formed_ollama_air_gapped
+        PASS [   0.009s] ( 46/237) maos-manifest manifest::model_provenance_tests::valid_section_parses_and_derives_unix_secs
+        PASS [   0.004s] ( 47/237) maos-manifest manifest::tests::author_rejects_empty_name
+        PASS [   0.005s] ( 48/237) maos-manifest manifest::supervision_manifest_tests::supervision_rejects_heartbeat_too_low
+        PASS [   0.005s] ( 49/237) maos-manifest manifest::supervision_manifest_tests::supervision_rejects_progress_too_high
+        PASS [   0.017s] ( 50/237) maos-manifest manifest::gateway_tests::gateway_empty_section_defaults
+        PASS [   0.017s] ( 51/237) maos-manifest manifest::gateway_tests::gateway_max_message_bytes_too_high_rejected
+        PASS [   0.007s] ( 52/237) maos-manifest manifest::supervision_manifest_tests::supervision_rejects_silent_failure_too_low
+        PASS [   0.005s] ( 53/237) maos-manifest manifest::tests::budget_rejects_excessive_time_cap
+        PASS [   0.008s] ( 54/237) maos-manifest manifest::supervision_manifest_tests::on_crash_default_nack
+        PASS [   0.008s] ( 55/237) maos-manifest manifest::on_revocation_tests::providers_well_formed_openai_with_anthropic_fallback
+        PASS [   0.014s] ( 56/237) maos-manifest manifest::hot_swap_manifest_tests::hot_swap_rejects_zero_schema_version
+        PASS [   0.014s] ( 57/237) maos-manifest manifest::on_revocation_tests::providers_fallback_validated_independently
+        PASS [   0.010s] ( 58/237) maos-manifest manifest::supervision_manifest_tests::supervision_defaults
+        PASS [   0.014s] ( 59/237) maos-manifest manifest::hot_swap_manifest_tests::halt_protocol_compat_well_formed
+        PASS [   0.019s] ( 60/237) maos-manifest manifest::gateway_tests::gateway_id_regex_rejects_space
+        PASS [   0.014s] ( 61/237) maos-manifest manifest::on_revocation_tests::on_revocation_default_terminate_immediately
+        PASS [   0.013s] ( 62/237) maos-manifest manifest::on_revocation_tests::providers_rejects_unsupported_id
+        PASS [   0.019s] ( 63/237) maos-manifest manifest::gateway_tests::gateway_id_empty_rejected
+        PASS [   0.014s] ( 64/237) maos-manifest manifest::on_revocation_tests::providers_accepts_valid_pin
+        PASS [   0.004s] ( 65/237) maos-manifest manifest::tests::capabilities_required_loom_false_fields_emit_no_loom_scopes
+        PASS [   0.007s] ( 66/237) maos-manifest manifest::tests::budget_rejects_zero_context_window_size
+        PASS [   0.011s] ( 67/237) maos-manifest manifest::on_revocation_tests::providers_well_formed_anthropic_no_fallback
+        PASS [   0.004s] ( 68/237) maos-manifest manifest::tests::capabilities_required_loom_maps_each_field_exactly
+        PASS [   0.009s] ( 69/237) maos-manifest manifest::tests::author_well_formed_with_homepage
+        PASS [   0.004s] ( 70/237) maos-manifest manifest::tests::capabilities_required_loom_degrades_before_schema_v4
+        PASS [   0.010s] ( 71/237) maos-manifest manifest::tests::author_rejects_bad_homepage_scheme
+        PASS [   0.008s] ( 72/237) maos-manifest manifest::tests::budget_rejects_zero_time_cap_seconds
+        PASS [   0.022s] ( 73/237) maos-manifest manifest::gateway_tests::gateway_max_message_bytes_too_low_rejected
+        PASS [   0.005s] ( 74/237) maos-manifest manifest::tests::capabilities_required_loom_rejects_malformed_fields
+        PASS [   0.007s] ( 75/237) maos-manifest manifest::tests::capabilities_required_loom_defaults_false_and_rejects_unknown_fields
+        PASS [   0.004s] ( 76/237) maos-manifest manifest::tests::class_section_accepts_public_vetted_tier
+        PASS [   0.005s] ( 77/237) maos-manifest manifest::tests::capabilities_required_rejects_unknown_field
+        PASS [   0.009s] ( 78/237) maos-manifest manifest::tests::budget_well_formed
+        PASS [   0.006s] ( 79/237) maos-manifest manifest::tests::capabilities_required_rejects_empty_complete
+        PASS [   0.020s] ( 80/237) maos-manifest manifest::on_revocation_tests::on_revocation_quarantine
+        PASS [   0.014s] ( 81/237) maos-manifest manifest::tests::author_well_formed_without_homepage
+        PASS [   0.005s] ( 82/237) maos-manifest manifest::tests::class_section_rejects_artifact_for_rust_inproc
+        PASS [   0.006s] ( 83/237) maos-manifest manifest::tests::class_section_rejects_bad_abi
+        PASS [   0.006s] ( 84/237) maos-manifest manifest::tests::class_section_rejects_wasm_component_before_schema_v5
+        PASS [   0.006s] ( 85/237) maos-manifest manifest::tests::class_section_rejects_wasm_component_with_another_form
+        PASS [   0.006s] ( 86/237) maos-manifest manifest::tests::class_section_accepts_v2_schema_version
+        PASS [   0.006s] ( 87/237) maos-manifest manifest::tests::class_section_rejects_empty_name
+        PASS [   0.007s] ( 88/237) maos-manifest manifest::tests::class_section_accepts_wasm_component_with_artifact_at_schema_v5
+        PASS [   0.008s] ( 89/237) maos-manifest manifest::tests::capabilities_required_rejects_overlong_entry
+        PASS [   0.006s] ( 90/237) maos-manifest manifest::tests::class_section_rejects_typo_field
+        PASS [   0.006s] ( 91/237) maos-manifest manifest::tests::class_section_rejects_wasm_component_without_artifact
+        PASS [   0.006s] ( 92/237) maos-manifest manifest::tests::class_section_rejects_non_semver_version
+        PASS [   0.007s] ( 93/237) maos-manifest manifest::tests::class_section_rejects_unsafe_wasm_component_artifacts
+        PASS [   0.017s] ( 94/237) maos-manifest manifest::supervision_manifest_tests::supervision_explicit_values
+        PASS [   0.007s] ( 95/237) maos-manifest manifest::tests::class_section_rejects_unknown_form
+        PASS [   0.018s] ( 96/237) maos-manifest manifest::supervision_manifest_tests::on_crash_rejects_unknown_action
+        PASS [   0.018s] ( 97/237) maos-manifest manifest::supervision_manifest_tests::on_crash_explicit_reassign
+        PASS [   0.005s] ( 98/237) maos-manifest manifest::tests::class_section_well_formed
+        PASS [   0.018s] ( 99/237) maos-manifest manifest::supervision_manifest_tests::on_crash_explicit_escalate
+        PASS [   0.005s] (100/237) maos-manifest manifest::tests::epistemic_policy_edge_case_multi_rule_no_qualifiers
+        PASS [   0.007s] (101/237) maos-manifest manifest::tests::class_section_still_accepts_v1_schema_version
+        PASS [   0.008s] (102/237) maos-manifest manifest::tests::class_section_rejects_unknown_trust_tier
+        PASS [   0.008s] (103/237) maos-manifest manifest::tests::class_section_rejects_zero_schema_version
+        PASS [   0.011s] (104/237) maos-manifest manifest::tests::capabilities_required_well_formed
+        PASS [   0.006s] (105/237) maos-manifest manifest::tests::epistemic_policy_malformed_fixture_default_action_is_rejected
+        PASS [   0.005s] (106/237) maos-manifest manifest::tests::epistemic_policy_malformed_fixture_rules_is_rejected
+        PASS [   0.007s] (107/237) maos-manifest manifest::tests::epistemic_policy_default_action_defaults_to_verbalize_only_when_omitted
+        PASS [   0.009s] (108/237) maos-manifest manifest::tests::class_section_still_accepts_v4_rust_inproc_manifest
+        PASS [   0.005s] (109/237) maos-manifest manifest::tests::lifecycle_malformed_duplicate_rejected
+        PASS [   0.005s] (110/237) maos-manifest manifest::tests::lifecycle_edge_empty_means_all_allowed
+        PASS [   0.005s] (111/237) maos-manifest manifest::tests::mcp_section_rejects_empty_uri
+        PASS [   0.006s] (112/237) maos-manifest manifest::tests::epistemic_policy_rejects_whitespace_in_tag
+        PASS [   0.007s] (113/237) maos-manifest manifest::tests::epistemic_policy_rejects_threshold_above_one
+        PASS [   0.006s] (114/237) maos-manifest manifest::tests::mcp_section_rejects_empty_name
+        PASS [   0.006s] (115/237) maos-manifest manifest::tests::lifecycle_well_formed
+        PASS [   0.006s] (116/237) maos-manifest manifest::tests::epistemic_policy_rejects_threshold_below_zero
+        PASS [   0.007s] (117/237) maos-manifest manifest::tests::lifecycle_edge_all_11_hooks
+        PASS [   0.006s] (118/237) maos-manifest manifest::tests::mcp_section_rejects_fallback_equals_primary
+        PASS [   0.007s] (119/237) maos-manifest manifest::tests::lifecycle_malformed_unknown_hook_rejected
+        PASS [   0.007s] (120/237) maos-manifest manifest::tests::mcp_section_rejects_duplicate_names
+        PASS [   0.005s] (121/237) maos-manifest manifest::tests::output_shape_rejects_empty
+        PASS [   0.008s] (122/237) maos-manifest manifest::tests::epistemic_policy_well_formed_parses
+        PASS [   0.009s] (123/237) maos-manifest manifest::tests::epistemic_policy_rejects_duplicate_tag
+        PASS [   0.006s] (124/237) maos-manifest manifest::tests::mcp_section_well_formed_parse
+        PASS [   0.010s] (125/237) maos-manifest manifest::tests::epistemic_policy_rejects_empty_tag
+        PASS [   0.004s] (126/237) maos-manifest manifest::tests::predicate_accepts_empty_object_for_empty_required_fields
+        PASS [   0.005s] (127/237) maos-manifest manifest::tests::posture_section_rejects_unknown_variant
+        PASS [   0.007s] (128/237) maos-manifest manifest::tests::mcp_section_rejects_glob_in_allowed_tools
+        PASS [   0.006s] (129/237) maos-manifest manifest::tests::output_shape_rejects_whitespace_in_field_name
+        PASS [   0.007s] (130/237) maos-manifest manifest::tests::mcp_section_rejects_public_vetted_tier
+        PASS [   0.006s] (131/237) maos-manifest manifest::tests::output_shape_rejects_overlong_list
+        PASS [   0.007s] (132/237) maos-manifest manifest::tests::output_shape_edge_single_field
+        PASS [   0.007s] (133/237) maos-manifest manifest::tests::output_shape_rejects_duplicate_field_name
+        PASS [   0.004s] (134/237) maos-manifest manifest::tests::predicate_hits_on_hello_spirit_four_fields
+        PASS [   0.007s] (135/237) maos-manifest manifest::tests::output_shape_well_formed
+        PASS [   0.006s] (136/237) maos-manifest manifest::tests::predicate_3_2_shape_backward_compat_unchanged
+        PASS [   0.005s] (137/237) maos-manifest manifest::tests::predicate_misses_first_field
+        PASS [   0.005s] (138/237) maos-manifest manifest::tests::predicate_on_value_above_well_formed_parses
+        PASS [   0.004s] (139/237) maos-manifest manifest::tests::predicate_misses_second_field
+        PASS [   0.008s] (140/237) maos-manifest manifest::tests::posture_section_well_formed
+        PASS [   0.008s] (141/237) maos-manifest manifest::tests::posture_section_rejects_max_below_default
+        PASS [   0.004s] (142/237) maos-manifest manifest::tests::predicate_on_value_below_well_formed_parses
+        PASS [   0.005s] (143/237) maos-manifest manifest::tests::predicate_rejects_both_confidence_below_and_on_value
+        PASS [   0.005s] (144/237) maos-manifest manifest::tests::predicate_on_confidence_below_desugars_to_below_predicate
+        PASS [   0.005s] (145/237) maos-manifest manifest::tests::predicate_on_value_within_well_formed_parses
+        PASS [   0.004s] (146/237) maos-manifest manifest::tests::predicate_rejects_both_forms_set
+        PASS [   0.008s] (147/237) maos-manifest manifest::tests::posture_section_edge_autonomous_with_halt_lt_autonomous
+        PASS [   0.005s] (148/237) maos-manifest manifest::tests::predicate_on_value_outside_well_formed_parses
+        PASS [   0.004s] (149/237) maos-manifest manifest::tests::predicate_rejects_nan_threshold_in_below
+        PASS [   0.004s] (150/237) maos-manifest manifest::tests::sandbox_config_t3_parseable
+        PASS [   0.005s] (151/237) maos-manifest manifest::tests::predicate_rejects_inverted_bounds_outside
+        PASS [   0.005s] (152/237) maos-manifest manifest::tests::resolve_caps_manifest_wins_when_tighter
+        PASS [   0.005s] (153/237) maos-manifest manifest::tests::resource_caps_malformed_zero_rejected
+        PASS [   0.005s] (154/237) maos-manifest manifest::tests::sandbox_config_malformed_rejected
+        PASS [   0.005s] (155/237) maos-manifest manifest::tests::resolve_caps_both_none_none
+        PASS [   0.005s] (156/237) maos-manifest manifest::tests::predicate_rejects_null_field
+        PASS [   0.005s] (157/237) maos-manifest manifest::tests::sandbox_config_well_formed
+        PASS [   0.005s] (158/237) maos-manifest manifest::tests::predicate_rejects_nan_threshold_in_outside
+        PASS [   0.005s] (159/237) maos-manifest manifest::tests::predicate_rejects_inverted_bounds_within
+        PASS [   0.005s] (160/237) maos-manifest manifest::tests::resource_caps_well_formed
+        PASS [   0.005s] (161/237) maos-manifest manifest::tests::sandbox_config_edge_missing_uses_default
+        PASS [   0.004s] (162/237) maos-manifest manifest::tests::scheduling_default_trait
+        PASS [   0.004s] (163/237) maos-manifest manifest::tests::scheduling_malformed_yield_too_high
+        PASS [   0.006s] (164/237) maos-manifest manifest::tests::resource_caps_partial_present
+        PASS [   0.007s] (165/237) maos-manifest manifest::tests::resolve_caps_none_falls_through
+        PASS [   0.007s] (166/237) maos-manifest manifest::tests::resolve_caps_operator_wins_when_tighter
+        PASS [   0.005s] (167/237) maos-manifest manifest::tests::trust_tier_parser_handles_valid_toml_syntax
+        PASS [   0.005s] (168/237) maos-manifest manifest::tests::trust_tier_parser_rejects_unknown_values
+        PASS [   0.005s] (169/237) maos-manifest manifest::tests::scheduling_malformed_idle_window_too_low
+        PASS [   0.005s] (170/237) maos-manifest manifest::tests::scheduling_malformed_priority_rejected
+        PASS [   0.005s] (171/237) maos-manifest manifest::tests::scheduling_malformed_idle_window_too_high
+        PASS [   0.005s] (172/237) maos-manifest manifest::tests::scheduling_malformed_priority_too_high
+        PASS [   0.006s] (173/237) maos-manifest manifest::tests::scheduling_edge_empty_defaults
+        PASS [   0.008s] (174/237) maos-manifest manifest::tests::resource_caps_edge_missing_all_optional
+        PASS [   0.006s] (175/237) maos-manifest manifest::tests::scheduling_malformed_yield_too_low
+        PASS [   0.006s] (176/237) maos-manifest::budget_thresholds_18_5 defaults_are_800_and_950_permille
+        PASS [   0.006s] (177/237) maos-manifest manifest::tests::scheduling_well_formed
+        PASS [   0.009s] (178/237) maos-manifest manifest::tests::predicate_rejects_nan_threshold_in_above
+        FAIL [   0.022s] (179/237) maos-manifest manifest::tests::class_section_rejects_above_max_schema_version
+  stdout ───
+
+    running 1 test
+    test manifest::tests::class_section_rejects_above_max_schema_version ... FAILED
+
+    failures:
+
+    failures:
+        manifest::tests::class_section_rejects_above_max_schema_version
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 177 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'manifest::tests::class_section_rejects_above_max_schema_version' (811793) panicked at crates/maos-manifest/src/manifest.rs:2942:51:
+    called `Result::unwrap_err()` on an `Ok` value: ClassSection { name: "hello-spirit", version: "0.1.0", abi: "1.0", manifest_schema_version: 6, min_substrate_version: "0.1.0-alpha", forms: ["rust-inproc"], trust_tier: "local", description: "MAOS reference Spirit", artifact: None }
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::result::unwrap_failed
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1870:5
+       3: <core::result::Result<maos_manifest::manifest::ClassSection, maos_manifest::manifest::ManifestError>>::unwrap_err
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1327:22
+       4: maos_manifest::manifest::tests::class_section_rejects_above_max_schema_version
+                 at ./src/manifest.rs:2942:51
+       5: maos_manifest::manifest::tests::class_section_rejects_above_max_schema_version::{closure#0}
+                 at ./src/manifest.rs:2936:56
+       6: <maos_manifest::manifest::tests::class_section_rejects_above_max_schema_version::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+  Cancelling due to test failure: 30 tests still running
+        PASS [   0.004s] (180/237) maos-manifest::iac_send_capability_17_3c provider_section_is_optional_but_refused_when_present_and_empty
+        PASS [   0.004s] (181/237) maos-manifest::cli_wrapper_egress_17_1 unknown_wrapper_and_posture_fields_are_refused
+        PASS [   0.004s] (182/237) maos-manifest::iac_send_capability_17_3c schema_below_v5_drops_iac
+        PASS [   0.006s] (183/237) maos-manifest::budget_thresholds_18_5 thresholds_rounding_to_positive_permille_are_admitted
+        PASS [   0.005s] (184/237) maos-manifest::budget_thresholds_18_5 well_formed_and_edge_thresholds_are_admitted_as_permille
+        PASS [   0.008s] (185/237) maos-manifest::budget_thresholds_18_5 pressure_at_or_above_limit_and_out_of_range_thresholds_are_rejected
+        PASS [   0.005s] (186/237) maos-manifest::lifecycle_hook_parity_17_4 manifest_accepts_every_abi_hook_and_rejects_a_non_hook
+        PASS [   0.006s] (187/237) maos-manifest::cli_wrapper_egress_17_1 absent_egress_denies_all_and_valid_destinations_keep_their_exact_ports
+        PASS [   0.006s] (188/237) maos-manifest::cli_wrapper_egress_17_1 duplicate_destinations_are_refused
+        PASS [   0.006s] (189/237) maos-manifest::budget_thresholds_18_5 thresholds_rounding_to_zero_permille_are_rejected
+        PASS [   0.004s] (190/237) maos-manifest::log_capability_17_3d schema_four_drops_both_log_grants
+        PASS [   0.004s] (191/237) maos-manifest::log_capability_17_3d unknown_log_keys_and_non_boolean_grants_are_refused
+        PASS [   0.006s] (192/237) maos-manifest::iac_send_capability_17_3c unknown_empty_and_duplicate_entries_are_refused_naming_the_field
+        PASS [   0.006s] (193/237) maos-manifest::iac_send_capability_17_3c each_closed_set_entry_parses_and_maps_to_iac_send_scope
+        PASS [   0.006s] (194/237) maos-manifest::iac_send_capability_17_3c unmatchable_selectors_are_refused_at_admission
+        PASS [   0.005s] (195/237) maos-manifest::log_capability_17_3d log_grants_map_independently_and_default_to_denied
+        PASS [   0.004s] (196/237) maos-manifest::manifest_n_minus_1_compat v1_manifest_loads_on_current_kernel
+        PASS [   0.005s] (197/237) maos-manifest::manifest_n_minus_1_compat n_minus_1_emits_warn_degradation_per_post_v1_section
+        PASS [   0.004s] (198/237) maos-manifest::resources_pid_17_2 pid_cap_resolution_is_independent_from_fd_and_uses_strictest_of
+        PASS [   0.005s] (199/237) maos-manifest::manifest_n_minus_1_compat above_max_schema_version_rejected
+        PASS [   0.004s] (200/237) maos-manifest::manifest_n_minus_1_compat n_minus_1_load_covers_every_class_field
+        PASS [   0.004s] (201/237) maos-manifest::manifest_n_minus_1_compat v2_manifest_loads_on_v2_kernel
+        PASS [   0.005s] (202/237) maos-manifest::manifest_n_minus_1_compat current_schema_version_manifest_loads
+        PASS [   0.004s] (203/237) maos-manifest::skill_capability_18_7 older_schema_never_acquires_skill_authority
+        PASS [   0.008s] (204/237) maos-manifest::cli_wrapper_egress_17_1 destination_grammar_is_strict_at_the_manifest_boundary
+        PASS [   0.004s] (205/237) maos-manifest::skill_capability_18_7 schema_six_declares_skill_author_self_only_when_requested
+        PASS [   0.006s] (206/237) maos-manifest::log_capability_17_3d schema_five_retains_both_log_grants
+        PASS [   0.005s] (207/237) maos-manifest::manifest_n_minus_1_compat zero_schema_version_rejected
+        PASS [   0.004s] (208/237) maos-manifest::skill_capability_18_7 unknown_skill_keys_and_non_boolean_authority_are_refused
+        PASS [   0.004s] (209/237) maos-spirit-abi cancellation::tests::never_cancel_is_always_false
+────────────
+     Summary [   0.058s] 209/237 tests run: 208 passed, 1 failed, 0 skipped
+        FAIL [   0.022s] (179/237) maos-manifest manifest::tests::class_section_rejects_above_max_schema_version
+warning: 28/237 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+error: test run failed

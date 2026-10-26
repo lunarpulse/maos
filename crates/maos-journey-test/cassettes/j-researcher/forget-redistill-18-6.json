@@ -62,14 +62,14 @@
     },
     {
       "sequence": 3,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "19af179fca4a31d80ea3845cf1264e70d37a0c446f130063a5faf394e18a3814",
+      "prompt_len": 716,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 180,
+          "output_tokens": 65
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -80,14 +80,14 @@
     },
     {
       "sequence": 4,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -116,14 +116,14 @@
     },
     {
       "sequence": 6,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -134,14 +134,14 @@
     },
     {
       "sequence": 7,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -152,14 +152,14 @@
     },
     {
       "sequence": 8,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -170,14 +170,14 @@
     },
     {
       "sequence": 9,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -188,14 +188,14 @@
     },
     {
       "sequence": 10,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -206,14 +206,14 @@
     },
     {
       "sequence": 11,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -224,14 +224,14 @@
     },
     {
       "sequence": 12,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -242,14 +242,14 @@
     },
     {
       "sequence": 13,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -260,14 +260,14 @@
     },
     {
       "sequence": 14,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -278,14 +278,14 @@
     },
     {
       "sequence": 15,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -296,14 +296,14 @@
     },
     {
       "sequence": 16,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -314,14 +314,14 @@
     },
     {
       "sequence": 17,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -332,14 +332,14 @@
     },
     {
       "sequence": 18,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -350,14 +350,14 @@
     },
     {
       "sequence": 19,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -368,14 +368,14 @@
     },
     {
       "sequence": 20,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -386,14 +386,14 @@
     },
     {
       "sequence": 21,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -404,14 +404,14 @@
     },
     {
       "sequence": 22,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -422,14 +422,14 @@
     },
     {
       "sequence": 23,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -440,14 +440,14 @@
     },
     {
       "sequence": 24,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -458,14 +458,14 @@
     },
     {
       "sequence": 25,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -476,14 +476,14 @@
     },
     {
       "sequence": 26,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -494,14 +494,14 @@
     },
     {
       "sequence": 27,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -512,14 +512,14 @@
     },
     {
       "sequence": 28,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -530,14 +530,14 @@
     },
     {
       "sequence": 29,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -548,14 +548,14 @@
     },
     {
       "sequence": 30,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -566,14 +566,14 @@
     },
     {
       "sequence": 31,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -584,14 +584,14 @@
     },
     {
       "sequence": 32,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -602,14 +602,14 @@
     },
     {
       "sequence": 33,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -620,14 +620,14 @@
     },
     {
       "sequence": 34,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -638,14 +638,14 @@
     },
     {
       "sequence": 35,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -656,14 +656,14 @@
     },
     {
       "sequence": 36,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -674,14 +674,14 @@
     },
     {
       "sequence": 37,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -692,14 +692,14 @@
     },
     {
       "sequence": 38,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -710,14 +710,14 @@
     },
     {
       "sequence": 39,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -728,14 +728,14 @@
     },
     {
       "sequence": 40,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -746,14 +746,14 @@
     },
     {
       "sequence": 41,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -764,14 +764,14 @@
     },
     {
       "sequence": 42,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -782,14 +782,14 @@
     },
     {
       "sequence": 43,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -800,14 +800,14 @@
     },
     {
       "sequence": 44,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -818,14 +818,14 @@
     },
     {
       "sequence": 45,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -836,14 +836,14 @@
     },
     {
       "sequence": 46,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -854,14 +854,14 @@
     },
     {
       "sequence": 47,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -872,14 +872,14 @@
     },
     {
       "sequence": 48,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -890,14 +890,14 @@
     },
     {
       "sequence": 49,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -908,14 +908,14 @@
     },
     {
       "sequence": 50,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -926,14 +926,14 @@
     },
     {
       "sequence": 51,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -944,14 +944,14 @@
     },
     {
       "sequence": 52,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -962,14 +962,14 @@
     },
     {
       "sequence": 53,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -980,14 +980,14 @@
     },
     {
       "sequence": 54,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -998,14 +998,14 @@
     },
     {
       "sequence": 55,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1016,14 +1016,14 @@
     },
     {
       "sequence": 56,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1034,14 +1034,14 @@
     },
     {
       "sequence": 57,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1052,14 +1052,14 @@
     },
     {
       "sequence": 58,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1070,14 +1070,14 @@
     },
     {
       "sequence": 59,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1088,14 +1088,14 @@
     },
     {
       "sequence": 60,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1106,14 +1106,14 @@
     },
     {
       "sequence": 61,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1124,14 +1124,14 @@
     },
     {
       "sequence": 62,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1142,14 +1142,14 @@
     },
     {
       "sequence": 63,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1160,14 +1160,14 @@
     },
     {
       "sequence": 64,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1178,14 +1178,14 @@
     },
     {
       "sequence": 65,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1196,14 +1196,14 @@
     },
     {
       "sequence": 66,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1214,14 +1214,14 @@
     },
     {
       "sequence": 67,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1232,14 +1232,14 @@
     },
     {
       "sequence": 68,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1250,14 +1250,14 @@
     },
     {
       "sequence": 69,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1268,14 +1268,14 @@
     },
     {
       "sequence": 70,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1286,14 +1286,14 @@
     },
     {
       "sequence": 71,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1304,14 +1304,14 @@
     },
     {
       "sequence": 72,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1322,14 +1322,14 @@
     },
     {
       "sequence": 73,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1340,14 +1340,14 @@
     },
     {
       "sequence": 74,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1358,14 +1358,14 @@
     },
     {
       "sequence": 75,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1376,14 +1376,14 @@
     },
     {
       "sequence": 76,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1394,14 +1394,14 @@
     },
     {
       "sequence": 77,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1412,14 +1412,14 @@
     },
     {
       "sequence": 78,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1430,14 +1430,14 @@
     },
     {
       "sequence": 79,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1448,14 +1448,14 @@
     },
     {
       "sequence": 80,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1466,14 +1466,14 @@
     },
     {
       "sequence": 81,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1484,14 +1484,14 @@
     },
     {
       "sequence": 82,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1502,14 +1502,14 @@
     },
     {
       "sequence": 83,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1520,14 +1520,14 @@
     },
     {
       "sequence": 84,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1538,14 +1538,14 @@
     },
     {
       "sequence": 85,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1556,14 +1556,14 @@
     },
     {
       "sequence": 86,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1574,14 +1574,14 @@
     },
     {
       "sequence": 87,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1592,14 +1592,14 @@
     },
     {
       "sequence": 88,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1610,14 +1610,14 @@
     },
     {
       "sequence": 89,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1628,14 +1628,14 @@
     },
     {
       "sequence": 90,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1646,14 +1646,14 @@
     },
     {
       "sequence": 91,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1664,14 +1664,14 @@
     },
     {
       "sequence": 92,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1682,14 +1682,14 @@
     },
     {
       "sequence": 93,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1700,14 +1700,14 @@
     },
     {
       "sequence": 94,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1718,14 +1718,14 @@
     },
     {
       "sequence": 95,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1736,14 +1736,14 @@
     },
     {
       "sequence": 96,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1754,14 +1754,14 @@
     },
     {
       "sequence": 97,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1772,14 +1772,14 @@
     },
     {
       "sequence": 98,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1790,14 +1790,14 @@
     },
     {
       "sequence": 99,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1808,14 +1808,14 @@
     },
     {
       "sequence": 100,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1826,14 +1826,14 @@
     },
     {
       "sequence": 101,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1844,14 +1844,14 @@
     },
     {
       "sequence": 102,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1862,14 +1862,14 @@
     },
     {
       "sequence": 103,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1880,14 +1880,14 @@
     },
     {
       "sequence": 104,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1898,14 +1898,14 @@
     },
     {
       "sequence": 105,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1916,14 +1916,14 @@
     },
     {
       "sequence": 106,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1934,14 +1934,14 @@
     },
     {
       "sequence": 107,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1952,14 +1952,14 @@
     },
     {
       "sequence": 108,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1970,14 +1970,14 @@
     },
     {
       "sequence": 109,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -1988,14 +1988,14 @@
     },
     {
       "sequence": 110,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2006,14 +2006,14 @@
     },
     {
       "sequence": 111,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2024,14 +2024,14 @@
     },
     {
       "sequence": 112,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2042,14 +2042,14 @@
     },
     {
       "sequence": 113,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2060,14 +2060,14 @@
     },
     {
       "sequence": 114,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2078,14 +2078,14 @@
     },
     {
       "sequence": 115,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2096,14 +2096,14 @@
     },
     {
       "sequence": 116,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2114,14 +2114,14 @@
     },
     {
       "sequence": 117,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2132,14 +2132,14 @@
     },
     {
       "sequence": 118,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2150,14 +2150,14 @@
     },
     {
       "sequence": 119,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2168,14 +2168,14 @@
     },
     {
       "sequence": 120,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2186,14 +2186,14 @@
     },
     {
       "sequence": 121,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2204,14 +2204,14 @@
     },
     {
       "sequence": 122,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2222,14 +2222,14 @@
     },
     {
       "sequence": 123,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2240,14 +2240,14 @@
     },
     {
       "sequence": 124,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2258,14 +2258,14 @@
     },
     {
       "sequence": 125,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2276,14 +2276,14 @@
     },
     {
       "sequence": 126,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2294,14 +2294,14 @@
     },
     {
       "sequence": 127,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
       "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
+          "input_tokens": 50,
+          "output_tokens": 23
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2312,14 +2312,14 @@
     },
     {
       "sequence": 128,
-      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
-      "prompt_len": 200,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
       "response": {
-        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
         "stop_reason": "stop_sequence",
         "usage": {
-          "input_tokens": 50,
-          "output_tokens": 23
+          "input_tokens": 44,
+          "output_tokens": 18
         },
         "provider_attribution": {
           "provider_id": "replay",
@@ -2330,24 +2330,6 @@
     },
     {
       "sequence": 129,
-      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
-      "prompt_len": 179,
-      "response": {
-        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
-        "stop_reason": "stop_sequence",
-        "usage": {
-          "input_tokens": 44,
-          "output_tokens": 18
-        },
-        "provider_attribution": {
-          "provider_id": "replay",
-          "endpoint_url": "cassette://j-researcher/forget-redistill-18-6",
-          "model_id": "hand-authored-seed"
-        }
-      }
-    },
-    {
-      "sequence": 130,
       "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
       "prompt_len": 200,
       "response": {
@@ -2365,7 +2347,7 @@
       }
     },
     {
-      "sequence": 131,
+      "sequence": 130,
       "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
       "prompt_len": 179,
       "response": {
@@ -2383,7 +2365,43 @@
       }
     },
     {
+      "sequence": 131,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
+      "response": {
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 50,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/forget-redistill-18-6",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
       "sequence": 132,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
+      "response": {
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 44,
+          "output_tokens": 18
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/forget-redistill-18-6",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 133,
       "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
       "prompt_len": 200,
       "response": {

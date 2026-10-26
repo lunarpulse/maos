@@ -1027,7 +1027,8 @@ fn build_spirit_obj(
                 .unwrap_or_else(|error| error.into_inner())
                 .clone()
                 .ok_or("butler seam not ready")?;
-            let declared = gate_staged(staged).map_or_else(Vec::new, |g| declared_providers(&g));
+            let gated = gate_staged(staged).ok_or("researcher staged manifest is unavailable")?;
+            let declared = declared_providers(&gated);
             let wiring = deps
                 .researcher
                 .lock()
@@ -1044,6 +1045,8 @@ fn build_spirit_obj(
                     .ok_or("researcher recall not ready")?)(class_name)?,
             );
             host.redistill_sink = Some(Arc::clone(&deps.redistill_sink));
+            host.declared_scopes =
+                maos_manifest::capabilities_required_to_scopes(&gated.caps_required);
             make_spirit_obj(maos_bin::researcher_root::construct(
                 ::researcher::Researcher::new().with_scalar_port(scalar),
                 &wiring,
@@ -2577,6 +2580,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&transparency_log),
         ),
     );
+    let skill_store = Arc::new(maos_skill::LocalFsSkillQueueStore::new()?);
     eprintln!("maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)");
 
     // Story 4.4 / 13.3b — LogRecallAdapter + directional manifest-consent seam.
@@ -4047,6 +4051,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(maos_bin::researcher_root::ResearcherWiring {
             live,
             recall: Some(Arc::clone(&researcher_recall)),
+            skill: Some(maos_bin::skill_authoring::binder(
+                &capability,
+                &security,
+                &transparency_log,
+                &self_telemetry,
+                &scheduler.scbs(),
+                &skill_store,
+                enterprise_runtime.as_ref(),
+                enterprise_pdp_runtime.clone(),
+            )),
             mcp: match live {
                 true => researcher_mcp_builder(
                     &io_arc,
@@ -4351,40 +4365,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ─────────────────────────────────────────────────────────────
     // Epic 10 §A3 — Daemon skill admission enforcement (deferred from 9.7 F6b).
     //
-    // Before loading any spirit, compute the skill admission view from
-    // discovery + TL reconcile.  If any skill is Rejected, the daemon
-    // REFUSES to start — the operator must resolve the rejection first.
-    // Pending skills emit a warning (the operator has not yet decided).
-    {
+    // Only discovered rejected documents block startup. Queue-only rejected
+    // drafts and decision-only revisions remain durable and inert.
+    if run_args.is_some() {
         use maos_skill::SkillQueueStore as _;
-        let skill_store = maos_skill::LocalFsSkillQueueStore::new();
         let skill_roots = maos_skill::default_search_path();
         let skill_outcome = maos_skill::discover_skills_detailed(&skill_roots);
-        let skill_stored = match skill_store.load() {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!(
-                    "maos: warning: skill queue cache unreadable ({e}) — proceeding from discovery + TL"
-                );
-                Vec::new()
-            }
-        };
+        let skill_stored = skill_store.load()?;
         let skill_view = maos_cli::subcommands::admission_view(
             &skill_outcome.discovered,
             skill_stored,
             &audit_db_path,
-        );
+        )?;
         let mut rejected: Vec<String> = Vec::new();
         let mut pending: Vec<String> = Vec::new();
         for entry in &skill_view.entries {
             match entry.state {
-                maos_skill::SkillAdmissionState::Rejected => {
+                maos_skill::SkillAdmissionState::Rejected
+                    if entry.entry_path != "revision_proposal"
+                        && skill_outcome.discovered.iter().any(|d| {
+                            d.skill.manifest.skill_id() == entry.id
+                                && d.skill.manifest.skill_version() == entry.version
+                        }) =>
+                {
                     rejected.push(format!("{}@{}", entry.id, entry.version));
                 }
                 maos_skill::SkillAdmissionState::Pending => {
                     pending.push(format!("{}@{}", entry.id, entry.version));
                 }
-                maos_skill::SkillAdmissionState::Admitted => {}
+                maos_skill::SkillAdmissionState::Admitted
+                | maos_skill::SkillAdmissionState::Rejected => {}
             }
         }
         if !pending.is_empty() {
@@ -5754,6 +5764,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             )?,
                         );
                         host.redistill_sink = Some(hook_pump.redistill_sink());
+                        host.declared_scopes =
+                            maos_manifest::capabilities_required_to_scopes(&gated.caps_required);
                         researcher = maos_bin::researcher_root::construct(
                             researcher,
                             &wiring,
@@ -7357,6 +7369,7 @@ description = "smoke test spirit successor"
                 loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
                 iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
                 log: maos_manifest::LogCapabilities::default(),
+                skill: maos_manifest::SkillCapabilities::default(),
             };
             let smoke_class = maos_kernel_core::security::manifest::ClassSection {
                 name: "smoke-spirit".into(),
@@ -13514,24 +13527,19 @@ async fn smoke_import_7_2() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(feature = "network")]
 /// Story 7.4 AC6 — `MAOS_ONE_SHOT=smoke-skill-7-4`: the v0.5 skill-ecosystem
-/// observability demo. Six deterministic JSON lines, no network, <30s:
+/// library smoke. Four deterministic JSON lines, no network, <30s:
 ///   1. parse + validate a `maos.skill.v1` document;
 ///   2. discover skills from a temp search-path root;
-///   3. dynamic-write a skill via `skill.author.self` → lands Pending (NOT admitted);
-///   4. build a `SkillRevisionProposal` from a real `SelfTelemetryReport` → enters queue;
 ///   5. probe a CliWrapper whose observed shape != declared → refuse + journaled version diff;
 ///   6. load the LCAS corpus → count=210 across the three 70-item buckets.
 async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
     use maos_domain::invariants::i9::SandboxTier;
-    use maos_domain::self_telemetry::SelfTelemetryReport;
     use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
     use maos_kernel_core::lifecycle::cli_wrapper::admit_cli_wrapper_journaled;
     use maos_kernel_core::security::manifest::{
         CliWrapperConfig, CliWrapperControlChannel, CliWrapperPosture, CliWrapperStdioShape,
     };
-    use maos_skill::{
-        build_proposal, parse_skill, SkillAdmissionState, SkillEntryPath, SkillId, SkillVersion,
-    };
+    use maos_skill::parse_skill;
 
     fn emit(v: serde_json::Value) {
         println!("{v}");
@@ -13557,44 +13565,6 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
     let discovered = maos_skill::discover_skills(&[root.clone()]);
     emit(serde_json::json!({
         "step": 2, "surface": "discover", "count": discovered.len()
-    }));
-
-    // ── Step 3 — dynamic-write via skill.author.self → Pending (NOT admitted) ─
-    let mut queue = maos_skill::SkillAdmissionQueue::new();
-    let id = queue
-        .enqueue_skill(skill.clone(), SkillEntryPath::AuthorSelf, "spirit:1")
-        .map_err(|e| format!("step3: {e}"))?;
-    let state = queue.state_of(&id);
-    if state != Some(SkillAdmissionState::Pending) {
-        return Err(
-            format!("step3: skill.author.self skill must land Pending, got {state:?}").into(),
-        );
-    }
-    emit(serde_json::json!({
-        "step": 3, "surface": "author_self", "state": "pending"
-    }));
-
-    // ── Step 4 — revision proposal from a REAL SelfTelemetryReport ──────────
-    let report = SelfTelemetryReport::new(7, 0, 10_000, 100, 13, 0, 0, 0, vec![], vec![], 10_500)?;
-    let has_evidence = report.success_count + report.failure_count > 0;
-    // Target the OTHER discovered skill (`smoke.planner`, step 2) — not the
-    // `smoke.reviewer` already enqueued Pending in step 3 — so the proposal occupies
-    // a distinct id in the shared admission queue (enqueue_proposal rejects a second
-    // Pending entry for the same SkillId, by design).
-    let proposal = build_proposal(
-        SkillId::from("smoke.planner"),
-        SkillVersion::from("0.2.0"),
-        "--- a/skill.md\n+++ b/skill.md\n@@\n-be terse\n+be terse and cite evidence\n".into(),
-        report,
-    )?;
-    let pid = queue
-        .enqueue_proposal(proposal, "spirit:7")
-        .map_err(|e| format!("step4: {e}"))?;
-    if queue.state_of(&pid) != Some(SkillAdmissionState::Pending) {
-        return Err("step4: revision proposal must land Pending".into());
-    }
-    emit(serde_json::json!({
-        "step": 4, "surface": "revision_proposal", "state": "pending", "has_evidence": has_evidence
     }));
 
     // ── Step 5 — CliWrapper output-shape mismatch → refuse + journaled diff ──
@@ -13743,6 +13713,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
         loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
         iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
         log: maos_manifest::LogCapabilities::default(),
+        skill: maos_manifest::SkillCapabilities::default(),
     };
     let posture =
         PostureSection::from_toml_str("default = \"assistive\"\nallowed_max = \"assistive\"")?;

@@ -24,12 +24,10 @@ use maos_skill::approval_target::approval_target;
 use maos_skill::{QueueEntry, SkillAdmissionState, SkillId, SkillVersion};
 
 fn make_entry(id: &str, version: &str, state: SkillAdmissionState) -> QueueEntry {
-    QueueEntry {
-        id: SkillId::from(id),
-        version: SkillVersion::from(version),
-        entry_path: "package_shipped".to_string(),
-        state,
-    }
+    let mut entry =
+        QueueEntry::package_shipped(SkillId::from(id), SkillVersion::from(version)).unwrap();
+    entry.state = state;
+    entry
 }
 
 /// Build the production decided-set from a seeded TL.

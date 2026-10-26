@@ -331,6 +331,12 @@ pub enum OperatorCommand {
     ReleaseLegalHold {
         principal: String,
     },
+    /// An authenticated operator decision; Spirits have no decision port.
+    SkillDecision {
+        entry: String,
+        approve: bool,
+        actor: String,
+    },
     AdmitGovernanceSchema {
         schema: serde_json::Value,
     },
@@ -381,6 +387,7 @@ impl OperatorCommand {
             | Self::ForgetMemory { .. }
             | Self::ReleaseLegalHold { .. }
             | Self::AdmitGovernanceSchema { .. }
+            | Self::SkillDecision { .. }
             | Self::Load { .. } => None,
         }
     }
@@ -539,6 +546,9 @@ pub trait OperatorCommandPort: Send + Sync + 'static {
     fn orchestrator_status(&self, spirit_id: &str) -> Option<OrchestratorStatusRow>;
 
     fn applied_revocations(&self) -> Vec<RevocationRow>;
+
+    /// Durable skill list/show, including complete payload and revision evidence.
+    fn skills_status(&self, entry: Option<&str>, roots: &[String]) -> OperatorOutcome;
 }
 
 /// A running server with explicit shutdown for daemon teardown and tests.
@@ -1238,6 +1248,58 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
             },
             _ => method_not_allowed(),
         },
+        ["v1", "skills", "decide"] => {
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            let entry = match required_str(&body, "entry") {
+                Ok(entry) => match validate_id(&entry) {
+                    Ok(_) => entry,
+                    Err(response) => return response,
+                },
+                Err(response) => return response,
+            };
+            let actor = match required_str(&body, "actor") {
+                Ok(actor) => actor,
+                Err(response) => return response,
+            };
+            match body.get("approve").and_then(serde_json::Value::as_bool) {
+                Some(approve) => submit(
+                    routes,
+                    OperatorCommand::SkillDecision {
+                        entry,
+                        approve,
+                        actor,
+                    },
+                ),
+                None => Response::error(400, "bad_request", "field `approve` must be boolean"),
+            }
+        }
+        ["v1", "skills"] | ["v1", "skills", _] => get_only(method, || {
+            let entry = segments.get(2).copied();
+            if let Some(entry) = entry {
+                if let Err(response) = validate_id(entry) {
+                    return response;
+                }
+            }
+            // A bounded optional JSON GET body preserves CLI --root overrides.
+            let roots = if request.header("content-length").is_some_and(|n| n != "0") {
+                match body_json(request).and_then(|body| optional_string_array(&body, "roots")) {
+                    Ok(roots) => roots,
+                    Err(response) => return response,
+                }
+            } else {
+                Vec::new()
+            };
+            match routes.commands {
+                Some(port) => port.skills_status(entry, &roots).into_response(),
+                None => Response::new(404, NOT_FOUND_BODY),
+            }
+        }),
         ["v1", "memory", "forget"] => {
             if let Err(response) = post_guard(method, request) {
                 return response;

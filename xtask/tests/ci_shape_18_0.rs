@@ -505,7 +505,8 @@ fn epic_18_exit_runs_line_3_verbatim_and_its_empty_cassette_twin() {
         "has(\"confidence_map\")",
         "has(\"bibliography\")",
         ".completions_consumed == $n",
-        "--argjson n \"$entries\"",
+        "survey_entries=$((entries - 1))",
+        "--argjson n \"$survey_entries\"",
     ] {
         assert!(run.contains(needle), "line 3 asserts {needle}");
     }

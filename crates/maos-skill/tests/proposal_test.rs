@@ -1,15 +1,8 @@
-//! FR57 skill-revision proposals — Story 7.4 AC3.
-//!
-//! A proposal built from a real `SelfTelemetryReport` (Story 4.3 / FR56)
-//! carries the three mandated fields, enters the SAME admission queue as a new
-//! skill (Pending, distinguishable in audit), and `approve` activates it. NO
-//! new telemetry counters are added — the report shape is consumed verbatim.
+//! FR57 proposal schema and lossless serde. Live admission is exercised in
+//! live_submission_18_7; diffs remain opaque and approval never applies them.
 
 use maos_domain::self_telemetry::{HaltTelemetryEntry, ResolutionKindLabel, SelfTelemetryReport};
-use maos_skill::{
-    build_proposal, ESkillProposal, SkillAdmissionQueue, SkillAdmissionState, SkillEntryPath,
-    SkillId, SkillVersion,
-};
+use maos_skill::{build_proposal, ESkillProposal, SkillId, SkillVersion};
 
 fn telemetry_with_halt() -> SelfTelemetryReport {
     let halt = HaltTelemetryEntry::new(
@@ -48,7 +41,7 @@ fn proposal_carries_the_three_fr57_fields() {
 }
 
 #[test]
-fn proposal_enters_queue_pending_and_approve_activates() {
+fn proposal_payload_round_trips_verbatim() {
     let proposal = build_proposal(
         SkillId::from("planner.core"),
         SkillVersion::from("3.1.4"),
@@ -56,33 +49,9 @@ fn proposal_enters_queue_pending_and_approve_activates() {
         telemetry_with_halt(),
     )
     .unwrap();
-
-    let mut q = SkillAdmissionQueue::new();
-    let id = q.enqueue_proposal(proposal, "spirit:7").unwrap();
-
-    // Lands Pending — subject to the SAME operator admission as a new skill.
-    assert_eq!(q.state_of(&id), Some(SkillAdmissionState::Pending));
-    // Distinguishable in audit as a revision (not a new skill).
-    let entry = &q.entries()[0];
-    assert!(matches!(
-        entry.entry_path,
-        SkillEntryPath::RevisionProposal(_)
-    ));
-    assert!(
-        entry.skill.is_none(),
-        "a revision targets an existing skill"
-    );
-    let enqueue_row = &q.audit_trail()[0];
-    assert_eq!(enqueue_row.intent, "revision_proposal");
-    assert!(enqueue_row
-        .reasoning
-        .as_ref()
-        .unwrap()
-        .contains("spirit_pid=7"));
-
-    // Operator admission activates it.
-    assert!(q.approve(&id));
-    assert_eq!(q.state_of(&id), Some(SkillAdmissionState::Admitted));
+    let bytes = serde_json::to_vec(&proposal).unwrap();
+    let restored: maos_skill::SkillRevisionProposal = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(restored, proposal);
 }
 
 #[test]

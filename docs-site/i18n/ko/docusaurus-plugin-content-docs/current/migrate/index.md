@@ -13,26 +13,27 @@ MAOS는 Spirit manifest 포맷의 브레이킹 체인지를 추적하기 위해 
 
 | 상수 | 값 |
 |---|---|
-| `MANIFEST_SCHEMA_VERSION` (현재) | `5` |
+| `MANIFEST_SCHEMA_VERSION` (현재) | `6` |
 | `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `1` |
-| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `5` |
+| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `6` |
 
-지원 윈도우는 `1..=5`입니다. `MIN_SUPPORTED` 미만의 manifest는 `SecurityError::EAbiTooOld`로, `MAX_SUPPORTED` 초과는 `SecurityError::EAbiTooNew`로 거부됩니다.
+지원 윈도우는 `1..=6`입니다. `MIN_SUPPORTED` 미만의 manifest는 `SecurityError::EAbiTooOld`로, `MAX_SUPPORTED` 초과는 `SecurityError::EAbiTooNew`로 거부됩니다.
 
 ## 마이그레이션 경로
 
-| 시작 | 도착 | 가이드 | v5에서의 kernel 동작 |
+| 시작 | 도착 | 가이드 | v6에서의 kernel 동작 |
 |---|---|---|---|
 | v1 | v2 | [v1 → v2](./v1-to-v2) | ✅ 로드(지원 윈도우 내) |
 | v2 | v3 | [v2 → v3](./v2-to-v3) | ✅ 로드(지원 윈도우 내) |
 | v3 | v4 | [v3 → v4](./v3-to-v4) | ✅ 로드(지원 윈도우 내) |
-| v4 | v5 | [v4 → v5](./v4-to-v5) | ✅ 현재 버전 |
+| v4 | v5 | [v4 → v5](./v4-to-v5) | ✅ 로드(지원 윈도우 내) |
+| v5 | v6 | [Native skill 선언](../manifest/v6) | ✅ 현재 버전 |
 
 ## 호환성 정책
 
 MAOS는 manifest 스키마 경계로 구성된 포괄 범위를 어드미션합니다:
 
-- `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`은 현재 `1..=5`입니다.
+- `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`은 현재 `1..=6`입니다.
 - 최솟값 미만 manifest는 어드미션 시점에 `SecurityError::EAbiTooOld`로 거부됩니다.
 - 최댓값 초과 manifest는 어드미션 시점에 `SecurityError::EAbiTooNew`로 거부됩니다.
 

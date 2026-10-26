@@ -44,6 +44,7 @@ const RATIFIED_POST_V1_SCHEMA_SECTIONS: &[&str] = &[
     // `17-3c-iac-send-capability`, xtask/abi-ratifications.toml), on schema 5.
     "capabilities.required.iac",
     "capabilities.required.log",
+    "capabilities.required.skill",
 ];
 
 /// Parse `pub const NAME: u32 = N;` (or an alias to another such const) from a

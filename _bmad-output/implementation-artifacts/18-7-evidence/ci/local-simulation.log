@@ -1,0 +1,16 @@
+18-7 CI verify local simulation (Linux; hosted ubuntu-24.04 run is the integrator's)
+One cargo process; env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo.
+Local process scratch: TMPDIR=/dev/shm after host disk wait_for_commit stalls. No timeout/budget change; CI uses default scratch filesystem.
+
+Control: journey_skill_authoring_18_7, both tests PASS (daemon-control-green.log).
+Mutation: exact ci/plant.diff applied in place to real store.rs via surgical edit, not a workspace copy.
+Rebuilt: cargo build --locked -p maos-bin --bin maos -p maos-cli --bin maosctl.
+Oracle: cargo nextest run --locked -p maos-journey-test --test journey_skill_authoring_18_7 -E 'test(=live_author_revision_restart_and_rejection_preserve_the_payload)'
+Observed exit100: durable proposal payload: diff missing; payload:null. Full output ../ac1-red.log.
+The workflow's nonzero-exit and exact-oracle guards were checked against that output, not an unrelated failure.
+Restored: cp /tmp/18-7-ac1.yBZMxm crates/maos-skill/src/store.rs && cmp /tmp/18-7-ac1.yBZMxm crates/maos-skill/src/store.rs && touch crates/maos-skill/src/store.rs.
+Rebuilt and same oracle PASS, 1 test passed (../ac1-restored-green.log).
+sha256sum -c ci/plant.diff.sha256: plant.diff OK.
+git apply --check ci/plant.diff: exit0 on restored tree.
+No second application/red run; this is the single AC1 mutation proof.
+No hosted run ID claimed.

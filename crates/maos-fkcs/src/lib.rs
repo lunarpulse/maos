@@ -206,9 +206,6 @@ impl AdmissionHarness {
         // negative control ADMITS, proving the rejection is bound to the genuine
         // `OffFrozenSurface` arm, not a canned assertion.
         let (admitted, reason) = if self.blind_admit_for_test {
-            if let Ok(id) = &queued {
-                queue.approve(id);
-            }
             (
                 true,
                 "blinded admission for test (always-admit falsifier; real path bypassed)"
@@ -216,31 +213,22 @@ impl AdmissionHarness {
             )
         } else {
             match admit_spirit(&pkg, &cfg) {
-                Ok(decision) if decision.admit => {
-                    if let Ok(id) = &queued {
-                        queue.approve(id);
-                    }
-                    (true, decision.journal_note)
-                }
-                Ok(decision) => {
-                    if let Ok(id) = &queued {
-                        queue.reject(id);
-                    }
-                    (false, decision.journal_note)
-                }
-                Err(err) => {
-                    if let Ok(id) = &queued {
-                        queue.reject(id);
-                    }
-                    (false, err.to_string())
-                }
+                Ok(decision) if decision.admit => (true, decision.journal_note),
+                Ok(decision) => (false, decision.journal_note),
+                Err(err) => (false, err.to_string()),
             }
         };
 
-        // `journaled` reflects both the enqueue audit row and the verdict audit
-        // row written above — the rejection (or admission) is falsifiable from
-        // `SkillAdmissionQueue::audit_trail`, not merely returned inline.
-        let journaled = queued.is_ok() && !queue.audit_trail().is_empty();
+        // The harness retains the prepared decision receipt only after the
+        // genuine admission verdict transitions the package queue entry.
+        let decision_receipt = queued.as_ref().ok().and_then(|id| {
+            let row = queue
+                .prepare_decision(&id.0, admitted, "fkcs-harness".into())
+                .ok()?;
+            queue.apply_decision(&id.0, admitted, None).ok()?;
+            Some(row)
+        });
+        let journaled = decision_receipt.is_some() && !queue.audit_trail().is_empty();
 
         AdmissionResult {
             spirit_id: spirit.id.clone(),

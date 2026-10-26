@@ -84,6 +84,7 @@ fn scope_to_intent(scope: &Scope) -> Result<cap_policy::decision::Intent, CapErr
         Scope::LogRecall => cap_policy::decision::Intent::LogRecall,
         Scope::LogFetch => cap_policy::decision::Intent::LogFetch,
         Scope::DistillateWrite => cap_policy::decision::Intent::DistillateWrite,
+        Scope::SkillAuthorSelf => cap_policy::decision::Intent::SkillAuthorSelf,
         Scope::McpCall { server, tool } => cap_policy::decision::Intent::McpCall {
             server: server.clone(),
             tool: tool.clone(),

@@ -1,0 +1,19 @@
+error-catalog-generate: exit0
+gen-abi-docs: exit0
+check-kernel-baseline: check-kernel-baseline: PASSED (maos-kernel-core/src = 26367 lines, 95 files, pinned 26367)
+check-service-boundary: check-service-boundary: PASSED (0 violations)
+check-fkcs: check-fkcs: PASSED — oracle green (8 legs)
+check-manifest-schema-version: check-manifest-schema-version: PASSED (current=6, min=1, max=6)
+check-skill-schema: check-skill-schema: PASS (maos.skill.v1 round-trip + deny_unknown_fields + semver)
+check-serde-error-handling: check-serde-error-handling: PASSED (0 violations)
+check-test-cost: check-test-cost: PASS (560 test files, 8 marked spawn site(s) of which 4 cargo-query, 7 expensive binaries)
+check-coverage-matrix-completeness: check-coverage-matrix-completeness: PASS (55 v1.0 entries, 43 advisory-until-engagement)
+error-catalog-check: error-catalog-check: PASS — 65 E* items registered, 65 discovered in source
+check-reza-production-path: check-reza-production-path: PASSED (evidence advisory; product_claim=NOT_PROVEN(tl-phase-b-persisted-datname-vs-live-current-database=ABSENT, gdpr-collective-partition-live=ABSENT, gdpr-collective-erase-live=ABSENT, spirit-route-and-tenant-audit-stage2-refusal-live=ABSENT); 4 ABSENT successor(s) derived)
+check-corpus: check-corpus: PASSED (15 corpus entries checked)
+kloc-check: kloc-check: PASSED (aggregate=187284 LOC)
+gen-abi-docs --check: exit0
+check-test-budget: check-test-budget: PASS (16 binaries, 206.440 s test time, budget 800.000 s)
+cargo fmt --check: exit0
+ko-coverage: PASS: canonical KO coverage 100.0% >= required 100%.
+ko-glossary: PASS: ko glossary-lock gate — all locked terms present, no denylist violations

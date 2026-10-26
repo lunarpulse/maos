@@ -898,13 +898,20 @@ fn authorize_and_deliver(
     }
     if allowed {
         if let FramePayload::TaskAssign(task) = &frame.payload {
-            // An unmediated scope is refused before any scope is minted, so
-            // it burns no quota and the whole frame is refused atomically.
-            if let Some(scope) = task.scope.iter().find(|scope| !is_mediated_scope(scope)) {
+            // Root-only authoring and unmediated scopes are never delegated.
+            if let Some(scope) = task
+                .scope
+                .iter()
+                .find(|scope| matches!(scope, Scope::SkillAuthorSelf) || !is_mediated_scope(scope))
+            {
                 decisions.push(ScopeDecision {
                     scope,
-                    kernel_verdict: Some("unmediated"),
-                    refusal: Some("scope is not mediated by the kernel".into()),
+                    kernel_verdict: Some(if matches!(scope, Scope::SkillAuthorSelf) {
+                        "nondelegable"
+                    } else {
+                        "unmediated"
+                    }),
+                    refusal: Some("scope cannot be delegated through TaskAssign".into()),
                 });
                 allowed = false;
             } else {

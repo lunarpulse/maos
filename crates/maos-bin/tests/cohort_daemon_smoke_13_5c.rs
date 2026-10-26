@@ -924,8 +924,12 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 18-1 — 28 → 29: `butler_root.rs` joins it.
     // Story 18-3 — 29 → 30: `researcher_root.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 30] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 31] = [
         ("main.rs", include_str!("../src/main.rs")),
+        (
+            "skill_authoring.rs",
+            include_str!("../src/skill_authoring.rs"),
+        ),
         ("egress.rs", include_str!("../src/egress.rs")),
         // Story 16-6 — the extracted `load → admit → start` path. Enrolled
         // deliberately and NOT whitelisted below: the door's load must never

@@ -502,7 +502,11 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26362
+src_lines = 26367
+# HISTORY: 18-7-live-skill-authoring-and-revisions D-01/02 A, FLAG-Winston
+# operator2026-10-26: exact formatted26362 -> 26367 (+5), tokei20606 -> 20610 (+4),
+# 95 files unchanged; SkillAuthorSelf mediation + schema-v6 harness literal;
+# only capability/{cap_policy/decision.rs,cap_policy/mod.rs,mod.rs} and scheduler/scheduler_loop.rs.
 # HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review R1-R4,
 # operator2026-10-26: physical26407 -> 26362 (-45), tokei20650 -> 20606 (-44),
 # 95 files, memory/mod.rs only; shared IAC sweep and typed held/gap receipts.
@@ -868,16 +872,16 @@ src_lines = 26362
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "526ce107ca0d8d42d6cd52cec011f9c2c03de6cf4b3fdbc9994a3b8e0be05cee"
+set_hash = "6e7bed16ea495333b7c7932b7a85b157fb6ab20873336ba95dde2690b59daee0"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
 "bin/assert-revocation-p99-floor.rs" = "dab2d5ac79c9c5f9b67eedc33350c640d4909715d5eb78aaa0187c2bf7e48432"
 "capability/cap_audit/mod.rs" = "9f253336da1d618808984fef11941929a6af927ef66120d84b43e122ff70decc"
 "capability/cap_audit/writer_task.rs" = "ae9cdf683e272c954afcfe34d607d38221c4edc6b8f01e1e1c1f37517bf05b35"
-"capability/cap_policy/decision.rs" = "be8b2e5a0b08821f55f019ab85b0a91b953dd60f3a8d3f994bd59e087b409e41"
-"capability/cap_policy/mod.rs" = "6276a69fff48fb56beb0ca7a28f28422145cbb0249ade07b0d5ba5356f9e2a37"
-"capability/mod.rs" = "af9b51c9155d261cdbd2b8d960b2090394d80175efced6f08a4168a37de67006"
+"capability/cap_policy/decision.rs" = "439ba4f4618bab63715df6404457918d8eeaffdfaf4e08a44fdfc73b2b0287f7"
+"capability/cap_policy/mod.rs" = "de11bb21d025aa3c108142811c782ce14906d9e1cad29e93f369a625104b8ca7"
+"capability/mod.rs" = "746153e65163b77e8d28d154e36ffcb544f20cfdecf4e2804fa65576b8d59e16"
 "capability/working_memory/mod.rs" = "151f1ea71b3b05e575b4771736a65aaaba0503e3a33a20d949d8e5382829892a"
 "capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"
 "capability/working_memory/policy_runtime.rs" = "199858803e69787c8f981c18f4fa22201c8ad0f47d18638623606462e2e374b5"
@@ -935,7 +939,7 @@ set_hash = "526ce107ca0d8d42d6cd52cec011f9c2c03de6cf4b3fdbc9994a3b8e0be05cee"
 "scheduler/kernel_ctx.rs" = "4fb780685c375ddf4115da9d9712dbafea52d8b2c4bd7b15a77059907127f807"
 "scheduler/mod.rs" = "9eb15c7cb98f00ab5a08085dd3a7d8d4ea5d940df8643f9110c540889ef1bcb2"
 "scheduler/schedule_watchdog.rs" = "d09a72d6d1ae27013a9de5e0a294dad3289776b68c133cc2210dfaa4cfd58703"
-"scheduler/scheduler_loop.rs" = "a776c81b58c6688d31e8f407c38c798cf05392242f0261d53befb948f1d4f7d1"
+"scheduler/scheduler_loop.rs" = "7ebf639c0282d2b6510682f1a11a2f28b2ea4b12789db3dc531cc785615a55d9"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
 "security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"

@@ -77,4 +77,52 @@ pub enum ESkillQueue {
     /// A Pending entry with this SkillId already exists in the queue.
     #[error("duplicate skill id `{0}`: a Pending entry with this id already exists in the admission queue")]
     DuplicateSkillId(String),
+    #[error("authored skill id is outside the root-resolved class namespace")]
+    ForeignNamespace,
+    #[error("revision target is not an admitted skill authored by this class")]
+    TargetNotOwned,
+    #[error("target version is stale or authored version does not advance")]
+    StaleTargetVersion,
+    #[error("skill requires an action absent from the author's declared scopes")]
+    CapabilityEscalation,
+    #[error("payload contains an indexed principal id")]
+    PrincipalDataRefused,
+    #[error("telemetry evidence pid differs from the root-fixed author pid")]
+    EvidenceMismatch,
+    #[error("unknown stored entry path `{0}`")]
+    UnknownEntryPath(String),
+    #[error("invalid stored entry `{0}`")]
+    InvalidStoredEntry(String),
+    #[error("invalid skill document: {0}")]
+    Schema(#[from] ESkillSchema),
+    #[error("invalid revision proposal: {0}")]
+    Proposal(#[from] ESkillProposal),
+    #[error("skill queue entry was not found")]
+    EntryNotFound,
+    #[error("skill id identifies multiple entries; use an entry id")]
+    AmbiguousEntry,
+    #[error("skill queue entry already has a terminal decision")]
+    AlreadyDecided,
+}
+
+impl ESkillQueue {
+    /// Stable, non-personal refusal code suitable for an audit receipt.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::DuplicateSkillId(_) => "duplicate-skill-id",
+            Self::ForeignNamespace => "foreign-namespace",
+            Self::TargetNotOwned => "target-not-owned",
+            Self::StaleTargetVersion => "stale-target-version",
+            Self::CapabilityEscalation => "capability-escalation",
+            Self::PrincipalDataRefused => "principal-data-refused",
+            Self::EvidenceMismatch => "evidence-mismatch",
+            Self::UnknownEntryPath(_) => "unknown-entry-path",
+            Self::InvalidStoredEntry(_) => "invalid-stored-entry",
+            Self::Schema(_) => "skill-schema",
+            Self::Proposal(_) => "skill-proposal",
+            Self::EntryNotFound => "entry-not-found",
+            Self::AmbiguousEntry => "ambiguous-entry",
+            Self::AlreadyDecided => "already-decided",
+        }
+    }
 }

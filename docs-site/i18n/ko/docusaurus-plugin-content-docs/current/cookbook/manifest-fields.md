@@ -84,7 +84,7 @@ on_confidence_below = 0.6
 
 ## Discussion
 
-`manifest_schema_version`은 kernel이 지원하는 범위 안에 있어야 합니다. 스키마 v5는 현재 최대 버전이며 `wasm-component` 형식을 지원합니다.
+`manifest_schema_version`은 kernel이 지원하는 범위 안에 있어야 합니다. 현재 최대 버전인 스키마 v6는 native [skill authoring](../manifest/v6)을 추가하며, `wasm-component` 형식을 포함한 v5도 계속 지원합니다.
 
 이 예시의 `my-spirit` 이름은 daemon의 내장 class가 아닙니다. manifest는 구조적으로 유효하지만, daemon이 어드미션하려면 실제 퍼스트파티 class를 컴파일하고 등록해야 합니다.
 

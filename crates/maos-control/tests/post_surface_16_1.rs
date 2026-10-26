@@ -319,6 +319,10 @@ impl OperatorCommandPort for FakePort {
             revoked_count: 1,
         }]
     }
+
+    fn skills_status(&self, entry: Option<&str>, roots: &[String]) -> OperatorOutcome {
+        OperatorOutcome::Completed(serde_json::json!({"entry": entry, "roots": roots}))
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1465,4 +1469,62 @@ fn ambiguous_or_overlong_request_framing_is_rejected() {
             "{case} must be rejected instead of reinterpreted: {response}"
         );
     }
+}
+
+#[test]
+fn skill_routes_require_bearer_and_keep_reads_and_decisions_distinct() {
+    let port = Arc::new(FakePort::new(PortBehaviour::Complete));
+    let server = server_with(Arc::clone(&port));
+    for path in [
+        "/v1/skills",
+        "/v1/skills/0123456789abcdef",
+        "/v1/skills/decide",
+    ] {
+        assert_eq!(status_of(&request(&server, "GET", path, "wrong")), 401);
+    }
+    let list = request(&server, "GET", "/v1/skills", TOKEN);
+    assert_eq!(status_of(&list), 200);
+    assert!(json_of(&list)["entry"].is_null());
+    let show = request(&server, "GET", "/v1/skills/0123456789abcdef", TOKEN);
+    assert_eq!(json_of(&show)["entry"], "0123456789abcdef");
+    assert_eq!(
+        status_of(&request(&server, "POST", "/v1/skills", TOKEN)),
+        405
+    );
+    assert_eq!(
+        status_of(&request(&server, "GET", "/v1/skills/decide", TOKEN)),
+        405
+    );
+    let body = r#"{"entry":"0123456789abcdef","approve":false,"actor":"alice"}"#;
+    let response = exchange(&server, &format!(
+        "POST /v1/skills/decide HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()));
+    assert_eq!(status_of(&response), 200, "{response}");
+    let command = json_of(&response)["command"].as_str().unwrap().to_string();
+    assert!(command.contains("SkillDecision"));
+    assert!(command.contains("approve: false"));
+    assert!(command.contains("0123456789abcdef"));
+    assert!(command.contains("alice"));
+    assert_eq!(port.submissions.load(Ordering::Acquire), 1);
+}
+
+#[test]
+fn malformed_skill_decision_never_submits_and_custom_roots_reach_the_read_port() {
+    let port = Arc::new(FakePort::new(PortBehaviour::Complete));
+    let server = server_with(Arc::clone(&port));
+    for body in [
+        r#"{"entry":"x","actor":"alice"}"#,
+        r#"{"entry":"x","approve":"true","actor":"alice"}"#,
+        r#"{"entry":"../x","approve":true,"actor":"alice"}"#,
+        r#"{"entry":"x","approve":true}"#,
+    ] {
+        let response = exchange(&server, &format!(
+            "POST /v1/skills/decide HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()));
+        assert_eq!(status_of(&response), 400, "{response}");
+    }
+    assert_eq!(port.submissions.load(Ordering::Acquire), 0);
+    let body = r#"{"roots":["/scratch/skills"]}"#;
+    let response = exchange(&server, &format!(
+        "GET /v1/skills HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()));
+    assert_eq!(status_of(&response), 200);
+    assert_eq!(json_of(&response)["roots"][0], "/scratch/skills");
 }

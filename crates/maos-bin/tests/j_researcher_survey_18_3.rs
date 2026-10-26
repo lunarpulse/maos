@@ -904,6 +904,7 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
         })),
         recall: Some(Arc::clone(&recall)),
         legacy_cassette: None,
+        skill: None,
     };
     let mut host = ResearcherHost::new(
         Arc::clone(&tl),

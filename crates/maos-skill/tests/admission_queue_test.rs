@@ -1,158 +1,74 @@
-//! Operator-admission queue — Story 7.4 AC2: three entry paths, pending !=
-//! admitted, approve/reject transitions, distinguishable audit rows.
-
-use maos_domain::self_telemetry::SelfTelemetryReport;
+//! Package discovery shares the same explicit operator decision mechanics.
 use maos_skill::{
-    build_proposal, parse_skill, ESkillQueue, Skill, SkillAdmissionQueue, SkillAdmissionState,
-    SkillEntryPath, SkillId, SkillVersion,
+    parse_skill, ESkillQueue, ESkillStore, SkillAdmissionQueue, SkillAdmissionState,
+    SkillEntryPath, SkillId,
 };
-
-fn skill(id: &str) -> Skill {
-    let src = format!(
-        "---\nid = \"{id}\"\nversion = \"1.0.0\"\nname = \"{id}\"\ndescription = \"d\"\n---\nBody for {id}.\n"
-    );
-    parse_skill(&src).unwrap()
-}
-
-fn telemetry() -> SelfTelemetryReport {
-    SelfTelemetryReport::new(42, 1_000, 2_000, 10, 1, 0, 0, 0, vec![], vec![], 2_500).unwrap()
-}
-
-#[test]
-fn three_entry_paths_all_land_pending_never_auto_admitted() {
+fn queue() -> SkillAdmissionQueue {
     let mut q = SkillAdmissionQueue::new();
-
-    // (1) package-shipped
-    q.enqueue_skill(
-        skill("skill.pkg"),
-        SkillEntryPath::PackageShipped,
-        "package",
+    let skill = parse_skill(
+        "---\nid='pkg.core'\nversion='1.0.0'\nname='Core'\ndescription='d'\n---\nBody\n",
     )
     .unwrap();
-    // (2) skill.author.self (dynamic write)
-    q.enqueue_skill(skill("skill.self"), SkillEntryPath::AuthorSelf, "spirit:42")
+    q.enqueue_skill(skill, SkillEntryPath::PackageShipped, "package")
         .unwrap();
-    // (3) FR57 revision proposal
-    let proposal = build_proposal(
-        SkillId::from("skill.target"),
-        SkillVersion::from("2.0.0"),
-        "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n".into(),
-        telemetry(),
-    )
-    .unwrap();
-    q.enqueue_proposal(proposal, "spirit:42").unwrap();
-
-    assert_eq!(q.entries().len(), 3);
-    assert_eq!(q.pending_count(), 3);
-    // CRITICAL: nothing is auto-admitted — all three land Pending.
-    assert!(q
-        .entries()
-        .iter()
-        .all(|e| e.state == SkillAdmissionState::Pending));
-
-    // The three entry paths are distinguishable.
-    let labels: Vec<&str> = q.entries().iter().map(|e| e.entry_path.label()).collect();
+    q
+}
+#[test]
+fn package_lands_pending_with_non_admitting_enqueue_receipt() {
+    let q = queue();
+    assert_eq!(q.pending_count(), 1);
+    assert_eq!(q.entries()[0].entry_path, "package_shipped");
+    let row = &q.audit_trail()[0];
+    assert_eq!(row.capability, "skill.admission.enqueue");
+    assert!(!row.decision);
+    assert_eq!(row.target, "pkg.core@1.0.0");
+}
+#[test]
+fn preparing_approval_does_not_activate_and_apply_is_terminal() {
+    let mut q = queue();
+    let row = q
+        .prepare_decision("pkg.core", true, "operator".into())
+        .unwrap();
+    assert!(row.decision);
     assert_eq!(
-        labels,
-        ["package_shipped", "author_self", "revision_proposal"]
+        q.state_of(&SkillId::from("pkg.core")),
+        Some(SkillAdmissionState::Pending)
     );
-}
-
-#[test]
-fn approve_transitions_pending_to_admitted_and_journals() {
-    let mut q = SkillAdmissionQueue::new();
-    let id = q
-        .enqueue_skill(
-            skill("skill.approve"),
-            SkillEntryPath::AuthorSelf,
-            "spirit:7",
-        )
-        .unwrap();
-    assert_eq!(q.state_of(&id), Some(SkillAdmissionState::Pending));
-
-    assert!(q.approve(&id), "approve must find the pending entry");
-    assert_eq!(q.state_of(&id), Some(SkillAdmissionState::Admitted));
+    q.apply_decision("pkg.core", true, None).unwrap();
     assert_eq!(q.pending_count(), 0);
-
-    // Audit trail: one enqueue row (decision=false) + one operator approve row (decision=true).
-    let audit = q.audit_trail();
-    assert_eq!(audit.len(), 2);
-    assert_eq!(audit[0].capability, "skill.admission.enqueue");
-    assert!(
-        !audit[0].decision,
-        "enqueue row is pending (decision=false)"
-    );
-    assert_eq!(audit[1].capability, "skill.admission.approve");
-    assert!(audit[1].decision, "approve row is decision=true");
-    assert_eq!(audit[1].actor, "operator");
+    assert!(matches!(
+        q.prepare_decision("pkg.core", false, "operator".into()),
+        Err(ESkillQueue::AlreadyDecided)
+    ));
 }
-
 #[test]
-fn reject_transitions_pending_to_rejected() {
-    let mut q = SkillAdmissionQueue::new();
-    let id = q
-        .enqueue_skill(
-            skill("skill.reject"),
-            SkillEntryPath::PackageShipped,
-            "package",
-        )
+fn rejection_is_terminal() {
+    let mut q = queue();
+    let row = q
+        .prepare_decision("pkg.core", false, "operator".into())
         .unwrap();
-    assert!(q.reject(&id));
-    assert_eq!(q.state_of(&id), Some(SkillAdmissionState::Rejected));
-    let audit = q.audit_trail();
-    assert_eq!(audit.last().unwrap().capability, "skill.admission.reject");
-    assert!(!audit.last().unwrap().decision);
+    assert_eq!(row.capability, "skill.admission.reject");
+    q.apply_decision("pkg.core", false, None).unwrap();
+    assert_eq!(q.entries()[0].state, SkillAdmissionState::Rejected);
 }
-
 #[test]
-fn approve_unknown_id_is_a_noop() {
-    let mut q = SkillAdmissionQueue::new();
-    assert!(!q.approve(&SkillId::from("does.not.exist")));
+fn unknown_entry_refuses_without_mutation() {
+    let mut q = queue();
+    assert!(matches!(
+        q.apply_decision("missing", true, None),
+        Err(ESkillStore::InvalidEntry(ESkillQueue::EntryNotFound))
+    ));
+    assert_eq!(q.pending_count(), 1);
 }
-
 #[test]
-fn already_resolved_entry_does_not_transition_again() {
-    let mut q = SkillAdmissionQueue::new();
-    let id = q
-        .enqueue_skill(skill("skill.once"), SkillEntryPath::AuthorSelf, "spirit:1")
-        .unwrap();
-    assert!(q.approve(&id));
-    // A second approve finds no PENDING entry with that id.
-    assert!(!q.approve(&id));
-    assert!(!q.reject(&id));
-    assert_eq!(q.state_of(&id), Some(SkillAdmissionState::Admitted));
-}
-
-#[test]
-fn duplicate_skill_id_rejected_on_enqueue() {
-    let mut q = SkillAdmissionQueue::new();
-    q.enqueue_skill(
-        skill("skill.dup"),
-        SkillEntryPath::PackageShipped,
-        "package",
-    )
-    .unwrap();
-    let err = q
-        .enqueue_skill(skill("skill.dup"), SkillEntryPath::AuthorSelf, "spirit:1")
-        .unwrap_err();
-    assert!(matches!(err, ESkillQueue::DuplicateSkillId(ref id) if id == "skill.dup"));
-    assert_eq!(
-        q.entries().len(),
-        1,
-        "only the first entry should be in the queue"
-    );
-}
-
-#[test]
-fn same_id_after_approve_allows_re_enqueue() {
-    let mut q = SkillAdmissionQueue::new();
-    let id = q
-        .enqueue_skill(skill("skill.re"), SkillEntryPath::PackageShipped, "package")
-        .unwrap();
-    q.approve(&id);
-    let id2 = q
-        .enqueue_skill(skill("skill.re"), SkillEntryPath::AuthorSelf, "spirit:1")
-        .unwrap();
-    assert_eq!(id, id2);
-    assert_eq!(q.entries().len(), 2);
+fn duplicate_package_identity_refuses_even_after_resolution() {
+    let mut q = queue();
+    q.apply_decision("pkg.core", true, None).unwrap();
+    let entry = q.entries()[0].clone();
+    let mut entry = entry;
+    entry.state = SkillAdmissionState::Pending;
+    assert!(matches!(
+        q.commit_prepared(entry),
+        Err(ESkillStore::InvalidEntry(ESkillQueue::DuplicateSkillId(_)))
+    ));
 }

@@ -12,8 +12,9 @@ Every Spirit ships a `manifest.toml` describing its identity, resource budget, c
 
 | Version | Status | Description |
 |---------|--------|-------------|
-| [v5](./v5) | **Current** | Adds `wasm-component` and `[class].artifact` (Story 17-3b). |
-| [v4](./v4) | Supported (N-1) | Adds `[capabilities.required.loom]` (Story 13.5d). |
+| [v6](./v6) | **Current** | Native `skill.author.self` declaration (Story 18-7). |
+| [v5](./v5) | Supported (N-1) | Adds `wasm-component` and `[class].artifact` (Story 17-3b). |
+| [v4](./v4) | Supported | Adds `[capabilities.required.loom]` (Story 13.5d). |
 | [v3](./v3) | Supported | Adds `[model_provenance]` (Story 9.4b). |
 | [v2](./v2) | Supported | Adds `[cli_wrapper]`, `[[schedule]]`, `[[gateway]]` (Epic 6). |
 | [v1](./v1) | Supported | Baseline schema (Epic 1b). |
@@ -22,7 +23,7 @@ Every Spirit ships a `manifest.toml` describing its identity, resource budget, c
 
 The kernel admits exactly the schema versions in its configured inclusive range:
 
-- **Current configured range:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, currently `1..=5`.
+- **Current configured range:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, currently `1..=6`.
 - **Below `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION`:** rejected at admission with `EAbiTooOld`.
 - **Above `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`:** rejected at admission with `EAbiTooNew`.
 

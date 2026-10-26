@@ -308,89 +308,289 @@ fn busy_timeout_5000_blocks_then_succeeds_green() {
     );
 }
 
-// ─── F2 self-heal: unknown-schema cache does not corrupt TL-derived decide ─
-
 #[test]
-fn schema_mismatch_cache_self_heals_through_decide() {
-    // Seed a queue.json with a future schema version. The store parser hard-fails
-    // (AC-1 tripwire at the parse layer), but the CLI must warn, derive pending
-    // from discovery + TL, journal correctly, and rewrite the cache as valid v1.
+fn unknown_or_corrupt_payload_queue_is_never_rebuilt_or_overwritten() {
     let dir = tempfile::tempdir().unwrap();
-    let skills_root = dir.path().join("skills");
-    write_skill(&skills_root, "skill.heal");
-    let discovered = discover_skills_detailed(&[skills_root]);
-    assert_eq!(discovered.discovered.len(), 1);
-
+    let root = dir.path().join("skills");
+    write_skill(&root, "skill.guarded");
+    let discovered = discover_skills_detailed(&[root]);
     let store = LocalFsSkillQueueStore::at_path(dir.path().join("queue.json"));
     let tl_path = dir.path().join("tl.db");
-
-    // Pre-seed a future-schema file. `load()` must refuse to parse it.
-    fs::write(
-        store.path(),
-        r#"{"schema_version":"maos.skill-queue.v99","pending":[{"id":"skill.heal","version":"1.0.0","entry_path":"package_shipped","state":"Pending"}]}"#,
-    )
-    .unwrap();
-    assert!(
-        store.load().is_err(),
-        "the store parser must hard-fail an unknown schema version"
-    );
-
-    // Decide must proceed (cache is rebuildable), journal to the TL, and rewrite
-    // the cache as the current schema version.
-    let out = decide_skill(
-        &discovered.discovered,
-        load_cache_warn(&store),
-        &store,
-        &tl_path,
-        "skill.heal",
-        true,
-        "healer",
-    );
-    assert!(
-        matches!(
-            out,
-            DecideOutcome::Applied {
-                new_state: SkillAdmissionState::Admitted
-            }
-        ),
-        "decide must succeed despite a bad cache: {out:?}"
-    );
-
-    // TL is the source of truth: exactly one approve row.
+    for bytes in [
+        r#"{"schema_version":"maos.skill-queue.v99","pending":[]}"#,
+        r#"{"schema_version":"maos.skill-queue.v2","pending":[{"id":"lost-payload"}]}"#,
+        r#"{"schema_version":"maos.skill-queue.v2","pending":["#,
+    ] {
+        fs::write(store.path(), bytes).unwrap();
+        let outcome = decide_skill(
+            &discovered.discovered,
+            vec![],
+            &store,
+            &tl_path,
+            "skill.guarded",
+            true,
+            "operator",
+        );
+        assert!(
+            matches!(outcome, DecideOutcome::JournalFailed(_)),
+            "{outcome:?}"
+        );
+        assert_eq!(fs::read(store.path()).unwrap(), bytes.as_bytes());
+    }
     let tl = TransparencyLogAdapter::open(&tl_path, 0).unwrap();
-    let rows = tl.query_approvals(None).unwrap();
-    assert_eq!(
-        rows.iter()
-            .filter(|d| d.target == "skill.heal@1.0.0")
-            .count(),
-        1,
-        "exactly one approve row must be journaled"
-    );
-
-    // Cache was rewritten as valid v1.
-    let cached = store.load().unwrap();
-    assert!(
-        cached.iter().any(
-            |e| e.id == SkillId::from("skill.heal") && e.state == SkillAdmissionState::Admitted
-        ),
-        "cache must be rewritten with the admitted skill"
-    );
-
-    // A subsequent list/decide load sees a valid v1 cache and emits no warning.
-    // (load_cache_warn is exercised here via the decide path above; the test log
-    // is not captured, but the fact that decide succeeded and cached v1 proves
-    // the self-heal path.)
+    assert!(tl.query_approvals(None).unwrap().is_empty());
 }
 
-// Helper mirroring the production cache-load policy for tests that need to
-// drive `decide_skill` with a future-schema cache without hand-mirroring the
-// warning logic.
-fn load_cache_warn(store: &LocalFsSkillQueueStore) -> Vec<maos_skill::QueueEntry> {
-    use maos_skill::ESkillStore;
-    match store.load() {
-        Ok(s) => s,
-        Err(ESkillStore::UnknownSchemaVersion(_)) => Vec::new(),
-        Err(ESkillStore::Io(_)) | Err(ESkillStore::Json(_)) => Vec::new(),
-        Err(_) => Vec::new(),
+fn authored_queue() -> (maos_skill::SkillAdmissionQueue, String, String) {
+    use maos_skill::{AuthorIdentity, SkillAdmissionQueue, SubmissionContext};
+    let author = AuthorIdentity {
+        class: "researcher".into(),
+        pid: 7,
+        boot_nonce: "boot".into(),
+    };
+    let actions = std::collections::BTreeSet::new();
+    let ctx = SubmissionContext {
+        author: &author,
+        declared_actions: &actions,
+        principal_ids: &[],
+    };
+    let document = "---\nid='researcher.core'\nversion='1.0.0'\nname='Core'\ndescription='d'\n---\nOriginal body\n".to_string();
+    let mut queue = SkillAdmissionQueue::new();
+    let (entry, _) = queue.prepare_author(document.clone(), &ctx).unwrap();
+    let id = entry.entry_id.clone();
+    queue.commit_prepared(entry).unwrap();
+    (queue, id, document)
+}
+
+#[test]
+fn authored_decision_journals_before_materializing_and_saving() {
+    use maos_cli::subcommands::apply_skill_decision;
+    let dir = tempfile::tempdir().unwrap();
+    let store = LocalFsSkillQueueStore::at_path(dir.path().join("queue.json"));
+    let directory = dir.path().join("materialized");
+    let destination = directory.join("researcher.core.md");
+    let tl = TransparencyLogAdapter::open(&dir.path().join("tl.db"), 0).unwrap();
+    let (mut queue, id, document) = authored_queue();
+    store.save(queue.entries()).unwrap();
+    let before = fs::read(store.path()).unwrap();
+    apply_skill_decision(
+        &mut queue,
+        &store,
+        &id,
+        true,
+        "alice",
+        Some(&directory),
+        |row| {
+            assert!(!destination.exists());
+            assert_eq!(fs::read(store.path()).unwrap(), before);
+            assert_eq!(row.target, "researcher.core@1.0.0");
+            assert!(row.reasoning.as_ref().unwrap().contains(&id));
+            assert!(!format!("{row:?}").contains("Original body"));
+            tl.insert_approval_decision(row).map_err(|e| e.to_string())
+        },
+    )
+    .unwrap();
+    assert_eq!(fs::read_to_string(destination).unwrap(), document);
+    assert_eq!(
+        store.load().unwrap()[0].state,
+        SkillAdmissionState::Admitted
+    );
+    assert_eq!(tl.query_approvals(None).unwrap().len(), 1);
+    assert_eq!(
+        apply_skill_decision(&mut queue, &store, &id, false, "bob", None, |_| panic!(
+            "resolved entries must not journal twice"
+        ))
+        .unwrap(),
+        SkillAdmissionState::Admitted
+    );
+}
+
+#[test]
+fn journal_failure_mutates_nothing_and_materialization_failure_is_reported_after_commit() {
+    use maos_cli::subcommands::{apply_skill_decision, SkillDecisionError};
+    let dir = tempfile::tempdir().unwrap();
+    let store = LocalFsSkillQueueStore::at_path(dir.path().join("queue.json"));
+    let (mut queue, id, _) = authored_queue();
+    store.save(queue.entries()).unwrap();
+    let before = fs::read(store.path()).unwrap();
+    let directory = dir.path().join("skills");
+    let out = apply_skill_decision(
+        &mut queue,
+        &store,
+        &id,
+        true,
+        "alice",
+        Some(&directory),
+        |_| Err("journal unavailable".into()),
+    );
+    assert!(matches!(out, Err(SkillDecisionError::Journal(_))));
+    assert_eq!(fs::read(store.path()).unwrap(), before);
+    assert!(!directory.exists());
+    assert_eq!(queue.show(&id).unwrap().state, SkillAdmissionState::Pending);
+    fs::create_dir_all(&directory).unwrap();
+    let destination = directory.join("researcher.core.md");
+    fs::write(&destination, "foreign document").unwrap();
+    let tl = TransparencyLogAdapter::open(&dir.path().join("tl.db"), 0).unwrap();
+    let out = apply_skill_decision(
+        &mut queue,
+        &store,
+        &id,
+        true,
+        "alice",
+        Some(&directory),
+        |row| tl.insert_approval_decision(row).map_err(|e| e.to_string()),
+    );
+    assert!(matches!(
+        out,
+        Err(SkillDecisionError::Store(
+            maos_skill::ESkillStore::MaterializeCollision(_)
+        ))
+    ));
+    assert_eq!(tl.query_approvals(None).unwrap().len(), 1);
+    assert_eq!(fs::read(store.path()).unwrap(), before);
+    assert_eq!(fs::read_to_string(destination).unwrap(), "foreign document");
+}
+
+#[test]
+fn queue_save_failure_never_reports_a_committed_decision_as_success() {
+    use maos_cli::subcommands::{apply_skill_decision, SkillDecisionError};
+    struct RefusingStore(std::path::PathBuf);
+    impl SkillQueueStore for RefusingStore {
+        fn load(&self) -> Result<Vec<maos_skill::QueueEntry>, maos_skill::ESkillStore> {
+            Ok(vec![])
+        }
+        fn save(&self, _: &[maos_skill::QueueEntry]) -> Result<(), maos_skill::ESkillStore> {
+            Err(std::io::Error::other("forced queue save failure").into())
+        }
+        fn path(&self) -> &Path {
+            &self.0
+        }
     }
+    let dir = tempfile::tempdir().unwrap();
+    let (mut queue, id, _) = authored_queue();
+    let tl = TransparencyLogAdapter::open(&dir.path().join("tl.db"), 0).unwrap();
+    let out = apply_skill_decision(
+        &mut queue,
+        &RefusingStore(dir.path().join("queue.json")),
+        &id,
+        false,
+        "alice",
+        None,
+        |row| tl.insert_approval_decision(row).map_err(|e| e.to_string()),
+    );
+    assert!(matches!(
+        out,
+        Err(SkillDecisionError::Store(maos_skill::ESkillStore::Io(_)))
+    ));
+    assert_eq!(tl.query_approvals(None).unwrap().len(), 1);
+}
+
+#[test]
+fn admission_view_keeps_revision_entries_and_refuses_ambiguous_skill_ids() {
+    use maos_cli::subcommands::{apply_skill_decision, skill_entries, SkillDecisionError};
+    use maos_skill::{AuthorIdentity, SkillAdmissionQueue, SubmissionContext};
+    let dir = tempfile::tempdir().unwrap();
+    let directory = dir.path().join("skills");
+    let store = LocalFsSkillQueueStore::at_path(dir.path().join("queue.json"));
+    let tl = TransparencyLogAdapter::open(&dir.path().join("tl.db"), 0).unwrap();
+    let (mut queue, base, _) = authored_queue();
+    apply_skill_decision(
+        &mut queue,
+        &store,
+        &base,
+        true,
+        "alice",
+        Some(&directory),
+        |row| tl.insert_approval_decision(row).map_err(|e| e.to_string()),
+    )
+    .unwrap();
+    let mut revisions = Vec::new();
+    for pid in [7, 8] {
+        let author = AuthorIdentity {
+            class: "researcher".into(),
+            pid,
+            boot_nonce: "boot".into(),
+        };
+        let actions = std::collections::BTreeSet::new();
+        let ctx = SubmissionContext {
+            author: &author,
+            declared_actions: &actions,
+            principal_ids: &[],
+        };
+        let report = maos_domain::self_telemetry::SelfTelemetryReport::new(
+            pid,
+            10,
+            20,
+            3,
+            1,
+            0,
+            0,
+            0,
+            vec![],
+            vec![],
+            21,
+        )
+        .unwrap();
+        let proposal = maos_skill::build_proposal(
+            "researcher.core".into(),
+            "1.0.0".into(),
+            format!("-old\n+new from {pid}"),
+            report,
+        )
+        .unwrap();
+        let (entry, _) = queue.prepare_proposal(proposal, &ctx).unwrap();
+        revisions.push(entry.entry_id.clone());
+        queue.commit_prepared(entry).unwrap();
+    }
+    store.save(queue.entries()).unwrap();
+    let discovered = discover_skills_detailed(&[directory.clone()]);
+    let mut view = skill_entries(
+        &discovered.discovered,
+        store.load().unwrap(),
+        &tl.query_approvals(None).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(view.entries().len(), 3);
+    let refusal = apply_skill_decision(
+        &mut view,
+        &store,
+        "researcher.core",
+        true,
+        "alice",
+        Some(&directory),
+        |_| panic!("ambiguous selectors must not journal"),
+    );
+    assert!(matches!(
+        refusal,
+        Err(SkillDecisionError::Queue(
+            maos_skill::ESkillQueue::AmbiguousEntry
+        ))
+    ));
+    apply_skill_decision(
+        &mut view,
+        &store,
+        &revisions[0],
+        false,
+        "alice",
+        Some(&directory),
+        |row| tl.insert_approval_decision(row).map_err(|e| e.to_string()),
+    )
+    .unwrap();
+    let restored = SkillAdmissionQueue::from_stored(store.load().unwrap()).unwrap();
+    assert_eq!(
+        restored.show(&base).unwrap().state,
+        SkillAdmissionState::Admitted
+    );
+    assert_eq!(
+        restored.show(&revisions[1]).unwrap().state,
+        SkillAdmissionState::Pending
+    );
+    assert!(tl
+        .query_approvals(None)
+        .unwrap()
+        .iter()
+        .any(
+            |row| row.target == format!("researcher.core@1.0.0#{}", revisions[0])
+                && row.capability == "skill.admission.reject"
+        ));
 }

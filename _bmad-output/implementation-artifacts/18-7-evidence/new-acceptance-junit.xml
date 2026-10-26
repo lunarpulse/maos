@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="39" skipped="0" failures="0" errors="0" uuid="ad250dd7-54f4-4e1f-bcbb-98a25cb8cdcd" timestamp="2026-10-26T11:31:10.647+00:00" time="1.951">
+    <testsuite name="maos-bin::skill_door_18_7" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="live_submission_and_door_decision_share_one_lock_without_lost_updates" classname="maos-bin::skill_door_18_7" timestamp="2026-10-26T11:31:10.647+00:00" time="0.061"/>
+        <testcase name="root_liveness_set_creates_and_locks_an_initially_missing_home" classname="maos-bin::skill_door_18_7" timestamp="2026-10-26T11:31:10.709+00:00" time="0.004"/>
+    </testsuite>
+    <testsuite name="maos-bin::skill_port_18_7" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="author_uses_root_pid_and_scb_class_mints_verifies_and_persists_enqueue_payload" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.713+00:00" time="0.009"/>
+        <testcase name="exhausted_context_refuses_both_submissions_at_root_fixed_pid" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.722+00:00" time="0.007"/>
+        <testcase name="issuance_quota_exhaustion_is_typed_journaled_and_preserves_existing_queue" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.728+00:00" time="0.007"/>
+        <testcase name="library_ownership_schema_escalation_and_principal_refusals_reach_typed_root_receipts" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.736+00:00" time="0.016"/>
+        <testcase name="org_deny_overrides_declared_authority_for_author_and_proposal" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.751+00:00" time="0.008"/>
+        <testcase name="port_trait_accepts_only_content_not_pid_class_evidence_or_decision" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.759+00:00" time="0.003"/>
+        <testcase name="proposal_evidence_is_root_telemetry_for_bound_pid_and_bind_window" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.763+00:00" time="0.009"/>
+        <testcase name="undeclared_author_and_proposal_are_typed_journaled_and_never_enqueued" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.771+00:00" time="0.005"/>
+        <testcase name="weak_services_shutdown_returns_host_shutdown_for_every_method_and_drains_audit" classname="maos-bin::skill_port_18_7" timestamp="2026-10-26T11:31:10.777+00:00" time="0.006"/>
+    </testsuite>
+    <testsuite name="maos-cli::skills_door_18_7" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="corrupt_v2_offline_show_and_decide_leave_payload_bytes_untouched" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T11:31:10.782+00:00" time="0.016"/>
+        <testcase name="list_preserves_custom_discovery_roots_over_the_door" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T11:31:10.798+00:00" time="0.006"/>
+        <testcase name="list_show_approve_and_reject_use_the_same_authenticated_door" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T11:31:10.804+00:00" time="0.012"/>
+        <testcase name="offline_decision_retains_exclusive_liveness_lock_until_journal_and_queue_finish" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T11:31:10.816+00:00" time="0.013"/>
+        <testcase name="refused_connection_uses_offline_only_while_the_home_lock_is_free" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T11:31:10.830+00:00" time="0.009"/>
+        <testcase name="rejected_bearer_never_falls_back_to_offline_queue_mutation" classname="maos-cli::skills_door_18_7" timestamp="2026-10-26T11:31:10.839+00:00" time="0.006"/>
+    </testsuite>
+    <testsuite name="maos-journey-test::journey_skill_authoring_18_7" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="live_author_revision_restart_and_rejection_preserve_the_payload" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T11:31:10.845+00:00" time="1.250"/>
+        <testcase name="undeclared_live_researcher_is_refused_without_queue_mutation" classname="maos-journey-test::journey_skill_authoring_18_7" timestamp="2026-10-26T11:31:12.095+00:00" time="0.435"/>
+    </testsuite>
+    <testsuite name="maos-manifest::skill_capability_18_7" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="older_schema_never_acquires_skill_authority" classname="maos-manifest::skill_capability_18_7" timestamp="2026-10-26T11:31:12.530+00:00" time="0.004"/>
+        <testcase name="schema_six_declares_skill_author_self_only_when_requested" classname="maos-manifest::skill_capability_18_7" timestamp="2026-10-26T11:31:12.534+00:00" time="0.003"/>
+        <testcase name="unknown_skill_keys_and_non_boolean_authority_are_refused" classname="maos-manifest::skill_capability_18_7" timestamp="2026-10-26T11:31:12.538+00:00" time="0.004"/>
+    </testsuite>
+    <testsuite name="maos-skill::live_submission_18_7" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="admission_materializes_only_after_decision_and_foreign_files_never_overwrite" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.542+00:00" time="0.003"/>
+        <testcase name="authored_next_version_replaces_only_known_owned_bytes_and_advances_target" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.545+00:00" time="0.004"/>
+        <testcase name="full_document_diff_evidence_and_provenance_survive_restart" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.549+00:00" time="0.004"/>
+        <testcase name="prepare_is_side_effect_free_and_enqueue_receipt_addresses_exact_payload" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.553+00:00" time="0.003"/>
+        <testcase name="principal_matching_is_token_bounded_in_both_document_and_diff" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.556+00:00" time="0.003"/>
+        <testcase name="proposal_requires_owned_current_admitted_author_revision_and_nonempty_diff" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.559+00:00" time="0.003"/>
+        <testcase name="refusal_codes_never_include_dynamic_error_details" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.561+00:00" time="0.003"/>
+        <testcase name="two_revision_authors_coexist_and_one_decision_changes_neither_base_nor_sibling" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.564+00:00" time="0.004"/>
+        <testcase name="vetting_refuses_foreign_namespace_capability_escalation_and_malformed_document" classname="maos-skill::live_submission_18_7" timestamp="2026-10-26T11:31:12.568+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="researcher::skill_authoring_18_7" tests="8" skipped="0" errors="0" failures="0">
+        <testcase name="admitted_owned_document_gets_model_diff_with_exact_target_then_pending_proposal_is_inert" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.572+00:00" time="0.004"/>
+        <testcase name="bound_pass_authors_model_bytes_once_with_the_pass_binding_then_waits_for_admission" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.576+00:00" time="0.003"/>
+        <testcase name="distillation_refusal_prevents_generation_and_host_calls" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.579+00:00" time="0.003"/>
+        <testcase name="malformed_model_document_is_refused_by_vetted_host_not_replaced_with_template" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.582+00:00" time="0.003"/>
+        <testcase name="strict_seed_fixture_pins_real_prompts_for_author_then_admitted_base_proposal" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.585+00:00" time="0.004"/>
+        <testcase name="unavailable_reader_and_generation_drift_are_typed_with_no_submission_or_fallback" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.589+00:00" time="0.003"/>
+        <testcase name="unbound_deterministic_pass_never_reads_or_submits_even_with_author_port_installed" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.592+00:00" time="0.003"/>
+        <testcase name="undeclared_author_still_generates_and_calls_host_then_surfaces_typed_denial_without_enqueue" classname="researcher::skill_authoring_18_7" timestamp="2026-10-26T11:31:12.595+00:00" time="0.003"/>
+    </testsuite>
+</testsuites>

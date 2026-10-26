@@ -19,7 +19,7 @@ slug: "/errors/ESkillStore::Json"
 
 ## Summary
 
-The durable skill-queue cache (queue.json) is not valid JSON / failed to (de)serialize
+The durable payload queue could not be strictly serialized or deserialized.
 
 ## Rust Path
 
@@ -27,7 +27,7 @@ The durable skill-queue cache (queue.json) is not valid JSON / failed to (de)ser
 
 ## Cause
 
-The skill-queue store could not deserialize queue.json into QueueFile or serialize the queue entries. Invalid JSON, missing required fields, or values incompatible with the persisted queue schema cause deserialization to fail.
+Invalid JSON, missing required v2 identity/provenance/payload fields, unknown fields or incompatible types prevent deserialization. V1 label-only entries are accepted only through the explicit versioned migration.
 
 ## Triggers
 
@@ -35,7 +35,7 @@ The skill-queue store could not deserialize queue.json into QueueFile or seriali
 
 ## Resolution
 
-Inspect the underlying JSON error and preserve the failing queue.json for diagnosis. Use maosctl skills list to rebuild the admission view from discovery and the transparency log instead of inventing queue entries, and repair or restore a valid cache before persisting changes.
+Preserve the failing queue.json and inspect the underlying JSON error. Restore validated payload data or repair it deliberately before submitting or deciding. Discovery and the transparency log cannot reconstruct lost skill documents, diffs or telemetry evidence, so never rebuild an empty queue over a corrupt payload store.
 
 ## Source Location
 

@@ -83,7 +83,7 @@ on_confidence_below = 0.6
 
 ## Discussion
 
-`manifest_schema_version` must be within the kernel's supported range. Schema v5 is the current maximum and supports the `wasm-component` form.
+`manifest_schema_version` must be within the kernel's supported range. Schema v6 is the current maximum and adds native [skill authoring](../manifest/v6); schema v5 remains supported, including the `wasm-component` form.
 
 This example's `my-spirit` name is not a built-in daemon class. Its manifest is structurally valid, but a real first-party class must be compiled and registered with the daemon before the daemon can admit it.
 

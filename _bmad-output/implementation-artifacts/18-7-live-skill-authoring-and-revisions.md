@@ -5,14 +5,14 @@ created: 2026-10-26
 context_commit: 8fdf497f
 baseline_commit: 8fdf497f
 security_sensitive: true
-kernel_grant: "◆ FLAG-Winston, **RATIFIED 2026-10-26 by the operator (Lunarpulse), ADR-069 envelope** (`18-7-flag-winston-decision.md` §Rulings): D-18-7-01 A + D-18-7-02 A = **+5 physical / +4 tokei**: `check-kernel-baseline` 26407 → **≤ 26412** (95 files, unchanged), `maos-kernel-core` 20650 → **≤ 20654**, exact measured figure at landing after `cargo fmt --all`. Files **only**: `capability/cap_policy/decision.rs` (`Intent::SkillAuthorSelf`), `capability/cap_policy/mod.rs` (`intent_action_key` arm), `capability/mod.rs` (`scope_to_intent` arm) — D-01 A +4 / +3 measured; `scheduler/scheduler_loop.rs` (the harness `CapabilitiesRequired` literal gains the new field) — D-02 A +1 / +1 measured. Surface: the `Intent` item re-pin in `docs/ci-baselines/kernel-surface-v0.1-beta.json:62` (class `kernel-api-classes.toml:128` unchanged) and nothing else. Any other kernel file, surface item or a figure above the grant returns as a FLAG request. 18-6's review patches may move the pin first: T0 re-measures from the landed pin and applies +5 / +4 over it."
-kloc_grant: "RULED 2026-10-26 (operator, Lunarpulse): D-18-7-15 A — **Epic 18's named maos-bin budget 28914 → 29150**; exact re-pin at landing; above 29150 → STOP and re-ask. Zero-headroom and capped rows are measured requests at landing; STOP at dev above expected + 25 %: maos-skill 800 + up to 270 → STOP above +338 (1138); maos-manifest 4583 + 37 → STOP above +46 (4629); maos-cli 6104 + up to 75 → STOP above +94 (6198); maos-iac 8080 + up to 20 → STOP above +25 (8105); maos-audit 7625 + up to 18 → STOP above +23 (7648); maos-domain / capability / wasm-host / spirit-sdk expected 0 → any growth STOP; maos-control, maos-journey-test, maos-fkcs, maos-spirit-abi land exact inside their ceilings. `_aggregate_hardfail` = measured + 1. Figures re-stated over the landed values at T0."
+kernel_grant: "◆ FLAG-Winston, RATIFIED 2026-10-26 by operator Lunarpulse: D-18-7-01 A + D-18-7-02 A = +5 physical / +4 tokei over LANDED 18-6 pins: 26362 → ≤26367 physical (95 files), 20606 → ≤20610 tokei. Exactly capability/cap_policy/decision.rs, capability/cap_policy/mod.rs, capability/mod.rs, scheduler/scheduler_loop.rs; Intent surface re-pin only. Original creation figures 26407/20650 are historical, not landing limits. Exact measured pins after cargo fmt --all; any other kernel file/surface or excess requires a new FLAG ruling."
+kloc_grant: "D-18-7-15 resumed operator addendum: maos-bin ≤29500, maos-skill ≤1350 (supersedes 29150/1138 and intermediate bin29300); exact measured landing pins. Other re-derived T0 STOPs unchanged: manifest≤4629, CLI≤6198, IAC≤8295, audit≤7658; zero growth domain9975/capability1432/wasm-host2412/SDK1085; control<1791, journey<1104, FKCS<591, ABI<3000. Main approved mandatory schema-v6 inventory xtask46363→46364 (+1) under operator D-02 A; reserved ceilings retained. _aggregate_hardfail = measured +1; per-file attribution in Dev Agent Record."
 review: "bmad-code-review under docs/testing/proof-contract.md. Difficult story (◆ kernel FLAG-Winston grant + security-critical authoring/admission ACs): creation anthropic/claude-opus-5-5; dev/finisher openai-codex/gpt-6.1-sol; Blind, Edge and Acceptance on opus-5.5, Test Infrastructure on glm-5.3, plus a security-focused reading of AC1–AC3 (who may author, propose and apply; pid fixing; evidence provenance; approval-target identity; single writer; restart availability). FLAG-Winston signs off the kernel diff. fable-5.1 only with operator permission."
 ---
 
 # Story 18.7: Live skill authoring and telemetry-evidenced revisions
 
-Status: ready-for-dev
+Status: review
 
 <!-- Created 2026-10-26 at 8fdf497f by bmad-create-story under the lighter creation contract (no party-mode preflight). 18-0…18-4, 18-8 done; 18-5 done pending one CI marker pin; 18-6 implemented and under review, its code treated as landing. Last story of Epic 18. Direct reads of every decision-bearing range; the host's only cargo process (CARGO_TARGET_DIR=/mnt/build/cargo, `env -u CI -u GITHUB_ACTIONS`) ran `check-kernel-baseline` (PASSED 26407 / 95) and `kloc-check --json` (passed, aggregate 186040) at HEAD, two throwaway prototypes (D-01 A alone; D-01 A + D-02 A with its workspace ripple), `cargo check --locked --workspace`, `check-service-boundary` and `kloc-check` on each, then `git checkout -- crates` (tree clean, `check-kernel-baseline` PASSED 26407 again). FLAG record `18-7-flag-winston-decision.md`. RULED 2026-10-26 by the operator (Lunarpulse), relayed by Main: D-18-7-01…16 all as recommended (06 B, 13 B, 16 B; the rest A); kernel grant +5 / +4 ratified; maos-bin named budget 28914 → 29150 → `ready-for-dev`. Rulings applied docs-only (no cargo). -->
 
@@ -190,18 +190,18 @@ Binary size: release + strip 29,968,248 B at 18-6 (3,586,184 B under 32 MiB); re
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight at the dev HEAD.** D-18-7-01…16 RULED 2026-10-26 (all as recommended); tracker `ready-for-dev` → `in-progress`. Re-anchor: `git diff --stat 8fdf497f -- crates/maos-skill crates/maos-cli/src/subcommands.rs crates/maos-control/src/lib.rs crates/maos-manifest/src/manifest.rs crates/maos-kernel-core/src/capability crates/maos-kernel-core/src/scheduler/scheduler_loop.rs crates/maos-bin/src/{main.rs,researcher_root.rs,operator_door.rs,spirit_session.rs,worker_spawn.rs} spirits/researcher/src`. **Re-measure `check-kernel-baseline` / `kloc-check --json` from the LANDED pin** — 18-6's review patches may have moved it inside 18-6's remaining grant (26407 / 20650 at creation); the ratified +5 physical / +4 tokei applies over the landed values, never widened, and the re-stated figure is written into the FLAG record's §Re-pin before any kernel edit. Re-measure every out-of-kernel row and re-state its STOP line over the landed figure (same expected + 25 % rule). Confirm 18-6 landed unchanged in `researcher_root::construct`.
-- [ ] **T1 — Kernel** (AC2.1; ◆ only as ruled): D-01 / D-02 lines in exactly the four ruled files; `check-service-boundary` re-baseline of the `Intent` item only; the re-pin set of `18-7-flag-winston-decision.md` §Re-pin (via `check-kernel-baseline --emit-pin`).
-- [ ] **T2 — Manifest** (D-02): v6 table, degrade, scope mapping, `MANIFEST_SCHEMA_VERSION`, N-1 tests; Researcher manifest → v6 with the declaration; fixture `tests/fixtures/researcher-no-skill/manifest.toml`; docs-site manifest v6 page en + ko.
-- [ ] **T3 — maos-skill** (AC3; D-03…06, 10, 14, 16): v2 store; payload types with serde; entry id; submission vetting; `from_stored`; materialize on admit; typed errors + `docs-site/docs/errors/ESkill*-*.md` pages (`error-catalog-check`); FKCS re-pin.
-- [ ] **T4 — Root port** (AC2; CR-1…CR-4; D-01, 08): mint/verify, pid fix, evidence attach, enqueue row, receipts + `WRITER_SHAPES`, weak holds; binder in the wiring; bound in `construct`; `TaskAssign` refusal; new maos-bin src file (if any) listed in `SCANNED_SOURCE_FILES` (`crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs:927`).
-- [ ] **T5 — Door and CLI** (D-07): `OperatorCommand::SkillDecision`, routes, door handler; `maosctl skills` over `durable_verb`, `show`, offline arm.
-- [ ] **T6 — Boot enforcement** (D-12): on-path filter at `main.rs:4342-4417`.
-- [ ] **T7 — Researcher** (D-09): authoring and proposal logic, prompts, `own_entries` use; typed outcomes; cassette `skill-authoring-18-7.json` (`provenance: seed`, real prompt hashes, as 18-4 CR-3; `cassette_provenance_15_6` green).
-- [ ] **T8 — Demo and coverage** (D-13): retire steps 3–4; CI 6 → 4; coverage rows FR39/FR57; inventory `:562` "delivered by 18-7" at landing.
-- [ ] **T9 — Witnesses and plants** (AC1–AC4): journey leg, root leg, library legs; plants red and byte-restored; hosted `ci/18-7-verify` diff + checksum + workflow checked in.
-- [ ] **T10 — Governance:** kernel re-pin set, crate ceilings exact, `_aggregate_hardfail` = measured + 1; `check-kernel-baseline`, `check-service-boundary`, `kloc-check`, `check-fkcs`, `check-manifest-schema-version`, `check-skill-schema`, `check-serde-error-handling`, `check-test-cost`, `check-test-budget`, `check-coverage-matrix-completeness`, `error-catalog-check`, `check-reza-production-path`, `gen-abi-docs --check` (if the schema constant is in the generated docs), Korean coverage + glossary; release binary < 32 MiB.
-- [ ] **T11 — Regression and record:** focused suites (below); `deferred-work.md` annotations for `:479`, `:485`, `:488`, `:651` per the rulings; Dev Agent Record, File List, Change Log; tracker. Do not edit `intent-lineage-coverage-report.md` (revert if a run modifies it). No commit or push.
+- [x] **T0 — Preflight at the dev HEAD.** D-18-7-01…16 RULED 2026-10-26 (all as recommended); tracker `ready-for-dev` → `in-progress`. Re-anchor: `git diff --stat 8fdf497f -- crates/maos-skill crates/maos-cli/src/subcommands.rs crates/maos-control/src/lib.rs crates/maos-manifest/src/manifest.rs crates/maos-kernel-core/src/capability crates/maos-kernel-core/src/scheduler/scheduler_loop.rs crates/maos-bin/src/{main.rs,researcher_root.rs,operator_door.rs,spirit_session.rs,worker_spawn.rs} spirits/researcher/src`. **Re-measure `check-kernel-baseline` / `kloc-check --json` from the LANDED pin** — 18-6's review patches may have moved it inside 18-6's remaining grant (26407 / 20650 at creation); the ratified +5 physical / +4 tokei applies over the landed values, never widened, and the re-stated figure is written into the FLAG record's §Re-pin before any kernel edit. Re-measure every out-of-kernel row and re-state its STOP line over the landed figure (same expected + 25 % rule). Confirm 18-6 landed unchanged in `researcher_root::construct`. Process deviation: the FLAG T0 annotation was written late; the measurement itself preceded kernel edits (Debug Log).
+- [x] **T1 — Kernel** (AC2.1; ◆ only as ruled): D-01 / D-02 lines in exactly the four ruled files; `check-service-boundary` re-baseline of the `Intent` item only; the re-pin set of `18-7-flag-winston-decision.md` §Re-pin (via `check-kernel-baseline --emit-pin`).
+- [x] **T2 — Manifest** (D-02): v6 table, degrade, scope mapping, `MANIFEST_SCHEMA_VERSION`, N-1 tests; Researcher manifest → v6 with the declaration; fixture `tests/fixtures/researcher-no-skill/manifest.toml`; docs-site manifest v6 page en + ko.
+- [x] **T3 — maos-skill** (AC3; D-03…06, 10, 14, 16): v2 store; payload types with serde; entry id; submission vetting; `from_stored`; materialize on admit; typed errors + `docs-site/docs/errors/ESkill*-*.md` pages (`error-catalog-check`); FKCS re-pin.
+- [x] **T4 — Root port** (AC2; CR-1…CR-4; D-01, 08): mint/verify, pid fix, evidence attach, enqueue row, receipts + `WRITER_SHAPES`, weak holds; binder in the wiring; bound in `construct`; `TaskAssign` refusal; new maos-bin src file (if any) listed in `SCANNED_SOURCE_FILES` (`crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs:927`).
+- [x] **T5 — Door and CLI** (D-07): `OperatorCommand::SkillDecision`, routes, door handler; `maosctl skills` over `durable_verb`, `show`, offline arm.
+- [x] **T6 — Boot enforcement** (D-12): on-path filter at `main.rs:4342-4417`.
+- [x] **T7 — Researcher** (D-09): authoring and proposal logic, prompts, `own_entries` use; typed outcomes; cassette `skill-authoring-18-7.json` (`provenance: seed`, real prompt hashes, as 18-4 CR-3; `cassette_provenance_15_6` green).
+- [x] **T8 — Demo and coverage** (D-13): retire steps 3–4; CI 6 → 4; coverage rows FR39/FR57; inventory `:562` "delivered by 18-7" at landing.
+- [x] **T9 — Witnesses and plants** (AC1–AC4): journey leg, root leg, library legs; plants red and byte-restored; hosted `ci/18-7-verify` diff + checksum + workflow checked in. Hosted execution/run id is integrator-owned by this assignment; local simulation is complete.
+- [x] **T10 — Governance:** kernel re-pin set, raised zero-headroom ceilings exact; reserved ceilings retained with exact consumed-figure HISTORY, `_aggregate_hardfail` = measured + 1; `check-kernel-baseline`, `check-service-boundary`, `kloc-check`, `check-fkcs`, `check-manifest-schema-version`, `check-skill-schema`, `check-serde-error-handling`, `check-test-cost`, `check-test-budget`, `check-coverage-matrix-completeness`, `error-catalog-check`, `check-reza-production-path`, `gen-abi-docs --check` (if the schema constant is in the generated docs), Korean coverage + glossary; release binary < 32 MiB.
+- [x] **T11 — Regression and record:** focused suites (below); `deferred-work.md` annotations for `:479`, `:485`, `:488`, `:651` per the rulings; Dev Agent Record, File List, Change Log; tracker. Do not edit `intent-lineage-coverage-report.md` (revert if a run modifies it). No commit or push.
 
 ## Dev Notes
 
@@ -315,21 +315,179 @@ Created 2026-10-26 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter co
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+anthropic/claude-opus-5-5 (creation); openai-codex/gpt-6.1-sol (development).
 
 ### Debug Log References
 
+- T0 (2026-10-26), landed HEAD `d155f08f`: `env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo run -q --locked -p xtask -- check-kernel-baseline` PASS, **26362 physical / 95 files**; `kloc-check --json` PASS (`over_budget: []`), **20606 kernel tokei**, aggregate **186483**. Original baseline_commit is preserved. Re-anchor against `8fdf497f`: only main.rs, operator_door.rs, researcher_root.rs and Researcher src changed among T0's paths (322 insertions / 119 deletions).
+- T0 landed grants and STOP lines: kernel **26362 → ≤26367 physical**, **20606 → ≤20610 tokei**, four ruled files + Intent surface only; maos-bin **29113 → ≤29150** (37 remaining). maos-skill **800 → ≤1138** (+338); maos-manifest **4583 → ≤4629** (+46); maos-cli **6104 → ≤6198** (+94); maos-iac **8270 → ≤8295** (+25); maos-audit **7635 → ≤7658** (+23). Zero-growth STOPs: domain **9975**, capability **1432**, wasm-host **2412**, spirit-sdk **1085**. Control **1286 <1791**, journey **946 <1104**, fkcs **491 <591**, spirit-abi **1042 <3000**; reaching those ceilings STOPs. Aggregate hardfail at landing = measured +1. Forecasts and 25% rounding unchanged; no grant widened.
+- **Historical halted checkpoint (superseded by the resumed D-15 addendum below):** post-`cargo fmt --all` STOP measured maos-bin **29275 >29150 by125**, landed **29113→29275 (+162)**; aggregate **186993** (`18-7-evidence/stop-kloc.log`). Expansion and re-pins stopped until the operator's new ruling. At that checkpoint kernel20610, skill1138, manifest4604, CLI6100, FKCS480, IAC8270, audit7635, domain9975, capability1432, wasm-host2412, SDK1085, control1286, journey946, ABI1042. These are not final measurements.
+- Exercised: T1 mediation witness failed on unmediated `SkillAuthorSelf`, then the focused `cap_policy_decision` binary passed **4/4** (`t1-mediation-{red,green}.log`); these are development red/green runs, **not AC plants**. Manifest+ABI focused run reached **208 passed /1 failed /28 not run** on a hardcoded forward-version probe; replaced that probe with `MAX_SUPPORTED+1`, not re-run before STOP (`t2-schema-readers.log`). The adapter and migrated CLI compiled as dependencies of the STOP gate; no final-tree build/test claim is made.
+- `cargo generate-lockfile --offline` initially produced unrelated resolver churn while adding the specified sha2 edge. That churn was removed at halt: lock restored from landed HEAD with only `maos-skill→sha2` and `researcher→maos-skill` dependency edges. The STOP gate therefore ran before this lock cleanup; its LOC figures remain exact, but compilation is not claimed for the restored lock graph.
+- Historical halt process note: landed figures were recorded before kernel edits, but their FLAG annotation was written only at halt, later than T0 required. Original `baseline_commit` preserved. No 18-6 TI patches had been applied at that checkpoint; the separately requested resumed-pass fixes are recorded below.
+
 ### Completion Notes List
+
+#### D-18-7-15 addendum — operator ruling 2026-10-26 (resumed)
+
+Operator Lunarpulse, relayed by Main: **maos-bin 29150 → ≤29500**, **maos-skill 1138 → ≤1350** pre-ratified; intermediate bin29300 is superseded. Kernel remains **≤26367 physical / ≤20610 tokei** in the four ruled files; other T0 STOPs unchanged. Main additionally approved the mandatory schema-v6 ratified-inventory line as implied by operator D-02 A, exact xtask +1. Reserved ceilings are retained by Main's explicit ruling, not silently ratcheted down.
+
+- Implemented native model-authored Researcher drafts/revisions, root-fixed pid/class and trusted manifest declarations, weak bus/store bindings on every construction path, governed issuance/verification, root-attached telemetry, typed journaled refusals, strict v2 durable payload/identity, journal-first admission, authenticated door/CLI read/decide, offline locking, author materialization and inert queue-only rejection at boot. Third-party authoring, skill consumption, revision auto-apply, queue erasure and operator identity remain the expressly stated non-goals above.
+- Kernel physical **26362 → 26367**, tokei **20606 → 20610**, **95 files**, exactly the four ruled files. Full physical/hash/set/content-test/ceiling-rule/kloc pins moved together; only the `Intent` surface item was re-pinned. FKCS admission hash re-pinned per D-10 A.
+- Exact formatted source measurements: maos-bin **29113 → 29443** (+330, grant29500); skill **800 → 1138** (+338, grant1350); manifest **4583 → 4604**; audit **7635 → 7645**; CLI **6104 → 6154**; control **1286 → 1344**; FKCS **491 → 480**. IAC8270/domain9975/capability1432/wasm-host2412/SDK1085/journey946/ABI1042 unchanged. Every T0 STOP is respected.
+- xtask 46363 → 46364 (+1), mandatory `capabilities.required.skill` ratified post-v1 inventory; Main approved under operator D-02 A. Exact aggregate **186483 → 187284** (+801); `_aggregate_hardfail` **186484 → 187285**, measured+1.
+- Reserved ceilings deliberately retained: CLI6856, control1791, journey1104, FKCS591, ABI3000; each receives the full story-key HISTORY and exact consumed figure. Other raised rows are exact, zero-headroom pins.
+- Bin per-file tokei delta (sum+330): `skill_authoring.rs` +249, `operator_door.rs` +80, `spirit_session.rs` +8, `researcher_root.rs` +7, `lib.rs` +2, `admission.rs` +1, `main.rs` −17. Exact old/new figures: `18-7-evidence/bin-attribution.log`.
+- All four distinct AC plants were red and copy-back/`cmp`/`touch` restored; timings, commands and outputs are checked into `18-7-evidence/plants.md`. CI payload-plant SHA256, diff, branch-only workflow and one local simulation are checked in; hosted ubuntu-24.04 run/run id is the integrator's, not claimed locally.
+- Separate 18-6 TI hunks: shared door wait5s→15s; `assert_absent` uses Butler's real `butler.acceptance/v1` acceptance-record canary. Focused journey-forget + kernel cascade: **15 passed** (`18-6-ti-green.log`); not mixed into the 18-7 feature attribution.
+- Regression repairs preserve production meaning: schema-v6 readers retain log grants but drop self-authoring under older versions; survey-only counters exclude the extra authoring completion; door reload waits for the durable draft before cancelling the old pid; CI exit-line3 derives survey3/total4; unmediated GatewaySend uses its typed JSON representation; FR4 has the real kind7 refusal fixture and scanned site.
+- Host disk `wait_for_commit` stalls were observed on daemon scratch. Only local daemon acceptance uses `TMPDIR=/dev/shm`; no timeout/budget widened. An attempted custom shared scratch root caused false ancestor-lock/0700 failures in broad legacy fixtures, so the supported broad run used normal scratch and truthful `MAOS_17_2_CGROUP_MODE=undelegated` (cgroup mount read-only).
+- Final new acceptance binaries: **39 passed / 0 skipped** — root9, door2, CLI6, journey2, manifest3, library submission9, Researcher8 (`new-acceptance-green.log`). Existing library/schema readers **594 passed**; kernel lib **258 passed**; final root+FR4 **30 passed**; required d11/recovery/kernel-content/CI-shape plus complete Researcher reload reader **64 passed**; cognitive journey/cassette readers **16 passed /1 inherited skip**. Complete green runs cover every selected reader binary after fixes; `broad-status.log` preserves initial failures and the full fix-to-green provenance. No workspace suite was run.
+- Strict `check-test-budget` **PASS: 16 binaries, 206.440 s test time /800 s** from preserved complete focused reports (all five existing exception binaries included, not deleted or loosened; `budget-provenance.log`). Every new binary is below30 s; maximum **1.685 s**. Actual retired smoke **exit0, four steps [1,2,5,6]**; CI source/marker pins and cassette provenance green.
+- All named governance gates PASS: kernel baseline26367/95, service boundary, exact kloc187284, FKCS8 legs, manifest current6/min1/max6, skill schema, serde0 violations, test-cost560 files, test-budget, coverage55 v1.0 rows, error catalog65/65, corpus15 entries, Reza production-path advisory, generated ABI `--check`, formatting `--check`, KO canonical42/42 and glossary. Full outputs are in `18-7-evidence/gate-*.log`. The pre-existing aggregate alarm and Reza's four inherited `ABSENT` successors (`product_claim=NOT_PROVEN`) are unchanged, not hidden as product proof.
+- Shipped release + strip: **29,968,248 → 30,445,560 bytes**, below **33,554,432** by **3,108,872 bytes** (`release-size.log`). Plant backups and temporary attribution file removed; no scaffold remains in the repo.
+- Development model **openai-codex/gpt-6.1-sol**. Story and sprint row → **review**; original `baseline_commit` retained, `intent-lineage-coverage-report.md` untouched, no commit/push. Only the hosted ubuntu-24.04 plant run/run id is handed to the integrator; no feature implementation blocker.
 
 ### File List
 
-- `_bmad-output/implementation-artifacts/18-7-live-skill-authoring-and-revisions.md`
+- `.github/workflows/discipline.yml`
+- `Cargo.lock`
 - `_bmad-output/implementation-artifacts/18-7-flag-winston-decision.md`
-- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md`
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (18-7 row; 20-8 row comment: received item)
-- `_bmad-output/implementation-artifacts/deferred-work.md` (D-18-7-11 received row for 20-8)
+- `_bmad-output/implementation-artifacts/18-7-live-skill-authoring-and-revisions.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/epics/requirements-inventory.md`
+- `crates/maos-audit/src/fr4_classifier.rs`
+- `crates/maos-audit/tests/fr4_classifier_16_2.rs`
+- `crates/maos-bin/src/admission.rs`
+- `crates/maos-bin/src/lib.rs`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/src/operator_door.rs`
+- `crates/maos-bin/src/researcher_root.rs`
+- `crates/maos-bin/src/skill_authoring.rs`
+- `crates/maos-bin/src/spirit_session.rs`
+- `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs`
+- `crates/maos-bin/tests/j_researcher_survey_18_3.rs`
+- `crates/maos-bin/tests/researcher_inference_18_3.rs`
+- `crates/maos-bin/tests/researcher_log_grant_17_3d.rs`
+- `crates/maos-bin/tests/shell_host_16_2.rs`
+- `crates/maos-bin/tests/skill_door_18_7.rs`
+- `crates/maos-bin/tests/skill_port_18_7.rs`
+- `crates/maos-bin/tests/spawned_scope_17_3c.rs`
+- `crates/maos-cli/src/cli.rs`
+- `crates/maos-cli/src/subcommands.rs`
+- `crates/maos-cli/tests/skill_queue_integration_test.rs`
+- `crates/maos-cli/tests/skill_queue_reconcile_test.rs`
+- `crates/maos-cli/tests/skills_door_18_7.rs`
+- `crates/maos-control/src/lib.rs`
+- `crates/maos-control/tests/post_surface_16_1.rs`
+- `crates/maos-control/tests/submit_and_wait_16_2.rs`
+- `crates/maos-fkcs/src/lib.rs`
+- `crates/maos-journey-test/cassettes/j-researcher/forget-redistill-18-6.json`
+- `crates/maos-journey-test/cassettes/j-researcher/skill-authoring-18-7.json`
+- `crates/maos-journey-test/cassettes/j-researcher/survey-distill.json`
+- `crates/maos-journey-test/tests/journey_forget_18_6.rs`
+- `crates/maos-journey-test/tests/journey_skill_authoring_18_7.rs`
+- `crates/maos-kernel-core/src/capability/cap_policy/decision.rs`
+- `crates/maos-kernel-core/src/capability/cap_policy/mod.rs`
+- `crates/maos-kernel-core/src/capability/mod.rs`
+- `crates/maos-kernel-core/src/scheduler/scheduler_loop.rs`
+- `crates/maos-kernel-core/tests/abi_stability_admit.rs`
+- `crates/maos-kernel-core/tests/cap_policy_decision.rs`
+- `crates/maos-kernel-core/tests/operator_posture_ceiling_16_6.rs`
+- `crates/maos-kernel-core/tests/provider_switched_journal.rs`
+- `crates/maos-kernel-core/tests/sandbox_admission.rs`
+- `crates/maos-manifest/src/lib.rs`
+- `crates/maos-manifest/src/manifest.rs`
+- `crates/maos-manifest/tests/skill_capability_18_7.rs`
+- `crates/maos-skill/Cargo.toml`
+- `crates/maos-skill/src/admission.rs`
+- `crates/maos-skill/src/errors.rs`
+- `crates/maos-skill/src/lib.rs`
+- `crates/maos-skill/src/proposal.rs`
+- `crates/maos-skill/src/store.rs`
+- `crates/maos-skill/tests/admission_queue_test.rs`
+- `crates/maos-skill/tests/admission_store_test.rs`
+- `crates/maos-skill/tests/live_submission_18_7.rs`
+- `crates/maos-skill/tests/proposal_test.rs`
+- `crates/maos-spirit-abi/src/lib.rs`
+- `crates/maos-spirit-abi/tests/manifest_n_minus_1_test.rs`
+- `docs-site/abi/v1/cancellation.md`
+- `docs-site/abi/v1/compliance.md`
+- `docs-site/abi/v1/constants.md`
+- `docs-site/abi/v1/ctx.md`
+- `docs-site/abi/v1/deprecation.md`
+- `docs-site/abi/v1/gateway.md`
+- `docs-site/abi/v1/identity.md`
+- `docs-site/abi/v1/index.md`
+- `docs-site/abi/v1/lifecycle.md`
+- `docs-site/docs/cookbook/manifest-fields.md`
+- `docs-site/docs/errors/ESkillQueue-AlreadyDecided.md`
+- `docs-site/docs/errors/ESkillQueue-AmbiguousEntry.md`
+- `docs-site/docs/errors/ESkillQueue-CapabilityEscalation.md`
+- `docs-site/docs/errors/ESkillQueue-DuplicateSkillId.md`
+- `docs-site/docs/errors/ESkillQueue-EntryNotFound.md`
+- `docs-site/docs/errors/ESkillQueue-EvidenceMismatch.md`
+- `docs-site/docs/errors/ESkillQueue-ForeignNamespace.md`
+- `docs-site/docs/errors/ESkillQueue-InvalidStoredEntry.md`
+- `docs-site/docs/errors/ESkillQueue-PrincipalDataRefused.md`
+- `docs-site/docs/errors/ESkillQueue-Proposal.md`
+- `docs-site/docs/errors/ESkillQueue-Schema.md`
+- `docs-site/docs/errors/ESkillQueue-StaleTargetVersion.md`
+- `docs-site/docs/errors/ESkillQueue-TargetNotOwned.md`
+- `docs-site/docs/errors/ESkillQueue-UnknownEntryPath.md`
+- `docs-site/docs/errors/ESkillStore-InvalidEntry.md`
+- `docs-site/docs/errors/ESkillStore-Json.md`
+- `docs-site/docs/errors/ESkillStore-MaterializeCollision.md`
+- `docs-site/docs/errors/ESkillStore-NoDataHome.md`
+- `docs-site/docs/errors/ESkillStore-UnknownSchemaVersion.md`
+- `docs-site/docs/manifest/index.md`
+- `docs-site/docs/manifest/v5.md`
+- `docs-site/docs/manifest/v6.md`
+- `docs-site/docs/migrate/index.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/cancellation.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/compliance.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/constants.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/ctx.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/deprecation.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/gateway.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/identity.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/index.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/lifecycle.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/manifest-fields.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/manifest/index.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/manifest/v5.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/manifest/v6.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/migrate/index.md`
+- `docs/ci-baselines/kernel-surface-v0.1-beta.json`
+- `docs/errors/error-catalog.json`
+- `spirits/researcher/Cargo.toml`
+- `spirits/researcher/manifest.toml`
+- `spirits/researcher/src/lib.rs`
+- `spirits/researcher/src/skill_author.rs`
+- `spirits/researcher/tests/inference_seam_18_3.rs`
+- `spirits/researcher/tests/skill_authoring_18_7.rs`
+- `tests/coverage-matrix.yaml`
+- `tests/fixtures/researcher-no-skill/manifest.toml`
+- `xtask/abi-ratifications.toml`
+- `xtask/error-catalog.toml`
+- `xtask/fkcs-baseline.toml`
+- `xtask/kernel-core-baseline.toml`
+- `xtask/kloc.toml`
+- `xtask/src/check_manifest_schema_version.rs`
+- `xtask/tests/ci_shape_18_0.rs`
+- `xtask/tests/kernel_pin_content_hash_16_0.rs`
+- `xtask/tests/recovery_lane_ceiling_rule.rs`
+- `_bmad-output/implementation-artifacts/18-7-evidence/**` (all checked-in commands, outputs, timing XML, plants and CI simulation artifacts)
+
+#### Separate requested 18-6 Test-Infrastructure hunks
+
+- `tests/harness/forget_18_6.rs` — shared door wait5s→15s.
+- `crates/maos-journey-test/tests/journey_forget_18_6.rs` — real Butler acceptance-record canary; the same file also has the feature cassette-count migration listed above.
 
 ### Change Log
 
 - 2026-10-26: Story created (backlog; D-18-7-01…16 PROPOSED) at `8fdf497f`. Kernel priced by reverted prototypes (recommended +5 physical / +4 tokei, ◆ FLAG-Winston request); epic §18-7, its stories row and the Kernel-Δ note corrected in place; tracker row comment refreshed.
 - 2026-10-26: RULED by the operator (Lunarpulse), relayed by Main: D-18-7-01…16 all as recommended (06 B, 13 B, 16 B; the rest A); ◆ kernel grant +5 physical / +4 tokei ratified (four files + `Intent` surface re-pin); Epic 18 named maos-bin budget 28914 → 29150; out-of-kernel STOP lines written into §Decisions; FLAG record `18-7-flag-winston-decision.md` created; D-11 received row filed for `20-8-manifest-contract-completion`. T0 re-measures from the landed pin (18-6 review patches). Status → `ready-for-dev`. Docs only, no cargo.
+- 2026-10-26: Development HALTED by D-18-7-15 measured STOP: maos-bin29275 exceeds29150 by125. Landed preflight and partial implementation recorded by openai-codex/gpt-6.1-sol. No ceiling/pin widening, AC completion, plant or CI claim; story/tracker remain in-progress pending operator ruling.
+- 2026-10-26: Resumed under operator D-15 bin≤29500/skill≤1350 and Main-approved schema-v6 inventory +1; completed 18-7-live-skill-authoring-and-revisions with native governed authoring/revisions, v2 payload durability, authenticated operator admission and all reader migrations. Four AC plants red/restored, CI verify simulated once; exact full kernel/FKCS/kloc pins and all named gates PASS, 39 new acceptance tests green, release30,445,560 B. Reserved ceilings retained. Separate 18-6 TI hunks green15. Story/tracker → review; hosted run remains integrator-owned; no commit/push.

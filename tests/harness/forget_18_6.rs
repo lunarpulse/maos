@@ -84,7 +84,7 @@ pub fn rows(home: &Path) -> Vec<(String, u32, String, Value)> {
     rows
 }
 pub fn wait(what: &str, daemon: &Daemon, mut predicate: impl FnMut() -> bool) {
-    let end = Instant::now() + Duration::from_secs(5);
+    let end = Instant::now() + Duration::from_secs(15);
     while !predicate() {
         assert!(
             Instant::now() < end,

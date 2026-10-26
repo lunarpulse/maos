@@ -60,7 +60,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::capability::cap_policy::decision::Intent",
-      "signature_hash": "f465931ab91d359c4acc0007503f76e6ef5a11e034600c11a8a4d5f3aab50e94"
+      "signature_hash": "5b4cc32e9d91f697119911a3e38e4b2e653f0df0685443b3eabae38da2d029fe"
     },
     {
       "kind": "enum",

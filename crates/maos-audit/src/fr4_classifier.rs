@@ -193,6 +193,16 @@ impl WriterShapeEntry {
 /// The eight lifecycle shapes are NOT uniform: `start`/`pause`/`resume`/
 /// `unload` carry `spirit_pid`, not `spirit_id` (validation round 1).
 pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
+    WriterShapeEntry {
+        site: ("skill_authoring.rs", "submit", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Prefix("skill.author.refused:"),
+        shape: Some(&[
+            ("spirit_pid", PayloadType::SpiritPidEqualsRow),
+            ("reason", PayloadType::Str),
+        ]),
+    },
     // ── maos-kernel-core — NonCall ─────────────────────────────────────────
     WriterShapeEntry {
         // Story 17-9 — the cap-audit writer's tokenless issuance-quota signals

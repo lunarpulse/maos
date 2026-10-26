@@ -35,6 +35,7 @@ pub struct ResearcherHost {
     pub recall: Arc<dyn LogRecallPort>,
     pub boot_nonce: [u8; 16],
     pub redistill_sink: Option<researcher::RedistillSink>,
+    pub declared_scopes: Vec<maos_domain::invariants::i1::Scope>,
 }
 
 impl ResearcherHost {
@@ -77,6 +78,7 @@ impl ResearcherHost {
             recall,
             boot_nonce,
             redistill_sink: None,
+            declared_scopes: Vec::new(),
         }
     }
 }
@@ -99,6 +101,7 @@ pub struct ResearcherWiring {
     /// `--live` with an MCP server configured.
     pub mcp: Option<McpBuilder>,
     pub recall: Option<RecallBuilder>,
+    pub skill: Option<crate::skill_authoring::SkillBuilder>,
     /// The legacy (mode-unset) cassette arm: the cassette and its strictness.
     pub legacy_cassette: Option<(PathBuf, bool)>,
 }
@@ -125,6 +128,10 @@ pub fn construct(
     }
     if let Some(bind) = &seam.context {
         researcher = researcher.with_context_port(bind(Arc::clone(&pid_of)));
+    }
+    if let Some(build) = &wiring.skill {
+        researcher =
+            researcher.with_skill_author_port(build(Arc::clone(&pid_of), &host.declared_scopes)?);
     }
     if let Some(build) = &wiring.mcp {
         drop(build(spirit_id, Arc::clone(&pid_of))?);

@@ -34,6 +34,8 @@
 //! — no live LLM in CI (NFR-Testability-1). The production compressor model
 //! class is declared in the manifest (`provider.complete`, ≥Sonnet-tier).
 
+pub mod skill_author;
+pub use skill_author::{SkillAuthorOutcome, SkillAuthorPort, SkillPortError};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -374,6 +376,8 @@ pub enum ResearcherError {
     /// Story 18-3 — `InferencePort::complete` failed (provider error,
     /// capability denial, cassette exhaustion or strict drift).
     Inference(InferenceError),
+    /// The host refused the model-authored skill or revision submission.
+    SkillAuthor(SkillPortError),
     /// Story 18-3 (D-18-3-05 A) — a bound pass's MCP survey failed.
     McpSurvey(ResearcherMcpError),
     /// Story 18-3 (review EC-8) — a bound pass surveyed no claims (no
@@ -390,6 +394,7 @@ impl std::fmt::Display for ResearcherError {
             ResearcherError::Internal(s) => write!(f, "internal consistency error: {s}"),
             ResearcherError::Unbound(s) => write!(f, "inference unavailable: {s}"),
             ResearcherError::Inference(e) => write!(f, "inference failed: {e}"),
+            ResearcherError::SkillAuthor(e) => write!(f, "skill authoring failed: {e}"),
             ResearcherError::McpSurvey(e) => write!(f, "MCP survey failed: {e}"),
             ResearcherError::NoClaims => write!(f, "the pass surveyed no claims"),
         }
@@ -407,6 +412,7 @@ impl ResearcherError {
             Self::Internal(_) => "malformed-payload",
             Self::Unbound(_) => "unbound",
             Self::Inference(_) => "inference",
+            Self::SkillAuthor(_) => "skill-authoring",
             Self::McpSurvey(_) => "mcp-survey",
             Self::NoClaims => "no-claims",
         }
@@ -595,6 +601,9 @@ pub struct Researcher {
     /// the Inference Port. The walker, every cite, and the I11 chain are
     /// unchanged in BOTH modes.
     inference: Option<LiveInference>,
+    /// Native host boundary; unused by the deterministic, unbound pass.
+    skill_author_port: Option<Arc<dyn SkillAuthorPort>>,
+    skill_author_outcome: Arc<Mutex<Option<SkillAuthorOutcome>>>,
     /// Story 8.14c — `None` (default) ⇒ byte-identical v0.5 path. `Some` ⇒
     /// `on_idle` fans out over real MCP servers, walks the participant-scoped
     /// log for McpInvocation frames, joins by `source_key`, then surveys.
@@ -642,6 +651,7 @@ impl std::fmt::Debug for Researcher {
             .field("pending", &self.pending)
             .field("last_output", &self.last_output)
             .field("inference", &self.inference)
+            .field("skill_author_port", &self.skill_author_port.is_some())
             .field("mcp_port", &self.mcp_port.is_some())
             .field("log_recall_port", &self.log_recall_port.is_some())
             .field("collective_port", &self.collective_port.is_some())
@@ -661,6 +671,10 @@ impl Researcher {
         if ctx.cancellation().is_cancelled() {
             return;
         }
+        *self
+            .skill_author_outcome
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = None;
         match self.ensure_collective_route() {
             Ok(()) => self.collective_probe_failed.store(false, Ordering::Release),
             Err(error) => {
@@ -710,6 +724,8 @@ impl Default for Researcher {
             pending: Arc::default(),
             last_output: Arc::new(Mutex::new(None)),
             inference: None,
+            skill_author_port: None,
+            skill_author_outcome: Arc::default(),
             mcp_port: None,
             log_recall_port: None,
             mcp_recall: Arc::new(Mutex::new(McpRecallState::default())),
@@ -954,6 +970,20 @@ impl Researcher {
         self
     }
 
+    /// Install the root-fixed native authoring boundary. Only bound passes use it.
+    pub fn with_skill_author_port(mut self, port: Arc<dyn SkillAuthorPort>) -> Self {
+        self.skill_author_port = Some(port);
+        self
+    }
+
+    /// Take the latest authoring outcome, including an existing pending submission.
+    pub fn take_skill_author_outcome(&self) -> Option<SkillAuthorOutcome> {
+        self.skill_author_outcome
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
+    }
+
     /// Story 18-5 (CR-3) — the root's pid- and window-bound context reporter.
     pub fn with_context_port(mut self, port: Arc<dyn ContextBudgetPort>) -> Self {
         self.context = Some(port);
@@ -980,7 +1010,7 @@ impl Researcher {
             .take()
     }
 
-    /// Story 18-3 — completions the bound Inference Port returned so far.
+    /// Survey completions returned so far; excludes skill-generation completions.
     pub fn completions_consumed(&self) -> usize {
         self.inference
             .as_ref()
@@ -1241,39 +1271,54 @@ impl Researcher {
         frames: &[RecalledFrame],
     ) -> Result<SurveyOutput, ResearcherError> {
         self.survey_with(frames, |statement| {
-            let req = InferenceRequest::new(
-                pid,
-                token.clone(),
-                synthesis_prompt(statement),
-                InferenceOptions {
-                    max_tokens: 256,
-                    temperature: Some(0.0),
-                    model_id: None,
-                },
-                Some(binding.provider_id.clone()),
-                Vec::new(),
-            );
-            let response = live
-                .port
-                .complete(req)
-                .map_err(ResearcherError::Inference)?;
+            let text =
+                self.complete_bound(live, binding, token, pid, synthesis_prompt(statement), 256)?;
             live.consumed.fetch_add(1, Ordering::SeqCst);
-            // Story 18-5 (AC2.3) — the Researcher reports its own count.
-            if let Some(port) = &self.context {
-                let usage = &response.usage;
-                let status = port
-                    .report_context_used(usage.input_tokens.saturating_add(usage.output_tokens))
-                    .map_err(|e| ResearcherError::Unbound(e.to_string()))?;
-                *self.last_context.lock().unwrap_or_else(|e| e.into_inner()) = Some(status);
-            }
-            // §9.5: the model's text is bounded, so the digest stays smaller
-            // than its inputs regardless of model verbosity.
-            Ok(summarize(&response.text))
+            // §9.5: bound the model text so the digest stays smaller than its inputs.
+            Ok(summarize(&text))
         })
     }
 
-    /// Story 18-3 — one bound pass: mint, input (MCP fan-out, pending frames
-    /// or the journaled seed), model survey, scalar, distillate.
+    fn complete_bound(
+        &self,
+        live: &LiveInference,
+        binding: &ResearcherInferenceBinding,
+        token: &CapabilityToken,
+        pid: u32,
+        prompt: String,
+        max_tokens: u32,
+    ) -> Result<String, ResearcherError> {
+        let request = InferenceRequest::new(
+            pid,
+            token.clone(),
+            prompt,
+            InferenceOptions {
+                max_tokens,
+                temperature: Some(0.0),
+                model_id: None,
+            },
+            Some(binding.provider_id.clone()),
+            Vec::new(),
+        );
+        let response = live
+            .port
+            .complete(request)
+            .map_err(ResearcherError::Inference)?;
+        if let Some(port) = &self.context {
+            let usage = &response.usage;
+            let status = port
+                .report_context_used(usage.input_tokens.saturating_add(usage.output_tokens))
+                .map_err(|error| ResearcherError::Unbound(error.to_string()))?;
+            *self
+                .last_context
+                .lock()
+                .unwrap_or_else(|error| error.into_inner()) = Some(status);
+        }
+        Ok(response.text)
+    }
+
+    /// One bound pass: mint, input, model survey, scalar, distillate, then at
+    /// most one model-authored skill or proposal through the native host port.
     fn bound_pass(&self, live: &LiveInference) -> Result<SurveyOutput, ResearcherError> {
         let (binding, token, pid) = Self::mint(live)?;
         // The minted pid is the admitted one on every construction path (a
@@ -1288,6 +1333,7 @@ impl Researcher {
             return Err(ResearcherError::NoClaims);
         }
         self.persist(&output, pid)?;
+        self.author_after_survey(live, &binding, &token, pid, &output)?;
         Ok(output)
     }
 

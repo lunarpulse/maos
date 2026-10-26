@@ -1,0 +1,4 @@
+Measured focused reports, not a workspace run or synthetic timings.
+Sources: new-acceptance-junit.xml (7 new binaries), budget-exceptions-initial-junit.xml (4 zero-failure exception binaries), ratchets-and-reload-final-junit.xml (4 ratchets/CI readers plus the corrected complete 9-test Researcher binary).
+The initial failed Researcher suite is replaced by the complete final green suite, not filtered testcases. All measured testcase timings and outputs are preserved by XML parse/serialization.
+16 binaries; 200 tests; measured sum 206.440000s.

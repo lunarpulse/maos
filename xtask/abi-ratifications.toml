@@ -283,3 +283,12 @@ adr_ref = "ADR-012,ADR-013,ADR-034"
 status = "ratified"
 covered_changes = ["ConsentEnvelope.recall", "ConsentRecall"]
 ratified_at = "2026-10-20"
+
+# Story 18-7-live-skill-authoring-and-revisions D-18-7-02 A, operator 2026-10-26.
+[[ratification]]
+proposal_id = "18-7-live-skill-authoring-and-revisions-manifest-schema-6"
+summary = "MANIFEST_SCHEMA_VERSION 5→6; native skill.author.self declaration with schema degradation"
+adr_ref = "ADR-045,ADR-069"
+status = "ratified"
+covered_changes = ["MANIFEST_SCHEMA_VERSION", "CapabilitiesRequired", "SkillCapabilities", "RawCapabilitiesRequired"]
+ratified_at = "2026-10-26"

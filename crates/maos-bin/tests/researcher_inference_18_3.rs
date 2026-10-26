@@ -187,9 +187,9 @@ fn exit_line_3_replays_one_completion_per_seed_claim_through_the_declared_provid
     assert_eq!(survey["completions_consumed"], entries);
     assert_eq!(survey["findings"].as_array().unwrap().len(), entries);
 
-    // AC5.1 — the request and the one token name `anthropic`.
+    // AC5.1 — survey and 18-7 authoring share the pass token and provider.
     let infers = infer_intents(scratch.path());
-    assert_eq!(infers.len(), entries, "{infers:?}");
+    assert_eq!(infers.len(), entries + 1, "{infers:?}");
     assert!(
         infers.iter().all(|i| i.starts_with("infer:anthropic->")),
         "{infers:?}"
@@ -358,6 +358,17 @@ fn wait_until(what: &str, diagnostics: impl Fn() -> String, mut ready: impl FnMu
     );
 }
 
+fn has_durable_author(scratch: &Path) -> bool {
+    std::fs::read(scratch.join(".local/share/maos/skills/queue.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .is_some_and(|queue| {
+            queue["pending"]
+                .as_array()
+                .is_some_and(|entries| entries.len() == 1)
+        })
+}
+
 fn drain(mut pipe: impl Read + Send + 'static) -> Arc<Mutex<String>> {
     let buffer = Arc::new(Mutex::new(String::new()));
     let sink = Arc::clone(&buffer);
@@ -393,11 +404,12 @@ fn a_serving_root_mints_per_pass_and_binds_a_door_loaded_researcher() {
     std::fs::create_dir_all(scratch.join("home")).unwrap();
     let init = maos(scratch).arg("init").output().expect("maos init");
     assert!(init.status.success(), "{}", stderr(&init));
-    // The seed's three completions, twice: the boot pass and the door pass.
+    // Boot consumes three survey completions and one authoring completion.
+    // The pending author entry suppresses authoring on the door-loaded pass.
     let cassette = variant(scratch, |c| {
         let entries = c["entries"].as_array_mut().unwrap();
         let again = entries.clone();
-        entries.extend(again);
+        entries.extend(again.into_iter().take(3));
     });
     let mut child = maos(scratch)
         .args(["run", MANIFEST])
@@ -415,8 +427,8 @@ fn a_serving_root_mints_per_pass_and_binds_a_door_loaded_researcher() {
     let _daemon = Daemon(Some(child));
     let err = || stderr_buf.lock().unwrap().clone();
 
-    wait_until("the boot pass's three inference calls", err, || {
-        infer_intents(scratch).len() >= 3
+    wait_until("the boot pass's durable author submission", err, || {
+        has_durable_author(scratch)
     });
     for args in [
         &["unload", "researcher"][..],
@@ -427,7 +439,7 @@ fn a_serving_root_mints_per_pass_and_binds_a_door_loaded_researcher() {
         assert!(out.status.success(), "maosctl {args:?}: {}", stderr(&out));
     }
     wait_until("the door-loaded Researcher's inference calls", err, || {
-        infer_intents(scratch).len() >= 6
+        infer_intents(scratch).len() >= 7
     });
     let infers = infer_intents(scratch);
     assert!(
@@ -473,8 +485,8 @@ fn a_legacy_cassette_root_binds_a_door_loaded_researcher() {
     let _daemon = Daemon(Some(child));
     let err = || stderr_buf.lock().unwrap().clone();
 
-    wait_until("the boot pass's issuance", err, || {
-        !provider_infer_issuances(scratch).is_empty()
+    wait_until("the boot pass's durable author submission", err, || {
+        has_durable_author(scratch)
     });
     for args in [
         &["unload", "researcher"][..],

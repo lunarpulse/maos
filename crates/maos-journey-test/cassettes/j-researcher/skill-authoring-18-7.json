@@ -1,0 +1,154 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
+  "recorded_at": "2026-10-26T00:00:00Z",
+  "model_id": "hand-authored-seed",
+  "spirit_id": "researcher",
+  "session": "skill-authoring-18-7",
+  "entries": [
+    {
+      "sequence": 0,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
+      "response": {
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 44,
+          "output_tokens": 18
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 1,
+      "prompt_sha256": "918e4919e4e227521296cb5c2239af44c75c0efac321c105a6e6664b193511a8",
+      "prompt_len": 185,
+      "response": {
+        "text": "Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 46,
+          "output_tokens": 20
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
+      "response": {
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 50,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "prompt_sha256": "19af179fca4a31d80ea3845cf1264e70d37a0c446f130063a5faf394e18a3814",
+      "prompt_len": 716,
+      "response": {
+        "text": "---\nid = \"researcher.survey-method\"\nversion = \"0.1.0\"\nname = \"Survey method\"\ndescription = \"Preserve conflicting evidence in research surveys\"\nrequired_capabilities = []\n---\n# Survey method\nCompare methodology before combining contradictory findings.\n",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 180,
+          "output_tokens": 65
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "prompt_sha256": "50a2cca1c109e87bb39db11f5a2eced496a5682379e5ac350a6ae071248dffa9",
+      "prompt_len": 179,
+      "response": {
+        "text": "Retrieval augmentation cuts hallucinated citations in literature surveys.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 44,
+          "output_tokens": 18
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 5,
+      "prompt_sha256": "918e4919e4e227521296cb5c2239af44c75c0efac321c105a6e6664b193511a8",
+      "prompt_len": 185,
+      "response": {
+        "text": "Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 46,
+          "output_tokens": 20
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 6,
+      "prompt_sha256": "70d5a1ad26c91e35c16636da8188a643c0f657a0c070d2841ea1ea1f9c6e5bd4",
+      "prompt_len": 200,
+      "response": {
+        "text": "Self-consistency voting may improve factual recall, but gains appear limited to larger models.",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 50,
+          "output_tokens": 23
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    },
+    {
+      "sequence": 7,
+      "prompt_sha256": "7687928c75dbe069fb7b4dd57107870a4694f4a3fa712a1be718165ce5fe1794",
+      "prompt_len": 843,
+      "response": {
+        "text": "--- a/researcher.survey-method.md\n+++ b/researcher.survey-method.md\n@@ -9 +9,2 @@\n Compare methodology before combining contradictory findings.\n+Retain uncertainty when the evidence remains contradictory.\n",
+        "stop_reason": "stop_sequence",
+        "usage": {
+          "input_tokens": 230,
+          "output_tokens": 56
+        },
+        "provider_attribution": {
+          "provider_id": "replay",
+          "endpoint_url": "cassette://j-researcher/skill-authoring-18-7",
+          "model_id": "hand-authored-seed"
+        }
+      }
+    }
+  ]
+}

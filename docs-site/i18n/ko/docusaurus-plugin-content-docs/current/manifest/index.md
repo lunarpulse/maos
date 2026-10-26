@@ -13,8 +13,9 @@ review_status: machine
 
 | 버전 | 상태 | 설명 |
 |---------|--------|-------------|
-| [v5](./v5) | **현재(Current)** | `wasm-component`와 `[class].artifact` 추가(Story 17-3b). |
-| [v4](./v4) | 지원(N-1) | `[capabilities.required.loom]` 추가(Story 13.5d). |
+| [v6](./v6) | **현재(Current)** | Native `skill.author.self` 선언(Story 18-7). |
+| [v5](./v5) | 지원(N-1) | `wasm-component`와 `[class].artifact` 추가(Story 17-3b). |
+| [v4](./v4) | 지원 | `[capabilities.required.loom]` 추가(Story 13.5d). |
 | [v3](./v3) | 지원 | `[model_provenance]` 추가(Story 9.4b). |
 | [v2](./v2) | 지원 | `[cli_wrapper]`, `[[schedule]]`, `[[gateway]]` 추가(Epic 6). |
 | [v1](./v1) | 지원 | 기준 스키마(Epic 1b). |
@@ -23,7 +24,7 @@ review_status: machine
 
 kernel은 구성된 포괄 범위에 속하는 스키마 버전만 어드미션합니다:
 
-- **현재 구성 범위:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, 현재 `1..=5`.
+- **현재 구성 범위:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, 현재 `1..=6`.
 - **`MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` 미만:** 어드미션 시점에 `EAbiTooOld`로 거부됩니다.
 - **`MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` 초과:** 어드미션 시점에 `EAbiTooNew`로 거부됩니다.
 

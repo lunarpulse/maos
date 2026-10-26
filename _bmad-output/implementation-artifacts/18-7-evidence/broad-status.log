@@ -1,0 +1,6 @@
+Broad reader inventory: broad-reader-files.log (skill/SKILL plus schema-v6 manifest readers; nested harness files resolved to their owning targets).
+Libraries/schema readers: 594 passed, library-schema-green.log.
+Bin reader run: 343 passed / 1 failed / 8 skipped, broad-bin-supported-mode.log. Its typed GatewaySend JSON assertion was migrated, and the complete 23-test spawned_scope_17_3c binary passed (spawned-scope-final.log).
+Kernel/Spirit/audit/CI reader run: 199 passed / 2 failed / 1 skipped, broad-kernel-spirit-ci-readers.log. Both were FR4 inventory/fixture mismatch; complete FR4 plus final root binaries passed 30/30 (root-and-fr4-final.log).
+Complete Researcher 9-test binary passed after both replay/legacy reload witnesses awaited the durable draft, alongside the required d11/recovery/kernel-content/CI-shape readers: 64/64, ratchets-and-reload-final.log.
+Every selected reader binary has a complete green run after its fixes; these are combined focused runs, not a claimed single final workspace/binary sweep.

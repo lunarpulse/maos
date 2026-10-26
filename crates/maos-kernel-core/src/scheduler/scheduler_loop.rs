@@ -329,6 +329,7 @@ impl SpiritSchedulerAdapter {
                 loom: crate::security::manifest::LoomCapabilities::default(),
                 iac: crate::security::manifest::IacCapabilities::default(),
                 log: maos_manifest::LogCapabilities::default(),
+                skill: maos_manifest::SkillCapabilities::default(),
             };
             let posture = PostureSection {
                 default: Posture::Cautious,

@@ -1,149 +1,149 @@
-//! Durable skill-queue store (Story 9.7 AC-1).
-//!
-//! A `SkillQueueStore` port + `LocalFsSkillQueueStore` that persists the
-//! `pending` Vec to a single `~/.local/share/maos/skills/queue.json` file
-//! using an **own atomic-write helper** (temp → sync → rename → dir-sync).
-//!
-//! # Schema version
-//!
-//! The file carries `schema_version: "maos.skill-queue.v1"`.  An unknown
-//! or absent version is a **hard error** (no best-effort parse — the 9.2b
-//! lesson).  A version stamp is a tripwire, not a migrator.
-//!
-//! # What is persisted
-//!
-//! ONLY the pending-entry state machine: `(id, version, entry_path label,
-//! state)`.  The in-memory `audit: Vec<ApprovalDecision>` is never
-//! round-tripped (it carries `actor`, a principal field; the TL is the
-//! audit source of truth).
-//!
-//! # Atomic write contract
-//!
-//! `LocalFsRegistryStorage` is confirmed NON-atomic (plain `fs::write`);
-//! this store's own helper writes to `queue.json.tmp.{pid}` (same dir)
-//! → `sync_all()` file → `fs::rename` → `sync_all()` parent dir.
-//!
-//! # Daemon enforcement (AC-5, resolved)
-//!
-//! The `maos run` daemon now consults persisted admission state before
-//! spirit-load.  Skills in `Rejected` state block daemon startup with a
-//! typed error; `Pending` skills emit a warning.  The enforcement runs the
-//! same `admission_view` + TL reconcile as `maosctl skills list`.
-
+//! Durable v2 payload queue. The root is the sole live writer and journals
+//! prepared decisions before saving. V1 label-only entries migrate explicitly;
+//! malformed payloads and unknown labels are never repaired or overwritten.
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::admission::SkillAdmissionState;
+use crate::admission::{SkillAdmissionQueue, SkillAdmissionState};
+use crate::errors::ESkillQueue;
+use crate::proposal::SkillRevisionProposal;
 use crate::schema::{SkillId, SkillVersion};
 
-/// The schema version string for the queue file.
-pub const SCHEMA_VERSION: &str = "maos.skill-queue.v1";
+pub const SCHEMA_VERSION: &str = "maos.skill-queue.v2";
 
-// ---------------------------------------------------------------------------
-// On-disk representation
-// ---------------------------------------------------------------------------
-
-/// A single entry in the persisted skill queue.
-///
-/// This is the on-disk representation; the in-memory [`PendingEntry`] holds
-/// additional fields (`skill`, `entry_path` as an enum) that are NOT persisted.
-///
-/// [`PendingEntry`]: crate::admission::PendingEntry
+/// Provenance resolved by the root, never accepted from a Spirit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct QueueEntry {
-    /// Skill id.
-    pub id: SkillId,
-    /// Skill version.
-    pub version: SkillVersion,
-    /// Entry-path label (`"package_shipped"`, `"author_self"`, `"revision_proposal"`).
-    pub entry_path: String,
-    /// Current admission state.
-    pub state: SkillAdmissionState,
+#[serde(deny_unknown_fields)]
+pub struct AuthorIdentity {
+    pub class: String,
+    pub pid: u32,
+    pub boot_nonce: String,
 }
 
-/// The top-level on-disk format of `queue.json`.
+/// Opaque content, persisted verbatim. Revision diffs are decision-only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "content",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum SkillPayload {
+    AuthorSelf(String),
+    RevisionProposal(SkillRevisionProposal),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueueEntry {
+    pub id: SkillId,
+    pub version: SkillVersion,
+    pub entry_path: String,
+    pub state: SkillAdmissionState,
+    pub entry_id: String,
+    pub author: Option<AuthorIdentity>,
+    pub payload: Option<SkillPayload>,
+    pub payload_sha256: String,
+    /// Only migrated v1 records may lack dynamic payload/provenance.
+    pub legacy: bool,
+}
+
+impl QueueEntry {
+    /// A label-only package-discovery entry, not a live authored submission.
+    pub fn package_shipped(id: SkillId, version: SkillVersion) -> Result<Self, ESkillStore> {
+        let mut entry = Self {
+            id,
+            version,
+            entry_path: "package_shipped".into(),
+            state: SkillAdmissionState::Pending,
+            entry_id: String::new(),
+            author: None,
+            payload: None,
+            payload_sha256: String::new(),
+            legacy: false,
+        };
+        entry.seal()?;
+        Ok(entry)
+    }
+    pub fn approval_target(&self) -> String {
+        let base = crate::approval_target::approval_target(&self.id, &self.version);
+        if self.entry_path == "revision_proposal" {
+            format!("{base}#{}", self.entry_id)
+        } else {
+            base
+        }
+    }
+
+    /// Deterministic SHA-256 over the canonical JSON provenance/content envelope.
+    pub fn seal(&mut self) -> Result<(), ESkillStore> {
+        use sha2::{Digest, Sha256};
+        let bytes = if self.payload.is_some() {
+            serde_json::to_vec(&(&self.author, &self.payload))?
+        } else {
+            serde_json::to_vec(&(&self.id, &self.version, &self.entry_path))?
+        };
+        self.payload_sha256 = format!("{:x}", Sha256::digest(bytes));
+        self.entry_id = self.payload_sha256[..16].to_owned();
+        Ok(())
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueueFile {
-    /// Must be [`SCHEMA_VERSION`]; unknown/absent = hard error.
     pub schema_version: String,
-    /// The pending entries (id/version/entry_path/state only).
     pub pending: Vec<QueueEntry>,
 }
 
-// ---------------------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------------------
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct V1Entry {
+    id: SkillId,
+    version: SkillVersion,
+    entry_path: String,
+    state: SkillAdmissionState,
+}
 
-/// Errors from the skill queue store.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ESkillStore {
-    /// Filesystem I/O failure.
     #[error("skill queue store I/O error: {0}")]
     Io(#[from] io::Error),
-
-    /// JSON serialization/deserialization failure.
     #[error("skill queue store JSON error: {0}")]
     Json(#[from] serde_json::Error),
-
-    /// The `schema_version` field in `queue.json` does not match the expected
-    /// version.  This is a hard error — no best-effort parse.
     #[error("unknown skill queue schema version `{0}` (expected `{SCHEMA_VERSION}`)")]
     UnknownSchemaVersion(String),
+    #[error("HOME is unavailable; skill payloads require a private data home")]
+    NoDataHome,
+    #[error("invalid stored skill queue: {0}")]
+    InvalidEntry(#[from] ESkillQueue),
+    #[error("skill materialization would overwrite a foreign file: {0}")]
+    MaterializeCollision(PathBuf),
 }
 
-// ---------------------------------------------------------------------------
-// Port trait
-// ---------------------------------------------------------------------------
-
-/// Port for durable skill-queue persistence.
-///
-/// Each `maosctl` invocation is a fresh short-lived process; the daemon does
-/// NOT touch the queue.  Load → operate → persist → exit.
 pub trait SkillQueueStore: Send + Sync {
-    /// Load the persisted queue entries.  Returns an empty Vec if the store
-    /// file does not exist (= fresh install, no queue yet).
     fn load(&self) -> Result<Vec<QueueEntry>, ESkillStore>;
-
-    /// Atomically persist the queue entries, replacing the previous content.
     fn save(&self, entries: &[QueueEntry]) -> Result<(), ESkillStore>;
-
-    /// The filesystem path to the queue file (for diagnostics / tests).
     fn path(&self) -> &Path;
 }
 
-// ---------------------------------------------------------------------------
-// Filesystem implementation
-// ---------------------------------------------------------------------------
-
-/// Filesystem-backed skill queue store.
-///
-/// Follows the `LocalFsRegistryStorage` directory convention
-/// (`~/.local/share/maos/skills/queue.json`) but uses its OWN atomic-write
-/// helper (the registry's `fs::write` is non-atomic — do NOT inherit it).
 pub struct LocalFsSkillQueueStore {
     queue_path: PathBuf,
 }
 
 impl LocalFsSkillQueueStore {
-    /// Construct a store at the conventional path
-    /// (`~/.local/share/maos/skills/queue.json`).
-    pub fn new() -> Self {
-        let home = dirs_fallback();
-        let dir = home
-            .join(".local")
-            .join("share")
-            .join("maos")
-            .join("skills");
-        Self {
-            queue_path: dir.join("queue.json"),
-        }
+    pub fn new() -> Result<Self, ESkillStore> {
+        let home = std::env::var_os("HOME")
+            .filter(|s| !s.is_empty())
+            .ok_or(ESkillStore::NoDataHome)?;
+        Ok(Self::at_path(
+            PathBuf::from(home).join(".local/share/maos/skills/queue.json"),
+        ))
     }
 
-    /// Construct a store at a custom path (for testing).
     pub fn at_path(path: PathBuf) -> Self {
         Self { queue_path: path }
     }
@@ -151,24 +151,63 @@ impl LocalFsSkillQueueStore {
 
 impl SkillQueueStore for LocalFsSkillQueueStore {
     fn load(&self) -> Result<Vec<QueueEntry>, ESkillStore> {
-        if !self.queue_path.exists() {
-            return Ok(Vec::new());
-        }
-        let data = fs::read_to_string(&self.queue_path)?;
-        let file: QueueFile = serde_json::from_str(&data)?;
-        if file.schema_version != SCHEMA_VERSION {
-            return Err(ESkillStore::UnknownSchemaVersion(file.schema_version));
-        }
-        Ok(file.pending)
+        let data = match fs::read(&self.queue_path) {
+            Ok(data) => data,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(e.into()),
+        };
+        let value: serde_json::Value = serde_json::from_slice(&data)?;
+        let version = value.get("schema_version").and_then(|v| v.as_str());
+        let entries = match version {
+            Some(SCHEMA_VERSION) => serde_json::from_value::<QueueFile>(value)?.pending,
+            Some("maos.skill-queue.v1") => {
+                #[derive(Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct V1File {
+                    schema_version: String,
+                    pending: Vec<V1Entry>,
+                }
+                let old: V1File = serde_json::from_value(value)?;
+                debug_assert_eq!(old.schema_version, "maos.skill-queue.v1");
+                old.pending
+                    .into_iter()
+                    .map(|e| {
+                        let mut entry = QueueEntry {
+                            id: e.id,
+                            version: e.version,
+                            entry_path: e.entry_path,
+                            state: e.state,
+                            entry_id: String::new(),
+                            author: None,
+                            payload: None,
+                            payload_sha256: String::new(),
+                            legacy: true,
+                        };
+                        entry.seal()?;
+                        Ok(entry)
+                    })
+                    .collect::<Result<Vec<_>, ESkillStore>>()?
+            }
+            other => {
+                return Err(ESkillStore::UnknownSchemaVersion(
+                    other
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| "<missing>".into()),
+                ))
+            }
+        };
+        Ok(SkillAdmissionQueue::from_stored(entries)?.to_stored())
     }
 
     fn save(&self, entries: &[QueueEntry]) -> Result<(), ESkillStore> {
+        // A malformed existing file must never be replaced with a fresh queue.
+        self.load()?;
+        SkillAdmissionQueue::from_stored(entries.to_vec())?;
         let file = QueueFile {
-            schema_version: SCHEMA_VERSION.to_string(),
+            schema_version: SCHEMA_VERSION.into(),
             pending: entries.to_vec(),
         };
-        let data = serde_json::to_vec_pretty(&file)?;
-        atomic_write(&self.queue_path, &data)?;
+        atomic_write(&self.queue_path, &serde_json::to_vec_pretty(&file)?)?;
         Ok(())
     }
 
@@ -226,15 +265,4 @@ pub fn atomic_write(dest: &Path, data: &[u8]) -> Result<(), io::Error> {
         let _ = fs::remove_file(&tmp_path);
     }
     result
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Resolve the user's home directory (same fallback as `maos-registry`).
-fn dirs_fallback() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"))
 }

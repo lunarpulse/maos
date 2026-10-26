@@ -68,3 +68,13 @@ fn distillate_write_policy_decision_is_require_approval() {
         }
     );
 }
+
+#[test]
+fn skill_author_self_is_mediated_but_gateway_send_is_not() {
+    use maos_kernel_core::capability::is_mediated_scope;
+    assert!(is_mediated_scope(&Scope::SkillAuthorSelf));
+    assert!(!is_mediated_scope(&Scope::GatewaySend {
+        gateway_id: "test".into(),
+        recipient: "test".into(),
+    }));
+}
