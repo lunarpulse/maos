@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -593,7 +593,7 @@
+                     }
+                 } else if TransparencyLogAdapter::distillate_source_refs(&row.payload_redacted)
+                     .is_ok_and(|refs| {
+-                        !refs.is_empty()
++                        true
+                             && refs
+                                 .iter()
+                                 .all(|id| request.surviving_source_log_ref.contains(id))

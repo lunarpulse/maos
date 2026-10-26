@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -790,7 +790,7 @@
+         }
+         // An in-flight pass can commit after the initial kernel scan, before purge.
+         let (late_distillates, late_frames, late_requests, held, gaps) = tl
+-            .scrub_forget_frames(&receipt.principal_id)
++            .scrub_forget_frames("never-matches-principal")
+             .map_err(|e| e.to_string())?;
+         for request in &late_requests {
+             let outcome = RedistillOutcome::Pending {

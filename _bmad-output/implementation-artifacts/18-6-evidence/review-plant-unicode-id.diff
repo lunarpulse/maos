@@ -1,0 +1,11 @@
+--- a/crates/maos-domain/src/memory.rs
++++ b/crates/maos-domain/src/memory.rs
+@@ -460,7 +460,7 @@
+ pub fn principal_id_occurs(body: &[u8], principal_id: &str) -> bool {
+     let extends = |near: Option<char>, far: Option<char>, edge: Option<char>| {
+         near.is_some_and(|c| {
+-            c.is_alphanumeric()
++            c.is_ascii_alphanumeric()
+                 || ("@._+-".contains(c)
+                     && far.is_some_and(char::is_alphanumeric)
+                     && edge.is_some_and(char::is_alphanumeric))

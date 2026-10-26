@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -569,7 +569,7 @@
+                     && row.boot_nonce == tl.boot_nonce()
+                     && row.kind
+                         == maos_kernel_core::iac::transparency_log::FrameKind::Distillate
+-                    && row.timestamp_ns > since
++                    && true
+                     && hex::encode(row.frame_id) != request.redacted_distillate_frame_id =>
+             {
+                 if maos_domain::memory::principal_id_occurs(&row.payload_redacted, principal) {

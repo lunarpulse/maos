@@ -1,0 +1,11 @@
+--- a/crates/maos-domain/src/memory.rs
++++ b/crates/maos-domain/src/memory.rs
+@@ -462,7 +462,7 @@
+         near.is_some_and(|c| {
+             c.is_alphanumeric()
+                 || ("@._+-".contains(c)
+-                    && far.is_some_and(char::is_alphanumeric)
++                    || far.is_some_and(char::is_alphanumeric)
+                     && edge.is_some_and(char::is_alphanumeric))
+         })
+     };

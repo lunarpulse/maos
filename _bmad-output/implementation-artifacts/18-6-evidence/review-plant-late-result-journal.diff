@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -538,7 +538,7 @@
+                             &slot.principal,
+                             slot.since,
+                         );
+-                        if let Err(error) = shared.tl.insert_redistill_outcome(request, &outcome) {
++                        if let Err(error) = Ok::<(), String>(()) {
+                             eprintln!("maos: late re-distillation outcome not journaled: {error}");
+                         }
+                     }

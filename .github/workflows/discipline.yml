@@ -4942,8 +4942,12 @@ jobs:
         run: cargo test --locked -p maos-kernel-core --test forget_cascade_18_6
       - name: GDPR production-door 50-removal 100-probe floors (18-6)
         run: cargo test --locked -p maos-bin --test forget_floors_18_6
-      - name: GDPR same-instance MCP re-distillation and cache purge (18-6)
-        run: cargo test --locked -p maos-bin --test j_researcher_survey_18_3 mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live -- --exact
+      - name: GDPR response-only MCP principal cannot resurrect from cache (18-6)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p maos-bin --test j_researcher_survey_18_3 mcp_response_only_principal_is_purged_without_cached_claim_resurrection -- --exact | tee forget-response-only.log
+          grep -q '^test result: ok\. 1 passed; 0 failed;' forget-response-only.log
       # 13.5b review: the operator-facing terminals (daemon JSON + exit codes)
       # and the maosctl forwarding wrapper had no CI invocation either — the
       # corpus suite above only replays kernel `ForgetOutcome`s.

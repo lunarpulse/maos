@@ -567,6 +567,16 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("outcome", PayloadType::RedistillOutcome),
         ]),
     },
+    WriterShapeEntry {
+        site: ("hook_pump.rs", "complete_forget", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("forget.purge.undelivered"),
+        shape: Some(&[
+            ("spirit_pid", PayloadType::SpiritPidEqualsRow),
+            ("reason", PayloadType::Str),
+        ]),
+    },
     // Story 18-5: the fallback writer selects kind 32/33 and serializes the
     // externally tagged FramePayload, not an unwrapped ContextEnvelope.
     WriterShapeEntry {

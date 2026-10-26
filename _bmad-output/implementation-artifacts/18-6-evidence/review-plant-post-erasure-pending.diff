@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -633,7 +633,7 @@
+                         rows.push(serde_json::json!({"request":request,"outcome":outcome,"journal_error":journal_error}));
+                     }
+                 }
+-                serde_json::json!({"redistill_outcomes":rows,"redistilled_count":0,"pending_count":rows.len(),"redistill_error":{"status":"pending","reason":"completion-error","detail":detail}})
++                serde_json::json!({"redistill_outcomes":rows,"redistilled_count":0,"pending_count":rows.len(),"redistill_error":{"status":"failed","reason":"completion-error","detail":detail}})
+             }
+         }
+     }

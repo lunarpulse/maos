@@ -1021,3 +1021,47 @@ fn private_tier_residue_prevents_not_found() {
         String::from_utf8_lossy(&output.stdout)
     );
 }
+
+#[test]
+fn redistillation_failure_after_erasure_does_not_skip_the_signed_uninstall_proof() {
+    let fixture = Fixture::new();
+    fixture.seed_named_markdown_principal(PRINCIPAL);
+    {
+        let tl = TransparencyLogAdapter::open_with_global_legal_holds(
+            &fixture.audit_db(),
+            &fixture.audit_db(),
+            1,
+        )
+        .unwrap();
+        tl.insert_kernel_event_returning_id(
+            0,
+            maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
+            None,
+            "distillate.redistill.requested",
+            b"{}",
+        );
+    }
+    let output = fixture.run_uninstall(None);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let terminal = terminal(&output);
+    assert_eq!(terminal["outcome"], "erased");
+    assert_eq!(
+        terminal["redistillation"]["redistill_outcomes"][0]["outcome"]["status"], "pending",
+        "{terminal}"
+    );
+    let proof_path = terminal["proof_path"]
+        .as_str()
+        .expect("post-erasure proof still required");
+    let proof: maos_audit::erasure::proof::ErasureProof =
+        serde_json::from_slice(&std::fs::read(proof_path).unwrap()).unwrap();
+    maos_audit::erasure::proof::verify_erasure_proof(
+        &proof,
+        &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
+    )
+    .expect("completion failure cannot prevent signing the real erasure");
+}

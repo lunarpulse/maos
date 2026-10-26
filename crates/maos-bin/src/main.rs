@@ -1038,6 +1038,10 @@ fn build_spirit_obj(
                 Arc::clone(&deps.transparency_log),
                 Arc::clone(&deps.distillate_writer) as _,
                 wiring.live,
+                (wiring
+                    .recall
+                    .as_ref()
+                    .ok_or("researcher recall not ready")?)(class_name)?,
             );
             host.redistill_sink = Some(Arc::clone(&deps.redistill_sink));
             make_spirit_obj(maos_bin::researcher_root::construct(
@@ -1323,10 +1327,9 @@ fn researcher_mcp_builder(
     io: &Arc<dyn maos_domain::ports::IoSubsystemPort>,
     secrets: &dyn maos_domain::ports::SecretStore,
     capability: &Arc<CapabilityRegistryAdapter>,
-    security: &Arc<maos_kernel_core::security::SecurityManagerAdapter>,
     tl: &Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
     telemetry: &Arc<IacRtMetrics>,
-    log_recall: &Arc<maos_kernel_core::iac::log_recall::LogRecallAdapter>,
+    recall: &maos_bin::researcher_root::RecallBuilder,
     enterprise: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     pdp: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
 ) -> Result<Option<maos_bin::researcher_root::McpBuilder>, String> {
@@ -1384,12 +1387,8 @@ fn researcher_mcp_builder(
         return Ok(None);
     }
     let client: Arc<dyn maos_mcp::McpClient + Send + Sync> = Arc::new(client);
-    let (capability, security) = (Arc::downgrade(capability), Arc::downgrade(security));
-    let (tl, telemetry, log_recall) = (
-        Arc::clone(tl),
-        Arc::clone(telemetry),
-        Arc::clone(log_recall),
-    );
+    let capability = Arc::downgrade(capability);
+    let (tl, telemetry, recall) = (Arc::clone(tl), Arc::clone(telemetry), Arc::clone(recall));
     Ok(Some(Arc::new(
         move |spirit_id: &str, pid_of: researcher::PidSource| {
             let gone = || "researcher MCP: the host is shutting down".to_owned();
@@ -1411,16 +1410,7 @@ fn researcher_mcp_builder(
                 Arc::clone(&tl),
                 spirit_id,
             );
-            let recall = maos_bin::recall_mediation::MediatedLogRecall::new(
-                Arc::clone(&log_recall),
-                capability,
-                security.upgrade().ok_or_else(gone)?,
-                Arc::clone(&tl),
-                enterprise.clone(),
-                pdp.clone(),
-                spirit_id.to_owned(),
-            );
-            let ports: maos_bin::researcher_root::McpPorts = (Arc::new(mcp), Arc::new(recall));
+            let ports: maos_bin::researcher_root::McpPorts = (Arc::new(mcp), recall(spirit_id)?);
             Ok(ports)
         },
     )))
@@ -4031,20 +4021,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // that fails to build refuses the BOOT; none configured refuses each
     // pass), and the legacy cassette arm replays on every construction path.
     let live = run_args.as_ref().is_some_and(|run| run.live);
+    let researcher_recall: maos_bin::researcher_root::RecallBuilder = {
+        let (cap, sec) = (Arc::downgrade(&capability), Arc::downgrade(&security));
+        let (recall, tl) = (
+            Arc::clone(&log_recall_adapter),
+            Arc::clone(&transparency_log),
+        );
+        let (enterprise, pdp) = (enterprise_runtime.clone(), enterprise_pdp_runtime.clone());
+        Arc::new(move |id| {
+            let gone = || "researcher recall: the host is shutting down".to_owned();
+            Ok(Arc::new(maos_bin::recall_mediation::MediatedLogRecall::new(
+                Arc::clone(&recall),
+                cap.upgrade().ok_or_else(gone)?,
+                sec.upgrade().ok_or_else(gone)?,
+                Arc::clone(&tl),
+                enterprise.clone(),
+                pdp.clone(),
+                id.to_owned(),
+            )) as Arc<dyn maos_domain::ports::LogRecallPort>)
+        })
+    };
     *researcher_wiring
         .lock()
         .unwrap_or_else(|error| error.into_inner()) =
         Some(maos_bin::researcher_root::ResearcherWiring {
             live,
+            recall: Some(Arc::clone(&researcher_recall)),
             mcp: match live {
                 true => researcher_mcp_builder(
                     &io_arc,
                     secret_store.as_ref(),
                     &capability,
-                    &security,
                     &transparency_log,
                     &telemetry,
-                    &log_recall_adapter,
+                    &researcher_recall,
                     enterprise_runtime.clone(),
                     enterprise_pdp_runtime.clone(),
                 )
@@ -5736,6 +5746,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Arc::clone(&transparency_log),
                             Arc::clone(&distillate_writer) as _,
                             wiring.live,
+                            (wiring
+                                .recall
+                                .as_ref()
+                                .ok_or("researcher recall not ready")?)(
+                                &spirit_id
+                            )?,
                         );
                         host.redistill_sink = Some(hook_pump.redistill_sink());
                         researcher = maos_bin::researcher_root::construct(
@@ -6541,7 +6557,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| format!("failed to serialize ForgetOutcome: {e}"))?;
             if let Some(fields) =
                 maos_bin::hook_pump::HookPump::finish_forget(&transparency_log, &outcome, None)
-                    .await?
+                    .await
                     .as_object()
             {
                 body.as_object_mut()
@@ -9531,7 +9547,7 @@ async fn run_uninstall_cascade_inner(
             if let Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) = &forgotten {
                 let report =
                     maos_bin::hook_pump::HookPump::finish_forget(transparency_log, outcome, pump)
-                        .await?;
+                        .await;
                 if let Some(rows) = report["redistill_outcomes"].as_array() {
                     redistillation.extend(rows.iter().cloned());
                 }

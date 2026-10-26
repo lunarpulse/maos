@@ -1,0 +1,11 @@
+--- a/spirits/researcher/src/lib.rs
++++ b/spirits/researcher/src/lib.rs
+@@ -883,7 +883,7 @@
+             frames.push(RecalledFrame {
+                 frame_id: frame.frame_id,
+                 intent: frame.intent,
+-                payload: frame.payload_redacted,
++                payload: Vec::new(),
+             });
+         }
+         if frames

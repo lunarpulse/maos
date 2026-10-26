@@ -1,0 +1,10 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -735,6 +735,7 @@
+                             | HookOutcome::BudgetWarning80 { fired: true, .. }
+                     )
+                 );
++                if let Some(outcome) = &hook { pump.shared.account(pid, &target.runtime_snapshot().spirit_obj, Hook::Consolidate, None, outcome); }
+                 // Privacy purges bypass ordinary consolidation quarantine accounting.
+                 if !completed {
+                     undelivered.push(pid);

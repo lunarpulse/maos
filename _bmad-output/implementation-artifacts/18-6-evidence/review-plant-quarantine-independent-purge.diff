@@ -1,0 +1,10 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -696,6 +696,7 @@
+                     pump.shared.sync(pid, entry, &snapshot);
+                     entry.dispatch_target(&scb, snapshot)
+                 };
++                if pump.shared.registry().get(&pid).is_some_and(|entry| entry.quarantined) { continue; }
+                 let addressed: Vec<_> = redistill
+                     .iter()
+                     .filter(|r| {

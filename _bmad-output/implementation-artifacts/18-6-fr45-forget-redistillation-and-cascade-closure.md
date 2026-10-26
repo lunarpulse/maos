@@ -6,7 +6,7 @@ context_commit: 5495863e
 baseline_commit: 5495863e
 security_sensitive: true
 kernel_grant: "◆ FLAG-Winston, **RATIFIED 2026-10-26 by the operator (Lunarpulse), ADR-069 envelope** (`18-6-flag-winston-decision.md` §Rulings): D-18-6-01 B + 02 A + 04 A = **+8 physical / +17 tokei**: `check-kernel-baseline` 26418 → **≤ 26426** (95 files, unchanged), `maos-kernel-core` 20643 → **≤ 20660**, exact measured figure at landing after `cargo fmt --all`. File: `crates/maos-kernel-core/src/memory/mod.rs` **only** (one any-writer, any-kind principal scan replaces the two index-keyed loops; derived-distillate closure; re-distillation requests formed before the scrub). Any other kernel file or a figure above the grant returns as a FLAG request. Kernel public surface unchanged (`check-service-boundary` PASSED, 0 violations, with the measured prototype)."
-kloc_grant: "RULED 2026-10-26 (operator, Lunarpulse): D-18-6-08 A — **Epic 18's named maos-bin budget 28700 → 28770**; exact re-pin at landing; above 28770 → STOP and re-ask. Zero-headroom rows are measured requests at landing; STOP at dev above expected + 25 %: maos-iac 7979 + up to 150 expected → STOP above +188 (8167); maos-domain 9848 + up to 47 → STOP above +59 (9907); maos-audit 7473 + 54–105 → STOP above +131 (7604). maos-cli and maos-journey-test land exact inside their ceilings. `_aggregate_hardfail` = measured + 1."
+kloc_grant: "RULED 2026-10-26 (operator, Lunarpulse): D-18-6-08 A — **Epic 18's named maos-bin budget 28700 → 28770**; exact re-pin at landing; above 28770 → STOP and re-ask. Zero-headroom rows are measured requests at landing; STOP at dev above expected + 25 %: maos-iac 7979 + up to 150 expected → STOP above +188 (8167); maos-domain 9848 + up to 47 → STOP above +59 (9907); maos-audit 7473 + 54–105 → STOP above +131 (7604). maos-cli and maos-journey-test land exact inside their ceilings. `_aggregate_hardfail` = measured + 1. Review operator ruling2026-10-26: bin<=29110/domain<=10000/IAC<=8270, audit<=7640; integrator correctness addendum bin29113 exact (+3), measured aggregate186483/hardfail186484; CLI6856/journey1104 reserves restored."
 review: "bmad-code-review under docs/testing/proof-contract.md. Difficult story (kernel FLAG-Winston + security-critical erasure ACs): creation anthropic/claude-opus-5-5; dev/finisher openai-codex/gpt-6.1-sol; Blind, Edge and Acceptance on opus-5.5, Test Infrastructure on glm-5.3, plus a security-focused reading of AC1–AC3 (erasure reach, over-erasure, pid fixing, purge of live working memory). FLAG-Winston signs off the kernel diff. fable-5.1 only with operator permission."
 ---
 
@@ -26,7 +26,7 @@ Status: review
 - **Inherited `deferred-work.md` rows owned by this story: none** (grep for `18-6` and `18-6-fr45`: zero owner rows). Adjacent rows recorded, not inherited: W1 cross-store non-atomicity `deferred-work.md:449` (no owner cue; D-18-6-10), crash-between-mutation-and-audit `:555` (`v25-erasure-crash-reconciliation`), pid-keyed Private memory `:1270` (`20-3b-gate-retirement-and-coverage-generator`), OTel span erasure-exemption acknowledgement `:19-20` (erasure-exempt by construction; scope documentation only).
 
 **Does NOT close, and says so (rule 11: stated as limits):**
-- **Content-blind detection.** The kernel finds the principal by its id (token-bounded, D-18-6-09), never by meaning (ADR-026 `:12`: the kernel does not interpret content). Data copied without the id escapes (D-18-6-01 C, value needles, was not ruled); transformed or JSON-escaped copies escape under every option.
+- **Content-blind detection.** The kernel finds the principal by its id (token-bounded, D-18-6-09 and review R1), never by meaning (ADR-026 `:12`: the kernel does not interpret content). Unicode letters/digits are part of an id; an id glued to CJK text without spaces may not match. Data copied without the id escapes (D-18-6-01 C, value needles, was not ruled); transformed or JSON-escaped copies escape under every option.
 - **Shared and Loom.** Under D-18-6-03 A they hold no principal-namespaced data by partition (13-5h). A non-principal Shared or Loom row that happens to name a principal is retained by design; no production writer exists at HEAD.
 - **External re-ingestion.** A source outside MAOS (an MCP server) that still returns the principal after forget is a new collection, not resurrection; the witness's fixture serves the principal once.
 - **Cross-boot re-distillation.** A redacted distillate whose writer is not live in this boot gets a typed pending row and is not resumed later (D-18-6-06 A); stable identity is 20-3b's.
@@ -78,7 +78,7 @@ Measured at `5495863e` by direct reads, `check-kernel-baseline`, `kloc-check --j
 - R18-19 NEW gains the same re-anchors (forget block `:545-641` → `:545-662`). The stories row `:115` and the Kernel-Δ note `:40` carry the figure (ratified 2026-10-26).
 - Routing audit `:103` (`epic-18:118-121`) → `:223-237`, not edited (outside the doc set).
 
-**Dev-head correction, AC3.5 (integrator-approved 2026-10-26):** the live MCP cache contains invocation argument frames, not the old fetched claims. `input_frames` fetches the current claims and joins them to cached source keys on each pass. With the specified serve-once MCP fixture removing the canary, merely skipping cache purge cannot make the next live pass's body contain that old canary. The honest purge falsifier therefore asserts that scrubbed frame ids/source references no longer remain in the Researcher's cache; a unit-seeded pending cached claim also witnesses next-pass non-resurrection where reachable. Production semantics are not changed to manufacture a resurrection path. The live serve-once process leg remains required.
+**Review correction, AC3.5 (2026-10-26, BH-1 / EC-1 / AA-1):** the implementation introduced a cache of fetched MCP claims keyed by invocation ids, contradicting the original premise note. A principal present only in response/claim text can leave its invocation arguments intact and must never be reused from that cache. Re-distillation therefore uses only freshly TL-fetched `payload_redacted`; every non-empty notice clears all cached claims and `last_output`, and cached ids are checked against the TL for retry tombstones. The falsifier puts the principal only in MCP response text, not invocation arguments; the root additionally scans regenerated bodies and scrubs/reports any principal-bearing result. The serve-once process/root-library proof split remains unchanged.
 
 **Dev-head correction, AC1.2 (integrator-approved 2026-10-26):** `DistillateWriter::write_distillate` rejects effective raw sources whose writer pid differs from the citer (`adapter/distillate.rs:337-358`), even when the citer is a recipient. New cross-pid digest-of-digest authoring is therefore not a valid fixture. The lineage witness uses (1) a genuine same-pid digest-of-digest through `DistillateWriter`, and (2) a persisted historical cross-writer TL row inserted through the real TL adapter, explicitly labelled “historical row, not new valid authoring”, to prove the any-writer sweep reaches it. The citation authorization rule is unchanged.
 
@@ -137,22 +137,22 @@ Measured at `5495863e` by direct reads, `check-kernel-baseline`, `kloc-check --j
 | ID | Question | Options | Recommendation and evidence | Status |
 |---|---|---|---|---|
 | **D-18-6-01** | How far the TL scrub reaches (security-critical; kernel) | A — every writer's Distillates, id match (−1/−2) · **B — every frame of every kind and writer naming the principal, except `principal.forget`, `principal.forget.held`, `distillate.redacted`; Distillate → ADR-044 tombstone + marker; kinds 28/29 → SR-3 field scrub; other kinds → whole-body tombstone + non-personal `frame.redacted` marker (−34/−20)** · C — B + the principal's stored values (≥ 16 B) as needles (+16/+14) · D — kernel 0, the same sweep in the root on all three call sites | **B.** The index-keyed scan misses every unindexed writer and every non-distillate frame; the MCP-invocation frames that carry the principal to the Researcher are exactly such frames. One any-writer scan replaces two pid-keyed loops (the kernel shrinks). C finds id-less copies at the cost of a read of each forgotten value; D splits one cascade across three root call sites and three journal rows. | **RULED 2026-10-26 — B** |
-| **D-18-6-02** | Derived distillates (kernel) | **A — after the scrub, every Distillate whose effective sources cite a scrubbed frame is tombstoned and marked (+17/+14)** · B — body match only (labelled) | **A.** Refs are flattened to raw frames (`distillate.rs:191-260`), so one pass finds every digest derived from a scrubbed source even when its body never names the principal. | **RULED 2026-10-26 — A** |
+| **D-18-6-02** | Derived distillates (kernel) | **A — every Distillate whose effective raw sources or DIRECT parent distillates cite a scrubbed frame is tombstoned and marked; follow parents transitively (review R2)** · B — body match only (labelled) | **A.** Flattened raw refs alone miss a parent whose body names the principal while its raw sources do not; receipts retain direct parent ids as well as effective raw refs. | **RULED 2026-10-26 — A; review R2** |
 | **D-18-6-03** | The Shared clause | **A — the 13-5h partition stands (kernel 0); a door-level witness that no Shared row names the principal; non-principal rows naming one are a labelled limit** · B — delete every Shared row naming the principal (+38/+34) · C — lift the partition for Shared and erase indexed Shared rows (+40/+36, export +8–12) | **A.** The epic premise is stale: Shared already refuses principal namespaces, and 13-5h ruled that legitimate cross-Spirit coordination data must survive a forget. B erases that data on a substring; C reverses 13-5h, its partition test and two Reza legs. No production Shared writer exists. | **RULED 2026-10-26 — A** |
 | **D-18-6-04** | Where the re-distillation request is formed (kernel) | **A — the kernel reads each redacted distillate's sources before the scrub, removes everything scrubbed in this cascade, journals a non-personal `distillate.redistill.requested` row and returns `redistill` on `ForgetOutcome::Erased` (+25/+23)** · B — the kernel returns pre-scrub sources; the root filters and journals (+18/+16) · C — kernel 0 (only with D-01 D) | **A.** The tombstone destroys the sources, so they can only be captured inside the cascade; journaling there gives one trigger for all three callers ("the kernel triggers", epic AC3). B moves the filtering to three root sites for 7 lines. | **RULED 2026-10-26 — A** |
 | **D-18-6-05** | How the writer learns, and how live working memory is purged (security-critical; kernel 0) | **A — on daemon paths (door forget, door uninstall) the root sends every live compiled-in Spirit registered with the hook pump a typed non-personal `ForgetNotice { scrubbed_frame_ids, redistill }` via `fire_on_consolidate`; the writer is resolved by the root from `(boot_nonce, spirit_pid)`; outcome rows `distillate.redistilled` / `distillate.redistill.pending`; offline arms journal pending** · B — Spirit-pulled on the next pass · C — new IAC frame kind 34 | **A.** `on_consolidate` is the existing memory-curation hook with a production caller and a payload; native Spirits have no mailbox pump (18-5), so C still needs A or B; B leaves the cache live until the next pass, which may re-distil the erased data first. | **RULED 2026-10-26 — A** |
 | **D-18-6-06** | What "pending" means | **A — terminal and typed: `reason ∈ {writer-not-live, no-distillation-path, no-surviving-sources, form-unsupported, refused:<typed>}`, counted in the forget terminal; no cross-boot resume** · B — re-dispatch when the writer's class is next admitted (maos-bin +30–50) | **A.** Pids are boot-local and stable identity is 20-3b's (`deferred-work.md:1270`); the epic asks for a typed pending outcome, never a silent skip. | **RULED 2026-10-26 — A** |
 | **D-18-6-07** | Floor evidence | **A — new `gdpr-cascade-v1` (50 erased-only, cross-Spirit strata) + `gdpr-cascade-probe-v1` (100), seeded through the real adapters into a scratch `MAOS_HOME`, forgotten over the daemon door, probed across every readable store; v0 unchanged as the held/failed/not-found regression** · B — regenerate v0 in place · C — adapter-level erased subset (35) | **A.** "Production path" means the door; v0 and its Reza leg keep covering the other three outcomes; C cannot reach 50. | **RULED 2026-10-26 — A** |
 | **D-18-6-08** | maos-bin budget | **A — Epic 18 named budget 28700 → 28770; exact re-pin; above → re-ask** · B — hold 28700; T0 returns a measured request | **A.** Forecast +52–88 [INFERENCE] × 1.3. The dispatch needs the scheduler and hook pump, which only the root holds; types, TL helpers and the handler live outside maos-bin. | **RULED 2026-10-26 — A** (maos-bin ≤ 28770) |
-| **D-18-6-09** | Principal-id matching (security-critical) | **A — token-bounded (`principal_id_occurs`; neighbours not `[A-Za-z0-9@._+-]`), SQL `instr` prefilter + Rust confirmation** · B — raw substring (today) | **A.** The raw substring erases `aa@b.org`'s data when `a@b.org` is forgotten. Escaped/transformed copies are a labelled limit. | **RULED 2026-10-26 — A** |
-| **D-18-6-10** | W1 non-atomicity (`deferred-work.md:449`) | **A — scrubs stay before deletions; witness that a re-run after an injected scrub failure completes; W1 annotated "narrowed, re-runnable" at landing, owner `v25-erasure-crash-reconciliation`** · B — route unchanged | **A.** Under D-01 B the scan does not depend on index rows, so a re-run is complete; no new code. | **RULED 2026-10-26 — A** |
+| **D-18-6-09** | Principal-id matching (security-critical) | **A — token-bounded `principal_id_occurs`, SQL `instr` prefilter + Rust confirmation; Unicode letters/digits belong to ids and `.@_+-` bridges only between id characters (review R1)** · B — raw substring | **A.** Protect longer ids including `jöanna@x.com` and `a@b.org.uk`, while matching prose-final punctuation. An id glued to CJK text without spaces may not match. | **RULED 2026-10-26 — A; review R1** |
+| **D-18-6-10** | W1 non-atomicity (`deferred-work.md:449`) | **A — scrubs before deletions; retry completes remaining scrubs and root recovers journaled requests with no outcome, including already-redacted ids; caches recheck TL tombstones** · B — route unchanged | **A.** The any-writer scan is index-independent, but tombstones lose source refs; outstanding request recovery is required after a later scrub failure. Cross-store/crash reconciliation remains `v25-erasure-crash-reconciliation`. | **RULED 2026-10-26 — A; BH-7 / EC-4 / AA-2 correction** |
 | CR-1 | Scan | One SQL pass `instr(payload_redacted, ?)` over `transparency_log`, streamed, excluding the three lifecycle intents; Rust confirms with `principal_id_occurs`. Never load every body into memory (the prototype did; not acceptable). Ordered by `timestamp_ns`. | — |
 | CR-2 | Request | `RedistillRequest { redacted_distillate_frame_id, writer_spirit_pid, writer_boot_nonce, surviving_source_log_ref }`: no principal id, no body bytes. `surviving_source_log_ref` excludes every frame scrubbed or derived-redacted in this cascade; empty → pending `no-surviving-sources` (I11 forbids an empty source set). | — |
 | CR-3 | Every call site (18-1/18-3 lesson) | Door forget (`operator_door.rs:1341`): dispatch. Door uninstall (`run_uninstall_cascade`, daemon impl): dispatch. One-shot forget (`main.rs:6530`) and one-shot uninstall (`main.rs:6483`, cascade `:9492`): pending `writer-not-live` for each request, journaled before exit. The uninstall pattern `:9493-9497` binds `redistill`, never `..`. | — |
 | CR-4 | Pids (root fixes pids) | The root resolves the target from the TL row's `(boot_nonce, spirit_pid)`: same boot nonce and a live SCB registered with the hook pump, else pending `writer-not-live`. The Spirit never receives a `Fn(pid)` or a pid to write as; it re-distils at the pid its binding minted, and the root checks the new Distillate row's `spirit_pid` equals the target before journaling `redistilled` (else `refused:writer-mismatch`). | — |
 | CR-5 | Typed outcomes | The Researcher returns `Result<RedistillOutcome, ResearcherError>` per request; a refused pass, an unbound Researcher (`no-distillation-path`), a parse error and a hook `SkippedManifest`/quarantine/timeout map to a typed pending reason. Serde results in `src` are never `.unwrap/.expect/.unwrap_or*` (the prototype's `serde_json::to_vec(..).unwrap_or_default()` in `insert_redistill_request` is exactly what is forbidden). | — |
 | CR-6 | Readers of tombstoned rows | `classify_fr4_row` (`fr4_classifier.rs:556-581`), `query_with_redaction`, sealed and trajectory export treat `{"redacted":true,…}` as a typed redacted row, never a schema error or panic. | — |
-| CR-7 | Purge | The Researcher's `on_consolidate` with a non-empty payload decodes `ForgetNotice`, drops every cached frame whose id is in `scrubbed_frame_ids` (`mcp_recall.frames`, `seed_frames`), clears `last_output` if it cites one, then re-distils each request addressed to it. An empty payload (the `ConsolidationWatchdog`, `hook_pump.rs:751`) keeps today's behaviour. Re-distillation reads surviving sources by id through its `LogRecallPort`, re-runs `survey_with` through its bound path (bound: inference; ADR-016 exits keep `ProviderInfer` and `MemWrite` open under context exhaustion) and writes through its `DistillationPort`. | — |
+| CR-7 | Purge | A non-empty `ForgetNotice` clears all Researcher cached claims and `last_output`, removes listed scrubbed ids, and rechecks every remaining cached id against current TL payloads to remove retry tombstones. Re-distillation uses only surviving `payload_redacted` fetched through `MediatedLogRecall` (governed token, posture, PDP) and the bound inference/distillation ports, never cached MCP claim text. Empty watchdog payload retains ordinary consolidation behavior; Observer ignores non-empty forget payloads. |
 
 ## Acceptance Criteria
 
@@ -184,7 +184,7 @@ Measured at `5495863e` by direct reads, `check-kernel-baseline`, `kloc-check --j
 2. The root (CR-3, CR-4) delivers the notice to every live compiled-in Spirit registered with the hook pump (`crates/maos-bin/src/hook_pump.rs`; no new maos-bin src file unless listed in `SCANNED_SOURCE_FILES`, `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs:927`) and journals one outcome row per request.
 3. The Researcher implements `on_consolidate` per CR-7 and is bound on every construction path (`researcher_root::construct` `:96-141`: boot arm, door `load`, hot-swap successor); its distillation port is the root's `DistillateWriter` (`bind` `:173-175`).
 4. Witnesses: the AC1 process leg (live dispatch); a door-level leg in the same binary in which the writer was unloaded before forget → `pending: writer-not-live`; the one-shot arm (`MAOS_ONE_SHOT=forget`) → pending for every request; library: an unbound (deterministic) Researcher → `no-distillation-path`; a request whose sources were all scrubbed → `no-surviving-sources`; a malformed payload → typed refusal, no panic.
-5. **Proven red (1 plant):** skip the purge of cached frames (CR-7) → the Researcher's next pass writes a Distillate containing the canary → red.
+5. **Proven red (control revised after BH-1 / EC-1 / AA-1):** principal appears only in the MCP response/claim, not invocation arguments. Restoring cached-claim reuse or suppressing unconditional claim/output purge must fail the focused no-resurrection witness. The root independently rejects/scrubs principal-bearing regenerated bodies.
 
 ### AC4 — the floors are production evidence (D-07)
 
@@ -305,6 +305,14 @@ None touched `forget_with_reason`, `distillate_frames_for_pids` or the scrub pri
 - `docs/adr/ADR-026-principal-memory-namespace.md:12`; `ADR-044-…md:20-46`; `ADR-069-…md:20-25,35-46`; `docs/testing/proof-contract.md:10-29,31-67`.
 - `routing-audit-2026-10-22.md:3,71,103`; `13-5h-shared-tier-principal-partition.md`; `18-6-flag-winston-decision.md`.
 
+### Review rulings D-18-6-R1…R4 (operator, 2026-10-26)
+
+- **R1 — EC-3 A, with BH-2 / EC-2 / AA-3:** Unicode letters/digits are id characters; punctuation bridges only between id characters. `director-ada.` and `ada@example.org.` match, but shorter ids inside `jöanna@x.com` / `a@b.org.uk` do not. An id glued to CJK text without spaces may not match; story, ADR-044 and en/ko operator docs record the limit.
+- **R2 — EC-6 / BH-6 A:** receipts record DIRECT parent distillate ids in addition to flattened raw refs; forget closes parents transitively, including parent-body-only principal data.
+- **R3 — EC-8 A:** frames also naming a legally held principal, plus derived distillates, are skipped and reported typed, not wiped.
+- **R4 — BH-9 / AA-5:** all re-distillation construction paths use governed `MediatedLogRecall` (token, posture, PDP); no raw recall fallback. Restore maos-cli ceiling **6104 → 6856** and maos-journey-test **946 → 1104**, retaining existing 15-2 reserves.
+
+
 ## Dev Agent Record
 
 ### Story context creation
@@ -346,7 +354,129 @@ openai-codex/gpt-6.1-sol (development); anthropic/claude-opus-5-5 (creation).
 - Protected `intent-lineage-coverage-report.md` is byte-identical to its pre-run backup. No commit or push. W1 remains narrowed/re-runnable, true cross-store atomicity owned by `v25-erasure-crash-reconciliation`; other explicit scope limits remain.
 - [ ] **AC5 hosted run:** integrator, at landing — record hosted `ci/18-6-verify` run id at the done flip; no hosted-run claim at review (Main-approved disposition, same as18-1…18-5).
 
+### Review (2026-10-26, opus Blind/Edge/Acceptance; Test-Infra pending)
+
+Reports: `agent://Blind186`, `agent://Edge186`, `agent://Accept186`, against local
+development commit `8fdf497f`. Operator rulings R1–R4 above are binding.
+Review patches are implemented, focused-green and proven-red locally after the
+explicit measured budget rulings below. Changes remain uncommitted; historical
+development evidence above is distinct from this review-patch proof. Test
+Infrastructure review and the hosted landing run are still integrator obligations.
+
+| Findings | Disposition in the review-patch candidate |
+|---|---|
+| BH-1 / EC-1 / AA-1 | Patch: TL-payload-only re-distillation; obsolete claims cache removed; non-empty notice clears last output; root re-scans returned bodies and scrubs/refuses hits. Response-only MCP falsifier authored, premise note corrected. Focused green and planted red; see evidence below. |
+| BH-2 / EC-2 / AA-3 | Patch under R1: punctuation bridges require id characters on both sides; prose-final punctuation is a boundary. Tests authored. Focused green and planted red; see evidence below. |
+| EC-3 | R1 A: Unicode alphanumeric id boundaries; CJK-glued-id limit recorded in story/ADR/en+ko docs. Tests authored. Focused green and planted red; see evidence below. |
+| BH-3 / EC-5 | Patch: shared second principal sweep after notices acknowledge; writer rejects tombstoned sources. In-flight pass witness authored. Focused green and planted red; see evidence below. |
+| BH-4 / AA-6 | Patch: privacy notices bypass ordinary hook quarantine/accounting; undelivered purges have typed rows and FR4 writer shape. Quarantine/disabled-hook witnesses authored. Focused green and planted red; see evidence below. |
+| BH-5 / EC-9 | Patch: retry `prior` includes exact three-key kernel tombstones only, not partial redactions. Witness authored. Focused green and planted red; see evidence below. |
+| BH-6 / EC-6 | R2 A: direct parents retained and transitive closure follows them; parent-body-only principal witness authored. Focused green and planted red; see evidence below. |
+| BH-7 / EC-4 / AA-2 | Patch: outstanding journaled requests recovered and re-emitted with redacted ids; Researcher caches recheck TL tombstones. Failure-after-distillate-scrub witness authored; ADR/D-10/W1 text corrected. Focused green and planted red; see evidence below. |
+| BH-8 / EC-7 | Patch: `principal.uninstall.%` evidence excluded from whole-body scrub. Witness authored. Focused green and planted red; see evidence below. |
+| EC-8 | R3 A: held co-principal frames and derived distillates preserved and typed in receipt. Witness authored. Focused green and planted red; see evidence below. |
+| BH-9 | R4: every root constructor uses one governed recall factory; mediated capability/security handles weak. Authorization/lifetime witnesses authored. Focused green and planted red; see evidence below. |
+| BH-10 | Patch: fresh timestamp, writer/boot, non-tombstone body and surviving-source subset checks; older/tombstone/wrong-source controls authored. Focused green and planted red; see evidence below. |
+| BH-11 / EC-11 | Patch: forget completion is infallible at the caller boundary, returning typed pending errors after committed erasure; uninstall cannot skip revocation/proof via `?`; Observer ignores non-empty payload. Witnesses authored. Focused green and planted red; see evidence below. |
+| EC-10 | Patch: empty principal refused before hold check. Witness authored. Focused green and planted red; see evidence below. |
+| EC-12 | Patch: malformed matching distillates scrubbed, unrelated malformed lineage reported typed rather than aborting forget. Witness authored. Focused green and planted red; see evidence below. |
+| EC-13 | Deferred: large-log locking/paging → `20-11-erasure-inventory-closure`; explicit open row in deferred-work. |
+| EC-14 | Patch: timed-out hook retains request context; eventual result is validated and journaled instead of dropped. Late-hook witness authored. Focused green and planted red; see evidence below. |
+| AA-4 | Patched record: inline PRIOR chains restored from `git show 3aad2f4c:xtask/kloc.toml`; 18-6 notes retained in front. |
+| AA-5 | R4: ceilings restored CLI6104 →6856 and journey946 →1104, retaining 15-2 reserves. |
+| AA-7 | Patched: removed the seven committed lineage-report append lines; restored the protected report with copy-back + `cmp` after audit-suite execution. |
+| AA-8 | Patched: inventory/matrix say implemented-under-review; delivery wording deferred to done flip/hosted proof. |
+| AA-9 | Dismiss: prior AC2/AC3 timing bounds were explicitly labelled, not exact full-cycle runtimes. |
+| AA-10 | Dismiss: fail-fast floor oracle is stronger than the original incorrect49/50 premise; no aggregate count fabricated. |
+
+**Measured STOP chronology:** initial formatting exposed bin29079 >28940,
+IAC8238 >8167, domain9975 >9907 (aggregate186417). Work stopped and was
+reported. The operator ratified **bin≤29110 / domain≤10000 / IAC≤8270**,
+audit≤7640 and the kernel grant unchanged. A later durable-metadata correctness
+repair measured IAC8271; the integrator permitted removing a genuinely
+redundant touched-code latch (closure cardinality already proves convergence),
+landing exactly8270. Final late-cache purge and typed completion-error reporting
+measured bin29113; the integrator explicitly accepted **29113 exact (+3 over
+the29110 allowance)**, retaining both timestamp and old-id checks. No grant
+was silently widened. Initial unavailable-`hex` compilation and the two
+surviving weak plants were repaired, not misreported as proof.
+
+**Exact formatted candidate:** kernel **26407 →26362 physical (-45)** and
+**20650 →20606 tokei (-44)**,95files, `memory/mod.rs` only; the full
+baseline/HISTORY/set_hash/memory-digest/four-reader/ceiling/RATIFIED pin set
+moves together. Bin **28914 →29113 (+199)**, IAC **8080 →8270 (+190)**,
+domain **9887 →9975 (+88)**, audit **7625 →7635 (+10)**; CLI6104 and
+journey946 measured unchanged, reserve ceilings6856/1104 restored.
+Aggregate **186040 →186483 (+443)**, strict hardfail **186484 = measured+1**.
+These are exact pins, not unused allowance. Epic18's future18-7 named bin
+budget remains29150; that story re-measures at its T0.
+
+**Final focused proof:** `review-package-final-green.log`: **838/838 PASS**,
+41.954s wall (Researcher, Observer, domain, IAC, audit); `review-scenario-final-green.log`:
+**107/107 PASS**,43.842s wall (all named18-6, governed-recall/constructors,
+18-4 principal-ledger, uninstall and CLI readers); `review-kernel-lib.log`:
+**258/258 PASS**,3.499s wall. Restored final cascade:13/13,5.140s wall.
+New/expanded binary Σ: HookPump24tests26.895s; MCP2tests1.734s;
+cascade13tests5.588s; floors1test15.167s; uninstall19tests8.922s;
+all below30s. The pre-existing9-test Researcher-constructor suite uses its
+unchanged47s exception (observed41.503s); no new exception added.
+`review-binary-budgets.json` records the figures.
+
+**Plants:**29 accepted review-control reds, plus the regenerated shared AC1/AC4
+index-filter mutation (30 distinct accepted mutations). Every modified source
+was copied back, `cmp`-verified and touched. Three unsuccessful attempts are
+explicitly excluded: tombstoned-distillate parsing and the first partial-redaction
+witness did not falsify their intended guards, so separate raw-tombstone and
+unrelated-forget witnesses were added and proved red; an uninstall assertion
+initially used the wrong JSON path and was corrected before its accepted plant.
+Commands, full outputs, mutation diffs, restoration statuses and exact wall
+clocks: `18-6-evidence/review-plant-*.{log,diff}`, `review-plant-results.json`,
+and `plants.md`. The regenerated `ci/plant.diff` now targets the shared IAC
+sweep; sha/apply/build/process-red/floor-red/copy-back/cmp/touch/rebuild/process-green
+simulation **PASS**,98.980s wall (`review-ci-simulation.log`).
+Hosted run still belongs to the integrator at landing; none is claimed here.
+
+**CI:** the renamed response-only MCP witness is enrolled with `--exact` and
+an explicit1-passed anti-vacuity pin. Other new binaries retain their existing
+whole-suite enrollment; no existing numerical pin was weakened. Corpora remain
+registered and unchanged. Gate results and xtask ratchets are recorded below.
+
+
+**Final gates (one cargo process, local environment):**
+
+| Gate | Result / observed decision | Wall (s) |
+|---|---|---:|
+| `kloc-check` | PASSED (aggregate=186483 LOC) | 0.587 |
+| `check-kernel-baseline` | PASSED (26362 physical lines,95 files,pinned26362) | 0.259 |
+| `check-service-boundary` | PASSED (0 violations) | 1.439 |
+| `check-serde-error-handling` | PASSED (0 violations) | 0.613 |
+| `check-test-cost` | PASS (553 files;8 marked spawn sites,4 cargo-query;7 expensive binaries) | 0.590 |
+| `check-corpus` | PASSED (15 registered corpus entries) | 0.371 |
+| `coverage-matrix` | exit0; existing phase/registry warnings retained | 0.276 |
+| `check-env-contract` | PASS (110 registered MAOS_* vars,0 violations) | 0.665 |
+| `check-exit-commands` | exit0; future backlog-owned verbs remain listed | 0.627 |
+| `gen-abi-docs --check` | exit0 (generated ABI docs check) | 2.667 |
+| `check-reza-production-path` | exit0; evidence-advisory,oracle_green=false;four existing live successors NOT_PROVEN | 136.359 |
+| `gate-ko-coverage.js` | exit0;canonical41/41 (100%),overall45/51;report-only policy unchanged | 0.106 |
+| `gate-glossary-lock.js` | PASS (45 translations;no denylist violations) | 0.085 |
+| `fmt --all -- --check` | PASS | 2.790 |
+| `check-dev-record-completeness` | PASSED (183 done-status stories checked) | 20.978 |
+
+`review-gates.json` and same-named `review-gate-*.log` retain full outputs. Reza's four absent live-Postgres successors/operator-key verification are **NOT_PROVEN**, not local product evidence; no new substrate claim is made. `review-xtask-ratchets.log`: **65/65 PASS**,5.508s wall, including the kernel content-hash suite, full pin readers and ceiling ratchets. No workspace suite or system package installation was run.
+
+Release: `cargo build --locked --release -p maos-bin --bin maos` **PASS**,65.610s wall. Stripped measured binary **30,115,064 B <33,554,432 B**,headroom3,439,368B (`review-release-size.log`). Protected lineage report restored by copy-back + `cmp`; temporary plant/binary copies removed. No commit/push. Story and tracker stay `review`; the hosted proven-red run and pending Test-Infrastructure review remain integrator-owned.
 ### File List
+
+- `crates/maos-bin/tests/erasure_uninstall_13_5b.rs`
+- `_bmad-output/implementation-artifacts/intent-lineage-coverage-report.md` (AA-7: remove the dev commit's seven appended lines).
+
+Review-patch additions to the development file inventory:
+`crates/maos-iac/src/adapter/distillate.rs`,
+`crates/maos-bin/src/recall_mediation.rs`,
+`crates/maos-bin/tests/recall_mediation_17_3d.rs`,
+`crates/maos-bin/tests/researcher_inference_18_3.rs`,
+`spirits/observer/src/lib.rs`, and
+`spirits/observer/tests/activity_hooks_17_4.rs`.
 
 - `.github/workflows/discipline.yml`
 - `_bmad-output/implementation-artifacts/18-6-fr45-forget-redistillation-and-cascade-closure.md`
@@ -396,3 +526,5 @@ openai-codex/gpt-6.1-sol (development); anthropic/claude-opus-5-5 (creation).
 - 2026-10-26: Development by openai-codex/gpt-6.1-sol; implementation and witnesses authored, domain 2/2 intermediate green, AC2 closure control proven red and byte-restored. Mandatory formatted kloc STOP: maos-bin 28916 > 28770 and maos-audit 7623 > 7604. No re-pin or completion claim; status remains `in-progress` pending operator ruling.
 - 2026-10-26: Operator A ruling lifts the measured STOP: maos-bin ≤28940 / maos-audit ≤7640, exact landing pins, per-file +258 root attribution recorded; implementation verification resumes.
 - 2026-10-26: Completed local implementation/proof and exact governance pins after the ratified STOP addendum. Focused2077+94green, kernel lib258, ratchets65; all named gates PASS, AC1–AC4red/restored and AC5local simulationPASS. Approved premise corrections and hosted landing handoff recorded. Story/tracker → `review`; no commit/push.
+- 2026-10-26: Applied review dispositions R1–R4 and authored safety regressions on top of local8fdf497f, without commit/push; restored budget history/reserves and removed premature delivery wording. Mandatory post-fmt measurement STOP: bin29079>28940, IAC8238>8167, domain9975>9907; audit7635/kernel20606 inside grants. Operator disposition required before further production edits/re-pins or acceptance verification. Story remains `review`.
+- 2026-10-26: Review patches completed after ratified measured addenda (bin29113 exact,IAC8270,domain9975,audit7635;kernel26362/20606,95files); full pins and inline history/reserves restored. Focused838+107,kernel258,xtask65 green;29 review controls plus regenerated shared AC1/AC4 plant red/restored; all named local gates green with explicit advisory limits. Story remains `review`; hosted proof/Test-Infra remain integrator-owned; no commit/push.

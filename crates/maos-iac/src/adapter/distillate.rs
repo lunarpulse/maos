@@ -122,9 +122,11 @@ impl DistillateWriter {
         receipt: &DistillationReceipt,
         digest_payload: &DigestPayload,
         segment_hint: &Option<SegmentHint>,
+        direct_source_log_ref: &[[u8; 16]],
     ) -> Result<Vec<u8>, DistillationError> {
         let payload = serde_json::json!({
             "kind": RECEIPT_KIND,
+            "direct_source_log_ref": direct_source_log_ref.iter().map(format_frame_id_hex).collect::<Vec<_>>(),
             "source_log_ref": receipt.effective_source_log_ref.iter().map(|fid| {
                 // Use colon-separated format to avoid triggering redaction's
                 // "32 consecutive hex chars" secret-detection pattern.
@@ -234,6 +236,15 @@ impl DistillateWriter {
                         .query_frame_by_id(frame_id)
                         .map_err(|e| DistillationError::Storage(e.to_string()))?;
 
+                    if let Some(e) = &entry {
+                        if super::transparency_log::TransparencyLogAdapter::is_kernel_tombstone(
+                            &e.payload_redacted,
+                        ) {
+                            return Err(DistillationError::Storage(
+                                "source frame was redacted".into(),
+                            ));
+                        }
+                    }
                     match entry {
                         Some(e) if e.kind == FrameKind::Distillate => {
                             let nested_receipt = Self::deserialize_receipt(&e.payload_redacted)?;
@@ -383,8 +394,12 @@ impl DistillationPort for DistillateWriter {
             effective_depth,
             timestamp_ns,
         );
-        let payload_bytes =
-            Self::serialize_receipt(&receipt_pre, &request.digest_payload, &request.segment_hint)?;
+        let payload_bytes = Self::serialize_receipt(
+            &receipt_pre,
+            &request.digest_payload,
+            &request.segment_hint,
+            &request.source_log_ref,
+        )?;
 
         // 5. Insert FrameKind::Distillate row via the token-guarded path
         // (Story 8.10 AC2a) — the ONLY sanctioned Distillate inserter.

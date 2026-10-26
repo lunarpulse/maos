@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -658,7 +658,7 @@
+             .outstanding_redistill_requests()
+             .map_err(|e| e.to_string())?
+         {
+-            if !redistill
++            if false && !redistill
+                 .iter()
+                 .any(|r| r.redacted_distillate_frame_id == request.redacted_distillate_frame_id)
+             {

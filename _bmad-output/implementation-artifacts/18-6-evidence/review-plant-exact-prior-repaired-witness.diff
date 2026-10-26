@@ -1,0 +1,14 @@
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1569,10 +1569,7 @@
+             .prepare(
+                 "SELECT lower(hex(frame_id)) FROM transparency_log \
+              WHERE CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
+-             THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 \
+-             AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' \
+-             AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') \
+-             AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END",
++             THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 ELSE 0 END",
+             )
+             .map_err(AuditError::SqliteRead)?;
+         let prior = tombstones

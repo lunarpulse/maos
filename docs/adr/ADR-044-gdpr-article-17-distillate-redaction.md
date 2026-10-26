@@ -49,24 +49,42 @@ marker alone does not remove embedded plaintext.
 
 Story `18-6-fr45-forget-redistillation-and-cascade-closure` supersedes Decision 3
 and the re-distillation follow-up above. The kernel scans every writer and frame
-kind for token-bounded principal ids, excluding the three erasure lifecycle
-intents, and closes distillates derived from scrubbed sources. It captures
-surviving source references before overwriting bodies and journals non-personal
-`distillate.redistill.requested` records.
+kind for token-bounded principal ids, preserving forget/redaction lifecycle
+records and `principal.uninstall.%` evidence. Direct distillate parents are
+recorded alongside effective raw references, and closure follows parents
+transitively, including summaries whose own text names the principal while
+their raw sources do not. Frames also naming a legally held principal, and
+their derived distillates, are preserved and reported as typed skips.
 
-The daemon root dispatches a typed forget notice to live compiled-in Spirits.
-The owning Researcher purges cached sources before regenerating through its
-bound distillation path; the root checks the new frame's writer pid. Every
-request ends in `distillate.redistilled` or typed `distillate.redistill.pending`.
-Offline and cross-boot writers are pending, not resumed. Legal holds still
-refuse without mutation. Non-distillate tombstones have `frame.redacted`
-markers; cost attribution retains its numerical fields.
+The daemon root dispatches a typed forget notice to live compiled-in Spirits,
+independently of ordinary hook quarantine accounting. The owning Researcher
+clears cached claims and its last output, rechecks cached ids against the TL,
+and regenerates only from current `payload_redacted` fetched through governed
+`MediatedLogRecall`, never cached MCP responses. The root validates writer,
+timestamp, non-tombstone body and surviving sources, scans regenerated text
+again, and completes a second principal sweep after live notices acknowledge.
+Undelivered purges, malformed lineage gaps and regeneration errors are typed.
+An error after erasure does not turn a completed erasure into a failed one or
+prevent uninstall token revocation and signed proof.
 
-Detection remains content-blind and id-based: content copied without the id,
-escaped or transformed ids, external re-ingestion, and non-principal Shared or
-Loom coordination data are explicit limits. Cross-store atomicity remains
-`v25-erasure-crash-reconciliation`; scrubs precede deletions and the any-writer
-scan makes a failed scrub re-runnable independently of the principal index.
+Each dispatched request ends in `distillate.redistilled` or typed
+`distillate.redistill.pending`; a same-boot retry recovers journaled requests
+without an outcome, including their redacted ids. Late hook results append
+their eventual outcome. Offline and cross-boot writers remain pending, not
+automatically resumed. Legal holds still refuse without mutation.
+Non-distillate tombstones have `frame.redacted` markers; cost attribution
+retains its numerical fields and is not a whole-body retry tombstone.
+
+Detection remains content-blind and id-based. Unicode letters/digits belong to
+ids; punctuation `.@_+-` continues an id only when it bridges id characters.
+Sentence-final punctuation is a boundary; a longer email suffix is not.
+An id glued directly to CJK text without spaces may therefore not match.
+Content copied without the id, escaped/transformed ids, external re-ingestion,
+and non-principal Shared/Loom coordination data remain explicit limits.
+Cross-store atomicity remains `v25-erasure-crash-reconciliation`: scrubs precede
+deletions, and a retry recovers outstanding requests as well as remaining
+scrubs, but mutation and audit still do not form a cross-store transaction.
+Large-log locking/paging is owned by `20-11-erasure-inventory-closure`.
 
 ## Compliance
 

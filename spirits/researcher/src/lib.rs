@@ -564,8 +564,6 @@ pub fn synthesis_prompt(statement: &str) -> String {
 struct McpRecallState {
     cursor: Option<LogRecallCursor>,
     frames: Vec<RecalledFrame>,
-    /// Joined claims keep the semantic payload the invocation's args cite.
-    claims: Vec<RecalledFrame>,
 }
 
 /// Root-owned, request-keyed hook results. The callback holds this weakly:
@@ -760,44 +758,21 @@ impl Researcher {
 
     /// Decode errors are typed and never echo untrusted notice bytes.
     pub fn consolidate_forget(&self, payload: &[u8]) -> Result<(), ResearcherError> {
+        if payload.is_empty() {
+            return Ok(());
+        }
+        let _pass = self.pass_lock.lock().unwrap_or_else(|e| e.into_inner());
+        // Response claims are not TL payloads: no semantic output may survive
+        // a notice merely because its invocation arguments remain citable.
+        *self.last_output.lock().unwrap_or_else(|e| e.into_inner()) = None;
         let notice: ForgetNotice = serde_json::from_slice(payload)
             .map_err(|_| ResearcherError::Internal("malformed-forget-notice".into()))?;
-        let _pass = self.pass_lock.lock().unwrap_or_else(|e| e.into_inner());
         let scrubbed_ids: Vec<_> = notice
             .scrubbed_frame_ids
             .iter()
             .map(|id| decode_frame_id_hex(id))
             .collect::<Result<_, _>>()?;
-        let scrubbed = |id: &[u8; 16]| scrubbed_ids.contains(id);
-        let mut recalled = self.mcp_recall.lock().unwrap_or_else(|e| e.into_inner());
-        recalled.frames.retain(|frame| !scrubbed(&frame.frame_id));
-        recalled.claims.retain(|frame| !scrubbed(&frame.frame_id));
-        drop(recalled);
-        if let Some(frames) = self
-            .seed_frames
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_mut()
-        {
-            frames.retain(|frame| !scrubbed(&frame.frame_id));
-        }
-        if let Some(frames) = self
-            .pending
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_mut()
-        {
-            frames.retain(|frame| !scrubbed(&frame.frame_id));
-        }
-        let mut last = self.last_output.lock().unwrap_or_else(|e| e.into_inner());
-        if last.as_ref().is_some_and(|output| {
-            output.bibliography.iter().any(|entry| {
-                decode_frame_id_hex(&entry.source_log_ref).is_ok_and(|id| scrubbed(&id))
-            })
-        }) {
-            *last = None;
-        }
-        drop(last);
+        let refresh = self.refresh_forget_caches(&scrubbed_ids);
         if let Some(route) = &self.forget_route {
             let pid = (route.pid)();
             for request in &notice.redistill {
@@ -806,16 +781,73 @@ impl Researcher {
                 {
                     continue;
                 }
-                let outcome = match self.redistill(request) {
-                    Ok(outcome) => outcome,
-                    Err(error) => RedistillOutcome::Pending {
+                let outcome = if let Err(error) = &refresh {
+                    RedistillOutcome::Pending {
                         reason: RedistillPendingReason::Refused(error.refusal_code().into()),
-                    },
+                    }
+                } else {
+                    self.redistill(request)
+                        .unwrap_or_else(|error| RedistillOutcome::Pending {
+                            reason: RedistillPendingReason::Refused(error.refusal_code().into()),
+                        })
                 };
                 (route.sink)(request, outcome);
             }
         }
-        Ok(())
+        refresh
+    }
+
+    /// Retry notices may omit earlier tombstones. Revalidate every cached id
+    /// against the governed TL, once per id; failed reads discard stale bytes.
+    fn refresh_forget_caches(&self, scrubbed: &[[u8; 16]]) -> Result<(), ResearcherError> {
+        let pid = self
+            .forget_route
+            .as_ref()
+            .and_then(|route| (route.pid)())
+            .unwrap_or_else(|| self.spirit_pid.load(Ordering::Acquire));
+        let mut checked = BTreeMap::new();
+        let mut failure = None;
+        let mut retain = |frame: &mut RecalledFrame| {
+            let fetched = checked.entry(frame.frame_id).or_insert_with(|| {
+                self.log_recall_port
+                    .as_ref()
+                    .ok_or(LogRecallError::CapabilityDenied)?
+                    .fetch(pid, frame.frame_id)
+            });
+            match fetched {
+                Ok(fresh)
+                    if !scrubbed.contains(&frame.frame_id)
+                        && !serde_json::from_slice::<serde_json::Value>(
+                            &fresh.payload_redacted,
+                        )
+                        .is_ok_and(|body| {
+                            body.get("redacted").and_then(|v| v.as_bool()) == Some(true)
+                                && body.get("reason").is_some()
+                                && body.get("redaction_reason").is_none()
+                        }) =>
+                {
+                    frame.intent.clone_from(&fresh.intent);
+                    frame.payload.clone_from(&fresh.payload_redacted);
+                    true
+                }
+                Ok(_) => false,
+                Err(error) => {
+                    failure.get_or_insert_with(|| error.clone());
+                    false
+                }
+            }
+        };
+        self.mcp_recall
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .frames
+            .retain_mut(&mut retain);
+        for cache in [&self.seed_frames, &self.pending] {
+            if let Some(frames) = cache.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
+                frames.retain_mut(&mut retain);
+            }
+        }
+        failure.map_or(Ok(()), |error| Err(ResearcherError::Recall(error)))
     }
 
     /// Reuse the bound survey path, but never survey MCP or seed data here:
@@ -848,22 +880,17 @@ impl Researcher {
             let frame = recall
                 .fetch(pid, decode_frame_id_hex(source)?)
                 .map_err(ResearcherError::Recall)?;
-            // MCP journals invocation arguments, not response bodies. Reuse
-            // only the surviving, source-bound claim already held by this
-            // Spirit, after the authoritative fetch has rechecked visibility.
-            let cached = self
-                .mcp_recall
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .claims
-                .iter()
-                .find(|claim| claim.frame_id == frame.frame_id)
-                .cloned();
-            frames.push(cached.unwrap_or(RecalledFrame {
+            frames.push(RecalledFrame {
                 frame_id: frame.frame_id,
                 intent: frame.intent,
                 payload: frame.payload_redacted,
-            }));
+            });
+        }
+        if frames
+            .iter()
+            .all(|frame| serde_json::from_slice::<ClaimPayload>(&frame.payload).is_err())
+        {
+            return Err(ResearcherError::NoClaims);
         }
         let output = self.survey_bound(live, &binding, &token, pid, &frames)?;
         if output.findings.is_empty() {
@@ -1300,19 +1327,8 @@ impl Researcher {
             state.frames.push(frame);
             state.cursor = Some(LogRecallCursor::new(entry.timestamp_ns, entry.frame_id));
         }
-        let joined = self.join_claims_to_frames(&fetched, &state.frames)?;
-        for claim in &joined {
-            if let Some(cached) = state
-                .claims
-                .iter_mut()
-                .find(|cached| cached.frame_id == claim.frame_id)
-            {
-                *cached = claim.clone();
-            } else {
-                state.claims.push(claim.clone());
-            }
-        }
-        Ok(Some(joined))
+        self.join_claims_to_frames(&fetched, &state.frames)
+            .map(Some)
     }
 
     /// Story 18-3 (D-18-3-01 A) — the seed claims, journaled once through the
@@ -1949,6 +1965,21 @@ mod unit_tests {
                 })
         }
     }
+
+    struct FailingLogRecallPort;
+    impl LogRecallPort for FailingLogRecallPort {
+        fn recall(
+            &self,
+            _pid: u32,
+            _filter: LogRecallFilter,
+        ) -> Result<LogRecallPage, LogRecallError> {
+            Err(LogRecallError::Storage("offline".into()))
+        }
+
+        fn fetch(&self, _pid: u32, _id: [u8; 16]) -> Result<LogFetchResponse, LogRecallError> {
+            Err(LogRecallError::Storage("offline".into()))
+        }
+    }
     #[test]
     fn mcp_fan_out_joins_claims_to_invocation_frames() {
         let claim = ClaimPayload {
@@ -2045,12 +2076,17 @@ mod unit_tests {
             &claim("director-ada-CANARY-18-6", "t", 0.8, 0.9, true, false),
         );
         let safe = claim_frame(0xB2, &claim("control", "t", 0.8, 0.9, true, false));
-        let researcher = Researcher::with_frames(vec![personal.clone(), safe.clone()]);
+        let researcher = Researcher::with_frames(vec![personal.clone(), safe.clone()])
+            .with_log_recall_port(
+                Arc::new(FakeLogRecallPort {
+                    frames: vec![personal.clone(), safe.clone()],
+                }),
+                Arc::new(AtomicU32::new(42)),
+            );
         *researcher.seed_frames.lock().unwrap() = Some(vec![personal.clone(), safe.clone()]);
         {
             let mut state = researcher.mcp_recall.lock().unwrap();
             state.frames = vec![personal.clone(), safe.clone()];
-            state.claims = vec![personal.clone(), safe.clone()];
         }
         researcher.on_idle(&mut Ctx::mock());
         assert!(serde_json::to_string(&researcher.last_output())
@@ -2075,10 +2111,6 @@ mod unit_tests {
             state.frames.iter().map(|f| f.frame_id).collect::<Vec<_>>(),
             [safe.frame_id]
         );
-        assert_eq!(
-            state.claims.iter().map(|f| f.frame_id).collect::<Vec<_>>(),
-            [safe.frame_id]
-        );
         drop(state);
         assert_eq!(
             researcher
@@ -2100,6 +2132,105 @@ mod unit_tests {
         assert!(!serde_json::to_string(&output)
             .unwrap()
             .contains("CANARY-18-6"));
+    }
+
+    #[test]
+    fn retry_notice_rechecks_tombstones_missing_from_its_scrubbed_ids() {
+        let stale = claim_frame(0xA1, &claim("CANARY", "t", 0.8, 0.9, true, false));
+        let safe = claim_frame(0xB2, &claim("control", "t", 0.8, 0.9, true, false));
+        let tombstone = RecalledFrame {
+            frame_id: stale.frame_id,
+            intent: stale.intent.clone(),
+            payload: br#"{"redacted":true,"reason":"forget","original_kind":11}"#.to_vec(),
+        };
+        let researcher = Researcher::with_frames(vec![stale.clone(), safe.clone()])
+            .with_log_recall_port(
+                Arc::new(FakeLogRecallPort {
+                    frames: vec![tombstone, safe.clone()],
+                }),
+                Arc::new(AtomicU32::new(42)),
+            );
+        *researcher.seed_frames.lock().expect("seed lock") =
+            Some(vec![stale.clone(), safe.clone()]);
+        researcher.mcp_recall.lock().expect("recall lock").frames = vec![stale, safe.clone()];
+        researcher.on_idle(&mut Ctx::mock());
+        let notice = serde_json::to_vec(&ForgetNotice {
+            scrubbed_frame_ids: Vec::new(),
+            redistill: Vec::new(),
+        })
+        .expect("notice");
+        researcher.consolidate_forget(&notice).expect("refresh");
+        assert!(researcher.last_output().is_none());
+        assert_eq!(
+            researcher.mcp_recall.lock().expect("recall lock").frames,
+            vec![safe.clone()]
+        );
+        for cache in [&researcher.seed_frames, &researcher.pending] {
+            assert_eq!(
+                cache.lock().expect("cache lock").as_ref(),
+                Some(&vec![safe.clone()])
+            );
+        }
+        researcher.on_idle(&mut Ctx::mock());
+        let output = researcher.last_output().expect("safe output");
+        assert_eq!(output.findings.len(), 1);
+        assert!(!serde_json::to_string(&output)
+            .expect("output")
+            .contains("CANARY"));
+    }
+
+    #[test]
+    fn cache_revalidation_failure_drops_stale_bytes_and_reports_typed_pending() {
+        let stale = claim_frame(0xA1, &claim("CANARY", "t", 0.8, 0.9, true, false));
+        let outcomes = Arc::new(Mutex::new(Vec::new()));
+        let recorded = outcomes.clone();
+        let researcher = Researcher::with_frames(vec![stale.clone()]).with_forget_route(
+            Arc::new(|| Some(42)),
+            (186u128).to_le_bytes(),
+            Arc::new(move |_, outcome| recorded.lock().expect("outcomes").push(outcome)),
+            Arc::new(FailingLogRecallPort),
+        );
+        *researcher.seed_frames.lock().expect("seed lock") = Some(vec![stale.clone()]);
+        researcher.mcp_recall.lock().expect("recall lock").frames = vec![stale.clone()];
+        researcher.on_idle(&mut Ctx::mock());
+        let notice = serde_json::to_vec(&ForgetNotice {
+            scrubbed_frame_ids: Vec::new(),
+            redistill: vec![redistill_request(vec![encode_frame_id_hex(
+                &stale.frame_id,
+            )])],
+        })
+        .expect("notice");
+        assert!(matches!(
+            researcher.consolidate_forget(&notice),
+            Err(ResearcherError::Recall(LogRecallError::Storage(_)))
+        ));
+        assert!(researcher.last_output().is_none());
+        assert!(researcher
+            .mcp_recall
+            .lock()
+            .expect("recall lock")
+            .frames
+            .is_empty());
+        for cache in [&researcher.seed_frames, &researcher.pending] {
+            assert!(cache
+                .lock()
+                .expect("cache lock")
+                .as_ref()
+                .expect("retained empty cache")
+                .is_empty());
+        }
+        assert_eq!(
+            *outcomes.lock().expect("outcomes"),
+            vec![RedistillOutcome::Pending {
+                reason: RedistillPendingReason::Refused("recall".into())
+            }]
+        );
+        researcher.on_idle(&mut Ctx::mock());
+        assert!(researcher
+            .last_output()
+            .expect("empty output")
+            .findings
+            .is_empty());
     }
 
     #[test]
@@ -2139,6 +2270,7 @@ mod unit_tests {
             .unwrap_err();
         assert_eq!(error.refusal_code(), "malformed-payload");
         assert!(!error.to_string().contains("secret"));
+        assert!(researcher.last_output().is_none());
     }
 
     struct RedistillInference(AtomicUsize);
@@ -2198,14 +2330,9 @@ mod unit_tests {
     }
 
     #[test]
-    fn redistill_fetches_only_survivors_infers_cached_claim_and_keeps_bound_pid() {
+    fn redistill_fetches_only_tl_survivors_and_keeps_bound_pid() {
         use maos_domain::invariants::i1::TokenId;
         let safe = claim_frame(0xB2, &claim("control", "t", 0.8, 0.9, true, false));
-        let raw = RecalledFrame {
-            frame_id: safe.frame_id,
-            intent: "mcp:web/fetch".into(),
-            payload: br#"{"url":"https://example.org/control"}"#.to_vec(),
-        };
         let inference = Arc::new(RedistillInference(AtomicUsize::new(0)));
         let writer = Arc::new(RedistillWriter::default());
         let results = Arc::new(Mutex::new(Vec::new()));
@@ -2222,14 +2349,10 @@ mod unit_tests {
                 Arc::new(|| Some(42)),
                 (186u128).to_le_bytes(),
                 Arc::new(move |_, outcome| sink_results.lock().unwrap().push(outcome)),
-                Arc::new(FakeLogRecallPort { frames: vec![raw] }),
+                Arc::new(FakeLogRecallPort {
+                    frames: vec![safe.clone()],
+                }),
             );
-        researcher
-            .mcp_recall
-            .lock()
-            .unwrap()
-            .claims
-            .push(safe.clone());
         let request = redistill_request(vec![encode_frame_id_hex(&safe.frame_id)]);
         let notice = ForgetNotice {
             scrubbed_frame_ids: vec![encode_frame_id_hex(&[0xA1; 16]).replace(':', "")],
@@ -2267,6 +2390,79 @@ mod unit_tests {
         );
         assert_eq!(inference.0.load(Ordering::SeqCst), 1);
         assert_eq!(writer.0.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn response_only_principal_is_not_resurrected_from_surviving_mcp_arguments() {
+        use maos_domain::invariants::i1::TokenId;
+        let raw = RecalledFrame {
+            frame_id: [0xB2; 16],
+            intent: "mcp:web/fetch".into(),
+            payload: br#"{"url":"https://example.org/control"}"#.to_vec(),
+        };
+        let response = FetchedClaim {
+            source_key: "https://example.org/control".into(),
+            claim: claim("director-ada-CANARY", "t", 0.8, 0.9, true, false),
+        };
+        let inference = Arc::new(RedistillInference(AtomicUsize::new(0)));
+        let writer = Arc::new(RedistillWriter::default());
+        let results = Arc::new(Mutex::new(Vec::new()));
+        let recorded = results.clone();
+        let researcher = Researcher::new()
+            .with_inference_port(
+                inference.clone(),
+                "stub",
+                CapabilityToken::new(TokenId([1; 16]), 42, u64::MAX, [0; 64]),
+                42,
+            )
+            .with_distillation_port(writer.clone())
+            .with_forget_route(
+                Arc::new(|| Some(42)),
+                (186u128).to_le_bytes(),
+                Arc::new(move |_, outcome| recorded.lock().expect("outcomes").push(outcome)),
+                Arc::new(FakeLogRecallPort {
+                    frames: vec![raw.clone()],
+                }),
+            );
+        let joined = researcher
+            .join_claims_to_frames(&[response], &[raw.clone()])
+            .expect("join");
+        let output = researcher.survey(&joined);
+        assert!(serde_json::to_string(&output)
+            .expect("output")
+            .contains("CANARY"));
+        assert!(!String::from_utf8_lossy(&raw.payload).contains("CANARY"));
+        assert_eq!(
+            output.bibliography[0].source_log_ref,
+            encode_frame_id_hex(&raw.frame_id)
+        );
+        *researcher.last_output.lock().expect("output lock") = Some(output);
+        researcher.mcp_recall.lock().expect("recall lock").frames = vec![raw.clone()];
+        let notice = serde_json::to_vec(&ForgetNotice {
+            scrubbed_frame_ids: vec![encode_frame_id_hex(&[0xEE; 16])],
+            redistill: vec![redistill_request(vec![encode_frame_id_hex(&raw.frame_id)])],
+        })
+        .expect("notice");
+        researcher.consolidate_forget(&notice).expect("forget");
+        assert!(researcher.last_output().is_none());
+        assert_eq!(
+            *results.lock().expect("outcomes"),
+            vec![RedistillOutcome::Pending {
+                reason: RedistillPendingReason::Refused("no-claims".into())
+            }]
+        );
+        assert_eq!(inference.0.load(Ordering::SeqCst), 0);
+        assert!(writer.0.lock().expect("writer").is_empty());
+        let no_requests = serde_json::to_vec(&ForgetNotice {
+            scrubbed_frame_ids: Vec::new(),
+            redistill: Vec::new(),
+        })
+        .expect("notice");
+        *researcher.last_output.lock().expect("output lock") = Some(researcher.survey(&joined));
+        researcher
+            .consolidate_forget(&no_requests)
+            .expect("purge-only notice");
+        assert!(researcher.last_output().is_none());
     }
 
     /// W5 — Negative falsifiability: a fabricated source_key that never appeared

@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -596,7 +596,7 @@
+                         !refs.is_empty()
+                             && refs
+                                 .iter()
+-                                .all(|id| request.surviving_source_log_ref.contains(id))
++                                .all(|_| true)
+                     })
+                 {
+                     return outcome;

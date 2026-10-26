@@ -4,10 +4,10 @@ All mutations run in place in the real tree, with `CARGO_TARGET_DIR=/mnt/build/c
 
 ## Integrator-approved premise corrections
 
-- **AC3.5:** the live MCP cache originally held invocation argument frames, not old fetched claims. `input_frames` re-fetches current claims and joins by source key on every pass. Serve-once MCP removes the canary, so skipping purge alone cannot produce the prescribed live next-pass canary resurrection. Main approved an honest cache scrubbed-frame-id/source-reference assertion, with a unit-seeded pending cached claim next-pass body check where reachable. Production is not changed to manufacture a resurrection.
+- **AC3.5 — superseded at review (BH-1 / EC-1 / AA-1):** the implementation introduced cached fetched claims, so the original “arguments only” premise was false. Review removes that obsolete cache, regenerates only from current TL `payload_redacted`, and clears last output on every non-empty notice. The revised MCP witness places the principal solely in response text, never invocation arguments; with argument-only survivors it returns typed `no-claims` pending without inference or a new distillate. The controls below supersede the old premise, rather than manufacturing a resurrection path.
 - **AC1.2:** `DistillateWriter::write_distillate` (`adapter/distillate.rs:337-358`) rejects effective raw source writer pids different from the citer. Main approved a genuine same-pid digest-of-digest plus a historical cross-writer TL row inserted through the real TL adapter, explicitly labelled historical row, not new valid authoring. Citation authorization remains unchanged.
 - **Historical-row injection detail:** direct Distillate insertion requires an unforgeable writer token. The historical fixture first creates its valid receipt through the real `DistillateWriter`/TL adapter, then explicitly adjusts persisted writer attribution with SQL; it does not claim that current cross-pid authoring is valid.
-- **ADR-064 composition:** replay inference plus `--live` is refused by the existing selector. Main approved a real daemon-door witness using bound non-`--live` seed replay, plus `mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live` in the root-library binary for real MCP adapter + replay inference + TL/DistillateWriter + the door's forget-completion route.
+- **ADR-064 composition:** replay inference plus `--live` is refused by the existing selector. The daemon-door witness uses bound non-`--live` seed replay; the root-library MCP witness is now `mcp_response_only_principal_is_purged_without_cached_claim_resurrection`, combining real MCP + governed recall + replay inference + TL/DistillateWriter + forget completion.
 - **No scheduled-repeat process claim:** the idle watchdog fires once per quiet period. A door reload creates a fresh Researcher and re-journals its constant seed claims. Main assessed this as a fixture artifact: the process-witness principal `noisy corpus.` deliberately collides with built-in seed vocabulary, which forget cannot and need not erase from the Spirit's compiled constants. The same-instance next-pass-clean proof is in the root-library witness and Researcher cache-purge unit test, not a claimed repeated daemon idle.
 
 ## Setup failure, not control evidence
@@ -90,3 +90,48 @@ cosmetic re-plants were run. Final broad focused run: **2077 passed / 23 skipped
 remaining reader set: **94 passed / 38 skipped**; kernel libtest: **258 passed**.
 All affected new/expanded binary runtime sums are below 30 s
 (`new-binary-budgets.json`).
+
+## Review-patch controls (2026-10-26)
+
+All commands retain the environment and one-cargo discipline above. `review-plant-results.json` is the machine-readable ledger; each row below has a same-named `.log` containing the complete cargo output, exact command wall, copy-back + `cmp` + `touch` exit codes, and full-cycle wall; `.diff` contains its mutation. Restored final proof is `review-package-final-green.log` (838/838), `review-scenario-final-green.log` (107/107), `review-cascade-restored-final.log` (13/13) and `review-kernel-lib.log` (258/258).
+
+| Mutation | Accepted control red? | Full-cycle wall (s) | Falsifier |
+|---|---|---:|---|
+| `unicode-id` | yes | 7.315 | `principal_matching_respects_unicode_and_punctuation_bridges` |
+| `punctuation-bridge` | yes | 3.608 | `principal_matching_respects_unicode_and_punctuation_bridges` |
+| `direct-parent` | yes | 11.297 | `clean_raw_ancestry_does_not_hide` |
+| `tombstoned-source` | NO — excluded | 3.691 | `clean_raw_ancestry_does_not_hide` |
+| `held-coprincipal` | yes | 3.195 | `held_coprincipal` |
+| `exact-tombstone-prior` | NO — excluded | 3.267 | `partial_redaction_is_not` |
+| `uninstall-evidence` | yes | 3.393 | `partial_redaction_is_not` |
+| `empty-principal` | yes | 3.395 | `partial_redaction_is_not` |
+| `malformed-lineage` | yes | 3.216 | `malformed_distillates_are_scrubbed` |
+| `tombstoned-raw-source` | yes | 3.216 | `an_erased_raw_source` |
+| `exact-prior-repaired-witness` | yes | 3.332 | `an_unrelated_forget` |
+| `unconditional-output-purge` | yes | 10.558 | `response_only_principal_is_not_resurrected` |
+| `retry-cache-revalidation` | yes | 4.092 | `retry_notice_rechecks_tombstones` |
+| `authoritative-tl-payload` | yes | 6.251 | `redistill_fetches_only_tl_survivors` |
+| `observer-forget-is-not-curation` | yes | 13.837 | `forget_notices_do_not_close` |
+| `no-raw-recall-fallback` | yes | 21.311 | `root_redistill_uses_governed` |
+| `root-principal-rescan` | yes | 7.561 | `regenerated_bodies_are_rescanned` |
+| `fresh-regeneration` | yes | 5.277 | `regenerated_bodies_are_rescanned` |
+| `non-tombstone-result` | yes | 4.904 | `regenerated_bodies_are_rescanned` |
+| `surviving-source-subset` | yes | 4.625 | `regenerated_bodies_are_rescanned` |
+| `late-frame-sweep` | yes | 4.216 | `in_flight_pass_is_scrubbed` |
+| `orphan-request-replay` | yes | 5.753 | `retry_after_distillate_scrub` |
+| `quarantine-independent-purge` | yes | 7.239 | `privacy_notice_bypasses_quarantine` |
+| `typed-undelivered-purge` | yes | 7.017 | `undelivered_purges_are_typed` |
+| `post-erasure-pending` | yes | 5.421 | `undelivered_purges_are_typed` |
+| `late-result-journal` | yes | 7.256 | `a_late_hook_result_appends` |
+| `durable-request-metadata` | yes | 7.714 | `retry_after_distillate_scrub` |
+| `late-cache-followup` | yes | 5.185 | `in_flight_pass_is_scrubbed` |
+| `purge-quarantine-accounting` | yes | 7.187 | `a_late_hook_result_appends` |
+| `uninstall-error-outcome` | NO — excluded | 5.613 | `redistillation_failure_after_erasure` |
+| `uninstall-error-outcome-repaired` | yes | 4.087 | `redistillation_failure_after_erasure` |
+| `transitive-parent-closure` | yes | 3.916 | `clean_raw_ancestry_does_not_hide` |
+
+**29 accepted review-control mutations, three unsuccessful attempts excluded.** The initial tombstoned-distillate test was independently refused by receipt parsing, and the initial partial-redaction test never forgot an unrelated principal; those surviving plants led to new raw-tombstone and unrelated-forget tests, both green and then proven red. The first uninstall proof assertion used a wrong JSON path and failed unplanted; its initial mutation is not proof. The repaired signed-proof witness is green and its mutation is accepted.
+
+**One regenerated shared AC1/AC4 mutation (30 distinct accepted mutations total):** `ci/plant.diff` now filters the shared IAC sweep back to index-associated pids, covering both initial and late sweeps. Checksum and `git apply --check` passed; applying it, rebuilding the daemon and executing the actual process control failed on `canary leakage` / `seed-rag-noisy`. The floor control failed on `CANARY-forget-18-6-001`. Copy-back + `cmp` + `touch` all returned0; rebuilt process control green. Complete simulation wall **98.980s**, commands and restoration in `review-ci-simulation.log`, with per-command outputs in `review-ci-*.log`. Hosted execution remains an integrator landing obligation, not a local claim.
+
+Final new/expanded binary sums are in `review-binary-budgets.json`: HookPump26.895s, cascade5.588s, floors15.167s, MCP1.734s, uninstall8.922s, all≤30s. The unchanged existing Researcher-constructor exception remains47s (observed41.503s); no exception was added.

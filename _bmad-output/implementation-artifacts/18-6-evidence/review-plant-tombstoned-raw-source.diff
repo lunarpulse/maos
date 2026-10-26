@@ -1,0 +1,11 @@
+--- a/crates/maos-iac/src/adapter/distillate.rs
++++ b/crates/maos-iac/src/adapter/distillate.rs
+@@ -237,7 +237,7 @@
+                         .map_err(|e| DistillationError::Storage(e.to_string()))?;
+ 
+                     if let Some(e) = &entry {
+-                        if super::transparency_log::TransparencyLogAdapter::is_kernel_tombstone(
++                        if false && super::transparency_log::TransparencyLogAdapter::is_kernel_tombstone(
+                             &e.payload_redacted,
+                         ) {
+                             return Err(DistillationError::Storage(

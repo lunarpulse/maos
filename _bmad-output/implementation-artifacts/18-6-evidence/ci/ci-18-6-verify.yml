@@ -40,7 +40,7 @@ jobs:
           sha256sum -c _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff.sha256
           git apply --check _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff
           git apply _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff
-          git diff -- crates/maos-kernel-core/src/memory/mod.rs
+          git diff -- crates/maos-iac/src/adapter/transparency_log.rs
       - name: Rebuild the planted daemon
         run: cargo build --locked -p maos-bin --bin maos
       - name: The same process control must find the leaked canary

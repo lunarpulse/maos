@@ -597,7 +597,7 @@ async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
 
 const FORGET_PRINCIPAL: &str = "director-ada-18-6";
 const FORGET_CANARY: &str = "CANARY_MCP_18_6_f81a9";
-const PERSONAL_SOURCE: &str = "https://example.test/director-ada-18-6/CANARY_MCP_18_6_f81a9";
+const PERSONAL_SOURCE: &str = "https://example.test/source-18-6";
 const CONTROL_SOURCE: &str = "https://example.test/control-18-6";
 
 /// Only the remote service is mocked. The personal source is offered and
@@ -698,7 +698,7 @@ impl InferencePort for ForgetInference {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
+async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection() {
     use maos_bin::admission::{
         gate_manifest, load_admit_start, AdmissionDeps, StartPolicy, KNOWN_CLASS_NAMES,
     };
@@ -784,15 +784,15 @@ async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
         .unwrap();
 
     // The seed cassette convention's all-zero hash permits either order of
-    // the two concurrent MCP claims. Four real replay entries cover the first
-    // two claims, one surviving-source redistillation, and the next idle pass.
+    // the two concurrent MCP claims. Re-distillation has only invocation
+    // arguments, so it must refuse without inference; the next idle surveys.
     let cassette = tmp.path().join("forget-inference.json");
     std::fs::write(
         &cassette,
         serde_json::to_vec(&serde_json::json!({
             "schema_version": "maos.journey.cassette/v1",
             "provenance": "seed",
-            "entries": (0..4).map(|_| serde_json::json!({
+            "entries": (0..3).map(|_| serde_json::json!({
                 "prompt_sha256": "0".repeat(64),
                 "response": {
                     "text": "Observed evidence summarized.",
@@ -851,36 +851,65 @@ async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
         personal_fetched: AtomicBool::new(false),
         calls: AtomicUsize::new(0),
     });
-    let client = Arc::new(McpClientAdapter::new(
-        remote.clone(),
-        Arc::clone(&capability),
+    let recall: maos_bin::researcher_root::RecallBuilder = {
+        let (capability, security, tl) = (
+            Arc::downgrade(&capability),
+            Arc::downgrade(&security),
+            Arc::clone(&tl),
+        );
+        let raw = Arc::new(LogRecallAdapter::new(Arc::clone(&tl)));
+        Arc::new(move |spirit_id| {
+            let gone = || "recall host stopped".to_owned();
+            Ok(Arc::new(maos_bin::recall_mediation::MediatedLogRecall::new(
+                Arc::clone(&raw),
+                capability.upgrade().ok_or_else(gone)?,
+                security.upgrade().ok_or_else(gone)?,
+                Arc::clone(&tl),
+                None,
+                None,
+                spirit_id.to_owned(),
+            )) as Arc<dyn LogRecallPort>)
+        })
+    };
+    let (mcp_capability, mcp_tl, mcp_metrics, mcp_remote, mcp_recall) = (
+        Arc::downgrade(&capability),
         Arc::clone(&tl),
         Arc::clone(&metrics),
-    ));
-    let (mcp_capability, mcp_tl) = (Arc::clone(&capability), Arc::clone(&tl));
+        remote.clone(),
+        Arc::clone(&recall),
+    );
     let wiring = ResearcherWiring {
         live: true,
         mcp: Some(Arc::new(move |spirit_id, pid_of| {
+            let capability = mcp_capability.upgrade().ok_or("MCP host stopped")?;
+            let client = Arc::new(McpClientAdapter::new(
+                mcp_remote.clone(),
+                Arc::clone(&capability),
+                Arc::clone(&mcp_tl),
+                Arc::clone(&mcp_metrics),
+            ));
             Ok((
                 Arc::new(LiveResearcherMcpPort::new(
                     pid_of,
                     [0; 32],
                     client.clone(),
-                    Arc::clone(&mcp_capability),
+                    capability,
                     None,
                     None,
                     Arc::clone(&mcp_tl),
                     spirit_id,
                 )),
-                Arc::new(LogRecallAdapter::new(Arc::clone(&mcp_tl))),
+                mcp_recall(spirit_id)?,
             ))
         })),
+        recall: Some(Arc::clone(&recall)),
         legacy_cassette: None,
     };
     let mut host = ResearcherHost::new(
         Arc::clone(&tl),
         Arc::new(DistillateWriter::new(Arc::clone(&tl), Arc::new(()))),
         true,
+        recall(RESEARCHER_SPIRIT_ID).expect("governed host recall"),
     );
     host.redistill_sink = Some(pump.redistill_sink());
     let researcher = construct(
@@ -950,7 +979,8 @@ async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
     let raw = tl.query_frame_by_id(personal_id).unwrap().unwrap();
     assert_eq!(raw.kind, FrameKind::McpInvocation);
     assert!(raw.capability_token.is_some());
-    assert!(String::from_utf8_lossy(&raw.payload_redacted).contains(FORGET_CANARY));
+    assert!(!String::from_utf8_lossy(&raw.payload_redacted).contains(FORGET_PRINCIPAL));
+    assert!(!String::from_utf8_lossy(&raw.payload_redacted).contains(FORGET_CANARY));
 
     // OperatorDoor::forget_command invokes exactly these two operations.
     // The daemon process/HTTP door leg has its separate seed-claim witness;
@@ -965,7 +995,10 @@ async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
     else {
         panic!("an unheld principal must be erased")
     };
-    assert_eq!(redacted_principal_frame_ids, &[hex::encode(personal_id)]);
+    assert!(
+        redacted_principal_frame_ids.is_empty(),
+        "principal exists only in the response"
+    );
     assert_eq!(
         redacted_distillate_frame_ids,
         &[hex::encode(old[0].frame_id)]
@@ -976,50 +1009,56 @@ async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
         redistill[0].writer_boot_nonce,
         (nonce as u128).to_le_bytes()
     );
+    let mut expected_sources = vec![hex::encode(personal_id), hex::encode(control_id)];
+    expected_sources.sort();
+    let mut surviving = redistill[0].surviving_source_log_ref.clone();
+    surviving.sort();
+    assert_eq!(surviving, expected_sources);
+    let report = HookPump::finish_forget(&tl, &forgotten, Some(&pump)).await;
+    assert_eq!(report["redistilled_count"], 0, "{report}");
+    assert_eq!(report["pending_count"], 1, "{report}");
     assert_eq!(
-        redistill[0].surviving_source_log_ref,
-        [hex::encode(control_id)]
+        report["redistill_outcomes"][0]["outcome"],
+        serde_json::json!({"status":"pending","reason":{"refused":"no-claims"}}),
+        "{report}"
     );
-    let report = HookPump::finish_forget(&tl, &forgotten, Some(&pump))
-        .await
-        .unwrap();
-    assert_eq!(report["redistilled_count"], 1, "{report}");
-    assert_eq!(report["pending_count"], 0, "{report}");
     assert_eq!(
         remote.calls.load(Ordering::SeqCst),
         6,
         "redistillation must not reacquire the remote canary"
     );
     assert!(researcher.take_pass_error().is_none());
-    for id in [personal_id, old[0].frame_id] {
-        let row = tl.query_frame_by_id(id).unwrap().unwrap();
-        let body: serde_json::Value = serde_json::from_slice(&row.payload_redacted).unwrap();
-        assert_eq!(body["redacted"], true);
-    }
-    let new_id = decode_frame_id_hex(
-        report["redistill_outcomes"][0]["outcome"]["new_distillate_frame_id"]
-            .as_str()
-            .unwrap(),
+    let body: serde_json::Value = serde_json::from_slice(
+        &tl.query_frame_by_id(old[0].frame_id)
+            .expect("old row")
+            .expect("distillate")
+            .payload_redacted,
     )
-    .unwrap();
-    assert_ne!(new_id, old[0].frame_id);
-    let new = tl.query_frame_by_id(new_id).unwrap().unwrap();
-    assert_eq!(new.kind, FrameKind::Distillate);
-    assert_eq!(new.spirit_pid, admitted.pid);
-    assert_eq!(new.boot_nonce, nonce);
-    let body: serde_json::Value = serde_json::from_slice(&new.payload_redacted).unwrap();
+    .expect("tombstone");
+    assert_eq!(body["redacted"], true);
     assert_eq!(
-        body["source_log_ref"],
-        serde_json::json!([researcher::encode_frame_id_hex(&control_id)])
+        tl.query_frame_by_id(personal_id)
+            .expect("source row")
+            .expect("source")
+            .payload_redacted,
+        raw.payload_redacted,
+        "response-only principal must not require erasing clean invocation arguments"
     );
-    assert!(!String::from_utf8_lossy(&new.payload_redacted).contains(FORGET_PRINCIPAL));
-    assert!(!String::from_utf8_lossy(&new.payload_redacted).contains(FORGET_CANARY));
+    assert!(
+        researcher.last_output().is_none(),
+        "all semantic cache is purged"
+    );
+    assert_eq!(inference.prompts.lock().expect("prompts").len(), 2);
     assert_eq!(
-        researcher.last_output().unwrap().findings[0].claim_id,
-        "control-18-6"
+        tl.query_frames(FrameFilter {
+            kind: Some(FrameKind::Distillate),
+            ..Default::default()
+        })
+        .expect("distillates")
+        .len(),
+        1,
+        "arg-only sources must not regenerate cached claims"
     );
-    assert_eq!(inference.prompts.lock().unwrap().len(), 3);
-    assert!(!inference.prompts.lock().unwrap()[2].contains(FORGET_CANARY));
 
     let (outcome, _) = idle(dispatcher, &scb).await;
     assert!(matches!(outcome, HookOutcome::Fired { .. }), "{outcome:?}");
@@ -1030,7 +1069,7 @@ async fn mcp_sourced_forget_scrubs_unindexed_writer_and_redistills_live() {
     assert_eq!(next.findings[0].source_log_ref, control.source_log_ref);
     assert_eq!(remote.calls.load(Ordering::SeqCst), 11);
     let prompts = inference.prompts.lock().unwrap();
-    assert_eq!(prompts.len(), 4);
+    assert_eq!(prompts.len(), 3);
     assert_eq!(
         prompts[..2]
             .iter()

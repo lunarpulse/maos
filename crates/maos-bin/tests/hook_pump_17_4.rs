@@ -1386,9 +1386,7 @@ async fn forget_notice_broadcast_binds_boot_and_pid_and_rejects_another_writer()
     } else {
         panic!("unheld forget must erase");
     }
-    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump))
-        .await
-        .unwrap();
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
     assert_eq!(report["pending_count"], 2);
     assert_eq!(report["redistilled_count"], 0);
     assert_eq!(
@@ -1401,7 +1399,7 @@ async fn forget_notice_broadcast_binds_boot_and_pid_and_rejects_another_writer()
     );
     let received = notices.lock().unwrap();
     assert_eq!(received.len(), 1);
-    assert_eq!(received[0].scrubbed_frame_ids, [scrubbed]);
+    assert!(received[0].scrubbed_frame_ids.contains(&scrubbed));
     assert_eq!(
         received[0].redistill.len(),
         1,
@@ -1423,18 +1421,14 @@ async fn forget_notice_broadcast_binds_boot_and_pid_and_rejects_another_writer()
         .forget_with_reason("held-root-18-6", Some("legal-hold"))
         .unwrap();
     assert!(matches!(held, ForgetOutcome::Suspended { .. }));
-    HookPump::finish_forget(&world.tl, &held, Some(&world.pump))
-        .await
-        .unwrap();
+    HookPump::finish_forget(&world.tl, &held, Some(&world.pump)).await;
     assert_eq!(
         notices.lock().unwrap().len(),
         1,
         "legal hold sends no notice"
     );
 
-    let offline = HookPump::finish_forget(&world.tl, &forgotten, None)
-        .await
-        .unwrap();
+    let offline = HookPump::finish_forget(&world.tl, &forgotten, None).await;
     assert_eq!(offline["pending_count"], 2);
     for row in offline["redistill_outcomes"].as_array().unwrap() {
         assert_eq!(row["outcome"]["reason"], "writer-not-live");
@@ -1478,9 +1472,7 @@ async fn forget_curates_a_live_spirit_even_when_it_has_no_redistillation_path() 
             surviving_source_log_ref: vec![hex::encode([0x44; 16])],
         });
     }
-    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump))
-        .await
-        .unwrap();
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
     assert_eq!(report["pending_count"], 1);
     assert_eq!(
         report["redistill_outcomes"][0]["outcome"]["reason"],
@@ -1491,5 +1483,504 @@ async fn forget_curates_a_live_spirit_even_when_it_has_no_redistillation_path() 
         1,
         "curation is not conditional on a distillation port"
     );
+    world.pump.shutdown().await;
+}
+
+struct ForgetAction(Arc<dyn Fn(&maos_domain::memory::ForgetNotice) + Send + Sync>);
+
+impl Spirit for ForgetAction {
+    fn on_consolidate(&self, _ctx: &mut Ctx, payload: &ConsolidatePayload<'_>) {
+        (self.0)(&serde_json::from_slice(payload.batch_data).unwrap());
+    }
+    fn on_telemetry_event(&self, _ctx: &mut Ctx, _payload: &TelemetryEventPayload<'_>) {
+        panic!("privacy notice must bypass telemetry quarantine");
+    }
+}
+
+fn write_forget_digest(
+    tl: &Arc<TransparencyLogAdapter>,
+    pid: u32,
+    source: [u8; 16],
+    body: &str,
+) -> [u8; 16] {
+    use maos_domain::distillation::{DigestPayload, DistillationRequest};
+    use maos_domain::ports::DistillationPort;
+    maos_kernel_core::iac::distillate::DistillateWriter::new(tl.clone(), Arc::new(()))
+        .write_distillate(
+            pid,
+            DistillationRequest::new(vec![source], 1, DigestPayload::Text(body.into()), None)
+                .unwrap(),
+        )
+        .unwrap()
+        .digest_frame_id
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn regenerated_bodies_are_rescanned_and_old_or_non_surviving_results_are_pending() {
+    use maos_domain::memory::{ForgetOutcome, RedistillOutcome, RedistillRequest};
+    for mode in ["principal", "old", "wrong-source", "tombstone", "valid"] {
+        let world = World::new();
+        let pid_slot = Arc::new(AtomicU32::new(0));
+        let source_slot = Arc::new(Mutex::new(([0; 16], [0; 16], [0; 16])));
+        let returned = Arc::new(Mutex::new(None));
+        let (tl, sink, bound_pid, sources, result) = (
+            world.tl.clone(),
+            world.pump.redistill_sink(),
+            pid_slot.clone(),
+            source_slot.clone(),
+            returned.clone(),
+        );
+        let pid = world
+            .admit(
+                OBSERVER_MANIFEST,
+                make_spirit_obj(ForgetAction(Arc::new(move |notice| {
+                    for request in &notice.redistill {
+                        let (clean, other, old) = *sources.lock().unwrap();
+                        let id = if mode == "old" {
+                            old
+                        } else {
+                            write_forget_digest(
+                                &tl,
+                                bound_pid.load(Ordering::Acquire),
+                                if mode == "wrong-source" { other } else { clean },
+                                if mode == "principal" {
+                                    "response-only-principal secret"
+                                } else {
+                                    "clean finding"
+                                },
+                            )
+                        };
+                        if mode == "tombstone" {
+                            tl.scrub_distillate_body(id, "gdpr-forget").unwrap();
+                        }
+                        *result.lock().unwrap() = Some(id);
+                        sink(
+                            request,
+                            RedistillOutcome::Redistilled {
+                                new_distillate_frame_id: hex::encode(id),
+                            },
+                        );
+                    }
+                }))),
+                StartPolicy::StartNow,
+            )
+            .await
+            .unwrap();
+        pid_slot.store(pid, Ordering::Release);
+        let clean = world.tl.insert_kernel_event_returning_id(
+            pid,
+            FrameKind::TaskComplete,
+            None,
+            "fixture.clean",
+            b"clean",
+        );
+        let other = world.tl.insert_kernel_event_returning_id(
+            pid,
+            FrameKind::TaskComplete,
+            None,
+            "fixture.other",
+            b"other",
+        );
+        let old = write_forget_digest(&world.tl, pid, clean, "old clean finding");
+        *source_slot.lock().unwrap() = (clean, other, old);
+        let mut forgotten = world
+            .memory
+            .forget_with_reason("response-only-principal", None)
+            .unwrap();
+        if let ForgetOutcome::Erased { redistill, .. } = &mut forgotten {
+            redistill.push(RedistillRequest {
+                redacted_distillate_frame_id: hex::encode([0x55; 16]),
+                writer_spirit_pid: pid,
+                writer_boot_nonce: (NONCE as u128).to_le_bytes(),
+                surviving_source_log_ref: vec![hex::encode(clean)],
+            });
+        }
+        let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
+        assert_eq!(
+            report["redistilled_count"],
+            usize::from(mode == "valid"),
+            "{mode}: {report}"
+        );
+        assert_eq!(
+            report["redistill_outcomes"][0]["outcome"]["status"],
+            if mode == "valid" {
+                "redistilled"
+            } else {
+                "pending"
+            }
+        );
+        if mode == "principal" {
+            let id = returned.lock().unwrap().unwrap();
+            let row = world.tl.query_frame_by_id(id).unwrap().unwrap();
+            assert!(
+                TransparencyLogAdapter::is_kernel_tombstone(&row.payload_redacted),
+                "{report}"
+            );
+            assert_eq!(
+                report["redistill_outcomes"][0]["outcome"]["reason"]["refused"],
+                "principal-resurrected"
+            );
+        }
+        world.pump.shutdown().await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn retry_after_distillate_scrub_reemits_the_orphan_request_and_scrubbed_id() {
+    let world = World::new();
+    let notices = Arc::new(Mutex::new(Vec::new()));
+    let pid = world
+        .admit(
+            OBSERVER_MANIFEST,
+            make_spirit_obj(ForgetProbe {
+                notices: notices.clone(),
+                sink: None,
+                result_frame: String::new(),
+            }),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    let clean = world.tl.insert_kernel_event_returning_id(
+        pid,
+        FrameKind::TaskComplete,
+        None,
+        "fixture.clean",
+        b"clean",
+    );
+    let digest = write_forget_digest(&world.tl, pid, clean, "retry-principal private");
+    let late = world.tl.insert_kernel_event_returning_id(
+        pid,
+        FrameKind::TaskComplete,
+        None,
+        "fixture.fail",
+        b"retry-principal",
+    );
+    let conn = rusqlite::Connection::open(world._dir.path().join("transparency.sqlite")).unwrap();
+    conn.execute_batch(&format!("CREATE TRIGGER fail_later_scrub BEFORE UPDATE OF payload_redacted ON transparency_log WHEN OLD.frame_id=X'{}' BEGIN SELECT RAISE(FAIL,'after digest scrub'); END;", hex::encode(late))).unwrap();
+    assert!(world
+        .memory
+        .forget_with_reason("retry-principal", None)
+        .is_err());
+    assert!(TransparencyLogAdapter::is_kernel_tombstone(
+        &world
+            .tl
+            .query_frame_by_id(digest)
+            .unwrap()
+            .unwrap()
+            .payload_redacted
+    ));
+    conn.execute_batch("DROP TRIGGER fail_later_scrub").unwrap();
+    let forgotten = world
+        .memory
+        .forget_with_reason("retry-principal", None)
+        .unwrap();
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
+    assert_eq!(report["pending_count"], 1, "{report}");
+    let notices = notices.lock().unwrap();
+    assert!(notices[0].scrubbed_frame_ids.contains(&hex::encode(digest)));
+    assert_eq!(
+        notices[0].redistill[0].redacted_distillate_frame_id,
+        hex::encode(digest)
+    );
+    assert!(world
+        .tl
+        .outstanding_redistill_requests()
+        .unwrap()
+        .is_empty());
+    drop(notices);
+    world.pump.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn undelivered_purges_are_typed_and_post_erasure_errors_are_pending() {
+    let world = World::new();
+    let manifest = format!("{OBSERVER_MANIFEST}\n[lifecycle]\nenabled_hooks = [\"on_start\"]\n");
+    // An explicitly disabled hook is a typed undelivered purge, not a silent skip.
+    let pid = world
+        .admit(
+            &manifest,
+            make_spirit_obj(ForgetProbe {
+                notices: Arc::default(),
+                sink: None,
+                result_frame: String::new(),
+            }),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    let forgotten = world
+        .memory
+        .forget_with_reason("undelivered-principal", None)
+        .unwrap();
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
+    assert_eq!(
+        report["purge_undelivered"],
+        serde_json::json!([pid]),
+        "{report}"
+    );
+    assert_eq!(
+        world
+            .tl
+            .query_frames(FrameFilter {
+                intent: Some("forget.purge.undelivered".into()),
+                ..Default::default()
+            })
+            .unwrap()
+            .len(),
+        1
+    );
+    // Corrupt request decoding after erasure; completion still has a pending terminal.
+    let id = world.tl.insert_kernel_event_returning_id(
+        0,
+        FrameKind::TaskComplete,
+        None,
+        "distillate.redistill.requested",
+        b"{}",
+    );
+    let report = HookPump::finish_forget(&world.tl, &forgotten, None).await;
+    assert_eq!(report["redistill_error"]["status"], "pending", "{report}");
+    assert!(world.tl.query_frame_by_id(id).unwrap().is_some());
+    world.pump.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn privacy_notice_bypasses_quarantine_without_changing_hook_accounting() {
+    let world = World::new();
+    let count = Arc::new(AtomicU32::new(0));
+    let seen = count.clone();
+    world
+        .admit(
+            OBSERVER_MANIFEST,
+            make_spirit_obj(ForgetAction(Arc::new(move |_| {
+                seen.fetch_add(1, Ordering::Relaxed);
+            }))),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    for _ in 0..3 {
+        world.emit(0.1).await;
+    }
+    let stats = world.pump.stats();
+    assert_eq!(stats.failed, 3);
+    let forgotten = world
+        .memory
+        .forget_with_reason("quarantine-principal", None)
+        .unwrap();
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
+    assert_eq!(count.load(Ordering::Relaxed), 1, "{report}");
+    assert_eq!(report["purge_undelivered"], serde_json::json!([]));
+    assert_eq!(
+        world.pump.stats(),
+        stats,
+        "privacy notice must not count toward quarantine"
+    );
+    world.pump.shutdown().await;
+}
+
+struct InFlightForget {
+    pass: Arc<Mutex<()>>,
+    notices: Arc<Mutex<Vec<maos_domain::memory::ForgetNotice>>>,
+    entered: std::sync::mpsc::Sender<()>,
+    release: Mutex<std::sync::mpsc::Receiver<()>>,
+    write: Arc<dyn Fn() + Send + Sync>,
+}
+
+impl Spirit for InFlightForget {
+    fn on_idle(&self, _ctx: &mut Ctx) {
+        let _pass = self.pass.lock().unwrap();
+        self.entered.send(()).unwrap();
+        self.release.lock().unwrap().recv().unwrap();
+        (self.write)();
+    }
+    fn on_consolidate(&self, _ctx: &mut Ctx, payload: &ConsolidatePayload<'_>) {
+        let _pass = self.pass.lock().unwrap();
+        self.notices
+            .lock()
+            .unwrap()
+            .push(serde_json::from_slice(payload.batch_data).unwrap());
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn in_flight_pass_is_scrubbed_after_its_forget_acknowledgement() {
+    let world = World::new();
+    let pid_slot = Arc::new(AtomicU32::new(0));
+    let source = Arc::new(Mutex::new([0; 16]));
+    let notices = Arc::new(Mutex::new(Vec::new()));
+    let written = Arc::new(Mutex::new(None));
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let (tl, writer_pid, source_id, result) = (
+        world.tl.clone(),
+        pid_slot.clone(),
+        source.clone(),
+        written.clone(),
+    );
+    let pid = world
+        .admit(
+            OBSERVER_MANIFEST,
+            make_spirit_obj(InFlightForget {
+                pass: Arc::default(),
+                notices: notices.clone(),
+                entered: entered_tx,
+                release: Mutex::new(release_rx),
+                write: Arc::new(move || {
+                    *result.lock().unwrap() = Some(write_forget_digest(
+                        &tl,
+                        writer_pid.load(Ordering::Acquire),
+                        *source_id.lock().unwrap(),
+                        "late-pass-principal secret",
+                    ));
+                }),
+            }),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    pid_slot.store(pid, Ordering::Release);
+    *source.lock().unwrap() = world.tl.insert_kernel_event_returning_id(
+        pid,
+        FrameKind::TaskComplete,
+        None,
+        "fixture.clean",
+        b"clean raw",
+    );
+    let scb = world
+        .scheduler
+        .scbs()
+        .read()
+        .unwrap()
+        .get(&pid)
+        .unwrap()
+        .clone();
+    let dispatcher = world.scheduler.dispatcher_arc();
+    let idle = tokio::spawn(async move { dispatcher.fire_on_idle(&scb).await });
+    tokio::task::spawn_blocking(move || entered_rx.recv_timeout(Duration::from_secs(3)).unwrap())
+        .await
+        .unwrap();
+    let forgotten = world
+        .memory
+        .forget_with_reason("late-pass-principal", None)
+        .unwrap();
+    release_tx.send(()).unwrap();
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
+    idle.await.unwrap();
+    let id = written.lock().unwrap().unwrap();
+    let received = notices.lock().unwrap();
+    assert_eq!(
+        received.len(),
+        2,
+        "late caches need a second purge-only notice"
+    );
+    assert!(received[1].scrubbed_frame_ids.contains(&hex::encode(id)));
+    assert!(received[1].redistill.is_empty());
+    drop(received);
+    assert!(
+        TransparencyLogAdapter::is_kernel_tombstone(
+            &world
+                .tl
+                .query_frame_by_id(id)
+                .unwrap()
+                .unwrap()
+                .payload_redacted
+        ),
+        "{report}"
+    );
+    assert_eq!(
+        report["late_redacted_distillate_frame_ids"],
+        serde_json::json!([hex::encode(id)])
+    );
+    assert_eq!(
+        report["redistill_outcomes"][0]["outcome"]["reason"]["refused"],
+        "late-frame"
+    );
+    world.pump.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_late_hook_result_appends_its_eventual_redistilled_receipt() {
+    use maos_domain::memory::{ForgetOutcome, RedistillOutcome, RedistillRequest};
+    let world = World::new();
+    let pid_slot = Arc::new(AtomicU32::new(0));
+    let source_slot = Arc::new(Mutex::new([0; 16]));
+    let (tl, sink, pid_of, source) = (
+        world.tl.clone(),
+        world.pump.redistill_sink(),
+        pid_slot.clone(),
+        source_slot.clone(),
+    );
+    let manifest = OBSERVER_MANIFEST.replace("time_cap_seconds = 10", "time_cap_seconds = 1");
+    let pid = world
+        .admit(
+            &manifest,
+            make_spirit_obj(ForgetAction(Arc::new(move |notice| {
+                std::thread::sleep(Duration::from_millis(1150));
+                for request in &notice.redistill {
+                    let id = write_forget_digest(
+                        &tl,
+                        pid_of.load(Ordering::Acquire),
+                        *source.lock().unwrap(),
+                        "late clean result",
+                    );
+                    sink(
+                        request,
+                        RedistillOutcome::Redistilled {
+                            new_distillate_frame_id: hex::encode(id),
+                        },
+                    );
+                }
+            }))),
+            StartPolicy::StartNow,
+        )
+        .await
+        .unwrap();
+    pid_slot.store(pid, Ordering::Release);
+    *source_slot.lock().unwrap() = world.tl.insert_kernel_event_returning_id(
+        pid,
+        FrameKind::TaskComplete,
+        None,
+        "fixture.clean",
+        b"clean",
+    );
+    let mut forgotten = world
+        .memory
+        .forget_with_reason("late-result-principal", None)
+        .unwrap();
+    if let ForgetOutcome::Erased { redistill, .. } = &mut forgotten {
+        redistill.push(RedistillRequest {
+            redacted_distillate_frame_id: hex::encode([0x66; 16]),
+            writer_spirit_pid: pid,
+            writer_boot_nonce: (NONCE as u128).to_le_bytes(),
+            surviving_source_log_ref: vec![hex::encode(*source_slot.lock().unwrap())],
+        });
+    }
+    let report = HookPump::finish_forget(&world.tl, &forgotten, Some(&world.pump)).await;
+    assert_eq!(report["pending_count"], 1, "{report}");
+    world.emit(0.1).await;
+    assert_eq!(
+        world.pump.stats().failed,
+        1,
+        "a privacy timeout must not quarantine telemetry delivery"
+    );
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if !world
+                .tl
+                .query_frames(FrameFilter {
+                    intent: Some("distillate.redistilled".into()),
+                    ..Default::default()
+                })
+                .unwrap()
+                .is_empty()
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("late result must be journaled, not dropped");
     world.pump.shutdown().await;
 }

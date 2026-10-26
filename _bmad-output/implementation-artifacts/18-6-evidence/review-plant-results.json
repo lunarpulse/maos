@@ -1,0 +1,259 @@
+[
+  {
+    "name": "unicode-id",
+    "exit": 100,
+    "wall_seconds": 7.315,
+    "red_oracle": "principal_matching_respects_unicode_and_punctuation_bridges",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "punctuation-bridge",
+    "exit": 100,
+    "wall_seconds": 3.608,
+    "red_oracle": "principal_matching_respects_unicode_and_punctuation_bridges",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "direct-parent",
+    "exit": 100,
+    "wall_seconds": 11.297,
+    "red_oracle": "clean_raw_ancestry_does_not_hide",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "tombstoned-source",
+    "exit": 0,
+    "wall_seconds": 3.691,
+    "red_oracle": "clean_raw_ancestry_does_not_hide",
+    "proven_red": false,
+    "restored_cmp": true
+  },
+  {
+    "name": "held-coprincipal",
+    "exit": 100,
+    "wall_seconds": 3.195,
+    "red_oracle": "held_coprincipal",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "exact-tombstone-prior",
+    "exit": 0,
+    "wall_seconds": 3.267,
+    "red_oracle": "partial_redaction_is_not",
+    "proven_red": false,
+    "restored_cmp": true
+  },
+  {
+    "name": "uninstall-evidence",
+    "exit": 100,
+    "wall_seconds": 3.393,
+    "red_oracle": "partial_redaction_is_not",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "empty-principal",
+    "exit": 100,
+    "wall_seconds": 3.395,
+    "red_oracle": "partial_redaction_is_not",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "malformed-lineage",
+    "exit": 100,
+    "wall_seconds": 3.216,
+    "red_oracle": "malformed_distillates_are_scrubbed",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "tombstoned-raw-source",
+    "exit": 100,
+    "wall_seconds": 3.216,
+    "red_oracle": "an_erased_raw_source",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "exact-prior-repaired-witness",
+    "exit": 100,
+    "wall_seconds": 3.332,
+    "red_oracle": "an_unrelated_forget",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "unconditional-output-purge",
+    "exit": 100,
+    "wall_seconds": 10.558,
+    "red_oracle": "response_only_principal_is_not_resurrected",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "retry-cache-revalidation",
+    "exit": 100,
+    "wall_seconds": 4.092,
+    "red_oracle": "retry_notice_rechecks_tombstones",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "authoritative-tl-payload",
+    "exit": 100,
+    "wall_seconds": 6.251,
+    "red_oracle": "redistill_fetches_only_tl_survivors",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "observer-forget-is-not-curation",
+    "exit": 100,
+    "wall_seconds": 13.837,
+    "red_oracle": "forget_notices_do_not_close",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "no-raw-recall-fallback",
+    "exit": 100,
+    "wall_seconds": 21.311,
+    "red_oracle": "root_redistill_uses_governed",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "root-principal-rescan",
+    "exit": 100,
+    "wall_seconds": 7.561,
+    "red_oracle": "regenerated_bodies_are_rescanned",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "fresh-regeneration",
+    "exit": 100,
+    "wall_seconds": 5.277,
+    "red_oracle": "regenerated_bodies_are_rescanned",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "non-tombstone-result",
+    "exit": 100,
+    "wall_seconds": 4.904,
+    "red_oracle": "regenerated_bodies_are_rescanned",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "surviving-source-subset",
+    "exit": 100,
+    "wall_seconds": 4.625,
+    "red_oracle": "regenerated_bodies_are_rescanned",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "late-frame-sweep",
+    "exit": 100,
+    "wall_seconds": 4.216,
+    "red_oracle": "in_flight_pass_is_scrubbed",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "orphan-request-replay",
+    "exit": 100,
+    "wall_seconds": 5.753,
+    "red_oracle": "retry_after_distillate_scrub",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "quarantine-independent-purge",
+    "exit": 100,
+    "wall_seconds": 7.239,
+    "red_oracle": "privacy_notice_bypasses_quarantine",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "typed-undelivered-purge",
+    "exit": 100,
+    "wall_seconds": 7.017,
+    "red_oracle": "undelivered_purges_are_typed",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "post-erasure-pending",
+    "exit": 100,
+    "wall_seconds": 5.421,
+    "red_oracle": "undelivered_purges_are_typed",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "late-result-journal",
+    "exit": 100,
+    "wall_seconds": 7.256,
+    "red_oracle": "a_late_hook_result_appends",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "durable-request-metadata",
+    "exit": 100,
+    "wall_seconds": 7.714,
+    "red_oracle": "retry_after_distillate_scrub",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "late-cache-followup",
+    "exit": 100,
+    "wall_seconds": 5.185,
+    "red_oracle": "in_flight_pass_is_scrubbed",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "purge-quarantine-accounting",
+    "exit": 100,
+    "wall_seconds": 7.187,
+    "red_oracle": "a_late_hook_result_appends",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "uninstall-error-outcome",
+    "exit": 100,
+    "wall_seconds": 5.613,
+    "red_oracle": "redistillation_failure_after_erasure",
+    "proven_red": false,
+    "restored_cmp": true,
+    "invalid_reason": "Unplanted witness had wrong JSON path; not accepted as red evidence."
+  },
+  {
+    "name": "uninstall-error-outcome-repaired",
+    "exit": 100,
+    "wall_seconds": 4.087,
+    "red_oracle": "redistillation_failure_after_erasure",
+    "proven_red": true,
+    "restored_cmp": true
+  },
+  {
+    "name": "transitive-parent-closure",
+    "exit": 100,
+    "wall_seconds": 3.916,
+    "red_oracle": "clean_raw_ancestry_does_not_hide",
+    "proven_red": true,
+    "restored_cmp": true
+  }
+]

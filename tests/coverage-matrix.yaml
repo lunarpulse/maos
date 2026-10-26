@@ -699,7 +699,7 @@ coverage:
     - gdpr-cascade-probe-v1
     phase: v1.0
     valid_until: '2027-06-12'
-    notes: Delivered by 18-6 — any-writer, any-kind erasure and derived closure; live Spirit-authored re-distillation through the daemon door (journey_forget_18_6); 50 erased-only production-door scenarios and 100 all-store probes (forget_floors_18_6). v0 retains held/failed/not-found regression.
+    notes: Implemented in 18-6, under review (hosted proven-red landing proof owed) — any-writer, any-kind erasure and direct-parent derived closure; live Spirit-authored re-distillation through the daemon door (journey_forget_18_6); 50 erased-only production-door scenarios and 100 all-store probes (forget_floors_18_6). v0 retains held/failed/not-found regression. Delivery claim belongs to the done flip.
   FR46:
     gates: []
     enforcement: advisory-until-engagement
@@ -921,7 +921,7 @@ coverage:
     - gdpr-cascade-probe-v1
     phase: v1.0
     valid_until: '2027-06-12'
-    notes: Delivered by 18-6 — forget_floors_18_6 seeds real adapters and uses one daemon door for 50/50 clean removals, 50/50 redaction markers and 0/100 leakage over every named readable store; no live judge. v0 retains held/failed/not-found regression.
+    notes: Implemented in 18-6, under review (hosted proven-red landing proof owed) — forget_floors_18_6 seeds real adapters and uses one daemon door for 50/50 clean removals, 50/50 redaction markers and 0/100 leakage over every named readable store; no live judge. v0 retains held/failed/not-found regression. Delivery claim belongs to the done flip.
   NFR-Aud-11:
     gates:
     - check-enterprise-identity

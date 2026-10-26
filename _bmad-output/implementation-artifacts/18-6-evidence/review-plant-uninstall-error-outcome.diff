@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -620,7 +620,7 @@
+         match Self::complete_forget(tl, forget, pump).await {
+             Ok(report) => report,
+             Err(detail) => {
+-                let mut rows = vec![serde_json::json!({"outcome":{"status":"pending","reason":{"refused":"completion-error"}},"detail":detail})];
++                let mut rows = Vec::new();
+                 if let ForgetOutcome::Erased { redistill, .. } = forget {
+                     for request in redistill {
+                         let outcome = RedistillOutcome::Pending {

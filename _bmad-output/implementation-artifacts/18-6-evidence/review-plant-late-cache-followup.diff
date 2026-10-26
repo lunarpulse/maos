@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -805,7 +805,7 @@
+             .chain(&late_frames)
+             .cloned()
+             .collect();
+-        if let Some(pump) = pump.filter(|_| !late_ids.is_empty()) {
++        if let Some(pump) = pump.filter(|_| false) {
+             let bytes = serde_json::to_vec(&ForgetNotice {
+                 scrubbed_frame_ids: late_ids,
+                 redistill: Vec::new(),

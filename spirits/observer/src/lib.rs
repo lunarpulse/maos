@@ -601,7 +601,10 @@ impl Observer {
     /// Story 17-4 — the host says *curate now* (the payload is empty, never a
     /// list of what). A non-empty window is reported as one
     /// [`ObservedActivity::Consolidated`] and reset; an empty one emits nothing.
-    fn on_consolidate(&self, _ctx: &mut Ctx, _payload: &ConsolidatePayload) {
+    fn on_consolidate(&self, _ctx: &mut Ctx, payload: &ConsolidatePayload) {
+        if !payload.batch_data.is_empty() {
+            return;
+        }
         let mut window = self.window.lock().unwrap_or_else(|e| e.into_inner());
         if window.window_events == 0 && window.undecodable == 0 {
             return;

@@ -128,19 +128,26 @@ writers, and redacts distillates derived from those frames. Its JSON result
 includes scrubbed frame ids, redacted distillate ids, re-distillation requests
 with surviving source references, and each request's outcome.
 
-In a running daemon, live compiled-in Spirits receive a forget notice to purge
-their cached frames. A live, bound Researcher regenerates its redacted summaries
-through its own distillation path. Otherwise the request is recorded as typed
-pending (`writer-not-live`, `no-distillation-path`, `no-surviving-sources`,
-`form-unsupported`, or `refused:<typed>`); pending does not resume across boots.
-Offline forget and uninstall record `writer-not-live` rather than silently
-skipping regeneration.
+In a running daemon, live compiled-in Spirits receive a forget notice even if
+ordinary hook delivery was quarantined. The Researcher clears cached claims
+and its last output, rechecks cached ids against the log, and regenerates only
+from current surviving log payloads through governed recall. The root validates
+and re-scans the result, then sweeps again for frames written by in-flight
+passes before completing. Outstanding requests from an interrupted cascade
+are recovered on retry. Undelivered purges and regeneration errors are typed;
+an already-completed erasure is not reported as failed solely because
+regeneration failed. Offline/unavailable writers are typed pending rather
+than silently skipped; pending does not resume automatically across boots.
 
 `maosctl forget --principal <id> --reason legal-hold` records a durable hold and
 exits 3 without scrubbing or regeneration. A prior hold also blocks erasure.
-Shared and Loom retain non-principal coordination data by partition. Detection
-is id-based, not semantic: copied content without the id, transformed or escaped
-ids, and later collection from an external source are outside this guarantee.
+Frames also naming another principal under legal hold, and their derived
+distillates, are preserved and reported as typed skips.
+Shared and Loom retain non-principal coordination data by partition. Unicode
+letters/digits are part of ids; trailing prose punctuation is a boundary, but
+an id glued directly to CJK text without spaces may not match. Detection is
+id-based, not semantic: copied content without the id, transformed/escaped ids,
+and later collection from an external source are outside this guarantee.
 
 ## Operate
 

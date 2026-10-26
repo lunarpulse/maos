@@ -1,0 +1,10 @@
+--- a/crates/maos-bin/src/researcher_root.rs
++++ b/crates/maos-bin/src/researcher_root.rs
+@@ -48,6 +48,7 @@
+         live: bool,
+         recall: Arc<dyn LogRecallPort>,
+     ) -> Self {
++        let recall = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(tl.clone()));
+         let boot_nonce = (tl.boot_nonce() as u128).to_le_bytes();
+         let seed_sink: researcher::SeedSink = Arc::new(move |pid, payload| {
+             let digest = Sha256::new()

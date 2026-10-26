@@ -439,6 +439,9 @@ impl MemoryManagerAdapter {
         principal_id: &str,
         reason: Option<&str>,
     ) -> Result<ForgetOutcome, MemoryError> {
+        if principal_id.is_empty() {
+            return Err(MemoryError::Storage("empty principal id".into()));
+        }
         let _forget_guard = self
             .forget_serialization
             .lock()
@@ -540,66 +543,16 @@ impl MemoryManagerAdapter {
             hook();
         }
 
-        // Scan all writers before deleting either principal store (re-runnable W1).
-        let mut frames = self
+        let (
+            redacted_distillate_frame_ids,
+            redacted_principal_frame_ids,
+            redistill,
+            held,
+            malformed,
+        ) = self
             .transparency_log
-            .principal_bearing_frames(principal_id)
+            .scrub_forget_frames(principal_id)
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
-        let mut scrubbed: HashSet<String> =
-            frames.iter().map(|f| hex::encode(f.frame_id)).collect();
-        let derived = self
-            .transparency_log
-            .distillates_citing(&scrubbed)
-            .map_err(|e| MemoryError::Storage(e.to_string()))?;
-        for frame in derived {
-            if scrubbed.insert(hex::encode(frame.frame_id)) {
-                frames.push(frame);
-            }
-        }
-        let mut redacted_distillate_frame_ids = Vec::new();
-        let mut redacted_principal_frame_ids = Vec::new();
-        let mut redistill = Vec::new();
-        for frame in frames {
-            let frame_id = frame.frame_id;
-            let id = hex::encode(frame_id);
-            match frame.kind {
-                11 => {
-                    let request = maos_domain::memory::RedistillRequest {
-                        redacted_distillate_frame_id: id.clone(),
-                        writer_spirit_pid: frame.spirit_pid,
-                        writer_boot_nonce: (frame.boot_nonce as u128).to_le_bytes(),
-                        surviving_source_log_ref: frame
-                            .source_log_ref
-                            .into_iter()
-                            .filter(|id| !scrubbed.contains(id))
-                            .collect(),
-                    };
-                    self.transparency_log
-                        .insert_redistill_request(&request)
-                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
-                    self.transparency_log
-                        .scrub_distillate_body(frame_id, "gdpr-forget")
-                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
-                    let _ = self
-                        .transparency_log
-                        .insert_distillate_redaction_marker(principal_id, frame_id);
-                    redacted_distillate_frame_ids.push(id);
-                    redistill.push(request);
-                }
-                28 | 29 => {
-                    self.transparency_log
-                        .scrub_principal_bearing_frame(frame_id, principal_id, "gdpr-forget")
-                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
-                    redacted_principal_frame_ids.push(id);
-                }
-                kind => {
-                    self.transparency_log
-                        .scrub_frame_body(frame_id, kind, "gdpr-forget")
-                        .map_err(|e| MemoryError::Storage(e.to_string()))?;
-                    redacted_principal_frame_ids.push(id);
-                }
-            }
-        }
 
         // 3. Delete private-tier entries + principal_index rows (existing cascade).
         let deleted_entries = self.private.forget_principal(principal_id)?;
@@ -631,6 +584,8 @@ impl MemoryManagerAdapter {
             frame_id,
         )
         .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        receipt.held_frame_ids = held;
+        receipt.malformed_distillate_frame_ids = malformed;
 
         // Story 9.3b (AC6 / R12) — stamp the schema version in force at
         // erasure-execution time, read from the R10 schema-lifecycle registry.

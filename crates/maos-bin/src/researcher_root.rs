@@ -46,10 +46,8 @@ impl ResearcherHost {
         tl: Arc<TransparencyLogAdapter>,
         distill: Arc<dyn DistillationPort + Send + Sync>,
         live: bool,
+        recall: Arc<dyn LogRecallPort>,
     ) -> Self {
-        let recall = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
-            Arc::clone(&tl),
-        ));
         let boot_nonce = (tl.boot_nonce() as u128).to_le_bytes();
         let seed_sink: researcher::SeedSink = Arc::new(move |pid, payload| {
             let digest = Sha256::new()
@@ -89,6 +87,7 @@ pub type McpPorts = (Arc<dyn ResearcherMcpPort>, Arc<dyn LogRecallPort>);
 /// Builds [`McpPorts`] for `(spirit_id, pid)`; it holds the root's capability
 /// registry only weakly (the `audit_tx` owner, as `butler::PortBuilder`).
 pub type McpBuilder = Arc<dyn Fn(&str, PidSource) -> Result<McpPorts, String> + Send + Sync>;
+pub type RecallBuilder = Arc<dyn Fn(&str) -> Result<Arc<dyn LogRecallPort>, String> + Send + Sync>;
 
 /// Story 18-3 (D-18-3-04 A; review rulings D-18-3-R1/R2, BH-1) — what every
 /// Researcher construction path of the root reads, filled once the router
@@ -99,6 +98,7 @@ pub struct ResearcherWiring {
     pub live: bool,
     /// `--live` with an MCP server configured.
     pub mcp: Option<McpBuilder>,
+    pub recall: Option<RecallBuilder>,
     /// The legacy (mode-unset) cassette arm: the cassette and its strictness.
     pub legacy_cassette: Option<(PathBuf, bool)>,
 }

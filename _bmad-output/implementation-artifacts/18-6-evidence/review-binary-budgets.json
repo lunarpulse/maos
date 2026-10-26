@@ -1,0 +1,57 @@
+{
+  "maos-bin::hook_pump_17_4": {
+    "tests": 24,
+    "sum_seconds": 26.895,
+    "budget_seconds": 30
+  },
+  "maos-bin::j_researcher_survey_18_3": {
+    "tests": 2,
+    "sum_seconds": 1.734,
+    "budget_seconds": 30
+  },
+  "maos-bin::recall_mediation_17_3d": {
+    "tests": 16,
+    "sum_seconds": 0.441,
+    "budget_seconds": 30
+  },
+  "maos-bin::researcher_inference_18_3": {
+    "tests": 9,
+    "sum_seconds": 41.503,
+    "budget_seconds": 47
+  },
+  "maos-bin::erasure_uninstall_13_5b": {
+    "tests": 19,
+    "sum_seconds": 8.922,
+    "budget_seconds": 30
+  },
+  "maos-bin::forget_floors_18_6": {
+    "tests": 1,
+    "sum_seconds": 15.167,
+    "budget_seconds": 30
+  },
+  "maos-kernel-core::forget_cascade_18_6": {
+    "tests": 13,
+    "sum_seconds": 5.588,
+    "budget_seconds": 30
+  },
+  "maos-domain": {
+    "tests": 281,
+    "sum_seconds": 0.913,
+    "budget_seconds": 30
+  },
+  "maos-domain::forget_cascade_18_6": {
+    "tests": 2,
+    "sum_seconds": 0.009,
+    "budget_seconds": 30
+  },
+  "observer::activity_hooks_17_4": {
+    "tests": 9,
+    "sum_seconds": 0.043,
+    "budget_seconds": 30
+  },
+  "researcher": {
+    "tests": 21,
+    "sum_seconds": 0.055,
+    "budget_seconds": 30
+  }
+}

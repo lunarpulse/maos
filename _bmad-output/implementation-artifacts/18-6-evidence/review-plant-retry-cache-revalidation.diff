@@ -1,0 +1,11 @@
+--- a/spirits/researcher/src/lib.rs
++++ b/spirits/researcher/src/lib.rs
+@@ -772,7 +772,7 @@
+             .iter()
+             .map(|id| decode_frame_id_hex(id))
+             .collect::<Result<_, _>>()?;
+-        let refresh = self.refresh_forget_caches(&scrubbed_ids);
++        let refresh: Result<(), ResearcherError> = Ok(());
+         if let Some(route) = &self.forget_route {
+             let pid = (route.pid)();
+             for request in &notice.redistill {

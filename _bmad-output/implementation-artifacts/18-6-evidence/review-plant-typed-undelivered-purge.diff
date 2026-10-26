@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -831,7 +831,7 @@
+                 }
+             }
+         }
+-        for pid in &undelivered {
++        for pid in undelivered.iter().take(0) {
+             tl.insert_frame_event(
+                 maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
+                 *pid,

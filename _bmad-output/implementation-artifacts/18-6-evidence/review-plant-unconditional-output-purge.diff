@@ -1,0 +1,10 @@
+--- a/spirits/researcher/src/lib.rs
++++ b/spirits/researcher/src/lib.rs
+@@ -764,7 +764,6 @@
+         let _pass = self.pass_lock.lock().unwrap_or_else(|e| e.into_inner());
+         // Response claims are not TL payloads: no semantic output may survive
+         // a notice merely because its invocation arguments remain citable.
+-        *self.last_output.lock().unwrap_or_else(|e| e.into_inner()) = None;
+         let notice: ForgetNotice = serde_json::from_slice(payload)
+             .map_err(|_| ResearcherError::Internal("malformed-forget-notice".into()))?;
+         let scrubbed_ids: Vec<_> = notice

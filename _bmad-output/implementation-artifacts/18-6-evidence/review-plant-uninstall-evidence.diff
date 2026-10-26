@@ -1,0 +1,11 @@
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1586,7 +1586,7 @@
+              ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) \
+              OR (?1 IS NULL AND kind = 11)) \
+              AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') \
+-             AND intent NOT LIKE 'principal.uninstall.%' \
++             AND 1 = 1 \
+              ORDER BY timestamp_ns ASC, frame_id ASC"
+         ).map_err(AuditError::SqliteRead)?;
+         let mut rows = stmt

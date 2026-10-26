@@ -1,0 +1,11 @@
+--- a/crates/maos-iac/src/adapter/distillate.rs
++++ b/crates/maos-iac/src/adapter/distillate.rs
+@@ -126,7 +126,7 @@
+     ) -> Result<Vec<u8>, DistillationError> {
+         let payload = serde_json::json!({
+             "kind": RECEIPT_KIND,
+-            "direct_source_log_ref": direct_source_log_ref.iter().map(format_frame_id_hex).collect::<Vec<_>>(),
++            "direct_source_log_ref": Vec::<String>::new(),
+             "source_log_ref": receipt.effective_source_log_ref.iter().map(|fid| {
+                 // Use colon-separated format to avoid triggering redaction's
+                 // "32 consecutive hex chars" secret-detection pattern.

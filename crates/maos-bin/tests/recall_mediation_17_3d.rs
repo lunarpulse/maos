@@ -36,6 +36,7 @@ const PAYLOAD: &[u8] = b"recall mediation payload";
 struct World {
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<CapabilityRegistryAdapter>,
+    security: Arc<SecurityManagerAdapter>,
     recall: MediatedLogRecall,
     audit: tokio::sync::mpsc::Receiver<CapAuditEvent>,
     adapter_calls: Arc<AtomicUsize>,
@@ -101,7 +102,7 @@ impl World {
                 })
             })),
             Arc::clone(&capability),
-            security,
+            Arc::clone(&security),
             Arc::clone(&tl),
             None,
             None,
@@ -111,6 +112,7 @@ impl World {
             tl,
             capability,
             recall,
+            security,
             audit,
             adapter_calls,
         }
@@ -982,4 +984,135 @@ async fn quota_audit_and_mcp_receipts_are_operator_visible_but_never_spirit_disc
             "private operator row must refuse without a payload"
         );
     }
+}
+
+struct UnexpectedRedistillInference;
+impl maos_domain::ports::InferencePort for UnexpectedRedistillInference {
+    fn complete(
+        &self,
+        _: maos_domain::ports::inference::InferenceRequest,
+    ) -> Result<
+        maos_domain::ports::inference::InferenceResponse,
+        maos_domain::ports::inference::InferenceError,
+    > {
+        panic!("an argument-only frame must not reach synthesis");
+    }
+}
+
+#[test]
+fn root_redistill_uses_governed_fetch_in_live_and_nonlive_constructions() {
+    use maos_bin::researcher_root::{construct, ResearcherHost, ResearcherWiring};
+    use maos_domain::invariants::i1::{CapabilityToken, TokenId};
+    use maos_domain::memory::RedistillRequest;
+    use maos_iac::adapter::distillate::DistillateWriter;
+    let seam = butler::ButlerSeam {
+        inference: None,
+        mint: Arc::new(|_, _| panic!("prebound inference is preserved")),
+        digest: Arc::new(butler::MorningDigestRenderer::new(
+            Default::default(),
+            Default::default(),
+            Arc::new(|_, _| {}),
+            Arc::new(maos_spirit_sdk::clock::SystemClock::UTC),
+        )),
+        rollover: false,
+        clock: Arc::new(maos_spirit_sdk::clock::SystemClock::UTC),
+        acceptance: None,
+        scene_butler: Arc::default(),
+        context: None,
+    };
+    for live in [false, true] {
+        for authorization in ["granted", "scope-denied", "posture-missing"] {
+            let mut world = World::new(if authorization == "scope-denied" {
+                vec![]
+            } else {
+                vec![Scope::LogFetch]
+            });
+            if authorization == "posture-missing" {
+                world.security.policy().update(PolicyTableInner::default());
+            }
+            world.seed(OWN, PID, b"{}");
+            let recall = Arc::new(MediatedLogRecall::new(
+                Arc::new(LogRecallAdapter::new(Arc::clone(&world.tl))),
+                Arc::clone(&world.capability),
+                Arc::clone(&world.security),
+                Arc::clone(&world.tl),
+                None,
+                None,
+                "researcher".into(),
+            ));
+            let mut host = ResearcherHost::new(
+                Arc::clone(&world.tl),
+                Arc::new(DistillateWriter::new(Arc::clone(&world.tl), Arc::new(()))),
+                live,
+                recall,
+            );
+            host.redistill_sink = Some(Arc::new(|_, _| {}));
+            let researcher = construct(
+                researcher::Researcher::new()
+                    .with_distillation_port(Arc::clone(&host.distill))
+                    .with_inference_port(
+                        Arc::new(UnexpectedRedistillInference),
+                        "test",
+                        CapabilityToken::new(TokenId([9; 16]), PID, u64::MAX, [0; 64]),
+                        PID,
+                    ),
+                &ResearcherWiring {
+                    live,
+                    ..Default::default()
+                },
+                &seam,
+                &[],
+                "researcher",
+                Arc::new(|| Some(PID)),
+                &host,
+            )
+            .unwrap();
+            let outcome = researcher.redistill(&RedistillRequest {
+                redacted_distillate_frame_id: researcher::encode_frame_id_hex(&[0x77; 16]),
+                writer_spirit_pid: PID,
+                writer_boot_nonce: (NONCE as u128).to_le_bytes(),
+                surviving_source_log_ref: vec![researcher::encode_frame_id_hex(&OWN)],
+            });
+            let rows = world.operation_rows();
+            assert_eq!(rows.len(), 1, "{live}/{authorization}");
+            if authorization == "granted" {
+                assert!(matches!(
+                    outcome,
+                    Err(researcher::ResearcherError::NoClaims)
+                ));
+                assert_call(&rows[0], "fetch");
+                world.assert_issued_and_revoked(&rows[0], Scope::LogFetch);
+            } else {
+                assert!(matches!(
+                    outcome,
+                    Err(researcher::ResearcherError::Recall(
+                        LogRecallError::CapabilityDenied
+                    ))
+                ));
+                assert_receipt(&rows[0], "fetch", "capability-denied", Some(OWN), None);
+                world.assert_no_mint();
+            }
+        }
+    }
+}
+
+#[test]
+fn retained_recall_port_does_not_keep_the_audit_bus_or_security_alive() {
+    let world = World::granted();
+    let capability = Arc::downgrade(&world.capability);
+    let security = Arc::downgrade(&world.security);
+    let World {
+        recall,
+        capability: cap,
+        security: sec,
+        ..
+    } = world;
+    drop(cap);
+    drop(sec);
+    assert!(capability.upgrade().is_none());
+    assert!(security.upgrade().is_none());
+    assert_eq!(
+        recall.fetch(PID, OWN),
+        Err(LogRecallError::CapabilityDenied)
+    );
 }

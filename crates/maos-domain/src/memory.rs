@@ -374,6 +374,10 @@ pub struct ForgetReceipt {
     /// Story 9.3b (AC6 / R12) — schema version in force at erasure-execution time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schema_version: Option<u32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub held_frame_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub malformed_distillate_frame_ids: Vec<String>,
 }
 
 impl ForgetReceipt {
@@ -396,6 +400,8 @@ impl ForgetReceipt {
             frame_id,
             schema_id: None,
             schema_version: None,
+            held_frame_ids: Vec::new(),
+            malformed_distillate_frame_ids: Vec::new(),
         })
     }
 }
@@ -450,15 +456,25 @@ pub enum RedistillOutcome {
     Pending { reason: RedistillPendingReason },
 }
 
-/// Match an id without erasing a longer email/id sharing its substring.
+/// Unicode letters/digits extend ids; punctuation bridges only two id characters.
 pub fn principal_id_occurs(body: &[u8], principal_id: &str) -> bool {
-    let needle = principal_id.as_bytes();
-    let token = |b: u8| b.is_ascii_alphanumeric() || b"@._+-".contains(&b);
-    !needle.is_empty()
-        && body.windows(needle.len()).enumerate().any(|(i, window)| {
-            window == needle
-                && (i == 0 || !token(body[i - 1]))
-                && (i + needle.len() == body.len() || !token(body[i + needle.len()]))
+    let extends = |near: Option<char>, far: Option<char>, edge: Option<char>| {
+        near.is_some_and(|c| {
+            c.is_alphanumeric()
+                || ("@._+-".contains(c)
+                    && far.is_some_and(char::is_alphanumeric)
+                    && edge.is_some_and(char::is_alphanumeric))
+        })
+    };
+    !principal_id.is_empty()
+        && body.utf8_chunks().any(|chunk| {
+            let text = chunk.valid();
+            text.match_indices(principal_id).any(|(i, _)| {
+                let mut left = text[..i].chars().rev();
+                let mut right = text[i + principal_id.len()..].chars();
+                !extends(left.next(), left.next(), principal_id.chars().next())
+                    && !extends(right.next(), right.next(), principal_id.chars().next_back())
+            })
         })
 }
 
@@ -506,6 +522,80 @@ pub enum ExportPayload {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn principal_matching_respects_unicode_and_punctuation_bridges() {
+        for body in [
+            "director-ada.",
+            "director-ada-",
+            "director-ada_",
+            "director-ada+",
+            "director-ada@",
+            "(director-ada).",
+            "director-ada..next",
+        ] {
+            assert!(
+                principal_id_occurs(body.as_bytes(), "director-ada"),
+                "{body}"
+            );
+        }
+        for body in ["ada@example.org.", "ada@example.org-", "ada@example.org_"] {
+            assert!(
+                principal_id_occurs(body.as_bytes(), "ada@example.org"),
+                "{body}"
+            );
+        }
+        for body in [
+            "a@b.org.uk",
+            "xa@b.org",
+            "a@b.org-x",
+            "a@b.org_x",
+            "a@b.org+x",
+        ] {
+            assert!(!principal_id_occurs(body.as_bytes(), "a@b.org"), "{body}");
+        }
+        for body in ["jöanna", "annaé", "１anna", "anna٢", "a-anna", "anna@x"] {
+            assert!(!principal_id_occurs(body.as_bytes(), "anna"), "{body}");
+        }
+        for body in [
+            "—anna。",
+            "🙂anna!",
+            "anna-🙂",
+            "a--anna",
+            "annabelle anna.",
+        ] {
+            assert!(principal_id_occurs(body.as_bytes(), "anna"), "{body}");
+        }
+        assert!(principal_id_occurs(
+            "contact jöanna@example.org.".as_bytes(),
+            "jöanna@example.org"
+        ));
+        assert!(principal_id_occurs(b"\xffanna.\xfe", "anna"));
+        assert!(!principal_id_occurs(b"anna", ""));
+    }
+
+    #[test]
+    fn forget_receipt_preserves_old_wire_shape_and_reports_typed_gaps() {
+        let mut receipt = ForgetReceipt::new("ada", 1, 2, 3, [4; 16]).expect("valid receipt");
+        let legacy = serde_json::to_value(&receipt).expect("serialize receipt");
+        assert!(legacy.get("held_frame_ids").is_none());
+        assert!(legacy.get("malformed_distillate_frame_ids").is_none());
+        assert_eq!(
+            serde_json::from_value::<ForgetReceipt>(legacy).expect("legacy receipt"),
+            receipt
+        );
+        receipt.held_frame_ids.push("held-frame".into());
+        receipt
+            .malformed_distillate_frame_ids
+            .push("malformed-frame".into());
+        let wire = serde_json::to_value(&receipt).expect("serialize typed gaps");
+        assert_eq!(wire["held_frame_ids"][0], "held-frame");
+        assert_eq!(wire["malformed_distillate_frame_ids"][0], "malformed-frame");
+        assert_eq!(
+            serde_json::from_value::<ForgetReceipt>(wire).expect("typed gaps receipt"),
+            receipt
+        );
+    }
 
     // --- MemoryTier ---
 

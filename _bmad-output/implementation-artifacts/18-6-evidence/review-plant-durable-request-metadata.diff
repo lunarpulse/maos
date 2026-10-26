@@ -1,0 +1,10 @@
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1841,7 +1841,6 @@
+ 
+     pub fn insert_redistill_request(&self, request: &RedistillRequest) -> Result<(), AuditError> {
+         let mut value = serde_json::json!({"request": request});
+-        Self::redistill_metadata_ids(&mut value, true);
+         let payload =
+             serde_json::to_vec(&value).map_err(|e| AuditError::Serialization(e.to_string()))?;
+         self.insert_frame_event(

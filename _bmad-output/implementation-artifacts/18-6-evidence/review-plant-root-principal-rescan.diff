@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/hook_pump.rs
++++ b/crates/maos-bin/src/hook_pump.rs
+@@ -572,7 +572,7 @@
+                     && row.timestamp_ns > since
+                     && hex::encode(row.frame_id) != request.redacted_distillate_frame_id =>
+             {
+-                if maos_domain::memory::principal_id_occurs(&row.payload_redacted, principal) {
++                if false && maos_domain::memory::principal_id_occurs(&row.payload_redacted, principal) {
+                     match tl.list_legal_holds() {
+                         Ok(holds)
+                             if holds.iter().any(|h| {

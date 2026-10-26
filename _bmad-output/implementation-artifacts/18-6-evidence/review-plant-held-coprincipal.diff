@@ -1,0 +1,11 @@
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1671,7 +1671,7 @@
+             (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+         for frame in frames {
+             let id = format!("{:032x}", u128::from_be_bytes(frame.frame_id));
+-            if protected.contains(&id) {
++            if false && protected.contains(&id) {
+                 held.push(id);
+                 continue;
+             }

@@ -1,0 +1,11 @@
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1604,7 +1604,7 @@
+             let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
+                 match Self::distillate_source_refs(&body) {
+                     Ok(refs) => refs,
+-                    Err(_) => Vec::new(),
++                    Err(error) => return Err(error),
+                 }
+             } else {
+                 Vec::new()

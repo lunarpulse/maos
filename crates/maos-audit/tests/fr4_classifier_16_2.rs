@@ -389,6 +389,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "redistill pending (18-6)",
         ),
         (
+            "task.complete",
+            None,
+            "forget.purge.undelivered",
+            r#"{"spirit_pid":7,"reason":"consolidate-hook"}"#,
+            7,
+            "typed undelivered privacy purge (18-6)",
+        ),
+        (
             "context.pressure",
             None,
             "context.pressure",

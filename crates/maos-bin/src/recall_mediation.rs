@@ -1,6 +1,6 @@
 //! One governed recall path for native Spirits and the in-band WASM service.
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use maos_domain::invariants::i1::{IntentClass, Scope, TokenId};
 use maos_domain::invariants::i3::FrameOrigin;
@@ -19,8 +19,8 @@ use crate::worker_spawn::issue_enterprise_governed_capability;
 /// Trusted composition-root identity; a wire request never supplies a pid or sender.
 pub struct MediatedLogRecall {
     adapter: Arc<LogRecallAdapter>,
-    capability: Arc<CapabilityRegistryAdapter>,
-    security: Arc<SecurityManagerAdapter>,
+    capability: Weak<CapabilityRegistryAdapter>,
+    security: Weak<SecurityManagerAdapter>,
     journal: Arc<TransparencyLogAdapter>,
     enterprise: Option<Arc<EnterpriseRuntime>>,
     pdp: Option<EnterprisePdpRuntime>,
@@ -56,8 +56,8 @@ impl MediatedLogRecall {
     ) -> Self {
         Self {
             adapter,
-            capability,
-            security,
+            capability: Arc::downgrade(&capability),
+            security: Arc::downgrade(&security),
             journal,
             enterprise,
             pdp,
@@ -98,13 +98,21 @@ impl MediatedLogRecall {
         scope: Scope,
         call: impl FnOnce(&TokenId) -> Result<T, LogRecallError>,
     ) -> Result<T, LogRecallError> {
-        let policy = self.security.policy().inner().load_full();
+        let capability = self
+            .capability
+            .upgrade()
+            .ok_or(LogRecallError::CapabilityDenied)?;
+        let security = self
+            .security
+            .upgrade()
+            .ok_or(LogRecallError::CapabilityDenied)?;
+        let policy = security.policy().inner().load_full();
         let posture = policy
             .spirit_postures
             .get(&pid)
             .ok_or(LogRecallError::CapabilityDenied)?;
         let token = issue_enterprise_governed_capability(
-            &self.capability,
+            &capability,
             self.enterprise.as_deref(),
             self.pdp.as_ref(),
             pid,
@@ -115,7 +123,7 @@ impl MediatedLogRecall {
         )
         .map_err(|_| LogRecallError::CapabilityDenied)?;
         let result = call(&token.token_id);
-        let revoked = match self.capability.revoke(token.token_id) {
+        let revoked = match capability.revoke(token.token_id) {
             Ok(()) | Err(CapError::Revoked | CapError::UnknownToken) => Ok(()),
             Err(error) => Err(LogRecallError::Storage(format!(
                 "token rollback failed: {error}"

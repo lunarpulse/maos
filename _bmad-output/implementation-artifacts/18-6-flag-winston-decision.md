@@ -124,3 +124,58 @@ All are inside the ratified grants; `kloc-check` passes with no over-budget rows
 Story and sprint row: `review`. Hosted proven-red execution belongs to the
 integrator at landing; local checksum/apply/build/expected-red/restore/green
 simulation passed, with no hosted-run claim here.
+
+## Review rulings D-18-6-R1…R4 — operator, 2026-10-26
+
+- **R1 (EC-3 A; BH-2 / EC-2 / AA-3):** Unicode letters/digits belong to principal ids. `.@_+-` continues a token only as a bridge between id characters, so prose-final punctuation matches while longer ids stay protected. An id glued to CJK text without spaces may not match; record this limit in story, ADR-044 and en/ko docs.
+- **R2 (EC-6 / BH-6 A):** distillate receipts retain DIRECT parent distillate ids alongside effective raw refs; cascade closure follows parents transitively.
+- **R3 (EC-8 A):** frames that also name a held principal, and their derived distillates, are preserved and reported as typed receipt skips.
+- **R4 (BH-9 / AA-5):** re-distillation uses `MediatedLogRecall` on every construction path, with governed token, posture and PDP. Restore CLI ceiling **6104 → 6856** and journey-test ceiling **946 → 1104**; measured code remains distinct from reserved ceilings.
+
+The existing kernel ceiling **26426 physical / 20660 tokei**, `memory/mod.rs`
+only, remains binding. All content pins move together after formatting;
+out-of-kernel ceilings remain bin28940 / audit7640 / IAC8167 / domain9907.
+The earlier exact development figures above are historical, not review-patch
+measurements. Story remains `review`; no commit or push is authorized here.
+
+
+## Review-patch measured STOP — 2026-10-26
+
+After `cargo fmt --all` (PASS2.529s), `kloc-check --json` executed
+(10.359s) and measured aggregate186417; kernel20606 tokei; audit7635.
+The candidate exceeds three binding STOP lines: **maos-bin29079 >28940
+(+139)**, **maos-iac8238 >8167 (+71)**, **maos-domain9975 >9907 (+68)**.
+Evidence: `18-6-evidence/review-kloc-measurement.log`. No production edit or
+re-pin followed the STOP. Kernel physical/content pins, focused suites,
+new-control plants and final acceptance gates remain unverified pending an
+operator disposition. These figures are measured requests, not new grants.
+CLI6856 and journey1104 reserve restoration follows R4; no speculative
+headroom was added to any other row.
+
+
+## Review STOP lifted and exact completion pins — 2026-10-26
+
+The operator ratified **maos-bin≤29110**, **maos-domain≤10000** and
+**maos-iac≤8270**, retaining audit≤7640 and the existing kernel grant.
+The integrator subsequently accepted **maos-bin29113 exact (+3 over29110)**
+for the late-cache purge and typed post-erasure error reporting, explicitly
+retaining both the old-id inequality and fresh timestamp validation.
+A transient IAC8271 measurement was reduced to8270 by removing the redundant
+mutable convergence latch; monotonic closure cardinality supplies that test.
+
+Exact post-`cargo fmt --all` pins: kernel **26407 →26362 physical (-45)**,
+**20650 →20606 tokei (-44)**,95files, `memory/mod.rs` only; baseline/HISTORY,
+set_hash, memory digest, four reader literals, kloc ceiling and
+`RATIFIED_AT_EASING` move together. IAC **8080 →8270**, domain **9887 →9975**,
+audit **7625 →7635**, bin **28914 →29113**. Aggregate **186040 →186483**,
+strict hardfail **186041 →186484 = measured+1**. CLI6104/journey946 remain
+measured inside restored6856/1104 reserve ceilings. No allowance transferred
+between crates, no speculative headroom, no kernel grant increase.
+Epic18's future18-7 named bin budget stays29150 and re-measures at its T0.
+
+Focused review proof:838package tests +107scenario tests, kernel lib258,
+all green;29 review-control mutations and the shared AC1/AC4 index-filter
+mutation proven red and byte-restored. The regenerated hosted diff/checksum
+and local CI simulation pass; no hosted-run claim. Story stays `review`.
+Exact outputs and wall clocks are under `18-6-evidence/review-*`.
+

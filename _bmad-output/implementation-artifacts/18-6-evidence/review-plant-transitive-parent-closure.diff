@@ -1,0 +1,11 @@
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1546,7 +1546,7 @@
+                     found.push(frame);
+                 }
+             }
+-            if closure.len() == before {
++            if true {
+                 return Ok(found);
+             }
+         }

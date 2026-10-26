@@ -1,0 +1,24 @@
+$ cp crates/maos-iac/src/adapter/transparency_log.rs /tmp/18-6-review-ci-transparency-log.rs
+EXIT 0
+
+$ sha256sum -c _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff.sha256
+_bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff: OK
+EXIT 0
+
+$ git apply --check _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff
+EXIT 0
+
+$ git apply _bmad-output/implementation-artifacts/18-6-evidence/ci/plant.diff
+EXIT 0
+
+$ cp /tmp/18-6-review-ci-transparency-log.rs crates/maos-iac/src/adapter/transparency_log.rs
+EXIT 0
+
+$ cmp /tmp/18-6-review-ci-transparency-log.rs crates/maos-iac/src/adapter/transparency_log.rs
+EXIT 0
+
+$ touch crates/maos-iac/src/adapter/transparency_log.rs
+EXIT 0
+
+FULL SIMULATION WALL 98.980s
+AC1 canary oracle and AC4 leak oracle proven red; copy-back/cmp/touch all EXIT0.

@@ -1,0 +1,21 @@
+$ LOCALE=ko node scripts/gate-ko-coverage.js
+gate:locale-coverage — KO translation coverage
+
+  Canonical doc deliverables:
+    abi                9/9    100%
+    cookbook          14/14   100%
+    deploy             5/5    100%
+    manifest           6/6    100%
+    migrate            6/6    100%
+    troubleshoot       1/1    100%
+    — canonical total  41/41   100%
+
+  Supporting sections (English fallback acceptable):
+    (root)             4/4    100%
+    community          0/6    0%
+
+  Overall: 45/51 pages have a KO counterpart (88%).
+
+Report-only (KO_COVERAGE_MIN unset). Set KO_COVERAGE_MIN=100 to enforce.
+
+EXIT 0; WALL 0.106s

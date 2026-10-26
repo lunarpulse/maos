@@ -1,0 +1,9 @@
+$ LOCALE=ko node scripts/gate-glossary-lock.js
+Loaded 42 locked terms, 3 denylist entries from DENYLIST
+[docs] scanned 91 en files; checked 36 ko counterparts
+[abi] scanned 18 en files; checked 9 ko counterparts
+Checked 45 ko translation files total
+
+PASS: ko glossary-lock gate — all locked terms present, no denylist violations
+
+EXIT 0; WALL 0.085s

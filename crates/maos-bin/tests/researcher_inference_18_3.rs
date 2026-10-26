@@ -554,6 +554,9 @@ fn the_root_binding_mints_once_per_pass_on_one_instance() {
         Arc::clone(&tl),
         Arc::new(DistillateWriter::new(Arc::clone(&tl), Arc::new(0u8))),
         false,
+        Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
+            Arc::clone(&tl),
+        )),
     );
     let researcher = maos_bin::researcher_root::bind(
         researcher::Researcher::new(),

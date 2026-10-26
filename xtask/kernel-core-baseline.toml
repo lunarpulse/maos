@@ -502,7 +502,11 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26407
+src_lines = 26362
+# HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review R1-R4,
+# operator2026-10-26: physical26407 -> 26362 (-45), tokei20650 -> 20606 (-44),
+# 95 files, memory/mod.rs only; shared IAC sweep and typed held/gap receipts.
+# Inside <=26426/20660 grant, ZERO HEADROOM; full content-pin set moved together.
 # HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, FLAG-Winston
 #          D-18-6-01 B / 02 A / 04 A, operator 2026-10-26: exact formatted
 #          26418 -> 26407 physical (-11), 20643 -> 20650 tokei (+7), 95 files.
@@ -864,7 +868,7 @@ src_lines = 26407
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "8400cd23000b0bd75c38aae063c357e7d158fca517b8f5abf947561699cd89bf"
+set_hash = "526ce107ca0d8d42d6cd52cec011f9c2c03de6cf4b3fdbc9994a3b8e0be05cee"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -906,7 +910,7 @@ set_hash = "8400cd23000b0bd75c38aae063c357e7d158fca517b8f5abf947561699cd89bf"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
 "mcp/mod.rs" = "a16d0937ba2e1f5e08169d6a2ed84e93dfe6a96a1f0ef028f3149cacd95d1da4"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
-"memory/mod.rs" = "028f5932a3f0f46de60e99a32f40329b89241528713a0492ba53c87c1c655bbf"
+"memory/mod.rs" = "8599e7bc36380446e124e03f922d415ff27eef8614c857f9fc1af681a598ca1b"
 "memory/principal.rs" = "c99431b9fd3fbe40b758e22dd54091fae4def4b8700717c9767d7ebc67bd9aac"
 "memory/private.rs" = "9b149278ed9128b4edb38601e5f0d0b88948283e10d4fd693aeee50024f40e5c"
 "memory/read_entry_point.rs" = "0528ce87453ef4a10b4bbe4a360f557769be412fc091df4734495482d551dda1"

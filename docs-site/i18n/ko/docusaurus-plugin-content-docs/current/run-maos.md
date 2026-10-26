@@ -123,16 +123,22 @@ dry run과 receipt는 각 형제 팀 로그를 row 개수와 함께 표시합니
 JSON 결과에는 지워진 프레임 id, redaction된 distillate id, 살아남은 source
 reference가 있는 재증류 요청, 각 요청의 결과가 포함됩니다.
 
-실행 중인 daemon은 live compiled-in Spirit에 forget notice를 전달하여 캐시된
-프레임을 제거합니다. 바인딩된 live Researcher는 자신의 distillation 경로로
-요약을 다시 생성합니다. 그 외에는 `writer-not-live`, `no-distillation-path`,
-`no-surviving-sources`, `form-unsupported`, `refused:<typed>` 중 하나로 typed
-pending을 기록합니다. pending은 다음 boot에서 재개하지 않습니다. offline forget과
-uninstall은 재생성을 조용히 건너뛰지 않고 `writer-not-live`를 기록합니다.
+실행 중인 daemon은 일반 hook이 quarantine된 경우에도 live compiled-in Spirit에
+forget notice를 전달합니다. Researcher는 캐시된 claim과 마지막 출력을 비우고,
+캐시 id를 로그와 대조한 뒤 governed recall로 가져온 현재의 살아남은 로그
+payload만으로 요약을 재생성합니다. root는 결과를 검증하고 다시 검사하며,
+진행 중이던 pass가 쓴 프레임도 마지막으로 지운 뒤 완료합니다. 중단된 cascade의
+미완료 요청은 재시도 시 복구됩니다. 전달하지 못한 purge와 재생성 오류는 typed
+결과로 남으며, 이미 끝난 삭제를 재생성 오류만으로 실패라고 보고하지 않습니다.
+offline 또는 부재 중인 작성자는 조용히 생략되지 않고 typed pending으로 기록됩니다.
+pending은 다음 boot에서 자동 재개하지 않습니다.
 
 `maosctl forget --principal <id> --reason legal-hold`는 durable hold를 기록하고
 삭제나 재생성 없이 종료 코드 3을 반환합니다. 기존 hold도 삭제를 차단합니다.
-Shared와 Loom의 non-principal 조정 데이터는 partition 규칙에 따라 유지됩니다.
+다른 legal-hold principal도 함께 명시한 프레임과 그 파생 distillate는 보존하고
+typed skip으로 보고합니다. Shared와 Loom의 non-principal 조정 데이터는 partition
+규칙에 따라 유지됩니다. Unicode 문자와 숫자는 id의 일부이고 문장 끝 구두점은
+경계입니다. 따라서 공백 없이 CJK 텍스트에 바로 붙은 id는 감지되지 않을 수 있습니다.
 감지는 의미가 아닌 id 기준이므로 id 없는 복사본, 변환되거나 escape된 id,
 외부 source에서 나중에 다시 수집된 데이터는 이 보장의 범위 밖입니다.
 

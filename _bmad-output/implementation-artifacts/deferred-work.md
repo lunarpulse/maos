@@ -447,7 +447,7 @@ and `check-epic-close-green` (§A5) added. YAML re-validated.
 ## Deferred from: code review of story-9-2-execute-gdpr-article-17-cascade-with-deterministic-replay-and-proof-of-erasure (2026-06-13)
 
 - **No cross-store transaction in the forget cascade (W1, HIGH).** private-delete + index-delete + distillate-scrub + journal run sequentially in `forget_with_reason` with no transaction/compensation; a failure after the private delete leaves dangling index rows and no rollback. Largely pre-existing (the original `MemoryManagerPort::forget` has the same non-atomic pattern); this change widens the non-atomic window by adding the distillate scrub step. ADR-044 covers only the distillate mark+scrub atomicity, not cross-store atomicity. True cross-store transactionality (private FS + sqlite index + TL sqlite) is an architectural lift. `crates/maos-kernel-core/src/memory/mod.rs:155-205`
-  **18-6 narrowing (D-18-6-10):** scrubs precede Private/index deletion and the any-writer scan no longer depends on the index; a retry after a scrub failure can complete the remaining cascade. This is narrowed, re-runnable, not an atomicity claim. Remaining cross-store/crash reconciliation owner: `v25-erasure-crash-reconciliation`.
+  **18-6 narrowing (D-18-6-10; review BH-7 / EC-4 / AA-2):** scrubs precede Private/index deletion and the any-writer scan no longer depends on the index. A retry recovers outstanding journaled re-distillation requests and their already-scrubbed ids; live Researcher caches recheck TL tombstones, so a failure after a distillate scrub does not silently lose its request or cached purge. This remains re-runnable, not cross-store atomicity. **Owner: `v25-erasure-crash-reconciliation`**. Status: open.
 
 ## ~~Deferred from: code review of 9-2b-journal-export-trajectory-and-deterministic-trace-shape-replay (2026-06-13)~~ **RESOLVED BEFORE COMPLETION**
 
@@ -1275,3 +1275,17 @@ Operator ruling 2026-10-22 (Lunarpulse): *"Record as pre-existing, route to owne
 ## Deferred from: code review of 18-4-self-tuning-halt-with-injectable-clock (2026-10-25)
 
 - **Teardown-time escape anomalies never reach FR17 (c)** [`crates/maos-bin/src/escape_detector_consumer.rs` `tl_journal` (the TL is held weakly) and `EscapeAnomalyTail::shutdown`'s final scan; `crates/maos-bin/src/main.rs` teardown (`tail.shutdown(drained, …)` after the audit-writer drain); review AA-5, operator ruling D-18-4-R4]: the 17-10 final scan runs after the audit drain, where the Transparency Log is gone, so an anomaly surfaced by that scan prints `maos: escape-anomaly not journaled (the Transparency Log is closed)` and its `escape-anomaly:` line goes out with no `anomaly.flagged:escape-detector` frame — the production digest's (c) never lists a kill that lands at teardown, and that line has no log entry before it (I2). Fix: run the final scan before the drain and journal its anomalies, or write post-drain frames through a short-lived TL handle; witness: a kill row inserted after the last tick appears as an `anomaly.flagged:` frame. **Owner: `20-3c-audit-truth-and-halt-receipt-residuals`**. Status: open.
+
+## Deferred from: review of 18-6-fr45-forget-redistillation-and-cascade-closure (2026-10-26)
+
+- **Large-log forget scanning holds the TL mutex across scans (EC-13).** `TransparencyLogAdapter::forget_frames` scans principal-bearing frames and distillate lineage while holding the shared TL lock; very large logs can delay log-before-deliver writers on a runtime worker. Move blocking scans off the async worker and page by stable rowid, releasing the mutex between pages while preserving forget/hold serialization. **Owner: `20-11-erasure-inventory-closure`**. Status: open.
+
+## Received from 18-7-live-skill-authoring-and-revisions (operator rulings, 2026-10-26)
+
+- **Third-party (WASM/TS) Spirits cannot call `skill.author.self` (D-18-7-11 A, ruled 2026-10-26).** WIT `maos:spirit@2.2.0` imports only `recall` and `context` (`wit/spirit.wit:30,378-381`). 18-7 delivers the skill port to native compiled-in Spirits only: the Researcher, through `researcher_root::construct`. It also delivers the schema v6 `[capabilities.required.skill] author_self` declaration and the minted `SkillAuthorSelf` capability (◆ D-18-7-01/02). Owed:
+  - a WIT `skills` import (author/propose, with the same pid-fixed, root-attached-evidence, own-namespace rules as D-18-7-03/08);
+  - the `maos-wasm-host` bridge (zero headroom at 2412);
+  - the TS SDK surface and the regenerated ABI docs;
+  - consumption of the v6 table alongside the manifest `skills` field.
+
+  A WASM Spirit that declares the v6 table before then can be minted a token it has no import to use; 18-7 refuses `TaskAssign` delegation of the scope. **Owner: `20-8-manifest-contract-completion`** (received; sprint row annotated). Status: open.

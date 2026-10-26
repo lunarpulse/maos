@@ -1,0 +1,5 @@
+$ cp /mnt/build/cargo/release/maos /tmp/18-6-review-maos-release
+EXIT 0
+$ strip /tmp/18-6-review-maos-release
+EXIT 0
+STRIPPED BYTES 30115064; LIMIT 33554432; HEADROOM 3439368

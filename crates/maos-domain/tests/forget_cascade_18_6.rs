@@ -5,15 +5,22 @@ use maos_domain::memory::{
 
 #[test]
 fn principal_matching_is_token_bounded_not_substring_bounded() {
-    for text in ["a@b.org", "principal=a@b.org;", "\"a@b.org\"", "éa@b.org雪"] {
+    for text in [
+        "a@b.org",
+        "principal=a@b.org;",
+        "\"a@b.org\"",
+        "_a@b.org",
+        "a@b.org-",
+        "a@b.org.",
+    ] {
         assert!(principal_id_occurs(text.as_bytes(), "a@b.org"), "{text}");
     }
     for text in [
         "aa@b.org",
         "a@b.org.uk",
         "a@b.org+tag",
-        "_a@b.org",
-        "a@b.org-",
+        "éa@b.org雪",
+        "x_a@b.org",
         "a@b.org@x",
     ] {
         assert!(!principal_id_occurs(text.as_bytes(), "a@b.org"), "{text}");

@@ -202,6 +202,13 @@ impl Hook {
     }
 }
 
+struct RedistillSlot {
+    outcome: Option<RedistillOutcome>,
+    principal: String,
+    since: u64,
+    waiting: bool,
+}
+
 struct Shared {
     scbs: Weak<ScbMap>,
     dispatcher: Weak<HookDispatcher>,
@@ -209,7 +216,7 @@ struct Shared {
     registry: Mutex<BTreeMap<u32, Subscriber>>,
     counters: Counters,
     stopped: AtomicBool,
-    redistill_results: Mutex<BTreeMap<String, RedistillOutcome>>,
+    redistill_results: Mutex<BTreeMap<String, RedistillSlot>>,
 }
 
 fn same_object(weak: &Weak<dyn AnySpiritObj>, live: &Arc<dyn AnySpiritObj>) -> bool {
@@ -513,26 +520,133 @@ impl HookPump {
         let shared = Arc::downgrade(&self.shared);
         Arc::new(move |request, outcome| {
             if let Some(shared) = shared.upgrade() {
-                if let Some(result) = shared
+                let mut results = shared
                     .redistill_results
                     .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .get_mut(&request.redacted_distillate_frame_id)
-                {
-                    *result = outcome;
+                    .unwrap_or_else(|e| e.into_inner());
+                if let Some(slot) = results.get_mut(&request.redacted_distillate_frame_id) {
+                    if slot.waiting {
+                        slot.outcome = Some(outcome);
+                    } else {
+                        let slot = results
+                            .remove(&request.redacted_distillate_frame_id)
+                            .expect("slot exists");
+                        let outcome = Self::check_redistilled(
+                            &shared.tl,
+                            request,
+                            outcome,
+                            &slot.principal,
+                            slot.since,
+                        );
+                        if let Err(error) = shared.tl.insert_redistill_outcome(request, &outcome) {
+                            eprintln!("maos: late re-distillation outcome not journaled: {error}");
+                        }
+                    }
                 }
             }
         })
     }
 
-    /// Synchronous forget completion: every live registered runtime is curated;
-    /// absent/offline writers are terminal pending, never silently omitted.
+    fn check_redistilled(
+        tl: &TransparencyLogAdapter,
+        request: &maos_domain::memory::RedistillRequest,
+        outcome: RedistillOutcome,
+        principal: &str,
+        since: u64,
+    ) -> RedistillOutcome {
+        let RedistillOutcome::Redistilled {
+            new_distillate_frame_id,
+        } = &outcome
+        else {
+            return outcome;
+        };
+        let row = researcher::decode_frame_id_hex(new_distillate_frame_id)
+            .ok()
+            .and_then(|id| tl.query_frame_by_id(id).ok().flatten());
+        let reason = match row {
+            Some(row)
+                if row.spirit_pid == request.writer_spirit_pid
+                    && row.boot_nonce == tl.boot_nonce()
+                    && row.kind
+                        == maos_kernel_core::iac::transparency_log::FrameKind::Distillate
+                    && row.timestamp_ns > since
+                    && hex::encode(row.frame_id) != request.redacted_distillate_frame_id =>
+            {
+                if maos_domain::memory::principal_id_occurs(&row.payload_redacted, principal) {
+                    match tl.list_legal_holds() {
+                        Ok(holds)
+                            if holds.iter().any(|h| {
+                                h.principal_id != principal
+                                    && maos_domain::memory::principal_id_occurs(
+                                        &row.payload_redacted,
+                                        &h.principal_id,
+                                    )
+                            }) =>
+                        {
+                            "legal-hold"
+                        }
+                        Ok(_) => match tl.scrub_distillate_body(row.frame_id, "gdpr-forget") {
+                            Ok(()) => "principal-resurrected",
+                            Err(_) => "scrub-failed",
+                        },
+                        Err(_) => "hold-check-failed",
+                    }
+                } else if TransparencyLogAdapter::distillate_source_refs(&row.payload_redacted)
+                    .is_ok_and(|refs| {
+                        !refs.is_empty()
+                            && refs
+                                .iter()
+                                .all(|id| request.surviving_source_log_ref.contains(id))
+                    })
+                {
+                    return outcome;
+                } else {
+                    "invalid-sources"
+                }
+            }
+            _ => "writer-mismatch",
+        };
+        RedistillOutcome::Pending {
+            reason: Pending::Refused(reason.into()),
+        }
+    }
+
+    /// Erasure has committed: completion errors are pending, never failed erasure.
     pub async fn finish_forget(
+        tl: &TransparencyLogAdapter,
+        forget: &ForgetOutcome,
+        pump: Option<&Self>,
+    ) -> serde_json::Value {
+        match Self::complete_forget(tl, forget, pump).await {
+            Ok(report) => report,
+            Err(detail) => {
+                let mut rows = vec![
+                    serde_json::json!({"outcome":{"status":"pending","reason":{"refused":"completion-error"}},"detail":detail}),
+                ];
+                if let ForgetOutcome::Erased { redistill, .. } = forget {
+                    for request in redistill {
+                        let outcome = RedistillOutcome::Pending {
+                            reason: Pending::Refused("completion-error".into()),
+                        };
+                        let journal_error = tl
+                            .insert_redistill_outcome(request, &outcome)
+                            .err()
+                            .map(|e| e.to_string());
+                        rows.push(serde_json::json!({"request":request,"outcome":outcome,"journal_error":journal_error}));
+                    }
+                }
+                serde_json::json!({"redistill_outcomes":rows,"redistilled_count":0,"pending_count":rows.len(),"redistill_error":{"status":"pending","reason":"completion-error","detail":detail}})
+            }
+        }
+    }
+
+    async fn complete_forget(
         tl: &TransparencyLogAdapter,
         forget: &ForgetOutcome,
         pump: Option<&Self>,
     ) -> Result<serde_json::Value, String> {
         let ForgetOutcome::Erased {
+            receipt,
             redacted_distillate_frame_ids,
             redacted_principal_frame_ids,
             redistill,
@@ -541,22 +655,48 @@ impl HookPump {
         else {
             return Ok(serde_json::json!({}));
         };
+        let mut redistill = redistill.clone();
+        for request in tl
+            .outstanding_redistill_requests()
+            .map_err(|e| e.to_string())?
+        {
+            if !redistill
+                .iter()
+                .any(|r| r.redacted_distillate_frame_id == request.redacted_distillate_frame_id)
+            {
+                tl.insert_redistill_request(&request)
+                    .map_err(|e| e.to_string())?;
+                redistill.push(request);
+            }
+        }
+        let mut scrubbed_frame_ids: Vec<_> = redacted_distillate_frame_ids
+            .iter()
+            .chain(redacted_principal_frame_ids)
+            .cloned()
+            .collect();
+        scrubbed_frame_ids.extend(
+            redistill
+                .iter()
+                .map(|r| r.redacted_distillate_frame_id.clone()),
+        );
         let mut outcomes = BTreeMap::new();
+        let mut undelivered = Vec::new();
         if let Some(pump) = pump {
             let pids: Vec<_> = pump.shared.registry().keys().copied().collect();
             for pid in pids {
                 let Some(scb) = pump.shared.scb(pid) else {
+                    undelivered.push(pid);
                     continue;
                 };
                 let snapshot = scb.runtime_snapshot();
-                let object = Arc::clone(&snapshot.spirit_obj);
-                let (target, quarantined) = {
+                let target = {
                     let mut registry = pump.shared.registry();
                     let Some(entry) = registry.get_mut(&pid) else {
+                        undelivered.push(pid);
                         continue;
                     };
                     pump.shared.sync(pid, entry, &snapshot);
-                    (entry.dispatch_target(&scb, snapshot), entry.quarantined)
+                    entry.dispatch_target(&scb, snapshot)
                 };
                 let addressed: Vec<_> = redistill
                     .iter()
@@ -573,25 +713,22 @@ impl HookPump {
                         .unwrap_or_else(|e| e.into_inner())
                         .insert(
                             request.redacted_distillate_frame_id.clone(),
-                            RedistillOutcome::Pending {
-                                reason: Pending::FormUnsupported,
+                            RedistillSlot {
+                                outcome: None,
+                                principal: receipt.principal_id.clone(),
+                                since: receipt.timestamp_ns,
+                                waiting: true,
                             },
                         );
                 }
-                let notice = ForgetNotice {
-                    scrubbed_frame_ids: redacted_distillate_frame_ids
-                        .iter()
-                        .chain(redacted_principal_frame_ids)
-                        .cloned()
-                        .collect(),
+                let bytes = serde_json::to_vec(&ForgetNotice {
+                    scrubbed_frame_ids: scrubbed_frame_ids.clone(),
                     redistill: addressed.clone(),
-                };
-                let bytes = serde_json::to_vec(&notice).map_err(|e| e.to_string())?;
-                let hook = match (quarantined, pump.shared.dispatcher.upgrade()) {
-                    (false, Some(dispatcher)) => {
-                        Some(dispatcher.fire_on_consolidate(&target, &bytes).await)
-                    }
-                    _ => None,
+                })
+                .map_err(|e| e.to_string())?;
+                let hook = match pump.shared.dispatcher.upgrade() {
+                    Some(dispatcher) => Some(dispatcher.fire_on_consolidate(&target, &bytes).await),
+                    None => None,
                 };
                 let completed = matches!(
                     hook,
@@ -600,22 +737,31 @@ impl HookPump {
                             | HookOutcome::BudgetWarning80 { fired: true, .. }
                     )
                 );
-                if let Some(hook) = &hook {
-                    pump.shared
-                        .account(pid, &object, Hook::Consolidate, None, hook);
+                // Privacy purges bypass ordinary consolidation quarantine accounting.
+                if !completed {
+                    undelivered.push(pid);
                 }
                 for request in addressed {
-                    let result = pump
+                    let mut results = pump
                         .shared
                         .redistill_results
                         .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .remove(&request.redacted_distillate_frame_id);
-                    let outcome = if completed {
-                        result.unwrap_or(RedistillOutcome::Pending {
-                            reason: Pending::FormUnsupported,
-                        })
+                        .unwrap_or_else(|e| e.into_inner());
+                    let outcome = if completed
+                        || results
+                            .get(&request.redacted_distillate_frame_id)
+                            .is_some_and(|slot| slot.outcome.is_some())
+                    {
+                        results
+                            .remove(&request.redacted_distillate_frame_id)
+                            .and_then(|slot| slot.outcome)
+                            .unwrap_or(RedistillOutcome::Pending {
+                                reason: Pending::FormUnsupported,
+                            })
                     } else {
+                        if let Some(slot) = results.get_mut(&request.redacted_distillate_frame_id) {
+                            slot.waiting = false;
+                        }
                         RedistillOutcome::Pending {
                             reason: Pending::Refused("consolidate-hook".into()),
                         }
@@ -626,42 +772,84 @@ impl HookPump {
         }
         let mut rows = Vec::new();
         let mut redistilled_count = 0;
-        for request in redistill {
-            let mut outcome = outcomes
-                .remove(&request.redacted_distillate_frame_id)
-                .unwrap_or(RedistillOutcome::Pending {
-                    reason: Pending::WriterNotLive,
-                });
-            if let RedistillOutcome::Redistilled {
-                new_distillate_frame_id,
-            } = &outcome
-            {
-                let id = researcher::decode_frame_id_hex(new_distillate_frame_id).ok();
-                let row = id
-                    .map(|id| tl.query_frame_by_id(id))
-                    .transpose()
-                    .map_err(|e| e.to_string())?
-                    .flatten();
-                if !row.is_some_and(|row| {
-                    row.spirit_pid == request.writer_spirit_pid
-                        && row.boot_nonce == tl.boot_nonce()
-                        && row.kind
-                            == maos_kernel_core::iac::transparency_log::FrameKind::Distillate
-                        && hex::encode(row.frame_id) != request.redacted_distillate_frame_id
-                }) {
-                    outcome = RedistillOutcome::Pending {
-                        reason: Pending::Refused("writer-mismatch".into()),
-                    };
-                }
-            }
+        for request in &redistill {
+            let outcome = Self::check_redistilled(
+                tl,
+                request,
+                outcomes
+                    .remove(&request.redacted_distillate_frame_id)
+                    .unwrap_or(RedistillOutcome::Pending {
+                        reason: Pending::WriterNotLive,
+                    }),
+                &receipt.principal_id,
+                receipt.timestamp_ns,
+            );
             tl.insert_redistill_outcome(request, &outcome)
                 .map_err(|e| e.to_string())?;
             redistilled_count +=
                 usize::from(matches!(outcome, RedistillOutcome::Redistilled { .. }));
-            rows.push(serde_json::json!({ "request": request, "outcome": outcome }));
+            rows.push(serde_json::json!({"request":request,"outcome":outcome}));
+        }
+        // An in-flight pass can commit after the initial kernel scan, before purge.
+        let (late_distillates, late_frames, late_requests, held, gaps) = tl
+            .scrub_forget_frames(&receipt.principal_id)
+            .map_err(|e| e.to_string())?;
+        for request in &late_requests {
+            let outcome = RedistillOutcome::Pending {
+                reason: Pending::Refused("late-frame".into()),
+            };
+            tl.insert_redistill_outcome(request, &outcome)
+                .map_err(|e| e.to_string())?;
+            rows.push(serde_json::json!({"request":request,"outcome":outcome}));
+        }
+        let late_ids: Vec<_> = late_distillates
+            .iter()
+            .chain(&late_frames)
+            .cloned()
+            .collect();
+        if let Some(pump) = pump.filter(|_| !late_ids.is_empty()) {
+            let bytes = serde_json::to_vec(&ForgetNotice {
+                scrubbed_frame_ids: late_ids,
+                redistill: Vec::new(),
+            })
+            .map_err(|e| e.to_string())?;
+            let dispatcher = pump.shared.dispatcher.upgrade();
+            let pids: Vec<_> = pump.shared.registry().keys().copied().collect();
+            for pid in pids {
+                let hook = match (pump.shared.scb(pid), &dispatcher) {
+                    (Some(scb), Some(dispatcher)) => {
+                        Some(dispatcher.fire_on_consolidate(&scb, &bytes).await)
+                    }
+                    _ => None,
+                };
+                if !matches!(
+                    hook,
+                    Some(
+                        HookOutcome::Fired { .. }
+                            | HookOutcome::BudgetWarning80 { fired: true, .. }
+                    )
+                ) {
+                    undelivered.push(pid);
+                }
+            }
+        }
+        for pid in &undelivered {
+            tl.insert_frame_event(
+                maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
+                *pid,
+                None,
+                "forget.purge.undelivered",
+                serde_json::json!({"spirit_pid":pid,"reason":"consolidate-hook"})
+                    .to_string()
+                    .as_bytes(),
+                maos_domain::invariants::i3::FrameOrigin::Kernel,
+            );
         }
         Ok(
-            serde_json::json!({ "redistill_outcomes": rows, "redistilled_count": redistilled_count, "pending_count": redistill.len() - redistilled_count }),
+            serde_json::json!({"redistill_outcomes":rows,"redistilled_count":redistilled_count,
+            "pending_count":rows.len()-redistilled_count,"purge_undelivered":undelivered,
+            "late_redacted_distillate_frame_ids":late_distillates,"late_redacted_principal_frame_ids":late_frames,
+            "held_frame_ids":held,"malformed_frame_ids":gaps}),
         )
     }
 

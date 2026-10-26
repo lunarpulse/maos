@@ -1356,21 +1356,12 @@ impl DoorInner {
                     .unwrap_or_else(|e| e.into_inner())
                     .as_ref()
                     .and_then(std::sync::Weak::upgrade);
-                let mut body = match crate::hook_pump::HookPump::finish_forget(
+                let mut body = crate::hook_pump::HookPump::finish_forget(
                     &self.transparency_log,
                     &outcome,
                     pump.as_deref(),
                 )
-                .await
-                {
-                    Ok(body) => body,
-                    Err(detail) => {
-                        return OperatorOutcome::Failed {
-                            code: "redistill_failed".into(),
-                            detail,
-                        }
-                    }
-                };
+                .await;
                 body["principal_id"] = serde_json::json!(principal);
                 body["outcome"] = serde_json::json!("erased");
                 body["forget"] = serde_json::json!(outcome);

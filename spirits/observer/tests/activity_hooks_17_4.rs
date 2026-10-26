@@ -207,6 +207,37 @@ fn an_empty_window_is_silent_and_a_closed_window_resets() {
 }
 
 #[test]
+fn forget_notices_do_not_close_or_reset_the_activity_window() {
+    let sink = Arc::new(Recorded::default());
+    let observer = observer_with(&sink, PrincipalScope::all());
+    run(&observer, vec![payload(0, "butler", "a", 1.0)], 0);
+    assert_eq!(sink.take(), vec![scalar(0, "butler", "a", 1.0)]);
+    for bytes in [
+        br#"{"scrubbed_frame_ids":[],"redistill":[]}"#.as_slice(),
+        b"malformed notice".as_slice(),
+    ] {
+        observer.on_consolidate(
+            &mut Ctx::mock(),
+            &ConsolidatePayload {
+                batch_data: bytes,
+                batch_len: 1,
+            },
+        );
+        assert!(sink.take().is_empty());
+    }
+    run(&observer, Vec::new(), 1);
+    assert_eq!(
+        sink.take(),
+        vec![ObservedActivity::Consolidated {
+            observer: "observer".into(),
+            window_events: 1,
+            streams: vec![stream("butler", "a", 1, 1.0)],
+            undecodable: 0,
+        }]
+    );
+}
+
+#[test]
 fn values_round_trip_bit_exact_through_payload_and_rendered_line() {
     for value in [
         51.248178375505404_f64,

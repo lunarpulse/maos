@@ -1,0 +1,11 @@
+--- a/crates/maos-kernel-core/src/memory/mod.rs
++++ b/crates/maos-kernel-core/src/memory/mod.rs
+@@ -439,7 +439,7 @@
+         principal_id: &str,
+         reason: Option<&str>,
+     ) -> Result<ForgetOutcome, MemoryError> {
+-        if principal_id.is_empty() {
++        if false && principal_id.is_empty() {
+             return Err(MemoryError::Storage("empty principal id".into()));
+         }
+         let _forget_guard = self
