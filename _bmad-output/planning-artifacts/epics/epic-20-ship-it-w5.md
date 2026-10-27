@@ -70,6 +70,8 @@ maos init && printf '@example-spirit-ts hello\n' | MAOS_INFERENCE_MODE=replay MA
 | `20-12-test-cost-budget-and-review-execution-contract` | Test-cost budget + review execution contract ◆ **pulled forward 2026-10-23** (operator approval, `review-cost-diagnosis-2026-10-22.md` Phase 2: before `18-1`, after `17-9`'s review) — no `cargo` inside `#[test]`, per-binary time budget under nextest, local `SKIP` profile, CI proof contract, review re-execution contract in skill config | throughput of every later story · kernel-Δ 0 · xtask +200–350 (zero headroom, measured grant) · `.config/nextest.toml` · `_bmad/custom/*.toml` · tests touched: ~34 files |
 | `20-13-pluggable-crypto-provider-selection` | Pluggable crypto provider: one operator selection point, every kernel FR48 surface through it ◆ FLAG-Winston — **added 2026-10-23** by operator ruling (routing audit DECIDE-1, split) | FR48 · NFR-Sec-15 (provider-trait half; FIPS module v1.5) · kernel-Δ by prototype at creation (ADR-069 envelope) · maos-bin, maos-domain, maos-secrets, maos-audit measured |
 | `20-14-complete-cost-attribution` | Complete cost attribution: per-task and session-principal token attribution on the cost frame; `maosctl audit cost-reconcile` grouped by task and principal ◆ FLAG-Winston — **added 2026-10-25** by operator ruling (routing audit DECIDE-2, split) | FR64 (token dimensions; CPU-time / storage-I/O v1.1) · NFR-Cost-1 (per-Spirit/per-task/per-principal clause) · kernel-Δ by prototype at creation (ADR-069 envelope ≤ 23,000, alarm 22,000) · maos-domain, maos-kernel-core, maos-cli measured |
+| `20-15-ci-build-once-nextest-archive` | Build-once CI: `cargo nextest archive` — compile once per image, reuse the archive across every test job (E18 retro R2, 2026-10-27; prep before 19-1; names the E17-A2 vehicle; owner Murat) | CI throughput of every later story · kernel-Δ 0 · xtask growth measured at creation |
+| `20-16-prepush-drift-gate` | `xtask prepush` aggregate gate — every cheap generated-artifact/pin check plus full-package nextest of changed crates, required before push (E18 retro R3, 2026-10-27; prep before 19-1; owner Amelia) | landing-run honesty of every later story · kernel-Δ 0 · xtask growth measured at creation |
 
 AC1 is always the command and what the operator observes; every AC cites the code it changes; `bmad-create-story` may tighten but not add uncited ACs.
 
@@ -236,6 +238,30 @@ The ACs below are the pre-split text, unchanged except where marked; each AC's o
 - **AC4.** Docs: the operator cost page names the three attribution axes, the attribution source values and their honesty boundary (proxy vs. session principal), the v1.1 CPU-time / storage-I/O plan, and ADR-046's amended R3; NFR-Cost-1's reconciliation claim is restated over the token dimensions only.
 
 *Does NOT close:* the subprocess CPU-time and storage-I/O cost dimensions (v1.1, PRD DELTA-2026-10-25; ADR-046 R6); provider-billing reconciliation sampling (NFR-Cost-1's ≥ 98 % operational half); multi-tenant cost isolation (NFR-Tenancy-1, v2.2).
+
+### 20-15-ci-build-once-nextest-archive — Build-once CI with `cargo nextest archive`
+
+*Closes · Δ:* CI throughput (E17-A2 / E18 retro R2, 2026-10-27; prep before Epic 19) · kernel-Δ 0 · xtask + `.github/workflows/discipline.yml` only · xtask growth measured at creation (zero headroom; exact grant at landing).
+
+*Why (measured 2026-10-27):* 74 % of CI wall is compile — 13167 s of 17737 s across the five largest jobs (18-0 AC10, run 40080259088; `18-0-evidence/ci/compile-vs-test-40080259088.json`; `build-test-fixtures` is the largest compile step in 4 of 5); a landing run ≈ 13.7 job-h (40396208547: 13.71 job-h, 73.9 min wall) and Epic 18 spent ≈ 11 landing/fix runs.
+
+- **AC1 (command).** The discipline pipeline builds one `cargo nextest archive` per image and every test job that today compiles the tree — at minimum `wasm-host-tests`, `cgroup-ceiling-undelegated`, `cgroup-ceiling-delegated`, `epic-17-exit`/`epic-18-exit`, `workspace-test-suite` — runs `cargo nextest run --archive-file <path>` against it. Observable: a landing-shaped discipline run with the per-job compile steps gone, gate set and job count unchanged, and per-job compile-vs-test wall before/after recorded in `20-15-evidence/` (18-0 AC10's measurement shape). Proven red: removing the archive before a consuming job reds that job (no silent fallback to a full in-job compile).
+- **AC2.** The archive is built once per image per run (not per job), keyed on the image and the tree SHA; `check-test-budget` and `aggregate.needs` are unchanged — this story buys wall-clock, not coverage.
+- **AC3.** Numbers: total job-hours before/after on ≥ 2 landing-shaped runs recorded in `20-15-evidence/`, stated against the 13.7 job-h baseline (run 40396208547).
+
+*Does NOT close:* the stable performance runner (20-7 / ADR-068); self-hosted runners; the local dev-host cost levers (20-12's scope).
+
+### 20-16-prepush-drift-gate — `xtask prepush` aggregate drift gate
+
+*Closes · Δ:* landing-run honesty (E18 retro R3, 2026-10-27; prep before Epic 19) · kernel-Δ 0 · xtask growth measured at creation.
+
+*Why (measured 2026-10-27):* every Epic 18 story except 18-0 and 18-2 needed ≥ 1 landing fix run, and the causes are overwhelmingly pin/generated-artifact drift or tests outside the focused set — unlisted file (18-1, run 40183021781), serde fixture (18-8, 40191703238), scanner/budget (18-3, 40237233599), binary size (18-4, 40251998973), WIT/ABI/KO parity + marker pins (18-5, 40267102242 + 40273714381), docs-site `error_codes` manifest drift (18-7, 40319842655, fixed `a2d69a29`) and 18-7's landing six reds (40336401565: cargo-deny zstd, STABILITY.md drift ×2, journey ANSI pin, error_catalog 49→67, loom package leg — fixed `271e2a33`).
+
+- **AC1 (command).** `cargo run -p xtask -- prepush` runs, in one aggregate exit: `stability-matrix --check`, `error-catalog-check`, `gen-abi-docs --check`, the ko coverage + glossary gates, the docs-site static gates incl. route-manifest parity, the CI count/marker pin readers, `SCANNED_SOURCE_FILES`/`WRITER_SHAPES` enrolment, the serde check, plus a full-package `cargo nextest` of every crate the pushed diff touches. Observable: exit 0, or one line per red check naming the drifted artifact and its pin. Proven red: planting the 18-7-class docs-site `error_codes` manifest drift reds `prepush` locally — the exact class that escaped to run 40319842655.
+- **AC2.** The dev contract names `prepush` as the required pre-push step (`docs/testing/proof-contract.md` gains the row); the CI landing run remains the authority — `prepush` is the cheap local mirror of its drift classes, not a second gate set.
+- **AC3.** Cost-bounded: total wall-clock measured at creation and recorded in `20-16-evidence/`; the nextest leg is limited to changed crates.
+
+*Does NOT close:* the CI landing run itself (stays authoritative); wall-clock performance gates (20-7); the build-once archive (20-15 — `prepush` may consume it when present).
 
 ### 20-9-spawned-form-lifecycle-hooks — received items (Epic-17 retrospective 2026-10-24) ◆
 
