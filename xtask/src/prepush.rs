@@ -187,18 +187,20 @@ fn success(output: &Output) -> Result<(), String> {
     if output.status.success() {
         return Ok(());
     }
-    // Bounded RED detail (workspace nextest echoes every passing test): of the
-    // final 20 lines and FAIL/panic/error/signal lines, the last 40, 400 chars each.
-    let failure = Regex::new("FAIL|panicked|error|SIG").unwrap();
+    // Bounded RED detail (workspace nextest echoes every passing test): 40 lines of
+    // 400 chars. Rank nextest failure status > panic > `error`, and lift the final 20
+    // to at least `error`, so captured `error` text never outranks the failing test;
+    // the highest 40 (latest first within a rank) show in rank, then output, order.
+    let failing = Regex::new(r"^\s*(FAIL|TIMEOUT|LEAK-FAIL|ABORT|SIG[A-Z]+) \[").unwrap();
     let text = combined(output);
     let lines: Vec<_> = text.lines().filter(|l| !l.trim().is_empty()).collect();
-    let mut kept: Vec<String> = (0..lines.len())
-        .rev()
-        .filter(|&i| i + 20 >= lines.len() || failure.is_match(lines[i]))
-        .take(40)
-        .map(|i| lines[i].chars().take(400).collect())
-        .collect();
-    kept.reverse();
+    let rank = |l: &str| u8::from(failing.is_match(l)) * 2 + u8::from(l.contains("panicked at"));
+    let rank = |l: &str| rank(l) * 2 + u8::from(l.contains("error"));
+    let mut order: Vec<_> = (0..lines.len()).collect();
+    order.sort_by_cached_key(|&i| (rank(lines[i]).max(u8::from(i + 20 >= lines.len())), i));
+    order.drain(..lines.len().saturating_sub(40));
+    let cut = |i: usize| lines[i].chars().take(400).collect::<String>();
+    let kept: Vec<_> = order.iter().map(|&i| cut(i)).collect();
     let (n, shown) = (lines.len() - kept.len(), single_line(&kept.join("\n")));
     let (status, text) = (output.status, format!("{n} lines omitted; {shown}"));
     Err(format!("expected exit 0, actual {status}; {text}"))

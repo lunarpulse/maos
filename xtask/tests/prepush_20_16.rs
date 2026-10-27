@@ -197,6 +197,39 @@ fn red_detail_is_bounded_and_keeps_failure_lines() {
 }
 
 #[test]
+fn red_detail_names_the_failing_test_among_captured_error_lines() {
+    // Workspace nextest (`--success-output immediate`): one early failure, then
+    // thousands of passing tests whose captured output carries `::error::` lines.
+    let failed =
+        "FAIL [  45.123s] maos-bin::one_daemon_one_door_16_1 ac4_cold_swap_is_refused_typed";
+    let script = format!(
+        "echo '        {failed}'; echo \"thread 'ac4' panicked at crates/a.rs:1:1:\"; i=0; while [ $i -lt 3000 ]; do echo \"        PASS [   0.010s] maos-bin::p t$i\"; echo \"::error::check-x: RED fixture $i\"; i=$((i+1)); done; echo '     Summary [ 300.000s] 3001 tests run: 3000 passed, 1 failed, 0 skipped'; echo 'error: test run failed' >&2; exit 100"
+    );
+    let mut report = Report::default();
+    let mut nextest = Command::new("sh");
+    nextest.args(["-c", &script]);
+    report.command("workspace-nextest", "junit.xml", &mut nextest);
+    let record = &report.records[0];
+    assert_eq!(record.status, "red");
+    assert!(record
+        .detail
+        .starts_with("expected exit 0, actual exit status: 100; 5964 lines omitted; "));
+    // The detail is whitespace-collapsed: `FAIL [ 45.123s] maos-bin::… ac4_…`.
+    let named = failed.replace("  ", " ");
+    assert!(record.detail.contains(&named), "{}", record.detail);
+    assert!(record.detail.contains("panicked at crates/a.rs:1:1:"));
+    assert!(record
+        .detail
+        .contains("1 failed, 0 skipped error: test run failed"));
+    assert!(!record.detail.contains("RED fixture 0 "));
+    assert!(
+        record.detail.len() < 40 * 400 + 200,
+        "{}",
+        record.detail.len()
+    );
+}
+
+#[test]
 fn only_timing_budget_findings_become_advisory_and_stale_rows_stay_red() {
     let root = tempfile::tempdir().unwrap();
     fs::create_dir(root.path().join("xtask")).unwrap();
