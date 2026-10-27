@@ -94,10 +94,9 @@ impl Invocation {
 /// concurrently and are capped; a client alive at the deadline is killed and
 /// reaped off-thread, and a descendant holding a pipe cannot postpone the
 /// result past the deadline.
-#[doc(hidden)]
 #[cfg(target_os = "linux")]
-pub fn invoke_bounded(
-    program: &Path,
+pub(crate) fn invoke_bounded_command(
+    command: &mut Command,
     args: &[&str],
     env: &[(String, String)],
     deadline: Instant,
@@ -137,7 +136,7 @@ pub fn invoke_bounded(
     if Instant::now() >= deadline {
         return Invocation::TimedOut;
     }
-    let spawned = runtime_command(program)
+    let spawned = command
         .args(args)
         .envs(env.iter().map(|(name, value)| (name, value)))
         .stdin(Stdio::null())
@@ -219,6 +218,17 @@ pub fn invoke_bounded(
             Invocation::TimedOut
         }
     }
+}
+
+#[doc(hidden)]
+#[cfg(target_os = "linux")]
+pub fn invoke_bounded(
+    program: &Path,
+    args: &[&str],
+    env: &[(String, String)],
+    deadline: Instant,
+) -> Invocation {
+    invoke_bounded_command(&mut runtime_command(program), args, env, deadline)
 }
 
 #[doc(hidden)]
@@ -483,8 +493,9 @@ pub fn launch_t3(
     {
         return Err(launch("init", "launch cancelled"));
     }
-    if !invoke_bounded(
-        &guard.terminal().runtime().path,
+    // conmon <= 2.1.10 writes `oom` into its cwd (cgroup.c:331): `init` runs in the state dir.
+    if !invoke_bounded_command(
+        runtime_command(&guard.terminal().runtime().path).current_dir(parent.state_dir),
         &["init", &cid],
         &[],
         Instant::now() + CLIENT_DEADLINE,

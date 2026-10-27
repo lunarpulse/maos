@@ -1,0 +1,1 @@
+2026-10-27T17:54:24.9908229Z test fixture stale — `forbidden-syscall-probe`: checkout is dirty; clean provenance cannot authorize changed files; git status --porcelain: ?? crates/maos-bin/oom | ?? oom; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`

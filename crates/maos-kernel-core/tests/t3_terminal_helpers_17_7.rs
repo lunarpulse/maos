@@ -328,6 +328,7 @@ fn failed_init_releases_launch_permit_before_cid_guard_drop() {
     let state_dir = temp.path().join("state");
     fs::create_dir(&state_dir).unwrap();
     fs::set_permissions(&state_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    let private_cwd = fs::canonicalize(&state_dir).unwrap();
     let cid = "c".repeat(64);
     let (runtime, calls) = stub_runtime(
         temp.path(),
@@ -335,12 +336,13 @@ fn failed_init_releases_launch_permit_before_cid_guard_drop() {
             r#"
 case "$1" in
   create) printf '%s\n' '{cid}' > '{}/cid'; printf '%s\n' '{cid}' ;;
-  init) exit 1 ;;
+  init) pwd -P > '{}/init.cwd'; exit 1 ;;
   kill|rm) exit 0 ;;
   container) exit 1 ;;
 esac
 "#,
-            state_dir.display()
+            state_dir.display(),
+            temp.path().display()
         ),
     );
     let image = signed_test_image();
@@ -372,6 +374,13 @@ esac
     assert!(started.elapsed() < Duration::from_secs(3));
     assert_eq!(published.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert!(!state_dir.exists(), "failed init must run CID teardown");
+    // Legacy conmon writes `oom` into the init client's cwd: it must be the private state dir.
+    assert_eq!(
+        fs::read_to_string(temp.path().join("init.cwd"))
+            .unwrap()
+            .trim_end(),
+        private_cwd.to_str().unwrap()
+    );
     assert_eq!(
         fs::read_to_string(&calls)
             .unwrap()

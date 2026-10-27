@@ -1,0 +1,124 @@
+consumer logs: 15
+cargo-line grep rc=123 (xargs 123 / grep 1 with no hit lines above = none found = PASS)
+no 'Compiling' substring anywhere in consumer logs
+--- pins: N tests run lines
+173_cgroup-ceiling-delegated (ubuntu-24.04).txt:4 tests run: 4 passed, 3 skipped
+173_cgroup-ceiling-delegated (ubuntu-24.04).txt:23 tests run: 23 passed, 0 skipped
+173_cgroup-ceiling-delegated (ubuntu-24.04).txt:1 test run: 1 passed, 3 skipped
+173_cgroup-ceiling-delegated (ubuntu-24.04).txt:2 tests run: 2 passed, 0 skipped
+174_cgroup-ceiling-delegated (ubuntu-26.04-arm).txt:4 tests run: 4 passed, 3 skipped
+174_cgroup-ceiling-delegated (ubuntu-26.04-arm).txt:23 tests run: 23 passed, 0 skipped
+176_cgroup-ceiling-delegated (ubuntu-24.04-arm).txt:4 tests run: 4 passed, 3 skipped
+176_cgroup-ceiling-delegated (ubuntu-24.04-arm).txt:23 tests run: 23 passed, 0 skipped
+177_cgroup-ceiling-undelegated (ubuntu-24.04).txt:23 tests run: 23 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:5 tests run: 5 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:5 tests run: 5 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:9 tests run: 9 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:9 tests run: 9 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:15 tests run: 15 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:121 tests run: 121 passed, 1 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:5 tests run: 5 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:23 tests run: 23 passed([,[:space:]]|$)' "$RUNNER_TEMP/spawned-17-3c.log" || { echo "::error title=17-3c process gates (ubuntu-26.04)::missing '23 tests run: 23 passed'"; fail=1; }[0m
+178_wasm-host-tests (ubuntu-26.04).txt:23 tests run: 23 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:2 tests run: 2 passed([,[:space:]]|$)' "$RUNNER_TEMP/live-escape-17-10.log" || { echo "::error title=17-10 escape tail (ubuntu-26.04)::missing '2 tests run: 2 passed'"; fail=1; }[0m
+178_wasm-host-tests (ubuntu-26.04).txt:2 tests run: 2 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:2 tests run: 2 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:18 tests run: 18 passed([,[:space:]]|$)' "$RUNNER_TEMP/recall-17-3d.log" || { echo "::error title=17-3d recall (ubuntu-26.04)::missing '18 tests run: 18 passed'"; fail=1; }[0m
+178_wasm-host-tests (ubuntu-26.04).txt:18 tests run: 18 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:18 tests run: 18 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:8 tests run: 8 passed([,[:space:]]|$)' "$RUNNER_TEMP/participant-17-8.log" || { echo "::error title=17-8 participant recall (ubuntu-26.04)::missing '8 tests run: 8 passed'"; fail=1; }[0m
+178_wasm-host-tests (ubuntu-26.04).txt:8 tests run: 8 passed, 0 skipped
+178_wasm-host-tests (ubuntu-26.04).txt:8 tests run: 8 passed, 0 skipped
+179_cgroup-ceiling-undelegated (ubuntu-26.04).txt:23 tests run: 23 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:5 tests run: 5 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:5 tests run: 5 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:9 tests run: 9 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:9 tests run: 9 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:15 tests run: 15 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:121 tests run: 121 passed, 1 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:5 tests run: 5 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:23 tests run: 23 passed([,[:space:]]|$)' "$RUNNER_TEMP/spawned-17-3c.log" || { echo "::error title=17-3c process gates (ubuntu-24.04-arm)::missing '23 tests run: 23 passed'"; fail=1; }[0m
+180_wasm-host-tests (ubuntu-24.04-arm).txt:23 tests run: 23 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:2 tests run: 2 passed([,[:space:]]|$)' "$RUNNER_TEMP/live-escape-17-10.log" || { echo "::error title=17-10 escape tail (ubuntu-24.04-arm)::missing '2 tests run: 2 passed'"; fail=1; }[0m
+180_wasm-host-tests (ubuntu-24.04-arm).txt:2 tests run: 2 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:2 tests run: 2 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:18 tests run: 18 passed([,[:space:]]|$)' "$RUNNER_TEMP/recall-17-3d.log" || { echo "::error title=17-3d recall (ubuntu-24.04-arm)::missing '18 tests run: 18 passed'"; fail=1; }[0m
+180_wasm-host-tests (ubuntu-24.04-arm).txt:18 tests run: 18 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:18 tests run: 18 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:8 tests run: 8 passed([,[:space:]]|$)' "$RUNNER_TEMP/participant-17-8.log" || { echo "::error title=17-8 participant recall (ubuntu-24.04-arm)::missing '8 tests run: 8 passed'"; fail=1; }[0m
+180_wasm-host-tests (ubuntu-24.04-arm).txt:8 tests run: 8 passed, 0 skipped
+180_wasm-host-tests (ubuntu-24.04-arm).txt:8 tests run: 8 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:5 tests run: 5 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:5 tests run: 5 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:9 tests run: 9 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:9 tests run: 9 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:15 tests run: 15 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:121 tests run: 121 passed, 1 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:5 tests run: 5 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:23 tests run: 23 passed([,[:space:]]|$)' "$RUNNER_TEMP/spawned-17-3c.log" || { echo "::error title=17-3c process gates (ubuntu-26.04-arm)::missing '23 tests run: 23 passed'"; fail=1; }[0m
+181_wasm-host-tests (ubuntu-26.04-arm).txt:23 tests run: 23 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:2 tests run: 2 passed([,[:space:]]|$)' "$RUNNER_TEMP/live-escape-17-10.log" || { echo "::error title=17-10 escape tail (ubuntu-26.04-arm)::missing '2 tests run: 2 passed'"; fail=1; }[0m
+181_wasm-host-tests (ubuntu-26.04-arm).txt:2 tests run: 2 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:2 tests run: 2 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:18 tests run: 18 passed([,[:space:]]|$)' "$RUNNER_TEMP/recall-17-3d.log" || { echo "::error title=17-3d recall (ubuntu-26.04-arm)::missing '18 tests run: 18 passed'"; fail=1; }[0m
+181_wasm-host-tests (ubuntu-26.04-arm).txt:18 tests run: 18 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:18 tests run: 18 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:8 tests run: 8 passed([,[:space:]]|$)' "$RUNNER_TEMP/participant-17-8.log" || { echo "::error title=17-8 participant recall (ubuntu-26.04-arm)::missing '8 tests run: 8 passed'"; fail=1; }[0m
+181_wasm-host-tests (ubuntu-26.04-arm).txt:8 tests run: 8 passed, 0 skipped
+181_wasm-host-tests (ubuntu-26.04-arm).txt:8 tests run: 8 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:5 tests run: 5 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:5 tests run: 5 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:9 tests run: 9 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:9 tests run: 9 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:15 tests run: 15 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:121 tests run: 121 passed, 1 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:5 tests run: 5 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:23 tests run: 23 passed([,[:space:]]|$)' "$RUNNER_TEMP/spawned-17-3c.log" || { echo "::error title=17-3c process gates (ubuntu-24.04)::missing '23 tests run: 23 passed'"; fail=1; }[0m
+182_wasm-host-tests (ubuntu-24.04).txt:23 tests run: 23 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:2 tests run: 2 passed([,[:space:]]|$)' "$RUNNER_TEMP/live-escape-17-10.log" || { echo "::error title=17-10 escape tail (ubuntu-24.04)::missing '2 tests run: 2 passed'"; fail=1; }[0m
+182_wasm-host-tests (ubuntu-24.04).txt:2 tests run: 2 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:2 tests run: 2 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:18 tests run: 18 passed([,[:space:]]|$)' "$RUNNER_TEMP/recall-17-3d.log" || { echo "::error title=17-3d recall (ubuntu-24.04)::missing '18 tests run: 18 passed'"; fail=1; }[0m
+182_wasm-host-tests (ubuntu-24.04).txt:18 tests run: 18 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:18 tests run: 18 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:8 tests run: 8 passed([,[:space:]]|$)' "$RUNNER_TEMP/participant-17-8.log" || { echo "::error title=17-8 participant recall (ubuntu-24.04)::missing '8 tests run: 8 passed'"; fail=1; }[0m
+182_wasm-host-tests (ubuntu-24.04).txt:8 tests run: 8 passed, 0 skipped
+182_wasm-host-tests (ubuntu-24.04).txt:8 tests run: 8 passed, 0 skipped
+183_cgroup-ceiling-undelegated (ubuntu-26.04-arm).txt:23 tests run: 23 passed, 0 skipped
+184_epic-17-exit (ubuntu-26.04).txt:1 test run: 1 passed, 3 skipped
+184_epic-17-exit (ubuntu-26.04).txt:31 tests run: 31 passed, 0 skipped
+184_epic-17-exit (ubuntu-26.04).txt:1 test run: 1 passed, 3 skipped
+184_epic-17-exit (ubuntu-26.04).txt:4 tests run: 4 passed, 0 skipped
+184_epic-17-exit (ubuntu-26.04).txt:16 tests run: 16 passed, 0 skipped
+184_epic-17-exit (ubuntu-26.04).txt:3 tests run: 3 passed, 0 skipped
+184_epic-17-exit (ubuntu-26.04).txt:5 tests run: 5 passed, 0 skipped
+184_epic-17-exit (ubuntu-26.04).txt:5 tests run: 5 passed, 0 skipped
+185_epic-17-exit (ubuntu-24.04).txt:1 test run: 1 passed, 3 skipped
+185_epic-17-exit (ubuntu-24.04).txt:31 tests run: 31 passed, 0 skipped
+185_epic-17-exit (ubuntu-24.04).txt:1 test run: 1 passed, 3 skipped
+185_epic-17-exit (ubuntu-24.04).txt:4 tests run: 4 passed, 0 skipped
+185_epic-17-exit (ubuntu-24.04).txt:16 tests run: 16 passed, 0 skipped
+185_epic-17-exit (ubuntu-24.04).txt:3 tests run: 3 passed, 0 skipped
+185_epic-17-exit (ubuntu-24.04).txt:5 tests run: 1 passed, 1 failed, 0 skipped
+185_epic-17-exit (ubuntu-24.04).txt:5 tests run: 1 passed, 1 failed, 0 skipped
+186_cgroup-ceiling-undelegated (ubuntu-24.04-arm).txt:23 tests run: 23 passed, 0 skipped
+187_cgroup-ceiling-delegated (ubuntu-26.04).txt:4 tests run: 4 passed, 3 skipped
+187_cgroup-ceiling-delegated (ubuntu-26.04).txt:23 tests run: 23 passed, 0 skipped
+187_cgroup-ceiling-delegated (ubuntu-26.04).txt:1 test run: 1 passed, 3 skipped
+187_cgroup-ceiling-delegated (ubuntu-26.04).txt:2 tests run: 2 passed, 0 skipped
+--- pins: marker counts (VERDICT/OUTCOME-style tokens per log)
+173_cgroup-ceiling-delegated (ubuntu-24.04).txt  8 SCOPED-VERDICT 
+174_cgroup-ceiling-delegated (ubuntu-26.04-arm).txt  8 SCOPED-VERDICT 
+175_epic-18-exit.txt 
+176_cgroup-ceiling-delegated (ubuntu-24.04-arm).txt  8 SCOPED-VERDICT 
+177_cgroup-ceiling-undelegated (ubuntu-24.04).txt  8 SCOPED-VERDICT 
+178_wasm-host-tests (ubuntu-26.04).txt  18 SCOPED-VERDICT 8 T2-OUTCOME 
+179_cgroup-ceiling-undelegated (ubuntu-26.04).txt  8 SCOPED-VERDICT 
+180_wasm-host-tests (ubuntu-24.04-arm).txt  18 SCOPED-VERDICT 8 T2-OUTCOME 
+181_wasm-host-tests (ubuntu-26.04-arm).txt  18 SCOPED-VERDICT 8 T2-OUTCOME 
+182_wasm-host-tests (ubuntu-24.04).txt  18 SCOPED-VERDICT 8 T2-OUTCOME 
+183_cgroup-ceiling-undelegated (ubuntu-26.04-arm).txt  8 SCOPED-VERDICT 
+184_epic-17-exit (ubuntu-26.04).txt  6 T2-OUTCOME 
+185_epic-17-exit (ubuntu-24.04).txt  1 T2-OUTCOME 
+186_cgroup-ceiling-undelegated (ubuntu-24.04-arm).txt  8 SCOPED-VERDICT 
+187_cgroup-ceiling-delegated (ubuntu-26.04).txt  8 SCOPED-VERDICT 

@@ -97,9 +97,15 @@ pub(super) fn runtime_reports_oom_marker(memory_mb: u32) -> bool {
     let memory = format!("{memory_mb}m");
     let cidfile_arg = format!("--cidfile={}", cidfile.display());
     let memory_arg = format!("--memory={memory}");
+    // Legacy conmon writes its `oom` marker into the client's cwd: run it in scratch.
+    let (scratch, client) = (dir.path().to_string_lossy(), runtime.to_string_lossy());
     let invocation = invoke_bounded(
-        &runtime,
+        Path::new("/bin/sh"),
         &[
+            "-c",
+            "cd \"$0\" && exec \"$@\"",
+            &scratch,
+            &client,
             "run",
             &cidfile_arg,
             &memory_arg,

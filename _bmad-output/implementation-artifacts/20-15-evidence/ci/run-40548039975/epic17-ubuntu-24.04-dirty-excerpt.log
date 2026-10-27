@@ -1,0 +1,24 @@
+# excerpt of logs/185_epic-17-exit (ubuntu-24.04).txt lines 2088-2110 (run 40548039975, branch ci/20-15-landing @ d076c204): line 3 dirty-checkout refusal naming the oom paths
+2026-10-27T17:54:24.3182638Z        START [         ] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T17:54:24.3215980Z 
+2026-10-27T17:54:24.3216145Z running 1 test
+2026-10-27T17:54:24.9902942Z 
+2026-10-27T17:54:24.9904668Z thread 'benign_rust_probe_survives_t2_under_same_spec' (10095) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:
+2026-10-27T17:54:24.9908229Z test fixture stale — `forbidden-syscall-probe`: checkout is dirty; clean provenance cannot authorize changed files; git status --porcelain: ?? crates/maos-bin/oom | ?? oom; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`
+2026-10-27T17:54:24.9910621Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-10-27T17:54:24.9911253Z test benign_rust_probe_survives_t2_under_same_spec ... FAILED
+2026-10-27T17:54:24.9911675Z 
+2026-10-27T17:54:24.9911864Z failures:
+2026-10-27T17:54:24.9912080Z 
+2026-10-27T17:54:24.9912210Z failures:
+2026-10-27T17:54:24.9912523Z     benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T17:54:24.9912771Z 
+2026-10-27T17:54:24.9913171Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.67s
+2026-10-27T17:54:24.9913582Z 
+2026-10-27T17:54:24.9913973Z         FAIL [   0.673s] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T17:54:24.9914758Z   Cancelling due to test failure
+2026-10-27T17:54:24.9915200Z ────────────
+2026-10-27T17:54:24.9915573Z      Summary [   0.679s] 2/5 tests run: 1 passed, 1 failed, 0 skipped
+2026-10-27T17:54:24.9916224Z         FAIL [   0.673s] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T17:54:24.9917101Z warning: 3/5 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+2026-10-27T17:54:24.9952662Z error: test run failed

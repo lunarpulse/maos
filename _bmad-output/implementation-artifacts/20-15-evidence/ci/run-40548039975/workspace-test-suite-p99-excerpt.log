@@ -1,0 +1,23 @@
+# excerpt of logs/138_workspace-test-suite.txt lines 10325-10343 and 12977-12978 (run 40548039975): cap_token_verify_p99_under_5us_hot_path P99 5007ns > 5000ns; pre-existing flake owned by 20-7
+2026-10-27T17:44:02.7689125Z         PASS [   0.046s] (2494/5124) maos-kernel-core::cap_token_verify_assertion cap_token_verify_p99_under_100us_overall
+2026-10-27T17:44:02.8080421Z         FAIL [   0.035s] (2495/5124) maos-kernel-core::cap_token_verify_assertion cap_token_verify_p99_under_5us_hot_path
+2026-10-27T17:44:02.8081241Z   stdout ───
+2026-10-27T17:44:02.8081379Z 
+2026-10-27T17:44:02.8081506Z     running 1 test
+2026-10-27T17:44:02.8081802Z     test cap_token_verify_p99_under_5us_hot_path ... FAILED
+2026-10-27T17:44:02.8082050Z 
+2026-10-27T17:44:02.8082136Z     failures:
+2026-10-27T17:44:02.8082251Z 
+2026-10-27T17:44:02.8082330Z     failures:
+2026-10-27T17:44:02.8082545Z         cap_token_verify_p99_under_5us_hot_path
+2026-10-27T17:44:02.8082744Z 
+2026-10-27T17:44:02.8083012Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.03s
+2026-10-27T17:44:02.8083406Z 
+2026-10-27T17:44:02.8083511Z   stderr ───
+2026-10-27T17:44:02.8083795Z     cap_token_verify P99 = 5007ns (ADR-030 budget: 5000ns)
+2026-10-27T17:44:02.8084025Z 
+2026-10-27T17:44:02.8084434Z     thread 'cap_token_verify_p99_under_5us_hot_path' (70066) panicked at crates/maos-kernel-core/tests/cap_token_verify_assertion.rs:85:5:
+2026-10-27T17:44:02.8085092Z     ADR-030 binding broken: cap_token_verify P99 = 5007ns, budget = 5000ns
+...
+2026-10-27T17:45:00.6318474Z      Summary [ 173.519s] 5124 tests run: 5123 passed (1 slow), 1 failed, 135 skipped
+2026-10-27T17:45:00.6319312Z         FAIL [   0.035s] (2495/5124) maos-kernel-core::cap_token_verify_assertion cap_token_verify_p99_under_5us_hot_path
