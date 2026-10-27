@@ -289,6 +289,11 @@ fn modified(path: &Path) -> SystemTime {
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+    git_stdout(root, args).map(|stdout| stdout.trim().to_owned())
+}
+
+/// Untrimmed stdout: a porcelain entry's leading status column is significant.
+fn git_stdout(root: &Path, args: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new("git")
         .args(args)
         .current_dir(root)
@@ -300,7 +305,7 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// Entries a dirty-checkout refusal names; the rest are only counted.
@@ -370,7 +375,7 @@ pub(crate) fn verify_entry(
                 actual.display()
             ));
         }
-        let status = git(
+        let status = git_stdout(
             root,
             &[
                 "status",
@@ -379,8 +384,9 @@ pub(crate) fn verify_entry(
                 "--ignore-submodules=none",
             ],
         )?;
+        let status = status.trim_end();
         if !status.is_empty() {
-            return Err(dirty_checkout(&status));
+            return Err(dirty_checkout(status));
         }
         let checkout = git(root, &["rev-parse", "HEAD^{tree}"])?;
         if tree != &checkout {

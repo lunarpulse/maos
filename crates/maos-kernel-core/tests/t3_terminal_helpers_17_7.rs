@@ -374,19 +374,20 @@ esac
     assert!(started.elapsed() < Duration::from_secs(3));
     assert_eq!(published.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert!(!state_dir.exists(), "failed init must run CID teardown");
-    // Legacy conmon writes `oom` into the init client's cwd: it must be the private state dir.
-    assert_eq!(
-        fs::read_to_string(temp.path().join("init.cwd"))
-            .unwrap()
-            .trim_end(),
-        private_cwd.to_str().unwrap()
-    );
     assert_eq!(
         fs::read_to_string(&calls)
             .unwrap()
             .lines()
             .collect::<Vec<_>>(),
         vec!["create", "init", "rm", "container"]
+    );
+    // conmon < 2.1.13 writes `oom` into the init client's cwd: it must be the private state dir.
+    assert_eq!(
+        fs::read_to_string(temp.path().join("init.cwd"))
+            .unwrap()
+            .trim_end(),
+        private_cwd.to_str().unwrap(),
+        "`init` must run with the private state dir as its cwd"
     );
     assert_eq!(
         custody.cancel_and_teardown(Instant::now() + Duration::from_secs(3)),

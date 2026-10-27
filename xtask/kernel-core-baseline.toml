@@ -507,7 +507,8 @@ src_lines = 26378
 # operator2026-10-27 (estimate +8..12 physical, exact at landing): exact formatted
 # 26367 -> 26378 (+11), tokei20610 -> 20619 (+9), 95 files unchanged; only
 # security/sandbox/t3/spawn.rs: the conmon-launching `init` client runs in the private
-# per-spawn state dir (Ubuntu 24.04 conmon 2.1.10 writes a cwd-relative `oom` marker).
+# per-spawn state dir (conmon < 2.1.13 writes a cwd-relative `oom` marker; 24.04 ships 2.1.10).
+# Review 2026-10-27: comment bound corrected to `< 2.1.13`; content hash re-pinned, lines unchanged.
 # HISTORY: 18-7-live-skill-authoring-and-revisions D-01/02 A, FLAG-Winston
 # operator2026-10-26: exact formatted26362 -> 26367 (+5), tokei20606 -> 20610 (+4),
 # 95 files unchanged; SkillAuthorSelf mediation + schema-v6 harness literal;
@@ -877,7 +878,7 @@ src_lines = 26378
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "08d675728ef6857716b32b8d5287fba980aed643bd5ca1d36bbcfa7f7fa29169"
+set_hash = "cd668a4d933381e1388c3a8974221d75cc9464ba735b1a1837a1ebb1dd838828"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -963,7 +964,7 @@ set_hash = "08d675728ef6857716b32b8d5287fba980aed643bd5ca1d36bbcfa7f7fa29169"
 "security/sandbox/t3/image_verify.rs" = "28125115858f49ad5784c19e3baaf0088f90f5c007eeb69976836d2b1a13873b"
 "security/sandbox/t3/mod.rs" = "ec392fc9de34dcabbe3c3bb63697df32d5f373986f11b2ae79841975deaaec2d"
 "security/sandbox/t3/runtime_detect.rs" = "8f1a9beab532f033bf7a65a7519beab0b2b100e78348a4869770522d2f92a361"
-"security/sandbox/t3/spawn.rs" = "ec330ec7d591e1309cbb411f8002eb0f6cb4527824fbabb97c4b17b32270391b"
+"security/sandbox/t3/spawn.rs" = "5b19357f873048acf7d56dad11c33bd927c6063703e47a9da1602c909a268b62"
 "security/sandbox/unsupported.rs" = "124e2d5baa3a64757cde10dcf7014bd7a77a77312c3ab76609140d060e515894"
 "security/sandbox/windows.rs" = "5f8ff06185984f9f5eb18a457b6f4329d0baf2ced8662db20ea70f5b7f5f2935"
 "supervision/cold_restart.rs" = "2977944d24dc54c28dba02c1d3395fc16225f45a3994b0a53f1a27aca20149b7"

@@ -188,17 +188,19 @@ fn success(output: &Output) -> Result<(), String> {
         return Ok(());
     }
     // Bounded RED detail (workspace nextest echoes every passing test): 40 lines of
-    // 400 chars. Rank nextest failure status > panic > `error`, and lift the final 20
-    // to at least `error`, so captured `error` text never outranks the failing test;
-    // the highest 40 (latest first within a rank) show in rank, then output, order.
-    let failing = Regex::new(r"^\s*(FAIL|TIMEOUT|LEAK-FAIL|ABORT|SIG[A-Z]+) \[").unwrap();
+    // 400 chars. Rank nextest/libtest failure status > panic > `error`, and lift the
+    // final 20 to at least `error`, so captured `error` text never outranks the failing
+    // test; the highest 40 (latest wins within a rank) show in output order, so an
+    // `error:` header precedes its `-->` location and a panic stays beside its FAIL.
+    let failing =
+        Regex::new(r"^\s*([A-Z-]*FAIL|TIMEOUT|ABORT|SIG[A-Z]+) \[|^test .*[.:] FAILED").unwrap();
     let text = combined(output);
     let lines: Vec<_> = text.lines().filter(|l| !l.trim().is_empty()).collect();
     let rank = |l: &str| u8::from(failing.is_match(l)) * 2 + u8::from(l.contains("panicked at"));
     let rank = |l: &str| rank(l) * 2 + u8::from(l.contains("error"));
     let mut order: Vec<_> = (0..lines.len()).collect();
     order.sort_by_cached_key(|&i| (rank(lines[i]).max(u8::from(i + 20 >= lines.len())), i));
-    order.drain(..lines.len().saturating_sub(40));
+    let order: BTreeSet<_> = order.drain(lines.len().saturating_sub(40)..).collect();
     let cut = |i: usize| lines[i].chars().take(400).collect::<String>();
     let kept: Vec<_> = order.iter().map(|&i| cut(i)).collect();
     let (n, shown) = (lines.len() - kept.len(), single_line(&kept.join("\n")));

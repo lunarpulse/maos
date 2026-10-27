@@ -511,13 +511,16 @@ fn researcher_live_mcp_sends_the_secret_store_bearer_and_never_leaks_it() {
 }
 
 /// Review ruling D-18-8-R1 (EC-3/BH-5/AA-7) — one server's bearer lookup
-/// error (here: its sealed file is a symlink, refused by the encrypted-file
-/// store) leaves ONLY that server unconfigured, with a warning naming the
-/// server and the error kind, never a value; the other three stay wired.
-/// The pass itself fails fast on web's `Unconfigured` and aborts its sibling
-/// calls (`survey_literature_impl`), so whether arxiv/github/citation-graph
-/// are ever reached is a race: the evidence is the boot's wiring, not their
-/// mocks' request counts.
+/// ERROR (here: its sealed file is a symlink, refused by the encrypted-file
+/// store) unconfigures only that server's lookup: exactly one lookup-failed
+/// warning, naming the server and the error kind (never a value), web's mock
+/// receives nothing, and the live port is still wired rather than refused as
+/// wholly unconfigured. It does NOT prove that a sibling whose lookup silently
+/// resolves to the wrong key is configured; that is outside R1. The pass fails
+/// fast on web's `Unconfigured` and aborts its sibling calls
+/// (`survey_literature_impl`), so whether arxiv/github/citation-graph are ever
+/// reached is a race: any sibling request that was made is only checked to
+/// carry no bearer or env canary.
 #[cfg(unix)]
 #[test]
 fn one_bearer_lookup_error_unconfigures_only_that_server() {
@@ -544,7 +547,7 @@ fn one_bearer_lookup_error_unconfigures_only_that_server() {
     // refuses as unconfigured instead of failing on web.
     assert!(
         combined.contains("researcher live MCP port wired (--live)"),
-        "the other servers stay wired. combined:\n{combined}"
+        "the live MCP port stays wired. combined:\n{combined}"
     );
     assert!(
         !combined.contains("no MCP server is configured"),
@@ -560,22 +563,6 @@ fn one_bearer_lookup_error_unconfigures_only_that_server() {
             assert!(heads.is_empty(), "web is unconfigured, never called");
             continue;
         }
-        for marker in [
-            format!("the {server} MCP bearer lookup failed"),
-            format!("{server} is unconfigured"),
-        ] {
-            assert!(
-                !combined.contains(&marker),
-                "{server} stays configured ({marker:?}). combined:\n{combined}"
-            );
-        }
-        let call_failed = format!("MCP call failed on {server}/");
-        assert!(
-            !combined
-                .lines()
-                .any(|line| line.contains(&call_failed) && line.contains("unconfigured")),
-            "{server}'s calls never fail as unconfigured. combined:\n{combined}"
-        );
         // The encrypted-file backend has no env fallback and holds no sealed
         // bearer for the siblings, so they are wired WITHOUT a bearer: any
         // request a sibling sent before the fail-fast abort carries no

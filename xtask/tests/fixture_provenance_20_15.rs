@@ -339,7 +339,12 @@ fn identical_tree_on_another_commit_keeps_provenance_valid() {
 
 #[test]
 fn consumer_rejects_all_dirty_states_even_with_matching_head_and_old_mtimes() {
-    for state in ["untracked", "unstaged", "staged"] {
+    // Each porcelain entry keeps its leading status column (` M` unstaged).
+    for (state, entry) in [
+        ("untracked", "?? new.rs"),
+        ("unstaged", " M source.rs"),
+        ("staged", "M  source.rs"),
+    ] {
         let dir = repository();
         let built = produce(dir.path());
         let consumed = consumer_entry(dir.path(), &built);
@@ -361,11 +366,38 @@ fn consumer_rejects_all_dirty_states_even_with_matching_head_and_old_mtimes() {
         )
         .unwrap_err();
         assert!(error.contains("dirty"), "{state}: {error}");
+        assert!(
+            error.contains(&format!("git status --porcelain: {entry}")),
+            "{state} names {entry:?}: {error}"
+        );
         assert_eq!(
             git(dir.path(), &["rev-parse", "HEAD^{tree}"]),
             built.tree.unwrap()
         );
     }
+}
+
+#[test]
+fn consumer_dirty_refusal_names_eight_entries_and_counts_the_rest() {
+    let dir = repository();
+    let built = produce(dir.path());
+    let consumed = consumer_entry(dir.path(), &built);
+    for index in 0..9 {
+        std::fs::write(dir.path().join(format!("dirty-{index}.rs")), "new").unwrap();
+    }
+    let error = fixture_harness::verify_entry(
+        &consumed,
+        &built.path,
+        future(),
+        dir.path(),
+        VerificationMode::Transport,
+    )
+    .unwrap_err();
+    for index in 0..8 {
+        assert!(error.contains(&format!("?? dirty-{index}.rs")), "{error}");
+    }
+    assert!(!error.contains("dirty-8.rs"), "only 8 are named: {error}");
+    assert!(error.ends_with("?? dirty-7.rs | … 1 more"), "{error}");
 }
 
 #[test]

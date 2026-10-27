@@ -493,7 +493,7 @@ pub fn launch_t3(
     {
         return Err(launch("init", "launch cancelled"));
     }
-    // conmon <= 2.1.10 writes `oom` into its cwd (cgroup.c:331): `init` runs in the state dir.
+    // conmon < 2.1.13 writes `oom` into its cwd (cgroup.c:331): `init` runs in the state dir.
     if !invoke_bounded_command(
         runtime_command(&guard.terminal().runtime().path).current_dir(parent.state_dir),
         &["init", &cid],

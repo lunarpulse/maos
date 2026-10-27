@@ -230,6 +230,33 @@ fn red_detail_names_the_failing_test_among_captured_error_lines() {
 }
 
 #[test]
+fn red_detail_keeps_output_order_and_libtest_failures() {
+    let red = |script: &str| {
+        let mut report = Report::default();
+        let mut cmd = Command::new("sh");
+        cmd.args(["-c", script]);
+        report.command("red", "artifact", &mut cmd);
+        assert_eq!(report.records[0].status, "red");
+        report.records[0].detail.clone()
+    };
+    // A rustc header outranks its unranked location, yet must still precede it.
+    let detail = red(
+        "echo 'error[E0425]: cannot find value `x`'; echo '  --> crates/a/src/lib.rs:7:5'; i=0; while [ $i -lt 30 ]; do echo \"noise $i\"; i=$((i+1)); done; exit 101",
+    );
+    let header = detail.find("error[E0425]: cannot find value `x`");
+    let location = detail.find("--> crates/a/src/lib.rs:7:5");
+    assert!(header.unwrap() < location.unwrap(), "{detail}");
+    // libtest: the FAILED test line is buried before more than 40 noise lines.
+    let detail = red(
+        "echo 'running 2 tests'; echo 'test tests::foo ... FAILED'; i=0; while [ $i -lt 60 ]; do echo \"noise $i\"; i=$((i+1)); done; echo 'test result: FAILED. 1 passed; 1 failed; 0 ignored'; exit 101",
+    );
+    let failed = detail.find("test tests::foo ... FAILED");
+    let result = detail.find("test result: FAILED. 1 passed; 1 failed");
+    assert!(failed.unwrap() < result.unwrap(), "{detail}");
+    assert!(!detail.contains("running 2 tests"), "{detail}");
+}
+
+#[test]
 fn only_timing_budget_findings_become_advisory_and_stale_rows_stay_red() {
     let root = tempfile::tempdir().unwrap();
     fs::create_dir(root.path().join("xtask")).unwrap();
