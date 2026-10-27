@@ -101,6 +101,23 @@ class CheckedExecutionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check(nextest_suite(22), 100, [22])
 
+    def test_nextest_cancelled_summary_is_refused_with_its_line_quoted(self):
+        # nextest's own cancelled shape: `M/N tests run` never matches the aggregate,
+        # so without this refusal the per-test libtest summaries would stand in.
+        cancelled = "     Summary [  15.750s] 2/3 tests run: 2 passed, 1 skipped\n"
+        children = nextest_no_capture(("t3::first", "t3::second"))
+        children = children[:children.rindex("     Summary")]
+        for text, exit_code, counts in (
+            (children + cancelled, 0, [2]),
+            (children + cancelled, 0, [1, 1]),
+            (children + cancelled, 100, [2]),
+            (nextest_no_capture() + cancelled.replace("2/3", "\x1b[1m3/4\x1b[0m"), 0, [3]),
+        ):
+            with self.subTest(text=text, counts=counts), self.assertRaisesRegex(
+                ValueError, r"cancelled before every test ran: Summary \[  15\.750s\] [23]/[34] tests run: "
+            ):
+                self.check(text, exit_code, counts)
+
     def test_nextest_missing_extra_or_reordered_summaries_are_rejected(self):
         for text, counts in (
             ("Starting 22 tests across 1 binary\n", [22]),
@@ -377,6 +394,18 @@ class CanaryArchiveBoundaryTests(unittest.TestCase):
                     helper.os.environ, caller, clear=True
                 ), self.assertRaisesRegex(RuntimeError, "GITHUB_WORKSPACE"):
                     helper._rootless_canary_command()
+
+    def test_archive_canary_runs_the_archive_consumer_profile(self):
+        helper = load_helper()
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "archive.tar.zst"
+            archive.touch()
+            caller = {"MAOS_CGROUP_CANARY_ARCHIVE": str(archive), "GITHUB_WORKSPACE": directory}
+            with mock.patch.dict(helper.os.environ, caller, clear=True):
+                command = helper._rootless_canary_command()
+        at = command.index("--profile")
+        self.assertEqual(command[at + 1], "archive-consumer")
+        self.assertEqual(command[command.index("--workspace-remap") + 1], directory)
 
 
 class UnitNameTests(unittest.TestCase):

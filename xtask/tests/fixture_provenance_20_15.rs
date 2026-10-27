@@ -54,7 +54,10 @@ fn commit(root: &Path) {
             "user.email=fixture@example.invalid",
             "-c",
             "commit.gpgsign=false",
+            "-c",
+            "core.hooksPath=/dev/null",
             "commit",
+            "--no-verify",
             "--quiet",
             "-m",
             "fixture source",
@@ -280,13 +283,6 @@ fn fresh_checkout_accepts_transported_manifest_despite_newer_source_mtimes() {
             ".",
         ],
     );
-    assert!(
-        std::fs::metadata(checkout.path().join("source.rs"))
-            .unwrap()
-            .modified()
-            .unwrap()
-            > UNIX_EPOCH
-    );
     // Transport restores the producer's absolute path, not a rewritten alias.
     std::fs::remove_file(&built.path).unwrap();
     std::fs::write(&built.path, artifact).unwrap();
@@ -318,7 +314,10 @@ fn identical_tree_on_another_commit_keeps_provenance_valid() {
             "user.email=fixture@example.invalid",
             "-c",
             "commit.gpgsign=false",
+            "-c",
+            "core.hooksPath=/dev/null",
             "commit",
+            "--no-verify",
             "--quiet",
             "--allow-empty",
             "-m",
@@ -540,34 +539,38 @@ fn transport_refuses_both_identities_removed_or_renamed_even_with_old_mtimes() {
     let renamed = valid
         .replace("\"tree\":", "\"not_tree\":")
         .replace("\"artifact\":", "\"not_artifact\":");
-    for changed in [removed, renamed] {
-        match fixture_harness::parse_manifest_entry(&changed, "fixture", &manifest) {
-            Ok(Some(consumed)) => {
-                // This reference would pass the old local timestamp fallback.
-                assert!(fixture_harness::verify_entry(
-                    &consumed,
-                    &built.path,
-                    future(),
-                    dir.path(),
-                    VerificationMode::Local,
-                )
-                .is_ok());
-                let error = fixture_harness::verify_entry(
-                    &consumed,
-                    &built.path,
-                    future(),
-                    dir.path(),
-                    VerificationMode::Transport,
-                )
-                .unwrap_err();
-                assert!(
-                    error.contains("requires clean tree and artifact provenance"),
-                    "{error}"
-                );
-            }
-            Err(_) => {} // Unknown renamed fields are corrupt generated entries.
-            Ok(None) => panic!("downgraded fixture entry disappeared"),
-        }
+    let parse = |text: &str| fixture_harness::parse_manifest_entry(text, "fixture", &manifest);
+    // Removing both identities must still parse, so transport itself refuses it.
+    let mut downgraded = vec![parse(&removed)
+        .unwrap()
+        .expect("downgraded fixture entry disappeared")];
+    match parse(&renamed) {
+        Ok(Some(consumed)) => downgraded.push(consumed),
+        Err(_) => {} // Unknown renamed fields are corrupt generated entries.
+        Ok(None) => panic!("renamed fixture entry disappeared"),
+    }
+    for consumed in downgraded {
+        // This reference would pass the old local timestamp fallback.
+        assert!(fixture_harness::verify_entry(
+            &consumed,
+            &built.path,
+            future(),
+            dir.path(),
+            VerificationMode::Local,
+        )
+        .is_ok());
+        let error = fixture_harness::verify_entry(
+            &consumed,
+            &built.path,
+            future(),
+            dir.path(),
+            VerificationMode::Transport,
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("requires clean tree and artifact provenance"),
+            "{error}"
+        );
     }
 }
 
@@ -743,6 +746,59 @@ fn ordinary_ci_own_builds_use_mtimes_until_explicit_transport_is_selected() {
         .unwrap()
         .is_none());
     assert!(producer::clean_tree(unversioned.path(), true).is_err());
+}
+
+#[test]
+fn consumer_git_ignores_inherited_repository_locators() {
+    let dir = repository();
+    let root = dir.path();
+    let sealed = produce(root);
+    consumer_entry(root, &sealed);
+    let transport = ("MAOS_FIXTURE_TRANSPORT", "1");
+    accepted(&public_fixture(root, &[transport]), &sealed.path);
+    std::fs::write(root.join("source.rs"), "changed source").unwrap();
+    // A clean repository with the same tree, as a hook could export it.
+    let other = repository();
+    let git_dir = path_arg(&other.path().join(".git"));
+    let work_tree = path_arg(other.path());
+    let locators = [
+        ("GIT_DIR", git_dir.as_str()),
+        ("GIT_WORK_TREE", work_tree.as_str()),
+    ];
+    // Unscrubbed, these locators would hide the dirty root behind a clean tree.
+    let redirected = scrub_git(&mut Command::new("git"))
+        .args(["status", "--porcelain", "--untracked-files=all"])
+        .envs(locators)
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(redirected.status.success() && redirected.stdout.is_empty());
+    assert_eq!(
+        git(other.path(), &["rev-parse", "HEAD^{tree}"]),
+        sealed.tree.unwrap()
+    );
+    refused(
+        &public_fixture(root, &[transport, locators[0], locators[1]]),
+        "test fixture stale — `fixture`: checkout is dirty",
+    );
+}
+
+#[test]
+fn public_fixture_reports_listed_but_absent_artifact_as_missing() {
+    let dir = repository();
+    let root = dir.path();
+    let sealed = produce(root);
+    consumer_entry(root, &sealed);
+    std::fs::remove_file(&sealed.path).unwrap();
+    for vars in [&[][..], &[("MAOS_FIXTURE_TRANSPORT", "1")][..]] {
+        refused(
+            &public_fixture(root, vars),
+            &format!(
+                "test fixture missing — `fixture`: {} does not exist",
+                sealed.path.display()
+            ),
+        );
+    }
 }
 
 #[test]

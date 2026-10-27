@@ -53,6 +53,18 @@ path = "junit.xml"
 store-success-output = false
 store-failure-output = true
 
+# Story 20-15 — the same-run archive consumers (`cargo-nextest nextest run
+# --archive-file ... --workspace-remap "$GITHUB_WORKSPACE"`, which loads this file
+# from the remapped root) replace `cargo test`, which ran every test and killed
+# none: the enclosing systemd unit `--timeout` (at most 2400 s) or the job
+# `timeout-minutes` bounds a hang. So no fail-fast, and a slow-timeout that only
+# reports — no `terminate-after` (the default profile's 120 s kill is replaced,
+# not merged). `[[profile.default.overrides]]` apply here too: they must never
+# set a slow-timeout.
+[profile.archive-consumer]
+fail-fast = false
+slow-timeout = { period = "60s" }
+
 # The `expensive-tests` job: real workloads and cargo-spawning tests, opted in
 # with `--run-ignored ignored-only` and the filter from
 # `cargo run -p xtask -- check-test-cost --expensive-filter`.

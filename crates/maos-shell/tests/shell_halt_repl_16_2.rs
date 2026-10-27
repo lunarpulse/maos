@@ -367,6 +367,32 @@ impl LiveRepl {
             self.out.text()
         );
     }
+
+    /// Bounded wait (the `wait_for` deadline) on the host's recorded calls,
+    /// returning the snapshot that satisfied `done`. Output is no proof of a
+    /// host call the REPL makes AFTER writing it (`proceed_with` renders the
+    /// turn, then records `shell.turn`), nor of a line the reader thread has
+    /// not yet handed to the loop.
+    fn wait_for_calls(&self, label: &str, done: impl Fn(&HostCalls) -> bool) -> HostCalls {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            let calls = self.handle.snapshot();
+            if done(&calls) {
+                return calls;
+            }
+            if std::time::Instant::now() >= deadline {
+                panic!(
+                    "{label}: host condition never held (raised={}, resolutions={}, \
+                     recorded_turns={}); output:\n{}",
+                    calls.raised.len(),
+                    calls.resolutions.len(),
+                    calls.recorded_turns.len(),
+                    self.out.text()
+                );
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
 }
 
 impl Drop for LiveRepl {
@@ -536,10 +562,13 @@ fn butler_pick_prototype_arm_is_unchanged() {
 fn typed_clarification_resolves_then_the_spirit_proceeds_with_the_context() {
     let (host, handle) = FakeHost::ok(1);
     let prompts = Arc::new(Mutex::new(Vec::new()));
-    let repl = LiveRepl::start(host, handle.clone(), Arc::clone(&prompts));
+    let repl = LiveRepl::start(host, handle, Arc::clone(&prompts));
     let id = raise_live(&repl);
 
     repl.input.send_line("idiomatic = clippy-clean, no unwrap");
+    // The door flips the registry only AFTER the REPL submitted the text;
+    // flipping first lets a tick proceed before the reader delivers the line.
+    repl.wait_for_calls("clarification submitted", |c| !c.resolutions.is_empty());
     // The scripted resolve is Ok; the registry flips only when the test does
     // it (the door's effect):
     repl.handle.set_state(&id, HaltState::Resumed);
@@ -552,7 +581,10 @@ fn typed_clarification_resolves_then_the_spirit_proceeds_with_the_context() {
     );
     repl.wait_for("mock response", "proceeding turn");
     {
-        let calls = handle.snapshot();
+        // `proceed_with` renders the turn BEFORE `record_turn`: wait on the
+        // recorded row itself, not on the output.
+        let calls =
+            repl.wait_for_calls("proceeding turn recorded", |c| !c.recorded_turns.is_empty());
         assert_eq!(
             calls.resolutions.len(),
             1,

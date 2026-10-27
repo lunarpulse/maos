@@ -2077,6 +2077,8 @@ jobs:
           tree = subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip()
           manifest_path = root / 'target/maos-fixtures/manifest.json'
           manifest = json.loads(manifest_path.read_text())
+          # The rewrite below re-emits exactly these keys; any other would be dropped.
+          assert set(manifest) == {'schema', 'command', 'fixtures'}, sorted(manifest)
           assert manifest['schema'] == 3, manifest['schema']
           # Archive extraction can replace the profile's runner with a different
           # family build. Keep the fixture's verified bytes at an immutable path;
@@ -2110,9 +2112,13 @@ jobs:
                   path = shutil.which(name)
                   assert path, name
                   archive.add(path, arcname=name, recursive=False)
+                  if name == 'cargo-nextest':
+                      # The packed binary's own report; consumers compare the extracted one.
+                      nextest = subprocess.check_output([path, 'nextest', '--version'], text=True).splitlines()[0]
+                      assert nextest.startswith('cargo-nextest 0.9.149 '), nextest
           identity = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
                           arch=os.environ['BUNDLE_ARCH'], workspace=str(root), tree=tree,
-                          nextest='0.9.149')
+                          nextest=nextest)
           (bundle / 'producer.json').write_text(json.dumps(identity) + '\n')
           PY
       - name: Upload same-run architecture archives
@@ -2198,17 +2204,18 @@ jobs:
       - name: Restore exact producer workspace files
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           python3 - <<'PY'
           import json, os, pathlib, subprocess
           producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          nextest = subprocess.check_output([os.environ['RUNNER_TEMP'] + '/ci-test-tools/cargo-nextest', 'nextest', '--version'], text=True).splitlines()[0]
           expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
                           arch='x64', workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
                           tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
-                          nextest='0.9.149')
+                          nextest=nextest)
           assert producer == expected, (producer, expected)
           PY
-          mkdir -p "$RUNNER_TEMP/ci-test-tools"
-          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
           tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
           tar -C / -xf "$RUNNER_TEMP/ci-test-files/release-epic17.tar"
@@ -2241,14 +2248,14 @@ jobs:
         run: |
           set +e
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-terminal --timeout 1800 --rootless-canary -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::worker_terminal_facts_17_7)" 2>&1 | tee "$RUNNER_TEMP/worker-terminal-facts.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::worker_terminal_facts_17_7)" 2>&1 | tee "$RUNNER_TEMP/worker-terminal-facts.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           required_tests=()
           while IFS= read -r test_name; do
             if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
           done <<< "${EPIC17_TERMINAL_REQUIRED_TESTS}"
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count "${EPIC17_TERMINAL_SUITE_TESTS}" "${required_tests[@]}" "$RUNNER_TEMP/worker-terminal-facts.log" || rc=1
-          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:' "$RUNNER_TEMP/worker-terminal-facts.log"; then
+          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:|tests? run: .*, [1-9][0-9]* skipped' "$RUNNER_TEMP/worker-terminal-facts.log"; then
             rc=1
             echo "::error title=Epic-17 exit line 4 (${{ matrix.image }})::SKIP, ignored, or zero tests"
           fi
@@ -2275,7 +2282,7 @@ jobs:
         run: |
           set +e
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-cli-quota-17-9 --timeout 1800 --rootless-canary -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::cli_wrapper_exhaustion_17_9)" 2>&1 | tee "$RUNNER_TEMP/cli-wrapper-exhaustion.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::cli_wrapper_exhaustion_17_9)" 2>&1 | tee "$RUNNER_TEMP/cli-wrapper-exhaustion.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           required_tests=()
           for name in remote_exhaustion_refuses_before_workload \
@@ -2291,7 +2298,7 @@ jobs:
                         'CLI-QUOTA-17-9 absent grant policy denial precedes quota'; do
             grep -qF -- "$marker" "$RUNNER_TEMP/cli-wrapper-exhaustion.log" || { rc=1; echo "::error title=17-9 CLI quota (${{ matrix.image }})::missing marker '${marker}'"; }
           done
-          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:' "$RUNNER_TEMP/cli-wrapper-exhaustion.log"; then
+          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:|tests? run: .*, [1-9][0-9]* skipped' "$RUNNER_TEMP/cli-wrapper-exhaustion.log"; then
             rc=1
             echo "::error title=17-9 CLI quota (${{ matrix.image }})::SKIP, ignored, or zero tests"
           fi
@@ -2308,9 +2315,10 @@ jobs:
       # Story 17-4 (CR-6) — exit line 5: Observer live beside Butler in one
       # root (AC1) and the 20-scenario activity corpus with its oracle (AC4).
       # `maosctl` is a sibling package's binary resolved beside `maos`, so it
-      # is prebuilt above. The executed-count guard refuses SKIP, ignored and
-      # zero-test runs; a run that leaves no summary.json did not reach the
-      # oracle and fails. Copy Cargo's fixed scratch output beside the CI log.
+      # is prebuilt above. The executed-count guard refuses SKIP, nextest-skipped
+      # (ignored) and zero-test runs — the required names cover 6 of 19 tests; a
+      # run that leaves no summary.json did not reach the oracle and fails. Copy
+      # Cargo's fixed scratch output beside the CI log.
       - name: Epic-17 exit line 5 — Observer live scene + activity corpus (Story 17-4)
         shell: bash
         env:
@@ -2328,9 +2336,9 @@ jobs:
           set +e
           rm -rf target/tmp/observer-activity-17-4
           rm -rf "$RUNNER_TEMP/observer-activity-17-4"
-          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E 'binary_id(maos-bin::observer_activity_corpus_17_4)' 2>&1 | tee "$RUNNER_TEMP/observer-17-4.log"
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E 'binary_id(maos-bin::observer_activity_corpus_17_4)' 2>&1 | tee "$RUNNER_TEMP/observer-17-4.log"
           corpus_rc=${PIPESTATUS[0]}
-          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E 'binary_id(maos-bin::observer_live_17_4)' 2>&1 | tee -a "$RUNNER_TEMP/observer-17-4.log"
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E 'binary_id(maos-bin::observer_live_17_4)' 2>&1 | tee -a "$RUNNER_TEMP/observer-17-4.log"
           rc=${PIPESTATUS[0]}
           if [ "$corpus_rc" -ne 0 ]; then rc=$corpus_rc; fi
           required_tests=()
@@ -2339,6 +2347,10 @@ jobs:
           done <<< "${EPIC17_LINE5_REQUIRED_TESTS}"
           # Suites run in target-name order: the corpus (16), then the scene (3).
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 16 --expected-count 3 "${required_tests[@]}" "$RUNNER_TEMP/observer-17-4.log" || rc=1
+          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:|tests? run: .*, [1-9][0-9]* skipped' "$RUNNER_TEMP/observer-17-4.log"; then
+            rc=1
+            echo "::error title=Epic-17 exit line 5 (${{ matrix.image }})::SKIP, ignored, or zero tests"
+          fi
           if [ -d target/tmp/observer-activity-17-4 ]; then
             cp -a target/tmp/observer-activity-17-4 "$RUNNER_TEMP/" || rc=1
           fi
@@ -2385,7 +2397,7 @@ jobs:
           NEXTEST_ARCHIVE_TESTS: t2_sandbox_kill
         run: |
           set +e
-          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(maos-wasm-host::t2_sandbox_kill)' 2>&1 | tee "$RUNNER_TEMP/t2.log"
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture -E 'binary_id(maos-wasm-host::t2_sandbox_kill)' 2>&1 | tee "$RUNNER_TEMP/t2.log"
           rc=${PIPESTATUS[0]}
           grep -E 'panicked at|rule 11' "$RUNNER_TEMP/t2.log" | head -3 | while IFS= read -r line; do
             echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::${line}"
@@ -2498,13 +2510,16 @@ jobs:
       - name: Restore exact producer workspace files
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           python3 - <<'PY'
           import json, os, pathlib, subprocess
           producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          nextest = subprocess.check_output([os.environ['RUNNER_TEMP'] + '/ci-test-tools/cargo-nextest', 'nextest', '--version'], text=True).splitlines()[0]
           expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
                           arch='x64', workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
                           tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
-                          nextest='0.9.149')
+                          nextest=nextest)
           assert producer == expected, (producer, expected)
           PY
           tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
@@ -4099,17 +4114,18 @@ jobs:
           BUNDLE_ARCH: ${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           python3 - <<'PY'
           import json, os, pathlib, subprocess
           producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          nextest = subprocess.check_output([os.environ['RUNNER_TEMP'] + '/ci-test-tools/cargo-nextest', 'nextest', '--version'], text=True).splitlines()[0]
           expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
                           arch=os.environ['BUNDLE_ARCH'], workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
                           tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
-                          nextest='0.9.149')
+                          nextest=nextest)
           assert producer == expected, (producer, expected)
           PY
-          mkdir -p "$RUNNER_TEMP/ci-test-tools"
-          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
           tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
       - uses: ./.github/actions/provision-t3-test-substrate
@@ -4131,7 +4147,7 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/kernel.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --run-ignored ignored-only --no-capture --test-threads 1 -E "binary_id(maos-kernel-core::cgroup_ceiling_smoke)" 2>&1 | tee "$RUNNER_TEMP/cgroup-smoke.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/kernel.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --run-ignored ignored-only --no-capture --test-threads 1 -E "binary_id(maos-kernel-core::cgroup_ceiling_smoke)" 2>&1 | tee "$RUNNER_TEMP/cgroup-smoke.log"; test ${PIPESTATUS[0]} -eq 0'
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 \
             --required-test native_child_is_placed_before_guest_and_resource_limits_bite \
             --required-test same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves \
@@ -4170,7 +4186,7 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/spawned-17-3c.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/spawned-17-3c.log"; test ${PIPESTATUS[0]} -eq 0'
           required_tests=()
           while IFS= read -r test_name; do
             if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
@@ -4190,7 +4206,7 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 --rootless-canary -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::worker_resource_limits_17_2)" 2>&1 | tee "$RUNNER_TEMP/worker-resource.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::worker_resource_limits_17_2)" 2>&1 | tee "$RUNNER_TEMP/worker-resource.log"; test ${PIPESTATUS[0]} -eq 0'
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 2 --required-test real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion --required-test fd_request_above_inherited_hard_limit_refuses_before_worker_payload "$RUNNER_TEMP/worker-resource.log"
 
   cgroup-ceiling-undelegated:
@@ -4224,17 +4240,18 @@ jobs:
           BUNDLE_ARCH: ${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           python3 - <<'PY'
           import json, os, pathlib, subprocess
           producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          nextest = subprocess.check_output([os.environ['RUNNER_TEMP'] + '/ci-test-tools/cargo-nextest', 'nextest', '--version'], text=True).splitlines()[0]
           expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
                           arch=os.environ['BUNDLE_ARCH'], workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
                           tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
-                          nextest='0.9.149')
+                          nextest=nextest)
           assert producer == expected, (producer, expected)
           PY
-          mkdir -p "$RUNNER_TEMP/ci-test-tools"
-          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
           tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
       - name: Install pinned WASM fixture assembler
@@ -4278,7 +4295,7 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode undelegated --unit maos-17-2-undelegated --timeout 1800 -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/undelegated-session.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/undelegated-session.log"; test ${PIPESTATUS[0]} -eq 0'
           required_tests=()
           while IFS= read -r test_name; do
             if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
@@ -4316,17 +4333,18 @@ jobs:
           BUNDLE_ARCH: ${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           python3 - <<'PY'
           import json, os, pathlib, subprocess
           producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          nextest = subprocess.check_output([os.environ['RUNNER_TEMP'] + '/ci-test-tools/cargo-nextest', 'nextest', '--version'], text=True).splitlines()[0]
           expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
                           arch=os.environ['BUNDLE_ARCH'], workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
                           tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
-                          nextest='0.9.149')
+                          nextest=nextest)
           assert producer == expected, (producer, expected)
           PY
-          mkdir -p "$RUNNER_TEMP/ci-test-tools"
-          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
           echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
           tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
       - name: Build the T2/WASM fixtures — probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)
@@ -4339,7 +4357,7 @@ jobs:
           NEXTEST_ARCHIVE_TESTS: t2_sandbox_kill
         run: |
           set +e
-          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(maos-wasm-host::t2_sandbox_kill)' 2>&1 | tee "$RUNNER_TEMP/t2.log"
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture -E 'binary_id(maos-wasm-host::t2_sandbox_kill)' 2>&1 | tee "$RUNNER_TEMP/t2.log"
           rc=${PIPESTATUS[0]}
           grep -o 'T2-OUTCOME .*' "$RUNNER_TEMP/t2.log" | while IFS= read -r line; do
             echo "::notice title=T2 exit line 3 (${{ matrix.image }})::${line#T2-OUTCOME }"
@@ -4361,7 +4379,7 @@ jobs:
           NEXTEST_ARCHIVE_TESTS: sandbox_enforcement_linux bridge_t2_route_17_6
         run: |
           set +e
-          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/kernel.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(maos-kernel-core::sandbox_enforcement_linux) | binary_id(maos-kernel-core::bridge_t2_route_17_6)' 2>&1 | tee "$RUNNER_TEMP/kernel-t2.log"
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/kernel.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture -E 'binary_id(maos-kernel-core::sandbox_enforcement_linux) | binary_id(maos-kernel-core::bridge_t2_route_17_6)' 2>&1 | tee "$RUNNER_TEMP/kernel-t2.log"
           rc=${PIPESTATUS[0]}
           route=$(grep -o 'BRIDGE-T2-ROUTE T[0-9]: [A-Za-z]*[^(]*' "$RUNNER_TEMP/kernel-t2.log" | sed 's/BRIDGE-T2-ROUTE //' | sort | paste -sd';' -)
           echo "::notice title=Bridge T2 route (${{ matrix.image }})::${route}"
@@ -4379,7 +4397,7 @@ jobs:
           NEXTEST_ARCHIVE_TESTS: ""
         run: |
           set +e
-          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/escape-detector.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(/^maos-escape-detector(::|$)/)' 2>&1 | tee "$RUNNER_TEMP/escape.log"
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/escape-detector.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture -E 'binary_id(/^maos-escape-detector(::|$)/)' 2>&1 | tee "$RUNNER_TEMP/escape.log"
           rc=${PIPESTATUS[0]}
           grep -E 'panicked at|rule 11' "$RUNNER_TEMP/escape.log" | head -3 | while IFS= read -r line; do
             echo "::error title=Escape detector (${{ matrix.image }})::${line}"
@@ -4395,15 +4413,18 @@ jobs:
           NEXTEST_ARCHIVE_PACKAGES: maos-host maos-wasm-host
           NEXTEST_ARCHIVE_FEATURES: ""
           NEXTEST_ARCHIVE_TESTS: ""
-        run: cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/host-wasm-host.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never -E 'binary_id(/^maos-(host|wasm-host)(::|$)/)'
+        run: cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/host-wasm-host.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer -E 'binary_id(/^maos-(host|wasm-host)(::|$)/)'
       - name: Install the pinned component fixture assembler
         run: test -x "$RUNNER_TEMP/ci-test-tools/wasm-tools"
+      # The remap root is the fixture's own workspace, which has no
+      # `.config/nextest.toml`: nextest's defaults kill no test, so only fail-fast
+      # is turned off (the repo config would not parse against this package graph).
       - name: Standalone native-twin fixture tests (Story 17-3c)
         env:
           NEXTEST_ARCHIVE_PACKAGES: equiv-native-twin
           NEXTEST_ARCHIVE_FEATURES: ""
           NEXTEST_ARCHIVE_TESTS: ""
-        run: cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/native-twin.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE/crates/maos-wasm-host/guests/equiv-fixture/native-twin" --extract-overwrite --color never -E 'binary_id(/^equiv-native-twin(::|$)/)'
+        run: cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/native-twin.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE/crates/maos-wasm-host/guests/equiv-fixture/native-twin" --extract-overwrite --color never --no-fail-fast -E 'binary_id(/^equiv-native-twin(::|$)/)'
       - name: Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates
         shell: bash
         env:
@@ -4414,7 +4435,7 @@ jobs:
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-host --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/spawned-17-3c.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/spawned-17-3c.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
@@ -4431,6 +4452,11 @@ jobs:
             grep '^SKIP[: ]' "$RUNNER_TEMP/spawned-17-3c.log" | while IFS= read -r line; do
               echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
             done
+            fail=1
+          fi
+          # No required names here: an ignored test would only show as nextest-skipped.
+          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:|tests? run: .*, [1-9][0-9]* skipped' "$RUNNER_TEMP/spawned-17-3c.log"; then
+            echo "::error title=17-3c process gates (${{ matrix.image }})::SKIP, ignored, or zero tests"
             fail=1
           fi
           grep -E 'SCOPED-VERDICT |GOVERNED-ATOMIC |HOSTILE-|WASM-IAC-SEND |RUNNER-SIGSYS |REPEATED-MAILBOX ' "$RUNNER_TEMP/spawned-17-3c.log" | while IFS= read -r line; do
@@ -4458,7 +4484,7 @@ jobs:
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-escape-tail --timeout 1800 -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::live_escape_anomaly_17_10)" 2>&1 | tee "$RUNNER_TEMP/live-escape-17-10.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::live_escape_anomaly_17_10)" 2>&1 | tee "$RUNNER_TEMP/live-escape-17-10.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-10 escape tail (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
@@ -4503,7 +4529,7 @@ jobs:
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-recall --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::recall_17_3d)" 2>&1 | tee "$RUNNER_TEMP/recall-17-3d.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::recall_17_3d)" 2>&1 | tee "$RUNNER_TEMP/recall-17-3d.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
@@ -4556,7 +4582,7 @@ jobs:
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-participant --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::participant_recall_17_8)" 2>&1 | tee "$RUNNER_TEMP/participant-17-8.log"; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::participant_recall_17_8)" 2>&1 | tee "$RUNNER_TEMP/participant-17-8.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-8 participant recall (${{ matrix.image }})::nextest rc=$rc"; fail=1; }

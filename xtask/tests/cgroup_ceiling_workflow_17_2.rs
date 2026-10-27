@@ -176,12 +176,19 @@ fn archive_cgroup_jobs_keep_real_delegation_counts_and_rootless_canary() {
         assert!(run.contains(&format!("/ci-test-archives/{archive}.tar.zst")));
         assert!(run.contains(&format!("::{suite})")));
         assert!(run.contains("--no-capture --test-threads 1"));
+        // Every test runs (no fail-fast) and none is killed short of the unit
+        // `--timeout`: the repo config's `archive-consumer` profile.
+        assert!(run.contains("--extract-overwrite --color never --profile archive-consumer --"));
+        assert!(run.contains(" --timeout 1800 ") || run.contains(" --timeout 2400 "));
         assert!(run.contains("test ${PIPESTATUS[0]} -eq 0"));
         assert!(run.contains(&format!("check-log --exit-code 0 --expected-count {count} ")));
         if suite == "cgroup_ceiling_smoke" {
             // Execute every original resource case, not the nonignored fixture
             // validation tests (those run in workspace-test-suite).
-            assert!(run.contains("--run-ignored ignored-only"));
+            assert!(run.contains("--profile archive-consumer --run-ignored ignored-only"));
+            // Ignored-only runs legitimately report the unignored cases as
+            // nextest-skipped; no skipped-count guard applies here.
+            assert!(!run.contains("[1-9][0-9]* skipped"));
             for name in [
                 "native_child_is_placed_before_guest_and_resource_limits_bite",
                 "same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves",

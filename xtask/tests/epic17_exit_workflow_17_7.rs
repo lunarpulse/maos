@@ -182,6 +182,52 @@ fn aggregate_workflow_executes_non_success_handling_and_failure_step() {
     );
 }
 
+/// The live executed-count guard (its first `grep -Eq` ERE) fires on SKIP, on
+/// nextest's indented zero-count summary and on any nonzero nextest `skipped`
+/// count (an ignored test), never on a full 10- or 20-test run or on nextest's
+/// `Starting ... (N binaries skipped)` header.
+fn guard_refuses_skip_ignored_and_zero(run: &str) -> bool {
+    let Some(guard) = run
+        .split("grep -Eq '")
+        .nth(1)
+        .and_then(|rest| rest.split('\'').next())
+    else {
+        return false;
+    };
+    let guard = regex::Regex::new(&format!("(?m){guard}")).expect("ERE guard");
+    [
+        ("        SKIP [   0.000s] maos-bin::scene skipped", true),
+        (
+            "     Summary [   0.012s] 0 tests run: 0 passed, 0 skipped",
+            true,
+        ),
+        (
+            "     Summary [  12.345s] 30 tests run: 30 passed, 1 skipped",
+            true,
+        ),
+        (
+            "     Summary [  12.345s] 3 tests run: 3 passed (1 slow), 12 skipped",
+            true,
+        ),
+        (
+            "     Summary [  12.345s] 10 tests run: 10 passed, 0 skipped",
+            false,
+        ),
+        (
+            "     Summary [  12.345s] 20 tests run: 20 passed, 0 skipped",
+            false,
+        ),
+        (
+            "    Starting 23 tests across 1 binary (5 binaries skipped)",
+            false,
+        ),
+    ]
+    .into_iter()
+    .all(|(log, fires)| guard.is_match(log) == fires)
+}
+
+const SKIPPED_ALTERNATIVE: &str = "|tests? run: .*, [1-9][0-9]* skipped";
+
 #[test]
 fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
     let workflow = workflow();
@@ -269,39 +315,18 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
             "cargo-nextest nextest run --archive-file".into(),
             "/ci-test-archives/maos-bin-network.tar.zst".into(),
             format!("binary_id(maos-bin::{suite})"),
-            "--no-capture --test-threads 1".into(),
+            "--color never --profile archive-consumer --no-capture --test-threads 1".into(),
             "test ${PIPESTATUS[0]} -eq 0".into(),
             "--required-test".into(),
-            "SKIP|(^|[[:space:]])0 tests run:".into(),
+            format!("SKIP|(^|[[:space:]])0 tests run:{SKIPPED_ALTERNATIVE}' \"$RUNNER_TEMP/"),
             "exit \"$rc\"".into(),
         ] {
             assert!(run.contains(&witness), "{name} lost {witness}");
         }
-        // The live guard must fire on SKIP and on nextest's indented zero-count
-        // summary, never on a 10- or 20-test run.
-        let guard = run
-            .split("grep -Eq '")
-            .nth(1)
-            .and_then(|rest| rest.split('\'').next())
-            .expect("zero-test guard");
-        let guard = regex::Regex::new(&format!("(?m){guard}")).expect("ERE guard");
-        for (log, fires) in [
-            ("        SKIP [   0.000s] maos-bin::scene skipped", true),
-            (
-                "     Summary [   0.012s] 0 tests run: 0 passed, 0 skipped",
-                true,
-            ),
-            (
-                "     Summary [  12.345s] 10 tests run: 10 passed, 0 skipped",
-                false,
-            ),
-            (
-                "     Summary [  12.345s] 20 tests run: 20 passed, 0 skipped",
-                false,
-            ),
-        ] {
-            assert_eq!(guard.is_match(log), fires, "{name}: {log}");
-        }
+        assert!(guard_refuses_skip_ignored_and_zero(run), "{name}");
+        let planted = run.replacen(SKIPPED_ALTERNATIVE, "", 1);
+        assert_ne!(planted, run, "{name}: guard plant must change the step");
+        assert!(!guard_refuses_skip_ignored_and_zero(&planted), "{name}");
         if suite == "worker_terminal_facts_17_7" {
             assert!(run.contains("done <<< \"${EPIC17_TERMINAL_REQUIRED_TESTS}\""));
             assert!(run.contains("--expected-count \"${EPIC17_TERMINAL_SUITE_TESTS}\""));
@@ -344,9 +369,18 @@ fn epic17_archive_keeps_observer_counts_oracle_and_delegated_launch() {
         "if [ \"$corpus_rc\" -ne 0 ]; then rc=$corpus_rc; fi",
         "if [ ! -s \"$RUNNER_TEMP/observer-activity-17-4/summary.json\" ]; then",
         "exit \"$rc\"",
+        "--color never --profile archive-consumer --no-capture --test-threads 1",
+        "' \"$RUNNER_TEMP/observer-17-4.log\"; then",
+        "::SKIP, ignored, or zero tests\"",
     ] {
         assert!(run.contains(witness), "observer proof lost {witness}");
     }
+    // Six required names cover 6 of the 19 tests: only the guard refuses an
+    // ignored (nextest-skipped) one.
+    assert!(guard_refuses_skip_ignored_and_zero(run));
+    let planted = run.replacen(SKIPPED_ALTERNATIVE, "", 1);
+    assert_ne!(planted, run, "observer guard plant must change the step");
+    assert!(!guard_refuses_skip_ignored_and_zero(&planted));
     let required: Vec<_> = step["env"]["EPIC17_LINE5_REQUIRED_TESTS"]
         .as_str()
         .expect("observer proof names")

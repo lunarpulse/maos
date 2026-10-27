@@ -25,6 +25,11 @@ _RESULT = re.compile(
     r"(?P<total>\d+) tests? run: (?P<outcomes>[^\r\n]*)$",
     re.MULTILINE,
 )
+# A run nextest stopped early (fail-fast, a signal, a cancelled unit) reports
+# `Summary [...] N/M tests run: ...`; it is never a complete aggregate.
+_CANCELLED = re.compile(
+    r"^[ \t]*Summary\s+\[[^\]\r\n]+\]\s+\d+/\d+ tests? run: [^\r\n]*$", re.MULTILINE
+)
 _ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 _FORBIDDEN = ("cpu", "memory", "pids")
 _DENIED = {errno.EPERM, errno.EACCES, errno.EROFS}
@@ -32,9 +37,12 @@ _DENIED = {errno.EPERM, errno.EACCES, errno.EROFS}
 
 def check_test_output(text, exit_code, expected_counts, required_tests=()):
     """Check exact suites, preferring nextest aggregates over child libtest output."""
+    text = _ANSI.sub("", text)
+    cancelled = _CANCELLED.search(text)
+    if cancelled:
+        raise ValueError(f"nextest run was cancelled before every test ran: {cancelled[0].strip()}")
     if exit_code != 0:
         raise ValueError(f"test command exited with status {exit_code}")
-    text = _ANSI.sub("", text)
     # Serial libtest flushes `test <name> ... ` before the body runs, so a
     # test's own SKIP line can follow that prefix instead of starting the line.
     if re.search(r"^(?:test \S+ \.\.\. )?\s*SKIP\b", text, re.MULTILINE):
@@ -275,7 +283,8 @@ def _rootless_canary_command():
         return [
             "cargo-nextest", "nextest", "run", "--archive-file", str(archive),
             "--extract-to", str(workspace), "--workspace-remap", str(workspace),
-            "--extract-overwrite", "--color", "never", "--no-capture",
+            "--extract-overwrite", "--color", "never", "--profile", "archive-consumer",
+            "--no-capture",
             "-E", "binary_id(maos-bin::smoke_cli_wrapper_8_12) & "
             "test(=maos_run_cli_wrapper_worker_spawns_real_subprocess)",
         ]

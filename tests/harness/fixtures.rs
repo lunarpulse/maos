@@ -292,9 +292,26 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     git_stdout(root, args).map(|stdout| stdout.trim().to_owned())
 }
 
+/// Repository-locating variables a hook or tool may export would redirect
+/// these queries to another repository; `HOME`/config (`safe.directory`) stay.
+const GIT_LOCATORS: [&str; 8] = [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_PREFIX",
+];
+
 /// Untrimmed stdout: a porcelain entry's leading status column is significant.
 fn git_stdout(root: &Path, args: &[&str]) -> Result<String, String> {
-    let output = std::process::Command::new("git")
+    let mut command = std::process::Command::new("git");
+    for locator in GIT_LOCATORS {
+        command.env_remove(locator);
+    }
+    let output = command
         .args(args)
         .current_dir(root)
         .output()
@@ -456,6 +473,13 @@ pub fn fixture(name: &str) -> PathBuf {
         )),
         Err(error) => missing(&error),
     };
+    // A listed but absent artefact is unbuilt, not stale provenance.
+    if !entry.path.is_file() {
+        missing(&format!(
+            "`{name}`: {} does not exist",
+            entry.path.display()
+        ));
+    }
     let root = std::env::current_dir().expect("fixture checkout directory");
     let built = UNIX_EPOCH + Duration::from_secs(entry.built_at);
     if let Err(error) = verify_entry(

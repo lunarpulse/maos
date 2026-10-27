@@ -718,11 +718,15 @@ const ARCHIVE_CONSUMERS: [&str; 5] = [
     "epic-18-exit",
 ];
 
-/// Consumers need no Cargo driver at all: even `cargo +stable --locked build`
-/// or an absolute Cargo path must not become an accidental fallback.
+/// Consumers need no Cargo driver at all: even `cargo +stable --locked build`,
+/// an absolute or quoted Cargo path (`"$HOME/.cargo/bin/cargo" build`), a command
+/// substitution (`$(command -v cargo) build`) or an inline `RUSTC=`/`CARGO=`
+/// reassignment must not become an accidental fallback.
 fn consumer_refuses_compilation(job: &Value) -> bool {
-    let compiler = regex::Regex::new(r#"(?:^|[\s/;'"|&(])(?:cargo|rustc)(?:\s|$)"#)
+    let compiler = regex::Regex::new(r#"(?:^|[\s/;'"|&(])(?:cargo|rustc)(?:[\s'")]|$)"#)
         .expect("compiler command regex");
+    let reassigned = regex::Regex::new(r#"(?:^|[\s;&|('"])(?:RUSTC|CARGO|CARGO_BUILD_RUSTC)="#)
+        .expect("compiler reassignment regex");
     let poisoned = |env: &Value| {
         ["RUSTC", "CARGO_BUILD_RUSTC", "CARGO"]
             .iter()
@@ -734,7 +738,8 @@ fn consumer_refuses_compilation(job: &Value) -> bool {
             !uses.starts_with("dtolnay/rust-toolchain@")
                 && !uses.starts_with("Swatinem/rust-cache@")
                 && !uses.starts_with("actions/cache@")
-                && str_of(step, "run").is_none_or(|run| !compiler.is_match(run))
+                && str_of(step, "run")
+                    .is_none_or(|run| !compiler.is_match(run) && !reassigned.is_match(run))
                 && get(step, "env").is_none_or(|env| {
                     ["RUSTC", "CARGO_BUILD_RUSTC", "CARGO"]
                         .iter()
@@ -822,12 +827,20 @@ fn archive_consumers_refuse_compilation_and_compile_plants() {
             "cargo --locked test -p maos-bin",
             "/usr/bin/cargo +stable run -p xtask -- build-test-fixtures",
             "rustc tests/fixtures/native/cgroup_ceiling.rs",
+            "\"$HOME/.cargo/bin/cargo\" build -p maos-bin",
+            "$(command -v cargo) build -p maos-bin",
+            "'rustc' tests/fixtures/native/cgroup_ceiling.rs",
+            "export RUSTC=/opt/toolchain/bin/rustc-1.85",
+            "CARGO=/opt/toolchain/bin/driver ./scripts/build.sh",
+            "env CARGO_BUILD_RUSTC=/opt/toolchain/bin/rc ./scripts/build.sh",
         ] {
             let mut planted = job.clone();
             planted["steps"]
                 .as_sequence_mut()
                 .expect("consumer steps")
-                .push(serde_yaml::from_str(&format!("run: {command}\n")).expect("compile plant"));
+                .push(
+                    serde_yaml::from_str(&format!("run: |\n  {command}\n")).expect("compile plant"),
+                );
             assert!(
                 !consumer_refuses_compilation(&planted),
                 "{name} accepted the compile plant {command}"
@@ -836,6 +849,159 @@ fn archive_consumers_refuse_compilation_and_compile_plants() {
         let mut unpoisoned = job.clone();
         unpoisoned["env"]["RUSTC"] = Value::String("rustc".into());
         assert!(!consumer_refuses_compilation(&unpoisoned));
+    }
+}
+
+/// The consumer compares the version line of the cargo-nextest it extracted —
+/// the binary every later step runs — with the producer's record of the packed
+/// binary, after extraction and before trusting the bundle.
+fn restore_binds_packed_nextest(restore: &str) -> bool {
+    let extract =
+        "tar -C \"$RUNNER_TEMP/ci-test-tools\" -xf \"$RUNNER_TEMP/ci-test-files/tools.tar\"";
+    let version = "nextest = subprocess.check_output([os.environ['RUNNER_TEMP'] + \
+                   '/ci-test-tools/cargo-nextest', 'nextest', '--version'], \
+                   text=True).splitlines()[0]";
+    let (Some(extracted), Some(checked)) =
+        (restore.find(extract), restore.find("python3 - <<'PY'"))
+    else {
+        return false;
+    };
+    extracted < checked
+        && restore.contains(version)
+        && restore.contains("nextest=nextest)")
+        && !restore.contains("nextest='")
+        && restore.contains("assert producer == expected, (producer, expected)")
+}
+
+/// Archive consumers replace `cargo test`, which ran every test and killed none:
+/// the systemd unit `--timeout` or the job timeout bounds a hang. A consumer
+/// remapped to the repo root loads its `.config/nextest.toml` and selects
+/// `archive-consumer` (no fail-fast, a slow-timeout that never terminates; the
+/// default profile's overrides apply to it too). The native-twin remap is its own
+/// workspace without that config — nextest's defaults kill nothing — so it only
+/// adds `--no-fail-fast`.
+fn consumer_runs_are_complete(job: &Value, config: &toml::Value) -> Result<(), String> {
+    let profiles = config.get("profile").ok_or("no [profile] tables")?;
+    let profile = profiles
+        .get("archive-consumer")
+        .ok_or("no [profile.archive-consumer]")?;
+    if profile.get("fail-fast").and_then(toml::Value::as_bool) != Some(false) {
+        return Err("archive-consumer must set fail-fast = false".into());
+    }
+    match profile.get("slow-timeout") {
+        Some(toml::Value::String(_)) => {}
+        Some(toml::Value::Table(table)) if !table.contains_key("terminate-after") => {}
+        other => return Err(format!("archive-consumer slow-timeout may kill: {other:?}")),
+    }
+    for scope in ["default", "archive-consumer"] {
+        let Some(scope) = profiles.get(scope) else {
+            continue;
+        };
+        if scope.get("global-timeout").is_some() {
+            return Err("a global-timeout kills archive consumers".into());
+        }
+        let overrides = scope.get("overrides").and_then(toml::Value::as_array);
+        if overrides
+            .into_iter()
+            .flatten()
+            .any(|o| o.get("slow-timeout").is_some())
+        {
+            return Err("an override's slow-timeout reaches archive consumers".into());
+        }
+    }
+    for run in steps(job).iter().filter_map(|step| str_of(step, "run")) {
+        for command in run
+            .lines()
+            .filter(|line| line.contains("cargo-nextest nextest run"))
+        {
+            let tokens: Vec<_> = command.split_whitespace().collect();
+            let has = |pair: [&str; 2]| tokens.windows(2).any(|w| w == pair);
+            let complete = if command.contains("--workspace-remap \"$GITHUB_WORKSPACE\" ") {
+                has(["--profile", "archive-consumer"])
+            } else {
+                tokens.contains(&"--no-fail-fast") && !tokens.contains(&"--profile")
+            };
+            if !complete
+                || tokens
+                    .iter()
+                    .any(|t| matches!(*t, "--fail-fast" | "--max-fail"))
+            {
+                return Err(format!("consumer may stop early or kill a test: {command}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn plant_runs(job: &Value, from: &str, to: &str) -> Value {
+    let mut planted = job.clone();
+    for step in planted["steps"].as_sequence_mut().expect("steps") {
+        let run = str_of(step, "run").map(|run| run.replace(from, to));
+        if let Some(run) = run {
+            step["run"] = Value::String(run);
+        }
+    }
+    planted
+}
+
+#[test]
+fn archive_consumers_run_every_test_without_a_per_test_kill() {
+    let workflow = workflow();
+    let jobs = key(&workflow, "jobs");
+    let text =
+        fs::read_to_string(root().join(".config/nextest.toml")).expect("read nextest config");
+    let config: toml::Value = toml::from_str(&text).expect("parse nextest config");
+    for name in ARCHIVE_CONSUMERS {
+        assert_eq!(
+            consumer_runs_are_complete(key(jobs, name), &config),
+            Ok(()),
+            "{name}"
+        );
+    }
+    // The rootless canary is the one consumer command built outside the workflow.
+    let helper = fs::read_to_string(root().join("scripts/run_cgroup_ceiling_17_2.py"))
+        .expect("read cgroup helper");
+    assert!(helper.contains(
+        "\"--extract-overwrite\", \"--color\", \"never\", \"--profile\", \"archive-consumer\","
+    ));
+    let job = key(jobs, "wasm-host-tests");
+    for (from, to) in [
+        (
+            " --profile archive-consumer --no-capture --test-threads 1 ",
+            " --no-capture --test-threads 1 ",
+        ),
+        (" --color never --no-fail-fast ", " --color never "),
+        (
+            " --profile archive-consumer ",
+            " --profile archive-consumer --fail-fast ",
+        ),
+    ] {
+        let planted = plant_runs(job, from, to);
+        assert_ne!(&planted, job, "consumer plant must change the job: {to}");
+        assert!(
+            consumer_runs_are_complete(&planted, &config).is_err(),
+            "{to}"
+        );
+    }
+    for (from, to) in [
+        (
+            "slow-timeout = { period = \"60s\" }",
+            "slow-timeout = { period = \"60s\", terminate-after = 4 }",
+        ),
+        ("slow-timeout = { period = \"60s\" }\n", ""),
+        (
+            "[profile.archive-consumer]\nfail-fast = false\n",
+            "[profile.archive-consumer]\n",
+        ),
+        (
+            "test-group = \"serial\"\n",
+            "test-group = \"serial\"\nslow-timeout = \"1s\"\n",
+        ),
+    ] {
+        let planted = text.replacen(from, to, 1);
+        assert_ne!(planted, text, "config plant must change the file: {to}");
+        let planted: toml::Value = toml::from_str(&planted).expect("parse planted config");
+        assert!(consumer_runs_are_complete(job, &planted).is_err(), "{to}");
     }
 }
 
@@ -914,7 +1080,7 @@ fn archive_transport_is_same_run_same_arch_and_restores_absolute_paths() {
             "GITHUB_WORKSPACE",
             "HEAD^{tree}",
             "assert producer == expected",
-            "nextest='0.9.149'",
+            "nextest=nextest)",
             "tar -C / -xf",
             "fixtures-debug.tar",
         ] {
@@ -922,6 +1088,23 @@ fn archive_transport_is_same_run_same_arch_and_restores_absolute_paths() {
                 restore.contains(witness),
                 "{name} restores identity-bound files: {witness}"
             );
+        }
+        assert!(
+            restore_binds_packed_nextest(restore),
+            "{name} compares the extracted cargo-nextest's version"
+        );
+        // A literal-vs-literal comparison, or reading the version before the
+        // binary is extracted, no longer binds the binary that will run.
+        let literal = restore.replace("nextest=nextest)", "nextest='0.9.149')");
+        let extract =
+            "tar -C \"$RUNNER_TEMP/ci-test-tools\" -xf \"$RUNNER_TEMP/ci-test-files/tools.tar\"\n";
+        let late = format!("{}{extract}", restore.replacen(extract, "", 1));
+        for planted in [literal, late] {
+            assert_ne!(
+                planted, restore,
+                "{name}: restore plant must change the step"
+            );
+            assert!(!restore_binds_packed_nextest(&planted), "{name}: {planted}");
         }
         for run in steps(job).iter().filter_map(|step| str_of(step, "run")) {
             for command in run
@@ -1046,6 +1229,23 @@ fn producer_families_are_exact(script: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The pack step rewrites the manifest from exactly `{schema, command, fixtures}`
+/// (any other key would be silently dropped), and records the packed
+/// cargo-nextest's own `--version` line — pinned to 0.9.149 — not a literal.
+fn pack_binds_manifest_and_nextest(pack: &str) -> bool {
+    let keys = "assert set(manifest) == {'schema', 'command', 'fixtures'}, sorted(manifest)";
+    let version = "nextest = subprocess.check_output([path, 'nextest', '--version'], \
+                   text=True).splitlines()[0]";
+    matches!(
+        (pack.find(keys), pack.find("manifest_path.write_text(")),
+        (Some(checked), Some(rewritten)) if checked < rewritten
+    ) && pack.contains("archive.add(path, arcname=name, recursive=False)")
+        && pack.contains(version)
+        && pack.contains("assert nextest.startswith('cargo-nextest 0.9.149 '), nextest")
+        && pack.contains("nextest=nextest)")
+        && !pack.contains("nextest='")
+}
+
 #[test]
 fn producer_keeps_package_feature_families_and_nextest_version() {
     let workflow = workflow();
@@ -1087,6 +1287,24 @@ fn producer_keeps_package_feature_families_and_nextest_version() {
     assert!(pack.contains("assert artifact == entry['artifact']"));
     assert!(pack.contains("paths.add(pathlib.Path(entry['path']))"));
     assert!(pack.contains("target/tmp/cgroup-ceiling-fixture"));
+    assert!(pack_binds_manifest_and_nextest(pack));
+    // An extra manifest key the rewrite would drop, or a literal version that
+    // names no binary, must both refuse.
+    for (from, to) in [
+        (
+            "assert set(manifest) == {'schema', 'command', 'fixtures'}, sorted(manifest)\n",
+            "",
+        ),
+        ("nextest=nextest)", "nextest='0.9.149')"),
+        (
+            "assert nextest.startswith('cargo-nextest 0.9.149 '), nextest\n",
+            "",
+        ),
+    ] {
+        let planted = pack.replacen(from, to, 1);
+        assert_ne!(planted, pack, "pack plant must change the step: {from}");
+        assert!(!pack_binds_manifest_and_nextest(&planted), "{from}");
+    }
     // AC2.3: one nextest version across the discipline and nightly workflows.
     let nightly: Value = serde_yaml::from_str(
         &fs::read_to_string(root().join(".github/workflows/journey-nightly.yml"))
@@ -1298,6 +1516,12 @@ fn wasm_archive_keeps_image_matrix_suite_counts_and_all_runtime_markers() {
         if suite != "spawned_scope_17_3c" {
             assert!(run.contains("--required-test \"$name\""));
             assert!(run.contains("\"${required[@]}\""));
+        } else {
+            // No required names: an ignored test only shows as nextest-skipped.
+            assert!(run.contains(
+                "if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:|tests? run: .*, [1-9][0-9]* skipped' \
+                 \"$RUNNER_TEMP/spawned-17-3c.log\"; then"
+            ));
         }
     }
     let run = str_of(

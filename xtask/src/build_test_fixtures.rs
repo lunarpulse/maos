@@ -402,8 +402,8 @@ pub fn write_manifest(path: &Path, entries: &BTreeMap<String, Entry>) -> Result<
             .chain(&entry.inputs)
             .map(|p| p.to_string_lossy())
         {
-            if text.contains(['"', '\\']) {
-                return Err(format!("fixture path {text} contains a quote or backslash"));
+            if text.bytes().any(|b| b == b'"' || b == b'\\' || b < 0x20) {
+                return Err(format!("fixture path {text:?} has quote/backslash/control"));
             }
         }
         merged.insert(name.clone(), entry.clone());
