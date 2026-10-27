@@ -143,6 +143,7 @@ mod gen_termination_corpus;
 mod invariant_lock;
 mod kloc_check;
 mod nfr_onb_1_gate;
+mod prepush;
 mod rebaseline_check;
 mod release_dry_run;
 mod release_verify;
@@ -160,6 +161,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Mirror CI drift checks and workspace tests before pushing a story tree.
+    Prepush {
+        #[arg(long)]
+        json: bool,
+    },
     /// AC2 — Zero-unsafe gate for the capability-validation path.
     CheckUnsafe {
         #[arg(long, default_value = "crates/maos-kernel-core/capability")]
@@ -1127,6 +1133,7 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
+        Commands::Prepush { json } => prepush::run(json),
         Commands::CheckUnsafe { path, json } => check_unsafe::run(&path, json),
         Commands::CheckEmptyKernel {
             path,

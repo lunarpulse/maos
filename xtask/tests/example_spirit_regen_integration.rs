@@ -1,5 +1,4 @@
 use std::process::Command;
-static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn xtask() -> Command {
     Command::new(env!("CARGO_BIN_EXE_xtask"))
@@ -11,9 +10,8 @@ fn workspace_root() -> std::path::PathBuf {
 
 #[test]
 fn check_mode_passes_on_committed_example() {
-    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let output = xtask()
-        .args(["example-spirit-regen", "--check", "--json"])
+        .args(["templates-regen", "--lang", "rust", "--check", "--json"])
         .current_dir(workspace_root())
         .output()
         .expect("xtask should run");
@@ -31,76 +29,57 @@ fn check_mode_passes_on_committed_example() {
 
 #[test]
 fn check_mode_fails_on_drift() {
-    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let root = workspace_root();
-    let lib_path = root.join("examples/example-spirit/src/lib.rs");
-    let original = std::fs::read_to_string(&lib_path).unwrap();
-
-    let drifted = original.clone() + "\n// intentional drift for test\n";
-    std::fs::write(&lib_path, &drifted).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let template = root.join("templates/spirit-rust/src");
+    let example = root.join("examples/example-spirit/src");
+    std::fs::create_dir_all(&template).unwrap();
+    std::fs::create_dir_all(&example).unwrap();
+    std::fs::write(template.join("lib.rs"), "pub struct {{class_name}};\n").unwrap();
+    std::fs::write(
+        root.join("templates/spirit-rust/README.md"),
+        "# {{class_name}} template README\n",
+    )
+    .unwrap();
+    let lib_path = example.join("lib.rs");
+    std::fs::write(&lib_path, "pub struct StaleSpirit;\n").unwrap();
+    let readme_path = root.join("examples/example-spirit/README.md");
+    let caller_readme: &[u8] = b"# Caller-owned README\r\nkeep these bytes\n";
+    std::fs::write(&readme_path, caller_readme).unwrap();
 
     let output = xtask()
-        .args(["example-spirit-regen", "--check"])
-        .current_dir(&root)
+        .args(["templates-regen", "--lang", "rust", "--check"])
+        .current_dir(root)
         .output()
         .expect("xtask should run");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    std::fs::write(&lib_path, &original).unwrap();
 
     assert!(
         !output.status.success(),
         "expected failure on drift, got success. stderr:\n{stderr}"
     );
     assert!(
-        stderr.contains("drift"),
-        "expected 'drift' in error output. stderr:\n{stderr}"
+        stderr.contains("src/lib.rs"),
+        "expected the drifted file in the error output. stderr:\n{stderr}"
     );
-}
-
-#[test]
-fn regen_mode_overwrites_files() {
-    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let root = workspace_root();
-    let tmpdir = tempfile::tempdir().unwrap();
-    let template_dir = tmpdir.path().join("templates/spirit-rust/src");
-    std::fs::create_dir_all(&template_dir).unwrap();
-    std::fs::write(template_dir.join("lib.rs"), "pub struct {{class_name}};").unwrap();
-
-    let example_dir = tmpdir.path().join("examples/example-spirit/src");
-    std::fs::create_dir_all(&example_dir).unwrap();
-    std::fs::write(example_dir.join("lib.rs"), "stale content").unwrap();
-
-    let template_content = "pub struct {{class_name}};";
-    let rendered = template_content.replace("{{class_name}}", "ExampleSpirit");
-
-    std::fs::write(example_dir.join("lib.rs"), &rendered).unwrap();
-    let result = std::fs::read_to_string(example_dir.join("lib.rs")).unwrap();
-    assert_eq!(result, "pub struct ExampleSpirit;");
-}
-
-#[test]
-fn regen_mode_preserves_readme() {
-    let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let root = workspace_root();
-    let readme_path = root.join("examples/example-spirit/README.md");
-    assert!(readme_path.exists(), "README.md should exist before test");
-
-    let output = xtask()
-        .args(["example-spirit-regen"])
-        .current_dir(&root)
+    let regenerated = xtask()
+        .args(["templates-regen", "--lang", "rust"])
+        .current_dir(root)
         .output()
-        .expect("xtask should run");
-
+        .expect("regenerate isolated example");
     assert!(
-        output.status.success(),
-        "regen should succeed. stderr:\n{}",
-        String::from_utf8_lossy(&output.stderr)
+        regenerated.status.success(),
+        "regeneration failed: {}",
+        String::from_utf8_lossy(&regenerated.stderr)
     );
-
-    let readme_content = std::fs::read_to_string(&readme_path).unwrap();
-    assert!(
-        readme_content.contains("Regeneration"),
-        "README should contain Regeneration section (intentional divergence preserved)"
+    assert_eq!(
+        std::fs::read_to_string(&lib_path).unwrap(),
+        "pub struct ExampleSpirit;\n"
+    );
+    assert_eq!(
+        std::fs::read(&readme_path).unwrap(),
+        caller_readme,
+        "regeneration must not overwrite an existing caller-owned README"
     );
 }

@@ -1,0 +1,16 @@
+  Extracting 2 binaries (including 1 non-test binary) and 5 linked paths to /home/runner/work/maos/maos
+   Extracted 47 files to /home/runner/work/maos/maos in 0.33s
+warning: ignoring --test-threads because --no-capture is specified
+────────────
+ Nextest run ID 4d638d1e-b17a-41b2-a01d-01f2f09b9182 with nextest profile: ci
+    Starting 1 test across 1 binary (7 tests skipped)
+       START [         ] (1/1) maos-wasm-host::e2e_roundtrip real_runner_subprocess_adr032_roundtrip_through_guest
+
+running 1 test
+test real_runner_subprocess_adr032_roundtrip_through_guest ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.32s
+
+        PASS [   1.324s] (1/1) maos-wasm-host::e2e_roundtrip real_runner_subprocess_adr032_roundtrip_through_guest
+────────────
+     Summary [   1.324s] 1 test run: 1 passed, 7 skipped

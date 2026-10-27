@@ -25,9 +25,9 @@ jobs:
       # Story 17-1 — journey_j1's delegated Worker runs under real T3.
       - uses: ./.github/actions/provision-t3-test-substrate
 
-      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@v2
         with:
-          tool: nextest
+          tool: cargo-nextest@0.9.149
 
       - name: Build workspace
         run: cargo build --locked --all-targets --workspace
@@ -79,9 +79,9 @@ jobs:
         with:
           key: journey-rerecord-${{ hashFiles('**/Cargo.lock') }}
       - uses: ./.github/actions/provision-t3-test-substrate
-      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@v2
         with:
-          tool: nextest
+          tool: cargo-nextest@0.9.149
 
       - name: Build workspace
         run: cargo build --locked --all-targets --workspace

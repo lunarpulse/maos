@@ -3,6 +3,7 @@
 
 //! Strict native T2 resource-ceiling smoke for a delegated cgroup-v2 runner.
 
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::LazyLock;
@@ -71,11 +72,76 @@ fn delegated_cgroup_present(caps: &ResolvedCaps) -> bool {
 
 static FIXTURE: LazyLock<PathBuf> = LazyLock::new(build_fixture);
 
-/// Build into Cargo's per-target scratch directory (statics are never dropped,
+/// CI consumes the producer's executable; an absent or unusable artifact is
+/// never permission to rebuild. Only a local run without an override compiles.
+fn prebuilt_fixture(path: Option<PathBuf>, declared_ci: bool) -> Option<PathBuf> {
+    let Some(binary) = path else {
+        assert!(
+            !declared_ci,
+            "CI requires MAOS_CGROUP_CEILING_FIXTURE from the artifact producer; refusing rustc fallback"
+        );
+        return None;
+    };
+    let metadata = std::fs::metadata(&binary).unwrap_or_else(|error| {
+        panic!(
+            "MAOS_CGROUP_CEILING_FIXTURE {} is unavailable: {error}",
+            binary.display()
+        )
+    });
+    assert!(
+        metadata.is_file() && metadata.permissions().mode() & 0o111 != 0,
+        "MAOS_CGROUP_CEILING_FIXTURE {} must be a regular executable",
+        binary.display()
+    );
+    Some(binary)
+}
+
+#[test]
+fn prebuilt_fixture_is_used_in_ci_without_compilation() {
+    let binary = std::env::current_exe().expect("current test executable");
+    assert_eq!(prebuilt_fixture(Some(binary.clone()), true), Some(binary));
+}
+
+#[test]
+fn missing_prebuilt_fixture_refuses_ci_but_allows_local_compilation() {
+    assert!(std::panic::catch_unwind(|| prebuilt_fixture(None, true)).is_err());
+    assert_eq!(prebuilt_fixture(None, false), None);
+}
+
+#[test]
+fn configured_prebuilt_fixture_never_falls_back_when_unusable() {
+    let directory = tempfile::tempdir().expect("fixture validation directory");
+    let non_executable = directory.path().join("non-executable");
+    std::fs::write(&non_executable, b"not an executable").expect("fixture validation file");
+    std::fs::set_permissions(&non_executable, std::fs::Permissions::from_mode(0o600))
+        .expect("make fixture non-executable");
+    for path in [
+        directory.path().join("missing"),
+        directory.path().to_path_buf(),
+        non_executable,
+    ] {
+        for declared_ci in [false, true] {
+            assert!(
+                std::panic::catch_unwind(|| prebuilt_fixture(Some(path.clone()), declared_ci))
+                    .is_err(),
+                "an unusable configured fixture must not permit a compiler fallback"
+            );
+        }
+    }
+}
+
+/// Use the producer's executable when configured; otherwise build locally into
+/// Cargo's per-target scratch directory (statics are never dropped,
 /// so a temp-dir guard here would leak a binary per run). Compile under a
 /// private name, then rename: a concurrent run never sees a partial file, and
 /// a fixture that is still executing keeps its own inode.
 fn build_fixture() -> PathBuf {
+    if let Some(binary) = prebuilt_fixture(
+        std::env::var_os("MAOS_CGROUP_CEILING_FIXTURE").map(PathBuf::from),
+        ci::declared_ci(),
+    ) {
+        return binary;
+    }
     let source =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/native/cgroup_ceiling.rs");
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR"));

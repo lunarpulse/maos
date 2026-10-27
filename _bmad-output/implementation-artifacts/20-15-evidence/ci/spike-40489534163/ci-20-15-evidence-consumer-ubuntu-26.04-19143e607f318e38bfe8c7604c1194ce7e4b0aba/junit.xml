@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="1" skipped="0" failures="0" errors="0" uuid="9068b7f8-afad-4ca0-b28f-7780f68997dd" timestamp="2026-10-27T10:36:30.543+00:00" time="2.525">
+    <testsuite name="maos-wasm-host::e2e_roundtrip" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="real_runner_subprocess_adr032_roundtrip_through_guest" classname="maos-wasm-host::e2e_roundtrip" timestamp="2026-10-27T10:36:30.543+00:00" time="2.524"/>
+    </testsuite>
+</testsuites>

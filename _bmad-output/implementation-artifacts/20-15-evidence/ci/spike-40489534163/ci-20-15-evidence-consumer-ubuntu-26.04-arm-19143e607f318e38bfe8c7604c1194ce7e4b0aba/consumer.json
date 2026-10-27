@@ -1,0 +1,29 @@
+{
+  "role": "consumer",
+  "arch": "arm64",
+  "image": "ubuntu-26.04-arm",
+  "machine": "aarch64",
+  "sha": "19143e607f318e38bfe8c7604c1194ce7e4b0aba",
+  "run_id": "40489534163",
+  "run_attempt": "1",
+  "workspace": "/home/runner/work/maos/maos",
+  "producer_workspace": "/home/runner/work/maos/maos",
+  "producer_image": "ubuntu-24.04-arm",
+  "download_step_wall_seconds": 1.271843309,
+  "compiler_guards": {
+    "RUSTC": "/bin/false",
+    "CARGO_BUILD_RUSTC": "/bin/false",
+    "CARGO": "/bin/false"
+  },
+  "extract_seconds": 0.33410178,
+  "identical_producer_files": {
+    "target/debug/deps/e2e_roundtrip-9acdf414beb53c63": "d3141b15f245087db6109768f79bb29ab66376c68da61af7995bf237ae547959",
+    "target/debug/maos-wasm-runner": "4da2f7669cf2e95daf2db7f2e90cb1e990c5d1c214a54297b7253570f933c57c",
+    "tests/fixtures/wasm/echo_spirit_component.wasm": "bb919df904a7542d760ee13d0e452f18a6553122ad5b624313138b7880c86681"
+  },
+  "test": "real_runner_subprocess_adr032_roundtrip_through_guest",
+  "tests_passed": 1,
+  "nextest_extract_and_run_seconds": 2.177191828,
+  "cross_image": true,
+  "result": "passed"
+}

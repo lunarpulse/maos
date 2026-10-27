@@ -15,20 +15,17 @@
 //! `<fixture dir>/maos-wasm-runner-fault-inject` before anything else can
 //! re-uplift `<target>/debug/maos-wasm-runner`.
 //!
-//! **Staleness (review 2026-10-23).** Each manifest entry records `built_at`
-//! (unix seconds at the start of its build) and `inputs`: the source roots of
-//! every local package in the fixture's normal/build dependency closure (from
-//! `cargo metadata`), each package's `Cargo.toml` and `wit/`, the workspace
-//! `Cargo.toml` and the root `wit/`. The harness refuses an artefact any of whose
-//! `.rs`/`.toml`/`.wit` inputs is newer — a plant in fixture code never runs the
-//! old binary.
+//! **Staleness.** `MAOS_FIXTURE_TRANSPORT=1` requires a clean checkout and records
+//! its Git tree and each artefact's Git blob identity in schema 3. The harness
+//! verifies both identities without trusting checkout mtimes. Ordinary own-build
+//! runs intentionally retain the schema-2 `built_at`/`inputs` mtime contract.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// The manifest format the harness parses (`tests/harness/fixtures.rs`).
-const SCHEMA: u64 = 2;
+const SCHEMA: u64 = 3;
 const COMMAND: &str = "cargo run -p xtask -- build-test-fixtures";
 
 /// One fixture build: the cargo arguments and the artefacts it produces.
@@ -45,12 +42,18 @@ struct Fixture {
     artefacts: Vec<(&'static str, PathBuf)>,
 }
 
-/// One manifest entry.
-#[derive(Debug, Clone, PartialEq)]
+/// One manifest entry. Unknown (e.g. renamed provenance) fields are refused,
+/// never dropped by a merge that would rewrite a sealed entry as unsealed.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Entry {
     pub path: PathBuf,
     pub built_at: u64,
     pub inputs: Vec<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tree: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact: Option<String>,
 }
 
 fn s(parts: &[&str]) -> Vec<String> {
@@ -330,21 +333,14 @@ fn package_inputs(metadata: &serde_json::Value, package: &str) -> Result<Vec<Pat
         }
         inputs.insert(manifest);
         for target in pkg["targets"].as_array().unwrap_or(&empty) {
-            let kinds: Vec<&str> = target["kind"]
-                .as_array()
-                .unwrap_or(&empty)
-                .iter()
-                .filter_map(|k| k.as_str())
-                .collect();
+            let kinds = target["kind"].as_array().unwrap_or(&empty);
+            let has_kind = |kind| kinds.iter().any(|value| value.as_str() == Some(kind));
             let Some(src) = target["src_path"].as_str().map(PathBuf::from) else {
                 continue;
             };
-            if kinds.contains(&"custom-build") {
+            if has_kind("custom-build") {
                 inputs.insert(src);
-            } else if !kinds
-                .iter()
-                .any(|k| matches!(*k, "test" | "bench" | "example"))
-            {
+            } else if !["test", "bench", "example"].into_iter().any(has_kind) {
                 inputs.insert(src.parent().map(Path::to_path_buf).unwrap_or(src));
             }
         }
@@ -366,45 +362,35 @@ fn package_inputs(metadata: &serde_json::Value, package: &str) -> Result<Vec<Pat
 pub fn parse_manifest(text: &str) -> Result<BTreeMap<String, Entry>, String> {
     let value: serde_json::Value =
         serde_json::from_str(text).map_err(|e| format!("not JSON: {e}"))?;
-    if value["schema"].as_u64() != Some(SCHEMA) {
+    if !matches!(value["schema"].as_u64(), Some(2 | SCHEMA)) {
         return Err(format!(
             "schema {} is not {SCHEMA} — delete it and run `{COMMAND}`",
             value["schema"]
         ));
     }
-    let fixtures = value["fixtures"]
-        .as_object()
-        .ok_or("no `fixtures` object")?;
-    fixtures
-        .iter()
-        .map(|(name, entry)| -> Result<(String, Entry), String> {
-            let bad = || format!("entry `{name}` is not {{path, built_at, inputs}}");
-            let path = entry["path"].as_str().ok_or_else(bad)?;
-            let built_at = entry["built_at"].as_u64().ok_or_else(bad)?;
-            let inputs = entry["inputs"]
-                .as_array()
-                .ok_or_else(bad)?
-                .iter()
-                .map(|input| input.as_str().map(PathBuf::from).ok_or_else(bad))
-                .collect::<Result<_, _>>()?;
-            Ok((
-                name.clone(),
-                Entry {
-                    path: PathBuf::from(path),
-                    built_at,
-                    inputs,
-                },
-            ))
-        })
-        .collect()
+    let fixtures: BTreeMap<String, Entry> = serde_json::from_value(value["fixtures"].clone())
+        .map_err(|e| format!("invalid fixtures: {e}"))?;
+    for (name, entry) in &fixtures {
+        if entry.tree.is_some() != entry.artifact.is_some()
+            || (value["schema"].as_u64() == Some(2) && entry.tree.is_some())
+            || [&entry.tree, &entry.artifact]
+                .into_iter()
+                .flatten()
+                .any(|id| {
+                    !matches!(id.len(), 40 | 64) || !id.bytes().all(|c| c.is_ascii_hexdigit())
+                })
+        {
+            return Err(format!(
+                "entry `{name}` needs valid schema-3 tree and artifact identities"
+            ));
+        }
+    }
+    Ok(fixtures)
 }
 
-/// Merge `entries` into the manifest at `path` (later builds add to earlier
-/// ones, so CI jobs can build a subset with `--only`). One entry per line,
-/// `"name": {"built_at":…,"inputs":[…],"path":"…"}` — the shape
-/// `tests/harness/fixtures.rs` scans. Written to `manifest.json.tmp`, then
-/// renamed over the manifest. An existing manifest that does not parse is an
-/// error.
+/// Merge entries, accepting schema 2's local mtime entries and writing schema
+/// 3. One compact entry per line is also parsed by the dependency-free harness.
+/// An unreadable or malformed existing manifest is never silently discarded.
 pub fn write_manifest(path: &Path, entries: &BTreeMap<String, Entry>) -> Result<(), String> {
     let mut merged = match std::fs::read_to_string(path) {
         Ok(text) => parse_manifest(&text).map_err(|e| format!("{}: {e}", path.display()))?,
@@ -425,14 +411,11 @@ pub fn write_manifest(path: &Path, entries: &BTreeMap<String, Entry>) -> Result<
     let lines: Vec<String> = merged
         .iter()
         .map(|(name, entry)| {
-            let object = serde_json::json!({
-                "path": entry.path,
-                "built_at": entry.built_at,
-                "inputs": entry.inputs,
-            });
-            format!("    {}: {object}", serde_json::Value::from(name.as_str()))
+            serde_json::to_string(entry)
+                .map(|value| format!("    {}: {value}", serde_json::Value::from(name.as_str())))
+                .map_err(|error| format!("cannot serialize fixture `{name}`: {error}"))
         })
-        .collect();
+        .collect::<Result<_, _>>()?;
     let body = format!(
         "{{\n  \"schema\": {SCHEMA},\n  \"command\": \"{COMMAND}\",\n  \"fixtures\": {{\n{}\n  }}\n}}\n",
         lines.join(",\n")
@@ -450,6 +433,53 @@ fn unix_now() -> Result<u64, String> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .map_err(|e| format!("system clock before the unix epoch: {e}"))
+}
+
+fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("fixture provenance: git {args:?}: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "fixture provenance: git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+/// Own-build mode skips Git; explicit transport refuses dirty source trees.
+pub fn clean_tree(root: &Path, transport: bool) -> Result<Option<String>, String> {
+    if !transport {
+        return Ok(None);
+    }
+    let status = git(
+        root,
+        &["status", "--porcelain", "-uall", "--ignore-submodules=none"],
+    )?;
+    if !status.is_empty() {
+        return Err("fixture transport requires a clean checkout; source tree is dirty".into());
+    }
+    git(root, &["rev-parse", "HEAD^{tree}"]).map(Some)
+}
+
+/// Seal only a build whose initially clean source tree stayed unchanged.
+pub fn artifact(root: &Path, path: &Path, tree: &Option<String>) -> Result<Option<String>, String> {
+    let Some(expected) = tree else {
+        return Ok(None);
+    };
+    if clean_tree(root, true)?.as_ref() != Some(expected) {
+        return Err(
+            "fixture provenance: checkout changed during the build; rebuild fixtures".into(),
+        );
+    }
+    git(
+        root,
+        &["hash-object", "--no-filters", "--", &path_arg(path)],
+    )
+    .map(Some)
 }
 
 pub fn run(release: bool, only: &[String], json: bool) -> Result<(), String> {
@@ -485,6 +515,8 @@ pub fn run(release: bool, only: &[String], json: bool) -> Result<(), String> {
         .filter(|p| p.exists())
         .collect();
     let mut resolved: BTreeMap<PathBuf, serde_json::Value> = BTreeMap::new();
+    let transport = std::env::var("MAOS_FIXTURE_TRANSPORT").as_deref() == Ok("1");
+    let tree = clean_tree(&root, transport)?;
     let mut built = BTreeMap::new();
     for fixture in table
         .iter()
@@ -544,6 +576,8 @@ pub fn run(release: bool, only: &[String], json: bool) -> Result<(), String> {
                     path: artefact.clone(),
                     built_at,
                     inputs: inputs.clone(),
+                    artifact: artifact(&root, artefact, &tree)?,
+                    tree: tree.clone(),
                 },
             );
         }

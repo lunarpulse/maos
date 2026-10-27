@@ -1,0 +1,385 @@
+# T1 ONLY: inert evidence file, not an installed workflow. If authorized, copy
+# this file unchanged to .github/workflows/ci-20-15-spike.yml on ci/20-15-spike.
+# No main/PR/dispatch trigger; never merge this temporary workflow.
+#
+# Scope: a real maos-wasm-host invocation family, not a workspace surrogate.
+# e2e_roundtrip::real_runner_subprocess_adr032_roundtrip_through_guest starts
+# the archived maos-wasm-runner and checks a real Wasmtime component's exact
+# ADR-032/CBOR round trip. Its compile-time CARGO_MANIFEST_DIR also exercises
+# absolute source paths. The checked-in component needs no fixture rebuild,
+# timestamp manipulation, wasm-tools install, or D03 provenance bypass.
+# This T1 does not claim to time the complete D01-C fixtures/release bundle.
+#
+# Assumptions to resolve by the hosted run, NOT observed results:
+# - ubuntu-26.04 and ubuntu-26.04-arm are available to this repository.
+#   They are already used by discipline.yml, but availability is unverified.
+#   An unsupported label must block/fail; never substitute another image.
+# - Hosted runner checkout paths match across both images and architectures.
+# - Ubuntu 24.04 binaries (including nextest) run on 26.04 of the same arch.
+# Upload/download timings bracket Actions steps (include inter-step overhead).
+# Build includes archive packing. A separate tar extraction measures unpacking;
+# the supported nextest archive run re-extracts and its wall includes BOTH
+# extraction and execution (never reported as pure test execution).
+name: ci-20-15-spike
+
+on:
+  push:
+    branches: [ci/20-15-spike]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-20-15-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  MAOS_SECRETS_BACKEND: env
+  NEXTEST_VERSION: '0.9.149'
+  SPIKE_TEST: real_runner_subprocess_adr032_roundtrip_through_guest
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  producer:
+    if: github.ref == 'refs/heads/ci/20-15-spike'
+    name: producer (${{ matrix.arch }}, ${{ matrix.image }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            uname: x86_64
+            image: ubuntu-24.04
+          - arch: arm64
+            uname: aarch64
+            image: ubuntu-24.04-arm
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      SPIKE_ARCH: ${{ matrix.arch }}
+      SPIKE_IMAGE: ${{ matrix.image }}
+      SPIKE_UNAME: ${{ matrix.uname }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      # Deliberately no rust-cache: measure a cold, once-per-arch build.
+      - name: Build one real wasm-host archive and record producer paths
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(uname -m)" = "$SPIKE_UNAME"
+          . /etc/os-release
+          test "$VERSION_ID" = 24.04
+          mkdir -p "$RUNNER_TEMP/spike/bundle" "$RUNNER_TEMP/spike/evidence"
+          cargo-nextest --version | tee "$RUNNER_TEMP/spike/evidence/nextest-version.txt"
+          rustc -vV | tee "$RUNNER_TEMP/spike/evidence/rustc-version.txt"
+          started=$(date +%s%N)
+          # Same package/default features as the existing wasm-host-tests job;
+          # --test selects an actual integration target, not a synthetic test.
+          cargo nextest archive --locked -p maos-wasm-host --test e2e_roundtrip \
+            --archive-file "$RUNNER_TEMP/spike/bundle/wasm-host.tar.zst" \
+            --color never 2>&1 | tee "$RUNNER_TEMP/spike/evidence/build.log"
+          finished=$(date +%s%N)
+          export SPIKE_BUILD_NS="$((finished - started))"
+          # Carry the exact pinned standalone runner, preserving executable mode
+          # inside tar (upload-artifact itself does not preserve Unix modes).
+          tar -C "$(dirname "$(command -v cargo-nextest)")" -cf \
+            "$RUNNER_TEMP/spike/bundle/nextest.tar" cargo-nextest
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, platform, subprocess
+          root = pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()
+          bundle = pathlib.Path(os.environ['RUNNER_TEMP']) / 'spike/bundle'
+          candidates = [p for p in (root / 'target/debug/deps').glob('e2e_roundtrip-*')
+                        if p.is_file() and os.access(p, os.X_OK) and not p.suffix]
+          assert len(candidates) == 1, candidates
+          runner = root / 'target/debug/maos-wasm-runner'
+          fixture = root / 'tests/fixtures/wasm/echo_spirit_component.wasm'
+          assert runner.is_file() and fixture.is_file()
+          def digest(path):
+              with path.open('rb') as stream:
+                  return hashlib.file_digest(stream, 'sha256').hexdigest()
+          record = {
+              'role': 'producer', 'arch': os.environ['SPIKE_ARCH'],
+              'image': os.environ['SPIKE_IMAGE'], 'machine': platform.machine(),
+              'sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
+              'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'workspace': str(root), 'target_dir': str(root / 'target'),
+              'tree': subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+              'nextest_version': os.environ['NEXTEST_VERSION'],
+              'build_and_pack_seconds': int(os.environ['SPIKE_BUILD_NS']) / 1e9,
+              'archive_bytes': (bundle / 'wasm-host.tar.zst').stat().st_size,
+              'files': {str(p.relative_to(root)): digest(p)
+                        for p in (candidates[0], runner, fixture)},
+              'transport_files': {name: digest(bundle / name)
+                                  for name in ('wasm-host.tar.zst', 'nextest.tar')},
+          }
+          (bundle / 'producer.json').write_text(json.dumps(record, indent=2) + '\n')
+          print(json.dumps(record, indent=2))
+          PY
+          ldd target/debug/maos-wasm-runner | tee "$RUNNER_TEMP/spike/evidence/producer-ldd.txt"
+      - name: Start bundle upload clock
+        id: upload-clock
+        run: echo "started_ns=$(date +%s%N)" >> "$GITHUB_OUTPUT"
+      - name: Upload same-commit architecture bundle
+        id: bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-20-15-wasm-host-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/spike/bundle/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+      - name: Record upload timing
+        env:
+          UPLOAD_STARTED_NS: ${{ steps.upload-clock.outputs.started_ns }}
+          BUNDLE_ARTIFACT_ID: ${{ steps.bundle.outputs.artifact-id }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, time
+          base = pathlib.Path(os.environ['RUNNER_TEMP']) / 'spike'
+          record = json.loads((base / 'bundle/producer.json').read_text())
+          record['upload_step_wall_seconds'] = (time.time_ns() - int(os.environ['UPLOAD_STARTED_NS'])) / 1e9
+          record['bundle_artifact_id'] = os.environ['BUNDLE_ARTIFACT_ID']
+          (base / 'evidence/producer.json').write_text(json.dumps(record, indent=2) + '\n')
+          print(json.dumps(record, indent=2))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('### Producer ' + record['arch'] + '\n```json\n' + json.dumps(record, indent=2) + '\n```\n')
+          PY
+      - name: Preserve producer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-20-15-evidence-producer-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/spike/evidence/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+
+  consumer:
+    if: github.ref == 'refs/heads/ci/20-15-spike'
+    needs: [producer]
+    name: consumer (${{ matrix.image }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            uname: x86_64
+            version: '24.04'
+            image: ubuntu-24.04
+          - arch: x64
+            uname: x86_64
+            version: '26.04'
+            image: ubuntu-26.04
+          - arch: arm64
+            uname: aarch64
+            version: '24.04'
+            image: ubuntu-24.04-arm
+          - arch: arm64
+            uname: aarch64
+            version: '26.04'
+            image: ubuntu-26.04-arm
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 15
+    env:
+      RUSTC: /bin/false
+      CARGO_BUILD_RUSTC: /bin/false
+      CARGO: /bin/false
+      SPIKE_ARCH: ${{ matrix.arch }}
+      SPIKE_IMAGE: ${{ matrix.image }}
+      SPIKE_UNAME: ${{ matrix.uname }}
+      SPIKE_OS_VERSION: ${{ matrix.version }}
+    steps:
+      # No Rust toolchain, cargo install, build command, cache, or fallback.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Start bundle download clock
+        id: download-clock
+        run: |
+          mkdir -p "$RUNNER_TEMP/spike/evidence"
+          echo "started_ns=$(date +%s%N)" >> "$GITHUB_OUTPUT"
+      - name: Download only this run's same-commit architecture bundle
+        uses: actions/download-artifact@v4
+        with:
+          # No repository/token/run-id: download-artifact defaults to THIS run.
+          name: ci-20-15-wasm-host-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/spike/bundle
+      - name: Record download timing and require exact producer identity and paths
+        env:
+          DOWNLOAD_STARTED_NS: ${{ steps.download-clock.outputs.started_ns }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(uname -m)" = "$SPIKE_UNAME"
+          . /etc/os-release
+          test "$VERSION_ID" = "$SPIKE_OS_VERSION"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, platform, subprocess, time
+          now = time.time_ns()
+          base = pathlib.Path(os.environ['RUNNER_TEMP']) / 'spike'
+          producer = json.loads((base / 'bundle/producer.json').read_text())
+          for key, value in [('sha', os.environ['GITHUB_SHA']),
+                             ('run_id', os.environ['GITHUB_RUN_ID']),
+                             ('run_attempt', os.environ['GITHUB_RUN_ATTEMPT']),
+                             ('arch', os.environ['SPIKE_ARCH']),
+                             ('workspace', str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve())),
+                             ('nextest_version', os.environ['NEXTEST_VERSION']),
+                             ('tree', subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip())]:
+              assert producer[key] == value, (key, producer[key], value)
+          for name, expected in producer['transport_files'].items():
+              with (base / 'bundle' / name).open('rb') as stream:
+                  assert hashlib.file_digest(stream, 'sha256').hexdigest() == expected, name
+          record = {
+              'role': 'consumer', 'arch': os.environ['SPIKE_ARCH'],
+              'image': os.environ['SPIKE_IMAGE'], 'machine': platform.machine(),
+              'sha': producer['sha'], 'run_id': producer['run_id'],
+              'run_attempt': producer['run_attempt'],
+              'workspace': os.environ['GITHUB_WORKSPACE'],
+              'producer_workspace': producer['workspace'], 'producer_image': producer['image'],
+              'download_step_wall_seconds': (now - int(os.environ['DOWNLOAD_STARTED_NS'])) / 1e9,
+              'compiler_guards': {key: os.environ[key] for key in ('RUSTC', 'CARGO_BUILD_RUSTC', 'CARGO')},
+          }
+          (base / 'evidence/consumer.json').write_text(json.dumps(record, indent=2) + '\n')
+          print(json.dumps(record, indent=2))
+          PY
+      - name: Extract archive at the producer absolute workspace path
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/spike/tools"
+          tar -C "$RUNNER_TEMP/spike/tools" -xf "$RUNNER_TEMP/spike/bundle/nextest.tar"
+          "$RUNNER_TEMP/spike/tools/cargo-nextest" --version
+          started=$(date +%s%N)
+          # nextest archives have target/... members relative to the workspace.
+          # Preserve that layout; producer-file hashes below enforce it.
+          tar --zstd -xvf "$RUNNER_TEMP/spike/bundle/wasm-host.tar.zst" \
+            -C "$GITHUB_WORKSPACE" 2>&1 | tee "$RUNNER_TEMP/spike/evidence/extract.log"
+          finished=$(date +%s%N)
+          export SPIKE_EXTRACT_NS="$((finished - started))"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          base = pathlib.Path(os.environ['RUNNER_TEMP']) / 'spike'
+          root = pathlib.Path(os.environ['GITHUB_WORKSPACE'])
+          producer = json.loads((base / 'bundle/producer.json').read_text())
+          for name, expected in producer['files'].items():
+              path = root / name
+              with path.open('rb') as stream:
+                  assert hashlib.file_digest(stream, 'sha256').hexdigest() == expected, str(path)
+              print('IDENTICAL_PRODUCER_FILE', path, expected)
+          record_path = base / 'evidence/consumer.json'
+          record = json.loads(record_path.read_text())
+          record['extract_seconds'] = int(os.environ['SPIKE_EXTRACT_NS']) / 1e9
+          record['identical_producer_files'] = producer['files']
+          record_path.write_text(json.dumps(record, indent=2) + '\n')
+          PY
+          ldd "$GITHUB_WORKSPACE/target/debug/maos-wasm-runner" | tee "$RUNNER_TEMP/spike/evidence/consumer-ldd.txt"
+      - name: Run real Wasmtime subprocess round trip with compiler and cargo disabled
+        run: |
+          set -euo pipefail
+          printf 'RUSTC=%s CARGO_BUILD_RUSTC=%s CARGO=%s\n' "$RUSTC" "$CARGO_BUILD_RUSTC" "$CARGO"
+          # The explicit existing ci profile enables target/nextest/ci/junit.xml.
+          # Remove any transported report so only THIS invocation can prove green.
+          rm -f "$GITHUB_WORKSPACE/target/nextest/ci/junit.xml"
+          started=$(date +%s%N)
+          "$RUNNER_TEMP/spike/tools/cargo-nextest" nextest run \
+            --archive-file "$RUNNER_TEMP/spike/bundle/wasm-host.tar.zst" \
+            --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" \
+            --extract-overwrite --config-file "$GITHUB_WORKSPACE/.config/nextest.toml" \
+            --profile ci --color never --test-threads 1 --no-capture \
+            -E "binary_id(maos-wasm-host::e2e_roundtrip) & test(=$SPIKE_TEST)" \
+            2>&1 | tee "$RUNNER_TEMP/spike/evidence/test.log"
+          finished=$(date +%s%N)
+          export SPIKE_RUN_NS="$((finished - started))"
+          python3 - <<'PY'
+          import json, os, pathlib, xml.etree.ElementTree as ET
+          base = pathlib.Path(os.environ['RUNNER_TEMP']) / 'spike'
+          junit = pathlib.Path(os.environ['GITHUB_WORKSPACE']) / 'target/nextest/ci/junit.xml'
+          cases = ET.parse(junit).getroot().findall('.//testcase')
+          assert len(cases) == 1, [(c.attrib) for c in cases]
+          case = cases[0]
+          assert case.attrib['name'] == os.environ['SPIKE_TEST'], case.attrib
+          assert not any(case.find(tag) is not None for tag in ('failure', 'error', 'skipped')), ET.tostring(case)
+          # A green command with zero tests, a SKIP, or a hidden rebuild is not proof.
+          for name in ('extract.log', 'test.log'):
+              for line in (base / 'evidence' / name).read_text().splitlines():
+                  assert not line.lstrip().startswith(('Compiling ', 'Finished ', 'SKIP:', 'SKIP ')), line
+          (base / 'evidence/junit.xml').write_bytes(junit.read_bytes())
+          path = base / 'evidence/consumer.json'
+          record = json.loads(path.read_text())
+          record.update(test=os.environ['SPIKE_TEST'], tests_passed=1,
+                        nextest_extract_and_run_seconds=int(os.environ['SPIKE_RUN_NS']) / 1e9,
+                        cross_image=record['image'] != record['producer_image'],
+                        result='passed')
+          path.write_text(json.dumps(record, indent=2) + '\n')
+          print('ARCHIVE_REAL_WASM_PROOF ' + json.dumps(record, sort_keys=True))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('### Consumer ' + record['image'] + '\n```json\n' + json.dumps(record, indent=2) + '\n```\n')
+          PY
+      - name: Preserve consumer evidence even when a proof fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-20-15-evidence-consumer-${{ matrix.image }}-${{ github.sha }}
+          path: ${{ runner.temp }}/spike/evidence/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+
+  report:
+    if: always() && github.ref == 'refs/heads/ci/20-15-spike'
+    needs: [producer, consumer]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ci-20-15-evidence-*-${{ github.sha }}
+          path: ${{ runner.temp }}/spike-report
+      - name: Require both architectures and all four real runtime proofs
+        env:
+          PRODUCER_RESULT: ${{ needs.producer.result }}
+          CONSUMER_RESULT: ${{ needs.consumer.result }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          base = pathlib.Path(os.environ['RUNNER_TEMP']) / 'spike-report'
+          producers = [json.loads(p.read_text()) for p in base.glob('*/producer.json')]
+          consumers = [json.loads(p.read_text()) for p in base.glob('*/consumer.json')]
+          records = producers + consumers
+          # Print partial records before assertions so a failure is diagnosable.
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('## T1 hosted archive evidence\n')
+              out.write('Transport timing is bracketed Actions-step wall, not pure network time.\n')
+              out.write('```json\n' + json.dumps(records, indent=2) + '\n```\n')
+          print(json.dumps(records, indent=2))
+          assert os.environ['PRODUCER_RESULT'] == 'success', os.environ['PRODUCER_RESULT']
+          assert os.environ['CONSUMER_RESULT'] == 'success', os.environ['CONSUMER_RESULT']
+          assert len(producers) == 2 and {r['arch'] for r in producers} == {'x64', 'arm64'}
+          assert len(consumers) == 4 and {r['image'] for r in consumers} == {
+              'ubuntu-24.04', 'ubuntu-26.04', 'ubuntu-24.04-arm', 'ubuntu-26.04-arm'}
+          assert len({r['workspace'] for r in records}) == 1, 'D04 absolute paths differ across images/architectures'
+          for r in records:
+              assert r['sha'] == os.environ['GITHUB_SHA']
+              assert r['run_id'] == os.environ['GITHUB_RUN_ID']
+              assert r['run_attempt'] == os.environ['GITHUB_RUN_ATTEMPT']
+          for r in consumers:
+              assert r['result'] == 'passed' and r['tests_passed'] == 1, r
+              assert r['workspace'] == r['producer_workspace'], r
+              assert set(r['compiler_guards'].values()) == {'/bin/false'}, r
+          assert {r['arch'] for r in consumers if r['cross_image']} == {'x64', 'arm64'}
+          print('T1_PROVED: identical absolute workspace on both arches; 24.04 archives ran real Wasmtime subprocess tests on all four images with compiler/cargo disabled')
+          PY

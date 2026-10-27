@@ -1,0 +1,36 @@
+# 20-16 creation, 2026-10-27 @ 84e0e659, local dev host (32 cores), CI/GITHUB_ACTIONS unset, CARGO_TARGET_DIR=/mnt/build/cargo, xtask already built.
+# check	command	exit	wall_ms
+stability-matrix	cargo run -q --locked -p xtask -- stability-matrix --check	0	597
+error-catalog-check	cargo run -q --locked -p xtask -- error-catalog-check	0	788
+gen-abi-docs	cargo run -q --locked -p xtask -- gen-abi-docs --check	0	3536
+check-serde-error-handling	cargo run -q --locked -p xtask -- check-serde-error-handling	0	592
+check-workspace-count	cargo run -q --locked -p xtask -- check-workspace-count	0	266
+check-coverage-matrix-completeness	cargo run -q --locked -p xtask -- check-coverage-matrix-completeness	0	268
+check-manifest-schema-version	cargo run -q --locked -p xtask -- check-manifest-schema-version	0	259
+check-skill-schema	cargo run -q --locked -p xtask -- check-skill-schema	0	272
+check-test-cost	cargo run -q --locked -p xtask -- check-test-cost	0	556
+check-env-contract	cargo run -q --locked -p xtask -- check-env-contract	0	685
+check-unsafe	cargo run -q --locked -p xtask -- check-unsafe	0	274
+check-service-boundary	cargo run -q --locked -p xtask -- check-service-boundary	0	1500
+check-kernel-baseline	cargo run -q --locked -p xtask -- check-kernel-baseline	0	269
+kloc-check	cargo run -q --locked -p xtask -- kloc-check	0	448
+check-breaking-md	cargo run -q --locked -p xtask -- check-breaking-md	0	294
+check-composition-root-completeness	cargo run -q --locked -p xtask -- check-composition-root-completeness	0	301
+check-pub-field-constructors	cargo run -q --locked -p xtask -- check-pub-field-constructors	0	497
+check-dependency-closure	cargo run -q --locked -p xtask -- check-dependency-closure	0	492
+check-deprecations-declared	cargo run -q --locked -p xtask -- check-deprecations-declared	0	619
+coverage-matrix	cargo run -q --locked -p xtask -- coverage-matrix	0	259
+check-corpus	cargo run -q --locked -p xtask -- check-corpus	0	336
+fmt	cargo fmt --all -- --check	0	2561
+# subtotal, 22 checks: 15669 ms
+docs-troubleshoot-bidi	node docs-site/scripts/gate-troubleshoot-bidi.js (incl. route-manifest error_codes parity)	0	90
+docs-glossary-lock	LOCALE=ko node docs-site/scripts/gate-glossary-lock.js	0	92
+docs-anchor-ids	node docs-site/scripts/gate-anchor-ids.js	0	91
+docs-ko-coverage	LOCALE=ko KO_COVERAGE_MIN=100 node docs-site/scripts/gate-ko-coverage.js	0	61
+docs-build	node node_modules/.bin/docusaurus build (webpack cache warm)	0	7000
+docs-routes	node docs-site/scripts/gate-routes.js (needs build/)	0	106
+# nextest legs (from the same warm target dir; after `cargo nextest archive --workspace`)
+nextest-workspace	cargo nextest run --workspace --locked --no-fail-fast	0	45000	# 5072 passed, 135 skipped; test phase 40.4 s
+nextest-maos-bin	cargo nextest run --locked -p maos-bin --no-fail-fast	0	92000	# 602 passed, 14 skipped; ~70 s rebuild under -p resolution
+nextest-xtask	cargo nextest run --locked -p xtask --no-fail-fast	0	49000	# 1105 passed, 12 skipped
+nextest-maos-skill	cargo nextest run --locked -p maos-skill --no-fail-fast	0	4000	# 62 passed

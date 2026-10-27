@@ -28,8 +28,8 @@
 //! An empty reason is a finding in both markers and in the `#[ignore]`.
 //!
 //! The scan is line-based over rustfmt-formatted sources (`check-fmt` enforces
-//! the shape): an item's body ends at the first line holding only `}` at the
-//! item's own indentation.
+//! the shape): an item ends at its own indentation with `}` (functions) or `;`
+//! (static initializers), including items completed on their declaration line.
 
 use crate::check_test_budget::{load_budgets, Budgets, BUDGETS_PATH};
 use std::collections::{BTreeMap, BTreeSet};
@@ -170,10 +170,9 @@ fn items<'a>(lines: &[&'a str]) -> Vec<Item<'a>> {
                 break;
             }
         }
-        let closer = format!("{}}}", " ".repeat(depth));
         let end = lines[decl..]
             .iter()
-            .position(|l| l.trim_end() == closer || l.trim_end() == format!("{closer};"))
+            .position(|l| indent(l) == depth && l.trim_end().ends_with(['}', ';']))
             .map_or(lines.len() - 1, |offset| decl + offset);
         out.push(Item {
             name,
@@ -341,7 +340,7 @@ fn scan_file(rel: &str, text: &str, findings: &mut Vec<Finding>) -> Scan {
         // The innermost enclosing item.
         let Some(owner) = items
             .iter()
-            .filter(|item| item.decl < index && index <= item.end)
+            .filter(|item| item.decl <= index && index <= item.end)
             .max_by_key(|item| item.decl)
         else {
             finding(
@@ -372,7 +371,7 @@ fn scan_file(rel: &str, text: &str, findings: &mut Vec<Finding>) -> Scan {
                 if reached.iter().any(|r| std::ptr::eq(*r, item)) {
                     continue;
                 }
-                let names_reached = lines[item.decl + 1..=item.end]
+                let names_reached = lines[item.decl..=item.end]
                     .iter()
                     .any(|body| reached.iter().any(|r| contains_word(body, r.name)));
                 if names_reached {
@@ -515,7 +514,7 @@ pub fn audit_with(root: &Path, budgets: &Budgets) -> Report {
 
 /// The non-comment lines of job `job` in `workflow` (from its `  <job>:` header
 /// to the next line at job-key indentation or shallower), or `None`.
-fn job_block<'a>(workflow: &'a str, job: &str) -> Option<Vec<&'a str>> {
+pub(crate) fn job_block<'a>(workflow: &'a str, job: &str) -> Option<Vec<&'a str>> {
     let header = format!("  {job}:");
     let mut lines = workflow
         .lines()

@@ -243,6 +243,48 @@ fn marked_ignored_and_registered_is_green_and_feeds_the_ci_filter() {
     );
 }
 
+fn static_helper_test(ignore: &str) -> String {
+    format!(
+        "fn build() {{\n\
+         \x20   // expensive: builds the tree\n\
+         \x20   let _ = {call}.arg(\"build\").status();\n\
+         }}\n\
+         static FIXTURE: LazyLock<()> = LazyLock::new(build);\n\
+         \n\
+         #[test]\n\
+         {ignore}fn uses_fixture() {{\n\
+         \x20   let _ = &*FIXTURE;\n\
+         }}\n",
+        call = cargo_call()
+    )
+}
+
+#[test]
+fn a_single_line_static_connects_its_helper_to_an_ignored_test() {
+    let source = format!(
+        "static UNRELATED: LazyLock<()> = LazyLock::new(|| ());\n{}\n\
+         #[test]\nfn unrelated() {{\n    let _ = &*UNRELATED;\n}}\n",
+        static_helper_test("#[ignore = \"expensive: builds the tree\"]\n")
+    );
+    let report = audit(&source, REGISTERED);
+    assert_green(&report);
+    assert_eq!(report.cargo_call_sites, 1);
+    assert_eq!(report.expensive_tests["foo::bar"], ["uses_fixture"]);
+    // An unused static must not inherit references from the following items.
+    let unused = source.replace("let _ = &*FIXTURE;", "assert!(true);");
+    assert_red_at(&audit(&unused, REGISTERED), 4, "no test reaches `build`");
+}
+
+#[test]
+fn an_ordinary_test_reaching_a_single_line_static_reds_at_that_test() {
+    let report = audit(&static_helper_test(""), EMPTY);
+    assert_red_at(
+        &report,
+        8,
+        "test `uses_fixture` reaches the marked cargo call via `build`",
+    );
+}
+
 #[test]
 fn a_cargo_query_for_tree_stays_in_the_default_run() {
     let report = audit(

@@ -25,7 +25,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  CARGO_TERM_COLOR: always
+  CARGO_TERM_COLOR: never
   TOKEI_VERSION: "14.0.0"
   CARGO_DENY_VERSION: "0.19.4"
   CARGO_PUBLIC_API_VERSION: "0.51.0"
@@ -1982,7 +1982,160 @@ jobs:
   # 2's store through the FR4 view (`scripts/epic_17_exit_line2b.py`). A red line
   # is fixed at its origin, never masked. No macOS image: the `macos-check` job
   # is the only macOS job.
+  # Story 20-15: Ubuntu 24.04 is the oldest shipped runtime. Build once per
+  # architecture; each package/features invocation keeps its own archive (never
+  # a workspace-feature-unified substitute). Artifacts are scoped to this run.
+  ci-test-producer:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            image: ubuntu-24.04
+          - arch: arm64
+            image: ubuntu-24.04-arm
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 120
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      MAOS_FIXTURE_TRANSPORT: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Install pinned WASM fixture assembler
+        run: cargo install --locked wasm-tools --version 1.259.0
+      - name: Build invocation-family nextest archives
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-test-archives" "$RUNNER_TEMP/ci-test-files"
+          cargo nextest archive --locked -p maos-bin --features network,wasm-host \
+            --test spawned_scope_17_3c --test worker_resource_limits_17_2 \
+            --test live_escape_anomaly_17_10 --test recall_17_3d --test participant_recall_17_8 \
+            --test smoke_cli_wrapper_8_12 \
+            --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst"
+          cargo nextest archive --locked -p maos-bin --features network \
+            --test worker_terminal_facts_17_7 --test cli_wrapper_exhaustion_17_9 \
+            --test observer_live_17_4 --test observer_activity_corpus_17_4 \
+            --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst"
+          cargo nextest archive --locked -p maos-kernel-core \
+            --test cgroup_ceiling_smoke --test sandbox_enforcement_linux --test bridge_t2_route_17_6 \
+            --archive-file "$RUNNER_TEMP/ci-test-archives/kernel.tar.zst"
+          cargo nextest archive --locked -p maos-wasm-host --test t2_sandbox_kill \
+            --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst"
+          cargo nextest archive --locked -p maos-escape-detector \
+            --archive-file "$RUNNER_TEMP/ci-test-archives/escape-detector.tar.zst"
+          cargo nextest archive --locked -p maos-host -p maos-wasm-host \
+            --archive-file "$RUNNER_TEMP/ci-test-archives/host-wasm-host.tar.zst"
+          cargo nextest archive --locked \
+            --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml \
+            --archive-file "$RUNNER_TEMP/ci-test-archives/native-twin.tar.zst"
+      - name: Build the release CLI invocation families
+        run: |
+          set -euo pipefail
+          cargo build --locked --release -p maos-bin -p maos-wasm-host \
+            --features maos-bin/wasm-host --bin maos --bin maos-wasm-runner
+          tar -C / -cf "$RUNNER_TEMP/ci-test-files/release-epic17.tar" \
+            "${GITHUB_WORKSPACE#/}/target/release/maos" \
+            "${GITHUB_WORKSPACE#/}/target/release/maos-wasm-runner"
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p maos-cli --bin maosctl
+          tar -C / -cf "$RUNNER_TEMP/ci-test-files/release-wasm-host.tar" \
+            "${GITHUB_WORKSPACE#/}/target/release/maos" \
+            "${GITHUB_WORKSPACE#/}/target/release/maos-wasm-runner" \
+            "${GITHUB_WORKSPACE#/}/target/release/maosctl"
+      - name: Build the fixtures and debug exit binaries
+        run: |
+          set -euo pipefail
+          cargo build --locked -p maos-bin --bin maos
+          cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin,maosctl,worker-cli-fixture
+          mkdir -p target/tmp
+          rustc --edition=2021 -C opt-level=1 --crate-name cgroup_ceiling_fixture \
+            crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs \
+            -o target/tmp/cgroup-ceiling-fixture
+          if [ '${{ matrix.arch }}' = x64 ]; then
+            RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked \
+              -p worker --bin worker-probe-fixture --target x86_64-unknown-linux-gnu
+          fi
+      - name: Pack exact producer fixtures, tools and identity
+        env:
+          BUNDLE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, shutil, subprocess, tarfile
+          root = pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()
+          bundle = pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files'
+          tree = subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip()
+          manifest_path = root / 'target/maos-fixtures/manifest.json'
+          manifest = json.loads(manifest_path.read_text())
+          assert manifest['schema'] == 3, manifest['schema']
+          # Archive extraction can replace the profile's runner with a different
+          # family build. Keep the fixture's verified bytes at an immutable path;
+          # profile_binary entries (maosctl/worker fixtures) stay profile-coupled.
+          runner = manifest['fixtures']['maos-wasm-runner']
+          stable_runner = root / 'target/maos-fixtures/maos-wasm-runner'
+          shutil.copy2(runner['path'], stable_runner)
+          runner['path'] = str(stable_runner)
+          entries = [f'    {json.dumps(name)}: {json.dumps(entry, separators=(",", ":"))}'
+                     for name, entry in sorted(manifest['fixtures'].items())]
+          manifest_path.write_text(
+              '{\n  "schema": 3,\n  "command": ' + json.dumps(manifest['command']) +
+              ',\n  "fixtures": {\n' + ',\n'.join(entries) + '\n  }\n}\n')
+          paths = {manifest_path, root / 'target/debug/maos',
+                   root / 'target/debug/maos-wasm-runner',
+                   root / 'target/tmp/cgroup-ceiling-fixture'}
+          for name, entry in manifest['fixtures'].items():
+              assert entry.get('tree') == tree and entry.get('artifact'), (name, entry)
+              artifact = subprocess.check_output(
+                  ['git', 'hash-object', '--no-filters', '--', entry['path']], cwd=root, text=True).strip()
+              assert artifact == entry['artifact'], (name, entry)
+              paths.add(pathlib.Path(entry['path']))
+          if os.environ['BUNDLE_ARCH'] == 'x64':
+              paths.add(root / 'target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture')
+          with tarfile.open(bundle / 'fixtures-debug.tar', 'w') as archive:
+              for path in sorted(paths):
+                  assert path.is_file(), str(path)
+                  archive.add(path, arcname=str(path).lstrip('/'), recursive=False)
+          with tarfile.open(bundle / 'tools.tar', 'w') as archive:
+              for name in ('cargo-nextest', 'wasm-tools'):
+                  path = shutil.which(name)
+                  assert path, name
+                  archive.add(path, arcname=name, recursive=False)
+          identity = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
+                          arch=os.environ['BUNDLE_ARCH'], workspace=str(root), tree=tree,
+                          nextest='0.9.149')
+          (bundle / 'producer.json').write_text(json.dumps(identity) + '\n')
+          PY
+      - name: Upload same-run architecture archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-archives-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-archives/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+      - name: Upload same-run architecture fixtures and binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-files-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-files/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+
   epic-17-exit:
+    needs: [ci-test-producer]
     strategy:
       fail-fast: false
       # 20-12 AC4 — KEPT at both x64 T3 images: the Epic-17 exit lines are product claims per shipped T3 image.
@@ -1991,6 +2144,11 @@ jobs:
     runs-on: ${{ matrix.image }}
     timeout-minutes: 120
     env:
+      RUSTC: /bin/false
+      CARGO_BUILD_RUSTC: /bin/false
+      CARGO: /bin/false
+      MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
+      MAOS_FIXTURE_TRANSPORT: '1'
       EPIC17_TERMINAL_SUITE_TESTS: 31
       EPIC17_TERMINAL_REQUIRED_TESTS: |
         root_crash::root_crash_retains_stopped_container_and_purge_reports_it
@@ -2029,21 +2187,40 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
+          name: ci-test-archives-x64-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-archives
+      - uses: actions/download-artifact@v4
         with:
-          key: epic-17-exit-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+          name: ci-test-files-x64-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-files
+      - name: Restore exact producer workspace files
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
+                          arch='x64', workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
+                          tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+                          nextest='0.9.149')
+          assert producer == expected, (producer, expected)
+          PY
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
+          echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
+          tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
+          tar -C / -xf "$RUNNER_TEMP/ci-test-files/release-epic17.tar"
       # ubuntu-26.04's /tmp is a quota-limited tmpfs (actions/runner-images#14777).
       - name: Keep build and image temporaries off /tmp
         run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: ./.github/actions/provision-t3-test-substrate
       - name: Build the Worker root and the static probe fixture
         run: |
-          cargo build --locked -p maos-bin --bin maos
-          cargo build --locked -p maos-cli --bin maosctl
-          RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked -p worker --bin worker-probe-fixture --target x86_64-unknown-linux-gnu
+          test -x target/debug/maos
+          test -x target/debug/maosctl
+          test -x target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture
       - name: Record T3 runtime versions
         run: |
           podman version
@@ -2052,23 +2229,26 @@ jobs:
           podman info --format '{{.Host.CgroupManager}}'
           uname -r
       - name: Build terminal-facts scene prerequisites
-        # The delegated runner builds `--offline`; fetch the locked graph first.
         run: |
-          cargo build --locked -p worker --bin worker-cli-fixture
-          cargo fetch --locked
+          test -x target/debug/worker-cli-fixture
       - name: Epic-17 exit line 4 — retained T3 terminal facts (Story 17-7)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network
+          NEXTEST_ARCHIVE_TESTS: worker_terminal_facts_17_7
+          MAOS_CGROUP_CANARY_ARCHIVE: ${{ runner.temp }}/ci-test-archives/maos-bin-network-wasm.tar.zst
         run: |
           set +e
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-terminal --timeout 1800 --rootless-canary -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network --test worker_terminal_facts_17_7 -- --nocapture --test-threads=1 2>&1 | tee worker-terminal-facts.log; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::worker_terminal_facts_17_7)" 2>&1 | tee "$RUNNER_TEMP/worker-terminal-facts.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           required_tests=()
           while IFS= read -r test_name; do
             if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
           done <<< "${EPIC17_TERMINAL_REQUIRED_TESTS}"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count "${EPIC17_TERMINAL_SUITE_TESTS}" "${required_tests[@]}" worker-terminal-facts.log || rc=1
-          if grep -Eq 'SKIP|^test [^ ]+ \.\.\. ignored' worker-terminal-facts.log || grep -Eq '^test result:.*ignored: [1-9][0-9]*|^test result:.*0 passed' worker-terminal-facts.log; then
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count "${EPIC17_TERMINAL_SUITE_TESTS}" "${required_tests[@]}" "$RUNNER_TEMP/worker-terminal-facts.log" || rc=1
+          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:' "$RUNNER_TEMP/worker-terminal-facts.log"; then
             rc=1
             echo "::error title=Epic-17 exit line 4 (${{ matrix.image }})::SKIP, ignored, or zero tests"
           fi
@@ -2077,7 +2257,7 @@ jobs:
         if: always()
         with:
           name: epic-17-terminal-${{ matrix.image }}
-          path: worker-terminal-facts.log
+          path: ${{ runner.temp }}/worker-terminal-facts.log
           if-no-files-found: warn
       # Story 17-9 (AC5.5, D-17-9-FW-06 A) — a CLI-wrapper spawn whose Worker
       # pid's issuance window is exhausted REFUSES on the local and the remote
@@ -2087,10 +2267,15 @@ jobs:
       # marker is required; SKIP, ignored and zero-test runs are refused.
       - name: CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network
+          NEXTEST_ARCHIVE_TESTS: cli_wrapper_exhaustion_17_9
+          MAOS_CGROUP_CANARY_ARCHIVE: ${{ runner.temp }}/ci-test-archives/maos-bin-network-wasm.tar.zst
         run: |
           set +e
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-cli-quota-17-9 --timeout 1800 --rootless-canary -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network --test cli_wrapper_exhaustion_17_9 -- --nocapture --test-threads=1 2>&1 | tee cli-wrapper-exhaustion.log; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::cli_wrapper_exhaustion_17_9)" 2>&1 | tee "$RUNNER_TEMP/cli-wrapper-exhaustion.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           required_tests=()
           for name in remote_exhaustion_refuses_before_workload \
@@ -2099,18 +2284,18 @@ jobs:
                       absent_grant_is_policy_denied_even_with_spent_quota; do
             required_tests+=(--required-test "$name")
           done
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 "${required_tests[@]}" cli-wrapper-exhaustion.log || rc=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 "${required_tests[@]}" "$RUNNER_TEMP/cli-wrapper-exhaustion.log" || rc=1
           for marker in 'CLI-QUOTA-17-9 remote exhaustion refused before workload' \
                         'CLI-QUOTA-17-9 local exhaustion refused before workload' \
                         'CLI-QUOTA-17-9 absent grant D1 completed without token' \
                         'CLI-QUOTA-17-9 absent grant policy denial precedes quota'; do
-            grep -qF -- "$marker" cli-wrapper-exhaustion.log || { rc=1; echo "::error title=17-9 CLI quota (${{ matrix.image }})::missing marker '${marker}'"; }
+            grep -qF -- "$marker" "$RUNNER_TEMP/cli-wrapper-exhaustion.log" || { rc=1; echo "::error title=17-9 CLI quota (${{ matrix.image }})::missing marker '${marker}'"; }
           done
-          if grep -Eq 'SKIP|^test [^ ]+ \.\.\. ignored' cli-wrapper-exhaustion.log || grep -Eq '^test result:.*ignored: [1-9][0-9]*|^test result:.*0 passed' cli-wrapper-exhaustion.log; then
+          if grep -Eq 'SKIP|(^|[[:space:]])0 tests run:' "$RUNNER_TEMP/cli-wrapper-exhaustion.log"; then
             rc=1
             echo "::error title=17-9 CLI quota (${{ matrix.image }})::SKIP, ignored, or zero tests"
           fi
-          [ "$rc" -eq 0 ] || grep -E 'panicked at' cli-wrapper-exhaustion.log | head -5 | while IFS= read -r line; do
+          [ "$rc" -eq 0 ] || grep -E 'panicked at' "$RUNNER_TEMP/cli-wrapper-exhaustion.log" | head -5 | while IFS= read -r line; do
             echo "::error title=17-9 CLI quota (${{ matrix.image }})::${line}"
           done
           exit "$rc"
@@ -2118,17 +2303,20 @@ jobs:
         if: always()
         with:
           name: epic-17-cli-quota-${{ matrix.image }}
-          path: cli-wrapper-exhaustion.log
+          path: ${{ runner.temp }}/cli-wrapper-exhaustion.log
           if-no-files-found: warn
       # Story 17-4 (CR-6) — exit line 5: Observer live beside Butler in one
       # root (AC1) and the 20-scenario activity corpus with its oracle (AC4).
       # `maosctl` is a sibling package's binary resolved beside `maos`, so it
       # is prebuilt above. The executed-count guard refuses SKIP, ignored and
       # zero-test runs; a run that leaves no summary.json did not reach the
-      # oracle and fails. Corpus journals land in this run's own target dir.
+      # oracle and fails. Copy Cargo's fixed scratch output beside the CI log.
       - name: Epic-17 exit line 5 — Observer live scene + activity corpus (Story 17-4)
         shell: bash
         env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network
+          NEXTEST_ARCHIVE_TESTS: observer_live_17_4 observer_activity_corpus_17_4
           EPIC17_LINE5_REQUIRED_TESTS: |
             observer_activity_corpus_production_path
             overflow_counts_exact_loss_and_preserves_first_plus_suffix
@@ -2139,19 +2327,26 @@ jobs:
         run: |
           set +e
           rm -rf target/tmp/observer-activity-17-4
-          cargo test --locked -p maos-bin --test observer_live_17_4 --test observer_activity_corpus_17_4 -- --nocapture --test-threads=1 2>&1 | tee observer-17-4.log
+          rm -rf "$RUNNER_TEMP/observer-activity-17-4"
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E 'binary_id(maos-bin::observer_activity_corpus_17_4)' 2>&1 | tee "$RUNNER_TEMP/observer-17-4.log"
+          corpus_rc=${PIPESTATUS[0]}
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E 'binary_id(maos-bin::observer_live_17_4)' 2>&1 | tee -a "$RUNNER_TEMP/observer-17-4.log"
           rc=${PIPESTATUS[0]}
+          if [ "$corpus_rc" -ne 0 ]; then rc=$corpus_rc; fi
           required_tests=()
           while IFS= read -r test_name; do
             if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
           done <<< "${EPIC17_LINE5_REQUIRED_TESTS}"
           # Suites run in target-name order: the corpus (16), then the scene (3).
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 16 --expected-count 3 "${required_tests[@]}" observer-17-4.log || rc=1
-          if [ ! -s target/tmp/observer-activity-17-4/summary.json ]; then
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 16 --expected-count 3 "${required_tests[@]}" "$RUNNER_TEMP/observer-17-4.log" || rc=1
+          if [ -d target/tmp/observer-activity-17-4 ]; then
+            cp -a target/tmp/observer-activity-17-4 "$RUNNER_TEMP/" || rc=1
+          fi
+          if [ ! -s "$RUNNER_TEMP/observer-activity-17-4/summary.json" ]; then
             rc=1
             echo "::error title=Epic-17 exit line 5 (${{ matrix.image }})::no summary.json — the corpus oracle never completed"
           fi
-          grep -E '^aggregate \|' observer-17-4.log | while IFS= read -r line; do
+          grep -E '^aggregate \|' "$RUNNER_TEMP/observer-17-4.log" | while IFS= read -r line; do
             echo "::notice title=Epic-17 exit line 5 (${{ matrix.image }})::${line}"
           done
           exit "$rc"
@@ -2160,8 +2355,8 @@ jobs:
         with:
           name: epic-17-observer-${{ matrix.image }}
           path: |
-            observer-17-4.log
-            target/tmp/observer-activity-17-4/
+            ${{ runner.temp }}/observer-17-4.log
+            ${{ runner.temp }}/observer-activity-17-4/
           if-no-files-found: warn
       # The runner refuses SKIP lines from its children; this step also refuses
       # one from the runner itself, and requires its positive kind-8 verdict, so
@@ -2172,27 +2367,31 @@ jobs:
           set +e
           python3 scripts/epic_17_exit_line1.py --maos target/debug/maos \
             --probe target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture \
-            --output epic-17-exit-line1 --image ${{ matrix.image }} 2>&1 | tee line1.out
+            --output "$RUNNER_TEMP/epic-17-exit-line1" --image ${{ matrix.image }} 2>&1 | tee "$RUNNER_TEMP/line1.out"
           rc=${PIPESTATUS[0]}
-          if grep -q '^SKIP[: ]' line1.out; then rc=1; echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::a SKIP line was printed"; fi
-          if [ "$rc" -eq 0 ] && ! grep -q '^::notice title=Epic-17 exit lines 1/1b .*3 Kernel-origin kind-8 rows' line1.out; then
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/line1.out"; then rc=1; echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if [ "$rc" -eq 0 ] && ! grep -q '^::notice title=Epic-17 exit lines 1/1b .*3 Kernel-origin kind-8 rows' "$RUNNER_TEMP/line1.out"; then
             rc=1
             echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::the runner exited 0 without its verified kind-8 verdict"
           fi
           exit "$rc"
       - name: Build the forbidden-syscall probes (line 3 prerequisite; xtask build-test-fixtures, Story 20-12)
-        run: cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe
+        run: test -s target/maos-fixtures/manifest.json
       - name: Epic-17 exit line 3 — T2 kill (Story 17-6)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-wasm-host
+          NEXTEST_ARCHIVE_FEATURES: ""
+          NEXTEST_ARCHIVE_TESTS: t2_sandbox_kill
         run: |
           set +e
-          cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture 2>&1 | tee t2.log
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(maos-wasm-host::t2_sandbox_kill)' 2>&1 | tee "$RUNNER_TEMP/t2.log"
           rc=${PIPESTATUS[0]}
-          grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
+          grep -E 'panicked at|rule 11' "$RUNNER_TEMP/t2.log" | head -3 | while IFS= read -r line; do
             echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::${line}"
           done
-          if grep -q '^SKIP[: ]' t2.log; then rc=1; echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::a SKIP line was printed"; fi
-          echo "::notice title=Epic-17 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep '^test result' t2.log)"
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/t2.log"; then rc=1; echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::a SKIP line was printed"; fi
+          echo "::notice title=Epic-17 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep 'tests run:' "$RUNNER_TEMP/t2.log")"
           exit "$rc"
       - name: Componentize the TypeScript Spirit (line 2 prerequisite)
         working-directory: examples/example-spirit-ts
@@ -2205,16 +2404,15 @@ jobs:
         shell: bash
         run: |
           set +e
-          cargo build --release -p maos-bin -p maos-wasm-host --features maos-bin/wasm-host --bin maos --bin maos-wasm-runner &&
-            sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect \
-              --uid="$(id -u)" --gid="$(id -g)" \
-              --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes \
-              --property="WorkingDirectory=$PWD" \
-              "$PWD/scripts/run_17_3c_delegated.sh" target/release/maos run examples/example-spirit-ts/manifest.toml --once 2>&1 | tee line2.log
+          sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect \
+            --uid="$(id -u)" --gid="$(id -g)" \
+            --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes \
+            --property="WorkingDirectory=$PWD" \
+            "$PWD/scripts/run_17_3c_delegated.sh" target/release/maos run examples/example-spirit-ts/manifest.toml --once 2>&1 | tee "$RUNNER_TEMP/line2.log"
           rc=${PIPESTATUS[0]}
-          if grep -q '^SKIP[: ]' line2.log; then rc=1; echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/line2.log"; then rc=1; echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::a SKIP line was printed"; fi
           if [ "$rc" -ne 0 ]; then
-            echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::rc=${rc} $(tail -n 3 line2.log | paste -sd' ' -)"
+            echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::rc=${rc} $(tail -n 3 "$RUNNER_TEMP/line2.log" | paste -sd' ' -)"
           else
             echo "::notice title=Epic-17 exit line 2 (${{ matrix.image }})::rc=0"
           fi
@@ -2232,31 +2430,31 @@ jobs:
         run: |
           set +e
           env -u MAOS_HOME -u MAOS_AUDIT_DB -u XDG_DATA_HOME HOME="$(getent passwd "$(id -u)" | cut -d: -f6)" \
-            target/release/maos audit query --spirit example-spirit-ts --format plain > line2b.log 2> line2b.err
+            target/release/maos audit query --spirit example-spirit-ts --format plain > "$RUNNER_TEMP/line2b.log" 2> "$RUNNER_TEMP/line2b.err"
           rc=$?
-          cat line2b.log line2b.err
+          cat "$RUNNER_TEMP/line2b.log" "$RUNNER_TEMP/line2b.err"
           if [ "$rc" -ne 0 ]; then
-            echo "::error title=Epic-17 exit line 2b (${{ matrix.image }})::maos audit query exited ${rc}: $(tail -n 2 line2b.err | paste -sd' ' -)"
+            echo "::error title=Epic-17 exit line 2b (${{ matrix.image }})::maos audit query exited ${rc}: $(tail -n 2 "$RUNNER_TEMP/line2b.err" | paste -sd' ' -)"
             exit "$rc"
           fi
-          python3 scripts/epic_17_exit_line2b.py line2b.log | tee line2b.verdict
+          python3 scripts/epic_17_exit_line2b.py "$RUNNER_TEMP/line2b.log" | tee "$RUNNER_TEMP/line2b.verdict"
           rc=${PIPESTATUS[0]}
           while IFS= read -r line; do
             if [ "$rc" -eq 0 ]; then echo "::notice title=Epic-17 exit line 2b (${{ matrix.image }})::${line}"
             else echo "::error title=Epic-17 exit line 2b (${{ matrix.image }})::${line}"; fi
-          done < line2b.verdict
+          done < "$RUNNER_TEMP/line2b.verdict"
           exit "$rc"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: epic-17-exit-${{ matrix.image }}
           path: |
-            epic-17-exit-line1/
-            line1.out
-            t2.log
-            line2.log
-            line2b.log
-            line2b.err
+            ${{ runner.temp }}/epic-17-exit-line1/
+            ${{ runner.temp }}/line1.out
+            ${{ runner.temp }}/t2.log
+            ${{ runner.temp }}/line2.log
+            ${{ runner.temp }}/line2b.log
+            ${{ runner.temp }}/line2b.err
           if-no-files-found: warn
 
   # Story 18-1 AC1.5 (D-18-1-11 A) — the Epic-18 hermetic exit job: exit line 1
@@ -2282,21 +2480,39 @@ jobs:
   # with NO halt (the standing red for line 4: a rule that ignores the window
   # halts the steady director on day 1).
   epic-18-exit:
+    needs: [ci-test-producer]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      RUSTC: /bin/false
+      CARGO_BUILD_RUSTC: /bin/false
+      CARGO: /bin/false
+      MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
+      MAOS_FIXTURE_TRANSPORT: '1'
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: epic-18-exit-${{ hashFiles('**/Cargo.lock') }}
+          name: ci-test-files-x64-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-files
+      - name: Restore exact producer workspace files
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
+                          arch='x64', workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
+                          tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+                          nextest='0.9.149')
+          assert producer == expected, (producer, expected)
+          PY
+          tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
       - name: Build the root
-        run: cargo build --locked -p maos-bin --bin maos
+        run: test -x target/debug/maos
       # Story 18-3 CR-3 (TIA-6) — the registry reader the line-2 sidecar is served by.
       - name: Build maosctl
-        run: cargo build --locked -p maos-cli --bin maosctl
+        run: test -x target/debug/maosctl
       - name: Epic-18 exit line 1 — Butler's proposal through the Inference Port (Story 18-1)
         shell: bash
         run: |
@@ -2305,23 +2521,23 @@ jobs:
           scratch="$(mktemp -d)"
           unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
           export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
-          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --once > line1.out 2> line1.err
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --once > "$RUNNER_TEMP/line1.out" 2> "$RUNNER_TEMP/line1.err"
           rc=$?
-          cat line1.out line1.err
-          if [ "$rc" -eq 0 ] && ! grep -q '"event":"butler_notification".*"options":\[' line1.out; then
+          cat "$RUNNER_TEMP/line1.out" "$RUNNER_TEMP/line1.err"
+          if [ "$rc" -eq 0 ] && ! grep -q '"event":"butler_notification".*"options":\[' "$RUNNER_TEMP/line1.out"; then
             rc=1
             echo "::error title=Epic-18 exit line 1::exit 0 without a notification carrying the completion's options"
           fi
-          if [ "$rc" -eq 0 ] && ! grep -q '"event":"halt"' line1.out; then
+          if [ "$rc" -eq 0 ] && ! grep -q '"event":"halt"' "$RUNNER_TEMP/line1.out"; then
             rc=1
             echo "::error title=Epic-18 exit line 1::exit 0 without the belief_variance halt"
           fi
-          if [ "$rc" -eq 0 ] && ! grep -q 'butler inference seam wired' line1.err; then
+          if [ "$rc" -eq 0 ] && ! grep -q 'butler inference seam wired' "$RUNNER_TEMP/line1.err"; then
             rc=1
             echo "::error title=Epic-18 exit line 1::exit 0 but Butler never bound the Inference Port (the arithmetic path also emits options and the halt)"
           fi
           if [ "$rc" -ne 0 ]; then
-            echo "::error title=Epic-18 exit line 1::rc=${rc} $(tail -n 3 line1.err | paste -sd' ' -)"
+            echo "::error title=Epic-18 exit line 1::rc=${rc} $(tail -n 3 "$RUNNER_TEMP/line1.err" | paste -sd' ' -)"
           else
             echo "::notice title=Epic-18 exit line 1::rc=0"
           fi
@@ -2343,15 +2559,15 @@ jobs:
           cassette["entries"][0]["response"]["text"] = json.dumps(completion)
           json.dump(cassette, open(sys.argv[2], "w"))
           PY
-          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/butler/manifest.toml --once > twin.out 2> twin.err
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/butler/manifest.toml --once > "$RUNNER_TEMP/twin.out" 2> "$RUNNER_TEMP/twin.err"
           rc=$?
-          cat twin.out twin.err
+          cat "$RUNNER_TEMP/twin.out" "$RUNNER_TEMP/twin.err"
           if [ "$rc" -eq 0 ]; then
             echo "::error title=Epic-18 exit line 1 twin::the planted violation exited 0 — the shape/proposal gate is not a control"
             exit 1
           fi
-          if ! grep -q 'pass refused.*options' twin.err; then
-            echo "::error title=Epic-18 exit line 1 twin::rc=${rc} but the refusal does not name the missing field: $(tail -n 3 twin.err | paste -sd' ' -)"
+          if ! grep -q 'pass refused.*options' "$RUNNER_TEMP/twin.err"; then
+            echo "::error title=Epic-18 exit line 1 twin::rc=${rc} but the refusal does not name the missing field: $(tail -n 3 "$RUNNER_TEMP/twin.err" | paste -sd' ' -)"
             exit 1
           fi
           echo "::notice title=Epic-18 exit line 1 twin::rc=${rc}, refused naming \`options\`"
@@ -2363,32 +2579,32 @@ jobs:
           scratch="$(mktemp -d)"
           unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE
           export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
-          maos eval halt --class butler > line2.out 2> line2.err
+          maos eval halt --class butler > "$RUNNER_TEMP/line2.out" 2> "$RUNNER_TEMP/line2.err"
           rc=$?
-          cat line2.out line2.err
-          if [ "$rc" -eq 0 ] && ! grep -q '"event":"eval_halt"' line2.out; then
+          cat "$RUNNER_TEMP/line2.out" "$RUNNER_TEMP/line2.err"
+          if [ "$rc" -eq 0 ] && ! grep -q '"event":"eval_halt"' "$RUNNER_TEMP/line2.out"; then
             rc=1
             echo "::error title=Epic-18 exit line 2::exit 0 without the eval_halt line"
           fi
-          if [ "$rc" -eq 0 ] && ! grep -q '"completions_consumed":30' line2.out; then
+          if [ "$rc" -eq 0 ] && ! grep -q '"completions_consumed":30' "$RUNNER_TEMP/line2.out"; then
             rc=1
             echo "::error title=Epic-18 exit line 2::exit 0 but the run did not consume one completion per row"
           fi
-          if ! cp "$scratch"/.local/share/maos/registry/spirits/butler/*/benchmark.signed.json line2.benchmark.signed.json; then
+          if ! cp "$scratch"/.local/share/maos/registry/spirits/butler/*/benchmark.signed.json "$RUNNER_TEMP/line2.benchmark.signed.json"; then
             rc=1
             echo "::error title=Epic-18 exit line 2::no signed benchmark sidecar in registry storage"
           fi
           # Story 18-3 CR-3 (TIA-6): the two binaries meet — maosctl reads and
           # verifies the sidecar maos eval halt wrote, same scratch HOME.
-          target/debug/maosctl spirit benchmark butler > line2.maosctl.out 2> line2.maosctl.err
+          target/debug/maosctl spirit benchmark butler > "$RUNNER_TEMP/line2.maosctl.out" 2> "$RUNNER_TEMP/line2.maosctl.err"
           bench_rc=$?
-          cat line2.maosctl.out line2.maosctl.err
+          cat "$RUNNER_TEMP/line2.maosctl.out" "$RUNNER_TEMP/line2.maosctl.err"
           if [ "$bench_rc" -ne 0 ]; then
             rc=1
-            echo "::error title=Epic-18 exit line 2::maosctl spirit benchmark butler rc=${bench_rc} $(tail -n 3 line2.maosctl.err | paste -sd' ' -)"
+            echo "::error title=Epic-18 exit line 2::maosctl spirit benchmark butler rc=${bench_rc} $(tail -n 3 "$RUNNER_TEMP/line2.maosctl.err" | paste -sd' ' -)"
           fi
           if [ "$rc" -ne 0 ]; then
-            echo "::error title=Epic-18 exit line 2::rc=${rc} $(tail -n 3 line2.err | paste -sd' ' -)"
+            echo "::error title=Epic-18 exit line 2::rc=${rc} $(tail -n 3 "$RUNNER_TEMP/line2.err" | paste -sd' ' -)"
           else
             echo "::notice title=Epic-18 exit line 2::rc=0"
           fi
@@ -2401,15 +2617,15 @@ jobs:
           scratch="$(mktemp -d)"
           unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_INFERENCE_MODE MAOS_REPLAY_CASSETTE
           export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
-          maos eval halt --class butler --cassette spirits/butler/tests/fixtures/halt-corpus-v0.3.drift-blind.json > line2-twin.out 2> line2-twin.err
+          maos eval halt --class butler --cassette spirits/butler/tests/fixtures/halt-corpus-v0.3.drift-blind.json > "$RUNNER_TEMP/line2-twin.out" 2> "$RUNNER_TEMP/line2-twin.err"
           rc=$?
-          cat line2-twin.out line2-twin.err
+          cat "$RUNNER_TEMP/line2-twin.out" "$RUNNER_TEMP/line2-twin.err"
           if [ "$rc" -eq 0 ]; then
             echo "::error title=Epic-18 exit line 2 twin::the drift-blind cassette exited 0 — the overall-recall floor is not a control"
             exit 1
           fi
-          if ! grep -q 'halt_recall_overall 0.800 below floor 0.90' line2-twin.err; then
-            echo "::error title=Epic-18 exit line 2 twin::rc=${rc} but the refusal does not name the overall-recall floor: $(tail -n 3 line2-twin.err | paste -sd' ' -)"
+          if ! grep -q 'halt_recall_overall 0.800 below floor 0.90' "$RUNNER_TEMP/line2-twin.err"; then
+            echo "::error title=Epic-18 exit line 2 twin::rc=${rc} but the refusal does not name the overall-recall floor: $(tail -n 3 "$RUNNER_TEMP/line2-twin.err" | paste -sd' ' -)"
             exit 1
           fi
           echo "::notice title=Epic-18 exit line 2 twin::rc=${rc}, halt_recall_overall 0.800 below floor 0.90"
@@ -2421,22 +2637,22 @@ jobs:
           scratch="$(mktemp -d)"
           unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
           export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
-          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-researcher/survey-distill.json maos run spirits/researcher/manifest.toml --once > line3.out 2> line3.err
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-researcher/survey-distill.json maos run spirits/researcher/manifest.toml --once > "$RUNNER_TEMP/line3.out" 2> "$RUNNER_TEMP/line3.err"
           rc=$?
-          cat line3.out line3.err
+          cat "$RUNNER_TEMP/line3.out" "$RUNNER_TEMP/line3.err"
           entries="$(jq '.entries | length' crates/maos-journey-test/cassettes/j-researcher/survey-distill.json)"
           # 18-7 adds one authoring completion after the three survey claims.
           survey_entries=$((entries - 1))
-          if [ "$rc" -eq 0 ] && ! grep -q 'researcher inference seam wired' line3.err; then
+          if [ "$rc" -eq 0 ] && ! grep -q 'researcher inference seam wired' "$RUNNER_TEMP/line3.err"; then
             rc=1
             echo "::error title=Epic-18 exit line 3::exit 0 but the Researcher never bound the Inference Port"
           fi
-          if [ "$rc" -eq 0 ] && ! jq -Rse --argjson n "$survey_entries" '[split("\n")[] | fromjson? | select(type == "object" and .event == "researcher_survey")] | length == 1 and $n > 0 and (.[0] | has("findings") and has("open_questions") and has("confidence_map") and has("bibliography") and .completions_consumed == $n)' line3.out > /dev/null; then
+          if [ "$rc" -eq 0 ] && ! jq -Rse --argjson n "$survey_entries" '[split("\n")[] | fromjson? | select(type == "object" and .event == "researcher_survey")] | length == 1 and $n > 0 and (.[0] | has("findings") and has("open_questions") and has("confidence_map") and has("bibliography") and .completions_consumed == $n)' "$RUNNER_TEMP/line3.out" > /dev/null; then
             rc=1
             echo "::error title=Epic-18 exit line 3::exit 0 without one researcher_survey event carrying findings/open_questions/confidence_map/bibliography and completions_consumed == ${survey_entries} (${entries} total including authoring)"
           fi
           if [ "$rc" -ne 0 ]; then
-            echo "::error title=Epic-18 exit line 3::rc=${rc} $(tail -n 3 line3.err | paste -sd' ' -)"
+            echo "::error title=Epic-18 exit line 3::rc=${rc} $(tail -n 3 "$RUNNER_TEMP/line3.err" | paste -sd' ' -)"
           else
             echo "::notice title=Epic-18 exit line 3::rc=0, completions_consumed=${survey_entries}, total_completions=${entries}"
           fi
@@ -2454,9 +2670,9 @@ jobs:
             echo "::error title=Epic-18 exit line 3 twin::could not build the empty cassette"
             exit 1
           fi
-          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/researcher/manifest.toml --once > line3-twin.out 2> line3-twin.err
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE="$twin" maos run spirits/researcher/manifest.toml --once > "$RUNNER_TEMP/line3-twin.out" 2> "$RUNNER_TEMP/line3-twin.err"
           rc=$?
-          cat line3-twin.out line3-twin.err
+          cat "$RUNNER_TEMP/line3-twin.out" "$RUNNER_TEMP/line3-twin.err"
           if [ "$rc" -eq 0 ]; then
             echo "::error title=Epic-18 exit line 3 twin::the empty cassette exited 0 — a fallback still answers without a completion"
             exit 1
@@ -2464,8 +2680,8 @@ jobs:
           # The replay port prints `CASSETTE EXHAUSTED` on its own; the
           # refusal line itself must name the cause (TIA-3) — that is what
           # proves the pass failed closed on the exhausted cassette.
-          if ! grep -qE 'researcher on_idle pass refused: .*exhausted' line3-twin.err; then
-            echo "::error title=Epic-18 exit line 3 twin::rc=${rc} but the refusal does not name the exhausted cassette: $(tail -n 3 line3-twin.err | paste -sd' ' -)"
+          if ! grep -qE 'researcher on_idle pass refused: .*exhausted' "$RUNNER_TEMP/line3-twin.err"; then
+            echo "::error title=Epic-18 exit line 3 twin::rc=${rc} but the refusal does not name the exhausted cassette: $(tail -n 3 "$RUNNER_TEMP/line3-twin.err" | paste -sd' ' -)"
             exit 1
           fi
           echo "::notice title=Epic-18 exit line 3 twin::rc=${rc}, refused naming \`exhausted\`"
@@ -2477,24 +2693,24 @@ jobs:
           scratch="$(mktemp -d)"
           unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
           export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
-          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d.jsonl > line4.out 2> line4.err
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d.jsonl > "$RUNNER_TEMP/line4.out" 2> "$RUNNER_TEMP/line4.err"
           rc=$?
-          cat line4.out line4.err
-          if [ "$rc" -eq 0 ] && ! grep -q 'butler inference seam wired' line4.err; then
+          cat "$RUNNER_TEMP/line4.out" "$RUNNER_TEMP/line4.err"
+          if [ "$rc" -eq 0 ] && ! grep -q 'butler inference seam wired' "$RUNNER_TEMP/line4.err"; then
             rc=1
             echo "::error title=Epic-18 exit line 4::exit 0 but Butler never bound the Inference Port"
           fi
-          halt_day="$(jq -rs '[.[] | select(.event == "halt" and .render == "halted on belief_variance" and .day <= 21 and .diagnostic.rate >= 0.6) | .day] | if length == 1 then .[0] else "none" end' line4.out)"
+          halt_day="$(jq -rs '[.[] | select(.event == "halt" and .render == "halted on belief_variance" and .day <= 21 and .diagnostic.rate >= 0.6) | .day] | if length == 1 then .[0] else "none" end' "$RUNNER_TEMP/line4.out")"
           if [ "$rc" -eq 0 ] && [ "$halt_day" = "none" ]; then
             rc=1
             echo "::error title=Epic-18 exit line 4::exit 0 without exactly one belief_variance halt on a day <= 21 at a pooled rate >= 0.6"
           fi
-          if [ "$rc" -eq 0 ] && ! jq -es --argjson d "$halt_day" '([.[] | select(.event == "acceptance_day")] | length) == ($d - 1) and ([.[] | select(.event == "morning_digest")] | length) == $d and ([.[] | select(.event == "scene_complete" and .halt_day == $d)] | length) == 1' line4.out > /dev/null; then
+          if [ "$rc" -eq 0 ] && ! jq -es --argjson d "$halt_day" '([.[] | select(.event == "acceptance_day")] | length) == ($d - 1) and ([.[] | select(.event == "morning_digest")] | length) == $d and ([.[] | select(.event == "scene_complete" and .halt_day == $d)] | length) == 1' "$RUNNER_TEMP/line4.out" > /dev/null; then
             rc=1
             echo "::error title=Epic-18 exit line 4::the scene did not decide one offer and render one digest per simulated day up to the halt"
           fi
           if [ "$rc" -ne 0 ]; then
-            echo "::error title=Epic-18 exit line 4::rc=${rc} $(tail -n 3 line4.err | paste -sd' ' -)"
+            echo "::error title=Epic-18 exit line 4::rc=${rc} $(tail -n 3 "$RUNNER_TEMP/line4.err" | paste -sd' ' -)"
           else
             echo "::notice title=Epic-18 exit line 4::rc=0, halted on day ${halt_day}"
           fi
@@ -2507,14 +2723,14 @@ jobs:
           scratch="$(mktemp -d)"
           unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY
           export HOME="$scratch" MAOS_HOME="$scratch" XDG_DATA_HOME="$scratch/xdg"
-          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d-steady.jsonl > line4-twin.out 2> line4-twin.err
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_STRICT=1 MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json maos run spirits/butler/manifest.toml --clock compressed:21d --acceptance tests/fixtures/j-butler/acceptance-21d-steady.jsonl > "$RUNNER_TEMP/line4-twin.out" 2> "$RUNNER_TEMP/line4-twin.err"
           rc=$?
-          cat line4-twin.out line4-twin.err
+          cat "$RUNNER_TEMP/line4-twin.out" "$RUNNER_TEMP/line4-twin.err"
           if [ "$rc" -ne 0 ]; then
-            echo "::error title=Epic-18 exit line 4 twin::rc=${rc} $(tail -n 3 line4-twin.err | paste -sd' ' -)"
+            echo "::error title=Epic-18 exit line 4 twin::rc=${rc} $(tail -n 3 "$RUNNER_TEMP/line4-twin.err" | paste -sd' ' -)"
             exit 1
           fi
-          if ! jq -es '([.[] | select(.event == "halt")] | length) == 0 and ([.[] | select(.event == "acceptance_day")] | length) == 21 and ([.[] | select(.event == "scene_complete" and .halt_day == null)] | length) == 1' line4-twin.out > /dev/null; then
+          if ! jq -es '([.[] | select(.event == "halt")] | length) == 0 and ([.[] | select(.event == "acceptance_day")] | length) == 21 and ([.[] | select(.event == "scene_complete" and .halt_day == null)] | length) == 1' "$RUNNER_TEMP/line4-twin.out" > /dev/null; then
             echo "::error title=Epic-18 exit line 4 twin::the steady director halted or the scene ran short — the halt does not lead on the director's uncertainty"
             exit 1
           fi
@@ -2524,25 +2740,25 @@ jobs:
         with:
           name: epic-18-exit
           path: |
-            line1.out
-            line1.err
-            twin.out
-            twin.err
-            line2.out
-            line2.err
-            line2.benchmark.signed.json
-            line2.maosctl.out
-            line2.maosctl.err
-            line2-twin.out
-            line2-twin.err
-            line3.out
-            line3.err
-            line3-twin.out
-            line3-twin.err
-            line4.out
-            line4.err
-            line4-twin.out
-            line4-twin.err
+            ${{ runner.temp }}/line1.out
+            ${{ runner.temp }}/line1.err
+            ${{ runner.temp }}/twin.out
+            ${{ runner.temp }}/twin.err
+            ${{ runner.temp }}/line2.out
+            ${{ runner.temp }}/line2.err
+            ${{ runner.temp }}/line2.benchmark.signed.json
+            ${{ runner.temp }}/line2.maosctl.out
+            ${{ runner.temp }}/line2.maosctl.err
+            ${{ runner.temp }}/line2-twin.out
+            ${{ runner.temp }}/line2-twin.err
+            ${{ runner.temp }}/line3.out
+            ${{ runner.temp }}/line3.err
+            ${{ runner.temp }}/line3-twin.out
+            ${{ runner.temp }}/line3-twin.err
+            ${{ runner.temp }}/line4.out
+            ${{ runner.temp }}/line4.err
+            ${{ runner.temp }}/line4-twin.out
+            ${{ runner.temp }}/line4-twin.err
           if-no-files-found: warn
 
   # Story 5.5b — multi-provider drift-check tool tests
@@ -3336,7 +3552,7 @@ jobs:
           toolchain: stable
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest@0.9.149
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
@@ -3853,6 +4069,7 @@ jobs:
   # Story 17-2 T5 — real delegated domain and an independently enforced
   # Delegate=no negative control. Both matrices are pinned (never ubuntu-latest).
   cgroup-ceiling-delegated:
+    needs: [ci-test-producer]
     strategy:
       fail-fast: false
       # 20-12 AC4 — KEPT at four images: cgroup v2 delegation is the image's systemd + kernel (the subject).
@@ -3860,59 +4077,124 @@ jobs:
         image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.image }}
     timeout-minutes: 60
+    env:
+      RUSTC: /bin/false
+      CARGO_BUILD_RUSTC: /bin/false
+      CARGO: /bin/false
+      MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
+      MAOS_FIXTURE_TRANSPORT: '1'
+      MAOS_CGROUP_CEILING_FIXTURE: ${{ github.workspace }}/target/tmp/cgroup-ceiling-fixture
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: stable
-          targets: wasm32-wasip2
-      - uses: Swatinem/rust-cache@v2
+          name: ci-test-archives-${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-archives
+      - uses: actions/download-artifact@v4
         with:
-          key: cgroup-ceiling-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+          name: ci-test-files-${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-files
+      - name: Restore exact producer workspace files
+        env:
+          BUNDLE_ARCH: ${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
+                          arch=os.environ['BUNDLE_ARCH'], workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
+                          tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+                          nextest='0.9.149')
+          assert producer == expected, (producer, expected)
+          PY
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
+          echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
+          tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
       - uses: ./.github/actions/provision-t3-test-substrate
         if: ${{ !endsWith(matrix.image, '-arm') }}
       - name: Install pinned WASM fixture assembler
-        run: cargo install --locked wasm-tools --version 1.259.0
+        run: test -x "$RUNNER_TEMP/ci-test-tools/wasm-tools"
       - name: Fetch locked standalone fixture dependencies for offline session tests
-        run: |
-          cargo fetch --locked
-          for fixture in \
-            crates/maos-wasm-host/guests/echo-spirit \
-            crates/maos-wasm-host/guests/routed-relay \
-            crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
-            cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
-          done
+        run: test -s target/maos-fixtures/manifest.json
       - name: Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)
-        run: cargo run --locked -p xtask -- build-test-fixtures --only maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,equiv-native-twin,maosctl
+        run: test -s target/maos-fixtures/manifest.json
       - name: Exercise helper boundary regressions
         run: python3 -m unittest scripts.tests.test_cgroup_ceiling_17_2
       - name: Native cgroup-v2 smoke — four real cases
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-kernel-core
+          NEXTEST_ARCHIVE_FEATURES: ""
+          NEXTEST_ARCHIVE_TESTS: cgroup_ceiling_smoke
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-kernel-core --test cgroup_ceiling_smoke -- --include-ignored --nocapture --test-threads=1 2>&1 | tee cgroup-smoke.log; test ${PIPESTATUS[0]} -eq 0'
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 cgroup-smoke.log
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/kernel.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --run-ignored ignored-only --no-capture --test-threads 1 -E "binary_id(maos-kernel-core::cgroup_ceiling_smoke)" 2>&1 | tee "$RUNNER_TEMP/cgroup-smoke.log"; test ${PIPESTATUS[0]} -eq 0'
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 \
+            --required-test native_child_is_placed_before_guest_and_resource_limits_bite \
+            --required-test same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves \
+            --required-test creation_limit_write_and_exec_failures_release_owned_leaves \
+            --required-test killed_leader_cleanup_kills_its_surviving_descendant "$RUNNER_TEMP/cgroup-smoke.log"
       - name: Real admitted session suite — 23 cases, serial
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: spawned_scope_17_3c
+          EPIC17_SPAWNED_REQUIRED_TESTS: |
+            eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims
+            forged_guest_provenance_is_restamped_by_the_kernel
+            a_delivery_needs_its_iac_send_grant
+            wasm_delivery_is_refused_when_its_issuance_window_is_exhausted
+            kernel_only_cross_host_oversized_and_foreign_retract_frames_are_refused
+            guest_floods_end_in_typed_failures_not_a_wedged_session
+            guest_diagnostics_are_bounded_per_session
+            runner_refusal_exits_before_ready_are_typed_and_not_crashes
+            a_once_session_that_never_completes_its_turn_is_not_success
+            hostile_metadata_fails_before_serialization_under_real_t2
+            hostile_aliased_strings_fail_before_serialization_under_real_t2
+            one_aliased_string_under_the_hostcall_budget_clears_the_canonical_call
+            actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not
+            repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall
+            a_new_turn_after_idle_restarts_the_progress_window
+            configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_forms
+            resource_downgrade_memory_only_is_persisted_for_each_fast_t2_restart
+            memory_only_t2_live_child_has_exact_rlimits_and_mode_truthful_journal
+            resource_downgrade_no_resource_or_fd_only_t2_spawn_emits_no_row
+            resource_downgrade_strict_cpu_pid_and_failed_t2_spawns_emit_no_row
+            resource_downgrade_append_panic_follows_live_child_observer_installation
+            admitted_t2_echo_enforces_exact_live_caps_in_delegated_mode
+            fast_t2_crash_then_restart_orders_one_downgrade_after_crash
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee spawned-17-3c.log; test ${PIPESTATUS[0]} -eq 0'
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 spawned-17-3c.log
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/spawned-17-3c.log"; test ${PIPESTATUS[0]} -eq 0'
+          required_tests=()
+          while IFS= read -r test_name; do
+            if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
+          done <<< "${EPIC17_SPAWNED_REQUIRED_TESTS}"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 "${required_tests[@]}" "$RUNNER_TEMP/spawned-17-3c.log"
       - name: Build the actual Worker CLI fixture before the in-unit canary (x64)
         if: ${{ !endsWith(matrix.image, '-arm') }}
-        run: cargo run --locked -p xtask -- build-test-fixtures --only worker-cli-fixture
+        run: test -x target/debug/worker-cli-fixture
       - name: Rootless T3 Worker resource enforcement (x64)
         if: ${{ !endsWith(matrix.image, '-arm') }}
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: worker_resource_limits_17_2
+          MAOS_CGROUP_CANARY_ARCHIVE: ${{ runner.temp }}/ci-test-archives/maos-bin-network-wasm.tar.zst
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 --rootless-canary -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test worker_resource_limits_17_2 -- --nocapture --test-threads=1 2>&1 | tee worker-resource.log; test ${PIPESTATUS[0]} -eq 0'
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 2 worker-resource.log
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::worker_resource_limits_17_2)" 2>&1 | tee "$RUNNER_TEMP/worker-resource.log"; test ${PIPESTATUS[0]} -eq 0'
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 2 --required-test real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion --required-test fd_request_above_inherited_hard_limit_refuses_before_worker_payload "$RUNNER_TEMP/worker-resource.log"
 
   cgroup-ceiling-undelegated:
+    needs: [ci-test-producer]
     strategy:
       fail-fast: false
       # 20-12 AC4 — KEPT at four images: the Delegate=no fallback is enforced by each image's systemd (the subject).
@@ -3920,40 +4202,91 @@ jobs:
         image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.image }}
     timeout-minutes: 45
+    env:
+      RUSTC: /bin/false
+      CARGO_BUILD_RUSTC: /bin/false
+      CARGO: /bin/false
+      MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
+      MAOS_FIXTURE_TRANSPORT: '1'
+      MAOS_CGROUP_CEILING_FIXTURE: ${{ github.workspace }}/target/tmp/cgroup-ceiling-fixture
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: stable
-          targets: wasm32-wasip2
-      - uses: Swatinem/rust-cache@v2
+          name: ci-test-archives-${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-archives
+      - uses: actions/download-artifact@v4
         with:
-          key: cgroup-undelegated-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install pinned WASM fixture assembler
-        run: cargo install --locked wasm-tools --version 1.259.0
-      - name: Fetch locked standalone fixture dependencies for offline session tests
+          name: ci-test-files-${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-files
+      - name: Restore exact producer workspace files
+        env:
+          BUNDLE_ARCH: ${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}
         run: |
-          cargo fetch --locked
-          for fixture in \
-            crates/maos-wasm-host/guests/echo-spirit \
-            crates/maos-wasm-host/guests/routed-relay \
-            crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
-            cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
-          done
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
+                          arch=os.environ['BUNDLE_ARCH'], workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
+                          tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+                          nextest='0.9.149')
+          assert producer == expected, (producer, expected)
+          PY
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
+          echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
+          tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
+      - name: Install pinned WASM fixture assembler
+        run: test -x "$RUNNER_TEMP/ci-test-tools/wasm-tools"
+      - name: Fetch locked standalone fixture dependencies for offline session tests
+        run: test -s target/maos-fixtures/manifest.json
       - name: Build the session-suite fixtures (xtask build-test-fixtures, Story 20-12)
-        run: cargo run --locked -p xtask -- build-test-fixtures --only maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,equiv-native-twin,maosctl
+        run: test -s target/maos-fixtures/manifest.json
       - name: Exercise helper boundary regressions
         run: python3 -m unittest scripts.tests.test_cgroup_ceiling_17_2
       - name: Full undelegated session suite — live fallback, strict refusal, persistence and ordering
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: spawned_scope_17_3c
+          EPIC17_SPAWNED_REQUIRED_TESTS: |
+            eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims
+            forged_guest_provenance_is_restamped_by_the_kernel
+            a_delivery_needs_its_iac_send_grant
+            wasm_delivery_is_refused_when_its_issuance_window_is_exhausted
+            kernel_only_cross_host_oversized_and_foreign_retract_frames_are_refused
+            guest_floods_end_in_typed_failures_not_a_wedged_session
+            guest_diagnostics_are_bounded_per_session
+            runner_refusal_exits_before_ready_are_typed_and_not_crashes
+            a_once_session_that_never_completes_its_turn_is_not_success
+            hostile_metadata_fails_before_serialization_under_real_t2
+            hostile_aliased_strings_fail_before_serialization_under_real_t2
+            one_aliased_string_under_the_hostcall_budget_clears_the_canonical_call
+            actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not
+            repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall
+            a_new_turn_after_idle_restarts_the_progress_window
+            configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_forms
+            resource_downgrade_memory_only_is_persisted_for_each_fast_t2_restart
+            memory_only_t2_live_child_has_exact_rlimits_and_mode_truthful_journal
+            resource_downgrade_no_resource_or_fd_only_t2_spawn_emits_no_row
+            resource_downgrade_strict_cpu_pid_and_failed_t2_spawns_emit_no_row
+            resource_downgrade_append_panic_follows_live_child_observer_installation
+            admitted_t2_echo_enforces_exact_live_caps_in_delegated_mode
+            fast_t2_crash_then_restart_orders_one_downgrade_after_crash
         run: |
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode undelegated --unit maos-17-2-undelegated --timeout 1800 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee undelegated-session.log; test ${PIPESTATUS[0]} -eq 0'
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 undelegated-session.log
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/undelegated-session.log"; test ${PIPESTATUS[0]} -eq 0'
+          required_tests=()
+          while IFS= read -r test_name; do
+            if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
+          done <<< "${EPIC17_SPAWNED_REQUIRED_TESTS}"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 23 "${required_tests[@]}" "$RUNNER_TEMP/undelegated-session.log"
 
   wasm-host-tests:
-    needs: [example-spirit-ts-tests]
+    needs: [ci-test-producer, example-spirit-ts-tests]
     strategy:
       fail-fast: false
       # 20-12 AC4 — KEPT at four images: T2 seccomp and the WASM runtime are per kernel/arch (R17-50, exit line 3).
@@ -3961,114 +4294,155 @@ jobs:
         image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.image }}
     timeout-minutes: 60
+    env:
+      RUSTC: /bin/false
+      CARGO_BUILD_RUSTC: /bin/false
+      CARGO: /bin/false
+      MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
+      MAOS_FIXTURE_TRANSPORT: '1'
+      MAOS_CGROUP_CEILING_FIXTURE: ${{ github.workspace }}/target/tmp/cgroup-ceiling-fixture
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: stable
-          targets: wasm32-wasip2
-      - uses: Swatinem/rust-cache@v2
+          name: ci-test-archives-${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-archives
+      - uses: actions/download-artifact@v4
         with:
-          key: wasm-host-tests-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+          name: ci-test-files-${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-test-files
+      - name: Restore exact producer workspace files
+        env:
+          BUNDLE_ARCH: ${{ endsWith(matrix.image, '-arm') && 'arm64' || 'x64' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          producer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())
+          expected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],
+                          arch=os.environ['BUNDLE_ARCH'], workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),
+                          tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+                          nextest='0.9.149')
+          assert producer == expected, (producer, expected)
+          PY
+          mkdir -p "$RUNNER_TEMP/ci-test-tools"
+          tar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"
+          echo "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"
+          tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
       - name: Build the T2/WASM fixtures — probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)
-        run: cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin,maosctl
+        run: test -s target/maos-fixtures/manifest.json
       - name: Epic-17 exit line 3 — T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-wasm-host
+          NEXTEST_ARCHIVE_FEATURES: ""
+          NEXTEST_ARCHIVE_TESTS: t2_sandbox_kill
         run: |
           set +e
-          cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture 2>&1 | tee t2.log
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(maos-wasm-host::t2_sandbox_kill)' 2>&1 | tee "$RUNNER_TEMP/t2.log"
           rc=${PIPESTATUS[0]}
-          grep -o 'T2-OUTCOME .*' t2.log | while IFS= read -r line; do
+          grep -o 'T2-OUTCOME .*' "$RUNNER_TEMP/t2.log" | while IFS= read -r line; do
             echo "::notice title=T2 exit line 3 (${{ matrix.image }})::${line#T2-OUTCOME }"
           done
-          grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
+          grep -E 'panicked at|rule 11' "$RUNNER_TEMP/t2.log" | head -3 | while IFS= read -r line; do
             echo "::error title=T2 exit line 3 (${{ matrix.image }})::${line}"
           done
-          if grep -q '^SKIP[: ]' t2.log; then
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/t2.log"; then
             echo "::error title=T2 exit line 3 (${{ matrix.image }})::a SKIP line was printed — a T2 suite must run, never skip, in CI"
             rc=1
           fi
-          echo "::notice title=T2 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep '^test result' t2.log)"
+          echo "::notice title=T2 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep 'tests run:' "$RUNNER_TEMP/t2.log")"
           exit "$rc"
       - name: Kernel T2 suites — sandbox enforcement + the launch primitive's route (Story 17-6 AC5)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-kernel-core
+          NEXTEST_ARCHIVE_FEATURES: ""
+          NEXTEST_ARCHIVE_TESTS: sandbox_enforcement_linux bridge_t2_route_17_6
         run: |
           set +e
-          cargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux --test bridge_t2_route_17_6 -- --nocapture 2>&1 | tee kernel-t2.log
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/kernel.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(maos-kernel-core::sandbox_enforcement_linux) | binary_id(maos-kernel-core::bridge_t2_route_17_6)' 2>&1 | tee "$RUNNER_TEMP/kernel-t2.log"
           rc=${PIPESTATUS[0]}
-          route=$(grep -o 'BRIDGE-T2-ROUTE T[0-9]: [A-Za-z]*[^(]*' kernel-t2.log | sed 's/BRIDGE-T2-ROUTE //' | sort | paste -sd';' -)
+          route=$(grep -o 'BRIDGE-T2-ROUTE T[0-9]: [A-Za-z]*[^(]*' "$RUNNER_TEMP/kernel-t2.log" | sed 's/BRIDGE-T2-ROUTE //' | sort | paste -sd';' -)
           echo "::notice title=Bridge T2 route (${{ matrix.image }})::${route}"
-          grep -E 'panicked at|rule 11' kernel-t2.log | head -3 | while IFS= read -r line; do
+          grep -E 'panicked at|rule 11' "$RUNNER_TEMP/kernel-t2.log" | head -3 | while IFS= read -r line; do
             echo "::error title=Kernel T2 suites (${{ matrix.image }})::${line}"
           done
-          if grep -q '^SKIP[: ]' kernel-t2.log; then rc=1; echo "::error title=Kernel T2 suites (${{ matrix.image }})::a SKIP line was printed"; fi
-          echo "::notice title=Kernel T2 suites (${{ matrix.image }})::rc=${rc} $(grep '^test result' kernel-t2.log | paste -sd' ' -)"
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/kernel-t2.log"; then rc=1; echo "::error title=Kernel T2 suites (${{ matrix.image }})::a SKIP line was printed"; fi
+          echo "::notice title=Kernel T2 suites (${{ matrix.image }})::rc=${rc} $(grep 'tests run:' "$RUNNER_TEMP/kernel-t2.log" | paste -sd' ' -)"
           exit "$rc"
       - name: Escape-detector suite on a real T2 kill (Story 17-6 AC4)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-escape-detector
+          NEXTEST_ARCHIVE_FEATURES: ""
+          NEXTEST_ARCHIVE_TESTS: ""
         run: |
           set +e
-          cargo test --locked -p maos-escape-detector -- --nocapture 2>&1 | tee escape.log
+          cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/escape-detector.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(/^maos-escape-detector(::|$)/)' 2>&1 | tee "$RUNNER_TEMP/escape.log"
           rc=${PIPESTATUS[0]}
-          grep -E 'panicked at|rule 11' escape.log | head -3 | while IFS= read -r line; do
+          grep -E 'panicked at|rule 11' "$RUNNER_TEMP/escape.log" | head -3 | while IFS= read -r line; do
             echo "::error title=Escape detector (${{ matrix.image }})::${line}"
           done
-          echo "::notice title=Escape detector (${{ matrix.image }})::rc=${rc} $(grep -oE 'ESCAPE-[A-Z-]*MEASURED[^ ]*( [a-z_]+=[0-9.]+)*' escape.log | paste -sd';' -)"
+          echo "::notice title=Escape detector (${{ matrix.image }})::rc=${rc} $(grep -oE 'ESCAPE-[A-Z-]*MEASURED[^ ]*( [a-z_]+=[0-9.]+)*' "$RUNNER_TEMP/escape.log" | paste -sd';' -)"
           exit "$rc"
-      # Guests are built at test time with `--offline` (17-3c fixtures, 17-3d
-      # recall-probe and the frozen @2.0 compat echo), so their locked
-      # dependencies are fetched before any suite that builds them.
+      # Guests and standalone fixtures are restored from the producer; a missing
+      # fixture must fail rather than fetching dependencies or compiling locally.
       - name: Fetch locked standalone fixture dependencies for offline process gates
-        run: |
-          for fixture in \
-            crates/maos-wasm-host/guests/echo-spirit \
-            crates/maos-wasm-host/guests/routed-relay \
-            crates/maos-wasm-host/guests/recall-probe \
-            crates/maos-wasm-host/guests/compat-echo-2-0 \
-            crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
-            cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
-          done
+        run: test -s target/maos-fixtures/manifest.json
       - name: Run maos-host + maos-wasm-host test suites
-        run: cargo test -p maos-host -p maos-wasm-host --locked
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-host maos-wasm-host
+          NEXTEST_ARCHIVE_FEATURES: ""
+          NEXTEST_ARCHIVE_TESTS: ""
+        run: cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/host-wasm-host.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never -E 'binary_id(/^maos-(host|wasm-host)(::|$)/)'
       - name: Install the pinned component fixture assembler
-        run: cargo install --locked wasm-tools --version 1.259.0
+        run: test -x "$RUNNER_TEMP/ci-test-tools/wasm-tools"
       - name: Standalone native-twin fixture tests (Story 17-3c)
-        run: cargo test --locked --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: equiv-native-twin
+          NEXTEST_ARCHIVE_FEATURES: ""
+          NEXTEST_ARCHIVE_TESTS: ""
+        run: cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/native-twin.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE/crates/maos-wasm-host/guests/equiv-fixture/native-twin" --extract-overwrite --color never -E 'binary_id(/^equiv-native-twin(::|$)/)'
       - name: Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: spawned_scope_17_3c
         run: |
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-host --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee spawned-17-3c.log; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::spawned_scope_17_3c)" 2>&1 | tee "$RUNNER_TEMP/spawned-17-3c.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
-          [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 23 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 23 passed;'"; fail=1; }
+          [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
+          grep -Eq '(^|[[:space:]])23 tests run: 23 passed([,[:space:]]|$)' "$RUNNER_TEMP/spawned-17-3c.log" || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing '23 tests run: 23 passed'"; fail=1; }
           for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :10' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
                       'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
                       'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
                       'HOSTILE-IAC-SEND :1' 'WASM-IAC-SEND :1'; do
             prefix=${spec%:*}; want=${spec##*:}
-            got=$(grep -oF -- "$prefix" spawned-17-3c.log | wc -l)
+            got=$(grep -oF -- "$prefix" "$RUNNER_TEMP/spawned-17-3c.log" | wc -l)
             [ "$got" -eq "$want" ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::marker '${prefix}' seen $got times, want $want"; fail=1; }
           done
-          if grep -q '^SKIP[: ]' spawned-17-3c.log; then
-            grep '^SKIP[: ]' spawned-17-3c.log | while IFS= read -r line; do
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/spawned-17-3c.log"; then
+            grep '^SKIP[: ]' "$RUNNER_TEMP/spawned-17-3c.log" | while IFS= read -r line; do
               echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
             done
             fail=1
           fi
-          grep -E 'SCOPED-VERDICT |GOVERNED-ATOMIC |HOSTILE-|WASM-IAC-SEND |RUNNER-SIGSYS |REPEATED-MAILBOX ' spawned-17-3c.log | while IFS= read -r line; do
+          grep -E 'SCOPED-VERDICT |GOVERNED-ATOMIC |HOSTILE-|WASM-IAC-SEND |RUNNER-SIGSYS |REPEATED-MAILBOX ' "$RUNNER_TEMP/spawned-17-3c.log" | while IFS= read -r line; do
             echo "::notice title=17-3c admitted runtime (${{ matrix.image }})::$line"
           done
           if [ "$fail" -ne 0 ]; then
-            grep -E 'panicked at' spawned-17-3c.log | while IFS= read -r line; do
+            grep -E 'panicked at' "$RUNNER_TEMP/spawned-17-3c.log" | while IFS= read -r line; do
               echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
             done
           fi
           echo "::notice title=17-3c process gates (${{ matrix.image }})::rc=$rc fail=$fail"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 23 spawned-17-3c.log || fail=1
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 23 "$RUNNER_TEMP/spawned-17-3c.log" || fail=1
           exit "$fail"
       # Story 17-10 (AC1.1, AC3.2) — the live escape-anomaly tail under real T2:
       # a real runner SIGSYS is surfaced by the RUNNING tail within 1 s, exactly
@@ -4076,38 +4450,42 @@ jobs:
       # count, both test names, no SKIP, markers annotated.
       - name: Live escape-anomaly consumer under real T2 (Story 17-10)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: live_escape_anomaly_17_10
         run: |
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-escape-tail --timeout 1800 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test live_escape_anomaly_17_10 -- --nocapture --test-threads=1 2>&1 | tee live-escape-17-10.log; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::live_escape_anomaly_17_10)" 2>&1 | tee "$RUNNER_TEMP/live-escape-17-10.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
-          [ "$rc" -eq 0 ] || { echo "::error title=17-10 escape tail (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 2 passed;' live-escape-17-10.log || { echo "::error title=17-10 escape tail (${{ matrix.image }})::missing 'test result: ok. 2 passed;'"; fail=1; }
+          [ "$rc" -eq 0 ] || { echo "::error title=17-10 escape tail (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
+          grep -Eq '(^|[[:space:]])2 tests run: 2 passed([,[:space:]]|$)' "$RUNNER_TEMP/live-escape-17-10.log" || { echo "::error title=17-10 escape tail (${{ matrix.image }})::missing '2 tests run: 2 passed'"; fail=1; }
           required=()
           for name in real_sigsys_surfaces_exactly_one_anomaly_within_bound \
                       planned_stop_surfaces_no_anomaly; do
             required+=(--required-test "$name")
           done
-          if grep -q '^SKIP[: ]' live-escape-17-10.log; then
-            grep '^SKIP[: ]' live-escape-17-10.log | while IFS= read -r line; do
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/live-escape-17-10.log"; then
+            grep '^SKIP[: ]' "$RUNNER_TEMP/live-escape-17-10.log" | while IFS= read -r line; do
               echo "::error title=17-10 escape tail (${{ matrix.image }})::${line}"
             done
             fail=1
           fi
           for marker in 'ESCAPE-TAIL-17-10 sigsys ' 'ESCAPE-TAIL-17-10 planned-stop '; do
-            got=$(grep -cF -- "$marker" live-escape-17-10.log)
+            got=$(grep -cF -- "$marker" "$RUNNER_TEMP/live-escape-17-10.log")
             [ "$got" -eq 1 ] || { echo "::error title=17-10 escape tail (${{ matrix.image }})::marker '${marker}' seen $got times, want 1"; fail=1; }
           done
-          grep -F 'ESCAPE-TAIL-17-10 ' live-escape-17-10.log | while IFS= read -r line; do
+          grep -F 'ESCAPE-TAIL-17-10 ' "$RUNNER_TEMP/live-escape-17-10.log" | while IFS= read -r line; do
             echo "::notice title=17-10 escape tail (${{ matrix.image }})::$line"
           done
-          [ "$fail" -eq 0 ] || grep -E 'panicked at' live-escape-17-10.log | head -5 | while IFS= read -r line; do
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' "$RUNNER_TEMP/live-escape-17-10.log" | head -5 | while IFS= read -r line; do
             echo "::error title=17-10 escape tail (${{ matrix.image }})::${line}"
           done
-          echo "::notice title=17-10 escape tail (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' live-escape-17-10.log)"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 2 "${required[@]}" live-escape-17-10.log || fail=1
+          echo "::notice title=17-10 escape tail (${{ matrix.image }})::rc=$rc fail=$fail $(grep 'tests run:' "$RUNNER_TEMP/live-escape-17-10.log")"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 2 "${required[@]}" "$RUNNER_TEMP/live-escape-17-10.log" || fail=1
           exit "$fail"
       # Story 17-3d — mediated in-band recall end to end: the real release
       # runner under T2 in the same delegated envelope, exact pass count and
@@ -4117,15 +4495,19 @@ jobs:
       # participant_recall_17_8 step below (V6-V10).
       - name: In-band recall through the admitted session (Story 17-3d)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: recall_17_3d
         run: |
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-recall --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test recall_17_3d -- --nocapture --test-threads=1 2>&1 | tee recall-17-3d.log; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::recall_17_3d)" 2>&1 | tee "$RUNNER_TEMP/recall-17-3d.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
-          [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 18 passed;' recall-17-3d.log || { echo "::error title=17-3d recall (${{ matrix.image }})::missing 'test result: ok. 18 passed;'"; fail=1; }
+          [ "$rc" -eq 0 ] || { echo "::error title=17-3d recall (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
+          grep -Eq '(^|[[:space:]])18 tests run: 18 passed([,[:space:]]|$)' "$RUNNER_TEMP/recall-17-3d.log" || { echo "::error title=17-3d recall (${{ matrix.image }})::missing '18 tests run: 18 passed'"; fail=1; }
           required=()
           for name in checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4 \
                       configured_sso_preserves_r1_r2_order_and_never_recalls_identity_asserted \
@@ -4147,17 +4529,17 @@ jobs:
                       unknown_tag_closes_once_with_typed_protocol_end; do
             required+=(--required-test "$name")
           done
-          if grep -q '^SKIP[: ]' recall-17-3d.log; then
-            grep '^SKIP[: ]' recall-17-3d.log | while IFS= read -r line; do
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/recall-17-3d.log"; then
+            grep '^SKIP[: ]' "$RUNNER_TEMP/recall-17-3d.log" | while IFS= read -r line; do
               echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
             done
             fail=1
           fi
-          [ "$fail" -eq 0 ] || grep -E 'panicked at' recall-17-3d.log | head -5 | while IFS= read -r line; do
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' "$RUNNER_TEMP/recall-17-3d.log" | head -5 | while IFS= read -r line; do
             echo "::error title=17-3d recall (${{ matrix.image }})::${line}"
           done
-          echo "::notice title=17-3d recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' recall-17-3d.log)"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 18 "${required[@]}" recall-17-3d.log || fail=1
+          echo "::notice title=17-3d recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep 'tests run:' "$RUNNER_TEMP/recall-17-3d.log")"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 18 "${required[@]}" "$RUNNER_TEMP/recall-17-3d.log" || fail=1
           exit "$fail"
       # Story 17-8 — participant recall and consent envelopes for BOTH forms
       # (native Researcher through MediatedLogRecall, WASM recall-probe through
@@ -4166,15 +4548,19 @@ jobs:
       # exact pass count, every test name, no SKIP, no zero-test pass.
       - name: Participant recall and consent envelopes, both forms (Story 17-8)
         shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: participant_recall_17_8
         run: |
           set +e
           set -o pipefail
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-participant --timeout 2400 -- \
-            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test participant_recall_17_8 -- --nocapture --test-threads=1 2>&1 | tee participant-17-8.log; test ${PIPESTATUS[0]} -eq 0'
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture --test-threads 1 -E "binary_id(maos-bin::participant_recall_17_8)" 2>&1 | tee "$RUNNER_TEMP/participant-17-8.log"; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
-          [ "$rc" -eq 0 ] || { echo "::error title=17-8 participant recall (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 8 passed;' participant-17-8.log || { echo "::error title=17-8 participant recall (${{ matrix.image }})::missing 'test result: ok. 8 passed;'"; fail=1; }
+          [ "$rc" -eq 0 ] || { echo "::error title=17-8 participant recall (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
+          grep -Eq '(^|[[:space:]])8 tests run: 8 passed([,[:space:]]|$)' "$RUNNER_TEMP/participant-17-8.log" || { echo "::error title=17-8 participant recall (${{ matrix.image }})::missing '8 tests run: 8 passed'"; fail=1; }
           required=()
           for name in cross_wall_remote_artifact_is_identically_emitter_scoped_with_or_without_side_tables \
                       direct_recipient_ids_roles_dedup_multiaddress_and_gate_rejection_both_forms \
@@ -4186,17 +4572,17 @@ jobs:
                       valid_consent_then_same_frame_expires_between_report_barriers_both_forms; do
             required+=(--required-test "$name")
           done
-          if grep -q '^SKIP[: ]' participant-17-8.log; then
-            grep '^SKIP[: ]' participant-17-8.log | while IFS= read -r line; do
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/participant-17-8.log"; then
+            grep '^SKIP[: ]' "$RUNNER_TEMP/participant-17-8.log" | while IFS= read -r line; do
               echo "::error title=17-8 participant recall (${{ matrix.image }})::${line}"
             done
             fail=1
           fi
-          [ "$fail" -eq 0 ] || grep -E 'panicked at' participant-17-8.log | head -5 | while IFS= read -r line; do
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' "$RUNNER_TEMP/participant-17-8.log" | head -5 | while IFS= read -r line; do
             echo "::error title=17-8 participant recall (${{ matrix.image }})::${line}"
           done
-          echo "::notice title=17-8 participant recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep '^test result' participant-17-8.log | paste -sd' ' -)"
-          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 8 "${required[@]}" participant-17-8.log || fail=1
+          echo "::notice title=17-8 participant recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep 'tests run:' "$RUNNER_TEMP/participant-17-8.log" | paste -sd' ' -)"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 8 "${required[@]}" "$RUNNER_TEMP/participant-17-8.log" || fail=1
           exit "$fail"
       - uses: actions/download-artifact@v4
         with:
@@ -4204,9 +4590,10 @@ jobs:
           path: examples/example-spirit-ts/dist
       - name: Build the actual feature-enabled CLI and release runner
         run: |
-          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
-          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
-          cargo build --locked --release -p maos-cli --bin maosctl
+          tar -C / -xf "$RUNNER_TEMP/ci-test-files/release-wasm-host.tar"
+          test -x target/release/maos
+          test -x target/release/maos-wasm-runner
+          test -x target/release/maosctl
       - name: Actual CPU-capped TS CLI with delegated controllers and attributed receipts
         shell: bash
         run: |
@@ -4224,14 +4611,14 @@ jobs:
             --property="WorkingDirectory=$PWD" \
             "$PWD/scripts/run_17_3c_delegated.sh" /usr/bin/python3 -I \
             "$PWD/scripts/prove_17_3c.py" --binary "$PWD/target/release/maos" \
-            --output "$PWD/17-3c-proof" --expected-os "$version" --expected-arch "$arch" \
-            2>&1 | tee 17-3c-proof.log
+            --output "$RUNNER_TEMP/17-3c-proof" --expected-os "$version" --expected-arch "$arch" \
+            2>&1 | tee "$RUNNER_TEMP/17-3c-proof.log"
           rc=${PIPESTATUS[0]}
           set -e
           if [ "$rc" -eq 0 ]; then
-            echo "::notice title=17-3c proof (${{ matrix.image }})::$(grep -m1 '^TS-ADMITTED-PROOF ' 17-3c-proof.log)"
+            echo "::notice title=17-3c proof (${{ matrix.image }})::$(grep -m1 '^TS-ADMITTED-PROOF ' "$RUNNER_TEMP/17-3c-proof.log")"
           else
-            msg=$(grep -m1 -A3 '17-3c proof FAILED' 17-3c-proof.log || tail -n 8 17-3c-proof.log)
+            msg=$(grep -m1 -A3 '17-3c proof FAILED' "$RUNNER_TEMP/17-3c-proof.log" || tail -n 8 "$RUNNER_TEMP/17-3c-proof.log")
             msg=${msg:0:1500}; msg=${msg//'%'/'%25'}; msg=${msg//$'\r'/}; msg=${msg//$'\n'/'%0A'}
             echo "::error title=17-3c proof (${{ matrix.image }}) rc=${rc}::${msg}"
           fi
@@ -4241,11 +4628,11 @@ jobs:
         with:
           name: admitted-17-3c-${{ matrix.image }}
           path: |
-            spawned-17-3c.log
-            recall-17-3d.log
-            participant-17-8.log
-            17-3c-proof/
-            17-3c-proof.log
+            ${{ runner.temp }}/spawned-17-3c.log
+            ${{ runner.temp }}/recall-17-3d.log
+            ${{ runner.temp }}/participant-17-8.log
+            ${{ runner.temp }}/17-3c-proof/
+            ${{ runner.temp }}/17-3c-proof.log
           if-no-files-found: error
 
   # RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
@@ -5795,7 +6182,7 @@ jobs:
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser + fuzz_exec_deps_parse_elf) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
-          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host + native-twin fixture tests + 17-3c spawned_scope_17_3c gate (23 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (18 passed, every name present, no SKIP) |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images, same-run producer nextest archives (cargo-nextest nextest run --archive-file): maos-wasm-host t2_sandbox_kill (exit line 3) + kernel/escape-detector T2 suites + maos-host/maos-wasm-host archive + native-twin fixture archive + 17-3c spawned_scope_17_3c gate (23 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) + 17-3d recall_17_3d gate (18 passed, every name present, no SKIP) |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"

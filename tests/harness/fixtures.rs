@@ -5,10 +5,13 @@
 //! `cargo run -p xtask -- build-test-fixtures` (a CI step before the suite) and
 //! resolved here. A missing fixture fails with that command in the message.
 //!
-//! A STALE fixture fails the same way (review 2026-10-23): the manifest records
-//! per entry `built_at` and the `inputs` its build read (source roots of the
-//! fixture's local dependency closure, manifests, WIT); any `.rs`/`.toml`/`.wit`
-//! input newer than the artefact means the artefact is not the code under test.
+//! Schema 3 entries may record a clean Git `tree` and `artifact` blob identity:
+//! a clean matching checkout accepts those bytes regardless of checkout mtimes.
+//! Dirty/mismatched checkouts and changed artefacts fail without rebuilding.
+//! `MAOS_FIXTURE_TRANSPORT=1` requires both identities. Ordinary own-build runs,
+//! including CI, retain schema 2/local schema-3 `built_at`/`inputs` mtime checks.
+//! These checks refuse stale/corrupt transport, not maliciously recomputed IDs;
+//! the manifest is not an authenticated signature or a producer attestation.
 //!
 //! Include with `#[path = "<rel>/tests/harness/fixtures.rs"] mod fixtures;`.
 
@@ -59,16 +62,16 @@ fn stale(what: &str) -> ! {
 }
 
 /// One manifest entry: the artefact, its build start and the inputs it read.
-struct Entry {
+pub(crate) struct Entry {
     path: PathBuf,
     built_at: u64,
     inputs: Vec<PathBuf>,
+    tree: Option<String>,
+    artifact: Option<String>,
 }
 
-/// The manifest entry for `name`. The builder writes one
-/// `"name": {"built_at":N,"inputs":["…"],"path":"…"}` entry per line and refuses
-/// paths containing `"` or `\`, so a substring scan is exact. `Ok(None)`: no
-/// manifest, or no entry for `name`; `Err`: unreadable or malformed.
+/// The builder writes one compact entry per line. Validate the entire generated
+/// envelope and every entry before using any identity, without a JSON dependency.
 fn manifest_entry(name: &str) -> Result<Option<Entry>, String> {
     let manifest = fixture_dir().join("manifest.json");
     let text = match std::fs::read_to_string(&manifest) {
@@ -76,41 +79,177 @@ fn manifest_entry(name: &str) -> Result<Option<Entry>, String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(format!("cannot read {}: {error}", manifest.display())),
     };
-    let key = format!("\"{name}\": {{");
-    let Some(line) = text.lines().find_map(|line| line.trim().strip_prefix(&key)) else {
-        return Ok(None);
-    };
-    let malformed = || format!("malformed `{name}` entry in {}", manifest.display());
-    let field = |key: &str| {
-        line.split_once(&format!("\"{key}\":"))
-            .map(|(_, rest)| rest)
-            .ok_or_else(malformed)
-    };
-    let path = field("path")?
-        .strip_prefix('"')
-        .and_then(|rest| rest.split('"').next())
-        .ok_or_else(malformed)?;
-    let built_at = field("built_at")?
-        .split(|c: char| !c.is_ascii_digit())
+    parse_manifest_entry(&text, name, &manifest)
+}
+
+pub(crate) fn parse_manifest_entry(
+    text: &str,
+    name: &str,
+    manifest: &Path,
+) -> Result<Option<Entry>, String> {
+    let malformed = || format!("malformed fixture manifest in {}", manifest.display());
+    let mut lines = text.lines().map(str::trim);
+    if lines.next() != Some("{") {
+        return Err(malformed());
+    }
+    let schema = lines
         .next()
-        .and_then(|digits| digits.parse().ok())
+        .and_then(|line| line.strip_prefix("\"schema\":"))
+        .and_then(|value| value.trim().strip_suffix(','))
+        .and_then(|value| match value.trim() {
+            "2" => Some(2),
+            "3" => Some(3),
+            _ => None,
+        })
         .ok_or_else(malformed)?;
-    // `["a","b"]` split on `"`: odd parts are the strings; an even part holding
-    // `]` closes the array.
-    let mut inputs = Vec::new();
-    let array = field("inputs")?.strip_prefix('[').ok_or_else(malformed)?;
-    for (index, part) in array.split('"').enumerate() {
-        if index % 2 == 1 {
-            inputs.push(PathBuf::from(part));
-        } else if part.contains(']') {
+    let mut header = lines.next();
+    if header
+        .and_then(|line| line.strip_prefix("\"command\": \""))
+        .and_then(|value| value.strip_suffix("\","))
+        == Some(BUILD_FIXTURES)
+    {
+        header = lines.next();
+    }
+    if header != Some("\"fixtures\": {") {
+        return Err(malformed());
+    }
+    let mut found = None;
+    let mut names = std::collections::BTreeSet::new();
+    let mut comma = true;
+    let mut any = false;
+    loop {
+        let line = lines.next().ok_or_else(malformed)?;
+        if line == "}" {
+            if any && comma {
+                return Err(malformed());
+            }
             break;
         }
+        // An empty fixture map has one blank body line in the generated format.
+        if line.is_empty() && !any {
+            continue;
+        }
+        if !comma {
+            return Err(malformed());
+        }
+        comma = line.ends_with(',');
+        let mut row = ManifestRow(line.strip_suffix(',').unwrap_or(line));
+        let parsed = (|| {
+            let key = row.string()?;
+            if !names.insert(key) {
+                return None;
+            }
+            row.take(":")?;
+            let entry = row.entry(schema)?;
+            if !row.0.is_empty() {
+                return None;
+            }
+            Some((key, entry))
+        })()
+        .ok_or_else(malformed)?;
+        if parsed.0 == name {
+            found = Some(parsed.1);
+        }
+        any = true;
     }
-    Ok(Some(Entry {
-        path: PathBuf::from(path),
-        built_at,
-        inputs,
-    }))
+    if lines.next() != Some("}") || lines.any(|line| !line.is_empty()) {
+        return Err(malformed());
+    }
+    Ok(found)
+}
+
+/// A deliberately small grammar for the writer's unescaped path/string format,
+/// not a general JSON parser. Unknown/duplicate fields and incomplete JSON fail.
+struct ManifestRow<'a>(&'a str);
+
+impl<'a> ManifestRow<'a> {
+    fn take(&mut self, token: &str) -> Option<()> {
+        self.0 = self.0.trim_start().strip_prefix(token)?.trim_start();
+        Some(())
+    }
+
+    fn string(&mut self) -> Option<&'a str> {
+        self.0 = self.0.trim_start().strip_prefix('"')?;
+        let (value, rest) = self.0.split_once('"')?;
+        if value.bytes().any(|c| c == b'\\' || c < 0x20) {
+            return None;
+        }
+        self.0 = rest.trim_start();
+        Some(value)
+    }
+
+    fn entry(&mut self, schema: u64) -> Option<Entry> {
+        self.take("{")?;
+        let (mut path, mut built_at, mut inputs, mut tree, mut artifact) =
+            (None, None, None, None, None);
+        loop {
+            let key = self.string()?;
+            self.take(":")?;
+            match key {
+                "path" if path.is_none() => path = Some(PathBuf::from(self.string()?)),
+                "built_at" if built_at.is_none() => {
+                    let end = self
+                        .0
+                        .find(|c: char| !c.is_ascii_digit())
+                        .unwrap_or(self.0.len());
+                    let digits = &self.0[..end];
+                    if digits.len() > 1 && digits.starts_with('0') {
+                        return None;
+                    }
+                    built_at = Some(digits.parse().ok()?);
+                    self.0 = self.0[end..].trim_start();
+                }
+                "inputs" if inputs.is_none() => {
+                    self.take("[")?;
+                    let mut paths = Vec::new();
+                    if !self.0.starts_with(']') {
+                        loop {
+                            paths.push(PathBuf::from(self.string()?));
+                            if self.0.starts_with(']') {
+                                break;
+                            }
+                            self.take(",")?;
+                        }
+                    }
+                    self.take("]")?;
+                    inputs = Some(paths);
+                }
+                "tree" | "artifact" => {
+                    let slot = if key == "tree" {
+                        &mut tree
+                    } else {
+                        &mut artifact
+                    };
+                    if slot.is_some() || schema != 3 {
+                        return None;
+                    }
+                    let value = self.string()?;
+                    if !matches!(value.len(), 40 | 64)
+                        || !value.bytes().all(|c| c.is_ascii_hexdigit())
+                    {
+                        return None;
+                    }
+                    *slot = Some(value.to_owned());
+                }
+                _ => return None,
+            }
+            if self.0.starts_with('}') {
+                self.take("}")?;
+                break;
+            }
+            self.take(",")?;
+        }
+        if tree.is_some() != artifact.is_some() {
+            return None;
+        }
+        Some(Entry {
+            path: path?,
+            built_at: built_at?,
+            inputs: inputs?,
+            tree,
+            artifact,
+        })
+    }
 }
 
 /// The first `.rs`/`.toml`/`.wit` file under `inputs` (files or dirs; `target/`,
@@ -149,9 +288,142 @@ fn modified(path: &Path) -> SystemTime {
         .unwrap_or_else(|error| missing(&format!("cannot stat {}: {error}", path.display())))
 }
 
+fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+    let output = std::process::Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cannot verify fixture provenance: git {args:?}: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "cannot verify fixture provenance: git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+/// Timestamp compatibility for own-built bytes never authorizes explicit transport.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum VerificationMode {
+    Local,
+    Transport,
+}
+
+impl VerificationMode {
+    pub(crate) fn from_transport(transport: bool) -> Self {
+        if transport {
+            Self::Transport
+        } else {
+            Self::Local
+        }
+    }
+
+    fn runtime() -> Self {
+        Self::from_transport(std::env::var("MAOS_FIXTURE_TRANSPORT").as_deref() == Ok("1"))
+    }
+}
+
+/// Provenance is all-or-nothing: never fall back to timestamps after a failed
+/// tree/cleanliness/blob check. The profile lookup must also name these bytes.
+pub(crate) fn verify_entry(
+    entry: &Entry,
+    path: &Path,
+    reference: SystemTime,
+    root: &Path,
+    mode: VerificationMode,
+) -> Result<(), String> {
+    if !path.is_file() {
+        return Err(format!("{} does not exist", path.display()));
+    }
+    if mode == VerificationMode::Transport && (entry.tree.is_none() || entry.artifact.is_none()) {
+        return Err("fixture transport requires clean tree and artifact provenance".to_owned());
+    }
+    if let Some(tree) = &entry.tree {
+        let listed = std::fs::canonicalize(&entry.path)
+            .map_err(|error| format!("cannot resolve {}: {error}", entry.path.display()))?;
+        let actual = std::fs::canonicalize(path)
+            .map_err(|error| format!("cannot resolve {}: {error}", path.display()))?;
+        if listed != actual {
+            return Err(format!(
+                "manifest names {}, not profile binary {}",
+                listed.display(),
+                actual.display()
+            ));
+        }
+        if !git(
+            root,
+            &[
+                "status",
+                "--porcelain",
+                "--untracked-files=all",
+                "--ignore-submodules=none",
+            ],
+        )?
+        .is_empty()
+        {
+            return Err(
+                "checkout is dirty; clean provenance cannot authorize changed files".to_owned(),
+            );
+        }
+        let checkout = git(root, &["rev-parse", "HEAD^{tree}"])?;
+        if tree != &checkout {
+            return Err(format!(
+                "manifest tree {tree} differs from checkout tree {checkout}"
+            ));
+        }
+        let artifact = git(
+            root,
+            &[
+                "hash-object",
+                "--no-filters",
+                "--",
+                path.to_str().ok_or("fixture path is not UTF-8")?,
+            ],
+        )?;
+        if entry.artifact.as_ref() != Some(&artifact) {
+            return Err(format!("artifact identity mismatch for {}", path.display()));
+        }
+    } else if let Some(input) = newer_input(&entry.inputs, reference) {
+        return Err(format!(
+            "{} is older than its input {}",
+            path.display(),
+            input.display()
+        ));
+    }
+    Ok(())
+}
+
+/// Profile-coupled fixtures belong to the manifest; product binaries such as
+/// `maos` may instead be supplied by the CI job's separate feature-family build.
+pub(crate) fn verify_profile_entry(
+    entry: Option<&Entry>,
+    name: &str,
+    path: &Path,
+    reference: SystemTime,
+    root: &Path,
+    mode: VerificationMode,
+) -> Result<(), String> {
+    match entry {
+        Some(entry) => verify_entry(entry, path, reference, root, mode),
+        None if mode == VerificationMode::Transport
+            && matches!(
+                name,
+                "maosctl" | "worker-cli-fixture" | "worker-probe-fixture"
+            ) =>
+        {
+            Err(format!(
+                "no provenance entry for manifest-owned profile binary `{name}`"
+            ))
+        }
+        None if !path.is_file() => Err(format!("{} does not exist", path.display())),
+        None => Ok(()),
+    }
+}
+
 /// The artefact the fixture manifest names `name` (e.g. `echo_spirit.wasm`,
 /// `maos-wasm-runner`, `forbidden-syscall-probe`). Panics naming
-/// [`BUILD_FIXTURES`] when the manifest, the entry or the file is absent, or
+/// [`BUILD_FIXTURES`] when absent, when provenance fails, or (for local entries)
 /// when an input is newer than the entry's `built_at`.
 pub fn fixture(name: &str) -> PathBuf {
     let entry = match manifest_entry(name) {
@@ -162,19 +434,16 @@ pub fn fixture(name: &str) -> PathBuf {
         )),
         Err(error) => missing(&error),
     };
-    if !entry.path.is_file() {
-        missing(&format!(
-            "`{name}` is listed but {} does not exist",
-            entry.path.display()
-        ));
-    }
+    let root = std::env::current_dir().expect("fixture checkout directory");
     let built = UNIX_EPOCH + Duration::from_secs(entry.built_at);
-    if let Some(input) = newer_input(&entry.inputs, built) {
-        stale(&format!(
-            "`{name}` ({}) is older than its input {}",
-            entry.path.display(),
-            input.display()
-        ));
+    if let Err(error) = verify_entry(
+        &entry,
+        &entry.path,
+        built,
+        &root,
+        VerificationMode::runtime(),
+    ) {
+        stale(&format!("`{name}`: {error}"));
     }
     entry.path
 }
@@ -182,11 +451,11 @@ pub fn fixture(name: &str) -> PathBuf {
 /// A workspace binary that must sit next to the running test's profile
 /// (`<target>/<profile>/<name>` — e.g. `worker-cli-fixture`, which `maos`
 /// resolves beside its own executable, or `maosctl`). Panics naming
-/// [`BUILD_FIXTURES`] (with `--release` for a release-profile test run) when it
-/// is absent, or when a manifest entry for `name` records an input newer than
-/// this file (the profile's own binary, so its mtime is the reference). A
-/// binary the builder did not record (no manifest, or no entry — built by a CI
-/// step's own `cargo build`) is checked for presence only.
+/// [`BUILD_FIXTURES`] (with `--release` for a release-profile test run) when
+/// absent or provenance fails. Own-build runs retain the profile binary's mtime
+/// as reference for entries without a tree. Explicit fixture transport requires
+/// manifest entries for profile-coupled fixtures, but separately built, unrecorded
+/// product binaries retain their presence-only check.
 pub fn profile_binary(name: &str) -> PathBuf {
     let path = profile_dir().join(name);
     let release = if cfg!(debug_assertions) {
@@ -200,20 +469,22 @@ pub fn profile_binary(name: &str) -> PathBuf {
             path.display()
         );
     }
-    let inputs = match manifest_entry(name) {
-        Ok(Some(entry)) => entry.inputs,
-        Ok(None) => Vec::new(),
+    let entry = match manifest_entry(name) {
+        Ok(entry) => entry,
         Err(error) => panic!(
             "test fixture manifest — {error}; build fixtures first: `{BUILD_FIXTURES}{release}`"
         ),
     };
-    if let Some(input) = newer_input(&inputs, modified(&path)) {
-        panic!(
-            "test fixture stale — {} is older than its input {}; rebuild fixtures: \
-             `{BUILD_FIXTURES}{release}`",
-            path.display(),
-            input.display()
-        );
+    let root = std::env::current_dir().expect("fixture checkout directory");
+    if let Err(error) = verify_profile_entry(
+        entry.as_ref(),
+        name,
+        &path,
+        modified(&path),
+        &root,
+        VerificationMode::runtime(),
+    ) {
+        panic!("test fixture stale — {error}; rebuild fixtures: `{BUILD_FIXTURES}{release}`");
     }
     path
 }

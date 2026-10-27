@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Run checked tests in a disposable, asserted 17-2 systemd cgroup unit."""
+"""Run checked tests in a disposable, asserted 17-2 systemd cgroup unit.
+
+MAOS_CGROUP_CANARY_ARCHIVE selects a prebuilt rootless canary archive. It must
+be an absolute file path; archive errors never fall back to compiling.
+"""
 
 import argparse
 import errno
@@ -15,35 +19,67 @@ import tomllib
 import uuid
 
 _RESULT = re.compile(
-    r"^test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored;",
+    r"^test result: (?P<status>ok|FAILED)\. (?P<passed>\d+) passed; "
+    r"(?P<failed>\d+) failed; (?P<ignored>\d+) ignored;"
+    r"|^[ \t]*(?:Summary\s+\[[^\]\r\n]+\]\s+)?"
+    r"(?P<total>\d+) tests? run: (?P<outcomes>[^\r\n]*)$",
     re.MULTILINE,
 )
+_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 _FORBIDDEN = ("cpu", "memory", "pids")
 _DENIED = {errno.EPERM, errno.EACCES, errno.EROFS}
 
 
 def check_test_output(text, exit_code, expected_counts, required_tests=()):
-    """Reject unsuccessful, skipped, vacuous, incomplete, or substituted suites."""
+    """Check exact suites, preferring nextest aggregates over child libtest output."""
     if exit_code != 0:
         raise ValueError(f"test command exited with status {exit_code}")
+    text = _ANSI.sub("", text)
     # Serial libtest flushes `test <name> ... ` before the body runs, so a
     # test's own SKIP line can follow that prefix instead of starting the line.
     if re.search(r"^(?:test \S+ \.\.\. )?\s*SKIP\b", text, re.MULTILINE):
         raise ValueError("test output contains an explicit SKIP")
-    suites = _RESULT.findall(text)
+    suites = list(_RESULT.finditer(text))
+    nextest_suites = [suite for suite in suites if suite["total"] is not None]
+    if nextest_suites:
+        suites = nextest_suites
     expected = list(expected_counts)
     if len(suites) != len(expected):
         raise ValueError(f"expected {len(expected)} test summaries, found {len(suites)}")
     for index, (suite, count) in enumerate(zip(suites, expected), start=1):
-        status, passed, failed, ignored = suite
-        if int(count) <= 0:
+        count = int(count)
+        if count <= 0:
             raise ValueError(f"expected suite {index} must select at least one test")
-        if status != "ok" or int(passed) != int(count) or failed != "0" or ignored != "0":
+        if suite["total"] is not None:
+            # Nextest skips can include both filter-excluded and ignored tests.
+            # They are outside the aggregate run count; explicit runtime SKIPs
+            # are refused above, and required names must have PASS records.
+            passed = re.fullmatch(
+                r"(\d+) passed(?: \(\d+ slow\))?(?:, \d+ skipped)?",
+                suite["outcomes"],
+            )
+            if passed and int(suite["total"]) == count and int(passed[1]) == count:
+                continue
+            raise ValueError(
+                f"suite {index} expected {count} tests run and passed; "
+                f"got {suite['total']} tests run: {suite['outcomes']}"
+            )
+        status, passed, failed, ignored = (
+            suite["status"], suite["passed"], suite["failed"], suite["ignored"]
+        )
+        if status != "ok" or int(passed) != count or failed != "0" or ignored != "0":
             raise ValueError(
                 f"suite {index} expected {count} passed, zero failed/ignored; "
                 f"got {status}, {passed} passed, {failed} failed, {ignored} ignored"
             )
-    executed = set(re.findall(r"^test (\S+) \.\.\.(?: |$)", text, re.MULTILINE))
+    if nextest_suites:
+        executed = set(re.findall(
+            r"^[ \t]*PASS\s+\[[^\]\r\n]+\]\s+(?:\(\s*\d+/\d+\)\s+)?"
+            r"\S+\s+(\S+)[ \t]*$",
+            text, re.MULTILINE,
+        ))
+    else:
+        executed = set(re.findall(r"^test (\S+) \.\.\.(?: |$)", text, re.MULTILINE))
     missing = set(required_tests) - executed
     if missing:
         raise ValueError(f"required tests did not execute: {', '.join(sorted(missing))}")
@@ -142,14 +178,14 @@ def _assert_undelegated(root):
         print(f"CGROUP-17-2 negative ancestor={candidate} common-placement=denied owned-subtree=denied", flush=True)
 
 
-def _checked_subprocess(arguments, expected_counts=None):
+def _checked_subprocess(arguments, expected_counts=None, required_tests=()):
     process = subprocess.run(arguments, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = process.stdout
     sys.stdout.write(output)
     sys.stdout.flush()
     if expected_counts is not None:
         try:
-            check_test_output(output, process.returncode, expected_counts)
+            check_test_output(output, process.returncode, expected_counts, required_tests)
         except ValueError:
             if os.environ.get("GITHUB_ACTIONS") == "true":
                 detail = output[-2800:].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
@@ -222,6 +258,40 @@ def _check_t3_runtime():
     )
 
 
+def _rootless_canary_command():
+    if "MAOS_CGROUP_CANARY_ARCHIVE" in os.environ:
+        archive = Path(os.environ["MAOS_CGROUP_CANARY_ARCHIVE"])
+        if not archive.is_absolute() or not archive.is_file():
+            raise RuntimeError(
+                f"MAOS_CGROUP_CANARY_ARCHIVE must name an existing absolute file: {archive}"
+            )
+        # Refuse unreadable files before invoking nextest. Malformed archives
+        # are nextest errors, not a reason to retry through Cargo.
+        with archive.open("rb"):
+            pass
+        workspace = Path(os.environ.get("GITHUB_WORKSPACE", ""))
+        if not workspace.is_absolute() or not workspace.is_dir():
+            raise RuntimeError("archive canary requires an absolute GITHUB_WORKSPACE directory")
+        return [
+            "cargo-nextest", "nextest", "run", "--archive-file", str(archive),
+            "--extract-to", str(workspace), "--workspace-remap", str(workspace),
+            "--extract-overwrite", "--color", "never", "--no-capture",
+            "-E", "binary_id(maos-bin::smoke_cli_wrapper_8_12) & "
+            "test(=maos_run_cli_wrapper_worker_spawns_real_subprocess)",
+        ]
+    if any(
+        os.environ.get(key) in ("false", "/bin/false", "/usr/bin/false")
+        for key in ("CARGO", "RUSTC", "CARGO_BUILD_RUSTC")
+    ):
+        raise RuntimeError("compiler-denied rootless canary requires MAOS_CGROUP_CANARY_ARCHIVE")
+    return [
+        "cargo", "test", "--locked", "--offline", "-p", "maos-bin",
+        "--features", "network,wasm-host", "--test", "smoke_cli_wrapper_8_12",
+        "maos_run_cli_wrapper_worker_spawns_real_subprocess", "--", "--exact",
+        "--nocapture", "--test-threads=1",
+    ]
+
+
 def _inside(args):
     try:
         root = _validate_unit(args.unit, args.mode)
@@ -237,15 +307,12 @@ def _inside(args):
         if args.rootless_canary:
             if args.mode != "delegated":
                 raise RuntimeError("the rootless T3 canary requires the delegated mode")
+            canary = _rootless_canary_command()
             _require_rootless_substrate()
             _check_t3_runtime()
-            canary = [
-                "cargo", "test", "--locked", "--offline", "-p", "maos-bin",
-                "--features", "network,wasm-host", "--test", "smoke_cli_wrapper_8_12",
-                "maos_run_cli_wrapper_worker_spawns_real_subprocess", "--", "--exact",
-                "--nocapture", "--test-threads=1",
-            ]
-            _checked_subprocess(canary, [1])
+            _checked_subprocess(
+                canary, [1], ["maos_run_cli_wrapper_worker_spawns_real_subprocess"]
+            )
             proof = f"uid={os.geteuid()} user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored"
             if os.environ.get("GITHUB_ACTIONS") == "true":
                 print(f"::notice title=17-2 actual rootless canary::{proof}", flush=True)
@@ -274,11 +341,16 @@ def _environment(mode):
         key for key in os.environ
         if key.startswith("CARGO_") or key.startswith("RUSTUP_")
     }
-    names.update(("RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
+    names.update(("RUSTC", "CARGO", "RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
     names.update(("CI", "GITHUB_ACTIONS", "MAOS_SECRETS_BACKEND"))
-    # 20-12: tests inside the envelope resolve prebuilt fixtures from the same
-    # manifest the caller's `build-test-fixtures` wrote (absolute path).
-    names.add("MAOS_FIXTURE_DIR")
+    # Fixture lookup and explicit portable provenance must cross together.
+    names.update(("MAOS_FIXTURE_DIR", "MAOS_FIXTURE_TRANSPORT"))
+    # 20-15: compiler-denial guards, artifact locations and the producer-built
+    # native smoke fixture must survive entry into the delegated unit.
+    names.update((
+        "MAOS_CGROUP_CEILING_FIXTURE", "MAOS_CGROUP_CANARY_ARCHIVE",
+        "RUNNER_TEMP", "GITHUB_WORKSPACE",
+    ))
     # 20-3a CI follow-up: check-multi-tenant-loom runs its whole-package maos-bin
     # leg inside this delegated envelope. Outside it the 17-2/17-7 live-T3 tests
     # fail deterministically: run 38985809156 (bin-plain red 6/6 variants)

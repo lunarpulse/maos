@@ -1,0 +1,26 @@
+{
+  "role": "producer",
+  "arch": "x64",
+  "image": "ubuntu-24.04",
+  "machine": "x86_64",
+  "sha": "19143e607f318e38bfe8c7604c1194ce7e4b0aba",
+  "run_id": "40489534163",
+  "run_attempt": "1",
+  "workspace": "/home/runner/work/maos/maos",
+  "target_dir": "/home/runner/work/maos/maos/target",
+  "tree": "8bbdcd0052515469c12cf545b73c351239421f3a",
+  "nextest_version": "0.9.149",
+  "build_and_pack_seconds": 84.857857471,
+  "archive_bytes": 37877332,
+  "files": {
+    "target/debug/deps/e2e_roundtrip-95a4359ca25f15c1": "de910e6b1beb6eb73af38e85e3a9ab8c623b36d95300880f2031a74001b3b686",
+    "target/debug/maos-wasm-runner": "8167770174e7a398296ae78f76358687e99bfe86b87bca5a2aa304778a82282c",
+    "tests/fixtures/wasm/echo_spirit_component.wasm": "bb919df904a7542d760ee13d0e452f18a6553122ad5b624313138b7880c86681"
+  },
+  "transport_files": {
+    "wasm-host.tar.zst": "462f4411494d0d165a6709b00925a5df67b95d8fb24adf1be5ae11417006e8a2",
+    "nextest.tar": "5d3afa7cbea60a00bccd5828316b6b3e055eb5830aba9faceac3596cd068a5f9"
+  },
+  "upload_step_wall_seconds": 2.008140122,
+  "bundle_artifact_id": "12728615518"
+}

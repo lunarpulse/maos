@@ -5,7 +5,7 @@
 //! Loads the 50-scenario corpus from
 //! `crates/maos-eval/fixtures/intent-lineage-corpus-v0/` and asserts per-scenario
 //! the expected outcome. The runner emits a per-class table to stdout and
-//! appends the run-record to `_bmad-output/implementation-artifacts/intent-lineage-coverage-report.md`.
+//! appends the run-record under Cargo's test scratch directory, never the checkout.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -119,20 +119,11 @@ async fn nfr_aud_14_intent_lineage_corpus_100_percent_coverage() {
         eprintln!("  FAIL {id}: {reason}");
     }
 
-    // Append run record to coverage report (best-effort; CI may run from any cwd).
-    let report_path = std::env::var("CARGO_MANIFEST_DIR")
-        .ok()
-        .map(PathBuf::from)
-        .map(|p| {
-            p.parent()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .join("_bmad-output")
-                .join("implementation-artifacts")
-                .join("intent-lineage-coverage-report.md")
-        });
-    if let Some(rp) = report_path {
+    // A tracked report dirties the checkout while other tests verify fixture provenance.
+    let report_path =
+        PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("intent-lineage-coverage-report.md");
+    {
+        let rp = report_path;
         if let Some(parent) = rp.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
