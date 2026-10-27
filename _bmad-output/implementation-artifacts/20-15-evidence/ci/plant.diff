@@ -1,0 +1,28 @@
+diff --git a/.github/workflows/discipline.yml b/.github/workflows/discipline.yml
+index 8c33a672..2b594fb8 100644
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -2,7 +2,7 @@ name: discipline
+ 
+ on:
+   push:
+-    branches: [main]
++    branches: [main, ci/20-15-verify]
+   pull_request:
+     branches: [main]
+ 
+@@ -4331,6 +4331,14 @@ jobs:
+           tar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"
+       - name: Build the T2/WASM fixtures — probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)
+         run: test -s target/maos-fixtures/manifest.json
++      - name: AC4 plant - delete the downloaded wasm-host-t2 archive (ubuntu-24.04 only)
++        if: ${{ matrix.image == 'ubuntu-24.04' }}
++        shell: bash
++        run: |
++          set -euo pipefail
++          test -f "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst"
++          rm -f -- "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst"
++          test ! -e "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst"
+       - name: Epic-17 exit line 3 — T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)
+         shell: bash
+         env:

@@ -1,0 +1,28 @@
+# excerpt of logs/174_epic-17-exit (ubuntu-24.04).txt (run 40536260336), step 20 line 3: non-plant dirty-checkout panic
+2026-10-27T16:37:52.3777079Z        START [         ] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T16:37:52.3818884Z 
+2026-10-27T16:37:52.3819505Z running 1 test
+2026-10-27T16:37:53.0537966Z 
+2026-10-27T16:37:53.0539388Z thread 'benign_rust_probe_survives_t2_under_same_spec' (9994) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:
+2026-10-27T16:37:53.0541144Z test fixture stale — `forbidden-syscall-probe`: checkout is dirty; clean provenance cannot authorize changed files; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`
+2026-10-27T16:37:53.0542377Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-10-27T16:37:53.0543467Z test benign_rust_probe_survives_t2_under_same_spec ... FAILED
+2026-10-27T16:37:53.0543866Z 
+2026-10-27T16:37:53.0543979Z failures:
+2026-10-27T16:37:53.0544112Z 
+2026-10-27T16:37:53.0544286Z failures:
+2026-10-27T16:37:53.0544893Z     benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T16:37:53.0545287Z 
+2026-10-27T16:37:53.0545978Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.67s
+2026-10-27T16:37:53.0546787Z 
+2026-10-27T16:37:53.0547500Z         FAIL [   0.677s] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T16:37:53.0548802Z   Cancelling due to test failure
+2026-10-27T16:37:53.0549563Z ────────────
+2026-10-27T16:37:53.0550141Z      Summary [   0.684s] 2/5 tests run: 1 passed, 1 failed, 0 skipped
+2026-10-27T16:37:53.0551101Z         FAIL [   0.677s] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2026-10-27T16:37:53.0552718Z warning: 3/5 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+2026-10-27T16:37:53.0598375Z error: test run failed
+2026-10-27T16:37:53.0641159Z ##[error]thread 'benign_rust_probe_survives_t2_under_same_spec' (9994) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:
+2026-10-27T16:37:53.0670311Z ##[notice]rc=100      Summary [   0.684s] 2/5 tests run: 1 passed, 1 failed, 0 skipped
+2026-10-27T16:37:53.0674765Z ##[error]Process completed with exit code 100.
+2026-10-27T16:37:53.0756069Z ##[group]Run actions/upload-artifact@v4

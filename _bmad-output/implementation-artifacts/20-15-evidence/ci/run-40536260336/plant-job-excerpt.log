@@ -1,0 +1,18 @@
+# excerpt of plant-job-122323659086.log (wasm-host-tests ubuntu-24.04, run 40536260336): step 7 plant, step 8 failure
+2026-10-27T16:35:21.5507570Z ##[group]Run set -euo pipefail
+2026-10-27T16:35:21.5507937Z [36;1mset -euo pipefail[0m
+2026-10-27T16:35:21.5508301Z [36;1mtest -f "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst"[0m
+2026-10-27T16:35:21.5508787Z [36;1mrm -f -- "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst"[0m
+2026-10-27T16:35:21.5509456Z [36;1mtest ! -e "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst"[0m
+2026-10-27T16:35:21.5997940Z [36;1mcargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/wasm-host-t2.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --no-capture -E 'binary_id(maos-wasm-host::t2_sandbox_kill)' 2>&1 | tee "$RUNNER_TEMP/t2.log"[0m
+2026-10-27T16:35:21.6186689Z error: error extracting archive `/home/runner/work/_temp/ci-test-archives/wasm-host-t2.tar.zst`
+2026-10-27T16:35:21.6187312Z 
+2026-10-27T16:35:21.6187403Z Caused by:
+2026-10-27T16:35:21.6187614Z   error reading archive
+2026-10-27T16:35:21.6187770Z 
+2026-10-27T16:35:21.6187854Z Caused by:
+2026-10-27T16:35:21.6188067Z   I/O error reading archive
+2026-10-27T16:35:21.6188238Z 
+2026-10-27T16:35:21.6188322Z Caused by:
+2026-10-27T16:35:21.6188533Z   No such file or directory (os error 2)
+2026-10-27T16:35:21.6267402Z ##[notice]rc=96 

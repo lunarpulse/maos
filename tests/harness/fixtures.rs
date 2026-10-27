@@ -303,6 +303,25 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
+/// Entries a dirty-checkout refusal names; the rest are only counted.
+const DIRTY_ENTRIES_SHOWN: usize = 8;
+
+/// Names the offending `git status --porcelain` entries (bounded) so a hosted
+/// refusal identifies what dirtied the checkout without a rerun.
+fn dirty_checkout(status: &str) -> String {
+    let entries: Vec<&str> = status.lines().collect();
+    let shown = entries.len().min(DIRTY_ENTRIES_SHOWN);
+    let more = match entries.len() - shown {
+        0 => String::new(),
+        hidden => format!(" | … {hidden} more"),
+    };
+    format!(
+        "checkout is dirty; clean provenance cannot authorize changed files; \
+         git status --porcelain: {}{more}",
+        entries[..shown].join(" | ")
+    )
+}
+
 /// Timestamp compatibility for own-built bytes never authorizes explicit transport.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum VerificationMode {
@@ -351,7 +370,7 @@ pub(crate) fn verify_entry(
                 actual.display()
             ));
         }
-        if !git(
+        let status = git(
             root,
             &[
                 "status",
@@ -359,12 +378,9 @@ pub(crate) fn verify_entry(
                 "--untracked-files=all",
                 "--ignore-submodules=none",
             ],
-        )?
-        .is_empty()
-        {
-            return Err(
-                "checkout is dirty; clean provenance cannot authorize changed files".to_owned(),
-            );
+        )?;
+        if !status.is_empty() {
+            return Err(dirty_checkout(&status));
         }
         let checkout = git(root, &["rev-parse", "HEAD^{tree}"])?;
         if tree != &checkout {

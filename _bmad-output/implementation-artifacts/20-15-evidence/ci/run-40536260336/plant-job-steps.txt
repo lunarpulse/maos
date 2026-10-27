@@ -1,0 +1,24 @@
+1 success Set up job
+2 success Run actions/checkout@v5
+3 success Run actions/download-artifact@v4
+4 success Run actions/download-artifact@v4
+5 success Restore exact producer workspace files
+6 success Build the T2/WASM fixtures — probes, runners, guests, native twin, maosctl (xtask build-test-fixtures, Story 20-12)
+7 success AC4 plant - delete the downloaded wasm-host-t2 archive (ubuntu-24.04 only)
+8 failure Epic-17 exit line 3 — T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)
+9 skipped Kernel T2 suites — sandbox enforcement + the launch primitive's route (Story 17-6 AC5)
+10 skipped Escape-detector suite on a real T2 kill (Story 17-6 AC4)
+11 skipped Fetch locked standalone fixture dependencies for offline process gates
+12 skipped Run maos-host + maos-wasm-host test suites
+13 skipped Install the pinned component fixture assembler
+14 skipped Standalone native-twin fixture tests (Story 17-3c)
+15 skipped Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates
+16 skipped Live escape-anomaly consumer under real T2 (Story 17-10)
+17 skipped In-band recall through the admitted session (Story 17-3d)
+18 skipped Participant recall and consent envelopes, both forms (Story 17-8)
+19 skipped Run actions/download-artifact@v4
+20 skipped Build the actual feature-enabled CLI and release runner
+21 skipped Actual CPU-capped TS CLI with delegated controllers and attributed receipts
+22 failure Run actions/upload-artifact@v4
+44 success Post Run actions/checkout@v5
+45 success Complete job
