@@ -1,0 +1,28 @@
+jobs 191 ran 191 conclusions {'success': 189, 'failure': 2}
+job-h 10.96
+wall_min 45.3
+ci-test-producer legs 2 sum_s 3382 max_s 1923
+wasm-host-tests legs 4 sum_s 1667 max_s 506
+cgroup-ceiling-delegated legs 4 sum_s 737 max_s 295
+cgroup-ceiling-undelegated legs 4 sum_s 413 max_s 132
+epic-17-exit legs 2 sum_s 900 max_s 477
+epic-18-exit legs 1 sum_s 52 max_s 52
+workspace-test-suite legs 1 sum_s 1667 max_s 1667
+producer ci-test-producer (x64, ubuntu-24.04) success dur_s 1923 start+158s done+2081s
+producer ci-test-producer (arm64, ubuntu-24.04-arm) success dur_s 1459 start+147s done+1606s
+producer_critical_path_min (first job start -> last producer done) 34.7
+producer_done_to_last_wasm_done_s 627
+last job to finish aggregate done+45.3min
+--- top 12 families by job-s
+  ci-test-producer legs 2 sum_s 3382
+  workspace-test-suite legs 1 sum_s 1667
+  wasm-host-tests legs 4 sum_s 1667
+  release-dry-run legs 2 sum_s 1028
+  epic-17-exit legs 2 sum_s 900
+  nfr-rel-11-halt-receipt-999pct legs 1 sum_s 797
+  cgroup-ceiling-delegated legs 4 sum_s 737
+  reproducible-build legs 1 sum_s 730
+  example-spirit-ts-tests legs 1 sum_s 666
+  nfr-rel-1-crash-detection-2s legs 1 sum_s 643
+  check-reza-production-path legs 1 sum_s 588
+  windows-check legs 1 sum_s 560

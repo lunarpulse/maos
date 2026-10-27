@@ -1,0 +1,17 @@
+nfr-rel-11-halt-receipt-999pct | failed steps: ['Assert the two halves still sum to the whole suite']
+workspace-test-suite | failed steps: ['Run the full workspace test suite (nextest)']
+v1-0-ship-gate | failed steps: ['Fail if any sub-gate failed or was skipped']
+v1-5-ship-gate | failed steps: ['Fail if any v1.5-blocking gate failed']
+aggregate | failed steps: ['Fail if any gate failed']
+--- nfr-rel-11 halves step (re-runs root_shutdown_unload_16_3 release --skip cohort + debug cohort; output swallowed by $(...|sed), cargo test exit 101 via pipefail). Earlier steps in same job (release 9 vectors, debug cohort) passed. Job def + test file byte-identical to baseline 271e2a33. Classification: known 20-7 flake family [INFERENCE: failing test not printed]
+2026-10-27T23:00:08.3552778Z [36;1mrel=$(cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)[0m
+2026-10-27T23:00:08.3553555Z [36;1mdbg=$(cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)[0m
+2026-10-27T23:00:08.3554088Z [36;1mecho "release=${rel} debug=${dbg} total=$(( rel + dbg ))"[0m
+2026-10-27T23:00:31.7223801Z ##[error]Process completed with exit code 101.
+--- workspace-test-suite (classification: known 20-7 flake, root_shutdown_unload_16_3 ac4 5 s bound, same assert rs:348:9)
+2026-10-27T23:04:54.9010478Z         FAIL [  16.511s] (1144/5124) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+2026-10-27T23:04:54.9016772Z     thread 'cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains' (51969) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:348:9:
+2026-10-27T23:04:54.9017361Z     host B's hang Worker (pid 52509) is still in /proc after 5s
+2026-10-27T23:06:45.0111434Z      Summary [ 157.293s] 5124 tests run: 5123 passed, 1 failed, 135 skipped
+2026-10-27T23:07:16.6147312Z ##[error]Process completed with exit code 100.
+--- v1-0-ship-gate/v1-5-ship-gate/aggregate: downstream of workspace-test-suite only (v1-0 log line 210 'workspace-test-suite: failure'); macos-check skipped = macos-scope applicable!=true on empty commit (not a failure)

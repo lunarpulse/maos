@@ -1,0 +1,6 @@
+nfr-rel-11-halt-receipt-999pct | failed steps: ['Run root shutdown unload suite (release — 9 vectors)']
+aggregate | failed steps: ['Fail if any gate failed']
+--- excerpt (classification: known 20-7 flake root_shutdown_unload_16_3 ac4 5 s bound)
+2026-10-27T22:14:35.2073465Z thread 'ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan' (15723) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:348:9:
+2026-10-27T22:14:35.2075177Z the standalone Worker (pid 15836) is still in /proc after 5s
+2026-10-27T22:14:35.2156317Z ##[error]Process completed with exit code 101.

@@ -1,0 +1,540 @@
+{
+ "compile_by_class_h": {
+  "release-other": 2.24,
+  "xtask-dev": 2.03,
+  "test": 1.17,
+  "dev-other": 0.64,
+  "bench": 0.33,
+  "fixtures(dev)": 0.28,
+  "fixtures(release)": 0.24
+ },
+ "per_job_s": {
+  "check-unsafe": {
+   "xtask-dev": 107
+  },
+  "check-empty-kernel": {
+   "xtask-dev": 107
+  },
+  "manifest-field-coverage": {
+   "test": 42
+  },
+  "abi-diff": {
+   "xtask-dev": 87
+  },
+  "expensive-tests": {
+   "test": 293
+  },
+  "hello-spirit-tests": {
+   "test": 36
+  },
+  "check-composition-root-completeness": {
+   "xtask-dev": 85
+  },
+  "check-exit-commands": {
+   "dev-other": 248,
+   "xtask-dev": 71,
+   "test": 71
+  },
+  "check-a2a-sender-completeness": {
+   "xtask-dev": 88
+  },
+  "kloc-check": {
+   "xtask-dev": 103
+  },
+  "check-fr47": {
+   "xtask-dev": 127
+  },
+  "gen-abi-docs": {
+   "xtask-dev": 122
+  },
+  "check-cert-rotation-trigger": {
+   "xtask-dev": 71,
+   "test": 25
+  },
+  "check-workspace-count": {
+   "xtask-dev": 113
+  },
+  "check-corpus": {
+   "xtask-dev": 114
+  },
+  "check-loom": {
+   "xtask-dev": 102
+  },
+  "check-model-currency": {
+   "xtask-dev": 118,
+   "test": 1
+  },
+  "cap-token-verify-bench": {
+   "bench": 102
+  },
+  "check-env-contract": {
+   "xtask-dev": 110
+  },
+  "safety-critical-corpus-8-5": {
+   "test": 29
+  },
+  "check-pub-field-constructors": {
+   "xtask-dev": 68
+  },
+  "check-security-md": {
+   "xtask-dev": 89,
+   "test": 12
+  },
+  "observer-tests": {
+   "test": 24
+  },
+  "reproducible-build": {
+   "dev-other": 657
+  },
+  "check-service-boundary": {
+   "xtask-dev": 109
+  },
+  "architect-tests": {
+   "test": 65
+  },
+  "check-judge-config": {
+   "xtask-dev": 112
+  },
+  "nfr-rel-1-crash-detection-2s": {
+   "release-other": 462,
+   "fixtures(dev)": 122,
+   "fixtures(release)": 15
+  },
+  "lcas-corpus-tests": {
+   "test": 7
+  },
+  "invariant-lock": {
+   "xtask-dev": 114
+  },
+  "fr4-1000-call-fixture": {
+   "test": 40
+  },
+  "check-decision-register": {
+   "xtask-dev": 82,
+   "test": 1
+  },
+  "check-test-cost": {
+   "xtask-dev": 84,
+   "test": 0
+  },
+  "nash-tests": {
+   "test": 12
+  },
+  "calibrate-per-commit": {
+   "xtask-dev": 105
+  },
+  "hello-spirit-bench": {
+   "bench": 107
+  },
+  "example-spirit-tests": {
+   "test": 13
+  },
+  "mira-nash-bench": {
+   "bench": 146
+  },
+  "spirit-test-tests": {
+   "test": 11
+  },
+  "corpus-staleness": {
+   "xtask-dev": 129
+  },
+  "worker-tests": {
+   "test": 37
+  },
+  "founder-loop-bench": {
+   "bench": 126
+  },
+  "butler-tests": {
+   "test": 29
+  },
+  "orchestrator-tests": {
+   "test": 42
+  },
+  "nfr-aud-7-distillate-five-metrics-floor": {
+   "test": 57,
+   "dev-other": 99
+  },
+  "researcher-bench": {
+   "bench": 113
+  },
+  "nfr-rel-3-hsis-95pct": {
+   "test": 37
+  },
+  "coverage-matrix": {
+   "xtask-dev": 110
+  },
+  "mira-tests": {
+   "test": 26
+  },
+  "isolation-framework-tests": {
+   "test": 11
+  },
+  "onb-nfr2-timing": {
+   "release-other": 237
+  },
+  "example-spirit-drift": {
+   "xtask-dev": 85
+  },
+  "reviewer-tests": {
+   "test": 14
+  },
+  "nfr-sec-14-cross-spirit-isolation-200": {
+   "test": 41
+  },
+  "researcher-tests": {
+   "test": 48
+  },
+  "nfr-rel-11-halt-receipt-999pct": {
+   "release-other": 556,
+   "dev-other": 106,
+   "test": 44
+  },
+  "nfr-rel-10-cold-restart": {
+   "release-other": 107
+  },
+  "determinism-tests": {
+   "test": 34
+  },
+  "upgrade-policy-corpus": {
+   "release-other": 107
+  },
+  "revocation-corpus": {
+   "release-other": 125
+  },
+  "nfr-rel-2-hang-detection-60s": {
+   "release-other": 331,
+   "fixtures(dev)": 85,
+   "fixtures(release)": 10
+  },
+  "nfr-rel-9-revocation-5s-p99": {
+   "bench": 118,
+   "dev-other": 34
+  },
+  "nfr-sec-1-t3-image-signature": {
+   "release-other": 74
+  },
+  "nfr-rel-4-silent-failure-detection": {
+   "release-other": 113
+  },
+  "intent-lineage-6-4-extension": {
+   "test": 25
+  },
+  "nfr-perf-j4-latency": {
+   "bench": 134
+  },
+  "t3-escape-corpus (ubuntu-24.04)": {
+   "release-other": 69
+  },
+  "smoke-a2a-loopback-6-3": {
+   "release-other": 355
+  },
+  "check-serde-error-handling": {
+   "xtask-dev": 118
+  },
+  "smoke-a2a-fail-closed-8-8": {
+   "release-other": 390
+  },
+  "t3-escape-corpus (ubuntu-26.04)": {
+   "release-other": 112
+  },
+  "check-manifest-schema-version": {
+   "xtask-dev": 83
+  },
+  "check-bare-review-findings": {
+   "xtask-dev": 109
+  },
+  "check-review-findings-resolved": {
+   "xtask-dev": 77
+  },
+  "smoke-orchestrator-fanout-6-2": {
+   "release-other": 272
+  },
+  "smoke-schedule-6-4": {
+   "release-other": 360
+  },
+  "retract-corpus-tests": {
+   "test": 41
+  },
+  "a2a-loopback-corpus-v0": {
+   "test": 22
+  },
+  "a2a-tcp-tests-8-6": {
+   "test": 56
+  },
+  "multi-provider-drift-tests": {
+   "test": 84
+  },
+  "manifest-n-minus-1-test": {
+   "test": 16
+  },
+  "nfr-aud-14-intent-lineage-corpus": {
+   "test": 39
+  },
+  "nfr-perf-1-iac-routing-budget": {
+   "bench": 107
+  },
+  "t3-smoke-busybox (ubuntu-24.04)": {
+   "release-other": 86
+  },
+  "smoke-a2a-consent-vocab-8-7": {
+   "release-other": 375
+  },
+  "t3-smoke-busybox (ubuntu-26.04)": {
+   "release-other": 80
+  },
+  "nfr-scale-4-rate-limit-isolation": {
+   "test": 21
+  },
+  "intent-lineage-a2a-extension-6-3": {
+   "test": 37
+  },
+  "smoke-a2a-tcp-8-6": {
+   "release-other": 372
+  },
+  "adr-034-consent-rupture-corpus": {
+   "test": 41
+  },
+  "bench-audit-query-latency": {
+   "bench": 105
+  },
+  "ci-test-producer (arm64, ubuntu-24.04-arm)": {
+   "test": 379,
+   "release-other": 555,
+   "fixtures(dev)": 176,
+   "fixtures(release)": 133
+  },
+  "nfr-perf-8-orchestrator-fanout": {
+   "bench": 133
+  },
+  "ci-test-producer (x64, ubuntu-24.04)": {
+   "test": 477,
+   "release-other": 801,
+   "fixtures(dev)": 223,
+   "fixtures(release)": 200
+  },
+  "check-dev-record-completeness": {
+   "xtask-dev": 110,
+   "test": 1
+  },
+  "fr26-schedule-firing-corpus": {
+   "test": 52
+  },
+  "check-skill-schema": {
+   "xtask-dev": 126
+  },
+  "check-j1-two-host-signed-run": {
+   "xtask-dev": 108,
+   "test": 147
+  },
+  "check-dev-model-tier": {
+   "xtask-dev": 108
+  },
+  "check-stability-matrix": {
+   "xtask-dev": 105
+  },
+  "check-epic-close-green": {
+   "xtask-dev": 112
+  },
+  "smoke-registry-7-2": {
+   "dev-other": 108
+  },
+  "check-breaking-md": {
+   "xtask-dev": 113
+  },
+  "check-epic-close-coherence": {
+   "xtask-dev": 101
+  },
+  "smoke-abi-7-5a": {
+   "dev-other": 80
+  },
+  "ccac-n600-ship-gate": {
+   "test": 19
+  },
+  "check-red-team-gate": {
+   "xtask-dev": 83
+  },
+  "journey-hermetic-tier-1": {
+   "dev-other": 142,
+   "test": 107
+  },
+  "check-kernel-baseline": {
+   "xtask-dev": 90,
+   "test": 1
+  },
+  "fr59-yank-propagation-5min": {
+   "test": 19
+  },
+  "air-gap-import-corpus": {
+   "dev-other": 48,
+   "test": 18
+  },
+  "smoke-compliance-7-3": {
+   "dev-other": 98
+  },
+  "check-third-party-trial": {
+   "xtask-dev": 111
+  },
+  "smoke-skill-7-4": {
+   "dev-other": 106
+  },
+  "check-pentest-gate": {
+   "xtask-dev": 119
+  },
+  "nfr-onb-1-gate": {
+   "xtask-dev": 114
+  },
+  "check-j1-loopback-delegation": {
+   "xtask-dev": 114,
+   "test": 108,
+   "fixtures(dev)": 11,
+   "dev-other": 0
+  },
+  "check-coverage-matrix-completeness": {
+   "xtask-dev": 95
+  },
+  "check-dev-model-used-populated": {
+   "xtask-dev": 104
+  },
+  "smoke-onb-1-7-5b": {
+   "test": 30
+  },
+  "j0-scene": {
+   "dev-other": 120,
+   "test": 56
+  },
+  "release-dry-run (aarch64-unknown-linux-gnu)": {
+   "xtask-dev": 124,
+   "release-other": 472
+  },
+  "check-wasm-form-equiv": {
+   "fixtures(dev)": 116,
+   "fixtures(release)": 198,
+   "xtask-dev": 0
+  },
+  "release-dry-run (x86_64-unknown-linux-gnu)": {
+   "xtask-dev": 84,
+   "release-other": 317
+  },
+  "one-daemon-one-door": {
+   "dev-other": 51,
+   "test": 95
+  },
+  "check-migration-merkle": {
+   "release-other": 76,
+   "xtask-dev": 113
+  },
+  "check-multi-region-slo": {
+   "xtask-dev": 114
+  },
+  "check-enterprise-pdp": {
+   "xtask-dev": 94
+  },
+  "check-scale-churn": {
+   "xtask-dev": 91
+  },
+  "check-host-surface": {
+   "xtask-dev": 109
+  },
+  "check-fuzz-targets": {
+   "xtask-dev": 110
+  },
+  "check-j4-latency": {
+   "test": 50
+  },
+  "maosctl-load-over-the-door": {
+   "dev-other": 50,
+   "test": 104
+  },
+  "check-dependency-closure": {
+   "xtask-dev": 111
+  },
+  "check-escape-detector": {
+   "fixtures(dev)": 105,
+   "fixtures(release)": 1
+  },
+  "check-cohort-mesh": {
+   "xtask-dev": 115
+  },
+  "check-live-bilateral-consent": {
+   "test": 23
+  },
+  "workspace-test-suite": {
+   "test": 381,
+   "fixtures(dev)": 169,
+   "fixtures(release)": 293,
+   "dev-other": 54
+  },
+  "check-export-control": {
+   "xtask-dev": 90
+  },
+  "check-multi-tenant-loom": {
+   "dev-other": 54,
+   "xtask-dev": 100
+  },
+  "check-loom-substrate-drift": {
+   "xtask-dev": 115
+  },
+  "check-vetting-attestation": {
+   "xtask-dev": 112
+  },
+  "fuzz-build": {
+   "release-other": 123
+  },
+  "windows-check": {
+   "dev-other": 114,
+   "test": 327
+  },
+  "check-cross-region-consensus": {
+   "xtask-dev": 112
+  },
+  "check-fkcs": {
+   "xtask-dev": 114
+  },
+  "check-enterprise-identity": {
+   "xtask-dev": 98
+  },
+  "check-mobile-push-on-halt": {
+   "test": 39
+  },
+  "check-ff-j6": {
+   "xtask-dev": 117
+  },
+  "check-reza-production-path": {
+   "test": 104,
+   "dev-other": 112,
+   "xtask-dev": 65
+  },
+  "check-skill-conformance": {
+   "xtask-dev": 88,
+   "test": 0
+  },
+  "check-rotation-real-timing": {
+   "xtask-dev": 109
+  },
+  "check-trial-attestation": {
+   "xtask-dev": 110,
+   "test": 32
+  },
+  "coverage-matrix-nfr-test-3": {
+   "xtask-dev": 95
+  },
+  "example-spirit-ts-tests": {
+   "release-other": 280,
+   "dev-other": 30,
+   "test": 168
+  },
+  "check-mock-not-in-release": {
+   "release-other": 499
+  },
+  "smoke-discipline-7-1-5": {
+   "release-other": 373
+  },
+  "check-test-budget": {
+   "xtask-dev": 111,
+   "test": 0
+  },
+  "check-ship-gate-completeness": {
+   "xtask-dev": 93
+  }
+ }
+}
