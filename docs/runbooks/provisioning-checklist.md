@@ -33,7 +33,7 @@ than inherited from planning prose.
 | `lunarpulse/homebrew-maos` | `packaging/homebrew/maos.rb` | hard fail for publication: repository does not exist and formula hashes remain placeholders | `ops-brew-tap-and-aur-publication` | `absent` |
 | `AUR account and package publication` | `packaging/aur/PKGBUILD` | hard fail for publication: package was not submitted and hashes/version remain scaffold values | `ops-brew-tap-and-aur-publication` | `absent` |
 | `rto-ledger branch permission` | `.github/workflows/rpo-rto-cadence.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; collectors never create a branch | `ops-provisioning-secrets-and-accounts` | `present` |
-| `fuzz-ledger branch permission` | `.github/workflows/fuzz-cadence.yml`, `fuzz-prerelease.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; operators must provision the branch, initial ledger, and write access | `ops-provisioning-secrets-and-accounts` | `absent` |
+| `fuzz-ledger branch permission` | `.github/workflows/fuzz-cadence.yml`, `fuzz-prerelease.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; operators must provision the branch, initial ledger, and write access | `ops-provisioning-secrets-and-accounts` | `present` |
 | `self-hosted fuzz runner` | `.github/workflows/fuzz-cadence.yml` and `fuzz-prerelease.yml` | not required: both workflows use GitHub-hosted Ubuntu runners | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (hosted runners execute both fuzz tiers)` |
 | `24-hour fuzz execution` | `.github/workflows/fuzz-prerelease.yml` | chain fails on a crash, missing link/counter, or measured total below 86,400 libFuzzer seconds per target; five 5h links fit the hosted job cap | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (workflow implemented by 20-3a; actual run evidence accrues in CI, rc precondition belongs to 20-5)` |
 | `external third-party authors` | `xtask/src/check_third_party_trial.rs:325` | hard fail below the gate's honest denominator; the current gate requires 12 rather than the former prose's 3 | `ops-external-cohort-and-pen-test` | `absent` |
@@ -57,6 +57,13 @@ than inherited from planning prose.
   fail rather than seed/no-op/warn. `fuzz-ledger` was absent at the story baseline;
   **ops-provisioning-secrets-and-accounts** must provision it and its write access.
   The existing `rto-ledger` remains operator-owned; collectors never create it.
+- **`fuzz-ledger` provisioned 2026-10-27 (operator-authorized, agent-pushed):** orphan
+  branch `fuzz-ledger` at `5e251fffd0fca188cc288070e8d339c7cf719c21`, one root file
+  `fuzz-ledger.json` = `{"schema_version":1,"records":[]}` (the shape
+  `scripts/collect-ledger.sh` validates and `check-fuzz-floor` reads). Write access is the
+  workflows' explicit `permissions: contents: write` with `GITHUB_TOKEN`, the same path that
+  produced the live `rto-ledger` history. The first collector append and `check-fuzz-floor`
+  read are not yet observed; until 90 days of records accrue the gate reports `Accumulating`.
 - `fuzz-prerelease.yml` implements the ≥24h T3 chain on hosted runners, via five
   5h links (four 6h links leave no setup time under the hosted cap). Completed
   links produce measured evidence; implementation alone is not a green T3 run.
