@@ -4,6 +4,9 @@ name: maos-dev
 
 services:
   cosmohub-dev-env:
+    # A real PID 1 reaps orphaned tool processes. A bare `sleep infinity` cannot,
+    # so long agent sessions otherwise accumulate zombies.
+    init: true
     build:
       context: .
       dockerfile: ./Dockerfile
