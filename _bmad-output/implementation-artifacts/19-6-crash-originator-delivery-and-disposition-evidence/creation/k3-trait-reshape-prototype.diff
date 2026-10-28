@@ -1,0 +1,58 @@
+--- a/crates/maos-kernel-core/src/supervision/disposition.rs
++++ b/crates/maos-kernel-core/src/supervision/disposition.rs
+@@ -34,11 +34,10 @@
+         }
+         OnCrashAction::ReassignToReplica => {
+             for task in drained_tasks {
+-                let intent_str = task.intent_class.as_str();
+-                let target = replica.and_then(|r| r.find_replica(intent_str));
+-                if let Some(_replica_pid) = target {
+-                    // v0.3-β: reassign task to replica
+-                    iac.reassign_task_to(task, &task.originator_spirit_id);
++                let target = replica.and_then(|r| r.find_replica(task));
++                if let Some(target) = target {
++                    // Story 19-6 (D-19-6-05 C): the row names the resolved target.
++                    iac.reassign_task_to(task, &target.spirit_id);
+                     reassigned += 1;
+                 } else {
+                     // v0.3-β — no replica available; fall through to escalation
+--- a/crates/maos-domain/src/supervision.rs
++++ b/crates/maos-domain/src/supervision.rs
+@@ -178,19 +178,33 @@
+ 
+ // ── ReplicaResolver trait ─────────────────────────────────────
+ 
++/// Where a dead Spirit's in-flight task is reassigned (FR50, Story 19-6).
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct ReplicaTarget {
++    /// The Spirit id the `task.reassigned` row names.
++    pub spirit_id: String,
++    /// Its pid, `0` when the target re-dispatches to a Spirit not yet bound.
++    pub spirit_pid: u32,
++}
++
+ /// Resolve a replica Spirit for task reassignment (FR50).
+ /// v0.3-β default is `NullReplicaResolver` (always `None`).
+ pub trait ReplicaResolver: Send + Sync + 'static {
+-    /// Return the `spirit_pid` of a healthy replica for the given `intent_class`,
+-    /// or `None` if no replica is available.
+-    fn find_replica(&self, intent_class: &str) -> Option<u32>;
++    /// The replica for this in-flight task, or `None` if no replica is available.
++    fn find_replica(
++        &self,
++        task: &crate::ports::task::TaskAssignmentRecord,
++    ) -> Option<ReplicaTarget>;
+ }
+ 
+ /// Default v0.3-β resolver — always returns `None`.
+ pub struct NullReplicaResolver;
+ 
+ impl ReplicaResolver for NullReplicaResolver {
+-    fn find_replica(&self, _intent_class: &str) -> Option<u32> {
++    fn find_replica(
++        &self,
++        _task: &crate::ports::task::TaskAssignmentRecord,
++    ) -> Option<ReplicaTarget> {
+         None
+     }
+ }

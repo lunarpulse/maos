@@ -1,0 +1,48 @@
+--- a/crates/maos-kernel-core/src/supervision/crash_detector.rs
++++ b/crates/maos-kernel-core/src/supervision/crash_detector.rs
+@@ -10,11 +10,14 @@
+ 
+ use tokio::task::JoinHandle;
+ 
++use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskCompletePayload};
++use maos_domain::invariants::i1::IntentClass;
+ use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
+ use maos_domain::invariants::i3::FrameOrigin;
+ use maos_domain::supervision::{
+     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+ };
++use maos_spirit_abi::identity::SpiritId;
+ 
+ use crate::halt::{terminate_spirit, HaltRegistry};
+ use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+@@ -168,6 +171,30 @@
+                 payload.to_string().as_bytes(),
+                 FrameOrigin::Kernel,
+             );
++            // Story 19-6 (D-19-6-01 B) — FR12: the orphan reaches the originator's
++            // mailbox as a kernel-sent `TaskComplete` (I2: journaled by `deliver_typed`).
++            // An originator with no registered mailbox is journaled-only, as before.
++            let address = |spirit_id: &str| FrameAddress {
++                spirit_id: SpiritId::from(spirit_id),
++                host_id: None,
++                role: None,
++            };
++            let frame = IacFrame {
++                frame_id: self.tl.mint_frame_id(),
++                timestamp_ns: task_orphaned_emitted_at_ns,
++                logical_clock: 0,
++                from: address(crate::iac::mailbox::KERNEL_SENDER_SPIRIT_ID),
++                to: vec![address(&task.originator_spirit_id)].into(),
++                kind: maos_spirit_abi::identity::FrameKind::TaskComplete,
++                intent: IntentClass::Standard,
++                payload: FramePayload::TaskComplete(TaskCompletePayload {
++                    result: format!("orphaned:{}:{}", task.task_id, cause.as_str()),
++                }),
++                auto_marker: FrameOrigin::Kernel,
++                consent_envelope: None,
++                intent_lineage: Default::default(),
++            };
++            let _ = self.iac.deliver_typed(frame, spirit_pid, None).await;
+         }
+ 
+         // Step 6: Apply FR50 disposition

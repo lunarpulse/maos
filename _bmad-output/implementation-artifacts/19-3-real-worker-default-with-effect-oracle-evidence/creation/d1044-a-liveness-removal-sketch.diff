@@ -1,0 +1,115 @@
+diff --git a/crates/maos-bin/src/worker_cli.rs b/crates/maos-bin/src/worker_cli.rs
+index 4bd052c..02b9cdb 100644
+--- a/crates/maos-bin/src/worker_cli.rs
++++ b/crates/maos-bin/src/worker_cli.rs
+@@ -194,9 +194,7 @@ pub trait WorkerCli: Send + Sync {
+     /// check that the binary is present and invokable. Default = a `--version`
+     /// liveness probe; the fixture overrides to the bridge handshake.
+     fn probe_strategy(&self) -> ProbeStrategy {
+-        ProbeStrategy::Liveness {
+-            argv: vec!["--version".to_string()],
+-        }
++        ProbeStrategy::SpawnIsProbe
+     }
+ 
+     /// The argv token GROUPS this adapter REQUIRES in the manifest's hashed
+@@ -250,60 +248,10 @@ pub enum ProbeStrategy {
+     /// The kernel's Story 6.2 `--maos-bridge-probe` output-shape handshake.
+     /// Fixture-only — the only CLI that answers the MAOS probe protocol.
+     BridgeHandshake,
+-    /// A liveness probe for a real adapter-backed CLI: run it with `argv` and
+-    /// require a clean exit. The adapter (not a handshake) is the output-shape
+-    /// contract, verified at completion.
+-    Liveness { argv: Vec<String> },
++    /// No host-side probe: the T3 spawn is the invokability check.
++    SpawnIsProbe,
+ }
+ 
+-/// Run a liveness probe: spawn `program argv`, require a clean exit within
+-/// `timeout`. Fail-closed on spawn error, non-zero exit, or timeout. Output is
+-/// discarded — a liveness probe checks invokability, NOT output shape (that is
+-/// the adapter's completion oracle). Mirrors the kernel probe's poll+timeout
+-/// shape so the real-CLI admission path has the same fail-loud guarantees.
+-pub fn run_liveness_probe(
+-    program: &str,
+-    argv: &[String],
+-    timeout: std::time::Duration,
+-) -> Result<(), String> {
+-    use std::process::{Command, Stdio};
+-    let mut child = Command::new(program)
+-        .env_clear()
+-        .envs(
+-            [
+-                "PATH",
+-                "HOME",
+-                "XDG_RUNTIME_DIR",
+-                "DBUS_SESSION_BUS_ADDRESS",
+-            ]
+-            .into_iter()
+-            .filter_map(|name| std::env::var_os(name).map(|value| (name, value))),
+-        )
+-        .args(argv)
+-        .stdin(Stdio::null())
+-        .stdout(Stdio::null())
+-        .stderr(Stdio::null())
+-        .spawn()
+-        .map_err(|e| format!("spawn failed for {program}: {e}"))?;
+-    let start = std::time::Instant::now();
+-    loop {
+-        match child
+-            .try_wait()
+-            .map_err(|e| format!("try_wait failed for {program}: {e}"))?
+-        {
+-            Some(status) if status.success() => return Ok(()),
+-            Some(status) => return Err(format!("non-zero exit ({status}) for {program}")),
+-            None => {
+-                if start.elapsed() >= timeout {
+-                    let _ = child.kill();
+-                    let _ = child.wait();
+-                    return Err(format!("timed out after {timeout:?} for {program}"));
+-                }
+-                std::thread::sleep(std::time::Duration::from_millis(50));
+-            }
+-        }
+-    }
+-}
+ 
+ /// The clean-home invariant (spec "Never"): on the live path, refuse if the CLI's
+ /// ambient auth file exists in the sandbox home. codex's `~/.codex/auth.json`
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+index 28304ef..8a52e9f 100644
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -830,31 +830,19 @@ pub fn run_cli_wrapper_manifest(
+             )
+             .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+         }
+-        worker_cli::ProbeStrategy::Liveness { argv } => {
++        worker_cli::ProbeStrategy::SpawnIsProbe => {
+             maos_kernel_core::lifecycle::cli_wrapper::admission::check_egress(
+                 &config,
+                 proxy_configured,
+                 &permitted_egress,
+             )
+             .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+-            // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
+-            // this; preserve it on the real-CLI path, typed — Story 17-6 D-17-6-C).
+             if !matches!(granted_tier, SandboxTier::T3) {
+                 let e = maos_domain::cli_wrapper::CliWrapperAdmissionError::ECliWrapperRequiresT3 {
+                     observed_tier: format!("{granted_tier:?}"),
+                 };
+                 return Err(format!("maos run: cli_wrapper admission failed: {e}").into());
+             }
+-            worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
+-                .map_err(|e| {
+-                    format!("maos run: cli_wrapper admission failed: liveness probe: {e}")
+-                })?;
+-            eprintln!(
+-                "maos run: cli_wrapper '{}' admitted via liveness probe (real adapter-backed CLI; \
+-                 output shape is verified at completion by the {} adapter, not a bridge handshake)",
+-                resolved,
+-                worker_cli.name()
+-            );
+         }
+     }
+ 

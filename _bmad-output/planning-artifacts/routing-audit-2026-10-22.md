@@ -18,7 +18,7 @@
 |---|---|---|---|---|---|
 | `18-7-live-skill-authoring-and-revisions` | 18-1 | FR39, FR57 | capability-mediated runtime `skill.author.self` submission with durable skill content, telemetry-evidenced revision proposals (target/version/diff/evidence) preserved through operator admission, vetting and audit | 0 [INFERENCE] | `requirements-inventory.md:562` promised "follow-on at Epic 18 preflight"; `main.rs:13135-13164` smoke-only enqueue; `crates/maos-skill/src/store.rs:50-75` payload not persisted |
 | `19-5-cross-form-upgrade-and-cold-swap` | 19-3 | FR10, FR11, FR49 | state/token-preserving upgrade parity for the subprocess form; admission rejects an archived predecessor without a migrator; cold-swap policy ships (`ColdSwapUnsupported` today) | ◆ FLAG-Winston (scheduler) | `16-1…md:43-46,478-486` compiled Butler swap only; `05-fr1-20-scout.md:13` |
-| `19-6-crash-originator-delivery-and-disposition` | 19-1 | FR12, FR50, NFR-Rel-1 | crash → mailbox delivery to the task originator with reassignment; all declared crash dispositions applied (production `NullReplicaResolver` replaced) | 0–small | `16-3…md:35-37` journaled, never mailbox-delivered; `main.rs:2795-2796` |
+| `19-6-crash-originator-delivery-and-disposition` | 19-1 | FR12, FR50, NFR-Rel-1 | crash → mailbox delivery to the task originator with reassignment; all declared crash dispositions applied (production `NullReplicaResolver` replaced) | 0–small | `16-3…md:35-37` journaled, never mailbox-delivered; `main.rs:2795-2796` (→ `crates/maos-bin/src/main.rs:2997-2998` @d9bd59c4, 19-6 creation) |
 | `20-8-manifest-contract-completion` | 20-1 | FR8 | manifest declares `skills`, `explanation_shape`, `intent_promotion_set`, `swap_invariants`; signed manifest verified at admission | ◆ FLAG-Winston (admission) | `05-fr1-20-scout.md:10` four fields missing; unsigned admission |
 | `20-9-spawned-form-lifecycle-hooks` | 20-8 | FR55 | budgeted lifecycle triggers (incl. 17-4's idle-quiescent consolidation + live telemetry hooks) reach spawned forms (subprocess Worker, WASM); v1.0 third-party Spirits otherwise lack the hook ABI | ◆ FLAG-Winston | `17-4…md:51,135` "spawned forms receive neither new hook" |
 | `20-10-purge-residue-removal` | 20-2 | FR2 | `maos purge` removes owned T3 containers and cgroups it today only reports | 0 | `16-4-maos-uninstall-and-keyring.md:423-424` |
@@ -174,7 +174,7 @@ See `epics/requirements-inventory.md` § "Routing audit corrections (2026-10-22)
 | FR11 | Reject archived predecessor without migrator | 16-1 | PARTIAL: admission lacks archive check | `05-fr1-20-scout.md:13` | ADD `19-5` |
 | FR49 | Hot, cold, migrator upgrade policies | 16-1 | PARTIAL: `ColdSwapUnsupported` | `16-1…md:43-46,484-486` | ADD `19-5` |
 | FR12 | Detect crashes, notify originators | 16-3 | PARTIAL: journaled, never delivered | `16-3…md:35-37` | ADD `19-6` |
-| FR50 | All declared crash dispositions | 16-3 | PARTIAL | `main.rs:2795-2796` `NullReplicaResolver` | ADD `19-6` |
+| FR50 | All declared crash dispositions | 16-3 | PARTIAL | `main.rs:2795-2796` `NullReplicaResolver` (→ `:2997-2998` @d9bd59c4) | ADD `19-6` |
 | FR15 | Three halt resolutions and per-class floors | 16-2 | PARTIAL: J0 only | `16-2…md:25-26` | `18-2` |
 | FR58 | Zero-config reference response | 16-2 | PARTIAL: hello/J0 only | `16-2…md:25-34` | `18-1` |
 | FR29 | Participant recall honoring production consent | 17-3d/17-8 | PARTIAL: no production granter/gate; native pid 0 | `17-8…md:45,114` | ADD `21-7` |

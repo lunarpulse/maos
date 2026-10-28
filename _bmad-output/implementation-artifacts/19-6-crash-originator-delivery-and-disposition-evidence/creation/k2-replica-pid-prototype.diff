@@ -1,0 +1,15 @@
+--- a/crates/maos-kernel-core/src/supervision/disposition.rs
++++ b/crates/maos-kernel-core/src/supervision/disposition.rs
+@@ -36,9 +36,9 @@
+             for task in drained_tasks {
+                 let intent_str = task.intent_class.as_str();
+                 let target = replica.and_then(|r| r.find_replica(intent_str));
+-                if let Some(_replica_pid) = target {
+-                    // v0.3-β: reassign task to replica
+-                    iac.reassign_task_to(task, &task.originator_spirit_id);
++                if let Some(replica_pid) = target {
++                    // Story 19-6 (D-19-6-05 B): the row names the resolved replica pid.
++                    iac.reassign_task_to(task, &format!("pid:{replica_pid}"));
+                     reassigned += 1;
+                 } else {
+                     // v0.3-β — no replica available; fall through to escalation
