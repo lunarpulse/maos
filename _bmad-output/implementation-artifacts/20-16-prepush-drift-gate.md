@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. Easy tier (no ke
 
 # Story 20.16: `xtask prepush` aggregate drift gate
 
-Status: in-progress
+Status: done
 
 <!-- Created 2026-10-27 at 84e0e659 by bmad-create-story under the lighter creation contract (no party-mode preflight). Prep story before 19-1 (E18 retro R3, operator ruling 2026-10-27; action E18-A3). D-20-16-01…08 RULED 2026-10-27 (01 C; 02–08 A — all recommendations accepted); dev may start. Measured, not read: every Epic-18 landing red the retro cites, mapped job-by-job from the jobs API (`20-16-evidence/creation/epic18-landing-reds.md`); every candidate check timed locally at HEAD (`prepush-timings.tsv`); `cargo nextest run` workspace vs per-package from one warm target dir. One cargo process; CARGO_TARGET_DIR=/mnt/build/cargo; `env -u CI -u GITHUB_ACTIONS`. No crate source changed; `intent-lineage-coverage-report.md` reverted after the workspace run touched it. -->
 
@@ -119,12 +119,12 @@ Planting the 18-7-class drift (one code removed from `docs-site/route-manifest.j
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** D-20-16-01…08 RULED; tracker → `in-progress`. Re-measure `prepush-timings.tsv` rows that moved; re-check that 20-15 has not renamed any job a pin reader reads.
-- [ ] **T1 — Skeleton** (AC1, CR-1, D-04, D-05): subcommand, self-exec runner, change set, report/JSON; in-src tests for aggregation and exit.
-- [ ] **T2 — Legs** (AC1): the 22 gates; docs scripts; D-03 conditional legs; D-01 test leg.
-- [ ] **T3 — Pin reader** (D-02): parse `discipline.yml` (`serde_yaml`; reuse `check_test_cost::job_block`, `:518`, made `pub(crate)`), counts vs `nextest list`, marker sites, ANSI lint; it must be green on HEAD (fix or exempt-with-reason any real drift it finds, each named).
-- [ ] **T4 — Proven red** (AC4) and **cost** (AC3): plant, restore, timings.
-- [ ] **T5 — Contract** (AC2): `proof-contract.md`; local customizations; kloc exact re-pin per D-07 (`d11_xtask_ceiling_ratchet` cites this story's full key); Dev Agent Record, File List, Change Log; tracker. Do not edit `intent-lineage-coverage-report.md` (revert if a run modifies it). No commit or push without the operator.
+- [x] **T0 — Preflight.** D-20-16-01…08 RULED; tracker → `in-progress`. Re-measure `prepush-timings.tsv` rows that moved; re-check that 20-15 has not renamed any job a pin reader reads. *(Ticked 2026-10-28 at the done flip: the pin readers ran green on the final tree (`prepush --json` exit 0, 0 red) and the landed workflow shape holds on run 40609213235; timings were re-measured in `20-16-evidence/timings-2026-10-27.md`.)*
+- [x] **T1 — Skeleton** (AC1, CR-1, D-04, D-05): subcommand, self-exec runner, change set, report/JSON; in-src tests for aggregation and exit. *(Ticked: `xtask/src/prepush.rs`, `main.rs` wiring, `xtask/tests/prepush_20_16.rs`; landed.)*
+- [x] **T2 — Legs** (AC1): the 22 gates; docs scripts; D-03 conditional legs; D-01 test leg. *(Ticked: final post-correction `prepush --json` exit 0, 62 pass / 8 skip / 1 advisory / 0 red, `20-16-evidence/local-integration-smoke-2026-10-27.md`.)*
+- [x] **T3 — Pin reader** (D-02): parse `discipline.yml` (`serde_yaml`; reuse `check_test_cost::job_block`, `:518`, made `pub(crate)`), counts vs `nextest list`, marker sites, ANSI lint; it must be green on HEAD (fix or exempt-with-reason any real drift it finds, each named). *(Ticked: green on the final tree; named drift fix `CARGO_TERM_COLOR` recorded in the Completion Notes.)*
+- [x] **T4 — Proven red** (AC4) and **cost** (AC3): plant, restore, timings. *(Ticked: AC4 plant `20-16-evidence/plants.md` — exit 1, red line names `docs-site/route-manifest.json` and `EAbiTooOld`; AC3 timings `20-16-evidence/timings-2026-10-27.md` — warm 141.81 s shell / 135.876 s internal, one-line incremental 249.71 s, both on the committed candidate `38e5b52a`. The warm run exceeds the 2× creation budget and is reported as a regression there; not re-measured on the landed `b35c9284`.)*
+- [x] **T5 — Contract** (AC2): `proof-contract.md`; local customizations; kloc exact re-pin per D-07 (`d11_xtask_ceiling_ratchet` cites this story's full key); Dev Agent Record, File List, Change Log; tracker. Do not edit `intent-lineage-coverage-report.md` (revert if a run modifies it). No commit or push without the operator. *(Ticked: `docs/testing/proof-contract.md` section, xtask pin 47422 landed with the aggregate 188504 / hardfail 188505, record and tracker updated at the landing.)*
 
 ## Dev Notes
 
@@ -233,6 +233,15 @@ The first JSON smoke was red and included compilation; it is not the AC3 warm be
 - Producer-parse P3 (unknown-field erasure) was fixed on the 20-15 side with `deny_unknown_fields` (+1 producer line, inside STOP38).
 - Not done: final post-correction full prepush, in-place plants, warm/incremental timing, hosted proof, final approval, savings or landed-E19 base.
 
+### Landing (2026-10-28; evidence in `20-15-evidence/ci/run-40609213235/`)
+
+Landed on main `271e2a33..b35c9284` (operator-authorized 2026-10-28), together with 20-15. Discipline run **40609213235** @ `b35c9284`: success, attempt 1, **191/191 jobs** — the tree whose workflow pins `xtask prepush` reads holds all of them (AC1.2 pins, 0 dirty refusals, no reds). This is not a hosted run of the `prepush` command itself (it is a local, pre-push command; the plant and timings above are local). The "Not done" list above is superseded: the final post-correction prepush, the in-place plant and the warm/incremental timings are recorded in `20-16-evidence/`; the landed E19 base is below.
+
+- **Landed grant:** xtask +1020 (46402 -> 47422 = `prepush.rs` 1014 + `main.rs` 6, exactly at the ruled STOP, not above); kernel-Δ 0 for this story. Aggregate measured 188504, hardfail 188505 (the 20-15 conmon kernel grant, 26367 -> 26378 / 20610 -> 20619, landed in the same push).
+- **E19 rebase (D-20-16-07 A):** xtask 47422 + 202 = **47624** (was 46364 -> 46566), recorded in `epic-19-founder-loop-w4.md`; the kernel/aggregate endpoint shifts there are derived arithmetic, to be confirmed at the 19-1 preflight.
+- **Reviews:** merged opus Blind+Edge, Acceptance, Test-Infra — all triaged above.
+- **Known cost note:** AC3 warm no-change 141.81 s shell vs the ≈ 61 s creation budget (2.32×; reported as a regression in `timings-2026-10-27.md`).
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/20-16-prepush-drift-gate.md`
@@ -268,3 +277,4 @@ The first JSON smoke was red and included compilation; it is not the AC3 warm be
 - 2026-10-27: Second-round post-review corrections (parent-verified, uncommitted tree on `ed2118a0`). Test-Infra review `TestInfraDelta`: **T-1 MED fixed** — prepush RED detail kept lines now display in output order; new vector `red_detail_keeps_output_order_and_libtest_failures` in `xtask/tests/prepush_20_16.rs`. **T-2 LOW fixed** — the detail regex ranks `[A-Z-]*FAIL [`, `TIMEOUT`, `ABORT`, `SIG*` and libtest `test ... FAILED` / `test result: FAILED` first. Shared with 20-15 (recorded there): R-1 accepted as a narrower proof, R-2/F-1/K-1 fixed, K-2 dismissed, Acceptance P3 #6 fixed (kernel hash re-pinned, 26378/20619 unchanged). **Exact measurement** after `cargo fmt --all` / `kloc-check --json`: `prepush.rs` 1013 -> **1014**, so 20-16 = 1014 + `main.rs` 6 = **+1020, exactly AT (not above) the ruled STOP +1020**; xtask 47421 -> **47422**; aggregate measured 188503 -> **188504**, hardfail 188504 -> **188505**; 20-15 xtask component stays +38. Verification: fmt clean; `check-kernel-baseline` PASSED 26378/95; `kloc-check` passed; 84/84 tests (`prepush_20_16`, `fixture_provenance_20_15`, d11 ratchet, recovery_lane, `kernel_pin_content_hash_16_0`); `t3_terminal_helpers` 7/7; `researcher_8_14c` 7/7; `check-test-cost` PASS; full `xtask prepush --json` exit 0, 62 pass / 8 skip / 1 advisory / 0 red, 426.0 s internal wall (includes rebuild after edits; **not** an AC3 timing). Pending: hosted landing (and the in-place AC4 plant and AC3 warm/incremental pair on the committed tree); no completion, approval or savings claim.
 - 2026-10-27: Hosted landing-shaped runs 40590389455 and 40596566414 on `ed2118a0` exercised the workflow pins the prepush pin readers read (both 20-15 runs: AC1.2 pin lines held, see the 20-15 record "Hosted landing runs 2 and 3"). They are not hosted proof of the prepush command itself or of the later candidate `31bce4fb`. Landing pending (operator approval); no completion, approval or savings claim.
 - 2026-10-28: Hosted validation run 40602500711 (`ci/20-15-validate` @ `afdff29a` = `31bce4fb` + trigger-only commit) is completed/success, 191/191 jobs green, on the tree whose workflow pins `xtask prepush` reads (evidence and figures in the 20-15 record, "Hosted validation of the corrected candidate (run 40602500711)"). Final code tree: `31bce4fb`; later commits are records-only. This is not hosted proof of the prepush command itself. Landing on main pending operator approval; no done flip or landing claim.
+- 2026-10-28: **Done.** Landed on main `271e2a33..b35c9284` (operator-authorized) with 20-15; discipline run 40609213235 @ `b35c9284` green (attempt 1, 191/191 jobs; evidence `20-15-evidence/ci/run-40609213235/`). T0–T5 ticked against recorded evidence (final prepush exit 0; AC4 plant `plants.md`; AC3 `timings-2026-10-27.md`; contract section and 47422 pin landed). xtask +1020 exactly at the STOP; E19 xtask envelope rebases to 47422 + 202 = 47624 (epic-19; kernel/aggregate endpoint shifts derived, confirm at 19-1 preflight). Tracker and epic status lines flipped.

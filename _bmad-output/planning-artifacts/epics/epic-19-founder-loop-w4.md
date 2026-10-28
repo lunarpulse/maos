@@ -38,13 +38,15 @@ MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassett
 | Crate | Measured @f889b3e4 | D19-1 A envelope (OLD → NEW) |
 |---|---|---|
 | maos-bin | 29497 exact (`xtask/kloc.toml:517`) | 29497 → **30563** |
-| xtask | 46364 exact (`:339`) | 46364 → **46566** |
+| xtask | 46364 exact (`:339`) | 46364 → **46566** — **REBASED 2026-10-28 (D-20-16-07 A, landed): 47422 → 47624** (landed xtask 47422 + 202; see the note below the table) |
 | maos-bench | 2359 exact (`:520`) | 2359 → **2476** |
 | maos-control | 1344/1791 (`:484`) | 1344 → **1422** (inside the reserved ceiling — no raise) |
 | maos-cli | 6155/6856 (`:489`) | 6155 → **6220** (inside — no raise) |
 | maos-shell | 613 exact (`:691`) | 613 → **626** (exact row — raise) |
 | maos-journey-test · maos-fkcs · maos-spirit-abi | 946/1104 (`:681`) · 482/591 (`:677`) · 1042/3000 (`:270`) | unchanged |
 | aggregate hardfail | 187438 (`:718`) | 187438 → **188988** |
+
+**Rebase after the 20-15/20-16 landing (2026-10-28; main 271e2a33..b35c9284, hosted green run 40609213235).** The xtask envelope is rebased per the operator's D-20-16-07 A ruling (2026-10-27, "landed xtask + 202"): landed xtask **47422** (20-15 +38: 46364 → 46402; 20-16 +1020: 46402 → 47422 = `prepush.rs` 1014 + `main.rs` 6, exactly at its STOP) + 202 = **47624** (was 46364 → 46566). The +202 is the unchanged Σ of the 19-x xtask forecasts × 1.3. **Derived arithmetic, not newly ruled — confirm at the 19-1 preflight:** (a) the D19-2 kernel deltas stay +12 physical / +9 tokei, but the endpoints move because the 20-15 conmon FLAG-Winston grant landed first (26367 → 26378 physical, 20610 → 20619 tokei): 26379 → **26390** physical and 20619 → **20628** tokei; (b) the aggregate hardfail envelope delta stays +1550 (187438 → 188988 above is the pre-landing base) and its endpoint moves from landed base 188505 (measured 188504) to **190055**. The OLD endpoints in the table, the kernel-Δ paragraph and the D19-1 row are kept as history.
 
 The 15-2 per-story figures (maos-bin +500–1000, xtask +150, maos-bench +200, maos-control +40–80) are superseded by D19-1; the maos-bench reservation was consumed by `18-2-eval-halt-verb-and-corpus-numbers` (D-18-2-R1, 2026-10-25). `spirits/` stays ungoverned (`xtask/src/kloc_check.rs:311,408`) — the preferred home for the epic parser, the deterministic split, the halt tag and the digest composition; `benches/` too (`:305`).
 

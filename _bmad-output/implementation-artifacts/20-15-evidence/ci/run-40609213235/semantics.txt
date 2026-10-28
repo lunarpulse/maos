@@ -1,0 +1,134 @@
+== 1. nextest profile per run (consumers)
+173_epic-17-exit (ubuntu-26.04).txt: 7 runs; archive-consumer<-maos-bin x6, archive-consumer<-maos-wasm-host x1
+    L831 profile=archive-consumer first=maos-bin::smoke_cli_wrapper_8_12
+    L848 profile=archive-consumer first=maos-bin::worker_terminal_facts_17_7
+    L1293 profile=archive-consumer first=maos-bin::smoke_cli_wrapper_8_12
+    L1310 profile=archive-consumer first=maos-bin::cli_wrapper_exhaustion_17_9
+    L1547 profile=archive-consumer first=maos-bin::observer_activity_corpus_17_4
+    L1787 profile=archive-consumer first=maos-bin::observer_live_17_4
+    L2079 profile=archive-consumer first=maos-wasm-host::t2_sandbox_kill
+174_epic-17-exit (ubuntu-24.04).txt: 7 runs; archive-consumer<-maos-bin x6, archive-consumer<-maos-wasm-host x1
+    L830 profile=archive-consumer first=maos-bin::smoke_cli_wrapper_8_12
+    L847 profile=archive-consumer first=maos-bin::worker_terminal_facts_17_7
+    L1293 profile=archive-consumer first=maos-bin::smoke_cli_wrapper_8_12
+    L1310 profile=archive-consumer first=maos-bin::cli_wrapper_exhaustion_17_9
+    L1548 profile=archive-consumer first=maos-bin::observer_activity_corpus_17_4
+    L1788 profile=archive-consumer first=maos-bin::observer_live_17_4
+    L2080 profile=archive-consumer first=maos-wasm-host::t2_sandbox_kill
+175_cgroup-ceiling-undelegated (ubuntu-26.04).txt: 1 runs; archive-consumer<-maos-bin x1
+    L351 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+176_cgroup-ceiling-undelegated (ubuntu-26.04-arm).txt: 1 runs; archive-consumer<-maos-bin x1
+    L351 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+177_cgroup-ceiling-undelegated (ubuntu-24.04).txt: 1 runs; archive-consumer<-maos-bin x1
+    L351 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+178_cgroup-ceiling-delegated (ubuntu-26.04-arm).txt: 2 runs; archive-consumer<-maos-bin x1, archive-consumer<-maos-kernel-core x1
+    L326 profile=archive-consumer first=maos-kernel-core::cgroup_ceiling_smoke
+    L428 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+179_epic-18-exit.txt: 0 runs; 
+180_cgroup-ceiling-delegated (ubuntu-24.04-arm).txt: 2 runs; archive-consumer<-maos-bin x1, archive-consumer<-maos-kernel-core x1
+    L326 profile=archive-consumer first=maos-kernel-core::cgroup_ceiling_smoke
+    L429 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+181_cgroup-ceiling-undelegated (ubuntu-24.04-arm).txt: 1 runs; archive-consumer<-maos-bin x1
+    L351 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+182_cgroup-ceiling-delegated (ubuntu-24.04).txt: 4 runs; archive-consumer<-maos-bin x3, archive-consumer<-maos-kernel-core x1
+    L389 profile=archive-consumer first=maos-kernel-core::cgroup_ceiling_smoke
+    L495 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+    L873 profile=archive-consumer first=maos-bin::smoke_cli_wrapper_8_12
+    L890 profile=archive-consumer first=maos-bin::worker_resource_limits_17_2
+183_cgroup-ceiling-delegated (ubuntu-26.04).txt: 4 runs; archive-consumer<-maos-bin x3, archive-consumer<-maos-kernel-core x1
+    L389 profile=archive-consumer first=maos-kernel-core::cgroup_ceiling_smoke
+    L494 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+    L871 profile=archive-consumer first=maos-bin::smoke_cli_wrapper_8_12
+    L888 profile=archive-consumer first=maos-bin::worker_resource_limits_17_2
+184_wasm-host-tests (ubuntu-26.04).txt: 9 runs; archive-consumer<-maos-bin x4, archive-consumer<-maos-escape-detector x1, archive-consumer<-maos-kernel-core x1, archive-consumer<-maos-wasm-host x2, default<-equiv-native-twin x1
+    L274 profile=archive-consumer first=maos-wasm-host::t2_sandbox_kill
+    L364 profile=archive-consumer first=maos-kernel-core::bridge_t2_route_17_6
+    L481 profile=archive-consumer first=maos-escape-detector
+    L649 profile=archive-consumer first=maos-wasm-host
+    L814 profile=default first=equiv-native-twin::modes
+    L887 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+    L1304 profile=archive-consumer first=maos-bin::live_escape_anomaly_17_10
+    L1405 profile=archive-consumer first=maos-bin::recall_17_3d
+    L1705 profile=archive-consumer first=maos-bin::participant_recall_17_8
+185_wasm-host-tests (ubuntu-26.04-arm).txt: 9 runs; archive-consumer<-maos-bin x4, archive-consumer<-maos-escape-detector x1, archive-consumer<-maos-kernel-core x1, archive-consumer<-maos-wasm-host x2, default<-equiv-native-twin x1
+    L274 profile=archive-consumer first=maos-wasm-host::t2_sandbox_kill
+    L364 profile=archive-consumer first=maos-kernel-core::bridge_t2_route_17_6
+    L481 profile=archive-consumer first=maos-escape-detector
+    L649 profile=archive-consumer first=maos-wasm-host
+    L814 profile=default first=equiv-native-twin::modes
+    L887 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+    L1304 profile=archive-consumer first=maos-bin::live_escape_anomaly_17_10
+    L1405 profile=archive-consumer first=maos-bin::recall_17_3d
+    L1705 profile=archive-consumer first=maos-bin::participant_recall_17_8
+186_wasm-host-tests (ubuntu-24.04).txt: 9 runs; archive-consumer<-maos-bin x4, archive-consumer<-maos-escape-detector x1, archive-consumer<-maos-kernel-core x1, archive-consumer<-maos-wasm-host x2, default<-equiv-native-twin x1
+    L274 profile=archive-consumer first=maos-wasm-host::t2_sandbox_kill
+    L364 profile=archive-consumer first=maos-kernel-core::bridge_t2_route_17_6
+    L481 profile=archive-consumer first=maos-escape-detector
+    L649 profile=archive-consumer first=maos-wasm-host
+    L814 profile=default first=equiv-native-twin::modes
+    L887 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+    L1305 profile=archive-consumer first=maos-bin::live_escape_anomaly_17_10
+    L1407 profile=archive-consumer first=maos-bin::recall_17_3d
+    L1708 profile=archive-consumer first=maos-bin::participant_recall_17_8
+187_wasm-host-tests (ubuntu-24.04-arm).txt: 9 runs; archive-consumer<-maos-bin x4, archive-consumer<-maos-escape-detector x1, archive-consumer<-maos-kernel-core x1, archive-consumer<-maos-wasm-host x2, default<-equiv-native-twin x1
+    L274 profile=archive-consumer first=maos-wasm-host::t2_sandbox_kill
+    L364 profile=archive-consumer first=maos-kernel-core::bridge_t2_route_17_6
+    L481 profile=archive-consumer first=maos-escape-detector
+    L649 profile=archive-consumer first=maos-wasm-host
+    L814 profile=default first=equiv-native-twin::modes
+    L887 profile=archive-consumer first=maos-bin::spawned_scope_17_3c
+    L1305 profile=archive-consumer first=maos-bin::live_escape_anomaly_17_10
+    L1407 profile=archive-consumer first=maos-bin::recall_17_3d
+    L1708 profile=archive-consumer first=maos-bin::participant_recall_17_8
+== 2. 'Cancelling due to test failure' in consumers
+173_epic-17-exit (ubuntu-26.04).txt: 0
+174_epic-17-exit (ubuntu-24.04).txt: 0
+175_cgroup-ceiling-undelegated (ubuntu-26.04).txt: 0
+176_cgroup-ceiling-undelegated (ubuntu-26.04-arm).txt: 0
+177_cgroup-ceiling-undelegated (ubuntu-24.04).txt: 0
+178_cgroup-ceiling-delegated (ubuntu-26.04-arm).txt: 0
+179_epic-18-exit.txt: 0
+180_cgroup-ceiling-delegated (ubuntu-24.04-arm).txt: 0
+181_cgroup-ceiling-undelegated (ubuntu-24.04-arm).txt: 0
+182_cgroup-ceiling-delegated (ubuntu-24.04).txt: 0
+183_cgroup-ceiling-delegated (ubuntu-26.04).txt: 0
+184_wasm-host-tests (ubuntu-26.04).txt: 0
+185_wasm-host-tests (ubuntu-26.04-arm).txt: 0
+186_wasm-host-tests (ubuntu-24.04).txt: 0
+187_wasm-host-tests (ubuntu-24.04-arm).txt: 0
+== 3. skipped-test guard errors (SKIP, ignored, or zero tests) in consumers
+173_epic-17-exit (ubuntu-26.04).txt: 0
+174_epic-17-exit (ubuntu-24.04).txt: 0
+175_cgroup-ceiling-undelegated (ubuntu-26.04).txt: 0
+176_cgroup-ceiling-undelegated (ubuntu-26.04-arm).txt: 0
+177_cgroup-ceiling-undelegated (ubuntu-24.04).txt: 0
+178_cgroup-ceiling-delegated (ubuntu-26.04-arm).txt: 0
+179_epic-18-exit.txt: 0
+180_cgroup-ceiling-delegated (ubuntu-24.04-arm).txt: 0
+181_cgroup-ceiling-undelegated (ubuntu-24.04-arm).txt: 0
+182_cgroup-ceiling-delegated (ubuntu-24.04).txt: 0
+183_cgroup-ceiling-delegated (ubuntu-26.04).txt: 0
+184_wasm-host-tests (ubuntu-26.04).txt: 0
+185_wasm-host-tests (ubuntu-26.04-arm).txt: 0
+186_wasm-host-tests (ubuntu-24.04).txt: 0
+187_wasm-host-tests (ubuntu-24.04-arm).txt: 0
+== 4. restore step (producer.json == expected incl. nextest) per consumer
+epic-17-exit (ubuntu-26.04): [('Restore exact producer workspace files', 'success')]
+epic-17-exit (ubuntu-24.04): [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-undelegated (ubuntu-26.04): [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-undelegated (ubuntu-26.04-arm): [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-undelegated (ubuntu-24.04): [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-delegated (ubuntu-26.04-arm): [('Restore exact producer workspace files', 'success')]
+epic-18-exit: [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-delegated (ubuntu-24.04-arm): [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-undelegated (ubuntu-24.04-arm): [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-delegated (ubuntu-24.04): [('Restore exact producer workspace files', 'success')]
+cgroup-ceiling-delegated (ubuntu-26.04): [('Restore exact producer workspace files', 'success')]
+wasm-host-tests (ubuntu-26.04): [('Restore exact producer workspace files', 'success')]
+wasm-host-tests (ubuntu-26.04-arm): [('Restore exact producer workspace files', 'success')]
+wasm-host-tests (ubuntu-24.04): [('Restore exact producer workspace files', 'success')]
+wasm-host-tests (ubuntu-24.04-arm): [('Restore exact producer workspace files', 'success')]
+== 5. producer pack step + nextest version
+ci-test-producer (arm64, ubuntu-24.04-arm) [('Pack exact producer fixtures, tools and identity', 'success')]
+ci-test-producer (x64, ubuntu-24.04) [('Pack exact producer fixtures, tools and identity', 'success')]
+TOTAL VIOLATIONS: 0

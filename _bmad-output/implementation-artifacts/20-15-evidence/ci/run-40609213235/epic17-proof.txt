@@ -1,0 +1,39 @@
+dirty-checkout refusals across all 191 job logs: 0
+== 173_epic-17-exit (ubuntu-26.04).txt
+842:2026-10-28T01:04:43.5221763Z      Summary [   5.099s] 1 test run: 1 passed, 3 skipped
+873:2026-10-28T01:04:57.1767589Z         PASS [   4.225s] ( 3/31) maos-bin::worker_terminal_facts_17_7 runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+913:2026-10-28T01:05:07.6185581Z         PASS [   3.657s] ( 8/31) maos-bin::worker_terminal_facts_17_7 s4_oom_marker_is_not_payload_evidence_alone
+1125:2026-10-28T01:06:40.1810787Z      Summary [ 115.984s] 31 tests run: 31 passed, 0 skipped
+1304:2026-10-28T01:06:48.5002844Z      Summary [   4.928s] 1 test run: 1 passed, 3 skipped
+1373:2026-10-28T01:06:52.3142640Z      Summary [   3.105s] 4 tests run: 4 passed, 0 skipped
+1782:2026-10-28T01:06:55.9979475Z      Summary [   1.406s] 16 tests run: 16 passed, 0 skipped
+1814:2026-10-28T01:06:58.7565869Z      Summary [   2.038s] 3 tests run: 3 passed, 0 skipped
+2089:2026-10-28T01:07:05.0790505Z         PASS [   0.006s] (1/5) maos-wasm-host::t2_sandbox_kill benign_process_survives_t2_under_same_spec
+2098:2026-10-28T01:07:05.6828071Z         PASS [   0.604s] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2107:2026-10-28T01:07:05.7905448Z         PASS [   0.106s] (3/5) maos-wasm-host::t2_sandbox_kill forbidden_syscall_killed_by_t2_with_sigsys
+2117:2026-10-28T01:07:05.8026115Z         PASS [   0.014s] (4/5) maos-wasm-host::t2_sandbox_kill granted_fs_capability_works_ungranted_is_refused
+2126:2026-10-28T01:07:05.8352341Z         PASS [   0.032s] (5/5) maos-wasm-host::t2_sandbox_kill pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2
+2128:2026-10-28T01:07:05.8483795Z      Summary [   0.762s] 5 tests run: 5 passed, 0 skipped
+2129:2026-10-28T01:07:05.8485418Z ##[notice]rc=0      Summary [   0.762s] 5 tests run: 5 passed, 0 skipped
+2328:2026-10-28T01:10:51.4194578Z ##[notice]rc=0
+2416:2026-10-28T01:10:51.4919304Z ##[notice]LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+  'checkout is dirty' hits: 0
+== 174_epic-17-exit (ubuntu-24.04).txt
+841:2026-10-28T01:05:08.3685010Z      Summary [   5.514s] 1 test run: 1 passed, 3 skipped
+872:2026-10-28T01:05:19.8375816Z         PASS [   2.285s] ( 3/31) maos-bin::worker_terminal_facts_17_7 runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+912:2026-10-28T01:05:27.6556362Z         PASS [   2.433s] ( 8/31) maos-bin::worker_terminal_facts_17_7 s4_oom_marker_is_not_payload_evidence_alone
+1124:2026-10-28T01:06:59.9255853Z      Summary [ 110.963s] 31 tests run: 31 passed, 0 skipped
+1304:2026-10-28T01:07:07.5520505Z      Summary [   4.202s] 1 test run: 1 passed, 3 skipped
+1373:2026-10-28T01:07:11.3745382Z      Summary [   3.209s] 4 tests run: 4 passed, 0 skipped
+1783:2026-10-28T01:07:14.7942617Z      Summary [   1.287s] 16 tests run: 16 passed, 0 skipped
+1815:2026-10-28T01:07:17.2324143Z      Summary [   1.832s] 3 tests run: 3 passed, 0 skipped
+2090:2026-10-28T01:07:23.3390387Z         PASS [   0.005s] (1/5) maos-wasm-host::t2_sandbox_kill benign_process_survives_t2_under_same_spec
+2099:2026-10-28T01:07:23.5020439Z         PASS [   0.163s] (2/5) maos-wasm-host::t2_sandbox_kill benign_rust_probe_survives_t2_under_same_spec
+2108:2026-10-28T01:07:23.6055861Z         PASS [   0.103s] (3/5) maos-wasm-host::t2_sandbox_kill forbidden_syscall_killed_by_t2_with_sigsys
+2118:2026-10-28T01:07:23.6151848Z         PASS [   0.010s] (4/5) maos-wasm-host::t2_sandbox_kill granted_fs_capability_works_ungranted_is_refused
+2127:2026-10-28T01:07:23.6459339Z         PASS [   0.031s] (5/5) maos-wasm-host::t2_sandbox_kill pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2
+2129:2026-10-28T01:07:23.6461103Z      Summary [   0.312s] 5 tests run: 5 passed, 0 skipped
+2130:2026-10-28T01:07:23.6573547Z ##[notice]rc=0      Summary [   0.312s] 5 tests run: 5 passed, 0 skipped
+2329:2026-10-28T01:10:25.3485634Z ##[notice]rc=0
+2417:2026-10-28T01:10:25.3951162Z ##[notice]LINE-2B OK R1 log.recall -> R2 log.fetch (participant scope: seed fetched, no refusal)
+  'checkout is dirty' hits: 0
