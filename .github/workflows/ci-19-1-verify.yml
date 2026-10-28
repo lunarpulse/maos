@@ -1,0 +1,195 @@
+# Story 19-1 AC4.3 — branch-only hosted (T3) planted-red run
+# (docs/testing/proof-contract.md:28 controls (a) and (b)). Copy to
+# `.github/workflows/ci-19-1-verify.yml` on `ci/19-1-verify` ONLY; never merge
+# this workflow or a planted tree; delete the branch after the run.
+#
+# T3 setup mirrors the `check-j1-loopback-delegation` job
+# (.github/workflows/discipline.yml:3334-3428). The unplanted control must be
+# green with no SKIP. The two plants then run one after the other; each is
+# restored byte-identically before the next one:
+#   AC4a  ac4a-followup-no-ref-plant.diff: `followup_dispatch_remote` sends
+#         `prior_distillate_ref: None`. Expected red:
+#         `epic_dispatches_each_section_to_its_worker_with_distillate_fed_followups`
+#         fails its exit-0 assertion, and the panic carries the maos child's
+#         stderr with FR21's rejection.
+#   AC4b  ac4b-halt-check-plant.diff: `dispatch_stop` ignores pending halts.
+#         Expected red: `a_pending_halt_before_section_two_stops_dispatch` fails
+#         the one-`dispatch_halted`-event assertion (0 != 1).
+name: 19-1-proven-red
+on:
+  push:
+    branches: ["ci/19-1-verify"]
+permissions:
+  contents: read
+env:
+  PLANTS: _bmad-output/implementation-artifacts/19-1-orchestrator-dispatch-loop-and-epic-input-evidence
+  TEST_FILE: crates/maos-bin/tests/epic_dispatch_19_1.rs
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: 19-1-proven-red
+      # Same composite action as discipline.yml:3346. It exports
+      # MAOS_T3_RUNTIME, MAOS_T3_IMAGE_LOCK_PATH and the trust anchor through
+      # GITHUB_ENV. GitHub sets CI=true, so `require_t3` fails closed here and
+      # never skips quietly.
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Record provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git status --short
+          rustc -Vv
+          cargo -V
+          uname -a
+          cat /etc/os-release
+          podman --version
+          echo "MAOS_T3_RUNTIME=${MAOS_T3_RUNTIME:-<unset>}"
+          sha256sum "$PLANTS/ac4a-followup-no-ref-plant.diff" "$PLANTS/ac4b-halt-check-plant.diff"
+      # discipline.yml:3355-3356. Builds `worker-cli-fixture` (and
+      # `worker-probe-fixture`) into target/debug. The test puts target/debug
+      # on the maos child's PATH (`path_with_target_debug`), and
+      # `CARGO_BIN_EXE_maos` is built by `cargo test` itself.
+      - name: Build the worker CLI fixture (xtask build-test-fixtures, Story 20-12)
+        run: cargo run -p xtask -- build-test-fixtures --only worker-cli-fixture
+      # Unplanted control. `--nocapture` is needed because libtest hides a
+      # passing test's stderr, and the `SKIP: T3 …` line from `require_t3`
+      # (tests/harness/t3_substrate.rs:11 and :18-24 via tests/harness/ci.rs:28)
+      # would otherwise be hidden.
+      - name: Unplanted control must pass with no T3 SKIP
+        id: control
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          set +e
+          cargo test --color never -p maos-bin --test epic_dispatch_19_1 -- --test-threads=1 --nocapture 2>&1 | tee control.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          test "$rc" -eq 0 || { echo "::error title=19-1 control::unplanted epic_dispatch_19_1 exited $rc"; exit 1; }
+          if grep -n 'SKIP:' control.log; then
+            echo "::error title=19-1 control::a T3 vector printed SKIP on the provisioned runner"; exit 1
+          fi
+          for name in \
+            epic_dispatches_each_section_to_its_worker_with_distillate_fed_followups \
+            a_pending_halt_before_section_two_stops_dispatch \
+            a_failing_second_worker_stops_the_epic_after_section_one; do
+            grep -q "^test ${name} \.\.\. ok\$" control.log \
+              || { echo "::error title=19-1 control::${name} did not report ok"; exit 1; }
+          done
+          grep -q '^test result: ok\. [0-9]* passed; 0 failed;' control.log \
+            || { echo "::error title=19-1 control::no clean test result line"; exit 1; }
+          echo "::notice title=19-1 control GREEN::unplanted epic_dispatch_19_1 passed on T3 with no SKIP"
+      - name: AC4a plant (remote follow-up without prior_distillate_ref) must be RED
+        id: ac4a
+        shell: bash
+        run: |
+          set -euo pipefail
+          plant="$PLANTS/ac4a-followup-no-ref-plant.diff"
+          files=(spirits/orchestrator/src/lib.rs)
+          name=epic_dispatches_each_section_to_its_worker_with_distillate_fed_followups
+          restore() {
+            git checkout -- "${files[@]}"
+            git diff --exit-code || { echo "::error title=19-1 AC4a::tree not restored byte-identically"; exit 1; }
+          }
+          # Safety net: the tree is restored even if a command below aborts the step.
+          trap restore EXIT
+          echo "525d76d742c870165c992f0585ab743fc0269ecd8e3897f5f0134780be3634e8  $plant" | sha256sum -c -
+          git diff --exit-code
+          git apply --check "$plant"
+          git apply "$plant"
+          git diff --stat
+          git diff
+          set +e
+          cargo test --color never -p maos-bin --test epic_dispatch_19_1 -- --exact "$name" --test-threads=1 2>&1 | tee ac4a-followup-no-ref-plant.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          verdict=ok
+          test "$rc" -ne 0 || { echo "::error title=19-1 AC4a::planted tree stayed GREEN (rc=0)"; verdict=bad; }
+          grep -q '^running 1 test$' ac4a-followup-no-ref-plant.log \
+            || { echo "::error title=19-1 AC4a::the --exact filter did not select exactly one test"; verdict=bad; }
+          grep -q "^test ${name} \.\.\. FAILED\$" ac4a-followup-no-ref-plant.log \
+            || { echo "::error title=19-1 AC4a::${name} did not FAIL"; verdict=bad; }
+          # epic_dispatch_19_1.rs:206-209: the exit-0 assertion, whose message embeds the child's stderr.
+          grep -q 'the epic run must exit 0; stderr:' ac4a-followup-no-ref-plant.log \
+            || { echo "::error title=19-1 AC4a::red was not the exit-0 assertion"; verdict=bad; }
+          # delegation.rs:1006 (emit_failure) + iac_bus_types.rs:170 (IacBusError Display).
+          grep -q 'delegation emit/route failed: orchestrator dispatch references raw worker output not a distillate' ac4a-followup-no-ref-plant.log \
+            || { echo "::error title=19-1 AC4a::stderr lacks the FR21 rejection text"; verdict=bad; }
+          grep -q 'EOrchestratorDispatchRawOutput' ac4a-followup-no-ref-plant.log \
+            || { echo "::error title=19-1 AC4a::stderr does not name EOrchestratorDispatchRawOutput"; verdict=bad; }
+          trap - EXIT
+          restore
+          git diff --stat
+          test "$verdict" = ok || exit 1
+          echo "::notice title=19-1 AC4a PROVEN-RED::a remote follow-up without prior_distillate_ref is refused by FR21 (EOrchestratorDispatchRawOutput) and the epic run exits non-zero"
+      - name: AC4b plant (dispatch_stop ignores pending halts) must be RED
+        id: ac4b
+        if: ${{ !cancelled() && steps.control.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          plant="$PLANTS/ac4b-halt-check-plant.diff"
+          files=(crates/maos-bin/src/orchestrator_root.rs)
+          name=a_pending_halt_before_section_two_stops_dispatch
+          restore() {
+            git checkout -- "${files[@]}"
+            git diff --exit-code || { echo "::error title=19-1 AC4b::tree not restored byte-identically"; exit 1; }
+          }
+          # Safety net: the tree is restored even if a command below aborts the step.
+          trap restore EXIT
+          echo "67c384b25c7421ade601fc675e335a0cb3b9df056bbcd3707bb5d8c6a6456d3e  $plant" | sha256sum -c -
+          git diff --exit-code
+          git apply --check "$plant"
+          git apply "$plant"
+          git diff --stat
+          git diff
+          set +e
+          cargo test --color never -p maos-bin --test epic_dispatch_19_1 -- --exact "$name" --test-threads=1 2>&1 | tee ac4b-halt-check-plant.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          verdict=ok
+          test "$rc" -ne 0 || { echo "::error title=19-1 AC4b::planted tree stayed GREEN (rc=0)"; verdict=bad; }
+          grep -q '^running 1 test$' ac4b-halt-check-plant.log \
+            || { echo "::error title=19-1 AC4b::the --exact filter did not select exactly one test"; verdict=bad; }
+          grep -q "^test ${name} \.\.\. FAILED\$" ac4b-halt-check-plant.log \
+            || { echo "::error title=19-1 AC4b::${name} did not FAIL"; verdict=bad; }
+          # The single-line assertion `assert_eq!(halted.len(), 1, "one dispatch_halted event: …")`.
+          # Its line is derived from the tree, so the panic site is pinned to it.
+          line=$(grep -n 'assert_eq!(halted.len(), 1, "one dispatch_halted event' "$TEST_FILE" | cut -d: -f1 || true)
+          if [ -z "$line" ]; then
+            echo "::error title=19-1 AC4b::oracle assertion not found in $TEST_FILE"; verdict=bad
+          elif ! grep -q "panicked at ${TEST_FILE}:${line}:" ac4b-halt-check-plant.log; then
+            echo "::error title=19-1 AC4b::red did not panic at ${TEST_FILE}:${line}"; verdict=bad
+          fi
+          grep -q 'assertion `left == right` failed: one dispatch_halted event: ' ac4b-halt-check-plant.log \
+            || { echo "::error title=19-1 AC4b::red was not the one-dispatch_halted-event assertion"; verdict=bad; }
+          grep -q '^  left: 0$' ac4b-halt-check-plant.log && grep -q '^ right: 1$' ac4b-halt-check-plant.log \
+            || { echo "::error title=19-1 AC4b::dispatch_halted count was not 0 != 1"; verdict=bad; }
+          trap - EXIT
+          restore
+          git diff --stat
+          test "$verdict" = ok || exit 1
+          echo "::notice title=19-1 AC4b PROVEN-RED::a pending halt that dispatch_stop ignores yields zero dispatch_halted events (0 != 1 at ${TEST_FILE}:${line})"
+      - name: Upload plant evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 19-1-proven-red
+          if-no-files-found: warn
+          path: |
+            control.log
+            ac4a-followup-no-ref-plant.log
+            ac4b-halt-check-plant.log
+            ${{ env.PLANTS }}/ac4a-followup-no-ref-plant.diff
+            ${{ env.PLANTS }}/ac4b-halt-check-plant.diff
+            ${{ env.PLANTS }}/plants.md
