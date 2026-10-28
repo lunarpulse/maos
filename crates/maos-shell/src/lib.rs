@@ -506,32 +506,20 @@ fn handle_line(
         }
     };
 
-    // Dispatch (v0.1-β: hello-spirit wired; v0.3-β: butler pick prototype).
+    // Dispatch (v0.1-β: hello-spirit wired). Story 19-2 (D-19-2-09 A): this
+    // root runs no Butler, so `@butler` is refused typed and dispatches
+    // nothing; a director's pick reaches a running Butler over its door.
     if spirit_name == "butler" {
-        // Story 8.14b FORK 2 — option-pick dispatch surface.
-        // Full scheduler access (real running Butler) is Epic 9.
-        // Prototype: render option-pick outcome message directly.
-        let option = msg
-            .trim()
-            .strip_prefix("pick ")
-            .and_then(|s| s.chars().next())
-            .unwrap_or('?');
-        let message = match option {
-            'a' => "Linear note written: Calendar conflict — evt-a ↔ evt-b (stub — real dispatch requires scheduler access, Epic 9)",
-            'b' => "Butler: Slack message queued for [partner] (live send v0.4)",
-            'c' => "Butler: snoozed — will re-check at 12:00 UTC (stub)",
-            _ => "maos: butler pick error: no pending notification to pick from",
-        };
-        writeln!(output, "{message}")?;
+        let refusal = "maos: no Butler runs in this shell — pick on a running Butler with \
+                       `maosctl spirit pick butler <n> --work-mode <mode>`";
+        print_line(output, color_choice, refusal)?;
         return Ok(());
     }
     if spirit_name != "hello-spirit" {
         print_line(
             output,
             color_choice,
-            &format!(
-                "maos: unknown spirit '{spirit_name}' — known: hello-spirit, butler (pick only)",
-            ),
+            &format!("maos: unknown spirit '{spirit_name}' — known: hello-spirit"),
         )?;
         return Ok(());
     }

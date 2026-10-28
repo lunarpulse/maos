@@ -15,16 +15,21 @@ use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::distillation::{DigestPayload, DistillationRequest};
 use maos_domain::frame::{EpistemicHaltPayload, PriorDistillateRef};
 use maos_domain::halt::HaltState;
+use maos_domain::invariants::i4::ApprovalDecision;
 use maos_domain::notification::{NotificationEvent, NotificationLevel};
+use maos_domain::orchestrator::OrchestratorInstruction;
 use maos_domain::ports::DistillationPort;
 use maos_domain::supervision::OnCrashAction;
 use maos_kernel_core::halt::{invoke_halt, HaltRegistry};
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::journal::JournalAdapter;
+use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
+use maos_kernel_core::scheduler::control_block::ScbLifecycleState;
+use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
 use orchestrator::{
-    split_epic, EpicSection, Orchestrator, OrchestratorInferenceBinding, PidSource,
-    SCALAR_TAG_DISPATCH_AMBIGUITY,
+    fold_instruction, split_epic, EpicSection, Orchestrator, OrchestratorInferenceBinding,
+    PidSource, SCALAR_TAG_DISPATCH_AMBIGUITY,
 };
 use sha2::{Digest, Sha256};
 
@@ -40,6 +45,12 @@ pub const HALT_PLANT_ENV: &str = "MAOS_TEST_ONLY_HALT_BEFORE_SECTION";
 /// section whose 1-based ordinal it names, the root kills that Worker once it
 /// runs (see [`plant_test_crash`]). Release builds never read it.
 pub const CRASH_PLANT_ENV: &str = "MAOS_TEST_ONLY_CRASH_SECTION_ONCE";
+
+/// Story 19-2 (D-19-2-04 A) — the debug-build harness hold: once the named
+/// 1-based section's `task.assign` is delivered (its delegation in flight),
+/// the root waits for `$MAOS_HOME/release-section-<k>` (see
+/// [`hold_test_section`]). Release builds never read it.
+pub const HOLD_SECTION_ENV: &str = "MAOS_TEST_ONLY_HOLD_SECTION";
 
 /// D-19-1-04 A — the ONE Orchestrator binding: the context port through the
 /// seam's binder (18-5) on every path; under `--live` or an explicit mode the
@@ -293,6 +304,132 @@ pub fn plant_test_crash(
     })
 }
 
+/// Story 19-2 (D-19-2-02 B / 03 A) — at a NEW `--epic` section's safe point
+/// (`safe_point`: never a 19-6 re-dispatch, never off `--epic`) take ONE
+/// director instruction through the Orchestrator's FR20 gate from the
+/// buffer the door enqueues on, and append it to `goal`. Anything else stays
+/// queued (D-03 A).
+pub fn drain_at_safe_point(
+    emitter: &Orchestrator,
+    registry: &OrchestratorBufferRegistry,
+    goal: String,
+    safe_point: bool,
+) -> (String, Option<OrchestratorInstruction>) {
+    let instruction = registry
+        .get(&crate::delegation::FROM_SPIRIT.into())
+        .filter(|_| safe_point)
+        .and_then(|buffer| emitter.drain_next(|| buffer.dequeue_at_safe_point()));
+    match instruction {
+        Some(instruction) => (fold_instruction(goal, &instruction), Some(instruction)),
+        None => (goal, None),
+    }
+}
+
+/// Story 19-2 (AC1.2, CR-2) — journal the instruction drained into section
+/// `ordinal`'s frame `frame_id` BEFORE the frame is delivered, then print
+/// `orchestrator_instruction_dispatched`. A failed row fails the run: the
+/// frame is never delivered.
+pub fn record_safe_point_drain(
+    tl: &TransparencyLogAdapter,
+    instruction: &OrchestratorInstruction,
+    ordinal: usize,
+    frame_id: &[u8; 16],
+) -> Result<(), String> {
+    let frame = hex::encode(frame_id);
+    tl.insert_approval_decision(ApprovalDecision {
+        actor: crate::delegation::FROM_SPIRIT.into(),
+        target: crate::delegation::FROM_SPIRIT.into(),
+        capability: "orchestrator.dispatch".into(),
+        intent: "safe-point".into(),
+        decision: true,
+        reasoning: Some(format!(
+            "id={} section={ordinal} frame={frame}",
+            instruction.id.0
+        )),
+    })
+    .map_err(|e| {
+        format!(
+            "maos run: safe-point row for instruction {}: {e}",
+            instruction.id.0
+        )
+    })?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "orchestrator_instruction_dispatched",
+            "instruction_id": instruction.id.0,
+            "section": ordinal,
+            "frame_id": frame,
+        })
+    );
+    Ok(())
+}
+
+/// Story 19-2 (D-19-2-17 A) — before section `ordinal`'s frame, wait while
+/// the Orchestrator at `pid` is Paused (polled every 100 ms), printing
+/// `dispatch_paused` once. `false` when the root's shutdown ended the wait.
+pub async fn hold_while_paused(
+    scheduler: &SpiritSchedulerAdapter,
+    pid: u32,
+    ordinal: usize,
+    shutdown: &tokio_util::sync::CancellationToken,
+) -> bool {
+    let paused = || {
+        let scbs = scheduler.scbs();
+        let guard = scbs.read().unwrap_or_else(|e| e.into_inner());
+        guard
+            .get(&pid)
+            .is_some_and(|scb| scb.current_state() == ScbLifecycleState::Paused)
+    };
+    if paused() {
+        println!(
+            "{}",
+            serde_json::json!({"event": "dispatch_paused", "section": ordinal})
+        );
+    }
+    while paused() {
+        tokio::select! {
+            () = shutdown.cancelled() => return false,
+            () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
+        }
+    }
+    true
+}
+
+/// The [`HOLD_SECTION_ENV`] hold: debug builds only, only at the named
+/// section. Prints `dispatch_held_test_only` before waiting; bounded at 30 s,
+/// then a typed error.
+pub async fn hold_test_section(ordinal: Option<usize>) -> Result<(), String> {
+    let held = cfg!(debug_assertions)
+        && ordinal.is_some()
+        && std::env::var(HOLD_SECTION_ENV)
+            .ok()
+            .and_then(|value| value.trim().parse::<usize>().ok())
+            == ordinal;
+    let Some(ordinal) = ordinal.filter(|_| held) else {
+        return Ok(());
+    };
+    let release = maos_domain::operator_door::maos_home()
+        .map_err(|e| format!("maos run: {HOLD_SECTION_ENV}: {e}"))?
+        .ok_or_else(|| format!("maos run: {HOLD_SECTION_ENV} needs MAOS_HOME"))?
+        .join(format!("release-section-{ordinal}"));
+    println!(
+        "{}",
+        serde_json::json!({"event": "dispatch_held_test_only", "section": ordinal})
+    );
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !release.exists() {
+        if tokio::time::Instant::now() >= deadline {
+            return Err(format!(
+                "maos run: {HOLD_SECTION_ENV}: section {ordinal} not released within 30 s ({})",
+                release.display()
+            ));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    Ok(())
+}
+
 /// D-19-1-08 A — the distillate's digest: non-raw facts only, so 18-6's forget
 /// cascade reaches it through its sources, never its body.
 pub fn section_digest(section: &EpicSection, run: &WorkerRun) -> serde_json::Value {
@@ -369,6 +506,47 @@ pub fn declares_reassign(manifest: &toml::Value) -> bool {
         == Some("reassign-to-replica")
 }
 
+/// D-19-6-03 A — the `TaskComplete` rows at `pid` whose payload names
+/// `task_id`, as `(intent, payload)`: the Transparency Log's join key for a
+/// crashed Worker's `task.orphaned` (at its pid) and disposition (at pid 0).
+fn task_rows(
+    tl: &TransparencyLogAdapter,
+    task_id: &str,
+    pid: u32,
+) -> Result<Vec<(String, serde_json::Value)>, String> {
+    Ok(tl
+        .query_frames(FrameFilter {
+            spirit_pid: Some(pid),
+            kind: Some(FrameKind::TaskComplete),
+            ..FrameFilter::default()
+        })
+        .map_err(|e| format!("maos run: crash rows for {task_id} unreadable: {e}"))?
+        .into_iter()
+        .filter_map(|row| {
+            let payload = serde_json::from_slice::<serde_json::Value>(&row.payload_redacted);
+            Some((row.intent, payload.ok()?))
+        })
+        .filter(|(_, payload)| payload["task_id"] == task_id)
+        .collect())
+}
+
+/// D-19-6-03 A — whether the kernel's crash handler journaled
+/// `task.orphaned` for `task_id` at the Worker's pid, i.e. an orphan frame was
+/// owed to the Orchestrator. A pid-0 disposition row alone is no evidence: a
+/// planned stop (door unload, session timeout) writes one too. With no orphan
+/// frame and no such row (a planned stop, no exit code, a handler past its
+/// join budget) the loop reports the Worker's non-completion, not a delivery
+/// fault.
+pub fn orphan_recorded(
+    tl: &TransparencyLogAdapter,
+    task_id: &str,
+    worker_pid: u32,
+) -> Result<bool, String> {
+    Ok(task_rows(tl, task_id, worker_pid)?
+        .iter()
+        .any(|(intent, _)| intent == "task.orphaned"))
+}
+
 /// D-19-6-03/04/06 A — the loop's disposition of a delegated Worker's crash,
 /// called once its orphan frame was drained and the Orchestrator's in-flight
 /// delegation released. Both facts are the Transparency Log's, joined on
@@ -377,7 +555,7 @@ pub fn declares_reassign(manifest: &toml::Value) -> bool {
 /// removed the SCB first), where `fallback_cause`, the Worker's own verdict,
 /// stands in; the APPLIED disposition is the pid-0 row the kernel or the
 /// supervisor's executor wrote (an unarmed `reassign-to-replica` is already
-/// `task.escalated` there). Prints `delegation_orphaned`. `Ok` means
+/// `task.escalated` there). Prints `delegation_orphaned`. `Ok(cause)` means
 /// re-dispatch the section once; otherwise the typed stop, after one
 /// `AnomalyFlagged` on escalation.
 pub fn dispose_orphan(
@@ -388,29 +566,13 @@ pub fn dispose_orphan(
     worker_pid: u32,
     fallback_cause: &str,
     safe_point: bool,
-) -> Result<(), String> {
-    let joined = |pid: u32| -> Result<Vec<(String, serde_json::Value)>, String> {
-        Ok(tl
-            .query_frames(FrameFilter {
-                spirit_pid: Some(pid),
-                kind: Some(FrameKind::TaskComplete),
-                ..FrameFilter::default()
-            })
-            .map_err(|e| format!("maos run: crash rows for {task_id} unreadable: {e}"))?
-            .into_iter()
-            .filter_map(|row| {
-                let payload = serde_json::from_slice::<serde_json::Value>(&row.payload_redacted);
-                Some((row.intent, payload.ok()?))
-            })
-            .filter(|(_, payload)| payload["task_id"] == task_id)
-            .collect())
-    };
-    let cause = joined(worker_pid)?
+) -> Result<String, String> {
+    let cause = task_rows(tl, task_id, worker_pid)?
         .into_iter()
         .filter(|(intent, _)| intent == "task.orphaned")
         .find_map(|(_, payload)| payload["cause"].as_str().map(str::to_owned))
         .unwrap_or_else(|| fallback_cause.to_owned());
-    let disposition = joined(0)?
+    let disposition = task_rows(tl, task_id, 0)?
         .into_iter()
         .find_map(|(intent, _)| match intent.as_str() {
             "task.nacked" => Some(OnCrashAction::Nack),
@@ -431,7 +593,7 @@ pub fn dispose_orphan(
         })
     );
     if disposition == OnCrashAction::ReassignToReplica {
-        return Ok(());
+        return Ok(cause);
     }
     let section = section.map_or_else(|| "-".to_owned(), |ordinal| ordinal.to_string());
     if disposition == OnCrashAction::EscalateToOperator {

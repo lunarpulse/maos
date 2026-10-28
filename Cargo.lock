@@ -3185,7 +3185,6 @@ dependencies = [
 name = "maos-shell"
 version = "0.1.0-alpha.1"
 dependencies = [
- "butler",
  "maos-audit",
  "maos-cli",
  "maos-director-surface",

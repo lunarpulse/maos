@@ -538,15 +538,23 @@ fn every_repl_line_flows_through_the_output_writer() {
     assert!(text.contains("maos: shell exiting"));
 }
 
-/// The butler prototype arm is unchanged (AC2).
+/// Story 19-2 (D-19-2-09 A) — the shell runs no Butler: `@butler pick` is
+/// refused typed, names `maosctl spirit pick`, and dispatches nothing.
 #[test]
-fn butler_pick_prototype_arm_is_unchanged() {
+fn butler_pick_is_refused_typed_and_dispatches_nothing() {
     let (host, handle) = FakeHost::ok(1);
     let output = run_sync(&host, "@butler pick a\n").unwrap();
     let text = String::from_utf8(output).unwrap();
     assert!(
-        text.contains("Linear note written"),
-        "butler arm intact: {text}"
+        text.contains(
+            "maos: no Butler runs in this shell — pick on a running Butler with \
+             `maosctl spirit pick butler <n> --work-mode <mode>`"
+        ),
+        "typed refusal: {text}"
+    );
+    assert!(
+        !text.contains("Linear note written"),
+        "no canned outcome: {text}"
     );
     let calls = handle.snapshot();
     assert!(calls.raised.is_empty() && calls.recorded_turns.is_empty());

@@ -134,6 +134,15 @@ impl McpClientPort for McpClientAdapter {
                 .record_iac_rt(Service::Capability, Outcome::Ok, duration_us);
         }
 
+        // Story 19-2 (FR51 a/d) — re-checked after the call: a token revoked,
+        // or a Spirit paused, mid-call fails closed; the journaled remote
+        // effect is not undone, but nothing builds on its response.
+        self.capability
+            .recheck(token)
+            .map_err(|_e| McpError::CapabilityDenied {
+                server: server.into(),
+                tool: tool.into(),
+            })?;
         Ok(response)
     }
 }

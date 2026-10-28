@@ -132,6 +132,9 @@ pub struct CapabilityRegistryAdapter {
     telemetry: Arc<TelemetryStreamAdapter>,
     /// Story 18-5 — ADR-016 context-token ledger, built here on every path.
     context: Arc<context_budget::ContextBudget>,
+    /// Story 19-2 (FR51 a) — pids the director paused: every mediated action
+    /// (issuance and verification) of a fenced pid fails closed until resume.
+    paused: std::sync::RwLock<std::collections::BTreeSet<u32>>,
 }
 
 impl std::fmt::Debug for CapabilityRegistryAdapter {
@@ -173,6 +176,7 @@ impl CapabilityRegistryAdapter {
             working_memory,
             telemetry,
             context: Arc::default(),
+            paused: std::sync::RwLock::default(),
         }
     }
 
@@ -195,6 +199,10 @@ impl CapabilityRegistryAdapter {
         posture_hash: [u8; 32],
         intent_class: IntentClass,
     ) -> Result<CapabilityToken, CapError> {
+        // 0. Story 19-2 (FR51 a) — a paused pid mints nothing.
+        if self.is_paused(spirit_pid) {
+            return Err(CapError::Revoked);
+        }
         // 1. Policy check: derive Intent from the actual scope
         let intent = scope_to_intent(&scope)?;
         let cap = cap_policy::decision::Capability {
@@ -308,9 +316,44 @@ impl CapabilityRegistryAdapter {
         posture_hash: [u8; 32],
         sandbox: SandboxTier,
     ) -> Result<(), CapError> {
-        let result = self.tokens.verify(token, posture_hash, sandbox);
+        let result = if self.is_paused(token.spirit_pid) {
+            Err(CapError::Revoked)
+        } else {
+            self.tokens.verify(token, posture_hash, sandbox)
+        };
         self.record_verification(token, VerifyOutcome::from_result(&result));
         result
+    }
+
+    /// Story 19-2 (FR51 a) — fence (`true`) or release (`false`) every
+    /// mediated action of `spirit_pid`: an in-flight hook's next issuance or
+    /// verification fails closed, so the director's pause is bounded by the
+    /// time to set this flag, not by the hook.
+    pub fn set_paused(&self, spirit_pid: u32, paused: bool) {
+        let mut set = self.paused.write().unwrap_or_else(|e| e.into_inner());
+        if paused {
+            set.insert(spirit_pid);
+        } else {
+            set.remove(&spirit_pid);
+        }
+    }
+
+    /// Story 19-2 (FR51 a/d) — the post-call re-check of a token verified (and
+    /// audited) before a slow external call: refuses if the token was revoked
+    /// or its pid paused meanwhile. Silent — the pre-call row is the audit.
+    pub fn recheck(&self, token: &CapabilityToken) -> Result<(), CapError> {
+        if self.is_paused(token.spirit_pid) {
+            return Err(CapError::Revoked);
+        }
+        self.tokens.verify(token, [0u8; 32], SandboxTier(0))
+    }
+
+    /// Whether `spirit_pid` is fenced by a director pause.
+    pub fn is_paused(&self, spirit_pid: u32) -> bool {
+        self.paused
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(&spirit_pid)
     }
 }
 

@@ -319,6 +319,7 @@ pub fn run(
             path.file_name().unwrap_or_default().to_string_lossy()
         ),
         None => {
+            remove_worker_workspaces(&home);
             match std::fs::remove_dir_all(&home) {
                 Ok(()) => {
                     println!("  state home       ephemeral, removed on exit (pass --keep-home to inspect)")
@@ -361,9 +362,29 @@ struct EphemeralHome {
 impl Drop for EphemeralHome {
     fn drop(&mut self) {
         if !self.keep {
+            remove_worker_workspaces(&self.path);
             let _ = std::fs::remove_dir_all(&self.path);
         }
     }
+}
+
+/// Story 19-3 — a live Worker's files under `<home>/workspaces` belong to its
+/// mapped subuid (podman's `:U`), so `remove_dir_all` hits EACCES on them and
+/// stops partway, leaving the rest of the home behind. Remove them inside
+/// podman's user namespace first. Best-effort and bounded: a failure surfaces
+/// as the home's own removal failure.
+fn remove_worker_workspaces(home: &Path) {
+    let workspaces = home.join("workspaces");
+    if !workspaces.exists() {
+        return;
+    }
+    let _ = Command::new("timeout")
+        .args(["-k", "5s", "120s", "podman", "unshare", "rm", "-rf"])
+        .arg(&workspaces)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
 }
 
 /// The Tier-2 beat name, referenced from both the declaration and the live take.
@@ -1341,6 +1362,9 @@ fn live_codex_take(
         .arg("--once")
         .env("MAOS_HOME", home)
         .env("XDG_DATA_HOME", home)
+        // Keep the workspace inside the ephemeral home, where cleanup and the
+        // home-relative report below expect it.
+        .env_remove("MAOS_WORKER_WORKSPACES_ROOT")
         .env("MAOS_LIVE_AGENT", "1")
         .output()
         .map_err(|e| format!("cannot run the live daemon: {e}"))?;
@@ -1412,11 +1436,15 @@ fn live_codex_take(
         short_ref(&tl_ref)
     );
     // Story 19-3 (AC1.2) — where the Worker's effect lives; the diff that made
-    // this run `completed` is over this directory.
+    // this run `completed` is over this directory. AC5 forbids absolute
+    // workstation paths in scene output: name it relative to the state home.
     let workspace = completion
         .as_ref()
         .and_then(|e| e["workspace"].as_str())
-        .unwrap_or("unknown");
+        .map(Path::new)
+        .and_then(|path| path.strip_prefix(home).ok())
+        .map(|relative| relative.display().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
     println!("  worker workspace {workspace}");
 
     // AC3 records `redaction_result: "verified"`. VERIFY it rather than assert

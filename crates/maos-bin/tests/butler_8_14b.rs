@@ -41,7 +41,7 @@ fn maos_run_butler_once_preserved_existing_halt_behavior() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/butler/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
-        // MAOS_HOME isolated like `shell_butler_pick_renders_option_messages`
+        // MAOS_HOME isolated like `shell_butler_pick_is_refused_typed`
         // (the one test that stayed green): without it `maos run` reads the
         // machine's real `~/.maos/control.json`, and the CI decoy (D-16-1-Q)
         // correctly reds it with EndpointInUse — measured on 6af9423a.
@@ -111,8 +111,10 @@ fn maos_run_butler_live_once_wires_mcp_port() {
     );
 }
 
+/// Story 19-2 (D-19-2-09 A) — `maos shell` runs no Butler: every `@butler`
+/// line is refused typed, naming `maosctl spirit pick`; no canned outcome.
 #[test]
-fn shell_butler_pick_renders_option_messages() {
+fn shell_butler_pick_is_refused_typed() {
     let home = isolated_data_home("shell");
     let mut child = Command::new(env!("CARGO_BIN_EXE_maos"))
         .arg("shell")
@@ -129,9 +131,7 @@ fn shell_butler_pick_renders_option_messages() {
         let stdin = child.stdin.as_mut().expect("stdin piped");
         use std::io::Write;
         writeln!(stdin, "@butler pick a").unwrap();
-        writeln!(stdin, "@butler pick b").unwrap();
-        writeln!(stdin, "@butler pick c").unwrap();
-        writeln!(stdin, "@butler pick x").unwrap();
+        writeln!(stdin, "@butler pick 1").unwrap();
         // Ctrl-D (EOF)
     }
     drop(child.stdin.take());
@@ -139,22 +139,19 @@ fn shell_butler_pick_renders_option_messages() {
     let output = child.wait_with_output().expect("shell output");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    assert!(
-        stdout.contains("Linear note written"),
-        "pick a renders Linear note: {stdout}"
+    let refusal = "maos: no Butler runs in this shell — pick on a running Butler with \
+                   `maosctl spirit pick butler <n> --work-mode <mode>`";
+    assert_eq!(
+        stdout.matches(refusal).count(),
+        2,
+        "each pick is refused typed: {stdout}"
     );
-    assert!(
-        stdout.contains("Slack message queued"),
-        "pick b renders Slack reminder: {stdout}"
-    );
-    assert!(
-        stdout.contains("snoozed"),
-        "pick c renders snooze: {stdout}"
-    );
-    assert!(
-        stdout.contains("no pending notification"),
-        "pick x renders error: {stdout}"
-    );
+    for canned in ["Linear note written", "Slack message queued", "snoozed"] {
+        assert!(
+            !stdout.contains(canned),
+            "no canned outcome `{canned}`: {stdout}"
+        );
+    }
 }
 
 use parking_lot::Mutex;

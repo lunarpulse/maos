@@ -134,6 +134,27 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         manifest: &Path,
         pread: Option<Arc<String>>,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
+
+    /// Story 19-2 (D-19-2-08 A) — the principal bound at boot for a serving
+    /// Butler (`MAOS_BUTLER_PRINCIPAL` or the scene header). `None` ⇒ a pick
+    /// is 409 `principal_unbound` before anything is written. A root that
+    /// hosts no Butler keeps this default.
+    fn butler_principal(&self) -> Option<String> {
+        None
+    }
+
+    /// Story 19-2 (D-19-2-07 A) — run a 1-based pick on the live,
+    /// principal-bound Butler at `pid` off the runtime with its own MCP
+    /// port, and map the result to the route's typed outcome.
+    async fn option_pick(
+        &self,
+        spirit_id: &str,
+        _pid: u32,
+        _pick: usize,
+        _work_mode: &str,
+    ) -> OperatorOutcome {
+        DoorInner::not_found("butler_not_found", format!("no live Butler '{spirit_id}'"))
+    }
 }
 
 /// The uninstall terminal as the door renders it: the serialized
@@ -144,6 +165,17 @@ pub struct UninstallOutcome {
     pub body: serde_json::Value,
     pub terminal_code: i32,
 }
+
+/// Story 19-2 (D-19-2-14 A) — the root's blocking Worker freeze/thaw:
+/// `(pid, frozen)`. `None` ⇒ the pid is no supervised Worker; `Some(Err(code))`
+/// ⇒ 409 with `code` (`worker_freeze_failed`, or `worker_pause_unsupported`
+/// under the D-19-2-14 C fallback).
+pub type WorkerFreezeHook =
+    Arc<dyn Fn(u32, bool) -> Option<Result<(), &'static str>> + Send + Sync>;
+/// Story 19-2 (D-19-2-16 A leg 3) — stop the Worker whose binding recorded
+/// this spawn token; returns its spirit id, `None` when none did.
+pub type WorkerRevokeStopHook =
+    Arc<dyn Fn(maos_domain::invariants::i1::TokenId) -> Option<String> + Send + Sync>;
 
 /// Where the upgrade successor factory finds the target manifest path.
 ///
@@ -239,6 +271,8 @@ struct DoorInner {
     spirit_locks: SpiritCommandLocks,
     command_tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
     post_unload_stop: Mutex<Option<Arc<dyn Fn(u32) + Send + Sync>>>,
+    worker_freeze: Mutex<Option<WorkerFreezeHook>>,
+    worker_revoke_stop: Mutex<Option<WorkerRevokeStopHook>>,
     forget_pump: Mutex<Option<std::sync::Weak<crate::hook_pump::HookPump>>>,
     /// Story 19-7 — the set-once re-pin control. Empty (every route 404) in
     /// every root but `cohort-a2a-daemon`, which installs its live pin store.
@@ -307,6 +341,8 @@ impl OperatorDoor {
             spirit_locks: SpiritCommandLocks::default(),
             command_tasks: Mutex::new(Vec::new()),
             post_unload_stop: Mutex::new(None),
+            worker_freeze: Mutex::new(None),
+            worker_revoke_stop: Mutex::new(None),
             forget_pump: Mutex::default(),
             repin: Arc::new(crate::repin_door::RepinControl::new()),
         }))
@@ -354,6 +390,23 @@ impl OperatorDoor {
             .unwrap_or_else(|error| error.into_inner()) = Some(stop);
     }
 
+    /// Story 19-2 — install the root's Worker freeze/thaw (AC7) and
+    /// revoke-stop (AC8) hooks. Uninstalled ⇒ no Worker is frozen or stopped.
+    pub fn set_worker_freeze(&self, hook: WorkerFreezeHook) {
+        *self
+            .0
+            .worker_freeze
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(hook);
+    }
+    pub fn set_worker_revoke_stop(&self, hook: WorkerRevokeStopHook) {
+        *self
+            .0
+            .worker_revoke_stop
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(hook);
+    }
+
     /// Story 19-7 — the door's re-pin control, for `run_cohort_a2a_daemon` to
     /// install the live transport's pin store into after bind.
     pub fn repin_control(&self) -> Arc<crate::repin_door::RepinControl> {
@@ -377,6 +430,38 @@ impl DoorInner {
         if let Some(stop) = stop {
             let _ = tokio::task::spawn_blocking(move || stop(pid)).await;
         }
+    }
+    /// Story 19-2 (D-19-2-14 A) — the root's Worker freeze/thaw, off the
+    /// async worker (a bounded runtime verb). A panicked hook is a failure.
+    async fn worker_freeze(&self, pid: u32, frozen: bool) -> Option<Result<(), &'static str>> {
+        let hook = installed(&self.worker_freeze)?;
+        tokio::task::spawn_blocking(move || hook(pid, frozen))
+            .await
+            .unwrap_or(Some(Err("worker_freeze_failed")))
+    }
+
+    /// One director Approval-Decision row; a failed write is 500
+    /// `approval_log_failed`.
+    fn approval_row(
+        &self,
+        target: &str,
+        capability: &str,
+        intent: &str,
+        reasoning: String,
+    ) -> Result<(), OperatorOutcome> {
+        self.transparency_log
+            .insert_approval_decision(maos_domain::invariants::i4::ApprovalDecision {
+                actor: DIRECTOR.into(),
+                target: target.into(),
+                capability: capability.into(),
+                intent: intent.into(),
+                decision: true,
+                reasoning: Some(reasoning),
+            })
+            .map_err(|error| OperatorOutcome::Failed {
+                code: "approval_log_failed".into(),
+                detail: error.to_string(),
+            })
     }
 
     fn not_found(code: &str, detail: String) -> OperatorOutcome {
@@ -478,6 +563,14 @@ impl DoorInner {
             OperatorCommand::OrchestratorEnqueue { spirit_id, text } => {
                 self.orchestrator_enqueue_command(&spirit_id, &text).await
             }
+            OperatorCommand::OrchestratorRecall { spirit_id } => {
+                self.orchestrator_recall_command(&spirit_id).await
+            }
+            OperatorCommand::OptionPick {
+                spirit_id,
+                pick,
+                work_mode,
+            } => self.option_pick_command(&spirit_id, pick, &work_mode).await,
             OperatorCommand::RevokeToken { token_id } => self.revoke_token_command(&token_id).await,
             OperatorCommand::ImportRevocations { crl } => {
                 self.import_revocations_command(&crl).await
@@ -545,6 +638,7 @@ impl DoorInner {
         spirit_id: &str,
     ) -> OperatorOutcome {
         use maos_domain::lifecycle::LifecycleError;
+        use maos_kernel_core::scheduler::control_block::ScbLifecycleState as Scb;
 
         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
@@ -580,6 +674,27 @@ impl DoorInner {
                 };
             }
         }
+        // Story 19-2 (AC7.2, D-19-2-14 A) — a Worker is frozen BEFORE its SCB
+        // pauses and thawed BEFORE it resumes: a refused freeze/thaw leaves
+        // the SCB untouched (never `Paused` over a running container), and a
+        // transition that did not land undoes it.
+        let freeze = match (verb, self.scb_state(spirit_id)) {
+            ("pause", Some(Scb::Running)) => Some(true),
+            ("resume", Some(Scb::Paused)) => Some(false),
+            _ => None,
+        };
+        let mut frozen = None;
+        if let Some(target) = freeze {
+            match self.worker_freeze(pid, target).await {
+                Some(Err(code)) => {
+                    return OperatorOutcome::Conflict {
+                        code: code.into(),
+                        detail: format!("Worker '{spirit_id}' not frozen/thawed; {verb} not run"),
+                    }
+                }
+                done => frozen = done.map(|_| target),
+            }
+        }
         let transitioned = match verb {
             "start" => self.scheduler.start(pid).await,
             "pause" => self.scheduler.pause(pid).await,
@@ -587,6 +702,14 @@ impl DoorInner {
             "unload" => self.scheduler.unload(pid).await,
             _ => unreachable!("lifecycle_command is only called with the four scheduler verbs"),
         };
+        if let (Err(_), Some(target)) = (&transitioned, frozen) {
+            let landed = if target { Scb::Paused } else { Scb::Running };
+            if self.scb_state(spirit_id) != Some(landed) {
+                if let Some(Err(code)) = self.worker_freeze(pid, !target).await {
+                    eprintln!("maos: {verb} '{spirit_id}' failed; freeze undo: {code}");
+                }
+            }
+        }
         if verb == "unload" {
             self.stop_worker_after_unload(pid).await;
         }
@@ -638,11 +761,19 @@ impl DoorInner {
             .scb_state(spirit_id)
             .map(|state| format!("{state:?}"))
             .unwrap_or_else(|| "Unloaded".into());
-        OperatorOutcome::Completed(serde_json::json!({
+        let mut body = serde_json::json!({
             "spirit_id": spirit_id,
             "verb": verb,
             "lifecycle_state": lifecycle_state,
-        }))
+        });
+        if matches!(verb, "pause" | "resume") {
+            // AC7.4 — the capability fence, read back rather than assumed.
+            body["fenced"] = self.capability.is_paused(pid).into();
+        }
+        if let Some(frozen) = frozen {
+            body["frozen"] = frozen.into();
+        }
+        OperatorOutcome::Completed(body)
     }
     /// Story 16-6 — `POST /v1/spirits`: admit a Spirit into the running
     /// daemon and leave it in `Loaded`.
@@ -1260,6 +1391,81 @@ impl DoorInner {
         }))
     }
 
+    /// Story 19-2 (AC3, D-19-2-05/06 A, FR51(c)) — recall EVERY pending
+    /// instruction. Log before act: the intent row precedes the drain, then
+    /// one row per recalled instruction. A failed per-instruction row is a
+    /// 500 naming the recalled set; nothing is re-enqueued.
+    async fn orchestrator_recall_command(&self, spirit_id: &str) -> OperatorOutcome {
+        use maos_spirit_abi::identity::SpiritId;
+
+        if self.scheduler.resolve_pid(spirit_id).is_none() {
+            return Self::spirit_not_loaded(spirit_id);
+        }
+        let buffer = self
+            .orchestrator_registry
+            .get_or_create(&SpiritId::from(spirit_id));
+        let pending = format!("pending={}", buffer.pending_count());
+        let row = |intent: &str, reasoning: String| {
+            self.approval_row(spirit_id, "orchestrator.recall", intent, reasoning)
+        };
+        if let Err(outcome) = row("recall-requested", pending) {
+            return outcome;
+        }
+        let (mut recalled, mut failed) = (Vec::new(), false);
+        for instruction in buffer.recall_all_pending() {
+            let (id, text) = (instruction.id.0, instruction.goal);
+            if let Err(outcome) = row("recall", format!("id={id}: {text}")) {
+                eprintln!("maos: orchestrator recall '{spirit_id}' id={id}: {outcome:?}");
+                failed = true;
+            }
+            recalled.push(serde_json::json!({ "instruction_id": id, "text": text }));
+        }
+        let body = serde_json::json!({
+            "spirit_id": spirit_id,
+            "recalled": recalled,
+            "pending": buffer.pending_count(),
+        });
+        if failed {
+            return OperatorOutcome::Failed {
+                code: "approval_log_failed".into(),
+                detail: format!("recalled (not re-enqueued), a recall row failed: {body}"),
+            };
+        }
+        OperatorOutcome::Completed(body)
+    }
+
+    /// Story 19-2 (AC4, D-19-2-07/08 A) — a director's option pick reaches the
+    /// running Butler. No boot principal ⇒ 409 before anything is written;
+    /// the intent row precedes the call; the root runs the pick off the
+    /// runtime on the live Butler (id + pid checked) with its own MCP port.
+    async fn option_pick_command(
+        &self,
+        spirit_id: &str,
+        pick: usize,
+        work_mode: &str,
+    ) -> OperatorOutcome {
+        let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
+            return Self::spirit_not_loaded(spirit_id);
+        };
+        let Some(principal) = self.private_ops.butler_principal() else {
+            return OperatorOutcome::Conflict {
+                code: "principal_unbound".into(),
+                detail: "this daemon was booted with no Butler principal \
+                         (MAOS_BUTLER_PRINCIPAL); nothing was recorded"
+                    .into(),
+            };
+        };
+        let reasoning = format!("pick={pick} work_mode={work_mode} principal={principal}");
+        if let Err(outcome) =
+            self.approval_row(spirit_id, "butler.pick", "pick-requested", reasoning)
+        {
+            return outcome;
+        }
+        self.private_ops
+            .option_pick(spirit_id, pid, pick, work_mode)
+            .await
+    }
+
     /// Token revocation through the canonical adapter path. D-16-1-V: an
     /// already-revoked token with `RevokeReason::Operator` is
     /// `Err(CapError::Revoked)` with NO second audit event — mapped to
@@ -1293,20 +1499,37 @@ impl DoorInner {
                 detail: error.to_string(),
             },
             Ok(()) => {
-                if let Err(error) = maos_kernel_core::orchestrator::journal_token_revocation(
+                let journaled = maos_kernel_core::orchestrator::journal_token_revocation(
                     &self.transparency_log,
                     DIRECTOR,
                     token_id,
                     None,
-                ) {
+                );
+                // Story 19-2 (AC8 leg 3, D-19-2-16 A) — a Worker spawned under
+                // this grant is stopped (bounded by the root) even when the row
+                // failed: a revoked grant must not keep acting.
+                let worker_stopped = match installed(&self.worker_revoke_stop) {
+                    Some(stop) => {
+                        let token = maos_domain::invariants::i1::TokenId(token_bytes);
+                        tokio::task::spawn_blocking(move || stop(token))
+                            .await
+                            .unwrap_or_else(|error| {
+                                eprintln!("maos: revoke-token Worker stop: {error}");
+                                None
+                            })
+                    }
+                    None => None,
+                };
+                if let Err(error) = journaled {
                     return OperatorOutcome::Failed {
                         code: "approval_log_failed".into(),
-                        detail: error.to_string(),
+                        detail: format!("{error} (worker_stopped: {worker_stopped:?})"),
                     };
                 }
                 OperatorOutcome::Completed(serde_json::json!({
                     "token_id": token_id,
                     "revoked": true,
+                    "worker_stopped": worker_stopped,
                 }))
             }
         }
@@ -1791,6 +2014,11 @@ impl OperatorCommandPort for OperatorDoor {
     }
 }
 
+/// A root-installed hook, if any (poison-tolerant).
+fn installed<T: Clone>(slot: &Mutex<Option<T>>) -> Option<T> {
+    slot.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
 /// A stable machine label per command for the completion row's intent.
 fn command_verb(command: &OperatorCommand) -> &'static str {
     match command {
@@ -1804,6 +2032,10 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         OperatorCommand::Uninstall { .. } => "uninstall",
         OperatorCommand::ResolveHalt { .. } => "halt-resolve",
         OperatorCommand::OrchestratorEnqueue { .. } => "orchestrator",
+        // Story 19-2 — `operator.orchestrator-recall.<op>:<outcome>` and
+        // `operator.spirit-pick.<op>:<outcome>`.
+        OperatorCommand::OrchestratorRecall { .. } => "orchestrator-recall",
+        OperatorCommand::OptionPick { .. } => "spirit-pick",
         OperatorCommand::RevokeToken { .. } => "revoke-token",
         OperatorCommand::ImportRevocations { .. } => "revocations-import",
         OperatorCommand::ForgetMemory { .. } => "forget",

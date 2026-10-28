@@ -23,6 +23,11 @@ pub enum WrittenBy {
 pub enum RootKind {
     File,
     Directory,
+    /// Story 19-3 — a Worker workspaces root. Podman's `:U` volume option
+    /// hands each workspace to the Worker's mapped subuid, so the files a
+    /// Worker wrote cannot be unlinked by this user: removal falls back to
+    /// `podman unshare`, and a tree it cannot remove is reported residue.
+    WorkerWorkspaces,
 }
 
 /// One resolved item in the MAOS footprint.
@@ -56,13 +61,36 @@ pub fn maos_roots() -> Vec<MaosRoot> {
         .unwrap_or_else(|| Path::new("."))
         .to_path_buf();
 
-    let mut roots = Vec::with_capacity(18);
+    let mut roots = Vec::with_capacity(20);
     if let Ok(Some(home)) = maos_domain::operator_door::maos_home() {
+        push(
+            &mut roots,
+            "Worker workspaces",
+            home.join("workspaces"),
+            RootKind::WorkerWorkspaces,
+            WrittenBy::Maos,
+        );
         push(
             &mut roots,
             "MAOS home",
             home,
             RootKind::Directory,
+            WrittenBy::Maos,
+        );
+    }
+    // Story 19-3 — a relocated workspaces root (`MAOS_WORKER_WORKSPACES_ROOT`,
+    // used verbatim, same rules as `worker_workspace`), kept off the audit
+    // filesystem. `<home>/workspaces` stays enumerated: runs before the
+    // relocation wrote there. A relative value is refused by
+    // `validate_purge_roots`, as the daemon refuses it.
+    if let Some(path) =
+        std::env::var_os("MAOS_WORKER_WORKSPACES_ROOT").filter(|value| !value.is_empty())
+    {
+        push(
+            &mut roots,
+            "Worker workspaces override",
+            PathBuf::from(path),
+            RootKind::WorkerWorkspaces,
             WrittenBy::Maos,
         );
     }
@@ -900,7 +928,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
         }
         drop(locks);
         snapshot.restore()?;
-        print_report_only_residue();
+        print_report_only_residue(&[]);
         return Ok(());
     }
 
@@ -943,10 +971,12 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
     #[cfg(unix)]
     let keyring = keyring_store();
     let mut left_files = Vec::new();
+    let mut workspace_residue = Vec::new();
     let dispositions = remove_planned_roots(
         &planned,
         &protected,
         &mut left_files,
+        &mut workspace_residue,
         |index, disposition| {
             receipt_roots[index].disposition = disposition.to_string();
             receipt.update(&receipt_roots)
@@ -1008,7 +1038,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
         println!("maos purge: left behind: {}", leaf_name(&path));
     }
     println!("maos purge: receipt: {}", receipt_path.display());
-    print_report_only_residue();
+    print_report_only_residue(&workspace_residue);
     println!("maos purge: remove the Cargo-owned binary with: cargo uninstall maos");
     if let Some(error) = finalize_error {
         return Err(error);
@@ -1197,10 +1227,17 @@ fn planned_disposition(plan: &PlannedRoot, protected: &[PathBuf]) -> &'static st
         // The root is entered and selectively emptied: it survives, most of
         // its contents do not.
         "would partially remove"
+    } else if plan.root.kind == RootKind::WorkerWorkspaces {
+        WORKSPACES_DRY_RUN
     } else {
         "would remove"
     }
 }
+
+/// Dry-run disposition of a present Worker workspaces root.
+const WORKSPACES_DRY_RUN: &str = "would remove (Worker-written files via podman unshare)";
+/// Disposition of a Worker workspaces root neither removal could take.
+const WORKSPACES_RESIDUE: &str = "left (subuid-owned residue)";
 
 fn planned_receipt_roots(planned: &[PlannedRoot], protected: &[PathBuf]) -> Vec<ReceiptRoot> {
     planned
@@ -1209,7 +1246,9 @@ fn planned_receipt_roots(planned: &[PlannedRoot], protected: &[PathBuf]) -> Vec<
             path: plan.root.path.display().to_string(),
             written_by: plan.root.written_by,
             disposition: match planned_disposition(plan, protected) {
-                "would remove" | "would partially remove" => "pending".to_string(),
+                "would remove" | "would partially remove" | WORKSPACES_DRY_RUN => {
+                    "pending".to_string()
+                }
                 disposition => disposition.to_string(),
             },
         })
@@ -1220,6 +1259,7 @@ fn remove_planned_roots<F>(
     planned: &[PlannedRoot],
     protected: &[PathBuf],
     left_files: &mut Vec<PathBuf>,
+    workspace_residue: &mut Vec<PathBuf>,
     mut record: F,
 ) -> Result<Vec<String>, PurgeError>
 where
@@ -1228,6 +1268,10 @@ where
     let mut order: Vec<usize> = (0..planned.len()).collect();
     order.sort_by_key(|index| std::cmp::Reverse(planned[*index].root.path.components().count()));
     let mut dispositions = vec![String::new(); planned.len()];
+    // Protected paths plus every workspaces root left as residue: deepest
+    // first, so a residue root is skipped by the walk of the root holding it
+    // instead of failing it on a subuid-owned file.
+    let mut skip = protected.to_vec();
     for index in order {
         let plan = &planned[index];
         if !plan.initially_present {
@@ -1259,7 +1303,7 @@ where
             })?;
         let matches_kind = match plan.root.kind {
             RootKind::File => metadata.is_file(),
-            RootKind::Directory => metadata.is_dir(),
+            RootKind::Directory | RootKind::WorkerWorkspaces => metadata.is_dir(),
         };
         if !matches_kind {
             dispositions[index] = "left (type mismatch)".to_string();
@@ -1270,7 +1314,16 @@ where
         match plan.root.kind {
             RootKind::File => remove_file_nofollow(&plan.root.path)?,
             RootKind::Directory => {
-                remove_tree_selective(&plan.root.path, protected, left_files)?;
+                remove_tree_selective(&plan.root.path, &skip, left_files)?;
+            }
+            RootKind::WorkerWorkspaces => {
+                if !remove_worker_workspaces(&plan.root.path, &skip, left_files)? {
+                    skip.push(plan.root.path.clone());
+                    workspace_residue.push(plan.root.path.clone());
+                    dispositions[index] = WORKSPACES_RESIDUE.to_string();
+                    record(index, &dispositions[index])?;
+                    continue;
+                }
             }
         }
         dispositions[index] = if std::fs::symlink_metadata(&plan.root.path).is_err() {
@@ -1283,7 +1336,74 @@ where
         };
         record(index, &dispositions[index])?;
     }
+    // A residue root is reported once, with its removal command — not as
+    // every leaf the later walks collected beneath it.
+    left_files.retain(|file| !workspace_residue.iter().any(|root| file.starts_with(root)));
     Ok(dispositions)
+}
+
+/// Story 19-3 — remove one Worker workspaces root. The ordinary walk runs
+/// first: it takes operator-owned entries and the empty workspaces of fixture
+/// runs without touching podman. What it cannot unlink — files a Worker wrote
+/// under its mapped subuid — goes to `podman unshare`, inside the user
+/// namespace that owns them. `Ok(false)`: the tree survives as residue for
+/// the operator, never a purge failure.
+fn remove_worker_workspaces(
+    path: &Path,
+    skip: &[PathBuf],
+    left_files: &mut Vec<PathBuf>,
+) -> Result<bool, PurgeError> {
+    let collected = left_files.len();
+    match remove_tree_selective(path, skip, left_files) {
+        Ok(()) | Err(PurgeError::Io { .. }) => {}
+        Err(error) => return Err(error),
+    }
+    if std::fs::symlink_metadata(path).is_err() {
+        return Ok(true);
+    }
+    // The walk's leaves under this root are either removed below or covered
+    // by the residue line.
+    left_files.truncate(collected);
+    Ok(podman_unshare_remove(path) && std::fs::symlink_metadata(path).is_err())
+}
+
+/// The removal run inside podman's user namespace — and, verbatim, the
+/// command a residue line hands the operator. `--one-file-system` keeps the
+/// walk's device boundary: a mount under a workspace is never emptied.
+fn workspace_removal_command(path: &Path) -> String {
+    format!("podman unshare rm -rf --one-file-system {}", path.display())
+}
+
+/// `podman unshare rm -rf --one-file-system <path>` with a hard deadline: a
+/// wedged runtime must not stall purge after the receipt is written. `false`
+/// on a missing runtime, a failed removal or the deadline.
+fn podman_unshare_remove(path: &Path) -> bool {
+    use std::process::Stdio;
+    let Ok(mut child) = std::process::Command::new("podman")
+        .args(["unshare", "rm", "-rf", "--one-file-system"])
+        .arg(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        return false;
+    };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return status.success(),
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+            Err(_) => return false,
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -1675,7 +1795,7 @@ fn validate_receipt_path(
         })?);
     for plan in planned {
         if plan.root.written_by != WrittenBy::Maos
-            || plan.root.kind != RootKind::Directory
+            || plan.root.kind == RootKind::File
             || path_is_protected(&plan.root.path, protected)
         {
             continue;
@@ -1772,13 +1892,26 @@ fn leaf_name(path: &Path) -> String {
         .unwrap_or_else(|| path.display().to_string())
 }
 
-fn print_report_only_residue() {
+/// `workspace_residue`: Worker workspaces roots neither the walk nor
+/// `podman unshare` removed (Story 19-3), each with its exact command.
+fn print_report_only_residue(workspace_residue: &[PathBuf]) {
     let mut printed_heading = false;
     let cgroup = Path::new("/sys/fs/cgroup/maos");
     if cgroup.exists() {
         println!("maos purge: residue MAOS cannot remove for you:");
         println!("  cgroup subtree: {} (report-only)", cgroup.display());
         printed_heading = true;
+    }
+    for root in workspace_residue {
+        if !printed_heading {
+            println!("maos purge: residue MAOS cannot remove for you:");
+            printed_heading = true;
+        }
+        println!(
+            "  Worker workspaces ({}): files owned by a Worker's subuid remain; run `{}`",
+            leaf_name(root),
+            workspace_removal_command(root)
+        );
     }
     for runtime in ["podman", "docker"] {
         if runtime == "podman" && !podman_storage_exists() {

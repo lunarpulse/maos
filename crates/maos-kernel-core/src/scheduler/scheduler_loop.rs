@@ -453,6 +453,9 @@ impl SpiritSchedulerAdapter {
             payload.to_string().as_bytes(),
             FrameOrigin::SpiritAuto,
         );
+        // Story 19-2 (FR51 a) — fence before `on_pause`: from here every
+        // mediated action of this pid fails closed, in-flight hooks included.
+        self.capability.set_paused(spirit_pid, true);
 
         let outcome = self.dispatcher.fire_on_pause(&scb).await;
         self.check_hook_outcome("on_pause", spirit_pid, outcome)?;
@@ -480,6 +483,9 @@ impl SpiritSchedulerAdapter {
             payload.to_string().as_bytes(),
             FrameOrigin::SpiritAuto,
         );
+
+        // Story 19-2 (FR51 a) — lift the pause fence once Running again.
+        self.capability.set_paused(spirit_pid, false);
 
         // Story 3.4 — replay buffered Orchestrator instructions.
         if let Some(ref registry) = self.orchestrator_registry {
@@ -563,6 +569,7 @@ impl SpiritSchedulerAdapter {
         );
         self.capability.revoke_all_for_pid(spirit_pid);
         self.capability.context_budget().remove(spirit_pid);
+        self.capability.set_paused(spirit_pid, false);
         // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
         let _ = self._halt_registry.drain_for_spirit(spirit_pid);
         {

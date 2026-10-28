@@ -392,9 +392,10 @@ pub fn map_response(verb: &str, response: Response) -> ExitCode {
         503 => map_retryable_503(verb, &response.body),
         status => {
             let (code, detail) = response.error_parts();
-            // 404/409/500 typed outcomes and 400/405/411/413 protocol errors
-            // are all exit 1 per D-16-1-P; the stderr names the status so a
-            // client/daemon version skew is diagnosable.
+            // 404/409/500/502 typed outcomes (502 is 19-2's `mcp_failed`: a
+            // pick's MCP effect failed after its record) and 400/405/411/413
+            // protocol errors are all exit 1 per D-16-1-P; the stderr names
+            // the status so a client/daemon version skew is diagnosable.
             if detail.is_empty() {
                 eprintln!("maosctl: {verb} — {code} (HTTP {status})");
             } else {
@@ -524,6 +525,15 @@ fn print_body(body: &[u8]) {
     let mut out = std::io::stdout();
     let _ = out.write_all(body);
     let _ = out.write_all(b"\n");
+}
+
+/// Story 19-2 (D-19-2-07 A) — `POST /v1/spirits/<id>/pick` body, twin of the
+/// maos-control `"pick"` arm: `pick` ≥ 1, `work_mode` non-blank.
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OptionPickRequest {
+    pub pick: u64,
+    pub work_mode: String,
 }
 
 // ─── Story 19-7 — `maosctl a2a repin` wire shapes (twins of maos-control) ──

@@ -23,6 +23,8 @@
 > THIS document remains normative for **judgment**: what was wrong and why, what the release may not
 > claim, and the abort conditions. It is a record, not a checklist.
 
+> **HISTORICAL (pre-19-3):** the `codex --version` probe passages (1.3, the 1.5 admission note, 실행 요약 1단계) and the "run maos FROM `$DEMO`" cwd passages (1.5, Phase 3, 실행 요약 3단계) describe the pre-19-3 build — since `19-3-real-worker-default-with-effect-oracle` no real CLI runs on the host, and a Worker's only persistent writable path is its own T3 `/workspace` (`<MAOS_HOME>/workspaces/<container_name>/`, or under `MAOS_WORKER_WORKSPACES_ROOT`); the daemon's cwd never reaches it.
+
 ## Preconditions (before you touch a key)
 
 - [ ] **T1–T5 landed and green** on the pre-Epic-13 bridge branch (`cargo test --workspace --locked`, discipline gates, `check-kernel-baseline` @23147). `[T1–T5]`

@@ -234,6 +234,13 @@ mod worker {
     /// The default progress threshold: the NFR's "no progress IAC for > 30 s".
     pub const DEFAULT_PROGRESS_THRESHOLD_MS: u32 = 30_000;
 
+    /// Story 19-2 D-19-2-14 — THE switch: `true` is A (a door `pause` freezes a
+    /// Worker's container with the runtime's `pause`, `resume` thaws it, state
+    /// kept); `false` is the C fallback should the hosted rootless spike refuse
+    /// `pause` (409 `worker_pause_unsupported`, FR51(a) in-process only for
+    /// Workers). Never B: stopping a paused Worker destroys FR51(b)'s state.
+    pub const WORKER_FREEZE_ENABLED: bool = true;
+
     // ── The task record's source (D-16-3-E) ─────────────────────────────
 
     /// WHERE a Worker run came from. The caller passes this; `bind` derives the
@@ -720,6 +727,9 @@ mod worker {
         strategy: Arc<dyn ExitObservation>,
         counters: Arc<SupervisorCounters>,
         seams: SupervisorSeams,
+        /// Story 19-2 — the container is frozen. Its own lock is held across
+        /// the runtime verb so a teardown waits for, then undoes, a freeze.
+        frozen: Mutex<bool>,
     }
 
     impl BindingCore {
@@ -796,6 +806,40 @@ mod worker {
             let action = self.begin_stop();
             self.execute(action);
             self.cleanup_container(Instant::now() + TEARDOWN_BUDGET);
+        }
+
+        /// Story 19-2 (D-19-2-14 A) — freeze or thaw the container, bounded by
+        /// `TEARDOWN_BUDGET`; only a `Running` binding with a CID freezes. A
+        /// freeze that fails is undone best-effort: nothing is claimed.
+        pub fn set_frozen(&self, frozen: bool) -> Result<(), &'static str> {
+            let mut current = self.frozen.lock().unwrap_or_else(|e| e.into_inner());
+            if *current == frozen {
+                return Ok(());
+            }
+            if !WORKER_FREEZE_ENABLED {
+                return Err("worker_pause_unsupported");
+            }
+            let live = !frozen || self.phase() == BindingPhase::Running;
+            let terminal = self.container_terminal().filter(|_| live);
+            let by = Instant::now() + TEARDOWN_BUDGET;
+            if let Some(terminal) = terminal {
+                if terminal.set_frozen(frozen, by) {
+                    *current = frozen;
+                } else if frozen {
+                    let _ = terminal.set_frozen(false, by);
+                }
+            }
+            (*current == frozen)
+                .then_some(())
+                .ok_or("worker_freeze_failed")
+        }
+
+        /// Every stop thaws first, so the runtime's kill reaches a frozen CID.
+        fn thaw_for_teardown(&self, deadline: Instant) {
+            let mut frozen = self.frozen.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(terminal) = self.container_terminal().filter(|_| *frozen) {
+                *frozen = !terminal.set_frozen(false, deadline);
+            }
         }
 
         /// The current phase.
@@ -1033,6 +1077,7 @@ mod worker {
         /// crash-handled binding still owns a container (fault cleanup never
         /// latches `PlannedStop` and never rewrites the frozen snapshot).
         fn cleanup_container(&self, deadline: Instant) {
+            self.thaw_for_teardown(deadline);
             let (custody, terminal) = {
                 let state = self.lock();
                 (
@@ -1089,6 +1134,7 @@ mod worker {
         }
 
         pub(super) fn signal(&self, deadline: Instant) {
+            self.thaw_for_teardown(deadline);
             let (custody, terminal) = {
                 let state = self.lock();
                 (
@@ -1609,6 +1655,7 @@ mod worker {
                 strategy: Arc::clone(&self.strategy),
                 counters: Arc::clone(&self.counters),
                 seams: self.seams.clone(),
+                frozen: Mutex::new(false),
             })
         }
 
@@ -1855,6 +1902,52 @@ mod worker {
             if let Some(core) = self.registry.by_pid(spirit_pid) {
                 core.stop_session();
             }
+        }
+
+        /// Story 19-2 (D-19-2-14) — the door's freeze/thaw of the Worker at
+        /// `spirit_pid`; `None` if it is not a live binding. A thaw restarts
+        /// the progress stamp: the pause is not a stall.
+        pub fn freeze_binding(
+            &self,
+            spirit_pid: u32,
+            frozen: bool,
+        ) -> Option<Result<(), &'static str>> {
+            let result = self.registry.by_pid(spirit_pid)?.set_frozen(frozen);
+            if result.is_ok() && !frozen {
+                let now = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+                self.exec.with_scb(spirit_pid, |scb| {
+                    scb.last_progress_iac_ns.store(now, Ordering::Relaxed)
+                });
+            }
+            Some(result)
+        }
+
+        /// Story 19-2 (D-19-2-16 A leg 3) — revoking a Worker's spawn token
+        /// stops the live binding that recorded it (`stop_session`: bounded
+        /// kill, termination confirmed within `TEARDOWN_BUDGET`). Returns that
+        /// Worker's Spirit id; `None` if no live binding recorded `token`.
+        pub fn stop_binding_by_token(&self, token: TokenId) -> Option<String> {
+            let core = self
+                .registry
+                .active()
+                .into_iter()
+                .find(|core| core.lock().record.capability_token == Some(token))?;
+            core.stop_session();
+            Some(core.spirit_id().to_owned())
+        }
+
+        /// Story 19-2 — install [`Self::freeze_binding`] and
+        /// [`Self::stop_binding_by_token`] on the door over a weak supervisor
+        /// (the `stop_after_unload` shape).
+        pub fn install_door_hooks(self: &Arc<Self>, door: &crate::operator_door::OperatorDoor) {
+            let weak = Arc::downgrade(self);
+            door.set_worker_freeze(Arc::new(move |pid, frozen| {
+                weak.upgrade()?.freeze_binding(pid, frozen)
+            }));
+            let weak = Arc::downgrade(self);
+            door.set_worker_revoke_stop(Arc::new(move |token| {
+                weak.upgrade()?.stop_binding_by_token(token)
+            }));
         }
 
         /// Story 19-6 harness plant only (`orchestrator_root::CRASH_PLANT_ENV`):
@@ -2328,13 +2421,14 @@ mod worker {
         ) {
             self.take_record(spirit_pid, &record.task_id);
             // Story 19-6 (D-19-6-05 A) — the root's resolver, not `None`: the
-            // same `Arc` the `CrashDetector` and the scheduler hold.
+            // same `Arc` the `CrashDetector` and the scheduler hold. Crash path
+            // only: a planned stop never writes `task.reassigned`.
             let replica = self.originator_delivery.get();
             maos_kernel_core::supervision::enforce_disposition(
                 action,
                 std::slice::from_ref(record),
                 &self.iac,
-                replica.map(|replica| &**replica),
+                replica.filter(|_| crashed).map(|replica| &**replica),
             );
             // Story 19-6 (D-19-6-01 A) — a concurrent unload removed the SCB
             // first, so `handle_crash` journaled no `task.orphaned`; the
@@ -3201,4 +3295,5 @@ pub use worker::{
     SupervisorCounters, SupervisorSeams, WorkerBinding, WorkerBindingView, WorkerSpirit,
     WorkerSupervision, WorkerSupervisionError, WorkerSupervisor, WorkerTask, ARMED_MARKER,
     CRASH_HANDLER_JOIN_BUDGET, DEFAULT_PROGRESS_THRESHOLD_MS, ROOT_GRACE, STAMPER_TICK,
+    WORKER_FREEZE_ENABLED,
 };

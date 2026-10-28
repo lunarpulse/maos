@@ -29,7 +29,7 @@ Status: ready-for-dev (RULED 2026-10-28)
 **Does NOT close, and says so:**
 - FR10's spawned-form clause (an in-flight version swap of a non-in-process Spirit) — **D-19-5-10 RULED C** (ask `w3_19_5_d10`, operator-approved scope cut): routed to `20-9-spawned-form-lifecycle-hooks`; the `[cli_wrapper]` Worker is not a Spirit form (ADR-060 `:27-31`) and its upgrade target is refused typed.
 - A state archive: the FR11 record is an identity record (manifest text, empty snapshot); `SpiritArchive::read` keeps zero production readers (D-19-5-03).
-- `[on_crash]`, `[on_revocation]`, `[supervision]` are also dropped from the admitted SCB bundle (`admission.rs:404-412`) — FR50/FR13 charters, filed as cross-story note X1 (`records-owed.md`), not fixed here.
+- ~~`[on_crash]`, `[on_revocation]`, `[supervision]` are also dropped from the admitted SCB bundle (`admission.rs:404-412`) — FR50/FR13 charters, filed as cross-story note X1 (`records-owed.md`), not fixed here.~~ **r19_x1 (2026-10-28): the drop is ADDED to 19-5** by extending D-19-5-06 A — `bundle()` carries the three sections too (AC4.3, kloc note ~+6–10 maos-bin); the FR50/FR13 charters stay filed in `records-owed.md` (X1 flips at landing).
 - FR53 halt identity across swaps (`20-3b`, routing audit Appendix C); a drained halt's missing receipt (`deferred-work.md:894`, owner `20-3c`).
 - The archive root ignoring `MAOS_HOME` (`deferred-work.md:862`, owner `21-4`).
 
@@ -104,6 +104,8 @@ Component forecast for the recommended rows (tokei code; "measured" = prototype 
 | xtask · maos-bench · maos-shell · maos-domain · maos-wasm-host | 0 | — |
 | **aggregate** | ≈ +140…+155 | Σ |
 
+**kloc note — r19_x1 (2026-10-28):** D-19-5-06 A extended (AC4.3: `bundle()` also carries `[on_crash]`/`[on_revocation]`/`[supervision]`) adds **~+6–10 maos-bin** [INFERENCE, unmeasured, on top of the measured +27 admission row] ⇒ maos-bin ≈ **+192…+211** (× 1.3 ≈ 250–274), aggregate ≈ +146…+165 — still inside the ruled envelopes 31710 (863 − 279 − 130 = 454 ≥ 274) and 191669; exact figure re-pinned at landing.
+
 Not-recommended deltas: D-01 B kernel 0 instead of −53, maos-bin +16 (the smoke arm's cold step stays); D-01 C kernel +19 and maos-bin admitter impl +20–35 [INFERENCE]; D-02 B maos-bin ≈ −35; D-03 B kernel +13 and maos-bin −12; D-05 B kernel +48, maos-bin −31 (measured); D-05 C kernel +66; D-06 C kernel +6 (+ K8); D-08 B maos-bin −3, maos-control −4, maos-cli +7; D-09 B kernel −4, maos-bin −6; D-10 A maos-bin +15–25 (+ `worker_spawn.rs`, 19-3's file); D-10 B maos-wasm-host / WIT +150–300 [INFERENCE, outside every E19 envelope].
 
 **Cumulative use against the E19 envelope** (`epic-19:38-48`):
@@ -171,6 +173,7 @@ Not-recommended deltas: D-01 B kernel 0 instead of −53, maos-bin +16 (the smok
 
 1. A butler predecessor admitted by `maos run` with `[hot_swap] state_schema_version = 65537` (major 1) hot-swaps to a 0.3.1 successor declaring the same `65537` with no `[migrates_from]` ⇒ `completed` (same major; note `validate_logical_envelope` refuses a same-major successor whose schema is HIGHER than the predecessor's, `state_codec.rs:163-169` — unchanged here, so the vector uses equal schemas). **Proven red:** revert D-06 A (bundle drops the section) ⇒ the predecessor reads as `1` (major 0), the swap is cross-major and fails `EMigratorMissing` (`coordinator.rs:273-299`, `migrator.rs:48-68`).
 2. Kernel witness (`hot_swap_same_major_lifecycle.rs`): a token issued at the predecessor pid before the swap verifies after it; a working-memory scalar slot set before reads back after; the pid is unchanged. **Proven red:** perform the transition as unload + load (new pid) ⇒ both reads fail.
+3. **r19_x1 (2026-10-28; D-19-5-06 A extended):** `GatedManifest::bundle()` (`crates/maos-bin/src/admission.rs:404-412`) also carries `[on_crash]`, `[on_revocation]` and `[supervision]` for class Spirits, parsed by `gate_manifest` and carried beside the swap sections, so a class Spirit admitted by `maos run` or `maosctl load` keeps its declared crash-disposition and supervision sections (cross-story note X1, ruled into 19-5). Observable: a vector admits a class Spirit whose manifest declares the three sections and asserts the admitted SCB bundle carries them. Kloc note: ~+6–10 maos-bin.
 
 ### AC5 — FR49: migrator over the door (D-08 A)
 
@@ -190,7 +193,7 @@ Comments that describe the old behaviour are updated where they live outside the
 
 - [ ] **T0 — Preflight.** D-19-5-01…14 RULED; tracker `:291` → `in-progress`; records-owed R1–R5/E1–E5/T1–T2 applied by the parent. Re-measure every HEAD cite in `main.rs` / `supervision.rs` / `worker_spawn.rs` / `discipline.yml` after 19-3/19-6 land. Run measurements owed 1–4; if R measures other than −41 / −43, STOP and return a FLAG-Winston D-row.
 - [ ] **T1 — Kernel** (AC2.1–2.2): apply R's shape; re-pins; surface + class row; FLAG-Winston obligations (`kernel-core-baseline.toml` procedure).
-- [ ] **T2 — Admission** (AC3, AC4.1): `GatedManifest` swap sections; FR11 gate + `MigratorMissing`; write-if-absent record; manifest-path record at the three admission sites.
+- [ ] **T2 — Admission** (AC3, AC4.1, AC4.3): `GatedManifest` swap sections + r19_x1's `[on_crash]`/`[on_revocation]`/`[supervision]`; FR11 gate + `MigratorMissing`; write-if-absent record; manifest-path record at the three admission sites.
 - [ ] **T3 — Door** (AC1, AC2.4, AC5, AC6): cold swap from the admission triple with restore; ABI pre-check; migrator policy (maos-control, maos-cli); typed `[cli_wrapper]` refusal; successor record on completed upgrades.
 - [ ] **T4 — Cutover** (AC1.4, AC2.3, AC5.1): door/CLI tests; kernel tests; smoke arm + script; root E fixture append dropped.
 - [ ] **T5 — Vectors + plants** (AC1.5, AC2.4, AC3.5, AC4.1–4.2): one plant per AC, restored byte-identical, `plants.md` with wall-clock.
@@ -323,3 +326,4 @@ anthropic/claude-opus-5-5 (creation).
 
 - 2026-10-28: Story created at `61af7461` (D-19-5-01…14 PROPOSED; Status ready-for-dev pending the rulings; tracker `:291`, epic, routing audit and deferred-work untouched — corrections R1–R5, premise P1, the missing epic §19-5 and finding X1 filed in `creation/records-owed.md`). Kernel priced by reverted `/tmp` prototype (E16-A7): recommended −41 / −43; alternatives +8…+73 physical. maos-bin re-priced +186…+201 against the epic's 150 (D-19-5-12).
 - 2026-10-28: Operator rulings recorded (Lunarpulse; ask `w3_19_5`): D-19-5-01 A, 02 A, 03 A, 04 A, 05 A, 06 A, 07 B, 08 A, 09 A, 11 A, 13 A, 14 A — including the FLAG-Winston kernel change K1 + K6 + K8 (net −41 physical / −43 tokei, a LOWER re-pin at landing). D-19-5-10 RULED **C** (ask `w3_19_5_d10`; operator-approved scope cut): FR10's subprocess-form clause routed to `20-9-spawned-form-lifecycle-hooks`; an upgrade whose target is a `[cli_wrapper]` Worker gets a typed refusal (AC6). D-19-5-12 superseded by the E19 kloc ruling (ask `w3_kloc`, "Raise to cover forecasts ×1.3"): maos-bin envelope 31353 → 31710, xtask 47624 → 47688, aggregate hardfail 191248 → 191669. Status → ready-for-dev (RULED 2026-10-28).
+- 2026-10-28: Operator ruling **r19_x1** recorded: X1 — `GatedManifest::bundle()` (`crates/maos-bin/src/admission.rs:404-412`) also drops `[on_crash]`, `[on_revocation]`, `[supervision]` for class Spirits — ADDED to 19-5 by extending D-19-5-06 A (carry the three sections too): AC4.3 added, T2 covers it, kloc note ~+6–10 maos-bin (⇒ ≈ +192…+211, × 1.3 ≈ 250–274, still inside 31710); the "Does NOT close" X1 bullet amended (FR50/FR13 charters stay filed).

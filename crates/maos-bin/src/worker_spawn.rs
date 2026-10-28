@@ -1061,14 +1061,26 @@ pub fn run_cli_wrapper_manifest(
     let container_name = format!("maos-{worker_spirit_id}-{boot_nonce}");
     // Story 19-3 (D-19-3-02 A) — a fresh workspace per Worker run, retained
     // after exit; the kernel mounts it at `/workspace` as the Worker's cwd. The
-    // pre-spawn snapshot is empty by construction (D-19-3-03 A).
+    // pre-spawn snapshot is empty by construction (D-19-3-03 A). Blind19x3
+    // P3-2: a spawn that fails before the Worker runs removes it again.
     let workspace =
         crate::worker_workspace::create(&container_name).map_err(|e| format!("maos run: {e}"))?;
-    let workspace_before =
-        crate::worker_workspace::snapshot(&workspace, crate::worker_workspace::WALK_ENTRY_CAP)?;
-    let state_dir = supervision
-        .create_t3_state_dir()
-        .map_err(crate::supervision::WorkerSupervisionError::Start)?;
+    let pre_spawn =
+        crate::worker_workspace::snapshot(&workspace, crate::worker_workspace::WALK_ENTRY_CAP);
+    let workspace_before = match pre_spawn {
+        Ok(before) => before,
+        Err(error) => {
+            crate::worker_workspace::remove_unused(&workspace);
+            return Err(error.into());
+        }
+    };
+    let state_dir = match supervision.create_t3_state_dir() {
+        Ok(state_dir) => state_dir,
+        Err(error) => {
+            crate::worker_workspace::remove_unused(&workspace);
+            return Err(crate::supervision::WorkerSupervisionError::Start(error).into());
+        }
+    };
     let payload_pidfd = supervision.payload_pidfd();
     let core = Arc::downgrade(binding.core());
     let launch_custody = maos_kernel_core::lifecycle::cli_wrapper::ContainerLaunchCustody::new(
@@ -1122,6 +1134,7 @@ pub fn run_cli_wrapper_manifest(
     let bridge_result = spawn_and_bridge(spec);
     if bridge_result.is_err() {
         launch_custody.remove_state_dir_if_unowned();
+        crate::worker_workspace::remove_unused(&workspace);
     }
     let bridge = bridge_result?;
     // Story 16-3 (D-16-3-Q (6)) — guard FIRST. `SpawnedBridge::drop` kills and
@@ -1217,6 +1230,8 @@ pub fn run_cli_wrapper_manifest(
     let workspace_effect =
         crate::worker_workspace::snapshot(&workspace, crate::worker_workspace::WALK_ENTRY_CAP)
             .map(|after| crate::worker_workspace::diff(&workspace_before, &after));
+    // Ruling r19_3_disk — no quota; warn (never refuse) on a filling filesystem.
+    crate::worker_workspace::warn_if_low_space(&workspace);
     let workspace_path = workspace.display().to_string();
     let workspace_effect_json = crate::worker_workspace::effect_json(&workspace_effect);
 

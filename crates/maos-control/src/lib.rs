@@ -342,6 +342,20 @@ pub enum OperatorCommand {
         spirit_id: String,
         text: String,
     },
+    /// Story 19-2 (D-19-2-05 A, FR51(c)) — recall EVERY pending instruction
+    /// from the Spirit's buffer; keyed on the Spirit so it serializes with
+    /// `OrchestratorEnqueue`.
+    OrchestratorRecall {
+        spirit_id: String,
+    },
+    /// Story 19-2 (D-19-2-07 A) — a director's 1-based option pick on a
+    /// running Butler's notification. No principal travels: it is bound at
+    /// the daemon's boot (D-19-2-08 A).
+    OptionPick {
+        spirit_id: String,
+        pick: usize,
+        work_mode: String,
+    },
     RevokeToken {
         token_id: String,
     },
@@ -413,7 +427,9 @@ impl OperatorCommand {
             | Self::HotSwapPrecheck { spirit_id, .. }
             | Self::Uninstall { spirit_id }
             | Self::ResolveHalt { spirit_id, .. }
-            | Self::OrchestratorEnqueue { spirit_id, .. } => Some(spirit_id),
+            | Self::OrchestratorEnqueue { spirit_id, .. }
+            | Self::OrchestratorRecall { spirit_id }
+            | Self::OptionPick { spirit_id, .. } => Some(spirit_id),
             // `Load` is `None` BY CONSTRUCTION, not by omission: the id it
             // will create lives inside a file the daemon has not opened yet,
             // so no port-level key exists at enqueue time. The handler takes
@@ -452,11 +468,15 @@ impl OperatorCommand {
             // which dispatches the Spirit's `on_load` and `on_start` hooks;
             // each carries its own manifest `[budget]` cap, and two of them
             // do not fit inside a 10 s route.
-            | Self::Load { .. } => LONG_ROUTE_BUDGET,
+            | Self::Load { .. }
+            // Story 19-2 — a pick may run the option's MCP effect (a remote
+            // call on the Butler's own port) inside the request.
+            | Self::OptionPick { .. } => LONG_ROUTE_BUDGET,
             // Story 19-7 — explicit, never inherited from `_`: a re-pin
             // decision is a store lookup, one Approval Decision Log row and a
-            // non-blocking consent read.
-            Self::RepinDecision { .. } => DEFAULT_ROUTE_BUDGET,
+            // non-blocking consent read. Story 19-2's recall is a buffer drain
+            // and its Approval Decision Log rows.
+            Self::RepinDecision { .. } | Self::OrchestratorRecall { .. } => DEFAULT_ROUTE_BUDGET,
             _ => DEFAULT_ROUTE_BUDGET,
         }
     }
@@ -812,6 +832,11 @@ impl OperatorOutcome {
             Self::NotFound { code, detail } => Response::error(404, &code, &detail),
             Self::Conflict { code, detail } => Response::error(409, &code, &detail),
             Self::Invalid { code, detail } => Response::error(400, &code, &detail),
+            // Story 19-2 (AC4) — the upstream MCP call failed AFTER the pick
+            // was recorded: a gateway failure, not the handler's.
+            Self::Failed { code, detail } if code == "mcp_failed" => {
+                Response::error(502, &code, &detail)
+            }
             Self::Failed { code, detail } => Response::error(500, &code, &detail),
         }
     }
@@ -1282,6 +1307,18 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
                 _ => method_not_allowed(),
             }
         }
+        // Story 19-2 (D-19-2-05 A) — POST-only, empty body; id validated
+        // before the method guard like every id route.
+        ["v1", "orchestrator", id, "recall"] => {
+            let spirit_id = match validate_id(id) {
+                Ok(id) => id.to_owned(),
+                Err(response) => return response,
+            };
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            submit(routes, OperatorCommand::OrchestratorRecall { spirit_id })
+        }
         ["v1", "tokens", token_id, "revoke"] => {
             let token_id = match validate_id(token_id) {
                 Ok(token_id) => token_id.to_owned(),
@@ -1447,6 +1484,31 @@ fn spirit_command<S: SandboxReportSource>(
             };
             match required_str(&body, "posture") {
                 Ok(posture) => OperatorCommand::Posture { spirit_id, posture },
+                Err(response) => return response,
+            }
+        }
+        // Story 19-2 (D-19-2-07 A) — `{"pick": <1-based>, "work_mode": "<non-blank>"}`.
+        "pick" => {
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            let pick = match body.get("pick").and_then(serde_json::Value::as_u64) {
+                Some(pick) if pick >= 1 => usize::try_from(pick).unwrap_or(usize::MAX),
+                _ => {
+                    return Response::error(
+                        400,
+                        "bad_request",
+                        "field `pick` must be a positive integer",
+                    )
+                }
+            };
+            match required_str(&body, "work_mode") {
+                Ok(work_mode) => OperatorCommand::OptionPick {
+                    spirit_id,
+                    pick,
+                    work_mode,
+                },
                 Err(response) => return response,
             }
         }
@@ -1952,6 +2014,7 @@ fn respond(
         409 => "Conflict",
         411 => "Length Required",
         413 => "Payload Too Large",
+        502 => "Bad Gateway",
         503 => "Service Unavailable",
         _ => "Internal Server Error",
     };

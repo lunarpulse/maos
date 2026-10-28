@@ -204,6 +204,16 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_TEST_ONLY_HOLD_SECTION",
+        purpose: "Debug-build-only: once the named 1-based `--epic` section's `task.assign` is delivered (in flight), the root prints `dispatch_held_test_only` and waits, bounded at 30 s, for `$MAOS_HOME/release-section-<k>` so a test queues or recalls mid-delegation (Story 19-2 D-19-2-04 A); release builds never read it",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_BUTLER_PRINCIPAL",
+        purpose: "The director's principal id a serving root binds its Butler's acceptance record to at boot, so `maosctl spirit pick` records into that principal's namespace; unset ⇒ picks answer 409 `principal_unbound`; a `--scene` with a different principal refuses the boot (Story 19-2 D-19-2-08 A)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_SPIRIT_ID",
         purpose: "Spirit identifier for one-shot lifecycle verbs",
         stability: EnvStability::UserFacing,
@@ -561,6 +571,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_HOST_GRANTS",
         purpose: "Path to an operator TOML file of host-managed CliWrapper grants ([[grant]] attested_image/signing_key_id/permitted_tier/permitted_egress_destinations); replaces the v0.9 self-grant. Absent → built-in fixture grant only, real agent CLIs fail closed (j1-tier2-live-agent-signed-bridge)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_WORKER_WORKSPACES_ROOT",
+        purpose: "Absolute path of the directory holding each T3 Worker run's retained /workspace (<root>/<container_name>/); unset or empty ⇒ <MAOS home>/workspaces; relative ⇒ refused; created 0700 if missing and refused unless a non-symlink 0700 directory owned by the daemon user. Workspaces have no quota, so put it off the audit store's filesystem; a stderr warning fires after a run when under 1 GiB is free; maos purge removes it (via podman unshare when needed) (Story 19-3, ruling r19_3_disk)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

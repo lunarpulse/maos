@@ -271,8 +271,9 @@ pub type AttestationSink = Arc<dyn Fn(&[u8]) -> Result<(), String> + Send + Sync
 pub type ContextBinder = Arc<dyn Fn(PidSource) -> Arc<dyn ContextBudgetPort> + Send + Sync>;
 
 /// Story 18-4 (CR-4) — one Butler's acceptance record: the director's
-/// principal id (from the scene fixture, D-18-4-05 A), the pid-fused port
-/// and the attestation sink, both resolved by the host.
+/// principal id (the scene fixture's header, D-18-4-05 A, or a serving
+/// root's `MAOS_BUTLER_PRINCIPAL`, D-19-2-08 A), the pid-fused port and the
+/// attestation sink, both resolved by the host.
 #[derive(Clone)]
 pub struct AcceptanceSeam {
     pub principal: String,
@@ -314,12 +315,17 @@ pub struct ButlerSeam {
     /// the same one.
     pub clock: Arc<dyn Clock>,
     /// Story 18-4 (D-18-4-02/05 A; review TIA-1/BH-2) — `Some` only when a
-    /// principal is known (the scene fixture's header): the host's binder; a
-    /// serving daemon has no pick input.
+    /// principal is known (the scene fixture's header, or — Story 19-2,
+    /// D-19-2-08 A — the serving root's boot-configured
+    /// `MAOS_BUTLER_PRINCIPAL`): the host's binder. `None` ⇒ a director's
+    /// pick is refused at the door (`principal_unbound`).
     pub acceptance: Option<AcceptanceBinder>,
-    /// Story 18-4 (review ruling D-18-4-R3) — the Butler a scene drives: the
-    /// last one attached with an acceptance binder (the boot arm, or a door
-    /// load that replaced it). The host clears it before its audit drain.
+    /// Story 18-4 (review ruling D-18-4-R3); Story 19-2 (D-19-2-07 A) — the
+    /// live Butler: the last one attached WITH an acceptance binder (the boot
+    /// arm, a door load or the hot-swap successor; an unbound Butler is never
+    /// retained — it would hold `audit_tx` past a root's drain). The scene
+    /// driver and the door's `maosctl spirit pick` ([`Self::live_butler`])
+    /// read it; the host clears it before its audit drain.
     pub scene_butler: Arc<std::sync::Mutex<Option<Butler>>>,
     /// Story 18-5 (CR-3) — the host's context binder; every Butler and
     /// Researcher this host builds is bound through it.
@@ -333,6 +339,15 @@ impl ButlerSeam {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone()
+    }
+
+    /// Story 19-2 (D-19-2-07 A, CR-1) — the live Butler iff its own pid
+    /// source resolves to `pid` (the pid the host's scheduler resolves for
+    /// the routed Spirit id): a non-Butler, an unloaded or a replaced Butler
+    /// is `None` — a stale handle is never called.
+    pub fn live_butler(&self, pid: u32) -> Option<Butler> {
+        self.scene_butler()
+            .filter(|butler| butler.pid_of.as_ref().and_then(|pid_of| pid_of()) == Some(pid))
     }
 
     /// Bind `butler` (D-18-1-02/05 A): its token names its first declared
@@ -352,6 +367,7 @@ impl ButlerSeam {
         pid_of: PidSource,
     ) -> Result<Butler, String> {
         butler = butler.with_clock(Arc::clone(&self.clock));
+        butler.pid_of = Some(Arc::clone(&pid_of));
         butler.context = self.context.as_ref().map(|bind| bind(Arc::clone(&pid_of)));
         if let Some(bind) = &self.acceptance {
             butler.acceptance = Some(Arc::new(AcceptanceBinding {
@@ -893,7 +909,9 @@ pub struct Butler {
     /// Story 8.14b FORK 1 — the MCP domain port for fetching real calendar/comms
     /// data and writing Linear notes. When `Some`, `on_idle` calls it to build
     /// the `ScenarioInput` from real data instead of using `self.pending`.
-    mcp_port: Option<Arc<dyn ButlerMcpPort>>,
+    /// Story 19-2 (D-19-2-07 A) — shared across clones, so a port installed
+    /// after `attach` is the live handle's own port too.
+    mcp_port: Arc<parking_lot::Mutex<Option<Arc<dyn ButlerMcpPort>>>>,
     /// Story 8.14b FORK 2 — the pending notification from the last `on_idle`,
     /// so `handle_option_pick` can dispatch the selected option.
     /// `parking_lot::Mutex` — Butler is `Send + Sync` behind `Arc`; `parking_lot`
@@ -922,6 +940,9 @@ pub struct Butler {
     /// Story 18-4 (D-18-4-02 A) — the principal-namespace binding of the
     /// record (`None` ⇒ in-memory only: no principal is known).
     acceptance: Option<Arc<AcceptanceBinding>>,
+    /// Story 19-2 (D-19-2-07 A) — the pid source the host attached this
+    /// Butler with (`None` until [`ButlerSeam::attach`]).
+    pid_of: Option<PidSource>,
     /// Story 18-5 (AC2.3) — the host-bound context reporter and the status
     /// of Butler's most recent report.
     context: Option<Arc<dyn ContextBudgetPort>>,
@@ -933,7 +954,7 @@ impl std::fmt::Debug for Butler {
         f.debug_struct("Butler")
             .field("pending", &self.pending)
             .field("has_scalar_port", &self.scalar_port.is_some())
-            .field("has_mcp_port", &self.mcp_port.is_some())
+            .field("has_mcp_port", &self.mcp_port.lock().is_some())
             .field("has_inference", &self.inference.is_some())
             .finish()
     }
@@ -969,7 +990,7 @@ impl Default for Butler {
             last_assessment: Arc::new(std::sync::Mutex::new(None)),
             scalar_port: None,
             last_halt_receipt: Arc::new(std::sync::Mutex::new(None)),
-            mcp_port: None,
+            mcp_port: Arc::default(),
             last_notification: Arc::new(parking_lot::Mutex::new(None)),
             output_channel: None,
             inference: None,
@@ -978,6 +999,7 @@ impl Default for Butler {
             clock: Arc::new(SystemClock::UTC),
             ledger: Arc::default(),
             acceptance: None,
+            pid_of: None,
             context: None,
             last_context: Arc::default(),
         }
@@ -996,7 +1018,7 @@ impl Butler {
         // Story 8.14b — build the scenario from real MCP data when the port
         // is wired (--live), otherwise fall back to the injected pending
         // scenario (fixture-replay / smoke tests).
-        let scenario = if let Some(mcp) = &self.mcp_port {
+        let scenario = if let Some(mcp) = self.mcp_port() {
             // MCP calls are low-frequency (once per on_idle cycle), not inner
             // loops. block_on is safe here because on_idle runs inside
             // spawn_blocking and the underlying MCP client is sync.
@@ -1468,9 +1490,21 @@ impl Butler {
 
     /// Story 8.14b FORK 1 — inject the MCP domain port. When set, `on_idle`
     /// fetches real calendar/comms data via MCP instead of using `self.pending`.
-    pub fn with_mcp_port(mut self, port: Arc<dyn ButlerMcpPort>) -> Self {
-        self.mcp_port = Some(port);
+    pub fn with_mcp_port(self, port: Arc<dyn ButlerMcpPort>) -> Self {
+        *self.mcp_port.lock() = Some(port);
         self
+    }
+
+    /// Story 19-2 (D-19-2-07 A) — this Butler's own MCP port (the one a
+    /// director's pick from the door writes through).
+    pub fn mcp_port(&self) -> Option<Arc<dyn ButlerMcpPort>> {
+        self.mcp_port.lock().clone()
+    }
+
+    /// Story 19-2 (D-19-2-08 A) — whether a principal binds the acceptance
+    /// record; the door refuses a pick when it does not (`principal_unbound`).
+    pub fn principal_bound(&self) -> bool {
+        self.acceptance.is_some()
     }
 
     /// Story 8.14b FORK 2; Story 18-4 (D-18-4-03/04 A) — the director picks
@@ -2226,6 +2260,96 @@ pub mod test_support {
         async fn fetch_figma_summary(&self) -> Result<serde_json::Value, ButlerMcpError> {
             Ok(serde_json::json!({"status": "mock"}))
         }
+    }
+}
+
+/// Story 19-2 (D-19-2-07/08 A, CR-1) — the live handle the door's pick reads.
+#[cfg(test)]
+mod live_handle_tests {
+    use super::test_support::FakeButlerMcpPort;
+    use super::*;
+    use maos_domain::invariants::i1::TokenId;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    fn seam(acceptance: Option<AcceptanceBinder>) -> ButlerSeam {
+        ButlerSeam {
+            inference: None,
+            mint: Arc::new(|pid, _: &str| {
+                Ok(CapabilityToken::new(TokenId::ZERO, pid, 0, [0u8; 64]))
+            }),
+            digest: Arc::new(MorningDigestRenderer::new(
+                "unused".into(),
+                "unused".into(),
+                Arc::new(|_, _| {}),
+                Arc::new(SystemClock::UTC),
+            )),
+            rollover: false,
+            clock: Arc::new(SystemClock::UTC),
+            acceptance,
+            scene_butler: Arc::default(),
+            context: None,
+        }
+    }
+
+    fn pid_source(cell: &Arc<AtomicU32>) -> PidSource {
+        let cell = Arc::clone(cell);
+        Arc::new(move || Some(cell.load(Ordering::SeqCst)).filter(|pid| *pid != 0))
+    }
+
+    fn binder() -> AcceptanceBinder {
+        Arc::new(|_: PidSource| AcceptanceSeam {
+            principal: "director-ada".into(),
+            port_for: Arc::new(|| Err("unused".to_owned())),
+            attest: Arc::new(|_| Ok(())),
+        })
+    }
+
+    #[test]
+    fn the_live_butler_is_the_last_bound_one_at_its_own_resolved_pid_only() {
+        let (first, second) = (Arc::new(AtomicU32::new(7)), Arc::new(AtomicU32::new(9)));
+        let unbound = seam(None);
+        unbound
+            .attach(Butler::new(), || None, pid_source(&first))
+            .unwrap();
+        assert!(
+            unbound.live_butler(7).is_none(),
+            "an unbound Butler is never retained"
+        );
+        let seam = seam(Some(binder()));
+        seam.attach(Butler::new(), || None, pid_source(&first))
+            .unwrap();
+        let live = seam.live_butler(7).expect("attached at pid 7");
+        assert!(live.principal_bound());
+        assert!(
+            seam.live_butler(8).is_none(),
+            "another pid is not this Butler"
+        );
+        first.store(0, Ordering::SeqCst);
+        assert!(seam.live_butler(7).is_none(), "an unresolved pid is stale");
+        first.store(7, Ordering::SeqCst);
+        seam.attach(Butler::new(), || None, pid_source(&second))
+            .unwrap();
+        assert!(
+            seam.live_butler(7).is_none(),
+            "the replaced Butler is never called"
+        );
+        assert!(seam.live_butler(9).is_some());
+    }
+
+    #[test]
+    fn a_port_installed_after_attach_is_the_live_handles_own() {
+        let seam = seam(Some(binder()));
+        let cell = Arc::new(AtomicU32::new(3));
+        let butler = seam
+            .attach(Butler::new(), || None, pid_source(&cell))
+            .unwrap();
+        let live = seam.live_butler(3).expect("attached at pid 3");
+        assert!(live.mcp_port().is_none());
+        let _butler = butler.with_mcp_port(Arc::new(FakeButlerMcpPort::empty()));
+        assert!(
+            seam.live_butler(3).and_then(|b| b.mcp_port()).is_some(),
+            "the boot `--live` port, installed after attach, reaches the handle"
+        );
     }
 }
 

@@ -79,25 +79,37 @@ pub enum Subcommand {
     /// Log via `journal_halt_resolution`. The live pending-halt set + halt
     /// receipt lands at Story 4.1's `invoke_halt` mechanism.
     Halt(HaltArgs),
-    /// Inspect or enqueue Orchestrator instructions (Story 3.4).
+    /// Inspect, enqueue or recall Orchestrator instructions over the
+    /// operator door (Stories 3.4, 16-1, 19-2).
     ///
-    /// At v0.3-β `status` reads the per-Spirit `OrchestratorBuffer` for
-    /// pending counts; `queue` enqueues a natural-language instruction.
-    /// The Orchestrator-class Spirit (Story 8.4 founder-loop) consumes
-    /// queued instructions at safe sequence points between task completions
-    /// via `OrchestratorBuffer::dequeue_at_safe_point`.
+    /// `queue` adds an instruction to the Spirit's in-memory buffer (a daemon
+    /// restart loses it). In a `maos run … --epic` run the root consumes ONE
+    /// instruction per safe point — after a section's Worker completes and
+    /// before the next section's first `task.assign`, appended to that
+    /// section's goal; a running Worker is never preempted. Outside `--epic`
+    /// runs nothing consumes it. `recall` takes back every pending
+    /// instruction; `status` reads the pending count.
     Orchestrator(OrchestratorArgs),
-    /// Pause a Spirit — interrupts in-flight autonomous actions, preserves
-    /// state across pause/resume, recalls Orchestrator-buffered actions on
-    /// resume (Story 3.4). P99 ≤2s interruption (FR51 a).
+    /// Pause a Spirit (FR51 a). After the control block moves to Paused and
+    /// before its `on_pause` hook runs, the capability fence refuses every
+    /// further token mint and verify for that Spirit, and the response of an
+    /// inference or MCP call still on the wire (`"fenced": true`). A
+    /// supervised Worker's container is frozen first (`"frozen": true`); if
+    /// it cannot be frozen the pause is refused (409) and nothing changes. A
+    /// paused `orchestrator` holds `--epic` dispatch before the next section.
+    /// Limits: computation already running inside an in-process hook is not
+    /// interrupted, and a remote effect already executed is not undone.
     Pause(PauseArgs),
-    /// Resume a paused Spirit — restores from preserved state, replays
-    /// Orchestrator-buffered pending actions per FR20 (Story 3.4, FR51 c).
+    /// Resume a paused Spirit: lifts the capability fence, thaws a frozen
+    /// Worker from where it stopped, and re-enqueues its Orchestrator buffer
+    /// in order (FR51 b/c).
     Resume(ResumeArgs),
-    /// Revoke a capability token — in-flight operations using the token
-    /// fail-safe with bounded time (Story 3.4, FR51 d). Revocation is
-    /// journaled to the Approval Decision Log with director identity +
-    /// reason per FR42.
+    /// Revoke a capability token (FR51 d): its next mint or verify fails, the
+    /// response of an inference or MCP call made with it that is still on the
+    /// wire is refused, and a Worker spawned under it is stopped
+    /// (`"worker_stopped"`). A remote effect already executed stays journaled
+    /// and is not undone. Journaled to the Approval Decision Log with director
+    /// identity (FR42).
     RevokeToken(RevokeTokenArgs),
     /// Spirit lifecycle operations (upgrade, hot-swap precheck, etc.).
     /// Story 5.2 ships `hot-swap-precheck`; Story 5.4 ships `upgrade`.
@@ -820,9 +832,11 @@ pub struct OrchestratorArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum OrchestratorOp {
-    /// Enqueue an instruction onto the per-Spirit Orchestrator buffer.
+    /// Enqueue an instruction onto the per-Spirit Orchestrator buffer
+    /// (in memory; consumed one per safe point in `--epic` runs only).
     Queue {
-        /// Spirit ID to enqueue against (v0.3-β: only `hello-spirit`).
+        /// Spirit ID whose buffer to enqueue on (a loaded Spirit; the
+        /// `--epic` loop consumes `orchestrator`'s).
         #[arg(long)]
         spirit: String,
         /// Natural-language instruction (free-form at v0.3-β; typed
@@ -834,12 +848,18 @@ pub enum OrchestratorOp {
         #[arg(long)]
         spirit: String,
     },
+    /// Take back EVERY pending instruction for a Spirit (FR51 c); prints
+    /// the recalled set. Nothing recalled reaches a Worker.
+    Recall {
+        #[arg(long)]
+        spirit: String,
+    },
 }
 
 /// Story 3.4 — pause a Spirit.
 #[derive(clap::Args, Debug)]
 pub struct PauseArgs {
-    /// Spirit ID to pause (v0.3-β: only `hello-spirit`).
+    /// Spirit ID to pause (any loaded Spirit, a Worker included).
     pub spirit: String,
 }
 
@@ -930,6 +950,20 @@ pub enum SpiritOp {
         /// Print sandbox isolation details.
         #[arg(long)]
         sandbox: bool,
+    },
+    /// Story 19-2 (AC4) — answer a running Butler's notification: pick option
+    /// `<pick>` (1-based) under `--work-mode`. The daemon records the decision
+    /// in the principal it was booted with (`MAOS_BUTLER_PRINCIPAL`; none ⇒
+    /// `principal_unbound`, nothing recorded) and runs the option's action.
+    Pick {
+        /// Spirit ID of the running Butler (e.g. "butler").
+        spirit: String,
+        /// The option number, 1-based, as the notification lists it.
+        #[arg(value_parser = clap::value_parser!(u64).range(1..))]
+        pick: u64,
+        /// The director's current work mode (non-blank).
+        #[arg(long)]
+        work_mode: String,
     },
     /// Story 18-2 (D-18-2-04 A) — print a class's signed halt benchmark
     /// sidecar (`maos eval halt`) after verifying its Ed25519 signature

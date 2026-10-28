@@ -12,7 +12,9 @@
 //! * Story 19-6 (D-19-6-09 A) — a crashed section's Worker reaches the
 //!   Orchestrator as a kernel-sent orphan, and the loop applies the declared
 //!   disposition: one vector per `nack` / `reassign-to-replica` (once, then
-//!   escalation on a second crash) / `escalate-to-operator`.
+//!   escalation on a second crash) / `escalate-to-operator`, plus a crashed
+//!   `reassign-to-replica` section 1, which has no prior distillate for a
+//!   re-dispatch to carry and so escalates.
 //!
 //! Observables are the root's stdout events and the TL rows it wrote — never
 //! state this test set itself.
@@ -278,24 +280,32 @@ fn worker_manifest(home: &DataHome, mode: Option<&str>, on_crash: Option<&str>) 
     path
 }
 
-/// The epic topology with `second` as section 2's entry (D-19-1-03 A:
-/// section k ↔ host-bearing entry k).
-fn topology_with_second_entry(home: &DataHome, second: &Path) -> PathBuf {
-    let topology = home.0.join("epic-second-entry.toml");
+/// The epic topology with `manifest` as section `section`'s entry (D-19-1-03
+/// A: section k ↔ host-bearing entry k); the other host-bearing entries keep
+/// the default Worker.
+fn topology_with_section_entry(home: &DataHome, section: usize, manifest: &Path) -> PathBuf {
+    let root = workspace_root();
+    let hosts: String = (1..=3)
+        .map(|k| {
+            let path = if k == section {
+                manifest.display().to_string()
+            } else {
+                format!("{root}/spirits/worker/manifest.toml")
+            };
+            format!(
+                "\n[[topology.spirits]]\nmanifest = \"{path}\"\n\
+                 host = \"developer-remote-host\"\n"
+            )
+        })
+        .collect();
+    let topology = home.0.join(format!("epic-section-{section}-entry.toml"));
     std::fs::write(
         &topology,
         format!(
-            "[topology]\nname = \"epic-second-entry-19-6\"\n\n\
+            "[topology]\nname = \"epic-section-{section}-entry-19-6\"\n\n\
              [[topology.spirits]]\nmanifest = \"{root}/spirits/orchestrator/manifest.toml\"\n\n\
              [[topology.spirits]]\nmanifest = \"{root}/spirits/architect/manifest.toml\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/reviewer/manifest.toml\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
-             host = \"developer-remote-host\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{second}\"\nhost = \"developer-remote-host\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
-             host = \"developer-remote-host\"\n",
-            root = workspace_root(),
-            second = second.display()
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/reviewer/manifest.toml\"\n{hosts}"
         ),
     )
     .expect("write topology");
@@ -323,6 +333,18 @@ struct CrashedAttempt {
     delivered_ns: i64,
 }
 
+/// The kernel's task id of the delegation whose `task.assign` frame is
+/// `assign_frame_hex` (the id every crash row is joined on).
+fn delegation_task_id(assign_frame_hex: &str) -> String {
+    let frame_id: [u8; 16] = hex::decode(assign_frame_hex)
+        .expect("hex frame id")
+        .try_into()
+        .expect("a 16-byte frame id");
+    maos_bin::supervision::WorkerTask::Delegation { frame_id }
+        .record_ids("worker")
+        .0
+}
+
 /// AC1.2 / AC2.2 / AC2.4 — one crashed attempt joined end to end on its
 /// delegation's `task.assign` frame id: the kernel's `task.orphaned` row at
 /// the Worker's pid (cause, originator) and its pid-0 disposition row
@@ -344,8 +366,7 @@ fn assert_orphan_reached_orchestrator(
         .expect("hex frame id")
         .try_into()
         .expect("a 16-byte frame id");
-    let (task_id, _) =
-        maos_bin::supervision::WorkerTask::Delegation { frame_id }.record_ids("worker");
+    let task_id = delegation_task_id(assign_frame_hex);
     let complete = journal_rows(home, KIND_TASK_COMPLETE);
     let of_task = |intent: &str| -> Vec<&JournalRow> {
         complete
@@ -421,14 +442,19 @@ fn assert_orphan_reached_orchestrator(
     }
 }
 
-/// AC1.2 — one `delegation_orphaned` per crashed attempt, in order, each
-/// naming the kernel's cause and the APPLIED disposition and leaving the
-/// Orchestrator at a safe point (its in-flight task released).
-fn assert_orphaned_events(events: &[serde_json::Value], attempts: &[(&CrashedAttempt, &str)]) {
+/// AC1.2 — one `delegation_orphaned` per crashed attempt of section
+/// `section`, in order, each naming the kernel's cause and the APPLIED
+/// disposition and leaving the Orchestrator at a safe point (its in-flight
+/// task released).
+fn assert_orphaned_events(
+    events: &[serde_json::Value],
+    section: u64,
+    attempts: &[(&CrashedAttempt, &str)],
+) {
     let orphaned = named(events, "delegation_orphaned");
     assert_eq!(orphaned.len(), attempts.len(), "{events:?}");
     for (event, (attempt, disposition)) in orphaned.iter().zip(attempts) {
-        assert_eq!(event["section"].as_u64(), Some(2), "{event}");
+        assert_eq!(event["section"].as_u64(), Some(section), "{event}");
         assert_eq!(event["task_id"].as_str(), Some(attempt.task_id.as_str()));
         assert_eq!(
             event["cause"].as_str(),
@@ -445,14 +471,15 @@ fn assert_orphaned_events(events: &[serde_json::Value], attempts: &[(&CrashedAtt
 }
 
 /// AC1.2 / AC3.3 — the typed stop names section, cause and disposition.
-fn assert_stopped(output: &Output, cause: &str, disposition: &str) {
+fn assert_stopped(output: &Output, section: u64, cause: &str, disposition: &str) {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         !output.status.success(),
         "a crashed section fails the epic run; stderr:\n{stderr}"
     );
     let stop = format!(
-        "maos run: section 2 Worker crashed ({cause}); disposition {disposition}; dispatch stopped"
+        "maos run: section {section} Worker crashed ({cause}); disposition {disposition}; \
+         dispatch stopped"
     );
     assert!(
         stderr.contains(&stop),
@@ -465,17 +492,19 @@ fn assert_stopped(output: &Output, cause: &str, disposition: &str) {
 }
 
 /// AC3.3 (D-19-6-06 A) — one `AnomalyFlagged` from the crash detector about
-/// the crashed Worker, on the root dispatcher's terminal channel.
-fn assert_anomaly_flagged(output: &Output, worker_pid: i64) {
+/// the crashed Worker of section `section`, on the root dispatcher's
+/// terminal channel.
+fn assert_anomaly_flagged(output: &Output, section: u64, worker_pid: i64) {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let subject = format!("pid:{worker_pid}");
+    let named_section = format!("section {section}:");
     let flagged: Vec<&str> = stderr
         .lines()
         .filter(|line| line.contains("Anomaly kernel.crash-detector"))
         .collect();
     assert_eq!(flagged.len(), 1, "one AnomalyFlagged; stderr:\n{stderr}");
     assert!(
-        flagged[0].contains(&subject) && flagged[0].contains("section 2"),
+        flagged[0].contains(&subject) && flagged[0].contains(&named_section),
         "the notification names the Worker and the section: {}",
         flagged[0]
     );
@@ -727,7 +756,7 @@ fn a_crashed_second_worker_reaches_the_orchestrator_and_nacks_the_epic() {
     }
     let home = data_home("crash-nack");
     let second = worker_manifest(&home, Some("exit-nonzero"), None);
-    let output = run_epic(&home, &topology_with_second_entry(&home, &second), &[]);
+    let output = run_epic(&home, &topology_with_section_entry(&home, 2, &second), &[]);
     let events = events(&output);
     let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
     assert_eq!(
@@ -742,8 +771,8 @@ fn a_crashed_second_worker_reaches_the_orchestrator_and_nacks_the_epic() {
         Some("fault.non-zero-exit"),
         "task.nacked",
     );
-    assert_orphaned_events(&events, &[(&crashed, "nack")]);
-    assert_stopped(&output, "fault.non-zero-exit", "nack");
+    assert_orphaned_events(&events, 2, &[(&crashed, "nack")]);
+    assert_stopped(&output, 2, "fault.non-zero-exit", "nack");
     assert_only_section_one_distilled(&home, &events);
 }
 
@@ -751,6 +780,8 @@ fn a_crashed_second_worker_reaches_the_orchestrator_and_nacks_the_epic() {
 /// and its FIRST Worker is killed while still running (the debug-only
 /// `MAOS_TEST_ONLY_CRASH_SECTION_ONCE` root hook; the entry's fixture mode
 /// `delay-then-complete` keeps it running for 2 s, then completes). The
+/// kill is proven first (TI-3: a starved plant would let the fixture
+/// complete, and every count below would red without saying why). The
 /// orphan reaches the Orchestrator, the kernel reassigns (`task.reassigned`
 /// naming the originator, rule 11), and section 2 is re-dispatched ONCE — a
 /// new `task.assign` with the same goal and the same `prior_distillate_ref`,
@@ -769,7 +800,7 @@ fn a_section_crashed_once_is_redispatched_to_a_fresh_worker_and_the_epic_complet
     );
     let output = run_epic(
         &home,
-        &topology_with_second_entry(&home, &second),
+        &topology_with_section_entry(&home, 2, &second),
         &[("MAOS_TEST_ONLY_CRASH_SECTION_ONCE", "2")],
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -781,6 +812,28 @@ fn a_section_crashed_once_is_redispatched_to_a_fresh_worker_and_the_epic_complet
     let orchestrator = orchestrator_pid(&events);
 
     let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
+    // TI-3 (TestInfra19x6) — the plant really killed section 2's FIRST
+    // Worker before any count is read: that attempt's `task.assign` has a
+    // kernel `task.orphaned` row with a `fault.*` cause, and the loop printed
+    // `delegation_orphaned`.
+    let first_attempt = assigns
+        .get(1)
+        .map(|(frame_id, _, _)| delegation_task_id(frame_id))
+        .unwrap_or_else(|| panic!("section 2 was never assigned: {assigns:?}"));
+    let complete = journal_rows(&home, KIND_TASK_COMPLETE);
+    let killed = complete.iter().any(|row| {
+        row.intent == "task.orphaned"
+            && row.payload["task_id"] == first_attempt.as_str()
+            && row.payload["cause"]
+                .as_str()
+                .is_some_and(|cause| cause.starts_with("fault."))
+    });
+    assert!(
+        killed && !named(&events, "delegation_orphaned").is_empty(),
+        "the MAOS_TEST_ONLY_CRASH_SECTION_ONCE plant failed to kill section 2's first Worker \
+         ({first_attempt}) before it completed: no fault.* task.orphaned row or no \
+         delegation_orphaned event; TaskComplete rows: {complete:?}; events: {events:?}"
+    );
     assert_eq!(
         assigns.len(),
         4,
@@ -803,7 +856,6 @@ fn a_section_crashed_once_is_redispatched_to_a_fresh_worker_and_the_epic_complet
         None,
         "task.reassigned",
     );
-    let complete = journal_rows(&home, KIND_TASK_COMPLETE);
     let reassigned: Vec<&JournalRow> = complete
         .iter()
         .filter(|row| row.intent == "task.reassigned")
@@ -827,7 +879,7 @@ fn a_section_crashed_once_is_redispatched_to_a_fresh_worker_and_the_epic_complet
         assign_rows[2].timestamp_ns > crashed.delivered_ns,
         "the re-dispatch follows the orphan's delivery to the Orchestrator"
     );
-    assert_orphaned_events(&events, &[(&crashed, "reassign-to-replica")]);
+    assert_orphaned_events(&events, 2, &[(&crashed, "reassign-to-replica")]);
 
     // The fresh Worker completes section 2, and the epic goes on.
     let written = named(&events, "distillate_written");
@@ -871,7 +923,7 @@ fn a_reassigned_section_that_crashes_again_escalates_and_stops() {
     }
     let home = data_home("crash-twice");
     let second = worker_manifest(&home, Some("exit-nonzero"), Some("reassign-to-replica"));
-    let output = run_epic(&home, &topology_with_second_entry(&home, &second), &[]);
+    let output = run_epic(&home, &topology_with_section_entry(&home, 2, &second), &[]);
     let events = events(&output);
     let orchestrator = orchestrator_pid(&events);
     let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
@@ -923,13 +975,14 @@ fn a_reassigned_section_that_crashes_again_escalates_and_stops() {
     );
     assert_orphaned_events(
         &events,
+        2,
         &[
             (&first, "reassign-to-replica"),
             (&second, "escalate-to-operator"),
         ],
     );
-    assert_stopped(&output, "fault.non-zero-exit", "escalate-to-operator");
-    assert_anomaly_flagged(&output, second.worker_pid);
+    assert_stopped(&output, 2, "fault.non-zero-exit", "escalate-to-operator");
+    assert_anomaly_flagged(&output, 2, second.worker_pid);
     assert_only_section_one_distilled(&home, &events);
 }
 
@@ -943,7 +996,7 @@ fn an_escalating_section_flags_the_operator_and_stops() {
     }
     let home = data_home("crash-escalate");
     let second = worker_manifest(&home, Some("exit-nonzero"), Some("escalate-to-operator"));
-    let output = run_epic(&home, &topology_with_second_entry(&home, &second), &[]);
+    let output = run_epic(&home, &topology_with_section_entry(&home, 2, &second), &[]);
     let events = events(&output);
     let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
     assert_eq!(
@@ -958,10 +1011,61 @@ fn an_escalating_section_flags_the_operator_and_stops() {
         Some("fault.non-zero-exit"),
         "task.escalated",
     );
-    assert_orphaned_events(&events, &[(&crashed, "escalate-to-operator")]);
-    assert_stopped(&output, "fault.non-zero-exit", "escalate-to-operator");
-    assert_anomaly_flagged(&output, crashed.worker_pid);
+    assert_orphaned_events(&events, 2, &[(&crashed, "escalate-to-operator")]);
+    assert_stopped(&output, 2, "fault.non-zero-exit", "escalate-to-operator");
+    assert_anomaly_flagged(&output, 2, crashed.worker_pid);
     assert_only_section_one_distilled(&home, &events);
+}
+
+/// Edge19x6 / Blind19x6 / Accept19x6 P1 (D-19-6-04 A) — section 1's entry
+/// declares `reassign-to-replica` and its Worker crashes (`exit-nonzero`).
+/// With no prior distillate a re-dispatch could never pass the FR21 gate, so
+/// the root leaves the resolver unarmed: the kernel escalates
+/// (`task.escalated`, never a `task.reassigned` claiming a re-dispatch that
+/// cannot happen), one `AnomalyFlagged` names section 1, and dispatch stops
+/// typed naming section 1 — exactly one `task.assign`, nothing distilled.
+#[test]
+fn a_reassigning_first_section_that_crashes_escalates_without_a_prior_distillate() {
+    if !t3_substrate::require_t3("epic reassigning first section crashes") {
+        return;
+    }
+    let home = data_home("crash-first");
+    let first = worker_manifest(&home, Some("exit-nonzero"), Some("reassign-to-replica"));
+    let output = run_epic(&home, &topology_with_section_entry(&home, 1, &first), &[]);
+    let events = events(&output);
+    let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
+    assert_eq!(
+        assigns.len(),
+        1,
+        "section 1 once — no re-dispatch, nothing after: {assigns:?}"
+    );
+    assert!(
+        prior_ref(&assigns[0].2).is_null(),
+        "section 1 carries no prior distillate"
+    );
+    let crashed = assert_orphan_reached_orchestrator(
+        &home,
+        &assigns[0].0,
+        orchestrator_pid(&events),
+        Some("fault.non-zero-exit"),
+        "task.escalated",
+    );
+    let complete = journal_rows(&home, KIND_TASK_COMPLETE);
+    assert!(
+        complete.iter().all(|row| row.intent != "task.reassigned"),
+        "an unarmed resolver never claims a re-dispatch: {complete:?}"
+    );
+    assert_orphaned_events(&events, 1, &[(&crashed, "escalate-to-operator")]);
+    assert_stopped(&output, 1, "fault.non-zero-exit", "escalate-to-operator");
+    assert_anomaly_flagged(&output, 1, crashed.worker_pid);
+    assert!(
+        named(&events, "distillate_written").is_empty(),
+        "{events:?}"
+    );
+    assert!(tl_rows(&home, KIND_DISTILLATE).is_empty());
+    assert_eq!(named(&events, "delegation_routed").len(), 1);
+    assert!(named(&events, "delegation_completed").is_empty());
+    assert!(named(&events, "dispatch_halted").is_empty());
 }
 
 /// AC1.6 — the proven-red split: the fixture with its second heading

@@ -14,7 +14,7 @@
 //! orchestration policy.
 //!
 //! See `crates/maos-cli/src/cli.rs::OrchestratorOp` for the director-side
-//! CLI surface that enqueues into this buffer via `MAOS_ONE_SHOT=orchestrator-queue`.
+//! CLI surface: `maosctl orchestrator queue|recall` over the operator door (16-1).
 
 pub mod buffer;
 pub mod echo_gateway;

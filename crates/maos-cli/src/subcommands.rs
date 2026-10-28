@@ -2201,6 +2201,22 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, _color: ColorChoice) -> ExitCo
             }
             orchestrator_status(spirit)
         }
+        // Story 19-2 (D-19-2-05 A) — POST, empty body; the daemon prints the
+        // recalled set `{spirit_id, recalled:[{instruction_id,text}], pending}`.
+        OrchestratorOp::Recall { spirit } => {
+            if let Some(code) = checked_id("orchestrator recall", spirit) {
+                return code;
+            }
+            door_verb("orchestrator recall", |config| {
+                door_client::exchange(
+                    config,
+                    "POST",
+                    &format!("/v1/orchestrator/{spirit}/recall"),
+                    None,
+                    DEFAULT_ROUTE_BUDGET,
+                )
+            })
+        }
     }
 }
 
@@ -2489,6 +2505,39 @@ fn dispatch_spirit(args: &SpiritArgs, _color: ColorChoice) -> ExitCode {
                 return code;
             }
             spirit_benchmark(class, version.as_deref())
+        }
+        // Story 19-2 (D-19-2-07 A) — `pick` ≥ 1 is clap's (exit 2); a blank
+        // `--work-mode` is refused here (exit 2) before any round trip.
+        SpiritOp::Pick {
+            spirit,
+            pick,
+            work_mode,
+        } => {
+            let verb = "spirit pick";
+            if let Some(code) = checked_id(verb, spirit) {
+                return code;
+            }
+            if work_mode.trim().is_empty() {
+                eprintln!("maosctl: {verb} — --work-mode must be non-blank");
+                return ExitCode::from(2);
+            }
+            let sent = door_client::OptionPickRequest {
+                pick: *pick,
+                work_mode: work_mode.clone(),
+            };
+            // A u64 and a String always serialize; the arm is unreachable.
+            let Ok(body) = serde_json::to_vec(&sent) else {
+                return ExitCode::FAILURE;
+            };
+            door_verb(verb, |config| {
+                door_client::exchange(
+                    config,
+                    "POST",
+                    &format!("/v1/spirits/{spirit}/pick"),
+                    Some(("application/json", &body)),
+                    LONG_ROUTE_BUDGET,
+                )
+            })
         }
     }
 }

@@ -57,7 +57,7 @@ pub enum WorkerNonCompletion {
     /// The turn completed and claimed success, but there is no evidence the
     /// declared write-class work happened: codex's stream has no `item.completed`
     /// `file_change` with `status: "completed"`, or (Story 19-3,
-    /// [`gate_workspace_effect`]) the Worker's `/workspace` diff is empty. This
+    /// [`gate_workspace_effect`]) no `/workspace` effect is proven. This
     /// is the ship-blocker's exact shape — a clean exit and a fluent final
     /// message over a working tree the worker never touched.
     NoEffectEvidence,
@@ -175,10 +175,13 @@ pub trait WorkerCli: Send + Sync {
         exit: WorkerExit,
     ) -> WorkerCompletion;
 
-    /// Story 19-3 (D-19-3-04 A) — a `Completed` verdict also needs a non-empty
-    /// `/workspace` diff ([`gate_workspace_effect`]). The fixtures write nothing.
+    /// Story 19-3 (D-19-3-04 A) — a `Completed` verdict also needs a proven
+    /// `/workspace` effect ([`gate_workspace_effect`]); for codex this is
+    /// conjunctive with `file_change`, since a change into the `/tmp` tmpfs is
+    /// lost. Blind19x3 P3-1: `true` by default, so a new real adapter is gated;
+    /// only the hermetic fixtures, which write nothing, opt out.
     fn requires_workspace_effect(&self) -> bool {
-        false
+        true
     }
 
     /// The ambient auth file whose presence in the sandbox home lets this CLI use
@@ -356,14 +359,23 @@ pub fn refuse_unsafe_argv(cli: &dyn WorkerCli, argv_prefix: &[String]) -> Result
 
 /// Story 19-3 (D-19-3-05 A) — applied right after [`WorkerCli::parse_completion`]
 /// (still a pure function of the journaled rows): an effect-requiring adapter's
-/// `Completed` over an empty diff or a refused walk is `NoEffectEvidence`.
-/// Never the reverse, so `file_change` and `permission_denials` still refuse.
+/// `Completed` without a proven effect is `NoEffectEvidence`. Never the
+/// reverse, so `file_change` and `permission_denials` still refuse.
+///
+/// Proven: a non-empty diff, or (Blind19x3 P2-1) a walk refused after it
+/// listed an entry ([`crate::worker_workspace::WalkError::listed_an_entry`]) —
+/// the pre-spawn snapshot of a fresh workspace is empty, so any listed entry
+/// was created by the run. Unproven: an empty diff, or a workspace root that
+/// could not be listed.
 pub fn gate_workspace_effect(
     cli: &dyn WorkerCli,
     completion: WorkerCompletion,
     effect: &Result<crate::worker_workspace::WorkspaceEffect, crate::worker_workspace::WalkError>,
 ) -> WorkerCompletion {
-    let effect_proven = effect.as_ref().is_ok_and(|e| !e.is_empty());
+    let effect_proven = match effect {
+        Ok(effect) => !effect.is_empty(),
+        Err(refused) => refused.listed_an_entry(),
+    };
     if completion.is_completed() && cli.requires_workspace_effect() && !effect_proven {
         return WorkerCompletion::NotCompleted(WorkerNonCompletion::NoEffectEvidence);
     }
@@ -592,6 +604,11 @@ impl WorkerCli for ProbeCli {
     fn probe_strategy(&self) -> ProbeStrategy {
         ProbeStrategy::BridgeHandshake
     }
+
+    /// The probe writes nothing to `/workspace`.
+    fn requires_workspace_effect(&self) -> bool {
+        false
+    }
 }
 
 impl WorkerCli for FixtureCli {
@@ -630,6 +647,11 @@ impl WorkerCli for FixtureCli {
     /// Tier-1 keeps proving the kernel probe path).
     fn probe_strategy(&self) -> ProbeStrategy {
         ProbeStrategy::BridgeHandshake
+    }
+
+    /// The fixture writes nothing to `/workspace`.
+    fn requires_workspace_effect(&self) -> bool {
+        false
     }
 }
 
@@ -737,11 +759,6 @@ impl WorkerCli for CodexCli {
         exit: WorkerExit,
     ) -> WorkerCompletion {
         codex_jsonl_oracle(stdout, exit)
-    }
-
-    /// Conjunctive with `file_change`: a change into the `/tmp` tmpfs is lost.
-    fn requires_workspace_effect(&self) -> bool {
-        true
     }
 
     fn ambient_auth_path(&self, home: &std::path::Path) -> Option<std::path::PathBuf> {
@@ -874,10 +891,6 @@ impl WorkerCli for ClaudeCli {
         exit: WorkerExit,
     ) -> WorkerCompletion {
         claude_result_object_oracle(stdout, exit)
-    }
-
-    fn requires_workspace_effect(&self) -> bool {
-        true
     }
 
     /// claude's OAuth/subscription credential file. Note the LEADING DOT on the

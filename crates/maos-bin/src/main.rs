@@ -3308,6 +3308,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let factory_successor_slot = successor_manifest_slot.clone();
     let butler_seam: ButlerSeamSlot = Arc::default();
     let factory_butler_seam = Arc::clone(&butler_seam);
+    // Story 19-2 (D-19-2-08 A) — the Butler principal bound at boot, read by
+    // the door's pick route (filled below, once the scene is loaded).
+    let butler_principal: Arc<std::sync::OnceLock<String>> = Arc::default();
     let researcher_wiring: ResearcherSlot = Arc::default();
     let factory_researcher_wiring = Arc::clone(&researcher_wiring);
     let factory_distillate_writer = Arc::clone(&distillate_writer);
@@ -3529,6 +3532,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 redistill_sink: hook_pump.redistill_sink(),
             }),
             hooks: Arc::clone(&hook_pump),
+            butler_principal: Arc::clone(&butler_principal),
         });
         let door = Arc::new(maos_bin::operator_door::OperatorDoor::new(
             Arc::clone(&scheduler),
@@ -3983,6 +3987,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(scene) => Arc::clone(&scene.clock) as Arc<dyn maos_spirit_sdk::clock::Clock>,
         None => Arc::new(system_clock),
     };
+    // Story 19-2 (D-19-2-08 A) — a serving root binds its Butler's principal
+    // from `MAOS_BUTLER_PRINCIPAL` exactly as a scene header does; a scene and
+    // a different env value refuse the boot.
+    let boot_principal = std::env::var("MAOS_BUTLER_PRINCIPAL")
+        .ok()
+        .filter(|principal| !principal.trim().is_empty());
+    let principal = match (butler_scene.as_ref(), boot_principal) {
+        (Some(scene), Some(env)) if env != scene.fixture.principal => {
+            return Err(format!(
+                "maos run: MAOS_BUTLER_PRINCIPAL `{env}` differs from the scene's principal `{}`",
+                scene.fixture.principal
+            )
+            .into());
+        }
+        (Some(scene), _) => Some(scene.fixture.principal.clone()),
+        (None, env) => env,
+    };
+    if let Some(principal) = &principal {
+        let _ = butler_principal.set(principal.clone());
+    }
     // Story 18-1 (review ruling D-18-1-R1) — the Butler seam every Butler of
     // this root attaches (boot arm, door load, hot-swap successor): bound
     // under `--live` and every explicit mode (unset mode stays deterministic,
@@ -4037,12 +4061,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .as_ref()
             .is_some_and(|run| run.once || run.scene.is_some()),
         clock: butler_clock,
-        // Story 18-4 (D-18-4-02/05 A; review TIA-1/BH-2) — a principal is
-        // known only from the scene fixture: the root's binder fuses each
-        // Butler's port and TL attestation to the pid ITS resolver yields.
-        acceptance: butler_scene.as_ref().map(|scene| {
+        // Story 18-4 (D-18-4-02/05 A; review TIA-1/BH-2) and 19-2 (D-19-2-08
+        // A) — a principal is known from the scene fixture or the boot env:
+        // the root's binder fuses each Butler's port and TL attestation to the
+        // pid ITS resolver yields.
+        acceptance: principal.map(|principal| {
             maos_bin::butler_root::acceptance_binder(
-                scene.fixture.principal.clone(),
+                principal,
                 Arc::downgrade(&memory),
                 Arc::downgrade(&transparency_log),
             )
@@ -4596,6 +4621,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         post_unload_stop = Some(Arc::clone(&stop_after_unload));
         if let Some(door) = operator_door_port.as_ref() {
             door.set_post_unload_stop(stop_after_unload);
+            root_worker_supervision.install_door_hooks(door);
         }
         let root_shutdown = root_worker_supervision.shutdown_token();
 
@@ -4694,9 +4720,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut epic_halted = false;
                 // Story 19-6 (D-19-6-04 A) — a crashed section's entry, re-run
                 // ONCE on a fresh Worker before the next entry (`epic_next` and
-                // `epic_prior` unchanged), and whether that budget is spent.
+                // `epic_prior` unchanged), whether that budget is spent, and the
+                // crash cause a stopped re-dispatch reports.
                 let mut redispatch = None;
                 let mut redispatched = false;
+                let mut redispatch_cause = String::new();
                 let mut entries = topology_entries.into_iter().enumerate();
                 // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
                 // topology Worker with no `host`; `TopologyEntry` carries only
@@ -4875,6 +4903,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // pid (unloaded through the door), stops dispatch here
                                 // (no frame, no Worker) and the run drains normally.
                                 if let Some(section) = section {
+                                    // Story 19-2 (D-19-2-17 A) — no `task.assign`
+                                    // while the Orchestrator is Paused.
+                                    if !maos_bin::orchestrator_root::hold_while_paused(
+                                        &scheduler,
+                                        pid,
+                                        section.ordinal,
+                                        &root_shutdown,
+                                    )
+                                    .await
+                                    {
+                                        topology_interrupted = true;
+                                        break;
+                                    }
                                     maos_bin::orchestrator_root::plant_test_halt(
                                         &transparency_log,
                                         &shared_journal,
@@ -4892,10 +4933,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         epic.as_ref().map_or(0, Vec::len),
                                     ) {
                                         println!("{stop}");
+                                        // Story 19-6 (D-19-6-03 A) — a crashed
+                                        // section that is never re-run is not a
+                                        // completed epic: the run fails typed.
+                                        if redispatched {
+                                            return Err(format!(
+                                                "maos run: section {} Worker crashed ({}); \
+                                                 disposition reassign-to-replica (re-dispatch \
+                                                 stopped)",
+                                                section.ordinal, redispatch_cause
+                                            )
+                                            .into());
+                                        }
                                         epic_halted = true;
                                         continue;
                                     }
                                 }
+                                // Story 19-2 (D-19-2-02 B / 03 A) — a NEW section's
+                                // safe point (never a 19-6 re-dispatch): ONE queued
+                                // director instruction joins this section's goal.
+                                let (goal, drained) =
+                                    maos_bin::orchestrator_root::drain_at_safe_point(
+                                        emitter,
+                                        &orchestrator_registry,
+                                        goal,
+                                        section.is_some() && !redispatched,
+                                    );
                                 let success_criteria = "the worker reports completion through \
                                                         its adapter's parse_completion oracle";
                                 let lineage = maos_domain::invariants::i13::IntentLineage::new(
@@ -4937,6 +5000,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     }
                                 };
                                 delegation_frame_id = Some(frame.frame_id);
+                                if let Some(instruction) = &drained {
+                                    maos_bin::orchestrator_root::record_safe_point_drain(
+                                        &transparency_log,
+                                        instruction,
+                                        section.map_or(0, |section| section.ordinal),
+                                        &frame.frame_id,
+                                    )?;
+                                }
                                 emitter.begin_delegation();
                                 // j1-crosshost-2b AC2.1 — the two arms diverge here.
                                 // On loopback the frame never left, so THIS Host runs
@@ -4968,6 +5039,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             })
                                         );
                                         delegation_seq += 1;
+                                        // Story 19-2 (D-19-2-04 A) — debug-only hold
+                                        // with this section's delegation in flight.
+                                        maos_bin::orchestrator_root::hold_test_section(
+                                            section.map(|section| section.ordinal),
+                                        )
+                                        .await?;
                                         Some(goal)
                                     }
                                     maos_bin::delegation::DelegationOutcome::SentCrossHost {
@@ -5048,11 +5125,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         };
                         // Story 19-6 (D-19-6-04/05 A) — the resolver is armed around
                         // this ONE run iff it is a section's first delegated attempt
-                        // whose manifest declares `reassign-to-replica`; the guard
-                        // disarms when the run returns.
+                        // whose manifest declares `reassign-to-replica` AND whose
+                        // re-dispatch can pass FR21: it carries a prior distillate
+                        // ref (section 2…N). A crashed section 1, or a loopback
+                        // delegation without `--epic`, finds no replica and the
+                        // kernel escalates. The guard disarms when the run returns.
                         let task_id = worker_task.record_ids("").0;
                         let replica_arm = (delegated_task.is_some()
                             && !redispatched
+                            && epic_prior.is_some()
                             && maos_bin::orchestrator_root::declares_reassign(&child_root))
                         .then(|| scheduler.resolve_pid(maos_bin::delegation::FROM_SPIRIT))
                         .flatten()
@@ -5121,7 +5202,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // reached the Orchestrator as the kernel-sent orphan: drain
                         // it, release the in-flight delegation (never twice), then
                         // apply the disposition — one re-dispatch of this entry, or
-                        // the typed stop. Other non-completions keep the error below.
+                        // the typed stop. No orphan frame and no kernel
+                        // `task.orphaned` row (a planned stop, no exit code, a late
+                        // handler) is the Worker's non-completion: the error below.
                         let crashed = matches!(
                             completion,
                             maos_bin::worker_cli::WorkerCompletion::NotCompleted(
@@ -5131,27 +5214,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if let (true, Some(frame_id), Some((emitter, _))) =
                             (crashed, delegation_frame_id, delegation_emitter.as_ref())
                         {
-                            if !delegation_leg.take_orphaned(frame_id)?
-                                || !emitter.release_orphaned_delegation()
+                            let orphaned = delegation_leg.take_orphaned(frame_id)?;
+                            if orphaned
+                                || maos_bin::orchestrator_root::orphan_recorded(
+                                    &transparency_log,
+                                    &task_id,
+                                    worker_run.spirit_pid,
+                                )?
                             {
-                                return Err(format!(
-                                    "maos run: {task_id} crashed but its orphan frame did not \
-                                     reach and release the Orchestrator"
-                                )
-                                .into());
+                                if !orphaned || !emitter.release_orphaned_delegation() {
+                                    return Err(format!(
+                                        "maos run: {task_id} crashed but its orphan frame did \
+                                         not reach and release the Orchestrator"
+                                    )
+                                    .into());
+                                }
+                                redispatch_cause = maos_bin::orchestrator_root::dispose_orphan(
+                                    &transparency_log,
+                                    &notification_dispatcher,
+                                    section_ordinal,
+                                    &task_id,
+                                    worker_run.spirit_pid,
+                                    completion.label(),
+                                    emitter.is_safe_point(),
+                                )?;
+                                redispatch = Some((topology_entry_index, entry));
+                                redispatched = true;
+                                continue;
                             }
-                            maos_bin::orchestrator_root::dispose_orphan(
-                                &transparency_log,
-                                &notification_dispatcher,
-                                section_ordinal,
-                                &task_id,
-                                worker_run.spirit_pid,
-                                completion.label(),
-                                emitter.is_safe_point(),
-                            )?;
-                            redispatch = Some((topology_entry_index, entry));
-                            redispatched = true;
-                            continue;
                         }
                         if !completion.is_completed() {
                             return Err(format!(
@@ -5441,6 +5531,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "topology": true,
                         "spirits": loaded_pids.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>(),
                         "workers": loaded_workers,
+                        // Story 19-2 (D-19-2-03 A) — instructions no safe point took.
+                        "orchestrator_instructions_pending": orchestrator_registry
+                            .get(&maos_bin::delegation::FROM_SPIRIT.into())
+                            .map_or(0, |buffer| buffer.pending_count()),
                     })
                 );
                 yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -5489,6 +5583,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Story 5.1 — scheduler + orchestrator hold Arc<CapabilityRegistryAdapter>
                 // which holds audit_tx clones; drop them so the channel closes.
                 drop(orchestrator);
+                // Story 19-2 (D-19-2-08 A) — a door-loaded, principal-bound
+                // Butler the seam retains holds `capability` too.
+                drop(butler_seam.lock().unwrap_or_else(|e| e.into_inner()).take());
                 // Story 16-3 — a NEW `audit_tx` owner: the Worker supervisor
                 // holds the crash detector (which holds the capability
                 // registry) and the IAC bus. Left alive, the writer await below
@@ -8726,6 +8823,7 @@ description = "smoke test spirit successor"
             post_unload_stop = Some(Arc::clone(&cohort_stop_after_unload));
             if let Some(door) = operator_door_port.as_ref() {
                 door.set_post_unload_stop(cohort_stop_after_unload);
+                cohort_worker_supervision.install_door_hooks(door);
             }
             let cohort_result = run_cohort_a2a_daemon(
                 Arc::clone(&transparency_log),
@@ -8778,6 +8876,7 @@ description = "smoke test spirit successor"
             drop(audit_tx);
             drop(inference);
             drop(orchestrator);
+            drop(butler_seam.lock().unwrap_or_else(|e| e.into_inner()).take());
             drop(cohort_worker_supervision);
             drop(scheduler);
             drop(revocation_poller);
@@ -9339,6 +9438,7 @@ description = "smoke test spirit successor"
     drop(audit_tx);
     drop(inference);
     drop(orchestrator);
+    drop(butler_seam.lock().unwrap_or_else(|e| e.into_inner()).take());
     drop(scheduler);
     drop(revocation_poller);
     drop(policy);
@@ -9498,6 +9598,8 @@ struct BinPrivateOpsImpl {
     /// Story 17-4 — a door-loaded compiled-in Spirit registers with the
     /// root's hook pump like any other admission.
     hooks: Arc<maos_bin::hook_pump::HookPump>,
+    /// Story 19-2 (D-19-2-08 A) — the boot-bound Butler principal.
+    butler_principal: Arc<std::sync::OnceLock<String>>,
 }
 
 #[cfg(feature = "network")]
@@ -9664,6 +9766,77 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             &mut |_pid| {},
         )
         .await
+    }
+
+    fn butler_principal(&self) -> Option<String> {
+        self.butler_principal.get().cloned()
+    }
+
+    /// Story 19-2 (D-19-2-07 A) — the live Butler at `pid` (never a stale
+    /// handle), picked off the runtime with its own MCP port.
+    async fn option_pick(
+        &self,
+        spirit_id: &str,
+        pid: u32,
+        pick: usize,
+        work_mode: &str,
+    ) -> maos_control::OperatorOutcome {
+        use butler::ButlerMcpError as E;
+        use maos_control::OperatorOutcome as O;
+        let seam = self
+            .spirit_build
+            .butler_seam
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let picked = match seam.and_then(|seam| seam.live_butler(pid)) {
+            None => Err((
+                "butler_not_found",
+                format!("no running Butler at pid {pid}"),
+            )),
+            Some(butler) if !butler.principal_bound() => Err((
+                "principal_unbound",
+                "no Butler principal bound at boot".into(),
+            )),
+            Some(butler) => {
+                let work_mode = work_mode.to_owned();
+                tokio::task::spawn_blocking(move || {
+                    let port = butler.mcp_port();
+                    butler.handle_option_pick(pick, &work_mode, port.as_deref())
+                })
+                .await
+                .map_err(|error| ("pick_task_failed", error.to_string()))
+                .and_then(|picked| {
+                    picked.map_err(|error| match &error {
+                        E::NoPendingNotification => ("no_pending_notification", error.to_string()),
+                        E::PickOutOfRange { .. } => ("pick_out_of_range", error.to_string()),
+                        E::UndeclaredAction(_) => ("undeclared_action", error.to_string()),
+                        E::Ledger(_) => ("acceptance_ledger_failed", error.to_string()),
+                        _ => ("mcp_failed", format!("pick {pick} was recorded; {error}")),
+                    })
+                })
+            }
+        };
+        let (code, detail) = match picked {
+            Ok(outcome) => {
+                return O::Completed(serde_json::json!({
+                    "spirit_id": spirit_id,
+                    "action": outcome.action.name(),
+                    "accepted": outcome.accepted,
+                    "effect": outcome.effect,
+                    "message": outcome.message,
+                }))
+            }
+            Err((code, detail)) => (code.to_owned(), detail),
+        };
+        match code.as_str() {
+            "butler_not_found" => O::NotFound { code, detail },
+            "principal_unbound"
+            | "no_pending_notification"
+            | "pick_out_of_range"
+            | "undeclared_action" => O::Conflict { code, detail },
+            _ => O::Failed { code, detail },
+        }
     }
 }
 

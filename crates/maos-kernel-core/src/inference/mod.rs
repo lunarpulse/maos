@@ -443,7 +443,14 @@ impl InferencePort for InferencePortAdapter {
             }
         }
 
-        result
+        // Story 19-2 (FR51 a/d) — re-checked after the call: a token revoked,
+        // or a Spirit paused, while the request was on the wire fails closed
+        // here; the paid completion stays journaled above but is not returned.
+        let response = result?;
+        self.capabilities
+            .recheck(&req.capability_token)
+            .map_err(|_e| InferenceError::CapabilityDenied)?;
+        Ok(response)
     }
 }
 

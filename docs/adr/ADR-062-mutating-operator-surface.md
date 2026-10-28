@@ -84,7 +84,13 @@ carried forward. It no longer identifies the claimed warning.
 - `16-1-daemon-post-surface-and-verb-retarget` builds the POST door,
   `control.json`, discovery, 405 handling, and verb retargeting.
 - `16-2-shell-halt-registry-and-j0-scene` uses the door for halt operations.
-- `19-2-fr20-enqueue-door-and-safe-point` uses it for queue mutation.
+- `19-2-fr20-enqueue-door-and-safe-point` uses it for queue mutation:
+  `POST /v1/orchestrator/{id}` (queue, consumed at the `--epic` safe point),
+  `POST /v1/orchestrator/{id}/recall` (recall all pending, intent row before
+  the drain), and `POST /v1/spirits/{id}/pick` (a director's option pick on
+  the running Butler, recorded in the boot-bound principal's namespace; 409
+  `principal_unbound` when none). Both new routes authenticate before
+  routing and are serialized per Spirit like every `{id}` verb.
 - `21-3-durable-tofu-and-self-leaf-rotation` relies on the preserved signed
   manifest identity path rather than an operator mutation route.
 

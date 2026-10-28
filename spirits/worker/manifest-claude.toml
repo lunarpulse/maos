@@ -79,15 +79,16 @@ command = "claude"                 # basename dispatch → ClaudeCli
 #                           it exits with an error at startup if the sandbox
 #                           cannot start — and denyRead/denyWrite bound the jail.
 #
-# THE POSTURE THIS FILE RATIFIES, in three checkable clauses: the FS jail is the
-# ADAPTER's, DECLARED by MAOS here in a hashed manifest, ENFORCED by the adapter,
-# NOT by MAOS. Since 17-1 the adapter runs INSIDE MAOS's T3 container
-# (`--read-only` root, `--network=none` with egress only through the proxy
-# socket, `--user=65534:65534`); since 19-3 its only persistent writable path is
-# its per-run workspace at /workspace, which MAOS diffs after exit. The
-# adapter is selected by BASENAME with no realpath, hash or signature check.
-# `CaptureDoc::validate` refuses a capture that claims otherwise (`fs_jail` must
-# read `adapter-enforced-maos-declared`).
+# THE POSTURE THIS FILE RATIFIES, in three checkable clauses: the ENFORCED FS
+# jail is MAOS's T3 container, not the adapter. Since 17-1 the adapter runs
+# INSIDE that container (`--read-only` root, `--network=none` with egress only
+# through the proxy socket, `--user=65534:65534`); since 19-3 its only
+# persistent writable path is its per-run workspace at /workspace, which MAOS
+# diffs after exit. claude's own sandbox (`--settings`, above) is a second,
+# adapter-side layer that MAOS declares here in a hashed manifest but does not
+# enforce. The adapter is selected by BASENAME with no realpath, hash or
+# signature check. `CaptureDoc::validate` refuses a capture that claims
+# otherwise (`fs_jail` must read `maos-enforced`).
 argv_prefix = [
     "--print",
     "--output-format",

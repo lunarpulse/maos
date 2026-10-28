@@ -11,8 +11,10 @@
 //!    enqueued while a delegation is in flight is **not** dispatched until the
 //!    delegation completes (FR20 "never preempt in-flight delegations"). The
 //!    safe-point gate is Spirit-side ([`Orchestrator::is_safe_point`]); the real
-//!    kernel buffer is the `dequeue_at_safe_point` source the gate guards
-//!    (driven as a dev-dep in `tests/orchestrator_buffer.rs`).
+//!    kernel buffer is the `dequeue_at_safe_point` source the gate guards. In
+//!    production the `maos run --epic` root's dispatch loop drains ONE
+//!    instruction before each NEW section's first frame and appends it to that
+//!    section's goal ([`fold_instruction`], Story 19-2 D-19-2-02 B).
 //! 2. **Dispatches distillate-fed** ([`Orchestrator::followup_dispatch`]): every
 //!    follow-up `task.assign` carries a [`PriorDistillateRef`] (FR21) — **always
 //!    a distillate ref, never raw output**. The kernel FR21 gate
@@ -225,6 +227,19 @@ pub fn parse_ambiguity(text: &str) -> Result<f64, OrchestratorInferenceError> {
 /// (`maos-a2a-core/src/router.rs:696-701`) before it ever routes. Both facts are
 /// pinned in `unit_tests::delegation_intent_is_canonical_and_task_assign_is_not`.
 pub const DELEGATION_CONSENT_INTENT: &str = "development-task:write-workspace";
+
+/// Story 19-2 (D-19-2-02 B) — the fixed delimiter a drained director
+/// instruction follows in the next section's goal.
+pub const DIRECTOR_INSTRUCTION_DELIMITER: &str =
+    "\n\n---\nDirector instruction (queued, delivered at this safe point):\n";
+
+/// Story 19-2 (D-19-2-02 B) — `goal` with ONE drained instruction appended
+/// under [`DIRECTOR_INSTRUCTION_DELIMITER`]. One per safe point keeps the
+/// Worker's single argv goal bounded; later instructions wait for later
+/// safe points.
+pub fn fold_instruction(goal: String, instruction: &OrchestratorInstruction) -> String {
+    format!("{goal}{DIRECTOR_INSTRUCTION_DELIMITER}{}", instruction.goal)
+}
 
 /// A remote dispatch cannot cross a consent boundary with missing or malformed
 /// provenance.
