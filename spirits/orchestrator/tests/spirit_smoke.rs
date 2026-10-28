@@ -4,11 +4,11 @@
 //! halt policy, all validating against the AUTHORITATIVE `maos-manifest`
 //! validators (no invented sections — AC8).
 //!
-//! Decision E: the Orchestrator declares NO `[capabilities.required]` — its
-//! dispatch logic is deterministic and the halt path needs no inference. The
-//! LIVE FR20 buffer-drain + FR21 dispatch paths are proven against the real
-//! adapters in the other test files; this harness exercises the firing-side
-//! hook + the manifest envelope.
+//! Decision E, amended by Story 19-1 (AC3): dispatch stays deterministic, and
+//! the Orchestrator declares `[capabilities.required] provider.complete` for
+//! its ambiguity judgement only (D-19-1-05 A). The LIVE FR20 buffer-drain +
+//! FR21 dispatch paths are proven against the real adapters in the other test
+//! files; this harness exercises the firing-side hook + the manifest envelope.
 
 use maos_spirit_sdk::spirit_test::{assert_no_deprecations, manifest_self_check, SpiritTest};
 use orchestrator::__maos_spirit_vtable_Orchestrator;
@@ -68,11 +68,12 @@ fn manifest_self_check_is_well_formed() {
             "output_shape must require '{f}'"
         );
     }
-    // Decision E — no inference / no MCP.
+    // Story 19-1 (AC3) — one `[capabilities.required]` key: provider.complete.
     assert_eq!(
-        report.capabilities_required_count, 0,
-        "Orchestrator declares no [capabilities.required] (Decision E)"
+        report.capabilities_required_count, 1,
+        "Orchestrator declares exactly [capabilities.required] provider.complete"
     );
+    assert_eq!(report.budget_context_window_size, Some(8192));
     assert!(
         report.warnings.is_empty(),
         "no manifest warnings: {:?}",
@@ -83,7 +84,7 @@ fn manifest_self_check_is_well_formed() {
 #[test]
 fn manifest_sections_parse_with_authoritative_validators() {
     use maos_manifest::manifest::{
-        ClassSection, EpistemicPolicySection, PostureSection, SandboxConfig,
+        CapabilitiesRequired, ClassSection, EpistemicPolicySection, PostureSection, SandboxConfig,
     };
 
     let _ = ClassSection::from_toml_str(&section(MANIFEST, "class")).expect("[class] valid");
@@ -101,11 +102,23 @@ fn manifest_sections_parse_with_authoritative_validators() {
         .expect("[epistemic_policy] valid");
     assert_eq!(ep.rules.len(), 2, "two recall-preferring halt rules");
 
-    // Decision E — Orchestrator declares no capabilities.
+    // Story 19-1 (AC3, D-19-1-05 A) — the declared providers, first one keying
+    // the class cassette; no MCP surface.
     let v = value(MANIFEST);
+    let required = v
+        .get("capabilities")
+        .and_then(|c| c.get("required"))
+        .expect("[capabilities.required] present");
+    let caps = CapabilitiesRequired::from_toml_str(&toml::to_string(required).unwrap())
+        .expect("[capabilities.required] valid");
+    assert_eq!(
+        caps.provider.complete,
+        ["anthropic.claude-haiku-4-5-20251001", "openai.gpt-4o-mini"],
+        "provider.complete per D-19-1-05 A"
+    );
     assert!(
-        v.get("capabilities").is_none(),
-        "Orchestrator declares no [capabilities] (Decision E)"
+        caps.mcp.servers.is_empty(),
+        "the Orchestrator calls no MCP server"
     );
 }
 

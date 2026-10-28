@@ -23,3 +23,7 @@ maos-manifest = { path = "../../crates/maos-manifest" }
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
 sha2 = "0.10"
 toml = "0.8"
+# Story 19-1 AC5.3 — the FR15 witness resolves a kernel halt through the
+# operator door's `HaltFlow` (`tests/harness/fr15_resolution.rs`; test-only).
+maos-director-surface = { path = "../../crates/maos-director-surface" }
+tempfile = "3"

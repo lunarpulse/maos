@@ -11,6 +11,8 @@ use std::io::Write;
 use std::path::Path;
 
 const TOPOLOGY: &str = "spirits/topologies/j1-founder-loop.toml";
+// Story 19-1 D-19-1-11 A — leg 1's epic sub-check reads this topology.
+const EPIC_TOPOLOGY: &str = "spirits/topologies/j1-founder-loop-epic.toml";
 const DELEGATION_RS: &str = "crates/maos-bin/src/delegation.rs";
 const MAILBOX_RS: &str = "crates/maos-iac/src/adapter/mailbox.rs";
 const MAIN_RS: &str = "crates/maos-bin/src/main.rs";
@@ -31,6 +33,11 @@ const TOPOLOGY_DELEGATION_TEST: &str = "crates/maos-bin/tests/topology_delegatio
 const GOOD_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop\"\n\n\
     [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
     [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n";
+const GOOD_EPIC_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop-epic\"\n\n\
+    [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
+    [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n\n\
+    [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n\n\
+    [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n";
 const GOOD_DELEGATION: &str = "pub async fn install(mailbox: Arc<Mailbox>, intent: &A2AIntent) {\n\
     let (router, rx) = maos_a2a::pairing::paired_loopback_router(&[]).await?;\n}\n\
     pub async fn delegate(&mut self) {\n    for addr in routed.to.iter_mut() {\n        addr.host_id = None;\n    }\n}\n";
@@ -39,7 +46,7 @@ const FORK_DELEGATION: &str = "pub async fn install(mailbox: Arc<Mailbox>, inten
     fn router_for(kind: DelegationRouter) {\n        let _ = maos_a2a_tcp::TcpA2ATransport::connect(&peer);\n        let _ = DelegationRouter::CrossHostVerified(router);\n    }\n\
     pub async fn delegate(&mut self) {\n    for addr in routed.to.iter_mut() {\n        addr.host_id = None;\n    }\n}\n";
 const GOOD_MAILBOX: &str = "fn phase_three() {\n    let router = self.a2a_router.get().ok_or_else(|| {\n        IacBusError::CrossHostNotConfigured { host_id: hosts }\n    })?;\n}\n";
-const GOOD_MAIN: &str = "#[cfg(feature = \"network\")]\nuse maos_bin::worker_cli;\nfn topology_loop() {\n    let frame = delegation_emitter.assign_frame_remote(seq, recipient, role);\n    let goal = delegation_leg.delegate(&iac, frame).await?;\n}\n";
+const GOOD_MAIN: &str = "#[cfg(feature = \"network\")]\nuse maos_bin::worker_cli;\nfn topology_loop() {\n    let frame = delegation_emitter.assign_frame_remote(seq, recipient, role);\n    let goal = delegation_leg.delegate(&iac, frame).await?;\n    let next = emitter.followup_dispatch_remote(seq, prior, to_host, from_host)?;\n}\n";
 const GOOD_ORCHESTRATOR: &str =
     "pub const DELEGATION_CONSENT_INTENT: &str = \"development-task:write-workspace\";\n";
 const GOOD_A2A_ROUTER: &str = "fn intake() {\n    let peer_host = match &frame.from.host_id { Some(h) => h.clone(), None => loopback() };\n}\npub async fn handle_intake_verified(&self, r: Req, p: &PeerId) {}\n";
@@ -59,6 +66,7 @@ fn write_file(root: &Path, rel: &str, content: &str) {
 
 fn lay_green(root: &Path) {
     write_file(root, TOPOLOGY, GOOD_TOPOLOGY);
+    write_file(root, EPIC_TOPOLOGY, GOOD_EPIC_TOPOLOGY);
     write_file(root, DELEGATION_RS, GOOD_DELEGATION);
     write_file(root, MAILBOX_RS, GOOD_MAILBOX);
     write_file(root, MAIN_RS, GOOD_MAIN);

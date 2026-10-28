@@ -1,0 +1,73 @@
+{
+  "head_f34f6b4e": {
+    "passed": true,
+    "aggregate": 188504,
+    "over_budget": [],
+    "per_crate": {
+      "maos-kernel-core": 20619,
+      "maos-bin": 29497,
+      "xtask": 47422,
+      "maos-bench": 2359,
+      "maos-eval": 4675,
+      "maos-control": 1344,
+      "maos-cli": 6155,
+      "maos-shell": 613,
+      "maos-journey-test": 946
+    }
+  },
+  "k2_prototype": {
+    "passed": false,
+    "aggregate": 188515,
+    "over_budget": [
+      "aggregate 188515 >= 188505",
+      "maos-bin 29499 > 29497",
+      "maos-kernel-core 20628 > 20619"
+    ],
+    "per_crate": {
+      "maos-kernel-core": 20628,
+      "maos-bin": 29499,
+      "xtask": 47422,
+      "maos-bench": 2359,
+      "maos-eval": 4675,
+      "maos-control": 1344,
+      "maos-cli": 6155,
+      "maos-shell": 613,
+      "maos-journey-test": 946
+    }
+  },
+  "epic_parse_prototype": {
+    "passed": false,
+    "aggregate": 188513,
+    "over_budget": [
+      "aggregate 188513 >= 188505",
+      "maos-bin 29506 > 29497"
+    ],
+    "per_crate": {
+      "maos-kernel-core": 20619,
+      "maos-bin": 29506,
+      "xtask": 47422,
+      "maos-bench": 2359,
+      "maos-eval": 4675,
+      "maos-control": 1344,
+      "maos-cli": 6155,
+      "maos-shell": 613,
+      "maos-journey-test": 946
+    }
+  },
+  "after_revert": {
+    "passed": true,
+    "aggregate": 188504,
+    "over_budget": [],
+    "per_crate": {
+      "maos-kernel-core": 20619,
+      "maos-bin": 29497,
+      "xtask": 47422,
+      "maos-bench": 2359,
+      "maos-eval": 4675,
+      "maos-control": 1344,
+      "maos-cli": 6155,
+      "maos-shell": 613,
+      "maos-journey-test": 946
+    }
+  }
+}

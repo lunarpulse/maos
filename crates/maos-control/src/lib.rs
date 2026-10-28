@@ -166,6 +166,32 @@ pub trait CohortSelfIdentitySource: Send + Sync + 'static {
     fn self_identity(&self) -> Option<SelfIdentityStatus>;
 }
 
+/// Story 19-7 (AC3, D-19-7-01/06 A) — one pending NFR-Rel-6 re-pin request,
+/// as an operator reads it.
+///
+/// Plain owned scalars for the SAME reason as [`RotationWindowRow`]: this
+/// surface adds NO crate edge to `maos-a2a-core`. The mapping from the pin
+/// store's request happens in `maos-bin`, the crate that depends on both.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepinRequestRow {
+    /// The TLS-verified peer whose restart was detected.
+    pub peer: String,
+    /// The invalidated pin's fingerprint, wire form `sha256:<hex64>` — the
+    /// identity an approval keeps (D-19-7-04 A).
+    pub pinned_fingerprint: String,
+    pub prior_boot_nonce: u64,
+    /// The nonce a decision must echo (D-19-7-03 A).
+    pub observed_boot_nonce: u64,
+    /// Unix seconds.
+    pub detected_at_secs: u64,
+    /// Unix seconds; a decision at or after it answers 409
+    /// `repin_request_expired`.
+    pub expires_at_secs: u64,
+    /// Listed until superseded, so a late decision reads `expired`, not
+    /// `not pending`.
+    pub expired: bool,
+}
+
 /// Configuration for the authenticated operator endpoint.
 #[derive(Debug, Clone)]
 pub struct OperatorHttpConfig {
@@ -354,6 +380,20 @@ pub enum OperatorCommand {
     Load {
         manifest: String,
     },
+    /// Story 19-7 (D-19-7-01/03/04 A) — an operator's consent decision on a
+    /// pending NFR-Rel-6 re-pin request.
+    ///
+    /// It carries NO fingerprint, by ruling: an approval re-pins the peer's
+    /// CURRENT pinned fingerprint with the pending observed nonce, so this
+    /// route can re-arm restart detection but can never change which
+    /// certificate a peer is (ADR-062, Amendment — Story 19-7).
+    RepinDecision {
+        peer: String,
+        /// Must echo the pending observed nonce, else 409.
+        boot_nonce: u64,
+        approve: bool,
+        actor: String,
+    },
 }
 
 impl OperatorCommand {
@@ -388,6 +428,10 @@ impl OperatorCommand {
             | Self::ReleaseLegalHold { .. }
             | Self::AdmitGovernanceSchema { .. }
             | Self::SkillDecision { .. }
+            // Story 19-7 — a host trust decision has no Spirit. The handler
+            // serializes decisions itself, so two operators cannot interleave
+            // record → Approval Decision Log row → consent on one peer.
+            | Self::RepinDecision { .. }
             | Self::Load { .. } => None,
         }
     }
@@ -409,6 +453,10 @@ impl OperatorCommand {
             // each carries its own manifest `[budget]` cap, and two of them
             // do not fit inside a 10 s route.
             | Self::Load { .. } => LONG_ROUTE_BUDGET,
+            // Story 19-7 — explicit, never inherited from `_`: a re-pin
+            // decision is a store lookup, one Approval Decision Log row and a
+            // non-blocking consent read.
+            Self::RepinDecision { .. } => DEFAULT_ROUTE_BUDGET,
             _ => DEFAULT_ROUTE_BUDGET,
         }
     }
@@ -549,6 +597,14 @@ pub trait OperatorCommandPort: Send + Sync + 'static {
 
     /// Durable skill list/show, including complete payload and revision evidence.
     fn skills_status(&self, entry: Option<&str>, roots: &[String]) -> OperatorOutcome;
+
+    /// Story 19-7 (AC3) — every pending re-pin request, expired ones
+    /// included. `None` when this process holds NO re-pin control (only the
+    /// `cohort-a2a-daemon` root installs one): the route then answers 404,
+    /// never an empty list that would read as "no restart detected".
+    fn pending_repins(&self) -> Option<Vec<RepinRequestRow>> {
+        None
+    }
 }
 
 /// A running server with explicit shutdown for daemon teardown and tests.
@@ -1061,6 +1117,23 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
             None => Response::new(404, NOT_FOUND_BODY),
         }),
         ["v1", "a2a", "rotation-windows"] => get_only(method, || rotation_windows(routes)),
+        // Story 19-7 (AC3) — the re-pin consent surface. The list is a read
+        // (405 to every other method); the decision is POST-only, its peer
+        // segment validated before the method guard like every id route.
+        ["v1", "a2a", "repins"] => get_only(method, || pending_repins(routes)),
+        ["v1", "a2a", "repins", peer] => {
+            let peer = match validate_id(peer) {
+                Ok(peer) => peer,
+                Err(response) => return response,
+            };
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            match body_json(request) {
+                Ok(body) => repin_decision(routes, peer, &body),
+                Err(response) => response,
+            }
+        }
         ["v1", "cohort", "peer-versions"] => get_only(method, || peer_versions(routes)),
         ["v1", "cohort", "self-identity"] => get_only(method, || self_identity(routes)),
         // Story 16-6 (D-16-6-E) — the COLLECTION route. `["v1","spirits"]`
@@ -1782,6 +1855,80 @@ fn self_identity<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
                 "last_pull_errors": identity.last_pull_errors,
             }
         }),
+    )
+}
+
+/// Story 19-7 — `GET /v1/a2a/repins`: a JSON ARRAY of pending requests.
+/// Nonces are DECIMAL STRINGS (a u64 does not survive a JSON number read as
+/// f64); `detected_at`/`expires_at` are unix seconds.
+fn pending_repins<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
+    let Some(rows) = routes.commands.and_then(|port| port.pending_repins()) else {
+        return Response::new(404, NOT_FOUND_BODY);
+    };
+    let rows: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|row| {
+            serde_json::json!({
+                "peer": row.peer,
+                "pinned_fingerprint": row.pinned_fingerprint,
+                "prior_boot_nonce": row.prior_boot_nonce.to_string(),
+                "observed_boot_nonce": row.observed_boot_nonce.to_string(),
+                "detected_at": row.detected_at_secs,
+                "expires_at": row.expires_at_secs,
+                "expired": row.expired,
+            })
+        })
+        .collect();
+    Response::value(200, serde_json::Value::Array(rows))
+}
+
+/// Story 19-7 — `POST /v1/a2a/repins/<peer>` with exactly
+/// `{"approve":bool,"boot_nonce":"<decimal>","actor":"<who>"}`.
+///
+/// Unknown fields are refused, so a `fingerprint` can never ride along
+/// (D-19-7-04 A). `boot_nonce` is ASCII digits only — `str::parse` alone
+/// would accept a leading `+` — and must fit a u64.
+fn repin_decision<S: SandboxReportSource>(
+    routes: &Routes<'_, S>,
+    peer: &str,
+    body: &serde_json::Value,
+) -> Response {
+    let Some(fields) = body.as_object() else {
+        return Response::error(400, "bad_request", "body must be a JSON object");
+    };
+    if let Some(unknown) = fields
+        .keys()
+        .find(|key| !matches!(key.as_str(), "approve" | "boot_nonce" | "actor"))
+    {
+        return Response::error(400, "bad_request", &format!("unknown field `{unknown}`"));
+    }
+    let Some(approve) = fields.get("approve").and_then(serde_json::Value::as_bool) else {
+        return Response::error(400, "bad_request", "field `approve` must be boolean");
+    };
+    let Some(boot_nonce) = fields
+        .get("boot_nonce")
+        .and_then(serde_json::Value::as_str)
+        .filter(|nonce| !nonce.is_empty() && nonce.bytes().all(|byte| byte.is_ascii_digit()))
+        .and_then(|nonce| nonce.parse::<u64>().ok())
+    else {
+        return Response::error(
+            400,
+            "bad_request",
+            "field `boot_nonce` must be a decimal u64 string",
+        );
+    };
+    let actor = match required_str(body, "actor") {
+        Ok(actor) => actor,
+        Err(response) => return response,
+    };
+    submit(
+        routes,
+        OperatorCommand::RepinDecision {
+            peer: peer.to_owned(),
+            boot_nonce,
+            approve,
+            actor,
+        },
     )
 }
 

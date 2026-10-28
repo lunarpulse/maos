@@ -17,6 +17,9 @@ thiserror = "2.0"
 maos-kernel-core = { path = "../maos-kernel-core" }
 butler = { path = "../../spirits/butler" }
 researcher = { path = "../../spirits/researcher" }
+# Story 19-1 AC5 (D-19-1-13 A) — the Orchestrator class row: `split_epic` +
+# `Orchestrator::judge_ambiguity` through the shared model-driven runner.
+orchestrator = { path = "../../spirits/orchestrator" }
 tempfile = "3"
 # Story 18-2 (D-18-2-01 B) — the halt-eval composition: the kernel-free scorer +
 # signed sidecar, the class manifests' tables, and the replay driver's trait.

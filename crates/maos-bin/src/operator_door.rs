@@ -240,6 +240,9 @@ struct DoorInner {
     command_tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
     post_unload_stop: Mutex<Option<Arc<dyn Fn(u32) + Send + Sync>>>,
     forget_pump: Mutex<Option<std::sync::Weak<crate::hook_pump::HookPump>>>,
+    /// Story 19-7 — the set-once re-pin control. Empty (every route 404) in
+    /// every root but `cohort-a2a-daemon`, which installs its live pin store.
+    repin: Arc<crate::repin_door::RepinControl>,
 }
 
 /// `maosctl`-visible director identity on every approval-log row (FR42 keeps
@@ -305,6 +308,7 @@ impl OperatorDoor {
             command_tasks: Mutex::new(Vec::new()),
             post_unload_stop: Mutex::new(None),
             forget_pump: Mutex::default(),
+            repin: Arc::new(crate::repin_door::RepinControl::new()),
         }))
     }
 
@@ -348,6 +352,12 @@ impl OperatorDoor {
             .post_unload_stop
             .lock()
             .unwrap_or_else(|error| error.into_inner()) = Some(stop);
+    }
+
+    /// Story 19-7 — the door's re-pin control, for `run_cohort_a2a_daemon` to
+    /// install the live transport's pin store into after bind.
+    pub fn repin_control(&self) -> Arc<crate::repin_door::RepinControl> {
+        Arc::clone(&self.0.repin)
     }
 }
 
@@ -491,6 +501,20 @@ impl DoorInner {
                 Some((approve, &actor)),
                 &[],
             ),
+            OperatorCommand::RepinDecision {
+                peer,
+                boot_nonce,
+                approve,
+                actor,
+            } => {
+                self.repin
+                    .decide(&peer, boot_nonce, approve, &actor, |row| {
+                        self.transparency_log
+                            .insert_approval_decision(row)
+                            .map_err(|error| error.to_string())
+                    })
+                    .await
+            }
             #[cfg(feature = "network")]
             OperatorCommand::Load { manifest } => self.load_command(&manifest, pread).await,
             // Air-gap build: the load verb needs the provenance gate, and the
@@ -1740,6 +1764,10 @@ impl OperatorCommandPort for OperatorDoor {
         skill_operation(&self.0.transparency_log, entry, None, roots)
     }
 
+    fn pending_repins(&self) -> Option<Vec<maos_control::RepinRequestRow>> {
+        self.0.repin.pending()
+    }
+
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {
         let reports =
             self.0.crl_reports.lock().expect(
@@ -1782,6 +1810,9 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         OperatorCommand::ReleaseLegalHold { .. } => "legal-hold-release",
         OperatorCommand::AdmitGovernanceSchema { .. } => "governance-admit",
         OperatorCommand::SkillDecision { .. } => "skill-decision",
+        // Story 19-7 — the completion row reads
+        // `operator.a2a-repin.<operation_id>:<outcome>`.
+        OperatorCommand::RepinDecision { .. } => "a2a-repin",
         // ⚠ Not cosmetic. This is the machine label written into the
         // completion TL row's intent as
         // `operator.{verb}.{operation_id}:{outcome}` — it is what the audit

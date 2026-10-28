@@ -400,8 +400,8 @@ since_version = "0.5.0"
 
 [[error]]
 code = "EPinMismatch::NotPinned"
-cause = "No TOFU pin exists for the target peer because first-contact has never been completed. The spirit attempted to communicate with a peer it has never established trust with."
-remediation = "Initiate a first-contact handshake with the peer to establish and record the TOFU pin. Use `maos a2a trust <peer_id>` or the equivalent API call to perform initial trust establishment before attempting communication."
+cause = "No TOFU pin exists for the target peer. Pins are configured, not learned: each one is loaded at transport bind from a `[[tcp.peer_pins]]` row in this host's configuration, and an unpinned peer is refused rather than trusted on first contact."
+remediation = "Verify the peer's leaf-certificate SHA-256 fingerprint and current boot nonce out of band, add a `[[tcp.peer_pins]]` row for it (`peer_id`, `fingerprint`, decimal `boot_nonce`) to this host's configuration, and restart this process so the pin store is rebuilt from config. No runtime command creates a first pin; `maosctl a2a repin` only re-arms an existing pin."
 rust_path = "EPinMismatch::NotPinned"
 source_file = "crates/maos-a2a-core/src/tofu.rs"
 description = "No TOFU pin recorded for peer — first-contact not yet attempted"
@@ -413,8 +413,8 @@ since_version = "0.5.0"
 
 [[error]]
 code = "EPinMismatch::Invalidated"
-cause = "The TOFU (Trust On First Use) pin for a peer spirit was explicitly invalidated — either because the peer restarted and generated a new identity, or because an operator manually revoked the pin."
-remediation = "Re-establish trust with the peer by initiating a new first-contact handshake. If the peer restarted legitimately, accept the new pin. If the invalidation was unexpected, investigate whether the peer's identity was compromised before re-pinning."
+cause = "The TOFU (Trust On First Use) pin for a peer is invalidated. Usually the peer Spirit restarted: its frame carried a boot nonce different from the pinned one (NFR-Rel-6 restart detection), the certificate identity is unchanged, and re-pin consent is required. The pin can also be manually invalidated, or a rotation-window or first-contact operation can be refused against an existing or invalidated pin."
+remediation = "After a peer restart, confirm the restart with the peer's operator and obtain its new boot nonce (decimal) out of band. On the receiving host's `cohort-a2a-daemon` door run `maosctl a2a repin list`, then `maosctl a2a repin approve <peer> --boot-nonce <N>` within 300 s of the detection: it re-pins the SAME pinned fingerprint with nonce N and writes an Approval Decision Log row first. The re-pin is held in memory only; a restart of the receiving daemon rebuilds pins from `[[tcp.peer_pins]]`. The alternative recovery is to correct that row's `boot_nonce` and restart the receiving host. If the restart was unexpected, investigate a possible compromise before approving; refuse with `maosctl a2a repin reject <peer> --boot-nonce <N>`."
 rust_path = "EPinMismatch::Invalidated"
 source_file = "crates/maos-a2a-core/src/tofu.rs"
 description = "TOFU pin invalidated for peer (Spirit restart, manual invalidation)"

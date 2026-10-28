@@ -339,8 +339,9 @@ fn validate_topology_is_loadable(
 /// strip first and this widening lands GREEN on day one, and the next decorative
 /// `host` key reds at its ORIGIN commit instead of being discovered two stories
 /// later. The `j1-founder-loop*` stem still carries the EXTRA obligation of
-/// declaring exactly one delegation target; every other topology must simply be
-/// routable-or-hostless.
+/// declaring exactly one delegation target (exactly three for the Story 19-1
+/// `--epic` loop, one per `### Story` section); every other topology must
+/// simply be routable-or-hostless.
 #[test]
 fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
     use maos_bin::topology::{topology_manifest_entries, validate_remote_topology_target};
@@ -410,11 +411,26 @@ fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
             // Without a `host` the delegated task is `None`, the frame-borne emit is
             // skipped and the completion enforcement is bypassed ENTIRELY — the
             // worker would be spawned with no task and the run would still exit 0.
+            // Story 19-1 (D-19-1-03/11 A) — the epic topology binds one Worker per
+            // `### Story` section of `tests/fixtures/j1/epic.md`, so it carries
+            // exactly THREE targets, and the fixture must split into exactly that
+            // many; every other founder loop keeps exactly one.
+            let expected = if name == "j1-founder-loop-epic" {
+                let epic =
+                    std::fs::read_to_string(workspace_root().join("tests/fixtures/j1/epic.md"))
+                        .expect("the epic fixture exists");
+                if let Err(err) = orchestrator::split_epic(&epic, 3) {
+                    panic!("tests/fixtures/j1/epic.md must bind 1:1 to the epic topology: {err}");
+                }
+                3
+            } else {
+                1
+            };
             assert_eq!(
                 delegation_targets,
-                1,
-                "{} must declare exactly one host-bearing [cli_wrapper] delegation \
-                 target; without it the completion enforcement is bypassed",
+                expected,
+                "{} must declare exactly {expected} host-bearing [cli_wrapper] delegation \
+                 target(s); without one the completion enforcement is bypassed",
                 path.display()
             );
             routable_founder_loops.push(name);
@@ -433,8 +449,10 @@ fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
             // WEAKER posture (it exempts the new file from the controls instead of
             // enrolling it).
             "j1-founder-loop-crosshost".to_string(),
+            // Story 19-1 (AC1.3) — the `--epic` founder loop: three Workers.
+            "j1-founder-loop-epic".to_string(),
         ],
-        "the hermetic founder loop, the ported codex profile, AND the cross-host scene must all \
-         be routable"
+        "the hermetic founder loop, the ported codex profile, the cross-host scene AND the \
+         epic founder loop must all be routable"
     );
 }

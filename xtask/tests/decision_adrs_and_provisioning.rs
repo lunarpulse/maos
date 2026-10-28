@@ -513,6 +513,9 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
             require_body_contains(number, body, adr_rel, "## Amendment — Story 16-1", findings);
             require_body_contains(number, body, adr_rel, "control.json", findings);
             require_body_contains(number, body, adr_rel, "cohort-a2a-daemon", findings);
+            // Story 19-7 (D-19-7-04 A) — the nonce-only re-pin POST route is
+            // recorded as an amendment, not a silent widening of `:61-64`.
+            require_body_contains(number, body, adr_rel, "## Amendment — Story 19-7", findings);
             if let Some(dep_test) = anchor_source(
                 root,
                 number,
@@ -1059,7 +1062,7 @@ impl Fixture {
             // red is credited.
             let amendment = match number {
                 61 => "\n## Amendment — Story 17-1\n\nThe bearer is daemon-minted; the Worker reaches `/proxy/egress.sock` only.\n",
-                62 => "\n## Amendment — Story 16-1\n\n`control.json` keeps one writer and `cohort-a2a-daemon` is a door root.\n",
+                62 => "\n## Amendment — Story 16-1\n\n`control.json` keeps one writer and `cohort-a2a-daemon` is a door root.\n\n## Amendment — Story 19-7\n\nA nonce-only re-pin route keeps the pinned fingerprint.\n",
                 _ => "",
             };
             let adr = format!(
@@ -1302,6 +1305,14 @@ fn every_clause_and_denominator_has_a_planted_red() {
             .join("\n")
     });
     assert_red_contains(&fx, "checklist denominator");
+
+    // ADR-062 loses its Story 19-7 amendment: the re-pin POST route would be
+    // an unrecorded widening of the certificate-identity exclusion.
+    let fx = Fixture::complete();
+    fx.rewrite("docs/adr/ADR-062-fixture-decision.md", |body| {
+        body.replace("## Amendment — Story 19-7", "")
+    });
+    assert_red_contains(&fx, "must contain `## Amendment — Story 19-7`");
 
     // ADR-060's documented field name may remain in comments, but deleting
     // its executable rust-inproc refusal must still red.

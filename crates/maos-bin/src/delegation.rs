@@ -39,11 +39,15 @@
 //! at a rung where the whole exchange is in-process anyway.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use maos_a2a::pairing::LoopbackEndpoint;
 use maos_a2a::LoopbackA2ARouter;
+use maos_a2a_core::{map_a2a_error_to_iac_bus, A2AError};
 use maos_domain::frame::{FramePayload, IacFrame, TaskCompletePayload};
+use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i8::A2AIntent;
+use maos_domain::ports::a2a::A2ARouter;
 use maos_kernel_core::iac::mailbox::SpiritMailboxHandle;
 use maos_kernel_core::iac::{FrameRowWrite, IacBusAdapter, Mailbox};
 use maos_spirit_abi::identity::FrameKind;
@@ -63,6 +67,119 @@ pub const TO_HOST: &str = "developer-remote-host";
 /// (`maos-a2a-core/src/router.rs:1087-1090`), so the accept side is keyed by the
 /// SOURCE host, not the destination.
 pub const FROM_HOST: &str = "founder-loop-host";
+
+/// The largest accepted `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` value (one day), so
+/// `Instant + Duration` can never overflow (j1-crosshost-2e §A6 P4).
+const PAIRING_TIMEOUT_MAX_SECS: u64 = 86_400;
+/// How long the re-pin hold waits between two re-sends of the refused frame.
+pub const REPIN_HOLD_RESEND_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Parse `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` (registered in `env_contract.rs`):
+/// `Ok(None)` when unset, `Ok(Some(secs))` for an integer in `1..=86400`, and a
+/// refusal for anything else — a non-UTF-8 or garbage bound is never folded into
+/// "unset" or a default.
+///
+/// The single parser for the variable: the pairing rendezvous applies its own
+/// default (300 s) to `None`, while story 19-7's re-pin hold (D-19-7-09 A) treats
+/// `None` as "not armed".
+pub fn pairing_timeout_secs_from_env() -> Result<Option<u64>, String> {
+    match std::env::var("MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS") {
+        Err(std::env::VarError::NotPresent) => Ok(None),
+        Err(std::env::VarError::NotUnicode(raw)) => Err(format!(
+            "maos run: MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS is not valid UTF-8 ({raw:?}); \
+             refusing rather than guessing a hold bound."
+        )),
+        Ok(raw) => match raw.parse::<u64>() {
+            Ok(secs) if (1..=PAIRING_TIMEOUT_MAX_SECS).contains(&secs) => Ok(Some(secs)),
+            _ => Err(format!(
+                "maos run: MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS must be an integer in \
+                 1..={PAIRING_TIMEOUT_MAX_SECS} seconds, got {raw:?}; refusing rather than \
+                 holding on a garbage bound."
+            )),
+        },
+    }
+}
+
+/// The sender's re-pin hold (story 19-7, D-19-7-09 A).
+///
+/// When host B NACKs the delegation as a Spirit restart (`-32004`, surfaced as
+/// `PinInvalidated { awaiting_repin: true }`), B's operator can consent to this
+/// sender's new boot nonce. A `--once` sender that exits on the refusal can never
+/// be delivered to after that consent — a re-run mints a NEW nonce, which is a new
+/// restart. With a hold armed the sender prints what B's operator must approve and
+/// re-sends the SAME, already-journaled frame until it is ACKed, refused
+/// differently, or the hold expires. Opt-in: no hold ⇒ today's immediate exit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RepinHold {
+    own_boot_nonce: u64,
+    timeout: Duration,
+    resend_interval: Duration,
+}
+
+impl RepinHold {
+    /// `own_boot_nonce` is this process's wire boot nonce (the value B's operator
+    /// echoes). `timeout` bounds the whole hold and must lie in `(0, 86400 s]`;
+    /// `resend_interval` must be non-zero so the hold can never spin.
+    pub fn new(
+        own_boot_nonce: u64,
+        timeout: Duration,
+        resend_interval: Duration,
+    ) -> Result<Self, String> {
+        if timeout.is_zero() || timeout > Duration::from_secs(PAIRING_TIMEOUT_MAX_SECS) {
+            return Err(format!(
+                "delegation: re-pin hold timeout {timeout:?} is outside (0, \
+                 {PAIRING_TIMEOUT_MAX_SECS}s]"
+            ));
+        }
+        if resend_interval.is_zero() {
+            return Err(
+                "delegation: re-pin hold resend interval is zero — the hold would spin".to_string(),
+            );
+        }
+        Ok(Self {
+            own_boot_nonce,
+            timeout,
+            resend_interval,
+        })
+    }
+}
+
+/// How a re-pin hold ended.
+enum RepinHoldOutcome {
+    /// A re-send was ACKed: the frame is delivered.
+    Delivered,
+    /// A re-send was refused with anything other than the awaiting-re-pin refusal.
+    Refused { resends: u32, error: IacBusError },
+    /// The bound elapsed while the peer still awaited consent.
+    TimedOut { resends: u32, last: IacBusError },
+}
+
+/// `Some(peer)` iff `error` is the sender-side rendering of
+/// `A2AError::PinInvalidated { awaiting_repin: true }` — host B's `-32004`
+/// restart NACK, or its `-32002` refusal while the pin stays invalidated.
+///
+/// `IacBusError::CrossHostPinMismatch` also carries a TLS fingerprint mismatch,
+/// so the variant alone is not enough; the detail is compared against the core
+/// mapper's own rendering of `PinInvalidated` rather than a literal copied here.
+fn awaiting_repin_peer(error: &IacBusError) -> Option<&str> {
+    let IacBusError::CrossHostPinMismatch { peer, detail } = error else {
+        return None;
+    };
+    let canonical = map_a2a_error_to_iac_bus(
+        A2AError::PinInvalidated {
+            peer: peer.clone(),
+            awaiting_repin: true,
+        },
+        peer,
+    );
+    match canonical {
+        IacBusError::CrossHostPinMismatch {
+            detail: canonical_detail,
+            ..
+        } if canonical_detail == *detail => Some(peer.as_str()),
+        _ => None,
+    }
+}
 
 /// What host B's intake consumer found in one inbound frame
 /// (j1-crosshost-2b AC1.3/AC3.2).
@@ -163,6 +280,14 @@ pub struct DelegationLeg {
     /// from under the mailbox, and so tests can assert against it. `None` on the
     /// cross-host arm — the transport is owned by the composition root there.
     _router: Option<Arc<LoopbackA2ARouter>>,
+    /// The installed cross-host router, retained so the re-pin hold re-sends the
+    /// already-journaled frame through the SAME set-once router without a second
+    /// `deliver_typed` (which would journal — or dedupe — instead of routing).
+    /// `None` on the loopback arm.
+    cross_host: Option<Arc<dyn A2ARouter>>,
+    /// Story 19-7 (D-19-7-09 A) — the opt-in re-pin hold. `None` ⇒ an
+    /// awaiting-re-pin refusal fails the delegation immediately, as before.
+    repin_hold: Option<RepinHold>,
 }
 
 impl DelegationLeg {
@@ -206,7 +331,7 @@ impl DelegationLeg {
         intent: &A2AIntent,
         router: DelegationRouter,
     ) -> Result<Self, String> {
-        let (installable, loopback_router, intake_rx) = match router {
+        let (installable, loopback_router, intake_rx, cross_host) = match router {
             DelegationRouter::LoopbackRehearsal => {
                 let (router, intake_rx) = maos_a2a::pairing::paired_loopback_router(&[
                     LoopbackEndpoint::sender_of(TO_HOST, 7451, intent),
@@ -218,9 +343,12 @@ impl DelegationLeg {
                     Arc::clone(&router) as Arc<dyn maos_domain::ports::a2a::A2ARouter>,
                     Some(router),
                     Some(intake_rx),
+                    None,
                 )
             }
-            DelegationRouter::CrossHostVerified(router) => (router, None, None),
+            DelegationRouter::CrossHostVerified(router) => {
+                (Arc::clone(&router), None, None, Some(router))
+            }
         };
         mailbox.install_a2a_router(installable).map_err(|()| {
             "delegation: an A2A router is already installed — the OnceLock is set-once so the \
@@ -241,8 +369,21 @@ impl DelegationLeg {
             orchestrator,
             intake_rx,
             _router: loopback_router,
+            cross_host,
+            repin_hold: None,
         })
     }
+
+    /// Arm (or leave disarmed) the story 19-7 re-pin hold on the cross-host arm.
+    ///
+    /// `None` keeps today's behaviour byte-identical: an awaiting-re-pin refusal
+    /// fails [`Self::delegate`] at once. On the loopback arm a hold is inert — no
+    /// frame leaves the process, so no peer can refuse it as a restart.
+    pub fn with_repin_hold(mut self, hold: Option<RepinHold>) -> Self {
+        self.repin_hold = hold;
+        self
+    }
+
     /// Emit the delegation, and — on the loopback arm only — pump and drain it.
     ///
     /// The emit goes through [`IacBusAdapter::deliver_typed`] so the frame is
@@ -270,30 +411,48 @@ impl DelegationLeg {
         frame: IacFrame,
     ) -> Result<DelegationOutcome, String> {
         let frame_id = frame.frame_id;
-        iac.deliver_typed(frame, 0, None).await.map_err(|e| {
-            // FOUND BY j1-crosshost-1a, owned elsewhere: FR21's gate
-            // (`maos-iac/src/adapter/orchestrator_dispatch.rs`) treats ANY
-            // `TaskComplete` row inside a 60s WALL-CLOCK window as a predecessor of
-            // an Orchestrator `TaskAssign`. That proxy cannot tell "a follow-up
-            // inside one fan-out" from "the first dispatch of a NEW process", so a
-            // second `maos run` on the same data home within 60s is refused even
-            // though this dispatch references nothing (`prior_distillate_ref: None`,
-            // empty `scope`) — which is not the case
-            // `docs-site/docs/errors/EOrchestratorDispatchRawOutput.md` describes.
-            // j1-crosshost-1a was the FIRST production emitter of such a frame, so
-            // it is where the false positive became reachable. It is NOT relaxed,
-            // faked with a synthetic distillate, or routed around here: the gate's
-            // semantics belong to Story 6.2's owners and the real fix is rung-2's
-            // stable `task_id` correlation. Fail-closed and self-explaining.
-
-            format!(
-                "delegation emit/route failed: {e}\n  \
-                 hint: if this is EOrchestratorDispatchRawOutput, a previous run's \
-                 TaskComplete row is inside FR21's 60s window on this MAOS_HOME. Use a \
-                 fresh data home or wait out the window; see the j1-crosshost-1a dev \
-                 record (filed against the Epic-14 decision queue)."
-            )
-        })?;
+        // Story 19-7 (D-19-7-09 A) — keep a copy for the re-pin hold ONLY when a hold
+        // is armed on the cross-host arm (no clone otherwise). It is the frame the
+        // emit below journals and routes: `deliver_typed` rewrites only a
+        // `DecisionDispatch` payload (I12 decoration) or an EMPTY lineage, and the
+        // delegation `TaskAssign` carries a non-empty lineage (`assign_frame_remote`
+        // refuses an empty one).
+        let held = (self.repin_hold.is_some() && self.cross_host.is_some()).then(|| frame.clone());
+        if let Err(error) = iac.deliver_typed(frame, 0, None).await {
+            let hold = match (self.repin_hold, self.cross_host.as_ref(), held) {
+                (Some(hold), Some(router), Some(held)) => awaiting_repin_peer(&error)
+                    .and_then(|peer| {
+                        held.to
+                            .iter()
+                            .filter_map(|addr| addr.host_id.as_ref())
+                            .find(|host| host.as_str() == peer)
+                            .cloned()
+                    })
+                    .map(|peer| (hold, router, held, peer)),
+                _ => None,
+            };
+            let Some((hold, router, held, peer)) = hold else {
+                return Err(emit_failure(error));
+            };
+            return match hold_for_repin(&**router, held, &peer, hold, error).await {
+                RepinHoldOutcome::Delivered => Ok(DelegationOutcome::SentCrossHost { frame_id }),
+                RepinHoldOutcome::Refused { resends, error } => Err(format!(
+                    "delegation re-pin hold ended on a different refusal after {resends} \
+                     re-send(s) of frame {}: {error}",
+                    hex16(frame_id)
+                )),
+                RepinHoldOutcome::TimedOut { resends, last } => Err(format!(
+                    "delegation re-pin hold expired after {:?} and {resends} re-send(s); frame {} \
+                     was never delivered. Last refusal: {last}. Host {} must run `maosctl a2a \
+                     repin approve {FROM_HOST} --boot-nonce {}` while this sender holds; a re-run \
+                     mints a NEW boot nonce, which that host sees as another restart.",
+                    hold.timeout,
+                    hex16(frame_id),
+                    peer.as_str(),
+                    hold.own_boot_nonce
+                )),
+            };
+        }
 
         // The cross-host arm ends HERE. `route_outbound` has put the frame on a
         // real mTLS socket; there is no local intake sink to pump from and no goal
@@ -724,7 +883,7 @@ pub async fn handle_one_inbound(
     .map_err(|e| format!("host B worker spawn_blocking join failed: {e}"))?
     .map_err(|e| format!("host B worker run failed: {e}"))?;
 
-    let label = completion.label().to_string();
+    let label = completion.completion.label().to_string();
     let outcome_frame_id = leg.journal_inbound_outcome(iac, frame_id, &label).await?;
     Ok(HostBOutcome::Ran {
         frame_id,
@@ -786,6 +945,91 @@ pub async fn serve_host_b_intake(
 /// a frame id carries no payload.
 fn hex16(frame_id: [u8; 16]) -> String {
     frame_id.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The emit/route failure [`DelegationLeg::delegate`] reports when no re-pin hold
+/// takes the refusal.
+fn emit_failure(error: IacBusError) -> String {
+    // FOUND BY j1-crosshost-1a, owned elsewhere: FR21's gate
+    // (`maos-iac/src/adapter/orchestrator_dispatch.rs`) treats ANY
+    // `TaskComplete` row inside a 60s WALL-CLOCK window as a predecessor of
+    // an Orchestrator `TaskAssign`. That proxy cannot tell "a follow-up
+    // inside one fan-out" from "the first dispatch of a NEW process", so a
+    // second `maos run` on the same data home within 60s is refused even
+    // though this dispatch references nothing (`prior_distillate_ref: None`,
+    // empty `scope`) — which is not the case
+    // `docs-site/docs/errors/EOrchestratorDispatchRawOutput.md` describes.
+    // j1-crosshost-1a was the FIRST production emitter of such a frame, so
+    // it is where the false positive became reachable. It is NOT relaxed,
+    // faked with a synthetic distillate, or routed around here: the gate's
+    // semantics belong to Story 6.2's owners and the real fix is rung-2's
+    // stable `task_id` correlation. Fail-closed and self-explaining.
+    format!(
+        "delegation emit/route failed: {error}\n  \
+         hint: if this is EOrchestratorDispatchRawOutput, a previous run's \
+         TaskComplete row is inside FR21's 60s window on this MAOS_HOME. Use a \
+         fresh data home or wait out the window; see the j1-crosshost-1a dev \
+         record (filed against the Epic-14 decision queue)."
+    )
+}
+
+/// Story 19-7 (D-19-7-09 A) — hold on an awaiting-re-pin refusal and re-send.
+///
+/// Prints the consent the peer's operator must give, then re-sends `frame` — the
+/// row the emit already journaled — straight through the installed router, so no
+/// second emit row is written. Schedule: sleep `resend_interval` (clipped to the
+/// time left), re-send, repeat. Ends on the first ACK, the first refusal that is
+/// NOT the awaiting-re-pin refusal, or when `timeout` (measured from the first
+/// refusal) has elapsed; no re-send starts after the deadline, and one already in
+/// flight is bounded by the transport's own partition timeout.
+async fn hold_for_repin(
+    router: &dyn A2ARouter,
+    frame: IacFrame,
+    peer: &maos_spirit_abi::identity::HostId,
+    hold: RepinHold,
+    refusal: IacBusError,
+) -> RepinHoldOutcome {
+    let frame_hex = hex16(frame.frame_id);
+    let nonce = hold.own_boot_nonce;
+    eprintln!(
+        "maos: re-pin hold — peer {} refused frame {frame_hex} as a restart of peer {FROM_HOST} \
+         (this sender's boot_nonce {nonce}, decimal): {refusal}",
+        peer.as_str()
+    );
+    eprintln!(
+        "maos: re-pin hold — on host {}, the operator consents with:",
+        peer.as_str()
+    );
+    eprintln!("maosctl a2a repin approve {FROM_HOST} --boot-nonce {nonce}");
+    eprintln!(
+        "maos: re-pin hold — re-sending the same frame every {:?} for up to {:?}; ends on ACK, \
+         a different refusal, or expiry",
+        hold.resend_interval, hold.timeout
+    );
+    // `RepinHold::new` caps `timeout` at one day, so this cannot overflow.
+    let deadline = tokio::time::Instant::now() + hold.timeout;
+    let mut last = refusal;
+    let mut resends: u32 = 0;
+    loop {
+        let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+        tokio::time::sleep(hold.resend_interval.min(left)).await;
+        if tokio::time::Instant::now() >= deadline {
+            return RepinHoldOutcome::TimedOut { resends, last };
+        }
+        resends = resends.saturating_add(1);
+        match router.route_outbound(frame.clone(), peer).await {
+            Ok(()) => {
+                eprintln!(
+                    "maos: re-pin hold — peer {} ACKed frame {frame_hex} on re-send {resends}; \
+                     delivered",
+                    peer.as_str()
+                );
+                return RepinHoldOutcome::Delivered;
+            }
+            Err(error) if awaiting_repin_peer(&error).is_some() => last = error,
+            Err(error) => return RepinHoldOutcome::Refused { resends, error },
+        }
+    }
 }
 
 /// The `developer-remote` → `orchestrator` completion frame. Same-host on both

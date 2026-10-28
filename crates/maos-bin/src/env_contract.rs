@@ -29,10 +29,16 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         // because a remote worker cannot inherit local env, so the task must be
         // frame-borne, and check-j1-loopback-delegation reds any such read as a
         // "decorative-frame shortcut".
+        //
+        // Story 19-1 (D-19-1-02 A): cross-host ONLY. On the loopback arm the
+        // goal is `--epic <file>` (one `### Story` section per host-bearing
+        // Worker) or, without it, the rehearsal string; a set value there is
+        // refused typed, naming `--epic`, rather than silently dropped (F7).
         name: "MAOS_DELEGATED_GOAL",
         purpose: "Operator-supplied goal for the delegated worker task (frame-borne; \
-                  REQUIRED on the cross-host arm, falls back to the founder-loop \
-                  rehearsal string on loopback)",
+                  REQUIRED on the cross-host arm; on loopback the goal is each `--epic \
+                  <file>` section, else the founder-loop rehearsal string, and a set value \
+                  is refused naming `--epic`)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {
@@ -50,10 +56,13 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         // Bounded, and it FAILS CLOSED: on timeout host A refuses to dial rather
         // than spending its single non-retryable connect attempt on a host B
-        // that is not listening.
+        // that is not listening. Story 19-7 (D-19-7-09 A): set ⇒ it also arms the
+        // sender's re-pin hold (re-send the same frame on a restart refusal until
+        // ACK); unset ⇒ no re-pin hold, the refusal exits at once.
         name: "MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS",
         purpose: "Bound on the cross-host pairing hold in seconds (default 300); \
-                  expiry fails the run closed rather than dialling blind",
+                  expiry fails the run closed rather than dialling blind. When set, \
+                  also bounds the sender's re-pin hold after a restart refusal",
         stability: EnvStability::UserFacing,
     },
     EnvVar {
@@ -181,6 +190,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_SCENE_HOLD_FILE",
         purpose: "Test-only: a Butler scene waits before each day after its first while this file exists, so a process witness can drive the operator door mid-scene (Story 18-4 review ruling D-18-4-R3)",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_TEST_ONLY_HALT_BEFORE_SECTION",
+        purpose: "Debug-build-only: before the named 1-based `--epic` section, raise a real pending halt for the Orchestrator's pid so the pre-assign halt check is proven red (Story 19-1 AC4.3(b)); release builds never read it",
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {

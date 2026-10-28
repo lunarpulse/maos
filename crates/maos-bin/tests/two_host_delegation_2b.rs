@@ -757,6 +757,7 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
             live: false,
             once: true,
             scene: None,
+            epic: None,
         },
         transparency_log: log,
         capability,

@@ -21,8 +21,12 @@
 //!     host-B restart with the corrected pin lets an honest frame ACK. The
 //!     first-vs-second DIFFERENT wire code (-32004 restart-detected, then
 //!     -32002 pin-mismatch-not-pinned) is pinned in-process against the real
-//!     TOFU store, because the intake NACK deliberately journals nothing
-//!     ("a -32004 refusal writes no TL row on host B — only the sender learns").
+//!     TOFU store, because the intake NACK journals no frame row on host B.
+//!  4. `restart_refusal_is_repinned_by_operator_consent_then_delivered` —
+//!     story 19-7 AC1, the re-pin twin of vector 3: B boots first with its door
+//!     bound, A pins B's real nonce, B journals one `a2a:repin-requested` row
+//!     for A's restart, A holds and re-sends, and `maosctl a2a repin approve`
+//!     on B's door is what lets the same frame ACK — no B restart.
 //!
 //! Plus the two fail-closed hold vectors from §A6 P2/P4: expiry refuses to
 //! dial, and a PRE-EXISTING ready file is refused before publication.
@@ -66,6 +70,18 @@ const NONCE_B: u64 = 0x2B_B;
 /// V3's wrong pin: non-zero (a zero nonce is refused by bind on both sides),
 /// and deliberately different from `NONCE_A` which host A actually runs with.
 const WRONG_NONCE_PINNED_FOR_A: u64 = 0x2B_DEAD;
+/// Vector 4's pin for A on host B: non-zero (bind refuses zero) and a
+/// placeholder by construction — A boots SECOND with a random nonce, so B
+/// cannot pre-pair it and A's first contact is a detected restart.
+const PLACEHOLDER_NONCE_FOR_A: u64 = 0x19_7;
+/// Vector 4's re-pin hold bound on host A. Long enough for list + approve
+/// (sub-second each), short enough that the proven-red plant (no approve)
+/// fails inside the f4 binary's budget when the hold expires.
+const REPIN_HOLD_SECS: u64 = 20;
+/// Vector 4's operator door bearer on host B (env pair, never `control.json`).
+const REPIN_DOOR_TOKEN: &str = "f4-pairing-19-7-repin-operator-token";
+const OPERATOR_LISTENING_MARKER: &str = "maos: operator HTTP listening on ";
+const REPIN_ACTOR: &str = "f4-pairing-v4-operator";
 
 struct Fixture {
     dir: PathBuf,
@@ -303,6 +319,12 @@ fn build_fixture_binary(_label: &str) {
 }
 
 fn host_a_config(fixture: &Fixture, port_b: u16) -> PathBuf {
+    host_a_config_pinning(fixture, port_b, NONCE_B)
+}
+
+/// Host A's config with B's pinned nonce as a parameter: vector 4 pins the
+/// nonce B actually booted with, read from B's own Transparency Log.
+fn host_a_config_pinning(fixture: &Fixture, port_b: u16, nonce_b: u64) -> PathBuf {
     write_daemon_config(
         fixture,
         "host-a",
@@ -310,7 +332,7 @@ fn host_a_config(fixture: &Fixture, port_b: u16) -> PathBuf {
         &fixture.a_key,
         delegation::TO_HOST,
         &fixture.b_fingerprint,
-        NONCE_B,
+        nonce_b,
         &format!("tls://127.0.0.1:{port_b}"),
         false,
         "127.0.0.1:0",
@@ -333,6 +355,13 @@ fn host_b_config(fixture: &Fixture, pinned_nonce_for_a: u64, listen_addr: &str) 
 }
 
 fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
+    let mut command = daemon_command_random_nonce(config, audit_db);
+    command.env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string());
+    command
+}
+
+/// Host B with its own per-process random boot nonce (no debug override).
+fn daemon_command_random_nonce(config: &Path, audit_db: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
         .env_clear()
@@ -345,7 +374,6 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
         .env("MAOS_COHORT_DAEMON_CONFIG", config)
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
-        .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -353,7 +381,15 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
     command
 }
 
-fn boot_until_listening(mut command: Command) -> Result<(RunningChild, u16), String> {
+fn boot_until_listening(command: Command) -> Result<(RunningChild, u16), String> {
+    boot_until_listening_captured(command).map(|(child, port, _pipes)| (child, port))
+}
+
+/// [`boot_until_listening`] that keeps the daemon's captured output, so a
+/// caller can scrape earlier announcements (vector 4: the operator door).
+fn boot_until_listening_captured(
+    mut command: Command,
+) -> Result<(RunningChild, u16, CapturedPipes), String> {
     let mut child = command
         .spawn()
         .map_err(|error| format!("spawn daemon: {error}"))?;
@@ -371,7 +407,7 @@ fn boot_until_listening(mut command: Command) -> Result<(RunningChild, u16), Str
                     .and_then(|(_, address)| address.trim().rsplit(':').next())
                     .and_then(|port| port.parse::<u16>().ok())
                 {
-                    return Ok((RunningChild(child), port));
+                    return Ok((RunningChild(child), port, pipes));
                 }
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
@@ -507,6 +543,19 @@ fn spawn_host_a_streaming(
     ready_file: &Path,
     timeout_secs: u64,
 ) -> (RunningChild, CapturedPipes) {
+    spawn_host_a_holding(config, audit_db, goal, Some(ready_file), timeout_secs)
+}
+
+/// Host A streaming with `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` set, which also
+/// arms the story 19-7 re-pin hold. `ready_file: None` (vector 4) leaves the
+/// rendezvous barrier off: B is already listening, so A dials at once.
+fn spawn_host_a_holding(
+    config: &Path,
+    audit_db: &Path,
+    goal: &str,
+    ready_file: Option<&Path>,
+    timeout_secs: u64,
+) -> (RunningChild, CapturedPipes) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
         .env_clear()
@@ -524,7 +573,6 @@ fn spawn_host_a_streaming(
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_DELEGATED_GOAL", goal)
-        .env("MAOS_CROSSHOST_PAIRING_READY_FILE", ready_file)
         .env(
             "MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS",
             timeout_secs.to_string(),
@@ -532,6 +580,9 @@ fn spawn_host_a_streaming(
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if let Some(ready_file) = ready_file {
+        command.env("MAOS_CROSSHOST_PAIRING_READY_FILE", ready_file);
+    }
     add_t3_environment(&mut command);
     let mut child = command.spawn().expect("spawn streaming host A");
     let stderr = child.stderr.take().expect("A stderr piped");
@@ -999,8 +1050,9 @@ fn wrong_nonce_is_refused_and_recovery_requires_a_b_restart() {
 /// the restart-detected arm (`invalidate_if_boot_nonce_differs` → Some(prior)),
 /// and the second contact then fails at `verify_pinned` because the pin is
 /// `Invalidated::SpiritRestarted` — exactly the router's `-32004`-then-`-32002`
-/// cascade (`router.rs:1313`, `router.rs:1343`), which deliberately journals
-/// nothing on the receiver.
+/// cascade (`router.rs:1313`, `router.rs:1343`). The receiver journals no
+/// frame row for the refused frame; since story 19-7 it journals one
+/// `a2a:repin-requested` TelemetryEvent detection row (vector 4 asserts it).
 #[tokio::test]
 async fn wrong_nonce_cascade_is_restart_detected_then_pin_mismatch() {
     use maos_a2a_core::tofu::{InMemoryTofuPinStore, TofuPinStore};
@@ -1035,4 +1087,373 @@ async fn wrong_nonce_cascade_is_restart_detected_then_pin_mismatch() {
         second.to_string().contains("Spirit restarted"),
         "the refusal must name the restart invalidation; got: {second}"
     );
+}
+
+// ── Vector 4 — story 19-7: the restart refusal is re-pinned by consent ──────
+
+/// `maosctl` against host B's door through the env pair (`resolve_door`: both
+/// or neither). B binds its door on an ephemeral port, so no `control.json`
+/// names it; the HOME is the doorless one, so nothing else can be discovered.
+/// Bounded by maosctl's own per-route budget.
+fn maosctl_on_door(door: &str, args: &[&str]) -> std::process::Output {
+    Command::new(fixtures::profile_binary("maosctl"))
+        .env_clear()
+        .env("HOME", doorless_home::doorless_home())
+        .env("MAOS_OPERATOR_HTTP_ENDPOINT", door)
+        .env("MAOS_OPERATOR_BEARER_TOKEN", REPIN_DOOR_TOKEN)
+        .env("NO_COLOR", "1")
+        .args(args)
+        .output()
+        .expect("run maosctl")
+}
+
+/// `(rowid, payload)` of every `a2a:repin-requested` row, oldest first.
+fn repin_requested_rows(db: &Path) -> Vec<(i64, String)> {
+    let connection = rusqlite::Connection::open(db).expect("open transparency log");
+    let mut statement = connection
+        .prepare(
+            "SELECT rowid, CAST(payload_redacted AS TEXT) FROM transparency_log \
+             WHERE intent = 'a2a:repin-requested' ORDER BY rowid",
+        )
+        .expect("prepare detection-row query");
+    statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .expect("query detection rows")
+        .collect::<Result<_, _>>()
+        .expect("read detection rows")
+}
+
+/// `(actor, target, intent, decision, reasoning)` of every I4 Approval
+/// Decision Log row with capability `a2a.repin`, oldest first.
+fn repin_approval_rows(db: &Path) -> Vec<(String, String, String, i64, String)> {
+    let connection = rusqlite::Connection::open(db).expect("open transparency log");
+    let mut statement = connection
+        .prepare(
+            "SELECT actor, target, intent, decision, coalesce(reasoning, '') \
+             FROM approval_decision_log WHERE capability = 'a2a.repin' ORDER BY decision_id",
+        )
+        .expect("prepare approval-row query");
+    statement
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        })
+        .expect("query approval rows")
+        .collect::<Result<_, _>>()
+        .expect("read approval rows")
+}
+
+fn output_text(output: &std::process::Output) -> (String, String) {
+    (
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+/// Story 19-7 AC1 — the 2026-09-21 vector (D-19-7-10 A), vector 3's re-pin twin.
+///
+/// Host B boots FIRST (door bound by the env pair, random nonce), so host A
+/// pins B's REAL nonce, read from B's own `cohort:daemon-started` row. B's pin
+/// for A is a placeholder: A boots second with a random nonce, so B cannot
+/// pre-pair it and A's first contact is a detected restart. A
+/// (`maos run --once`, cross-host arm, re-pin hold armed by
+/// `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS`) holds and re-sends the SAME frame;
+/// only `maosctl a2a repin approve` on B's door lets it ACK — no B restart.
+///
+/// Proven red (AC1.3, planted in place by the parent): remove the CONSENT
+/// block below and A's hold expires after `REPIN_HOLD_SECS`, A exits non-zero,
+/// and B admits nothing.
+#[test]
+fn restart_refusal_is_repinned_by_operator_consent_then_delivered() {
+    if !t3_substrate::require_t3("F4 pairing V4 re-pin consent delegated Worker") {
+        return;
+    }
+    build_fixture_binary("V4");
+    let fixture = fixture("v4-repin");
+    let goal = "V4 — operator consent must deliver this held goal to host B";
+
+    // (a) B first: operator door bound, random nonce, placeholder pin for A.
+    let mut host_b_command = daemon_command_random_nonce(
+        &host_b_config(&fixture, PLACEHOLDER_NONCE_FOR_A, "127.0.0.1:0"),
+        &fixture.host_b_log,
+    );
+    host_b_command
+        .env("MAOS_OPERATOR_BEARER_TOKEN", REPIN_DOOR_TOKEN)
+        .env("MAOS_OPERATOR_HTTP_BIND", "127.0.0.1:0");
+    let (host_b, port_b, b_pipes) = boot_until_listening_captured(host_b_command)
+        .unwrap_or_else(|e| panic!("host B (door-bound) failed to boot: {e}"));
+    let b_boot = combined(&b_pipes.stdout, &b_pipes.stderr);
+    let door = b_boot
+        .lines()
+        .find_map(|line| line.split_once(OPERATOR_LISTENING_MARKER))
+        .map(|(_, address)| address.trim().to_owned())
+        .unwrap_or_else(|| panic!("host B must announce its operator door:\n{b_boot}"));
+    let nonce_b = sql_i64(
+        &fixture.host_b_log,
+        "SELECT boot_nonce FROM transparency_log WHERE intent = ?1 ORDER BY rowid LIMIT 1",
+        "cohort:daemon-started",
+    )
+    .unwrap_or_else(|| panic!("host B must journal its `cohort:daemon-started` row:\n{b_boot}"))
+        as u64;
+    assert_ne!(
+        nonce_b, 0,
+        "host B's per-process boot nonce must be non-zero"
+    );
+
+    // (b) A second: random nonce, B's real nonce pinned, re-pin hold armed, no
+    // rendezvous barrier (B is already listening), so A dials at once.
+    let (mut host_a, a_pipes) = spawn_host_a_holding(
+        &host_a_config_pinning(&fixture, port_b, nonce_b),
+        &fixture.host_a_log,
+        goal,
+        None,
+        REPIN_HOLD_SECS,
+    );
+    let held = wait_for_output(
+        &a_pipes,
+        &format!(
+            "maosctl a2a repin approve {} --boot-nonce",
+            delegation::FROM_HOST
+        ),
+    );
+    let nonce_a = published_nonce(&held);
+    assert_ne!(
+        nonce_a, 0,
+        "host A's per-process boot nonce must be non-zero"
+    );
+    assert_ne!(
+        nonce_a, PLACEHOLDER_NONCE_FOR_A,
+        "A's random nonce collided with B's placeholder pin; no restart to detect"
+    );
+
+    // (c) B refused A's first contact as a restart (-32004, surfaced to A as
+    // the awaiting-re-pin invalidation) and A holds, printing the exact consent.
+    let refusal_line = held
+        .lines()
+        .find(|line| line.contains("maos: re-pin hold — peer ") && line.contains(" refused frame "))
+        .unwrap_or_else(|| panic!("host A must announce the re-pin hold:\n{held}"));
+    assert!(
+        refusal_line.contains(&format!("peer {} refused frame ", delegation::TO_HOST))
+            && refusal_line.contains(&format!(
+                "as a restart of peer {} (this sender's boot_nonce {nonce_a}, decimal)",
+                delegation::FROM_HOST
+            ))
+            && refusal_line.contains("pin invalidated — re-pin consent required"),
+        "the hold must name B, A's nonce and the restart invalidation:\n{held}"
+    );
+    let approve_line = format!(
+        "maosctl a2a repin approve {} --boot-nonce {nonce_a}",
+        delegation::FROM_HOST
+    );
+    assert!(
+        held.lines().any(|line| line.trim() == approve_line),
+        "host A must print the exact consent line `{approve_line}`:\n{held}"
+    );
+    // B journals ONE detection row (queued off intake, so poll a bounded while).
+    let detection_deadline = Instant::now() + Duration::from_secs(10);
+    let mut detections = repin_requested_rows(&fixture.host_b_log);
+    while detections.is_empty() && Instant::now() < detection_deadline {
+        thread::sleep(Duration::from_millis(50));
+        detections = repin_requested_rows(&fixture.host_b_log);
+    }
+    assert_eq!(
+        detections.len(),
+        1,
+        "host B must journal exactly one `a2a:repin-requested` row: {detections:?}"
+    );
+    let (detection_rowid, detection_payload) = detections[0].clone();
+    for field in [
+        format!("\"peer\":\"{}\"", delegation::FROM_HOST),
+        format!("\"prior_boot_nonce\":\"{PLACEHOLDER_NONCE_FOR_A}\""),
+        format!("\"observed_boot_nonce\":\"{nonce_a}\""),
+    ] {
+        assert!(
+            detection_payload.contains(&field),
+            "the detection row must carry {field}: {detection_payload}"
+        );
+    }
+    assert!(
+        host_a.0.try_wait().expect("poll host A").is_none(),
+        "host A must still be holding before consent:\n{}",
+        combined(&a_pipes.stdout, &a_pipes.stderr)
+    );
+    assert_eq!(
+        log_count_payloads_containing(&fixture.host_b_log, goal),
+        0,
+        "nothing may be admitted on B before the operator consents"
+    );
+
+    // (d) B's operator sees the request through the door.
+    let list = maosctl_on_door(&door, &["a2a", "repin", "list"]);
+    let (list_stdout, list_stderr) = output_text(&list);
+    assert!(
+        list.status.success(),
+        "`maosctl a2a repin list` must exit 0 (got {:?}); stdout:\n{list_stdout}\n\
+         stderr:\n{list_stderr}",
+        list.status.code()
+    );
+    let pending: serde_json::Value = serde_json::from_str(list_stdout.trim())
+        .unwrap_or_else(|e| panic!("the list must print the JSON array ({e}):\n{list_stdout}"));
+    let entry = pending
+        .as_array()
+        .and_then(|rows| {
+            rows.iter()
+                .find(|row| row["peer"].as_str() == Some(delegation::FROM_HOST))
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "the list must show {}:\n{list_stdout}",
+                delegation::FROM_HOST
+            )
+        });
+    assert_eq!(
+        entry["observed_boot_nonce"].as_str(),
+        Some(nonce_a.to_string().as_str()),
+        "the pending request must carry A's published nonce:\n{list_stdout}"
+    );
+
+    // (e) THE CONSENT — the AC1.3 proven-red plant removes exactly this block.
+    {
+        let nonce = nonce_a.to_string();
+        let approve = maosctl_on_door(
+            &door,
+            &[
+                "a2a",
+                "repin",
+                "approve",
+                delegation::FROM_HOST,
+                "--boot-nonce",
+                &nonce,
+                "--actor",
+                REPIN_ACTOR,
+            ],
+        );
+        let (approve_stdout, approve_stderr) = output_text(&approve);
+        assert!(
+            approve.status.success(),
+            "`maosctl a2a repin approve` must exit 0 (got {:?}); stdout:\n{approve_stdout}\n\
+             stderr:\n{approve_stderr}",
+            approve.status.code()
+        );
+        let reply: serde_json::Value = serde_json::from_str(approve_stdout.trim())
+            .unwrap_or_else(|e| panic!("approve must print the decision ({e}):\n{approve_stdout}"));
+        assert_eq!(
+            reply["decision"].as_str(),
+            Some("accepted"),
+            "{approve_stdout}"
+        );
+        assert_eq!(
+            reply["peer"].as_str(),
+            Some(delegation::FROM_HOST),
+            "{approve_stdout}"
+        );
+        assert_eq!(
+            reply["boot_nonce"].as_str(),
+            Some(nonce.as_str()),
+            "{approve_stdout}"
+        );
+        let approval_id = reply["approval_id"]
+            .as_str()
+            .filter(|id| id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()))
+            .unwrap_or_else(|| {
+                panic!("approve must print a 16-byte hex approval id:\n{approve_stdout}")
+            });
+        // CR-2: the I4 row is written BEFORE the pin moves, so before this 200.
+        assert!(
+            repin_approval_rows(&fixture.host_b_log)
+                .iter()
+                .any(|row| row.4.contains(&format!("approval_id={approval_id}"))),
+            "B's Approval Decision Log must hold the approval {approval_id} the door answered"
+        );
+    }
+
+    // (f) A's next re-send of the SAME frame ACKs; A exits 0, routed cross-host.
+    let exit_deadline = Instant::now() + Duration::from_secs(REPIN_HOLD_SECS + 15);
+    let mut status = None;
+    while Instant::now() < exit_deadline {
+        if let Some(exit) = host_a.0.try_wait().expect("poll host A exit") {
+            status = Some(exit);
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    let a_output = combined(&a_pipes.stdout, &a_pipes.stderr);
+    let status = status.unwrap_or_else(|| panic!("host A never exited its hold:\n{a_output}"));
+    assert!(
+        status.success(),
+        "after consent the held frame must ACK and host A exit 0:\n{a_output}"
+    );
+    let a_stdout = a_pipes.stdout.lock().expect("stdout capture lock").clone();
+    let frame_id = event_frame_id(&a_stdout, "delegation_routed")
+        .unwrap_or_else(|| panic!("the delivered frame must be routed:\n{a_output}"));
+    let frame_hex = hex::encode(frame_id);
+    assert!(
+        refusal_line.contains(&format!("refused frame {frame_hex} ")),
+        "the delivered frame must be the one B refused (no second emit):\n{a_output}"
+    );
+    assert!(
+        a_output.lines().any(|line| line.contains(&format!(
+            "maos: re-pin hold — peer {} ACKed frame {frame_hex} on re-send ",
+            delegation::TO_HOST
+        )) && line.trim_end().ends_with("; delivered")),
+        "host A must narrate the ACKed re-send:\n{a_output}"
+    );
+    assert!(
+        a_output.contains("\"transport\":\"cross-host-tcp-mtls\""),
+        "the consented crossing must report verified TCP routing:\n{a_output}"
+    );
+
+    // (g) B admitted the goal under A's frame id, after the detection, with
+    // one detection row and one I4 approval row for this restart.
+    let admit_deadline = Instant::now() + Duration::from_secs(10);
+    while log_count_payloads_containing(&fixture.host_b_log, goal) == 0
+        && Instant::now() < admit_deadline
+    {
+        thread::sleep(Duration::from_millis(50));
+    }
+    assert!(
+        log_count_payloads_containing(&fixture.host_b_log, goal) >= 1,
+        "host B must admit the delegated goal after consent"
+    );
+    let delivered_rowid = frame_rowid(&fixture.host_b_log, frame_id)
+        .unwrap_or_else(|| panic!("host B must journal the delivered frame {frame_hex}"));
+    assert!(
+        delivered_rowid > detection_rowid,
+        "B's frame row (rowid {delivered_rowid}) must follow the detection \
+         (rowid {detection_rowid})"
+    );
+    assert_eq!(
+        repin_requested_rows(&fixture.host_b_log).len(),
+        1,
+        "re-sends while the pin awaited consent must not journal further detections"
+    );
+    let approvals = repin_approval_rows(&fixture.host_b_log);
+    assert_eq!(
+        approvals.len(),
+        1,
+        "exactly one I4 re-pin decision: {approvals:?}"
+    );
+    let (actor, target, intent, decision, reasoning) = &approvals[0];
+    assert_eq!(
+        (actor.as_str(), target.as_str(), intent.as_str(), *decision),
+        (
+            REPIN_ACTOR,
+            delegation::FROM_HOST,
+            "nfr-rel-6.restart-repin",
+            1
+        ),
+        "the I4 row must record the operator's acceptance for A"
+    );
+    assert!(
+        reasoning.contains(&format!("prior_boot_nonce={PLACEHOLDER_NONCE_FOR_A};"))
+            && reasoning.contains(&format!("observed_boot_nonce={nonce_a};")),
+        "the I4 row must bind the consent to the detected nonces: {reasoning}"
+    );
+    drop(host_a);
+    drop(host_b);
 }

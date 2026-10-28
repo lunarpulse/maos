@@ -26,6 +26,8 @@ use std::path::Path;
 // ═══════════════════════════════════════════════════════════════════
 
 const TOPOLOGY: &str = "spirits/topologies/j1-founder-loop.toml";
+/// Story 19-1 D-19-1-11 A — leg 1's epic sub-check reads this topology.
+const EPIC_TOPOLOGY: &str = "spirits/topologies/j1-founder-loop-epic.toml";
 const DELEGATION_RS: &str = "crates/maos-bin/src/delegation.rs";
 const MAILBOX_RS: &str = "crates/maos-iac/src/adapter/mailbox.rs";
 const MAIN_RS: &str = "crates/maos-bin/src/main.rs";
@@ -59,6 +61,12 @@ const GOOD_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop\"\n\n\
      [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\n\
      host = \"developer-remote-host\"\n";
 
+const GOOD_EPIC_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop-epic\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n";
+
 /// j1-crosshost-1b AC2.2a — the repaired boundary leg reads the COMPOSITION ROOT,
 /// so this fixture must carry the loopback pairing call it keys on.
 const GOOD_DELEGATION: &str = "pub async fn install(mailbox: Arc<Mailbox>, intent: &A2AIntent) {\n\
@@ -72,7 +80,8 @@ const GOOD_MAILBOX: &str = "fn phase_three() {\n\
 
 const GOOD_MAIN: &str = "fn topology_loop() {\n\
      \x20   let frame = delegation_emitter.assign_frame_remote(seq, recipient, role);\n\
-     \x20   let goal = delegation_leg.delegate(&iac, frame).await?;\n}\n";
+     \x20   let goal = delegation_leg.delegate(&iac, frame).await?;\n\
+     \x20   let next = emitter.followup_dispatch_remote(seq, prior, to_host, from_host)?;\n}\n";
 
 const GOOD_ORCHESTRATOR: &str =
     "pub const DELEGATION_CONSENT_INTENT: &str = \"development-task:write-workspace\";\n\
@@ -156,6 +165,7 @@ fn write_file(root: &Path, rel: &str, content: &str) {
 /// Lay down a fixture tree that the gate must find GREEN.
 fn lay_green(root: &Path) {
     write_file(root, TOPOLOGY, GOOD_TOPOLOGY);
+    write_file(root, EPIC_TOPOLOGY, GOOD_EPIC_TOPOLOGY);
     write_file(root, DELEGATION_RS, GOOD_DELEGATION);
     write_file(root, MAILBOX_RS, GOOD_MAILBOX);
     write_file(root, MAIN_RS, GOOD_MAIN);

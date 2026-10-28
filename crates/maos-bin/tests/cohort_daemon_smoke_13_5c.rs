@@ -923,8 +923,10 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 17-4 — 27 → 28: `hook_pump.rs` joins it.
     // Story 18-1 — 28 → 29: `butler_root.rs` joins it.
     // Story 18-3 — 29 → 30: `researcher_root.rs` joins it.
+    // Story 19-7 — 31 → 32: `repin_door.rs` joins it.
+    // Story 19-1 — 32 → 33: `orchestrator_root.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 31] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 33] = [
         ("main.rs", include_str!("../src/main.rs")),
         (
             "skill_authoring.rs",
@@ -1050,6 +1052,17 @@ fn composition_root_does_not_seed_manifest_scopes() {
         (
             "researcher_root.rs",
             include_str!("../src/researcher_root.rs"),
+        ),
+        // Story 19-7 — the re-pin consent door. It reaches only the live
+        // transport's pin store and the Approval Decision Log, and must never
+        // seed the manifest-derived policy table.
+        ("repin_door.rs", include_str!("../src/repin_door.rs")),
+        // Story 19-1 — the Orchestrator's one construction, the `--epic` load
+        // and the per-section distillate. It must never seed the
+        // manifest-derived policy table.
+        (
+            "orchestrator_root.rs",
+            include_str!("../src/orchestrator_root.rs"),
         ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");

@@ -1,0 +1,40 @@
+{
+ "measured_at": "f34f6b4e (clean tree; crate sources identical to b35c9284 and, for the crates below, to f889b3e4 \u2014 `git diff --stat f889b3e4..HEAD -- crates` touches only kernel t3/spawn.rs in src)",
+ "date": "2026-10-28",
+ "instrument": "tokei 14.0.0 (the CI pin) with the exact argv of xtask/src/kloc_check.rs:294-318: --output json --types Rust -e target -e tests -e benches -e examples -e fuzz -e spirits -e crates/maos-kernel-core/src/memory/spill_test_faults.rs . \u2014 NOT `cargo run -p xtask -- kloc-check --json` (no cargo run by this creator; the parent confirms with kloc-check)",
+ "aggregate_code": 188504,
+ "crates": {
+  "maos-a2a-core": 4928,
+  "maos-a2a-tcp": 1442,
+  "maos-control": 1344,
+  "maos-cli": 6155,
+  "maos-bin": 29497,
+  "maos-cohort": 5873,
+  "maos-iac": 8270,
+  "maos-domain": 9975,
+  "maos-kernel-core": 20619,
+  "xtask": 47422
+ },
+ "pins": {
+  "maos-a2a-core": "4928 exact (xtask/kloc.toml:470)",
+  "maos-a2a-tcp": "1621 ceiling (:475)",
+  "maos-control": "1791 reserved ceiling (:484)",
+  "maos-cli": "6856 reserved ceiling (:489)",
+  "maos-bin": "29497 exact (:517)",
+  "maos-cohort": "5873 (:661)",
+  "maos-kernel-core": "20619 exact (:264)",
+  "xtask": "47422 exact (:339)",
+  "_aggregate_hardfail": "188505 (:718)"
+ },
+ "files_touched_candidates": {
+  "crates/maos-cli/src/cli.rs": 494,
+  "crates/maos-bin/src/delegation.rs": 438,
+  "crates/maos-bin/src/cert_rotation.rs": 155,
+  "crates/maos-control/src/lib.rs": 1344,
+  "crates/maos-bin/src/operator_door.rs": 1755,
+  "crates/maos-a2a-core/src/tofu.rs": 634,
+  "crates/maos-a2a-core/src/router.rs": 1862,
+  "crates/maos-cli/src/subcommands.rs": 4849,
+  "crates/maos-bin/src/main.rs": 12614
+ }
+}

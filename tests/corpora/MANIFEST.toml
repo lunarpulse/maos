@@ -149,6 +149,17 @@ valid_until = "2027-10-25"
 prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
 description = "Story 18-2 NFR-Test-4 Researcher class corpus (symlink to spirits/researcher/tests/fixtures/halt-corpus-v0.5.jsonl): 30 claim-metadata scenarios (15 expected halts) scored by `maos eval halt --class researcher` through the kernel's epistemic policy; model_driven false (claim-metadata arithmetic); floors overall recall >= 0.70, precision >= 0.85. Also pinned by spirits/researcher/tests/halt_corpus_18_2.rs."
 
+# Story 19-1 AC5 (D-18-2-05 A, received) — the NFR-Test-4 Orchestrator class
+# corpus `maos eval halt --class orchestrator` scores (symlink into the
+# Spirit's fixtures, single source of truth; the Spirit-side pin test stays).
+[corpus."orchestrator-halt-corpus-v0.1"]
+sha256 = "aa6836655472ce142fd4dccdead7d7a9135d083fc97ee225838f78747709c038"
+schema_version = 1
+item_count = 30
+valid_until = "2027-10-28"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Story 19-1 AC5 NFR-Test-4 Orchestrator class corpus (symlink to spirits/orchestrator/tests/fixtures/halt-corpus-v0.1.jsonl): 30 single-section `### Story` epics (15 expected halts: acceptance criteria a Worker could build wrong; 15 testable as written), each carrying `completion` (cassette + sequence) and the `prompt_sha256` of `orchestrator::ambiguity_prompt(section)`. Replayed by `maos eval halt --class orchestrator` from crates/maos-journey-test/cassettes/j1/orchestrator-halt-corpus-v0.1.json through `Orchestrator::judge_ambiguity` and the kernel's `dispatch_ambiguity` halt (> 0.5); model_driven true; floors overall recall >= 0.70, precision >= 0.85. Also pinned by spirits/orchestrator/tests/halt_corpus_19_1.rs."
+
 # Story 18-3 (D-18-3-06 A, CR-5) — the frozen Researcher five-metric corpus
 # `maos eval distill --class researcher` replays (symlink into the Spirit's
 # fixtures, single source of truth). prompt_version_hash pins the live judge's

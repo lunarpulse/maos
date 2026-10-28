@@ -58,10 +58,19 @@ pub mod inference_mode;
 /// port — a binary-crate `mod` would force its proofs inline, which kloc
 /// charges and CI cannot run.
 pub mod operator_door;
+/// Story 19-1 — the Orchestrator's one construction, the `--epic` load, the
+/// pending-halt check and the per-section distillate at the Worker's pid.
+#[cfg(feature = "network")]
+pub mod orchestrator_root;
 /// Story 16-4 — authoritative MAOS footprint and offline purge implementation.
 pub mod purge;
 #[cfg(feature = "network")]
 pub mod recall_mediation;
+/// Story 19-7 — the re-pin consent door (the set-once control the operator
+/// door holds, the decision handler, the detection journal). UNGATED because
+/// the door is: `maos-a2a-core` is a non-optional edge. In the library so
+/// `crates/maos-bin/tests/` drives the real handler against a real pin store.
+pub mod repin_door;
 /// Story 18-3 — the Researcher's Inference Port seam and `--once` verdict.
 #[cfg(feature = "network")]
 pub mod researcher_root;

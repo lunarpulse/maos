@@ -15,11 +15,12 @@ use std::collections::HashMap;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs, GovernanceOp,
-    HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, LoadArgs, MigrateArgs,
-    MigrateOp, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice,
-    ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs,
-    SkillsArgs, SkillsOp, SpiritArgs, SpiritOp, Subcommand, UninstallArgs, UpgradePolicyArg,
+    A2aArgs, A2aOp, AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs,
+    GovernanceOp, HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, LoadArgs,
+    MigrateArgs, MigrateOp, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs,
+    PostureChoice, RepinArgs, RepinOp, ResolutionKindChoice, ResumeArgs, RevocationsArgs,
+    RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs, SpiritOp,
+    Subcommand, UninstallArgs, UpgradePolicyArg,
 };
 use crate::door_client::{self, DoorConfig, DoorError, DEFAULT_ROUTE_BUDGET, LONG_ROUTE_BUDGET};
 
@@ -52,6 +53,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Migrate(args) => dispatch_migrate(args, color),
         Subcommand::ReleasePubkey => release_pubkey(),
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
+        Subcommand::A2a(args) => dispatch_a2a(args),
     }
 }
 
@@ -149,9 +151,20 @@ fn door_verb(
     verb: &str,
     request: impl FnOnce(&DoorConfig) -> Result<door_client::Response, DoorError>,
 ) -> ExitCode {
+    door_verb_mapped(verb, request, |response| {
+        door_client::map_response(verb, response)
+    })
+}
+
+/// [`door_verb`] with a verb-specific 2xx/typed-refusal mapping.
+fn door_verb_mapped(
+    verb: &str,
+    request: impl FnOnce(&DoorConfig) -> Result<door_client::Response, DoorError>,
+    map: impl FnOnce(door_client::Response) -> ExitCode,
+) -> ExitCode {
     match door_client::resolve_door() {
         Ok(config) => match request(&config) {
-            Ok(response) => door_client::map_response(verb, response),
+            Ok(response) => map(response),
             Err(DoorError::ConnectRefused) => {
                 door_client::door_class_connect_refused(verb, config.endpoint)
             }
@@ -159,6 +172,62 @@ fn door_verb(
         },
         Err(error) => door_client::map_error(verb, error),
     }
+}
+
+/// Story 19-7 (AC3, D-19-7-01/02/03 A) — `maosctl a2a repin`: door-class
+/// verbs, because the pin store lives only in the cohort A2A daemon (a fresh
+/// process would build its own store and leave the live mesh untouched).
+fn dispatch_a2a(args: &A2aArgs) -> ExitCode {
+    let A2aOp::Repin(RepinArgs { op }) = &args.op;
+    let (verb, decision, approve) = match op {
+        RepinOp::List => {
+            let verb = "a2a repin list";
+            return door_verb_mapped(
+                verb,
+                |config| {
+                    door_client::exchange(
+                        config,
+                        "GET",
+                        "/v1/a2a/repins",
+                        None,
+                        DEFAULT_ROUTE_BUDGET,
+                    )
+                },
+                |response| door_client::map_repin_response(verb, None, response),
+            );
+        }
+        RepinOp::Approve(decision) => ("a2a repin approve", decision, true),
+        RepinOp::Reject(decision) => ("a2a repin reject", decision, false),
+    };
+    if let Some(code) = checked_id(verb, &decision.peer) {
+        return code;
+    }
+    let sent = door_client::RepinDecisionRequest {
+        approve,
+        boot_nonce: decision.boot_nonce.to_string(),
+        actor: resolve_actor(decision.actor.as_deref()),
+    };
+    let body = match serde_json::to_vec(&sent) {
+        Ok(body) => body,
+        Err(error) => {
+            eprintln!("maosctl: {verb} — {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let peer = decision.peer.as_str();
+    door_verb_mapped(
+        verb,
+        |config| {
+            door_client::exchange(
+                config,
+                "POST",
+                &format!("/v1/a2a/repins/{peer}"),
+                Some(("application/json", &body)),
+                DEFAULT_ROUTE_BUDGET,
+            )
+        },
+        |response| door_client::map_repin_response(verb, Some((peer, &sent)), response),
+    )
 }
 
 /// Durable verb (AC5 / D-16-1-D / V-18): the door when it answers, the

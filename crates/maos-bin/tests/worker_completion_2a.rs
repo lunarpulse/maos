@@ -871,17 +871,20 @@ mod planted_refusal {
         p
     }
 
-    /// A topology whose single member is the `[cli_wrapper]` worker, with `host`
-    /// set so the delegation is FRAME-BORNE. Without `host` the delegated task is
-    /// `None`, the completion enforcement is skipped entirely, and the vector
-    /// would pass vacuously.
+    /// A topology whose delegated member is the `[cli_wrapper]` worker, with
+    /// `host` set so the delegation is FRAME-BORNE. Without `host` the delegated
+    /// task is `None`, the completion enforcement is skipped entirely, and the
+    /// vector would pass vacuously. Story 19-1 (D-19-1-04 A): the loaded
+    /// Orchestrator emits the frame, so it is listed first.
     fn write_topology(root: &std::path::Path, worker: &std::path::Path) -> std::path::PathBuf {
         let p = root.join("topology.toml");
         std::fs::write(
             &p,
             format!(
                 "[topology]\nname = \"crosshost-2a-planted-refusal\"\n\n\
+                 [[topology.spirits]]\nmanifest = \"{}/spirits/orchestrator/manifest.toml\"\n\n\
                  [[topology.spirits]]\nmanifest = \"{}\"\nhost = \"developer-remote-host\"\n",
+                workspace_root(),
                 worker.display()
             ),
         )

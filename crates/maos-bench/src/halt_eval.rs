@@ -6,18 +6,23 @@
 //! Per corpus row: a fresh kernel world (capability registry with the
 //! class's manifest scopes, in-memory Transparency Log, temp journal,
 //! `WorkingMemoryOrchestrator`), the class's real producer, and the kernel's
-//! `process_scalar_write` under the class's `[epistemic_policy]`. Butler is
-//! driven through its 18-1 seam: one bound `on_idle` pass whose Inference
-//! Port is the kernel `InferencePortAdapter` over the given router, with a
-//! token minted for Butler's first declared provider. The kernel-free
-//! scorer and the sidecar body are `maos_eval::halt_replay`'s.
+//! `process_scalar_write` under the class's `[epistemic_policy]`. The
+//! model-driven classes share ONE runner (D-19-1-13 A): per row the kernel
+//! `InferencePortAdapter` over the given router, with a token minted for the
+//! class's first declared provider. Butler is driven through its 18-1 seam
+//! (one bound `on_idle` pass); the Orchestrator through
+//! `Orchestrator::judge_ambiguity` over the row's one `### Story` section
+//! (Story 19-1 AC5). The kernel-free scorer and the sidecar body are
+//! `maos_eval::halt_replay`'s. The corpus and the committed cassette resolve
+//! against the compile-time workspace root (D-19-1-15 A), so a run works from
+//! any cwd inside the checkout.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use butler::{Butler, ButlerInferenceBinding, ScenarioInput};
+use butler::{Butler, ButlerInferenceBinding, InferenceMint, ScenarioInput};
 use maos_domain::halt::HaltReceipt;
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
@@ -50,16 +55,26 @@ use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 use maos_spirit_abi::ctx::{CapabilityHandle, Ctx, MailboxHandle};
 use maos_spirit_abi::lifecycle::Spirit;
+use orchestrator::{split_epic, Orchestrator, OrchestratorInferenceBinding};
 use researcher::{ClaimPayload, RecalledFrame, Researcher};
 
 pub(crate) const EVAL_PID: u32 = 1;
 const BOOT_NONCE: u64 = 0x18_02;
+
+/// The compile-time workspace root (D-19-1-15 A): `CLASSES` paths are
+/// relative to it, never to the cwd.
+const WORKSPACE_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+fn at_root(rel: &str) -> PathBuf {
+    Path::new(WORKSPACE_ROOT).join(rel)
+}
 
 /// Which producer a class's rows are scored through.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Composition {
     Butler,
     Researcher,
+    Orchestrator,
 }
 
 /// One row of the class table (CR-5).
@@ -79,7 +94,7 @@ pub struct HaltClass {
     composition: Composition,
 }
 
-/// THE class table. The Orchestrator class is received by
+/// THE class table. The Orchestrator class was received by
 /// `19-1-orchestrator-dispatch-loop-and-epic-input` AC5 (D-18-2-05 A).
 pub const CLASSES: &[HaltClass] = &[
     HaltClass {
@@ -113,9 +128,24 @@ pub const CLASSES: &[HaltClass] = &[
         manifest: include_str!("../../../spirits/researcher/manifest.toml"),
         composition: Composition::Researcher,
     },
+    HaltClass {
+        name: "orchestrator",
+        corpus: "spirits/orchestrator/tests/fixtures/halt-corpus-v0.1.jsonl",
+        cassette: Some("crates/maos-journey-test/cassettes/j1/orchestrator-halt-corpus-v0.1.json"),
+        floors: ClassFloors {
+            halt_recall_calendar_conflict: None,
+            halt_recall_overall: NFR_TEST_4_RECALL_FLOOR,
+            halt_precision_overall: HALT_PRECISION_FLOOR,
+        },
+        not_model_driven: None,
+        calendar_conflict_basis: None,
+        manifest: include_str!("../../../spirits/orchestrator/manifest.toml"),
+        composition: Composition::Orchestrator,
+    },
 ];
 
-const USAGE: &str = "usage: maos eval halt --class <butler|researcher> [--cassette <path>]";
+const USAGE: &str =
+    "usage: maos eval halt --class <butler|researcher|orchestrator> [--cassette <path>]";
 
 /// A parsed `maos eval halt` invocation.
 #[derive(Debug)]
@@ -178,15 +208,15 @@ impl EvalRequest {
     /// The cassette a replay run reads: `--cassette` (else
     /// `MAOS_REPLAY_CASSETTE`), else the class's.
     pub fn replay_cassette(&self) -> Option<PathBuf> {
-        let committed = self.class.cassette.map(PathBuf::from);
+        let committed = self.class.cassette.map(at_root);
         (!self.record).then(|| self.cassette.clone().or(committed))?
     }
 
     /// D-18-2-R2: only a record run or a replay of the class's committed
     /// cassette publishes the class sidecar; an override prints numbers only.
     pub fn publishes_sidecar(&self) -> bool {
-        let same = |a: &std::path::Path, b: &str| matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(a), Ok(b)) if a == b);
-        let committed = |c: &PathBuf| self.class.cassette.is_some_and(|k| same(c, k));
+        let same = |a: &Path, b: &Path| matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(a), Ok(b)) if a == b);
+        let committed = |c: &PathBuf| self.class.cassette.is_some_and(|k| same(c, &at_root(k)));
         self.record || self.cassette.as_ref().map_or(true, committed)
     }
 }
@@ -234,28 +264,44 @@ pub fn evaluate(req: &EvalRequest, completions: Option<Completions>) -> Result<E
     };
     let policy = EpistemicPolicySection::from_toml_str(&table("epistemic_policy")?)
         .map_err(|e| format!("{} [epistemic_policy]: {e}", class.name))?;
-    let bytes = std::fs::read(class.corpus).map_err(|e| format!("corpus {}: {e}", class.corpus))?;
+    let bytes = std::fs::read(at_root(class.corpus))
+        .map_err(|e| format!("corpus {}: {e}", class.corpus))?;
     let text = String::from_utf8(bytes).map_err(|e| format!("corpus {}: {e}", class.corpus))?;
     let lines = text.lines().filter(|l| !l.trim().is_empty());
+    let declared = || -> Result<Vec<Scope>, String> {
+        Ok(capabilities_required_to_scopes(
+            &CapabilitiesRequired::from_toml_str(&required(&manifest)?)
+                .map_err(|e| format!("{} [capabilities.required]: {e}", class.name))?,
+        ))
+    };
 
     let (rows, verdicts, cassette) = match class.composition {
-        Composition::Butler => {
-            let rows = lines
-                .map(parse_row)
-                .collect::<Result<Vec<ButlerRow>, _>>()?;
-            let completions = completions.ok_or("the butler class replays completions")?;
-            let declared = capabilities_required_to_scopes(
-                &CapabilitiesRequired::from_toml_str(&required(&manifest)?)
-                    .map_err(|e| format!("butler [capabilities.required]: {e}"))?,
-            );
-            let (verdicts, cassette) =
-                butler_verdicts(class, &rows, &policy, declared, completions)?;
-            (
-                rows.into_iter().map(|r| r.head).collect(),
-                verdicts,
-                Some(cassette),
-            )
-        }
+        Composition::Butler => model_verdicts(
+            class,
+            lines,
+            declared()?,
+            completions,
+            |row: &ButlerInput, world, port, provider_id, mint| {
+                butler_pass(&row.input, world, port, provider_id, mint, &policy)
+            },
+        )?,
+        Composition::Orchestrator => model_verdicts(
+            class,
+            lines,
+            declared()?,
+            completions,
+            |row: &OrchestratorInput, world, port, provider_id, mint| {
+                orchestrator_pass(
+                    &row.section,
+                    world,
+                    port,
+                    provider_id,
+                    mint,
+                    class.name,
+                    &policy,
+                )
+            },
+        )?,
         Composition::Researcher => {
             let rows = lines
                 .map(parse_row)
@@ -353,12 +399,26 @@ fn parse_row<T: serde::de::DeserializeOwned>(line: &str) -> Result<T, String> {
     serde_json::from_str(line).map_err(|e| format!("corpus row: {e}"))
 }
 
+/// A model-driven class's row: the scored head, the class's own input and
+/// the completion it replays (CR-3).
 #[derive(serde::Deserialize)]
-struct ButlerRow {
+struct ModelRow<I> {
     #[serde(flatten)]
     head: OnbScenario,
-    input: ScenarioInput,
+    #[serde(flatten)]
+    input: I,
     completion: CompletionRef,
+}
+
+#[derive(serde::Deserialize)]
+struct ButlerInput {
+    input: ScenarioInput,
+}
+
+/// Story 19-1 AC5 — one epic holding exactly one `### Story` section.
+#[derive(serde::Deserialize)]
+struct OrchestratorInput {
+    section: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -380,22 +440,38 @@ struct CassetteFacts {
     provenance: Option<String>,
 }
 
-/// One bound Butler pass per row (CR-2). A refused pass, a failed scalar
-/// write, or a run that consumed fewer completions than rows is an error.
-fn butler_verdicts(
+/// The shared model-driven runner (CR-2; D-19-1-13 A): per row a fresh
+/// world, the kernel `InferencePortAdapter` over the class router (counted)
+/// and an audited mint for the class's first declared provider; `pass` runs
+/// the class's real producer and reports whether the kernel halted. A refused
+/// pass, a failed scalar write, or a run that consumed fewer completions than
+/// rows is an error.
+fn model_verdicts<'a, I: serde::de::DeserializeOwned>(
     class: &HaltClass,
-    rows: &[ButlerRow],
-    policy: &EpistemicPolicySection,
+    lines: impl Iterator<Item = &'a str>,
     declared: Vec<Scope>,
-    completions: Completions,
-) -> Result<(BTreeMap<String, bool>, CassetteFacts), String> {
+    completions: Option<Completions>,
+    pass: impl Fn(&I, Arc<World>, Arc<Counted>, String, InferenceMint) -> Result<bool, String>,
+) -> Result<
+    (
+        Vec<OnbScenario>,
+        BTreeMap<String, bool>,
+        Option<CassetteFacts>,
+    ),
+    String,
+> {
+    let name = class.name;
+    let rows = lines
+        .map(parse_row)
+        .collect::<Result<Vec<ModelRow<I>>, _>>()?;
+    let completions = completions.ok_or_else(|| format!("the {name} class replays completions"))?;
     let provider = declared
         .iter()
         .find_map(|scope| match scope {
             Scope::ProviderInfer { provider } => Some(provider.clone()),
             _ => None,
         })
-        .ok_or("butler declares no inference provider")?;
+        .ok_or_else(|| format!("{name} declares no inference provider"))?;
     let (router, cassette, flush) = match completions {
         Completions::Replay { driver, cassette } => {
             let drivers = BTreeMap::from([(provider.clone(), driver)]);
@@ -429,39 +505,19 @@ fn butler_verdicts(
             ),
             consumed: Arc::clone(&consumed),
         });
-        let (capability, provider) = (Arc::clone(&world.capability), provider.clone());
-        let binding = ButlerInferenceBinding {
-            provider_id: provider.clone(),
-            mint: Arc::new(move || {
-                let scope = Scope::ProviderInfer {
-                    provider: provider.clone(),
-                };
-                capability
-                    .issue_with_mediation(EVAL_PID, scope, 60, [0; 32], IntentClass::Standard)
-                    .map(|token| (token, EVAL_PID))
-                    .map_err(|e| format!("token issue failed: {e}"))
-            }),
-        };
-        let scalar = Arc::new(ScalarPort {
-            world,
-            policy: policy.clone(),
-            outcome: Mutex::new(None),
+        let (capability, scoped) = (Arc::clone(&world.capability), provider.clone());
+        let mint: InferenceMint = Arc::new(move || {
+            let scope = Scope::ProviderInfer {
+                provider: scoped.clone(),
+            };
+            capability
+                .issue_with_mediation(EVAL_PID, scope, 60, [0; 32], IntentClass::Standard)
+                .map(|token| (token, EVAL_PID))
+                .map_err(|e| format!("token issue failed: {e}"))
         });
-        let butler = Butler::with_scenario(row.input.clone())
-            .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>)
-            .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))));
-        butler.on_idle(&mut Ctx::for_rust_inproc_hook(
-            CapabilityHandle(0),
-            MailboxHandle(0),
-        ));
-        if let Some(error) = butler.take_pass_error() {
-            return Err(format!("row {id}: pass refused: {error}"));
-        }
-        let written = scalar.outcome.lock().map_err(|e| e.to_string())?.take();
-        written
-            .ok_or_else(|| format!("row {id}: the pass wrote no scalar"))?
+        let halted = pass(&row.input, world, port, provider.clone(), mint)
             .map_err(|e| format!("row {id}: {e}"))?;
-        verdicts.insert(id.clone(), butler.last_halt_receipt().is_some());
+        verdicts.insert(id.clone(), halted);
     }
     check_consumed(consumed.load(Ordering::SeqCst), rows.len())?;
     if let Some(flush) = flush {
@@ -473,11 +529,73 @@ fn butler_verdicts(
         .get("provenance")
         .and_then(|p| p.as_str().map(str::to_owned));
     let facts = CassetteFacts {
-        path: cassette.display().to_string(),
+        path: (cassette.strip_prefix(WORKSPACE_ROOT).unwrap_or(&cassette))
+            .display()
+            .to_string(),
         sha256: sha256_hex(&bytes),
         provenance,
     };
-    Ok((verdicts, facts))
+    let heads = rows.into_iter().map(|r| r.head).collect();
+    Ok((heads, verdicts, Some(facts)))
+}
+
+/// One bound Butler pass (CR-2): `on_idle` writes the model-driven scalar
+/// through the row's world; the verdict is Butler's halt receipt.
+fn butler_pass(
+    input: &ScenarioInput,
+    world: Arc<World>,
+    port: Arc<Counted>,
+    provider_id: String,
+    mint: InferenceMint,
+    policy: &EpistemicPolicySection,
+) -> Result<bool, String> {
+    let scalar = Arc::new(ScalarPort {
+        world,
+        policy: policy.clone(),
+        outcome: Mutex::new(None),
+    });
+    let binding = ButlerInferenceBinding { provider_id, mint };
+    let butler = Butler::with_scenario(input.clone())
+        .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>)
+        .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))));
+    butler.on_idle(&mut Ctx::for_rust_inproc_hook(
+        CapabilityHandle(0),
+        MailboxHandle(0),
+    ));
+    if let Some(error) = butler.take_pass_error() {
+        return Err(format!("pass refused: {error}"));
+    }
+    let written = scalar.outcome.lock().map_err(|e| e.to_string())?.take();
+    written.ok_or("the pass wrote no scalar")??;
+    Ok(butler.last_halt_receipt().is_some())
+}
+
+/// One Orchestrator judgement (Story 19-1 AC5, D-19-1-12 A): the row's one
+/// `### Story` section through `judge_ambiguity`, its `dispatch_ambiguity`
+/// scalar through the kernel halt path. The harness writes the scalar itself
+/// (19-4 owns the live port); the verdict is the kernel's receipt.
+fn orchestrator_pass(
+    epic: &str,
+    world: Arc<World>,
+    port: Arc<Counted>,
+    provider_id: String,
+    mint: InferenceMint,
+    spirit_id: &str,
+    policy: &EpistemicPolicySection,
+) -> Result<bool, String> {
+    let section = split_epic(epic, 1)
+        .map_err(|e| format!("section: {e}"))?
+        .into_iter()
+        .next()
+        .ok_or("section: no `### Story` section")?;
+    let binding = OrchestratorInferenceBinding { provider_id, mint };
+    let (tag, value, derived_from) = Orchestrator::new(spirit_id)
+        .with_deferred_inference_port(port, Arc::new(Mutex::new(Some(binding))))
+        .judge_ambiguity(&section)
+        .map_err(|e| format!("pass refused: {e}"))?;
+    Ok(world
+        .write(spirit_id, tag, value, &derived_from, policy)?
+        .is_some())
 }
 
 /// A fresh, isolated kernel world for one row. `scopes` are admitted at

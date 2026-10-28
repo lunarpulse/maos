@@ -1,0 +1,39 @@
+binary	test	seconds
+maos-bin::eval_halt_18_2	a_drifted_prompt_hash_exits_1	0.02
+maos-bin::eval_halt_18_2	a_duplicate_scenario_id_is_refused	0.01
+maos-bin::eval_halt_18_2	a_29_entry_cassette_exits_1_naming_the_row	0.12
+maos-bin::eval_halt_18_2	an_env_cassette_is_replayed_and_publishes_no_sidecar	0.12
+maos-bin::eval_halt_18_2	exit_line_2_replays_the_seed_cassette_and_holds_every_floor	0.12
+maos-bin::eval_halt_18_2	record_without_a_provider_refuses_and_writes_no_cassette	0.04
+maos-bin::eval_halt_18_2	the_committed_cassette_named_explicitly_publishes_the_sidecar	0.19
+maos-bin::eval_halt_18_2	record_through_the_router_writes_a_cassette_that_replays_green	0.30
+maos-bin::eval_halt_18_2	the_drift_blind_negative_control_misses_overall_recall	0.17
+maos-bin::eval_halt_18_2	usage_errors_exit_2	0.03
+maos-bin::eval_halt_18_2	the_precision_planted_cassette_misses_precision	0.15
+maos-bin::eval_halt_18_2	the_researcher_class_is_published_as_not_model_driven	0.11
+maos-bin::smoke_cli_wrapper_8_12	delegated_goal_reaches_the_frame_verbatim_with_non_ascii	1.18
+maos-bin::smoke_cli_wrapper_8_12	founder_loop_journey_runs_with_real_worker_subprocess	1.18
+maos-bin::smoke_cli_wrapper_8_12	maos_run_cli_wrapper_worker_spawns_real_subprocess	1.16
+maos-bin::two_host_delegation_2b	replayed_inbound_frame_returns_duplicate_without_halting_host_b	0.95
+maos-bin::two_host_delegation_2b	two_daemon_delegation_is_joined_on_the_same_sixteen_bytes	1.04
+maos-bin::two_host_delegation_2b	sink_uninstalled_acks_but_does_not_admit_or_serve_the_frame	10.12
+maos-bin::worker_completion_2a	planted_refusal::a_hostless_topology_refusal_also_fails_the_run	1.11
+maos-bin::worker_completion_2a	planted_refusal::claude_permission_denial_fails_the_run	1.20
+maos-bin::worker_completion_2a	planted_refusal::codex_prose_only_refusal_fails_the_run	1.20
+maos-bin::worker_completion_2a	planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run	1.21
+maos-bin::worker_completion_2a	planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls	1.15
+maos-bin::worker_completion_2a	planted_refusal::the_standalone_path_no_longer_discards_the_verdict	1.11
+maos-journey-test::journey_j1	j1_founder_loop_topology_run_once	1.27
+maos-journey-test::journey_j1	j1_resume_continuity_ref_identity_oracle	2.38
+
+binary	sum_seconds
+maos-bin::smoke_cli_wrapper_8_12	3.56
+maos-bin::worker_completion_2a	7.59
+maos-bin::topology_delegation_1a	0.18
+maos-bin::delegation_leg_1a	0.06
+maos-bin::two_host_delegation_2b	12.17
+maos-bin::eval_halt_18_2	1.37
+maos-journey-test::journey_j1	3.71
+orchestrator::distillate_dispatch	0.04
+orchestrator::spirit_smoke	0.02
+ALL	564.1

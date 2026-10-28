@@ -179,3 +179,45 @@ rewritten except where a point says it supersedes them.
   refused typed (measured: 0.3.0 → 0.2.0 reported `completed`). CRL import
   carries the CRL's own bytes, never a path — the daemon's working directory is
   not the operator's.
+
+## Amendment — Story 19-7
+
+Amended 2026-10-28 by Story `19-7-repin-consent-operator-surface` (decision
+D-19-7-04, ruled A on 2026-10-28), in the same change as the code it governs.
+The certificate-identity exclusion in the Decision above STANDS unchanged:
+cohort membership, peer identity, certificate rotation and serving-leaf
+replacement still have no operator POST mutation route. This amendment records
+why one new POST route on the door does not cross that line.
+
+- **The route.** `GET /v1/a2a/repins` lists pending re-pin requests;
+  `POST /v1/a2a/repins/<peer>` with body
+  `{"approve":bool,"boot_nonce":"<decimal>","actor":"<who>"}` records an
+  operator decision; `maosctl a2a repin list|approve|reject` drives both. The
+  control is installed only in the `cohort-a2a-daemon` root, the root that owns
+  the receiving transport's pin store; a root without it answers 404, never an
+  empty list. Same bearer, authentication before route, same `control.json`
+  trust path as every other door mutation.
+- **Nonce-only consent keeps the pinned fingerprint.** The route takes no
+  fingerprint. An approval re-pins the peer's CURRENT pinned fingerprint — the
+  certificate TLS already verified against that pin — with the peer's new boot
+  nonce, and stamps the approval id into the pin. Re-arming NFR-Rel-6 restart
+  detection for an unchanged identity is not an identity mutation: the POST
+  never changes which certificate a peer is. Accepting a new fingerprint stays
+  signed-manifest reissue only (the 14-2 rotation window), and durable TOFU
+  stays `21-3-durable-tofu-and-self-leaf-rotation`.
+- **What the consent binds.** Only a restart the receiver itself detected can be
+  approved: no pending request ⇒ 404 `repin_not_pending` (nothing is
+  pre-armed). `boot_nonce` must echo the pending observed nonce, else 409
+  `repin_nonce_mismatch`. A request expires 300 s after detection ⇒ 409
+  `repin_request_expired`. A reject consumes the request and leaves the pin
+  invalidated. Every refusal leaves the pin invalidated.
+- **Log before act; in memory only.** The I4 Approval Decision Log row
+  (capability `a2a.repin`) is written before the pin changes; if it cannot be
+  written the pin does not change (500 `audit_unavailable`). The door's
+  completion row is `operator.a2a-repin.<operation_id>:<outcome>`. The re-pin
+  lives only in the daemon's process-local store: a restart rebuilds pins from
+  `[tcp] peer_pins`, and the daemon never writes operator config. Nothing
+  consents automatically.
+- **The read-route 405 guards stay.** `rotation-windows`, `peer-versions` and
+  `self-identity` keep answering an authenticated POST with 405; the re-pin
+  route is a separate path, not a widening of any certificate-identity read.

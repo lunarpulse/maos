@@ -42,6 +42,8 @@ use std::path::Path;
 // ═══════════════════════════════════════════════════════════════════
 
 const TOPOLOGY: &str = "spirits/topologies/j1-founder-loop.toml";
+/// Story 19-1 D-19-1-11 A — leg 1's epic sub-check reads this topology.
+const EPIC_TOPOLOGY: &str = "spirits/topologies/j1-founder-loop-epic.toml";
 const DELEGATION_RS: &str = "crates/maos-bin/src/delegation.rs";
 const MAILBOX_RS: &str = "crates/maos-iac/src/adapter/mailbox.rs";
 const MAIN_RS: &str = "crates/maos-bin/src/main.rs";
@@ -68,6 +70,14 @@ const GOOD_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop\"\n\n\
      [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\n\
      host = \"developer-remote-host\"\n";
 
+const EPIC_WORKER: &str =
+    "\n[[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n";
+const GOOD_EPIC_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop-epic\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n\n\
+     [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\nhost = \"developer-remote-host\"\n";
+
 /// The COMPOSITION ROOT of the J1 delegation. AC2.2a's repaired boundary leg reads
 /// this file, not `router.rs`: rung 2's flip is a change of which router the root
 /// composes, which is not a text change in `router.rs` at all.
@@ -83,7 +93,8 @@ const GOOD_MAILBOX: &str = "fn phase_three() {\n\
 const GOOD_MAIN: &str = "#[cfg(feature = \"network\")]\nuse maos_bin::worker_cli;\n\
      fn topology_loop() {\n\
      \x20   let frame = delegation_emitter.assign_frame_remote(seq, recipient, role);\n\
-     \x20   let goal = delegation_leg.delegate(&iac, frame).await?;\n}\n";
+     \x20   let goal = delegation_leg.delegate(&iac, frame).await?;\n\
+     \x20   let next = emitter.followup_dispatch_remote(seq, prior, to_host, from_host)?;\n}\n";
 
 const GOOD_ORCHESTRATOR: &str =
     "pub const DELEGATION_CONSENT_INTENT: &str = \"development-task:write-workspace\";\n";
@@ -171,6 +182,7 @@ fn write_file(root: &Path, rel: &str, content: &str) {
 /// reports green.
 fn lay_green(root: &Path) {
     write_file(root, TOPOLOGY, GOOD_TOPOLOGY);
+    write_file(root, EPIC_TOPOLOGY, GOOD_EPIC_TOPOLOGY);
     write_file(root, DELEGATION_RS, GOOD_DELEGATION);
     write_file(root, MAILBOX_RS, GOOD_MAILBOX);
     write_file(root, MAIN_RS, GOOD_MAIN);
@@ -630,6 +642,73 @@ fn planting_an_unenrolled_j1_test_file_must_red() {
         &v,
         "--test xyz_1b",
         "a new J1 test file was added without enrolling it",
+    );
+}
+
+/// Story 19-1 AC2.4 / D-19-1-10 A — the `_19_1.rs` twin of the vector above: a
+/// story-numbered J1 file on the new suffix is derived, so leaving it out of the
+/// job reds `completion-vectors-enrolled` by construction.
+#[test]
+fn planting_an_unenrolled_19_1_test_file_must_red() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-bin/tests/xyz_19_1.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+    });
+    assert_red(
+        &v,
+        "--test xyz_19_1`",
+        "a new 19-1 J1 test file was added without enrolling it",
+    );
+    assert!(
+        v.stdout
+            .contains("\"check\":\"completion-vectors-enrolled\""),
+        "the finding must be filed under completion-vectors-enrolled\nstdout:\n{}",
+        v.stdout
+    );
+}
+
+/// Story 19-1 AC2.4 / D-19-1-11 A — a fourth host-bearing Worker in the epic
+/// topology breaks the one-section-per-entry mapping and reds leg 1.
+#[test]
+fn a_fourth_epic_host_entry_must_red_frame_borne_route() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            EPIC_TOPOLOGY,
+            &format!("{GOOD_EPIC_TOPOLOGY}{EPIC_WORKER}"),
+        );
+    });
+    assert_red(
+        &v,
+        "\"check\":\"frame-borne-route-intact\",\"detail\":\"spirits/topologies/j1-founder-loop-epic.toml \
+         must declare exactly 3",
+        "a fourth host entry in the epic topology",
+    );
+    assert!(
+        v.stdout.contains("found 4 `host` keys"),
+        "the finding must count the planted entry\nstdout:\n{}",
+        v.stdout
+    );
+}
+
+/// Story 19-1 D-19-1-06 A / D-19-1-11 A — a follow-up built with the local
+/// `followup_dispatch` (host_id: None) would never route; leg 1 must red.
+#[test]
+fn a_local_epic_followup_must_red_frame_borne_route() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            MAIN_RS,
+            &GOOD_MAIN.replace(".followup_dispatch_remote(", ".followup_dispatch("),
+        );
+    });
+    assert_red(
+        &v,
+        "must emit epic follow-ups via `followup_dispatch_remote`",
+        "a local follow-up builder on the epic path",
     );
 }
 

@@ -1925,9 +1925,10 @@ coverage:
       Floor flips to hard-fail at Story 7.5a v1.0 STABILITY.md publication.
   NFR-Test-4:
     gates: [eval-halt]
-    # Story 18-2 review ruling D-18-2-R5: both class corpora are registered in
-    # tests/corpora/MANIFEST.toml (symlinks to the Spirit fixtures).
-    corpora: [butler-calendar-comms-v0.3, researcher-halt-corpus-v0.5]
+    # Story 18-2 review ruling D-18-2-R5: every class corpus is registered in
+    # tests/corpora/MANIFEST.toml (symlinks to the Spirit fixtures); Story 19-1
+    # AC5 adds the Orchestrator's.
+    corpora: [butler-calendar-comms-v0.3, researcher-halt-corpus-v0.5, orchestrator-halt-corpus-v0.1]
     notes: |
       Story 18-2 (D-18-2-02 B, D-18-2-05 A) — `maos eval halt --class <class>`
       (job epic-18-exit: exit line 2 + the drift-blind twin, which must exit 1
@@ -1938,8 +1939,15 @@ coverage:
       >= 0.90, precision >= 0.85, model_driven true. Researcher:
       spirits/researcher/tests/fixtures/halt-corpus-v0.5.jsonl (SHA-pinned),
       overall recall >= 0.70, precision >= 0.85, model_driven false
-      (claim-metadata arithmetic). Orchestrator: received by 19-1 AC5. Numbers
-      published as a signed sidecar read by `maosctl spirit benchmark`.
+      (claim-metadata arithmetic). Orchestrator (Story 19-1 AC5, D-19-1-13 A):
+      30 rows of spirits/orchestrator/tests/fixtures/halt-corpus-v0.1.jsonl
+      (SHA-pinned) replayed through `Orchestrator::judge_ambiguity` from
+      crates/maos-journey-test/cassettes/j1/orchestrator-halt-corpus-v0.1.json
+      (provenance seed, real `ambiguity_prompt` hashes), overall recall >= 0.70,
+      precision >= 0.85, model_driven true; gated in workspace-test-suite by
+      crates/maos-bin/tests/eval_halt_orchestrator.rs (D-19-1-14 A), whose miss
+      twin must exit 1 at halt_recall_overall 0.667. Numbers published as a
+      signed sidecar read by `maosctl spirit benchmark`.
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Test-5:

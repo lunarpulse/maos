@@ -32,7 +32,13 @@ pub struct PinnedFingerprint {
     /// REQUIRED (review patch P2): a `#[serde(default)] = 0` here was a footgun —
     /// a peer pinned with `0` triggers a spurious `CODE_SPIRIT_RESTART_DETECTED`
     /// on the first real non-zero-nonce frame (self-DoS), and a mutual `0`
-    /// silently disables restart detection. Operators MUST pre-pair the nonce.
+    /// silently disables restart detection. Operators pre-pair the nonce here;
+    /// when the peer's nonce differs (it restarted, or it booted after this
+    /// host), the receiver invalidates the pin and the recovery is either a
+    /// corrected value plus a restart, or operator consent on the running
+    /// `cohort-a2a-daemon` via `maosctl a2a repin approve <peer> --boot-nonce <N>`
+    /// — the latter keeps this fingerprint, re-arms only the nonce, and lives in
+    /// memory until the next boot rebuilds pins from this config.
     pub boot_nonce: u64,
 }
 

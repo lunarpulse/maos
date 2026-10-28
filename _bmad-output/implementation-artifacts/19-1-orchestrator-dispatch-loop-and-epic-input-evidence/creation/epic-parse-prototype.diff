@@ -1,0 +1,80 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 0874787e..8b2d8f93 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -10796,6 +10796,7 @@ fn host_b_worker_context(
+             live: false,
+             once: true,
+             scene: None,
++            epic: None,
+         },
+         transparency_log: std::sync::Arc::clone(transparency_log),
+         capability: Arc::clone(capability),
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+index 16be8e1c..bbdac55d 100644
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -61,6 +61,8 @@ pub struct RunArgs {
+     /// Story 18-4 (CR-2) — `--clock compressed:<n>d --acceptance <path>`: a
+     /// compressed Butler scene, one `on_idle` per simulated day.
+     pub scene: Option<SceneArgs>,
++    /// Story 19-1 — `--epic <file>`: one delegated `task.assign` per section.
++    pub epic: Option<String>,
+ }
+ 
+ /// Story 18-4 (CR-2) — the compressed scene's clock and acceptance fixture.
+@@ -72,8 +74,8 @@ pub struct SceneArgs {
+ }
+ 
+ #[cfg(feature = "network")]
+-const RUN_USAGE: &str =
+-    "<manifest> [--live] [--once] [--clock compressed:<n>d --acceptance <path>]";
++const RUN_USAGE: &str = "<manifest> [--live] [--once] [--epic <file>] [--clock compressed:<n>d \
++                         --acceptance <path>]";
+ 
+ #[cfg(feature = "network")]
+ /// Parse `run <manifest-path> [--live] [--once] [--clock <spec> --acceptance
+@@ -89,18 +91,19 @@ pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<
+     let mut manifest_path: Option<String> = None;
+     let (mut live, mut once) = (false, false);
+     let (mut clock, mut acceptance): (Option<String>, Option<String>) = (None, None);
++    let mut epic: Option<String> = None;
+     while let Some(a) = it.next() {
+         match a.as_str() {
+             "--live" => live = true,
+             "--once" => once = true,
+-            "--clock" | "--acceptance" => {
++            "--clock" | "--acceptance" | "--epic" => {
+                 let value = it.next().ok_or_else(|| {
+                     format!("maos run: {a} needs a value — expected: {RUN_USAGE}")
+                 })?;
+-                *(if a == "--clock" {
+-                    &mut clock
+-                } else {
+-                    &mut acceptance
++                *(match a.as_str() {
++                    "--clock" => &mut clock,
++                    "--acceptance" => &mut acceptance,
++                    _ => &mut epic,
+                 }) = Some(value);
+             }
+             other if !other.starts_with("--") && manifest_path.is_none() => {
+@@ -133,12 +136,18 @@ pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<
+             acceptance,
+         }),
+     };
++    if epic.is_some() && scene.is_some() {
++        return Err("maos run: --epic dispatches a topology; it cannot be combined with \
++                    --clock/--acceptance"
++            .into());
++    }
+     match manifest_path {
+         Some(manifest_path) => Ok(Some(RunArgs {
+             manifest_path,
+             live,
+             once,
+             scene,
++            epic,
+         })),
+         None => Err(format!(
+             "maos run: missing manifest path — expected: maos run {RUN_USAGE}"

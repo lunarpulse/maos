@@ -287,6 +287,7 @@ impl World {
                     live: false,
                     once: true,
                     scene: None,
+                    epic: None,
                 },
                 Arc::clone(&self.log),
                 Arc::clone(&self.capability),
@@ -306,6 +307,7 @@ impl World {
                 },
                 None,
             )
+            .map(|run| run.completion)
             .map_err(|error| error.to_string())
         })
     }

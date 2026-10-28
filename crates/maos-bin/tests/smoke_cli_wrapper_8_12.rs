@@ -263,8 +263,13 @@ fn ci_local_split_refuses_a_granted_real_agent_without_the_live_flag() {
 /// override (`founder-loop: execute the delegated assignment from <host>`); the
 /// dev's evidence for the override was a manual argv dump, never a committed
 /// vector. The `delegation_routed` event is emitted at the frame itself, so the
-/// exact `"goal":"<sentinel>"` string is the assertion — and the rehearsal
+/// exact `"goal":"<section>"` string is the assertion — and the rehearsal
 /// constant must NOT appear, proving override rather than append.
+///
+/// Story 19-1 (AC2.2, D-19-1-02 A) — re-keyed: on loopback the goal source is
+/// `--epic`, so the sentinel is the one `### Story` section of
+/// `tests/fixtures/j1/epic-one-section.md`, and the frame carries that section
+/// byte for byte (`MAOS_DELEGATED_GOAL` is cross-host only now).
 #[test]
 fn delegated_goal_reaches_the_frame_verbatim_with_non_ascii() {
     if !t3_substrate::require_t3("founder-loop delegated goal Worker") {
@@ -272,25 +277,45 @@ fn delegated_goal_reaches_the_frame_verbatim_with_non_ascii() {
     }
     let home = isolated_data_home("goal");
     let sentinel = "write a haiku to ./h.txt about a café — sentinel ✓ 2e-F7 §A6-P10";
+    let epic = "tests/fixtures/j1/epic-one-section.md";
+    let epic_text = std::fs::read_to_string(std::path::Path::new(workspace_root()).join(epic))
+        .expect("read the one-section epic fixture");
+    let section = orchestrator::split_epic(&epic_text, 1)
+        .expect("the fixture is one `### Story` section")
+        .remove(0);
+    assert!(
+        section.text.contains(sentinel),
+        "the fixture's section must carry the non-ASCII sentinel:\n{}",
+        section.text
+    );
     let mut command = production_command();
     let output = command
-        .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
+        .args([
+            "run",
+            "spirits/topologies/j1-founder-loop.toml",
+            "--epic",
+            epic,
+            "--once",
+        ])
         .env("HOME", t3_substrate::isolated_runtime_home(&home.path))
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_HOME", home.path.clone())
-        .env("MAOS_DELEGATED_GOAL", sentinel)
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos-bin");
     assert!(
         output.status.success(),
-        "the founder-loop topology must exit 0 with a goal set; stderr:\n{}",
+        "the founder-loop topology must exit 0 with a one-section epic; stderr:\n{}",
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
+    // `"goal":"<section>"` exactly as the event serializes it (JSON-escaped
+    // newlines, non-ASCII verbatim).
+    let goal_field = serde_json::json!({ "goal": section.text }).to_string();
+    let goal_field = &goal_field[1..goal_field.len() - 1];
     assert!(
-        stdout.contains(&format!("\"goal\":\"{sentinel}\"")),
-        "the frame must carry the operator's goal byte-for-byte, non-ASCII intact:\n{stdout}"
+        stdout.contains(goal_field),
+        "the frame must carry the epic section byte-for-byte, non-ASCII intact:\n{stdout}"
     );
     assert!(
         !stdout.contains("founder-loop: execute the delegated assignment"),

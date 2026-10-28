@@ -77,6 +77,10 @@ const DELEGATION_HOST: &str = "developer-remote-host";
 /// Files the oracle reads, all relative to the gate's root so the proven-red suite
 /// can point it at a fixture tree.
 const TOPOLOGY: &str = "spirits/topologies/j1-founder-loop.toml";
+/// Story 19-1 AC2 / D-19-1-11 A — the epic topology: one host-bearing Worker per
+/// `### Story` section, all three on the delegation host.
+const EPIC_TOPOLOGY: &str = "spirits/topologies/j1-founder-loop-epic.toml";
+const EPIC_WORKERS: usize = 3;
 const DELEGATION_RS: &str = "crates/maos-bin/src/delegation.rs";
 const MAILBOX_RS: &str = "crates/maos-iac/src/adapter/mailbox.rs";
 const MAIN_RS: &str = "crates/maos-bin/src/main.rs";
@@ -118,7 +122,11 @@ const MAOS_BIN_TESTS_DIR: &str = "crates/maos-bin/tests";
 /// `check_cert_rotation_trigger`'s own `invoke_cargo_test`; enrolling it here
 /// would double-run a real-daemon test on an untimed job. Numeric J1 names such
 /// as `j1_2a.rs` have no preceding decimal segment and remain derived.
-const J1_TEST_SUFFIXES: &[&str] = &["_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs"];
+///
+/// Story 19-1 D-19-1-10 A — `_19_1.rs` is a suffix in its own right, so
+/// `epic_dispatch_19_1.rs` (stem `epic_dispatch`) is derived while a story-numbered
+/// `*_19_1a.rs` stays excluded by D-2 under `_1a.rs`.
+const J1_TEST_SUFFIXES: &[&str] = &["_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs", "_19_1.rs"];
 
 /// j1-crosshost-1b AC1 — the refusal proofs themselves, the gate's TENTH governed
 /// file. The gate can only check that the assertions are WRITTEN; only the CI
@@ -263,6 +271,27 @@ fn leg_frame_borne_route_intact(root: &Path, findings: &mut Vec<Finding>, audit:
         }
     }
 
+    // (1b) Story 19-1 D-19-1-11 A — the epic topology maps section k to the k-th
+    //      host-bearing entry, so a Worker dropped to local (or a fourth one) breaks
+    //      the count the split is checked against.
+    if let Some(src) = read(root, EPIC_TOPOLOGY, findings, CHECK) {
+        audit.checked();
+        let hosts: Vec<&str> = live_lines(&src)
+            .filter(|l| l.trim_start().starts_with("host"))
+            .collect();
+        if hosts.len() != EPIC_WORKERS || !hosts.iter().all(|l| l.contains(DELEGATION_HOST)) {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{EPIC_TOPOLOGY} must declare exactly {EPIC_WORKERS} `host = \
+                     \"{DELEGATION_HOST}\"` entries (found {} `host` keys) — one frame-borne \
+                     Worker per `### Story` section",
+                    hosts.len()
+                ),
+            });
+        }
+    }
+
     // (2) The emit uses the REMOTE builder. `assign_frame` hardcodes
     //     `host_id: None` + `consent_envelope: None`, so emitting through it routes
     //     the frame same-host with no consent — locally, silently.
@@ -287,6 +316,20 @@ fn leg_frame_borne_route_intact(root: &Path, findings: &mut Vec<Finding>, audit:
                 detail: format!(
                     "{MAIN_RS} reads MAOS_WORKER_TASK again — the delegation frame becomes \
                      decorative while every routing assertion stays green"
+                ),
+            });
+        }
+        // (3b) Story 19-1 D-19-1-06 A — section k+1 goes out through the typed remote
+        //      follow-up; the local `followup_dispatch` builds through `assign_frame`
+        //      and would never route.
+        audit.checked();
+        let flat = structural(production_before_tests(&src));
+        if !flat.contains("followup_dispatch_remote(") || flat.contains(".followup_dispatch(") {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{MAIN_RS} must emit epic follow-ups via `followup_dispatch_remote`; the local \
+                     `followup_dispatch` hardcodes host_id: None and would deliver locally"
                 ),
             });
         }

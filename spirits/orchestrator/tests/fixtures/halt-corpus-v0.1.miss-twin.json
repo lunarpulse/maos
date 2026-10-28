@@ -1,0 +1,550 @@
+{
+  "entries": [
+    {
+      "prompt_len": 648,
+      "prompt_sha256": "1cdb393c26af8cb960b6ee2c5fe3f0979e60c90beb6971a1d9ef7d7b6bc40c84",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.2}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 0
+    },
+    {
+      "prompt_len": 575,
+      "prompt_sha256": "c3eff6cea4bc67aa1e1d610a64a603fd693016bddc068cc1ca458694207c192b",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.2}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "prompt_len": 640,
+      "prompt_sha256": "716066085387eec89709583ccbb6297cbcf2376dee7cdc92a945891ac4d0de26",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.2}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 2
+    },
+    {
+      "prompt_len": 635,
+      "prompt_sha256": "e83fafb88314dea7c71da11b8870dc00fe15e2ec8b9a2ca224e6bb6e1bb273e3",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.2}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 3
+    },
+    {
+      "prompt_len": 643,
+      "prompt_sha256": "d07e3d82e36a4febcf42cd5a29fd46f31a926127c7f7bc965e0381f86d9aa72f",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.2}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 4
+    },
+    {
+      "prompt_len": 604,
+      "prompt_sha256": "2576dadb8ebfc5f44ae3a9b04e97a284ab4d8035a288931728aac8b504bb5b21",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.95}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 5
+    },
+    {
+      "prompt_len": 608,
+      "prompt_sha256": "ed571a700f4d55d2d6c5b9928ea4f10e94a5877656c9123454466d297952c48e",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.66}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 6
+    },
+    {
+      "prompt_len": 650,
+      "prompt_sha256": "8de0264f9d73a43fb782e8a94a7e6f0471cf70d427657ccc66fbf983334fffef",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.81}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 7
+    },
+    {
+      "prompt_len": 597,
+      "prompt_sha256": "e8d90fbed54d527f6c0f811349c22b024e3f5e00e8d8fb970ec16abeb8f020ab",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.74}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 8
+    },
+    {
+      "prompt_len": 603,
+      "prompt_sha256": "cfbd0f235db25f50bcc7d0b6d1a860c71f8f0b76a62ad5cb72b3e50fa3b89f82",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.9}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 9
+    },
+    {
+      "prompt_len": 623,
+      "prompt_sha256": "bb34be929f6681e18f805fde3b1cc9d81b379c6acccb99d1875a5c6cead2cb6a",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.62}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 10
+    },
+    {
+      "prompt_len": 576,
+      "prompt_sha256": "6c9def9ec982b85f0f213374ef2d621a58c1a6a8756796c60d11e9be66475a5d",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.87}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 11
+    },
+    {
+      "prompt_len": 618,
+      "prompt_sha256": "2d358e152bf3c72690a6a02942404e4a30c9f0173728a73a6882ab9d0a06e396",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.58}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 12
+    },
+    {
+      "prompt_len": 621,
+      "prompt_sha256": "afe59183c8ea9e663fb7288c1da1d076fb9be685165f935ad3587686ebe91618",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.79}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 13
+    },
+    {
+      "prompt_len": 669,
+      "prompt_sha256": "180d18e8de356027e7b615ce162b0119bb7bf1ba2857c94114246fd83f54af0f",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.55}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 14
+    },
+    {
+      "prompt_len": 787,
+      "prompt_sha256": "45a0a62bf93789ca90e2dc762dd5d7a7ed196ed8462332a1acadd53be4745494",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.05}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 15
+    },
+    {
+      "prompt_len": 692,
+      "prompt_sha256": "cec08601af5b7d39ded48cd66d856d7083220578fd162b88ea2d315b92e292bd",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.1}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 16
+    },
+    {
+      "prompt_len": 701,
+      "prompt_sha256": "bc8432d368511ce619c05d7c0d9841fe4081201a833596ee83ab77fe4394f74b",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.08}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 17
+    },
+    {
+      "prompt_len": 730,
+      "prompt_sha256": "f8f9e40ec837fec5b6644ee3cac89081d52e19c66b6a72f1b1c3aa10c004c23a",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.15}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 18
+    },
+    {
+      "prompt_len": 746,
+      "prompt_sha256": "7e8a5c8d383d2287ed604da3aed39f3ef582fdb22066c30d1927efd657755a1f",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.12}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 19
+    },
+    {
+      "prompt_len": 685,
+      "prompt_sha256": "43c0fa2e7266c15a1f992f74f486a8ff24d395dbabe98d9f0d05662a71dfd6aa",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.2}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 20
+    },
+    {
+      "prompt_len": 717,
+      "prompt_sha256": "11e3e828c401fddf31ee7cc052ba40459ea51c9773f6a01ee614555978b7ee45",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.03}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 21
+    },
+    {
+      "prompt_len": 712,
+      "prompt_sha256": "34fc54e608edefcd94dba4a2539cecd49af08d513e0f52f494bb61e31518f040",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.25}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 22
+    },
+    {
+      "prompt_len": 764,
+      "prompt_sha256": "d6b38ef6ceb63d1e5cf023bfa23a3a57af18a20eadf7a9b821052c0fb4919718",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.18}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 23
+    },
+    {
+      "prompt_len": 700,
+      "prompt_sha256": "e1249e7b079d739e25e82750f7ee9334cd8649b7c5e1b89cb2b1195b02eacfc8",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.07}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 24
+    },
+    {
+      "prompt_len": 777,
+      "prompt_sha256": "a84d01ab1bad73ac6311570965289a478ef8d825b47e71c9d5d901540d1f4c02",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.3}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 25
+    },
+    {
+      "prompt_len": 741,
+      "prompt_sha256": "715c31214daa0e3ad77f45ea3ec591ebf792c4ad389b9378802b9472bab0fa89",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.11}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 26
+    },
+    {
+      "prompt_len": 788,
+      "prompt_sha256": "1caffbc9c333545106221410bcb91a3c62fd5db73350b1c5378185b10bcc70f9",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.35}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 27
+    },
+    {
+      "prompt_len": 717,
+      "prompt_sha256": "14ab3d235166985357035bd828c09f63244622e00af8265f23211564a9b19623",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.42}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 28
+    },
+    {
+      "prompt_len": 745,
+      "prompt_sha256": "b275acf2b47b59c1a13155427d7a75509aedce0b5dbbd563c5506da65a5166c6",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/orchestrator-halt-corpus-v0.1",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.5}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 29
+    }
+  ],
+  "model_id": "hand-authored-seed",
+  "provenance": "seed",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "schema_version": "maos.journey.cassette/v1",
+  "session": "orchestrator-halt-corpus-v0.1",
+  "spirit_id": "orchestrator"
+}

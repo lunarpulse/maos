@@ -27,11 +27,11 @@ TOFU pin invalidated for peer (Spirit restart, manual invalidation)
 
 ## Cause
 
-The TOFU (Trust On First Use) pin for a peer spirit was explicitly invalidated — either because the peer restarted and generated a new identity, or because an operator manually revoked the pin.
+The TOFU (Trust On First Use) pin for a peer is invalidated. Usually the peer Spirit restarted: its frame carried a boot nonce different from the pinned one (NFR-Rel-6 restart detection), the certificate identity is unchanged, and re-pin consent is required. The pin can also be manually invalidated, or a rotation-window or first-contact operation can be refused against an existing or invalidated pin.
 
 ## Resolution
 
-Re-establish trust with the peer by initiating a new first-contact handshake. If the peer restarted legitimately, accept the new pin. If the invalidation was unexpected, investigate whether the peer's identity was compromised before re-pinning.
+After a peer restart, confirm the restart with the peer's operator and obtain its new boot nonce (decimal) out of band. On the receiving host's `cohort-a2a-daemon` door run `maosctl a2a repin list`, then `maosctl a2a repin approve <peer> --boot-nonce <N>` within 300 s of the detection: it re-pins the SAME pinned fingerprint with nonce N and writes an Approval Decision Log row first. The re-pin is held in memory only; a restart of the receiving daemon rebuilds pins from `[[tcp.peer_pins]]`. The alternative recovery is to correct that row's `boot_nonce` and restart the receiving host. If the restart was unexpected, investigate a possible compromise before approving; refuse with `maosctl a2a repin reject <peer> --boot-nonce <N>`.
 
 ## Source Location
 

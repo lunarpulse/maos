@@ -1336,6 +1336,7 @@ async fn t_10_4b_rotation_under_load_window() {
 #[ignore] // AC5.5(a): the check-rotation-real-timing gate drives this via --ignored; skipped != passed
 async fn t_10_4b_rotation_overlap_pin_closure() {
     use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
+    use maos_a2a_core::tofu::RepinVerdict;
     use maos_a2a_core::{EPinMismatch, InMemoryTofuPinStore, RePinDecision, TofuPinStore};
 
     let store = InMemoryTofuPinStore::new();
@@ -1407,8 +1408,7 @@ async fn t_10_4b_rotation_overlap_pin_closure() {
     // An operator-approved re-pin that collides with another peer's open next
     // is explicitly refused by the store and never materialized.
     let approval_id = [7u8; 16];
-    let repin_store = InMemoryTofuPinStore::new()
-        .with_repin_hook(move |_, _, _| RePinDecision::AcceptedByOperator { approval_id });
+    let repin_store = InMemoryTofuPinStore::new();
     let rotating_peer = PeerId::new("rotating");
     let rotating_current = PeerCertFingerprint::from_cert_der(b"rotating-current");
     let colliding_next = PeerCertFingerprint::from_cert_der(b"colliding-next");
@@ -1420,6 +1420,21 @@ async fn t_10_4b_rotation_overlap_pin_closure() {
         .open_rotation_window(&rotating_peer, &colliding_next)
         .expect("open rotating peer window");
     let repin_peer = PeerId::new("repin-peer");
+    let repin_current = PeerCertFingerprint::from_cert_der(b"repin-current");
+    repin_store
+        .pin_first_contact(&repin_peer, &repin_current, &repin_current, 1)
+        .await
+        .expect("pin repin peer");
+    assert_eq!(
+        repin_store
+            .invalidate_if_boot_nonce_differs(&repin_peer, 2)
+            .await
+            .expect("restart detection"),
+        Some(1)
+    );
+    repin_store
+        .record_repin_decision(&repin_peer, 2, RepinVerdict::Approve { approval_id })
+        .expect("operator approval recorded");
     assert!(matches!(
         repin_store
             .await_repin_consent(&repin_peer, &colliding_next, 2)
@@ -1428,7 +1443,9 @@ async fn t_10_4b_rotation_overlap_pin_closure() {
             error: EPinMismatch::FingerprintCollision { .. }
         }
     ));
-    assert!(repin_store.get_pin(&repin_peer).await.is_none());
+    let refused = repin_store.get_pin(&repin_peer).await.expect("pin kept");
+    assert_eq!(refused.fingerprint, repin_current);
+    assert!(refused.invalidated.is_some() && refused.repin_approval_id.is_none());
 
     // §A6 Edge-3 (self-collision): `next == this peer's current` is refused.
     let err = store

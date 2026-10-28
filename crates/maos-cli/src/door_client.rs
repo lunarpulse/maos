@@ -526,6 +526,90 @@ fn print_body(body: &[u8]) {
     let _ = out.write_all(b"\n");
 }
 
+// ─── Story 19-7 — `maosctl a2a repin` wire shapes (twins of maos-control) ──
+
+/// `POST /v1/a2a/repins/<peer>` body (D-19-7-01/02/03 A). `boot_nonce` is a
+/// DECIMAL STRING because a u64 nonce does not survive a JSON number (f64
+/// above 2^53) and the door binds the consent to it exactly.
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepinDecisionRequest {
+    pub approve: bool,
+    pub boot_nonce: String,
+    pub actor: String,
+}
+
+/// The decision route's 200 body.
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RepinDecisionReply {
+    pub peer: String,
+    pub boot_nonce: String,
+    pub approval_id: String,
+    pub decision: RepinDecision,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RepinDecision {
+    Accepted,
+    Rejected,
+}
+
+/// Map a re-pin route response: the D-16-1-P table ([`map_response`]) plus
+/// one remedy line per typed refusal. For a decision (`sent` is `Some`), a
+/// 200 exits 0 only when its body is the decision that was sent — exit 0 is
+/// the operator's evidence that the pin moved (or stayed refused).
+pub fn map_repin_response(
+    verb: &str,
+    sent: Option<(&str, &RepinDecisionRequest)>,
+    response: Response,
+) -> ExitCode {
+    if let (200, Some((peer, sent))) = (response.status, sent) {
+        let skew = match serde_json::from_slice::<RepinDecisionReply>(&response.body) {
+            Ok(reply)
+                if reply.peer == peer
+                    && reply.boot_nonce == sent.boot_nonce
+                    && (reply.decision == RepinDecision::Accepted) == sent.approve =>
+            {
+                None
+            }
+            Ok(reply) => Some(format!("{reply:?} answers {sent:?} for {peer}")),
+            Err(error) => Some(error.to_string()),
+        };
+        if let Some(skew) = skew {
+            eprintln!("maosctl: {verb} — repin_reply_unrecognized: {skew} (HTTP 200)");
+            return ExitCode::from(1);
+        }
+    }
+    let remedy = match (response.status, response.error_parts().0.as_str()) {
+        (404, "not_found") => {
+            "this daemon holds no re-pin control; only the cohort A2A daemon \
+             (MAOS_ONE_SHOT=cohort-a2a-daemon) owns the pin store"
+        }
+        (404, "repin_not_pending") => {
+            "no restart detection is pending for this peer (never \
+             detected, or already decided); see `maosctl a2a repin list`"
+        }
+        (409, "repin_nonce_mismatch") => {
+            "--boot-nonce is not the pending observed nonce; the pin \
+             stays invalidated; read the nonce from the sender's published line or the list"
+        }
+        (409, "repin_request_expired") => {
+            "the pending detection expired before the decision; \
+             the pin stays invalidated; decide on a fresh detection (`maosctl a2a repin list`)"
+        }
+        (409, "repin_refused_by_store") => {
+            "the pin store refused the re-pin; the pin stays \
+             invalidated"
+        }
+        _ => "",
+    };
+    if !remedy.is_empty() {
+        eprintln!("maosctl: {verb} — {remedy}");
+    }
+    map_response(verb, response)
+}
+
 /// The client-side twin of the server's id validation: same charset, same
 /// bound, so a request the door must refuse never leaves maosctl. `Err`
 /// carries the operator-facing reason.

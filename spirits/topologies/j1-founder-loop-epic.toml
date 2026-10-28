@@ -1,0 +1,31 @@
+[topology]
+name = "j1-founder-loop-epic"
+
+# Story 19-1 (AC1.3) — the founder loop driven by `maos run … --epic <file>`.
+# File order is dispatch order. The Orchestrator is listed first: its loaded
+# instance emits every delegation frame (D-19-1-04 A), and a Worker entry that
+# precedes it is refused.
+[[topology.spirits]]
+manifest = "../orchestrator/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../architect/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../reviewer/manifest.toml"
+
+# Three frame-borne Developer-Workers (D-19-1-03 A): the epic's k-th
+# `### Story` section is the k-th Worker's goal, so the epic must split into
+# exactly three sections. Each Worker runs to completion and is distilled at
+# its own pid before the next section's follow-up carries that distillate.
+[[topology.spirits]]
+manifest = "../worker/manifest.toml"
+host = "developer-remote-host"
+
+[[topology.spirits]]
+manifest = "../worker/manifest.toml"
+host = "developer-remote-host"
+
+[[topology.spirits]]
+manifest = "../worker/manifest.toml"
+host = "developer-remote-host"

@@ -30,10 +30,20 @@ tier = "T0"
 name = "MAOS Project"
 homepage = "https://github.com/lunarpulse/maos"
 
+# Story 19-1 (AC3, D-19-1-05 A) — Inference Port. It serves ONLY the
+# `dispatch_ambiguity` judgement (one scalar against the 0.5 halt below — the
+# Butler's tier); `openai` is declared too so an OpenAI-only box (router
+# default `openai`) is not refused at issuance (17-11). The first declared
+# provider keys the class cassette.
+[capabilities.required]
+provider.complete = ["anthropic.claude-haiku-4-5-20251001", "openai.gpt-4o-mini"]
+
 # Halt policy preferring RECALL over precision (§6.7): the Orchestrator halts
 # readily (low ambiguity threshold) rather than dispatching on an uncertain
-# safe-point decision. No [capabilities.required] — dispatch is deterministic
-# (Decision E; provider.complete omitted, the halt path needs no inference).
+# safe-point decision. Decision E (amended by Story 19-1): dispatch is
+# deterministic — the epic split, the section count and the section ↔ Worker
+# binding never come from a completion; the ambiguity is judged, by one
+# completion per section, and the kernel owns the halt.
 [epistemic_policy]
 default_action = "verbalize_only"
 

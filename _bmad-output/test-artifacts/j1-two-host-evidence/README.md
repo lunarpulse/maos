@@ -213,8 +213,19 @@ where it is covered by the bundle signature. Anything added here must stay clear
 
    ⚠ The nonce is still a fresh random value per process, deliberately: making it stable or derived
    would defeat `NFR-Rel-6` restart detection (`tofu.rs:351-372`). A wrong transcription is **worse than
-   a failure** — it invalidates the pin, and recovery needs a host B restart, because the second attempt
-   fails *differently* (`invalidate_if_boot_nonce_differs`).
+   a failure** — it invalidates the pin, and the second attempt fails *differently*
+   (`invalidate_if_boot_nonce_differs`). Two recoveries exist since Story 19-7:
+   - **Config re-pair:** correct host B's `tcp.peer_pins[].boot_nonce` and restart host B.
+   - **Operator consent on the running host B:** host B journals `a2a:repin-requested` and holds the
+     request for **300 s**; on host B run `maosctl a2a repin list`, then
+     `maosctl a2a repin approve <peer> --boot-nonce <N>` with host A's published decimal nonce
+     (a different N is refused 409 `repin_nonce_mismatch`; an expired request 409
+     `repin_request_expired`). It re-pins the **same** pinned fingerprint — only the nonce changes —
+     after writing an Approval Decision Log row. The consent is **in memory only**: a host B restart
+     rebuilds pins from config, so a durable fix is still the config re-pair (durable TOFU is
+     `21-3`). Nothing consents automatically. Approve the nonce of the host A that is **still
+     running**: with `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` set it holds and re-sends the same frame
+     until ACK or the bound expires; a re-run of host A mints a new nonce, which is a new restart.
 2. **Host B's audit key, provisioned separately.** `reconcile_two_host_bundles` hard-refuses
    `key_a == key_b` with `SharedAttesterRoot`. Two processes on one box default to one `HOME` and
    therefore **one key file** — so without this step reconciliation fails by construction, and "two

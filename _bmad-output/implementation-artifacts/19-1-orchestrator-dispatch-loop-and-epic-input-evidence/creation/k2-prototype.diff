@@ -1,0 +1,89 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 0874787e..aedeef68 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -7638,6 +7638,7 @@ description = "smoke test spirit successor"
+                         payload_pidfd: true,
+                         launch_custody: None,
+                         env: &[],
++                        workspace: None,
+                     };
+                     match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
+                         &spec,
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+index 16be8e1c..33b2e9ec 100644
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -1089,6 +1089,7 @@ pub fn run_cli_wrapper_manifest(
+             state_dir: state_dir.clone(),
+             payload_pidfd,
+             launch_custody: Some(Arc::clone(&launch_custody)),
++            workspace: None,
+         }),
+     };
+     // Bound the completion read-back to THIS run's journaled CliSubprocessOutput
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+index 808c97b0..2106f15c 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -265,6 +265,8 @@ pub struct T3Launch {
+     pub payload_pidfd: bool,
+     /// Shared launch/root custody, published before initialization begins.
+     pub launch_custody: Option<std::sync::Arc<ContainerLaunchCustody>>,
++    /// Optional per-run workspace, bind-mounted rw at `/workspace`.
++    pub workspace: Option<std::path::PathBuf>,
+ }
+ 
+ /// A message handed from an OS reader thread to the kernel over the bounded mpsc.
+@@ -576,6 +578,7 @@ fn spawn_child(spec: &mut BridgeSpawnSpec, argv: &[String]) -> Result<BridgeChil
+                 payload_pidfd: launch.payload_pidfd,
+                 env: &spec.env,
+                 launch_custody: launch.launch_custody.as_ref(),
++                workspace: launch.workspace.as_deref(),
+             };
+             return spawn_t3(&spec.sandbox, &launch.image, argv, spawn_context)
+                 .map(|child| BridgeChild::Container(child, launch.image))
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+index fb494019..51379599 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+@@ -33,6 +33,7 @@ pub fn build_runtime_argv(
+     container_name: &str,
+     state_dir: &Path,
+     egress_socket: Option<&Path>,
++    workspace: Option<&Path>,
+     env: &[(String, String)],
+ ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+     let mut seen_names = std::collections::HashSet::new();
+@@ -98,6 +99,10 @@ pub fn build_runtime_argv(
+             socket.display()
+         ));
+     }
++    if let Some(dir) = workspace {
++        argv.push(format!("--volume={}:/workspace:rw,U", dir.display()));
++        argv.push("--workdir=/workspace".to_string());
++    }
+     argv.extend(env.iter().map(|(name, _)| format!("--env={name}")));
+     argv.push(image_ref);
+     argv.push("--".to_string());
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+index 0f889e68..b9e28162 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+@@ -51,6 +51,8 @@ pub struct T3SpawnContext<'a> {
+     pub env: &'a [(String, String)],
+     /// Shared root/binding custody registered before the create runtime call.
+     pub launch_custody: Option<&'a std::sync::Arc<ContainerLaunchCustody>>,
++    /// Optional per-run workspace, bind-mounted rw at `/workspace`.
++    pub workspace: Option<&'a Path>,
+ }
+ 
+ /// Construct a runtime client command with ambient credentials removed.
+@@ -417,6 +419,7 @@ pub fn launch_t3(
+         &parent.container_name,
+         parent.state_dir,
+         parent.egress_socket,
++        parent.workspace,
+         parent.env,
+     )
+     .map_err(|error| SpawnError::T3ImageInspect {

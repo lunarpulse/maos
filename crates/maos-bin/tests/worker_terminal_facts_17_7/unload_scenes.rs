@@ -196,6 +196,7 @@ async fn exercise_unload(
         live: false,
         once: false,
         scene: None,
+        epic: None,
     };
     let tl = Arc::clone(&world.tl);
     let capability = Arc::clone(&world.capability);

@@ -61,6 +61,9 @@ pub struct RunArgs {
     /// Story 18-4 (CR-2) — `--clock compressed:<n>d --acceptance <path>`: a
     /// compressed Butler scene, one `on_idle` per simulated day.
     pub scene: Option<SceneArgs>,
+    /// Story 19-1 (AC1.2) — `--epic <file>`: the epic whose `### Story`
+    /// sections are the loopback Workers' goals, one per host-bearing entry.
+    pub epic: Option<String>,
 }
 
 /// Story 18-4 (CR-2) — the compressed scene's clock and acceptance fixture.
@@ -73,14 +76,15 @@ pub struct SceneArgs {
 
 #[cfg(feature = "network")]
 const RUN_USAGE: &str =
-    "<manifest> [--live] [--once] [--clock compressed:<n>d --acceptance <path>]";
+    "<manifest> [--live] [--once] [--epic <file>] [--clock compressed:<n>d --acceptance <path>]";
 
 #[cfg(feature = "network")]
-/// Parse `run <manifest-path> [--live] [--once] [--clock <spec> --acceptance
-/// <path>]` from the process args (the args AFTER the binary name). Manual
-/// parsing — the binary has no clap dependency. Returns `None` when the
-/// first arg is not `run` (the env-gated paths win). Story 18-4 (CR-2): the
-/// scene flags come as a pair, never with `--once` or `--live`.
+/// Parse `run <manifest-path> [--live] [--once] [--epic <file>] [--clock <spec>
+/// --acceptance <path>]` from the process args (the args AFTER the binary
+/// name). Manual parsing — the binary has no clap dependency. Returns `None`
+/// when the first arg is not `run` (the env-gated paths win). Story 18-4
+/// (CR-2): the scene flags come as a pair, never with `--once` or `--live`.
+/// Story 19-1 (AC1.2): `--epic` takes one value and never drives a scene.
 pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunArgs>, String> {
     let mut it = args.into_iter();
     if it.next().as_deref() != Some("run") {
@@ -89,10 +93,19 @@ pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<
     let mut manifest_path: Option<String> = None;
     let (mut live, mut once) = (false, false);
     let (mut clock, mut acceptance): (Option<String>, Option<String>) = (None, None);
+    let mut epic: Option<String> = None;
     while let Some(a) = it.next() {
         match a.as_str() {
             "--live" => live = true,
             "--once" => once = true,
+            "--epic" => {
+                let value = it.next().filter(|v| !v.starts_with("--")).ok_or_else(|| {
+                    format!("maos run: --epic needs a file — expected: {RUN_USAGE}")
+                })?;
+                if epic.replace(value).is_some() {
+                    return Err("maos run: --epic is given twice; one epic per run".into());
+                }
+            }
             "--clock" | "--acceptance" => {
                 let value = it.next().ok_or_else(|| {
                     format!("maos run: {a} needs a value — expected: {RUN_USAGE}")
@@ -112,6 +125,13 @@ pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<
                 ));
             }
         }
+    }
+    if epic.is_some() && (clock.is_some() || acceptance.is_some()) {
+        return Err(
+            "maos run: --epic dispatches a topology's Workers; it cannot be combined with \
+             --clock/--acceptance (a Butler scene)"
+                .into(),
+        );
     }
     let scene = match (clock, acceptance) {
         (None, None) => None,
@@ -139,6 +159,7 @@ pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<
             live,
             once,
             scene,
+            epic,
         })),
         None => Err(format!(
             "maos run: missing manifest path — expected: maos run {RUN_USAGE}"
@@ -537,8 +558,9 @@ fn resolve_worker_caps(
 /// `goal` drained from the delegation `task.assign` payload, and `None` means
 /// there was no delegation (the standalone `[cli_wrapper]` path), not a default.
 ///
-/// Returns the adapter-parsed completion label so the caller can journal it as a
-/// real `FrameKind::TaskComplete` frame (AC3.10).
+/// Returns a [`WorkerRun`]: the adapter-parsed completion the caller journals as
+/// a real `FrameKind::TaskComplete` frame (AC3.10), plus the Worker's pid and
+/// its stdout row ids an `--epic` distillate cites (Story 19-1, D-19-1-07 A).
 ///
 /// # Story 16-3 — the Worker is SUPERVISED (D-16-3-C, D-16-3-D)
 ///
@@ -574,7 +596,7 @@ pub fn run_cli_wrapper_manifest(
     supervision: &dyn crate::supervision::WorkerSupervision,
     task: crate::supervision::WorkerTask,
     #[cfg(unix)] egress: Option<&crate::egress::EgressHandle>,
-) -> Result<worker_cli::WorkerCompletion, Box<dyn std::error::Error>> {
+) -> Result<WorkerRun, Box<dyn std::error::Error>> {
     use maos_domain::host_grant::HostGrantAllowlist;
     use maos_domain::invariants::i9::SandboxTier;
     use maos_kernel_core::lifecycle::cli_wrapper::{
@@ -1222,6 +1244,9 @@ pub fn run_cli_wrapper_manifest(
     // delete the evidence pointer at exactly the moment someone asks what the
     // worker actually printed.
     let mut last_stdout_tl_ref: Option<[u8; 16]> = None;
+    // Story 19-1 (D-19-1-07 A) — every stdout row's id, in journal order: the
+    // sources an `--epic` distillate cites at this Worker's pid (I11).
+    let mut stdout_frame_ids: Vec<[u8; 16]> = Vec::new();
     // Story 16-3 — the read-back filters on the Worker's OWN pid. Every Worker
     // of a root shares `from_spirit_id == "worker"` (the bridge's sender
     // identity), so with two concurrent Workers the old sender filter mixed
@@ -1246,6 +1271,7 @@ pub fn run_cli_wrapper_manifest(
                 match v.get("stream").and_then(|s| s.as_str()) {
                     Some("stdout") => {
                         last_stdout_tl_ref = Some(row.frame_id);
+                        stdout_frame_ids.push(row.frame_id);
                         wc_stdout.push(line);
                     }
                     Some("stderr") => wc_stderr.push(line),
@@ -1323,8 +1349,29 @@ pub fn run_cli_wrapper_manifest(
 
     // AC3.10 — return the typed oracle outcome. The topology caller emits
     // `TaskComplete` only for `WorkerCompletion::Completed`; a crash or missing
-    // marker must leave the delegation in flight and fail the run.
-    Ok(completion)
+    // marker must leave the delegation in flight and fail the run. Story 19-1
+    // (D-19-1-07 A) — with the Worker's pid and the stdout rows it journaled.
+    Ok(WorkerRun {
+        completion,
+        spirit_pid,
+        stdout_frame_ids,
+        stderr_lines: wc_stderr.len(),
+        last_stdout_tl_ref,
+    })
+}
+
+/// Story 19-1 (D-19-1-07 A) — what one [`run_cli_wrapper_manifest`] produced:
+/// the oracle's verdict, the Worker's real SCB pid and the ids of the stdout
+/// `CliSubprocessOutput` rows journaled at that pid during this run. The
+/// `--epic` loop distils those rows at that pid (I11 citer authorization).
+#[cfg(feature = "network")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkerRun {
+    pub completion: worker_cli::WorkerCompletion,
+    pub spirit_pid: u32,
+    pub stdout_frame_ids: Vec<[u8; 16]>,
+    pub stderr_lines: usize,
+    pub last_stdout_tl_ref: Option<[u8; 16]>,
 }
 
 #[cfg(all(test, feature = "network"))]

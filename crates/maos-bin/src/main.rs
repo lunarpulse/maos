@@ -990,8 +990,29 @@ fn build_spirit_obj(
     let kind = classify_spirit(class_name)
         .ok_or_else(|| format!("no loader registered for class '{class_name}'"))?;
     Ok(match kind {
+        // Story 19-1 (D-19-1-04 A) — the boot arms' ONE construction: the
+        // context port at the resolved pid and, under the seam's inference, the
+        // TARGET manifest's declared provider. A successor without the port
+        // would be the forbidden fallback (D-18-1-R1).
         LoadedSpiritKind::Orchestrator => {
-            make_spirit_obj(::orchestrator::Orchestrator::new(class_name))
+            let seam = deps
+                .butler_seam
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .clone()
+                .ok_or("butler seam not ready")?;
+            let declared = butler_manifest
+                .and_then(gate_staged)
+                .map(|gated| declared_providers(&gated))
+                .unwrap_or_default();
+            let (id, scheduler) = (class_name.to_owned(), Arc::clone(&deps.scheduler));
+            let pid_of: ::orchestrator::PidSource = Arc::new(move || scheduler.resolve_pid(&id));
+            make_spirit_obj(maos_bin::orchestrator_root::construct(
+                ::orchestrator::Orchestrator::new(class_name),
+                &seam,
+                &declared,
+                pid_of,
+            )?)
         }
         LoadedSpiritKind::Architect => make_spirit_obj(
             ::architect::Architect::new(class_name).with_pending_spec("upgrade successor"),
@@ -2801,6 +2822,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // random per-process value throughout, so NFR-Rel-6 restart detection keeps
     // working exactly as before — a pairing path that silently disabled restart
     // detection would trade one broken control for another.
+    // Story 19-7 (D-19-7-09 A) — the sender's re-pin hold, armed below only on the
+    // cross-host arm and only when `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` is set.
+    let mut repin_hold = None;
     if cross_host_arm_active {
         // §A6 review 2026-08-24, P2/P3/P4/P5 — resolve and validate the whole
         // rendezvous contract BEFORE the nonce is published:
@@ -2839,27 +2863,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .into());
             }
         }
-        let timeout_secs = match std::env::var("MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS") {
-            Err(std::env::VarError::NotPresent) => 300u64,
-            Err(std::env::VarError::NotUnicode(raw)) => {
-                return Err(format!(
-                    "maos run: MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS is not valid UTF-8 \
-                     ({raw:?}); refusing rather than guessing a hold bound."
+        // One parser for the variable (`delegation::pairing_timeout_secs_from_env`):
+        // unset ⇒ the rendezvous default of 300 s AND no re-pin hold (story 19-7).
+        let pairing_timeout_secs = maos_bin::delegation::pairing_timeout_secs_from_env()?;
+        let timeout_secs = pairing_timeout_secs.unwrap_or(300);
+        repin_hold = pairing_timeout_secs
+            .map(|secs| {
+                maos_bin::delegation::RepinHold::new(
+                    boot_nonce,
+                    std::time::Duration::from_secs(secs),
+                    maos_bin::delegation::REPIN_HOLD_RESEND_INTERVAL,
                 )
-                .into());
-            }
-            Ok(raw) => match raw.parse::<u64>() {
-                Ok(secs) if (1..=86400).contains(&secs) => secs,
-                _ => {
-                    return Err(format!(
-                        "maos run: MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS must be an integer in \
-                         1..=86400 seconds, got {raw:?}; refusing rather than holding on a \
-                         garbage bound."
-                    )
-                    .into());
-                }
-            },
-        };
+            })
+            .transpose()?;
         let _logged = transparency_log.insert_frame_event(
             maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
             0,
@@ -2871,11 +2887,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             maos_domain::invariants::i3::FrameOrigin::Kernel,
         );
         eprintln!(
-            "maos: cross-host sender ready — boot_nonce {boot_nonce} (decimal). Transcribe it \
-             into host B's [[tcp.peer_pins]] boot_nonce. Read it back with `maosctl audit query \
-             --frame-kind TelemetryEvent --intent-contains cohort:crosshost-started --format \
-             ndjson`; NEVER `--format plain`, which renders it as {:016x} under a column header \
-             named `boot_nonce` and would be parsed as decimal.",
+            "maos: cross-host sender ready — boot_nonce {boot_nonce} (decimal). Host B must pin \
+             it, by either of two recoveries: (1) config re-pair — transcribe it into host B's \
+             [[tcp.peer_pins]] boot_nonce and (re)start host B; or (2) consent on a running host \
+             B that refused it — within 300 s of the refusal run `maosctl a2a repin list` then \
+             `maosctl a2a repin approve <peer> --boot-nonce {boot_nonce}` on host B's door (keeps \
+             the pinned fingerprint; in memory only, lost when host B restarts). Read it back \
+             with `maosctl audit query --frame-kind TelemetryEvent --intent-contains \
+             cohort:crosshost-started --format ndjson`; NEVER `--format plain`, which renders it \
+             as {:016x} under a column header named `boot_nonce` and would be parsed as decimal.",
             boot_nonce
         );
         // The hold is OPT-IN and bounded: unset ⇒ no wait at all, so the loopback
@@ -2918,7 +2938,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             None => maos_bin::delegation::DelegationRouter::LoopbackRehearsal,
         },
     )
-    .await?;
+    .await?
+    .with_repin_hold(repin_hold);
     eprintln!(
         "maos: A2A delegation leg installed ({} -> {}, intent {}) (j1-crosshost-1a/2b)",
         maos_bin::delegation::FROM_HOST,
@@ -4585,6 +4606,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .into());
         }
+        // Story 19-1 (AC1.2) — `--epic` dispatches a topology's host-bearing
+        // Workers; a single-Spirit manifest has none to bind a section to.
+        if run.epic.is_some() && manifest_root.get("topology").is_none() {
+            return Err(format!(
+                "maos run: --epic needs a topology with host-bearing Worker entries; {} is not \
+                 a topology manifest",
+                manifest_path.display()
+            )
+            .into());
+        }
         if let Some(topology_entries) =
             maos_bin::topology::topology_manifest_entries(&manifest_root)?
         {
@@ -4600,16 +4631,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // combine it with the random per-run `boot_nonce`, so a later process
             // reusing the same Transparency Log cannot collide with sequence 1/2.
             let mut delegation_seq: u64 = 1;
-            // j1-crosshost-1a AC3.6 — the composition root's OWN Orchestrator, used
-            // only to build the delegation frame. The scheduler-loaded Orchestrator
-            // Spirit is MOVED into `scheduler.load(...)` below and is unreachable
-            // from here, and `on_idle` is inert with zero callers — so nothing in
-            // MAOS drives a dispatch today. This story deliberately does not build
-            // that loop; one composition-root-driven delegation is the v0.8 rung.
-            // The id must equal `delegation::FROM_SPIRIT` because the consent
-            // envelope's granter is compared against `frame.from` at intake.
-            let delegation_emitter =
-                orchestrator::Orchestrator::new(maos_bin::delegation::FROM_SPIRIT);
             // Story 16-3 (D-16-3-M) — a topology broken off mid-load by a
             // signal must exit NON-ZERO: the `--once` pass never completed, and
             // an exit 0 there is the 2a AC1.5 false-success shape.
@@ -4621,6 +4642,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // unload → audit drain → the escape tail's final scan before
             // `return Err`, with its error text unchanged.
             let topology_load: Result<(), Box<dyn std::error::Error>> = async {
+                // Story 19-1 (D-19-1-04 A) — the LOADED Orchestrator emits every
+                // delegation frame. The `orchestrator` entry's instance is built
+                // by `orchestrator_root::construct` and a clone is kept here (one
+                // `DispatchState`, so its in-flight count is the one 19-2 drains
+                // against) with the cell its admitted pid lands in. A host-bearing
+                // entry with no such Orchestrator before it is refused typed. The
+                // id equals `delegation::FROM_SPIRIT` because the consent
+                // envelope's granter is compared against `frame.from` at intake.
+                let mut delegation_emitter: Option<(
+                    orchestrator::Orchestrator,
+                    Arc<std::sync::atomic::AtomicU32>,
+                )> = None;
+                // Story 19-1 (D-19-1-02/03 A) — the epic is read and split before
+                // ANY entry loads, so every refusal precedes every emit: section k
+                // goes to the k-th host-bearing entry, as the k-th `task.assign`.
+                let epic = match run.epic.as_deref() {
+                    Some(path) => Some(maos_bin::orchestrator_root::load_epic(
+                        std::path::Path::new(path),
+                        topology_entries
+                            .iter()
+                            .filter(|entry| entry.host.is_some())
+                            .count(),
+                        cross_host_arm_active,
+                    )?),
+                    None => None,
+                };
+                // The next section's index, the previous section's distillate ref
+                // (FR21: frames 2…N carry it), and whether a pending halt stopped
+                // dispatch (D-19-1-09 A).
+                let mut epic_next: usize = 0;
+                let mut epic_prior: Option<maos_domain::frame::PriorDistillateRef> = None;
+                let mut epic_halted = false;
                 // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
                 // topology Worker with no `host`; `TopologyEntry` carries only
                 // `{manifest, host}`, so the position is the only stable handle.
@@ -4667,14 +4720,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             )
                             .into());
                         }
-                        // j1-crosshost-1a AC3.6 — the frame-borne delegation trigger.
-                        // The composition root calls `assign_frame_remote` directly,
-                        // once per `host`-bearing topology entry, at topology-load
-                        // time. THIS STORY DOES NOT BUILD AN ORCHESTRATOR DISPATCH
-                        // LOOP: `on_idle` is inert and nothing drives the Orchestrator
-                        // today, so one composition-root-driven delegation IS the v0.8
-                        // rung. The absence of a loop here is deliberate, not an
-                        // oversight — do not "fix" it by inventing a scheduler hook.
+                        // j1-crosshost-1a AC3.6 — the frame-borne delegation trigger:
+                        // one `assign_frame_remote` per `host`-bearing topology entry,
+                        // at topology-load time. Story 19-1 makes this the
+                        // Orchestrator's dispatch loop (still driven by the root, never
+                        // by a scheduler hook): with `--epic`, section k is the k-th
+                        // host-bearing entry's goal, each Worker is distilled at its
+                        // own pid, section k+1 carries that distillate through
+                        // `followup_dispatch_remote` (FR21), and a pending halt on the
+                        // Orchestrator stops dispatch before the next `task.assign`.
                         //
                         // AC3.5 — ordering is decided: emit → route → pump → drain,
                         // ALL completed before the worker admit below.
@@ -4693,7 +4747,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let mut delegation_frame_id: Option<[u8; 16]> = None;
                         let delegated_task = match &entry.host {
                             None => None,
+                            // Story 19-1 (D-19-1-09 A) — dispatch stopped on a pending
+                            // halt: no further Worker is admitted.
+                            Some(_) if epic_halted => continue,
                             Some(to_host) => {
+                                let Some((emitter, emitter_pid)) = delegation_emitter.as_ref()
+                                else {
+                                    return Err(format!(
+                                        "maos run: topology entry {} is host-bearing but no \
+                                         `{}` Orchestrator entry precedes it — the loaded \
+                                         Orchestrator emits every delegation frame (D-19-1-04)",
+                                        child_path.display(),
+                                        maos_bin::delegation::FROM_SPIRIT
+                                    )
+                                    .into());
+                                };
                                 let intent = maos_domain::invariants::i8::A2AIntent::new(
                                     orchestrator::DELEGATION_CONSENT_INTENT,
                                 );
@@ -4732,16 +4800,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 //     so the run errored `NoEffectEvidence` AFTER
                                 //     billing. Fail before the frame is emitted and
                                 //     before any spawn.
-                                //   * loopback arm → fall back to the rehearsal string.
-                                //     The loopback rehearsal and `demo-j1` set no goal
-                                //     and must stay green; they assert mechanism, not
-                                //     effect.
+                                //   * loopback arm → the `--epic` section bound to this
+                                //     entry, else the rehearsal string. The loopback
+                                //     rehearsal and `demo-j1` set no goal and must stay
+                                //     green; they assert mechanism, not effect. Story
+                                //     19-1 (D-19-1-02 A): a goal set here on loopback is
+                                //     refused, naming `--epic`, never silently dropped.
                                 let operator_goal = std::env::var("MAOS_DELEGATED_GOAL")
                                     .ok()
                                     .filter(|goal| !goal.trim().is_empty());
-                                let goal = match (operator_goal, cross_host_arm_active) {
-                                    (Some(goal), _) => goal,
-                                    (None, true) => {
+                                let section = epic
+                                    .as_ref()
+                                    .map(|sections| {
+                                        sections.get(epic_next).ok_or(
+                                            "maos run: --epic has fewer sections than \
+                                             host-bearing entries",
+                                        )
+                                    })
+                                    .transpose()?;
+                                let goal = match (operator_goal, cross_host_arm_active, section) {
+                                    (Some(_), false, _) => {
+                                        return Err(
+                                            "maos run: MAOS_DELEGATED_GOAL names a cross-host \
+                                             goal and this run delegates on the loopback arm. On \
+                                             loopback the goal comes from `--epic <file>` (one \
+                                             `### Story` section per host-bearing Worker); unset \
+                                             MAOS_DELEGATED_GOAL and pass --epic instead."
+                                                .to_string()
+                                                .into(),
+                                        );
+                                    }
+                                    (Some(goal), true, _) => goal,
+                                    (None, true, _) => {
                                         return Err(
                                             "maos run: MAOS_DELEGATED_GOAL is required for any \
                                              cross-host delegation and is unset or blank. The \
@@ -4756,32 +4846,87 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 .into(),
                                         );
                                     }
-                                    (None, false) => format!(
+                                    (None, false, Some(section)) => section.text.clone(),
+                                    (None, false, None) => format!(
                                         "founder-loop: execute the delegated assignment from {}",
                                         maos_bin::delegation::FROM_HOST
                                     ),
                                 };
-                                let payload = delegation_emitter.build_task_assign(
-                                    goal,
-                                    "the worker reports completion through its adapter's \
-                                     parse_completion oracle",
-                                    None,
+                                // Story 19-1 (D-19-1-09 A) — before each `--epic`
+                                // `task.assign`, the Orchestrator's pending halts: one
+                                // stops dispatch here (no frame, no Worker) and the
+                                // run drains normally.
+                                if let Some(section) = section {
+                                    let pid =
+                                        emitter_pid.load(std::sync::atomic::Ordering::Acquire);
+                                    maos_bin::orchestrator_root::plant_test_halt(
+                                        &transparency_log,
+                                        &shared_journal,
+                                        &halt_registry,
+                                        pid,
+                                        maos_bin::delegation::FROM_SPIRIT,
+                                        boot_nonce,
+                                        section.ordinal,
+                                    )?;
+                                    let halt_ids =
+                                        maos_bin::orchestrator_root::pending_halts(&halt_registry, pid);
+                                    if !halt_ids.is_empty() {
+                                        let total = epic.as_ref().map_or(0, Vec::len);
+                                        println!(
+                                            "{}",
+                                            serde_json::json!({
+                                                "event": "dispatch_halted",
+                                                "orchestrator_pid": pid,
+                                                "halt_ids": halt_ids,
+                                                "dispatched_sections": section.ordinal - 1,
+                                                "undispatched_sections":
+                                                    (section.ordinal..=total).collect::<Vec<_>>(),
+                                            })
+                                        );
+                                        epic_halted = true;
+                                        continue;
+                                    }
+                                }
+                                let success_criteria = "the worker reports completion through \
+                                                        its adapter's parse_completion oracle";
+                                let lineage = maos_domain::invariants::i13::IntentLineage::new(
+                                    vec![intent.clone()],
                                 );
-                                let frame = delegation_emitter.assign_frame_remote(
-                                    delegation_seq,
-                                    boot_nonce,
-                                    maos_bin::delegation::RECIPIENT_SPIRIT,
-                                    maos_spirit_abi::identity::SpiritRole::Worker,
-                                    payload,
-                                    maos_domain::invariants::i13::IntentLineage::new(vec![
-                                        intent.clone()
-                                    ]),
-                                    to_host,
-                                    maos_bin::delegation::FROM_HOST,
-                                    intent,
-                                )?;
+                                let frame = match epic_prior.take() {
+                                    // Story 19-1 (AC4, D-19-1-06 A) — section k+1
+                                    // references section k's distillate through the
+                                    // typed remote follow-up (FR21: never raw output).
+                                    Some(prior) => emitter.followup_dispatch_remote(
+                                        delegation_seq,
+                                        boot_nonce,
+                                        maos_bin::delegation::RECIPIENT_SPIRIT,
+                                        maos_spirit_abi::identity::SpiritRole::Worker,
+                                        goal,
+                                        success_criteria,
+                                        prior,
+                                        lineage,
+                                        to_host,
+                                        maos_bin::delegation::FROM_HOST,
+                                        intent,
+                                    )?,
+                                    None => {
+                                        let payload =
+                                            emitter.build_task_assign(goal, success_criteria, None);
+                                        emitter.assign_frame_remote(
+                                            delegation_seq,
+                                            boot_nonce,
+                                            maos_bin::delegation::RECIPIENT_SPIRIT,
+                                            maos_spirit_abi::identity::SpiritRole::Worker,
+                                            payload,
+                                            lineage,
+                                            to_host,
+                                            maos_bin::delegation::FROM_HOST,
+                                            intent,
+                                        )?
+                                    }
+                                };
                                 delegation_frame_id = Some(frame.frame_id);
-                                delegation_emitter.begin_delegation();
+                                emitter.begin_delegation();
                                 // j1-crosshost-2b AC2.1 — the two arms diverge here.
                                 // On loopback the frame never left, so THIS Host runs
                                 // the worker with the drained goal. On the cross-host
@@ -4923,7 +5068,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             topology_interrupted = true;
                             break;
                         }
-                        let completion = worker_result?;
+                        let worker_run = worker_result?;
+                        let completion = &worker_run.completion;
                         // AC3.10 + review 2a-P4 — the verdict is enforced for EVERY
                         // topology `[cli_wrapper]` entry, not only the delegated
                         // ones: an entry without `host` gets `delegated_task =
@@ -4941,10 +5087,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .into());
                         }
                         if delegated_task.is_some() {
+                            let emitter = delegation_emitter
+                                .as_ref()
+                                .map(|(emitter, _)| emitter)
+                                .ok_or("maos run: a delegated Worker completed with no emitter")?;
+                            // Story 19-1 (AC4, D-19-1-07/08 A) — on the `--epic`
+                            // path a completed Worker's stdout rows are distilled
+                            // AT ITS OWN PID (I11), BEFORE its `TaskComplete` is
+                            // journaled; the next section's follow-up carries the
+                            // ref, so the FR21 gate passes on these real rows.
+                            if let Some(sections) = epic.as_ref() {
+                                let section = sections.get(epic_next).ok_or(
+                                    "maos run: --epic has fewer sections than host-bearing entries",
+                                )?;
+                                let prior = maos_bin::orchestrator_root::write_section_distillate(
+                                    &*distillate_writer,
+                                    section,
+                                    &worker_run,
+                                )?;
+                                println!(
+                                    "{}",
+                                    serde_json::json!({
+                                        "event": "distillate_written",
+                                        "section": section.ordinal,
+                                        "digest_frame_id": hex::encode(prior.digest_frame_id),
+                                        "producer_pid": worker_run.spirit_pid,
+                                        "distillation_depth": prior.distillation_depth,
+                                    })
+                                );
+                                epic_prior = Some(prior);
+                                epic_next += 1;
+                            }
                             let drained = delegation_leg
                                 .journal_completion(&iac, delegation_seq, boot_nonce)
                                 .await?;
-                            delegation_emitter.complete_delegation();
+                            emitter.complete_delegation();
                             delegation_seq += 1;
                             println!(
                                 "{}",
@@ -4952,7 +5129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "event": "delegation_completed",
                                     "result": completion.label(),
                                     "orchestrator_frames_drained": drained,
-                                    "orchestrator_safe_point": delegation_emitter.is_safe_point(),
+                                    "orchestrator_safe_point": emitter.is_safe_point(),
                                 })
                             );
                         }
@@ -4995,9 +5172,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let spirit_obj: Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> =
                         match kind {
                             LoadedSpiritKind::Orchestrator => {
-                                maos_kernel_core::scheduler::make_spirit_obj(
+                                // Story 19-1 (D-19-1-04 A) — the ONE construction:
+                                // context port, and under `--live`/an explicit mode
+                                // the Inference Port with a per-pass mint at the pid
+                                // the load assigns (the fixup below, as Mira's).
+                                let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
+                                let pid_of: orchestrator::PidSource = {
+                                    let binding = Arc::clone(&pid_binding);
+                                    Arc::new(move || {
+                                        Some(binding.load(std::sync::atomic::Ordering::Acquire))
+                                            .filter(|pid| *pid != 0)
+                                    })
+                                };
+                                let seam = butler_seam
+                                    .lock()
+                                    .unwrap_or_else(|error| error.into_inner())
+                                    .clone()
+                                    .ok_or("maos run: butler seam not ready")?;
+                                let loaded = maos_bin::orchestrator_root::construct(
                                     orchestrator::Orchestrator::new(&spirit_id),
+                                    &seam,
+                                    &declared_providers(&gated),
+                                    pid_of,
                                 )
+                                .map_err(|e| format!("maos run: {e}"))?;
+                                if spirit_id == maos_bin::delegation::FROM_SPIRIT {
+                                    delegation_emitter =
+                                        Some((loaded.clone(), Arc::clone(&pid_binding)));
+                                }
+                                pid_fixups.push(Box::new(move |pid| {
+                                    pid_binding.store(pid, std::sync::atomic::Ordering::Release);
+                                }));
+                                maos_kernel_core::scheduler::make_spirit_obj(loaded)
                             }
                             LoadedSpiritKind::Architect => {
                                 maos_kernel_core::scheduler::make_spirit_obj(
@@ -5341,7 +5547,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .as_ref()
                                 .and_then(|root| root.egress_handle()),
                         )
-                    })?;
+                    })?
+                    .completion;
                     // j1-crosshost-2a AC1.5 — the SECOND false-success surface. This
                     // path used to DISCARD the returned `WorkerCompletion` and
                     // `return Ok(())`, so `maos run <manifest> --once` exited 0 when the
@@ -5824,9 +6031,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         maos_kernel_core::scheduler::make_spirit_obj(researcher)
                     }
                     Some(LoadedSpiritKind::Orchestrator) => {
-                        maos_kernel_core::scheduler::make_spirit_obj(
+                        // Story 19-1 (D-19-1-04 A) — the same ONE construction as
+                        // the topology arm and the successor factory.
+                        let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
+                        let pid_of: orchestrator::PidSource = {
+                            let binding = Arc::clone(&pid_binding);
+                            Arc::new(move || {
+                                Some(binding.load(std::sync::atomic::Ordering::Acquire))
+                                    .filter(|pid| *pid != 0)
+                            })
+                        };
+                        let seam = butler_seam
+                            .lock()
+                            .unwrap_or_else(|error| error.into_inner())
+                            .clone()
+                            .ok_or("maos run: butler seam not ready")?;
+                        let loaded = maos_bin::orchestrator_root::construct(
                             orchestrator::Orchestrator::new(&spirit_id),
+                            &seam,
+                            &declared_providers(&gated),
+                            pid_of,
                         )
+                        .map_err(|e| format!("maos run: {e}"))?;
+                        pid_fixups.push(Box::new(move |pid| {
+                            pid_binding.store(pid, std::sync::atomic::Ordering::Release);
+                        }));
+                        maos_kernel_core::scheduler::make_spirit_obj(loaded)
                     }
                     Some(LoadedSpiritKind::Architect) => {
                         maos_kernel_core::scheduler::make_spirit_obj(
@@ -8466,6 +8696,9 @@ description = "smoke test spirit successor"
                 enterprise_runtime.clone(),
                 enterprise_pdp_runtime.clone().map(Arc::new),
                 Arc::clone(&cohort_worker_supervision),
+                // Story 19-7 — the door's set-once re-pin control; this root
+                // is the only one that installs a pin store into it.
+                operator_door_port.as_ref().map(|door| door.repin_control()),
                 #[cfg(unix)]
                 cohort_supervision.egress_handle().cloned(),
             )
@@ -10796,6 +11029,7 @@ fn host_b_worker_context(
             live: false,
             once: true,
             scene: None,
+            epic: None,
         },
         transparency_log: std::sync::Arc::clone(transparency_log),
         capability: Arc::clone(capability),
@@ -10856,6 +11090,8 @@ async fn run_cohort_a2a_daemon(
     // the same supervisor's scheduler and halt registry for
     // `unload_all_loaded`.
     worker_supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
+    // Story 19-7 — `None` only when this root built no door port.
+    repin_control: Option<Arc<maos_bin::repin_door::RepinControl>>,
     #[cfg(unix)] egress: Option<maos_bin::egress::EgressHandle>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2ATransport as _;
@@ -11012,6 +11248,26 @@ async fn run_cohort_a2a_daemon(
         Arc::new(maos_bin::cert_rotation::TokioGraceTimer),
         maos_cohort::cold_deployment_t_grace(),
     )?;
+    // ── Story 19-7 (AC2.1, D-19-7-05/08 A) — THE RE-PIN CONSENT WIRING ──────
+    //
+    // Same root, same reason as the rotation control above: only here does the
+    // concrete transport's `pins()` survive, the SAME `Arc` the router core
+    // verifies against. The detection sink journals one `a2a:repin-requested`
+    // row per detection through a queue (intake never blocks on SQLite); the
+    // door's control gets the store so `POST /v1/a2a/repins/<peer>` reaches
+    // `await_repin_consent` on the live mesh. A detection before this point
+    // is still pending in the store; only its row is missed (pre-readiness).
+    let repin_pins = runtime.transport.pins();
+    if !repin_pins.install_repin_sink(maos_bin::repin_door::spawn_detection_journal(Arc::clone(
+        &transparency_log,
+    ))) {
+        return Err("cohort daemon: a re-pin detection sink was already installed".into());
+    }
+    if let Some(control) = repin_control {
+        if !control.install(repin_pins) {
+            return Err("cohort daemon: the re-pin control was already installed".into());
+        }
+    }
     // Spawned AFTER the bind so the sink is installed before the listener exists,
     // and BEFORE the readiness line below, so a peer that connects the instant the
     // daemon announces itself finds a live consumer rather than a full queue with

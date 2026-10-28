@@ -27,11 +27,11 @@ No TOFU pin recorded for peer — first-contact not yet attempted
 
 ## Cause
 
-No TOFU pin exists for the target peer because first-contact has never been completed. The spirit attempted to communicate with a peer it has never established trust with.
+No TOFU pin exists for the target peer. Pins are configured, not learned: each one is loaded at transport bind from a `[[tcp.peer_pins]]` row in this host's configuration, and an unpinned peer is refused rather than trusted on first contact.
 
 ## Resolution
 
-Initiate a first-contact handshake with the peer to establish and record the TOFU pin. Use `maos a2a trust <peer_id>` or the equivalent API call to perform initial trust establishment before attempting communication.
+Verify the peer's leaf-certificate SHA-256 fingerprint and current boot nonce out of band, add a `[[tcp.peer_pins]]` row for it (`peer_id`, `fingerprint`, decimal `boot_nonce`) to this host's configuration, and restart this process so the pin store is rebuilt from config. No runtime command creates a first pin; `maosctl a2a repin` only re-arms an existing pin.
 
 ## Source Location
 

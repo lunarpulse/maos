@@ -138,6 +138,8 @@ pub enum Subcommand {
     /// never be started by an operator. Host B of a two-host run was
     /// unreachable by construction.
     Cohort(CohortArgs),
+    /// Story 19-7 (AC3) — A2A trust operations on this host's daemon door.
+    A2a(A2aArgs),
 }
 
 /// Story 10.4a — `maosctl migrate sqlite-to-postgres`.
@@ -205,6 +207,52 @@ pub enum CohortOp {
         #[arg(long)]
         output: Option<std::path::PathBuf>,
     },
+}
+
+/// Story 19-7 (D-19-7-01 A) — `maosctl a2a <op>`.
+#[derive(clap::Args, Debug)]
+pub struct A2aArgs {
+    #[command(subcommand)]
+    pub op: A2aOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum A2aOp {
+    /// Consent to (or refuse) re-pinning a peer whose restart this host's
+    /// receiver detected (NFR-Rel-6). Served only by the cohort A2A daemon's
+    /// door (`MAOS_ONE_SHOT=cohort-a2a-daemon`), which holds the pin store.
+    Repin(RepinArgs),
+}
+
+#[derive(clap::Args, Debug)]
+pub struct RepinArgs {
+    #[command(subcommand)]
+    pub op: RepinOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum RepinOp {
+    /// List the pending restart detections (`GET /v1/a2a/repins`).
+    List,
+    /// Re-pin the peer at its observed boot nonce (`POST /v1/a2a/repins/<peer>`).
+    Approve(RepinDecisionArgs),
+    /// Refuse the re-pin; the peer's pin stays invalidated.
+    Reject(RepinDecisionArgs),
+}
+
+/// D-19-7-02/03 A — the bearer holder decides; the nonce is an echo that
+/// must equal the pending observed nonce or the door answers 409.
+#[derive(clap::Args, Debug)]
+pub struct RepinDecisionArgs {
+    /// Peer id whose restart was detected (e.g. `founder-loop-host`).
+    pub peer: String,
+    /// The peer's new boot nonce, decimal, as the sender published it.
+    #[arg(long, value_name = "DECIMAL")]
+    pub boot_nonce: u64,
+    /// Operator identity recorded in the Approval Decision Log.
+    /// Defaults to `$USER`, then `operator`.
+    #[arg(long, value_name = "ACTOR")]
+    pub actor: Option<String>,
 }
 
 /// Story 9.4 — `maosctl backup <create|verify|restore>`.

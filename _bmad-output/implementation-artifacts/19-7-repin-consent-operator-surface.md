@@ -1,0 +1,301 @@
+---
+story_id: '19.7'
+story_key: 19-7-repin-consent-operator-surface
+created: 2026-10-28
+context_commit: f34f6b4e
+baseline_commit: f34f6b4e
+security_sensitive: true
+kernel_grant: "none — kernel-Δ 0 by construction, verified by reading at f34f6b4e: no option's change set contains a `crates/maos-kernel-core/src` file (TOFU store `maos-a2a-core`; door `maos-control` + `maos-bin`; CLI `maos-cli`; Approval Decision Log writer `crates/maos-iac/src/adapter/transparency_log.rs:2168` and `FrameKind` `:57` live in `maos-iac`; grep `tofu|repin` in kernel-core src = no TOFU code). Pin 26378 physical (`xtask/kernel-core-baseline.toml:505`; git-tracked kernel src `wc -l` = 26378) / 20619 tokei (`xtask/kloc.toml:264`). No kernel-touching option exists, so no E16-A7 prototype was priced; `check-kernel-baseline` at landing confirms."
+kloc_grant: "RULED A 2026-10-28 (extend D19-1 once: a2a-core 4928 -> 5039, control 1422 -> 1539, cli 6220 -> 6318, bin 30563 -> 30810, aggregate 190055 -> 190627). Forecast Σ +283–440 tokei, ×1.3 ≈ +368–572 [INFERENCE, component table §Kernel and kloc pricing]: maos-a2a-core 4928 exact, zero headroom (`xtask/kloc.toml:470`; no D19-1 envelope — owed at this creation, `epics/epic-19-founder-loop-w4.md:137`) +58–85; maos-control 1344 / 1791 (`:484`) +60–90; maos-cli 6155 / 6856 (`:489`) +50–75; maos-bin 29497 exact (`:517`) +115–190; maos-a2a-tcp 1442 / 1621 (`:475`) 0; xtask 0; kernel 0. Recommended A: extend the D19-1 envelope once by 19-7's upper × 1.3 — maos-a2a-core 4928 → 5039, maos-control 1422 → 1539, maos-cli 6220 → 6318, maos-bin 30563 → 30810, aggregate hardfail 190055 (derived; confirm at the 19-1 preflight) → 190627. Cumulative use at creation: 0 of every Epic-19 envelope (no 19-x story has landed). Exact rows (maos-a2a-core, maos-bin) re-pin to their measured figure at landing."
+review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-71`): security-critical AC — an authenticated write route that changes cross-host TOFU trust state (NFR-Rel-6 restart detection; the ADR-062 certificate-identity boundary, `docs/adr/ADR-062-mutating-operator-surface.md:61-64`) — plus a concurrency seam (the pending entry against intake and the rotation `window_lock`, `crates/maos-a2a-core/src/tofu.rs:169-173`). No kernel grant. Separate Blind (opus-5.5) and Edge (opus-5.5) layers, Acceptance on opus-5.5, Test Infrastructure on glm-5.3; creation anthropic/claude-opus-5-5; dev/finisher openai-codex/gpt-6.1-sol (never reviews its own code). fable-5.1 on a security layer only with the operator's permission (`proof-contract.md:57-60`; D-19-7-12)."
+---
+
+# Story 19.7: Re-pin-consent operator surface — `maosctl a2a repin`
+
+Status: in-progress
+
+<!-- Created 2026-10-28 at f34f6b4e (= b35c9284's code tree; records-only on top) by bmad-create-story under the lighter creation contract (no party-mode preflight), under the ratified Epic-19 §R (D19-6 B: this story exists, before 19-4). D-19-7-01…12 are PROPOSED, not ruled — the operator rules; the parent flips this file and `sprint-status.yaml:293` to ready-for-dev after the ruling. Measured by reading only (a sibling creator held the host's single cargo slot): every cited range re-read; moved rows located with `git grep` across f889b3e4 / 84e0e659 / f34f6b4e; per-crate kloc by the kloc-check instrument replicated without cargo (tokei 14.0.0, argv of `xtask/src/kloc_check.rs:294-318`) — `19-7-repin-consent-operator-surface-evidence/creation/`. The figures that needed cargo or a CI artifact were measured by the parent on 2026-10-28 at f34f6b4e (see "Parent measurements (2026-10-28)"). No crate source changed. -->
+
+> **The capability:** *when a peer restarts, the receiving host does not go deaf until someone edits a config and restarts a daemon. Restart detection still refuses the first frame — that is NFR-Rel-6 working — but the receiving host now records what it saw, an operator who knows the peer's new boot nonce confirms it with one authenticated command, and the very next frame is delivered. The recovery the spec designed in Story 6.3 finally has a production caller, and the 2026-09-21 vector proves it end to end.*
+
+**Closes:**
+- 19-4's 2026-09-21 tracker precondition (`sprint-status.yaml:290`; `deferred-work.md:931`, was `:1010`) — D19-6 **B** (RATIFIED 2026-10-27, `epics/epic-19-founder-loop-w4.md:7,142`); epic §19-7 (`:203-207`); stories row `:156`; order `:158,211` (19-7 → 19-4).
+- NFR-Rel-6's production half — "Spirit-restart invalidates prior A2A TOFU pins; re-pin protocol with consent confirmation. v1.0." (`_bmad-output/planning-artifacts/prd/non-functional-requirements.md:25`): the consent half of Story 6.3 AC4 (`6-3-build-the-a2a-peer-mesh-from-loopback-to-cross-host-with-mtls-rotation-chaos.md:430-444`), shipped as a test hook only (`:699` "production wiring … deferred to composition-root install in follow-up").
+- The phantom remediation verb `maos a2a trust` in the error catalog (`xtask/error-catalog.toml:404`; grep `a2a trust` in `crates/` = 0) — fix at origin, rule 10(a).
+
+**Does NOT close, and says so:**
+- Durable TOFU state (a host-B restart still rebuilds pins from `[tcp] peer_pins`, `crates/maos-a2a-tcp/src/config.rs:116-138`; `RELEASE-HOLDS.md:62` row 12) — `21-3-durable-tofu-and-self-leaf-rotation` (`sprint-status.yaml:318`; ADR-063 owner, `xtask/tests/decision_adrs_and_provisioning.rs:23`).
+- Certificate identity change, rotation and serving-leaf replacement — signed manifest reissue only (ADR-062 `:61-64`, 14-2 rotation window `tofu.rs:283-452`). This surface re-arms restart detection for an UNCHANGED pinned identity (D-19-7-04).
+- Automated pairing: consent stays operator-mediated (`RELEASE-HOLDS.md:65` row 15 is restated, not closed).
+- 19-4's hermetic exit and beats (loopback; `two-host-signed-run` stays INDETERMINATE, epic `:20`).
+- The `maos run` (sender) root's own pin store: only the `cohort-a2a-daemon` root holds the concrete transport (`crates/maos-bin/src/main.rs:10992-11000`); a restarted host **B** seen by a sender is out of scope (the sender's pin is configured, `main.rs:2744-2753`).
+
+## Story
+
+As **the operator of a two-host MAOS mesh whose sending host just restarted**,
+I want **the receiving host to show me the restart it detected and let me confirm the peer's new boot nonce with one authenticated command**,
+so that **delivery resumes without editing a config or restarting a daemon — and the J1 two-host demo does not ship on a recovery path nobody has ever executed.**
+
+**Contract:**
+- Epic-19 §19-7 (`_bmad-output/planning-artifacts/epics/epic-19-founder-loop-w4.md:203-207` after the in-place corrections below): one AC (the vector), "the concrete verb/flag and the vector's covering tests are story creation's to fix (rule 9)"; `:158` create-story may tighten, not add uncited ACs — AC1 is the vector; AC2–AC5 tighten it into its cited parts.
+- Tracker `sprint-status.yaml:290` (19-4 precondition text) and `:293` (this row); retro ruling D19-6 B (`epic-18-retro-2026-10-27.md:138`).
+- `docs/testing/proof-contract.md:10-31` (one landing run + one planted red), `:57-71` (review tier, models), `:76-97` (test cost, budgets, fixtures), `:99-142` (build-once families), `:144-180` (prepush), `:182-187` (local profile).
+- Designed protocol: Story 6.3 AC4 (`6-3-…md:421-445`): detection telemetry on the receiver, consent through the Approval Decision Log, approval id in the new pin, default timeout 300 s.
+
+## Current-tree corrections — read before implementing
+
+Measured at `f34f6b4e` (crate sources of every crate this story touches are byte-identical to `f889b3e4`: `git diff --stat f889b3e4..HEAD -- crates` changes only `maos-kernel-core/src/security/sandbox/t3/spawn.rs` in `src`).
+
+| Premise (epic / tracker / deferred row) | Fact at `f34f6b4e` and consequence |
+|---|---|
+| "the default hook returns `TimedOut` (`router.rs:1235-1236`)" | The hook is `InMemoryTofuPinStore.test_repin_hook`, defaulted to `\|_, _, _\| RePinDecision::TimedOut` at **`crates/maos-a2a-core/src/tofu.rs:186`** (`Default` `:180-189`, field `:174-177`, builder `with_repin_hook` `:196-203` — a consuming builder that cannot reach a store `build_pin_store` already wrapped in an `Arc`, `crates/maos-a2a-tcp/src/config.rs:119-120`). `router.rs:1228-1230` is a comment saying so. Consequence: the production decision source is a `maos-a2a-core` change (D-19-7-05). |
+| `await_repin_consent` has zero production callers (`tofu.rs:128,612`) | **Holds.** Trait `:128-133`, impl `:612-646`; callers are tests only (`tofu.rs:764-796`; `crates/maos-a2a/tests/restart_invalidates_pin_nfr_rel_6.rs:58-145`; `crates/maos-a2a-tcp/tests/t_10_4b_rotation_real_timing.rs:1410-1430`). The impl's accept arm already guards collisions (`:621-629`), clears `rotation_next` (`:630`) and records `repin_approval_id` (`:639`, field `:29-31`). |
+| `verify_pinned_sync` returns `NotPinned` on an absent pin, so `[tcp] peer_pins` is the ONLY pinning mechanism (`tofu.rs:457-466`) | **Holds** (`:457-498`; `NotPinned` `:466`). Pins are loaded as first-contact pins at bind (`config.rs:116-138`, called `crates/maos-a2a-tcp/src/transport.rs:375`); a zero nonce is refused at bind (`transport.rs:366-374`). |
+| (unstated) which host must consent | **The receiver.** Restart detection runs in the receiver's intake (`crates/maos-a2a-core/src/router.rs:1343-1385`: `invalidate_if_boot_nonce_differs` `:1355-1358`, NACK `-32004` with `prior_boot_nonce`/`observed_boot_nonce` `:1360-1375`); the sender only learns through the NACK (`:1258-1261`, rendered `cross-host pin mismatch … re-pin consent required` `:2002-2005`). So the consent surface belongs on host B — the `cohort-a2a-daemon` root, which is both a door root (`main.rs:3384-3386`) and the ONLY root where the concrete `TcpA2ATransport` and its `pins()` survive (`main.rs:10992-11014`; `transport.rs:526-528` returns the same `Arc` the router core verifies against, `:375-388`). |
+| (unstated) a `maosctl` verb can act on the pin store | **Only through the door.** A fresh process builds its own store and leaves the live mesh untouched (`crates/maos-bin/src/cert_rotation.rs:10-23`). Since 16-1 the authenticated loopback door carries POST commands to daemon-held state (ADR-062; `crates/maos-control/src/lib.rs:186-201`, `OperatorCommand` `:263-357`). |
+| (unstated) an operator POST may change TOFU state | **Bounded by ADR-062 `:61-64`:** "peer identity, certificate rotation, and serving-leaf replacement … never gain an operator POST mutation route"; the read routes are 405 guards (`crates/maos-control/tests/post_surface_16_1.rs:944-977`). A re-pin that keeps the pinned fingerprint and only re-arms the restart nonce does not change identity; one that accepts a new fingerprint does (`tofu.rs:631-641` would insert any `new_observed`). → D-19-7-04 + an ADR-062 amendment. |
+| (unstated) B's operator can see the request | **Not at HEAD.** A `-32004` refusal journals nothing on B (`crates/maos-bin/tests/f4_pairing.rs:23-25`; the arm returns a NACK only, `router.rs:1360-1375`); the invalidation is only a mark (`tofu.rs:657-680`). → pending record + detection row (D-19-7-06, D-19-7-08). |
+| "→ re-pin → delivery" | **The sender exits on the refusal.** `maos run --once` cross-host (`main.rs:2739-2774`) fails the emit and exits (`crates/maos-bin/src/delegation.rs:273-296`); its nonce is random per process (`main.rs:2140-2152`, debug-only override `:2140-2146`), so a re-run is a NEW restart. Delivery after consent needs a sender that survives the refusal (D-19-7-09). |
+| "two real processes" | **Required, three in fact.** Restart detection is unreachable on loopback (`router.rs:1233-1237`; sentinel `:1349`; loopback stamps 0, `crates/maos-bin/tests/bounded_postures_2b.rs:129-131`); the consent must reach the running B over its door. The vector = B (`cohort-a2a-daemon`) + A (`maos run --once`) + a `maosctl` client. The f4 fixture already drives both roots (`daemon_command` `f4_pairing.rs:335-354`, `run_host_a_once` `:460-501`, `published_nonce` `:620-639`) and the door-bound daemon precedent exists (`crates/maos-bin/tests/cert_rotation_trigger_14_2a.rs:172,244-246`). |
+| (unstated) the vector needs the debug nonce override | **No.** With D-19-7-09 A both roots mint random nonces: the test reads B's from B's own `cohort:daemon-started` TL row (`main.rs:11043`; the unused helper `sql_i64`, `f4_pairing.rs:556`) and A's from its published line — the vector is profile-independent, unlike the debug-only 16-3 cohort vectors (`.github/workflows/discipline.yml:1763-1772`). |
+| The current recovery | **Proven, and stays:** f4 V3 `wrong_nonce_is_refused_and_recovery_requires_a_b_restart` (`f4_pairing.rs:886-995`) and the in-process cascade (`:1004-1038`). The new vector is its re-pin twin; V3 keeps the restart path honest. |
+| Operator docs name the recovery | **Stale or false:** `config.rs:31-35` ("Operators MUST pre-pair the nonce"); pairing stderr `main.rs:2873-2880` (transcribe into host B's config); `xtask/error-catalog.toml:404` (`maos a2a trust`, nonexistent), `:417`; `_bmad-output/test-artifacts/j1-two-host-evidence/README.md:214-217` ("recovery needs a host B restart"); `RELEASE-HOLDS.md:65`; stale comments `router.rs:1228-1230`, `crates/maos-bin/tests/root_shutdown_unload_16_3.rs:1732-1735`, `discipline.yml:1753-1756` (all "zero production callers … precondition on 19-4"). → AC4. |
+
+**Epic cites corrected in place (OLD → NEW @`f34f6b4e`; `epics/epic-19-founder-loop-w4.md`):**
+- §19-7 Closes `:205`: `deferred-work.md:1010` → `:931` (moved by the 2026-10-27 archival; `git grep` at f889b3e4 / 84e0e659 = `:1010`, at f34f6b4e = `:931`).
+- §19-7 AC1 `:207`: "the default hook returns `TimedOut`, `maos-a2a-core/src/router.rs:1235-1236`" → "`crates/maos-a2a-core/src/tofu.rs:186` (`Default` `:180-189`; the router comment saying so is `router.rs:1228-1230`)"; `tofu.rs:128,612`, `tofu.rs:457-466` and `sprint-status.yaml:290` hold.
+- Not edited (outside §19-7; reported to the parent): `:189` (§19-4), `:90` (R19-24) and `:142` (D19-6) still say `deferred-work.md:1010`; the tracker text `sprint-status.yaml:290` says `router.rs:1235-1236` (→ `tofu.rs:186`) and `router.rs:1239-1243` (→ `router.rs:1233-1237`).
+
+## Kernel and kloc pricing — measured at creation
+
+**Kernel:** Δ 0 by construction (frontmatter). No option in the table below touches `crates/maos-kernel-core/src`; the only TL kinds used already exist (`FrameKind::TelemetryEvent`, `crates/maos-iac/src/adapter/transparency_log.rs:57`) and the I4 row type is `maos-domain` (`crates/maos-domain/src/invariants/i4.rs:36-49`). A new `FrameKind` variant is NOT needed and is a guardrail.
+
+**kloc at `f34f6b4e`** (tokei 14.0.0 with the kloc-check argv, `xtask/src/kloc_check.rs:294-318`; evidence `creation/tokei-f34f6b4e.json`; `kloc-check --json` run by the parent 2026-10-28 at f34f6b4e: passed true, aggregate 188504, per-crate identical to the tokei replication — see "Parent measurements (2026-10-28)"): maos-a2a-core 4928 (exact row `:470`), maos-a2a-tcp 1442 / 1621 (`:475`), maos-control 1344 / 1791 (`:484`), maos-cli 6155 / 6856 (`:489`), maos-bin 29497 (exact `:517`), aggregate **188504** (hardfail 188505, `:718`). Doc comments count as code (tokei charges `///`/`//!`), and in-`src` `#[cfg(test)]` modules are charged (`tofu.rs:693-896` is inside the 634 code lines of `tofu.rs`) — new store tests go to `crates/maos-a2a/tests/` (uncharged).
+
+Component forecast for the recommended rows (tokei code, [INFERENCE]; analogues: 18-7's decision route `operator_door` +80, maos-control +58, maos-cli +51 — `epics/epic-19-founder-loop-w4.md:121`; skills decide route `crates/maos-control/src/lib.rs:1251-1281`; rotation read seam `lib.rs:30-84`, `crates/maos-bin/src/cert_rotation.rs` 155 code lines):
+
+| Crate | Component | Forecast |
+|---|---|---:|
+| maos-a2a-core | pending side-map recorded atomically in `invalidate_if_boot_nonce_differs` (latest observed supersedes; `window_lock` order `tofu.rs:169-173`) | 20–28 |
+| | read accessor for the door (sync, plain scalars) | 8–12 |
+| | production decision source replacing `test_repin_hook`; `await_repin_consent` consumes the decision, binds the nonce, expires → `TimedOut` (D-05/D-06 A) | 20–30 |
+| | detection sink in the router's `Ok(Some(prior))` arm (`router.rs:1360`) (D-08 A) | 10–15 |
+| | **Σ** | **58–85** |
+| maos-control | `OperatorCommand::RepinDecision` + `spirit_key`/`route_budget` arms | 6–8 |
+| | `POST /v1/a2a/repins/<peer>` (body parse, `post_guard`, `validate_id`) | 28–35 |
+| | `GET /v1/a2a/repins` + row type + port method | 26–47 |
+| | **Σ** | **60–90** |
+| maos-cli | `maosctl a2a repin list\|approve\|reject` clap types | 25–35 |
+| | door handlers (`door_verb`, `crates/maos-cli/src/subcommands.rs:148-162`) + list rendering | 25–40 |
+| | **Σ** | **50–75** |
+| maos-bin | door handler (pending check, I4 row before the pin moves, `await_repin_consent`, outcome mapping) + port method + verb label | 50–75 |
+| | set-once re-pin control installed in `run_cohort_a2a_daemon` (pattern `main.rs:3026-3034`, `:11009-11014`) | 10–20 |
+| | detection-row consumer `a2a:repin-requested` (D-08 A) | 15–20 |
+| | sender re-send hold (D-09 A; `delegation.rs:267-305`, bound `main.rs:2842-2862`) | 40–70 |
+| | operator strings (`main.rs:2873-2880`) | 0–5 |
+| | **Σ** | **115–190** |
+| maos-a2a-tcp · xtask · maos-cohort · maos-iac · maos-domain · kernel | — (D-08 A installs on `transport.core()`, no bind parameter; gates unchanged; tests uncharged) | 0 |
+| **Σ** | | **283–440 → × 1.3 ≈ 368–572** |
+
+Not-recommended deltas: D-09 B −40–70 (maos-bin); D-08 B −10–15 (a2a-core) −15–20 (maos-bin); D-06 B −5–8 (a2a-core); D-01 B swaps the control/cli rows for ≈ +40–60 in the halt path (maos-bin) and loses the GET.
+
+**Cumulative use against the D19-1 envelope** (`epics/epic-19-founder-loop-w4.md:36-49`; ratified Σ × 1.3; 19-7 was not in the Σ):
+
+| Crate | Measured | D19-1 envelope | Σ 19-1…19-6 forecasts | + 19-7 | Fits? |
+|---|---:|---|---:|---:|---|
+| maos-bin | 29497 | 30563 (+1066) | 820 | 115–190 → 935–1010 | yes, inside the × 1.3 slack (56–131 left for 19-5/19-6's analogue-only forecasts) |
+| maos-control | 1344 | 1422 (+78) | 60 (19-2) | 60–90 → 120–150 | **no** — over by 42–72 (inside the reserved ceiling 1791; no kloc.toml raise) |
+| maos-cli | 6155 | 6220 (+65) | 50 (19-2) | 50–75 → 100–125 | **no** — over by 35–60 (inside 6856) |
+| maos-a2a-core | 4928 (exact) | none | 0 | 58–85 | **no envelope** (owed here, `:137`) |
+| aggregate | 188504 / 188505 | 190055 (derived, +1550; `:49`) | 1185 + kernel 9 | 283–440 | **no** — the +1550 excludes 19-7 |
+| Cumulative consumed at creation | | | | | 0 in every row (no 19-x landed) |
+
+## Decisions — RULED A (all twelve, operator Lunarpulse, 2026-10-28, via ask; recommendations adopted)
+
+| ID | Question | Options | Recommendation and evidence | Status |
+|---|---|---|---|---|
+| **D-19-7-01** | The operator surface | **A — `maosctl` verbs over the 16-1 door on host B:** `maosctl a2a repin list` (`GET /v1/a2a/repins`) and `maosctl a2a repin approve\|reject <peer> --boot-nonce <decimal> [--actor <who>]` (`POST /v1/a2a/repins/<peer>`) · B — director surface: raise the request as a halt/notification and resolve it with `maosctl halt resolve` (16-2 registry) · C — config auto-consent (`[tcp]` flag; no surface) · D — signed cohort reissue path (`maosctl cohort …`) | **A.** The door is the one authenticated path to daemon-held state (ADR-062; a fresh process cannot reach the live store, `cert_rotation.rs:10-23`); the 18-7 skills decision is the same shape (`lib.rs:1251-1281`, `crates/maos-cli/src/cli.rs:324-341`). B: halts are per-Spirit (`ResolveHalt { spirit_id, … }`, `lib.rs:309-314`, route requires `spirit_id` `:1148-1154`) — a host trust decision has no Spirit. C removes the consent NFR-Rel-6 requires (`non-functional-requirements.md:25`). D: the J1 peers are deliberately not cohort members (`crates/maos-bin/tests/two_host_delegation_2b.rs:117-120`). Namespace `a2a` matches `GET /v1/a2a/rotation-windows` (`lib.rs:1063`). | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-02** | Who may consent | **A — the bearer holder of host B's door** (loopback + `control.json` `0600`, ADR-062 `:52-55,156-160`), with `--actor` recorded (default `$USER`, then `operator`, as `cli.rs:328-331`) · B — A + a cohort-authority signature over `(peer, nonce)` · C — an allowlist in config that auto-consents named peers | **A.** One trust path, the same authority as every other door mutation (halt resolve, skills approve); I4 records the actor (`i4.rs:36-49`). B is heavy and unavailable to bilateral (non-member) peers. C is D-01 C under another name. | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-03** | What the consent binds | **A — echo:** `--boot-nonce N` must equal the pending observed nonce; mismatch → 409 `repin_nonce_mismatch`, pin unchanged; the operator reads N from the sender's published line (`main.rs:2873-2880`) or its `cohort:crosshost-started` TL row · B — approve the pending observed nonce without an echo · C — pre-armed: the operator supplies a nonce with no pending detection (re-pin before first contact) | **A.** "Consent confirmation" (NFR-Rel-6) is a confirmation of *this* restart — the one the peer announced out of band; the pairing procedure already hands the operator that number (`README.md:197-212`). B approves whatever arrived. C turns the route into a runtime pin editor and skips the detection the vector must exercise. | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-04** | Fingerprint scope of a consented re-pin | **A — nonce-only:** re-pin the peer's CURRENT pinned fingerprint (cert already TLS-verified against it, `router.rs:1330-1341`) with the new nonce; the route takes no fingerprint; ADR-062 gains "## Amendment — Story 19-7" (re-arming restart detection for an unchanged identity is not an identity mutation; `:61-64` stands) · B — full re-pin: the route accepts a new fingerprint (the store allows it, `tofu.rs:631-641`) | **A.** B is exactly the "peer identity … operator POST mutation route" ADR-062 `:61-64` forbids and collides with the 14-2 rotation window and 21-3. The store method keeps its general semantics for its existing tests (`restart_invalidates_pin_nfr_rel_6.rs:58-97` re-pins a new cert; 14-2 AC2.2.b keeps `next = None`); the surface constrains it. | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-05** | How `await_repin_consent` gets a production caller | **A — the door handler calls the trait method** on `transport.pins()` after recording the operator decision in the store's decision source, which replaces `test_repin_hook` (trait signatures unchanged, house convention `tofu.rs:579-581`; no decision ⇒ `TimedOut` as today) · B — a new inherent `repin_with_consent(…)` for the door; `await_repin_consent` stays test-hook-only · C — a spawned task per detection that truly awaits a oneshot from the door, with the timeout | **A.** B leaves the epic's literal ask ("`await_repin_consent` has ZERO production callers", `:207`) unmet and two re-pin paths in one store. C adds a task per detection and a second clock for what the TTL already bounds. A keeps the accept arm's collision guard and `rotation_next` clear (`tofu.rs:619-642`). Clean cutover: `with_repin_hook` users migrate (`tofu.rs:764-796`; `restart_invalidates_pin_nfr_rel_6.rs`; `t_10_4b_rotation_real_timing.rs:1410-1430`) — no `test_`-named field on a production path. | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-06** | Timeout semantics | **A — pending entry with a TTL:** detection records one entry per peer `{prior, observed, detected_at}`; a later detection supersedes; it expires after 300 s (6.3 AC4 4.5, `6-3-…md:444`; equal to the rendezvous default `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS`, `crates/maos-bin/src/env_contract.rs:54-57`); a decision on an expired entry → `RePinDecision::TimedOut`, 409 `repin_request_expired`, no change; intake never blocks · B — no TTL (pending until decided or superseded) · C — intake suspends awaiting consent (6.3 AC4 step 3) | **A.** Fail-closed: a stale request cannot be approved hours later, and `TimedOut` (`tofu.rs:87`) finally means what it says. C holds the peer's connection inside the bounded intake (slow-loris defence, `CODE_TIMEOUT`, `router.rs:1271-1274`) — the 6.3 design pre-dates the 8.6 TCP transport. | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-07** | Consent persistence | **A — in-memory pin + journaled decision:** the re-pinned `TofuPin` lives in the process-local store (`repin_approval_id` set); the decision is the I4 Approval Decision Log row (`transparency_log.rs:2168`) plus the door's completion row `operator.a2a-repin.<operation_id>:<outcome>` (`crates/maos-bin/src/operator_door.rs:1766-1793`); a B restart rebuilds from config (RELEASE-HOLDS row 12 unchanged) · B — A + the daemon rewrites `[tcp] peer_pins` · C — durable pin store | **A.** B makes the daemon a second writer of operator config — the "second writer is a second trust path" rule (`crates/maos-domain/src/operator_door.rs:13-14`). C is 21-3's charter (`sprint-status.yaml:318`), rule 10. | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-08** | A record of the detection on host B | **A — journal `a2a:repin-requested`** (`TelemetryEvent`, payload `{peer, prior_boot_nonce, observed_boot_nonce}`) per detection through a sink installed on `transport.core()` inside `run_cohort_a2a_daemon` before the readiness line (`main.rs:11047`) — 6.3 AC4 step 2 (`6-3-…md:432`) · B — no detection row; the pending entry is visible live through `GET /v1/a2a/repins` only; decisions are journaled | **A.** Restart detection is a security event and a refused frame is currently invisible on B (`f4_pairing.rs:23-25`); an operator who never runs `list` still has the trail. Installing on `core()` needs no `maos-a2a-tcp` bind parameter (bind already takes 13, `transport.rs:336-351`); a detection before the install is still in the pending map (the window is pre-readiness only, like `install_cert_rotation` `main.rs:11009`). | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-09** | How "→ delivery" happens after consent | **A — the sender holds and re-sends:** on `PinInvalidated{awaiting_repin:true}` the cross-host `maos run --once` prints the peer, its own nonce and the exact `maosctl a2a repin approve …` line, then re-sends the SAME journaled frame on a bounded schedule until ACK, a different refusal, or `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` (opt-in: unset ⇒ today's immediate exit, so f4 V3 and `demo-j1` are unchanged); no second emit row (`delegation.rs:256-261`) · B — the test re-runs A with a fixed debug `MAOS_TEST_BOOT_NONCE` (f4 V3 idiom), no sender change · C — host B holds the refused frame and admits it on consent | **A.** Only A makes the asymmetry real: A's nonce is random and B truly cannot pre-pair it (tracker `:290`). B passes only because a debug hook keeps a re-run's nonce (`main.rs:2140-2146`), and a production `--once` sender gets a fresh nonce per run. C contradicts A's NACK with a later delivery on B. Risk to measure in T4: the re-send must reuse the installed router without re-journaling (the cross-host router is set-once inside the mailbox, `main.rs:2711-2716`). | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-10** | Where the vector lives and how CI runs it | **A — a new test in `crates/maos-bin/tests/f4_pairing.rs`** (existing binary and helpers): CI runs it in `workspace-test-suite` (T3 provisioned `discipline.yml:5906`, nextest `:6009`, `CI` set ⇒ a missing substrate fails closed, `proof-contract.md:182-187`); no new test target, no YAML change, not a 20-15 archive consumer · B — a new binary `crates/maos-bin/tests/repin_consent_19_7.rs` (new target, same job) · C — A + an explicit step in `check-j1-loopback-delegation` (`discipline.yml:3357-3363`, plus `build-test-fixtures --only maosctl`; it builds only `worker-cli-fixture` today, `:3355-3356`) | **A.** f4 already owns the pairing machinery and runs where the substrate is; zero archive-family impact (the producer families `discipline.yml:2019-2039` are for compiler-denied consumers; `workspace-test-suite` is its own workspace build, `proof-contract.md:106-109`). C double-runs a T3 vector. Budget: f4's per-binary Σ + the vector must stay ≤ 30 s (`xtask/test-budgets.toml:26`) or carry a measured `[[exception]]` — f4's CI Σ is **3.589 s** (6 testcases of `maos-bin::f4_pairing`, junit artifact `workspace-test-suite-junit` of run 40609213235 @b35c9284, `check-test-budget` passed true; parent 2026-10-28), leaving ≈ 26.4 s for the new vector. | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-11** | Kloc envelope for 19-7 | **A — extend D19-1 once by 19-7's upper × 1.3:** maos-a2a-core 4928 → **5039** (+111), maos-control 1422 → **1539** (+117), maos-cli 6220 → **6318** (+98), maos-bin 30563 → **30810** (+247), aggregate 190055 → **190627** (+572; base derived, 19-1 preflight) · B — extend only the crates 19-7 breaches (a2a-core, control, cli as A; aggregate +325 → 190380); maos-bin absorbs 19-7 inside its slack · C — own per-story measured grant at landing, outside D19-1 (the D-20-16-07 A shape): expected ≤ upper × 1.3, STOP above +25 % (a2a-core 139, control 146, cli 123, bin 309) | **A.** E18 retro R1: one envelope per epic, ratified once, with a cumulative-use line on every record (`epics/epic-19-founder-loop-w4.md:36`); D19-1 already says 19-7 charges against it and that a2a-core's envelope is owed here (`:36,137`). B spends the slack meant for 19-5/19-6's analogue-only forecasts (`:129-130`). C splits the epic's accounting. control/cli stay inside their reserved ceilings under every option (no `kloc.toml` ceiling raise). | RULED A (2026-10-28, Lunarpulse, ask) |
+| **D-19-7-12** | Review model on the security layer | **A — DIFFICULT tier on opus/glm only** (separate opus Blind + Edge, opus Acceptance, glm Test-Infra) · B — A + a fable-5.1 security review of the route and the store change (operator permission required) | **A.** The tier is set by rule (security-critical AC, `proof-contract.md:67-71`) and already puts three layers on opus; fable-5.1 is reserved for safety/security code review with permission (`:57-60`) — the operator's call, offered, not assumed. | RULED A (2026-10-28, Lunarpulse, ask) |
+| CR-1 | Fail-closed defaults (all options) | No decision ⇒ `TimedOut`; no pending entry ⇒ 404; wrong nonce, expired entry, collision ⇒ 409 with the pin still invalidated; a reject consumes the entry and leaves the pin invalidated; a root without the control answers 404, never an empty list (`lib.rs:79-83` precedent). | — |
+| CR-2 | Log before act (I2) | The I4 row is written before the pin changes; if it cannot be written, the pin does not change (500 `audit_unavailable`, the 16-5 class). | — |
+
+## Acceptance Criteria
+
+*(Epic §19-7 AC1 as corrected at creation; AC2–AC5 are AC1's cited parts, worded to the recommended rows and re-worded at the ruling.)*
+
+### AC1 — command and observable: the 2026-09-21 proven-red vector
+
+1. Shape (tracker `sprint-status.yaml:290`, unchanged): **host B boots first** (`cohort-a2a-daemon`, door bound by `MAOS_OPERATOR_BEARER_TOKEN` + `MAOS_OPERATOR_HTTP_BIND=127.0.0.1:0`, random nonce) so **A pins B's real nonce truthfully** (read from B's `cohort:daemon-started` TL row); B's `[[tcp.peer_pins]]` row for A carries a non-zero placeholder because **A boots second and B cannot pre-pair it**. A (`maos run --once`, cross-host arm, random nonce, D-19-7-09 A hold enabled) publishes N and dials.
+2. Observable, in order: B NACKs `-32004` `CODE_SPIRIT_RESTART_DETECTED` (`router.rs:1360-1375`) and journals one `a2a:repin-requested` row; A prints `cross-host pin mismatch … re-pin consent required` (`router.rs:1258-1261`, `:2002-2005`) plus the hold line naming `maosctl a2a repin approve founder-loop-host --boot-nonce N` (peer id `delegation::FROM_HOST`, `crates/maos-bin/src/delegation.rs:65`) and keeps holding; on B `maosctl a2a repin list` exits 0 and shows `founder-loop-host` with `observed_boot_nonce = N`; `maosctl a2a repin approve founder-loop-host --boot-nonce N --actor <who>` exits 0 printing the decision and approval id; A's next re-send ACKs, A exits 0 with `"transport":"cross-host-tcp-mtls"`, and B admits the goal (`log_count_payloads_containing(host_b_log, goal) >= 1`, the f4 V3 oracle `f4_pairing.rs:982-993`).
+3. **Proven red (Murat, 2026-09-21):** with the approve step removed, the vector FAILS — A's hold expires, A exits non-zero, B admits nothing. Planted once in place, restored, recorded in `19-7-repin-consent-operator-surface-evidence/plants.md` (proof contract `:24-31`).
+
+### AC2 — `await_repin_consent` is wired; the default stays fail-closed
+
+1. `TofuPinStore::await_repin_consent` (`tofu.rs:128-133`, impl `:612-646`) has a production caller: the door's re-pin handler on the `cohort-a2a-daemon` root, on `runtime.transport.pins()` (`transport.rs:526-528`; installed beside `install_cert_rotation`, `main.rs:11009-11014`). Trait signatures unchanged.
+2. The decision source replaces `test_repin_hook` (`tofu.rs:174-189`, D-19-7-05 A); with no recorded decision the call returns `TimedOut`. An accepted decision re-pins the CURRENT pinned fingerprint (D-19-7-04 A) with the pending observed nonce and `repin_approval_id = Some(id)`; the collision guard and `rotation_next` clear are kept (`:619-642`).
+3. Detection (`invalidate_if_boot_nonce_differs`, `tofu.rs:657-680`, called `router.rs:1355-1358`) records the pending entry atomically under the existing lock order (`window_lock` before any `pins` entry lock, `tofu.rs:169-173`); a later detection supersedes; the entry expires after 300 s (D-19-7-06 A).
+4. Every `with_repin_hook` caller is migrated (clean cutover). Store vectors in `crates/maos-a2a/tests/restart_invalidates_pin_nfr_rel_6.rs` (uncharged): accept re-pins and verifies with the new nonce; wrong nonce, expiry and reject leave the pin invalidated; no decision ⇒ `TimedOut` (scenario 4.5 `:128-145` stays).
+
+### AC3 — the authenticated surface (security-critical)
+
+1. `GET /v1/a2a/repins` (read) and `POST /v1/a2a/repins/<peer>` with body `{"approve":bool,"boot_nonce":"<decimal>","actor":"<who>"}` → `OperatorCommand::RepinDecision` (`crates/maos-control/src/lib.rs:263-357`; `spirit_key` → `None` with the host-wide group `:385-391`; an explicit `route_budget` arm — the `_` arm is unpoliced, `:398-400`). Auth before route (`:965-974`), `post_guard` (`:1571-1576`), `validate_id` on the peer (`:1585-1604`).
+2. Outcomes (`OperatorOutcome`, `:424-438`): accepted → 200 `{peer, boot_nonce, approval_id, decision:"accepted"}`; rejected → 200 `decision:"rejected"`, pin stays invalidated; no pending entry → 404 `repin_not_pending`; nonce ≠ pending (D-19-7-03 A) → 409 `repin_nonce_mismatch`; expired → 409 `repin_request_expired`; `RejectedByStore` → 409 `repin_refused_by_store`; control not installed (`maos run`, `maos shell`) → 404; no/wrong bearer → 401 before route.
+3. Each decision writes the I4 row (`ApprovalDecision { actor, target: <peer>, capability: "a2a.repin", intent: "nfr-rel-6.restart-repin", decision, reasoning: approval id + prior/observed nonces }`) BEFORE the pin changes (CR-2), plus the door completion row `operator.a2a-repin.<operation_id>:<outcome>` (`operator_door.rs:1766-1793`).
+4. ADR-062 gains "## Amendment — Story 19-7" (D-19-7-04 A); the three read-route 405 guards stay (`post_surface_16_1.rs:944-977`); `xtask/tests/decision_adrs_and_provisioning.rs` (`"062"` arm `:478-515`) stays green and requires the new heading.
+5. `maosctl a2a repin list|approve|reject` (`crates/maos-cli/src/cli.rs:39-141`; `door_verb` `subcommands.rs:148-162`; D-16-1-P exit codes); `maos-cli` gains no `maos-control` edge (`crates/maos-cli/src/door_client.rs:19-24`).
+
+### AC4 — the operator story tells the truth (rule 11)
+
+Named recovery and labels updated in the same change: `crates/maos-a2a-tcp/src/config.rs:31-35`; pairing stderr `main.rs:2873-2880` (both recoveries named); `xtask/error-catalog.toml:401-425` (`NotPinned` drops the nonexistent `maos a2a trust`; `Invalidated` names `maosctl a2a repin approve`) with the generated `docs/errors/error-catalog.json` and docs-site regenerated (prepush docs legs); `_bmad-output/test-artifacts/j1-two-host-evidence/README.md:214-217`; `RELEASE-HOLDS.md:62,65` (consent is operator-mediated and in-memory, not durable — 21-3); the stale "zero production callers / precondition on 19-4" comments (`router.rs:1228-1230`; `root_shutdown_unload_16_3.rs:1732-1735`; `discipline.yml:1753-1756`). No text may claim the re-pin is durable or automatic.
+
+### AC5 — CI runs the vector or fails (proof contract)
+
+The vector runs in `workspace-test-suite` per D-19-7-10 (T3 substrate; `CI` set ⇒ fail closed). It spawns `maos` (`env!("CARGO_BIN_EXE_maos")`) and `maosctl` from the fixture manifest (`fixtures::profile_binary("maosctl")`, `crates/maos-bin/tests/spawned_scope_17_3c.rs:46`; built by `build-test-fixtures`, `xtask/src/build_test_fixtures.rs:152`) — never `cargo`, so it is not `expensive` (`proof-contract.md:85-97`). f4's per-binary Σ stays ≤ 30 s or a measured `[[exception]]` lands with this story. One landing run on the final tree + the AC1 plant run on one image.
+
+## Tasks / Subtasks
+
+- [ ] **T0 — Preflight.** D-19-7-01…12 RULED; tracker → `in-progress`. Re-measure every cite that moved; read 19-1's preflight figures for the derived kernel/aggregate endpoints (`epics/epic-19-founder-loop-w4.md:49`). Record f4's CI Σ (parent-owed figure) in this record.
+- [ ] **T1 — Store** (AC2): pending side-map + supersede + TTL; decision source replacing `test_repin_hook`; read accessor; detection sink (D-08); migrate every `with_repin_hook` caller; store vectors in `crates/maos-a2a/tests/`.
+- [ ] **T2 — Door** (AC3): `OperatorCommand::RepinDecision`, GET/POST routes, port method; maos-bin handler with I4-before-act and outcome mapping; set-once control installed in `run_cohort_a2a_daemon`; detection-row consumer; route tests beside `crates/maos-control/tests/post_surface_16_1.rs`; ADR-062 amendment + gate clause.
+- [ ] **T3 — CLI** (AC3): `maosctl a2a repin list|approve|reject`; contract tests in `crates/maos-cli/tests/` (both sides of the duplicated shapes, `door_client.rs:19-24`).
+- [ ] **T4 — Sender** (AC1, D-09): bounded re-send hold on `PinInvalidated{awaiting_repin:true}`; same frame, no second emit row; opt-in by `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS`; f4 V1–V3 unchanged.
+- [ ] **T5 — Vector + proven red** (AC1, AC5): the f4 vector (B first, random nonces, door-bound B, `maosctl` from fixtures); plant: remove the approve call → red; restore; `plants.md` with wall-clock.
+- [ ] **T6 — Truth** (AC4): docs, catalog regen, RELEASE-HOLDS rows, README, stale comments.
+- [ ] **T7 — Close-out:** `cargo fmt --all`; exact kloc re-pins (maos-a2a-core, maos-bin; aggregate) inside the ruled D-19-7-11 envelope with the cumulative-use line; `kloc-check --json`, `check-kernel-baseline` (26378 unchanged); `prepush` exit 0 recorded (`proof-contract.md:144-148`); re-point `deferred-work.md:931`'s gap owner from 19-4 to this story; Dev Agent Record, File List, Change Log; tracker. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+
+## Dev Notes
+
+### What changes, by file
+
+| Area | Files | Today → after |
+|---|---|---|
+| Store | `crates/maos-a2a-core/src/tofu.rs` (`:153-203`, `:612-680`), `router.rs` (`:1360` arm sink; comment `:1228-1230`) | test hook, no pending → pending + production decision |
+| Door | `crates/maos-control/src/lib.rs` (`OperatorCommand`, routes after `:1063`), `crates/maos-bin/src/operator_door.rs` (`dispatch` `:388-508`, `command_verb` `:1766-1793`), `crates/maos-bin/src/main.rs` (`run_cohort_a2a_daemon` `:10825-11047`; door wiring `:3502-3535`) | no re-pin route → GET + POST |
+| CLI | `crates/maos-cli/src/cli.rs`, `subcommands.rs` | — → `maosctl a2a repin` |
+| Sender | `crates/maos-bin/src/delegation.rs:267-305`, `main.rs:2780-2912` | exit on refusal → bounded re-send (opt-in) |
+| Tests | `crates/maos-a2a/tests/restart_invalidates_pin_nfr_rel_6.rs`, `crates/maos-a2a-core/src/tofu.rs` tests `:764-796`, `crates/maos-a2a-tcp/tests/t_10_4b_rotation_real_timing.rs:1410-1430`, `crates/maos-control/tests/`, `crates/maos-cli/tests/`, `crates/maos-bin/tests/f4_pairing.rs`, `xtask/tests/decision_adrs_and_provisioning.rs` | migrate + new vectors |
+| Docs | `docs/adr/ADR-062-mutating-operator-surface.md`, `xtask/error-catalog.toml` (+ generated), `crates/maos-a2a-tcp/src/config.rs:31-35`, `RELEASE-HOLDS.md`, two-host README, `discipline.yml:1753-1756` comment, `root_shutdown_unload_16_3.rs:1732-1735` | AC4 |
+| Kloc | `xtask/kloc.toml:470,517,718` | exact re-pins (D-11) |
+
+### Current state that must be preserved
+
+- NFR-Rel-6 detection itself: the first frame from a restarted peer is still refused (`-32004`) and the pin is invalidated; the `boot_nonce != 0` sentinel and the zero-nonce bind refusal stay (`router.rs:1349`; `transport.rs:359-374`; `bounded_postures_2b.rs:119-181`).
+- The NACK census (12 typed / 4 fall-through, `bounded_postures_2b.rs:184-276`) — no new wire code is needed.
+- The rotation window semantics (14-2, `tofu.rs:283-452`) and `restart_invalidates_pin_nfr_rel_6.rs:83-92` (a re-pin retires the old cert; `next = None`).
+- f4 V1–V3 behaviour (the hold is opt-in), the 16-3 cohort debug split and its `9 + 3 == 12` guard (`discipline.yml:1763-1787`), ADR-062's read-route 405 guards.
+- `maos-cli` stays `maos-control`- and kernel-free (`door_client.rs:19-24`; `crates/maos-cli/tests/dep_kernel_core_free_test.rs`).
+
+### Guardrails
+
+- No `crates/maos-kernel-core/src` edit, no new `FrameKind`, no `maos-a2a-tcp` bind parameter (D-08 A installs on `core()`).
+- No fingerprint parameter on the route (D-04 A); no config writes by the daemon (D-07 A); the debug nonce override stays debug-only and unused by the new vector.
+- Lock order `window_lock` → pin entry (`tofu.rs:169-173`); the pending map is cleared/updated under the same guard as the invalidation it describes.
+- A re-sent frame is the journaled frame (same `frame_id`); never a second emit row (`delegation.rs:256-261`).
+- New tests outside `src` (uncharged); one cargo process, `CARGO_TARGET_DIR=/mnt/build/cargo`, `env -u CI -u GITHUB_ACTIONS`; plants restored byte-identical.
+
+### Proven-red controls (rule 11; proof contract `:24-31`)
+
+| Control | Plant | Expected red |
+|---|---|---|
+| AC1 vector | remove the `maosctl a2a repin approve` call | A exits non-zero after its hold; `log_count_payloads_containing(host_b_log, goal) == 0`; the vector's delivery assertion fails |
+| AC3 nonce binding (route test) | echo N+1 | 409 `repin_nonce_mismatch`; `verify_pinned` still `Invalidated` |
+| AC2 default (existing) | no decision | `TimedOut` (`restart_invalidates_pin_nfr_rel_6.rs:128-145`) |
+
+### Tests and commands
+
+```bash
+# local; one cargo process; CARGO_TARGET_DIR=/mnt/build/cargo; T3 vectors SKIP on this host (no rootless podman, epic R19-P2)
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- build-test-fixtures --only worker-cli-fixture --only maosctl
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-a2a-core -p maos-a2a -p maos-a2a-tcp
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-control -p maos-cli
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test f4_pairing --test bounded_postures_2b --test two_host_delegation_2b --test root_spawn_home_isolation_16_1
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p xtask --test decision_adrs_and_provisioning
+cargo run -q --locked -p xtask -- error-catalog-check && cargo run -q --locked -p xtask -- check-env-contract
+cargo run -q --locked -p xtask -- kloc-check --json && cargo run -q --locked -p xtask -- check-kernel-baseline && cargo run -q --locked -p xtask -- check-test-cost
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- prepush
+```
+
+### Review plan (proof contract `:33-71`)
+
+- DIFFICULT tier: Blind (opus) and Edge (opus) separate; Acceptance (opus) re-reads every AC against the ruled D-rows; Test-Infra (glm) checks the vector is a two-process proof, the plant, the budget and that no test spawns cargo.
+- Edge replays: wrong/expired/superseded nonce, concurrent detection during a decision, a decision racing `close_rotation_window`, a reject followed by a fresh detection, the door on `maos run`/`maos shell` roots (404).
+- Focused suites of every touched crate + the gates they enrol; the workspace suite runs in CI.
+
+### Previous-story intelligence
+
+- **6.3 (AC4):** designed the protocol, shipped the hook; P8 (`6-3-…md:1241`) — a re-pin must carry the observed nonce (fixed in tree, `tofu.rs:636`).
+- **14-2 / 14-2a:** `with_repin_hook` cannot reach a bound store (`14-2-10-host-mtls-rotation-chaos.md:325-328`); the operator read seam for rotation is a set-once control filled after bind (`cert_rotation.rs:65-83`); a GET-only surface for identity was a deliberate ADR-062 line.
+- **j1-crosshost-2b / 2e:** restart detection became reachable with two processes; the pairing hold, its bound and its fail-closed rules (`main.rs:2780-2912`); the nonce stays random per process.
+- **16-1 / 18-7:** door mutation shape, D-16-1-P exit codes, D-16-1-Q isolated HOME; 18-7's decision route is the size analogue.
+- **Epic-16 retro (2026-09-21, `deferred-work.md:931`):** the room's vector was unimplementable until the surface exists; "a recovery with zero callers is not a recovery".
+
+### Git intelligence
+
+| Commit | Content |
+|---|---|
+| `f34f6b4e` / `b35c9284` | 20-15/20-16 done; landing green 40609213235; code tree unchanged since |
+| `ed2118a0` | 20-15 conmon FLAG-Winston (kernel 26367 → 26378) — the only crate-src change since `f889b3e4` |
+| `a2d69a29` | 18-7 review patches — last change to `maos-control`/`maos-cli` src |
+| `b15eb503` | 18-0 — last change to `maos-a2a-core` src (4933 → 4928) |
+| `f461f23a` | 2026-09-17 — last change to `maos-a2a-tcp` src |
+
+### References
+
+- Epic `epic-19-founder-loop-w4.md:7,36-49,121,137,142,156,158,203-207,211`; tracker `sprint-status.yaml:290,293,318`; retro `epic-18-retro-2026-10-27.md:138`; `deferred-work.md:931`; PRD `non-functional-requirements.md:25`; Story 6.3 `:421-445,699,1241`.
+- `crates/maos-a2a-core/src/tofu.rs:29-31,69-88,125-203,454-498,594-680,764-796`; `router.rs:1013-1018,1073-1076,1218-1261,1330-1385,2002-2005`; `crates/maos-a2a-tcp/src/config.rs:19-37,116-138`; `transport.rs:336-388,526-528`.
+- `crates/maos-bin/src/main.rs:2140-2152,2711-2774,2780-2912,3026-3034,3384-3386,3502-3535,10825,10992-11014,11043-11047`; `delegation.rs:53-65,256-305`; `operator_door.rs:388-508,1633,1766-1793`; `cert_rotation.rs:10-23,65-83`; `env_contract.rs:44-57`.
+- `crates/maos-control/src/lib.rs:30-84,169-184,263-438,965-974,1017-1031,1063,1251-1281,1544-1604`; `crates/maos-control/tests/post_surface_16_1.rs:944-977`; `crates/maos-cli/src/cli.rs:39-141,303-342`; `door_client.rs:19-24`; `subcommands.rs:148-162,894-898`.
+- `crates/maos-bin/tests/f4_pairing.rs:4-28,335-354,460-501,556,620-639,886-1038`; `two_host_delegation_2b.rs:117-120`; `bounded_postures_2b.rs:119-276`; `root_shutdown_unload_16_3.rs:1712-1735`; `cert_rotation_trigger_14_2a.rs:172,244-246`; `root_spawn_home_isolation_16_1.rs:48-56`; `crates/maos-a2a/tests/restart_invalidates_pin_nfr_rel_6.rs:20-145`.
+- `docs/adr/ADR-062-mutating-operator-surface.md:46-80,115-181`; `xtask/tests/decision_adrs_and_provisioning.rs:22-23,478-515`; `xtask/error-catalog.toml:401-438`; `RELEASE-HOLDS.md:62,65`; `_bmad-output/test-artifacts/j1-two-host-evidence/README.md:180-217`; `crates/maos-domain/src/invariants/i4.rs:36-49`; `crates/maos-iac/src/adapter/transparency_log.rs:57,2168`.
+- `.github/workflows/discipline.yml:1753-1787,2015-2039,3334-3363,5863,5906,6009`; `docs/testing/proof-contract.md:10-31,57-71,76-97,99-142,144-187`; `xtask/test-budgets.toml:26-27`; `xtask/kloc.toml:264,470,475,484,489,517,718`; `xtask/kernel-core-baseline.toml:505`; `xtask/src/kloc_check.rs:294-318`; `xtask/src/build_test_fixtures.rs:152`.
+
+## Dev Agent Record
+
+### Story context creation
+
+Created 2026-10-28 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter contract) at `f34f6b4e`, clean tree, while a sibling creator held the single cargo slot — so no cargo, build, test or xtask gate was run.
+
+**Inputs:** direct reads of every cited range; `git grep` across `f889b3e4` / `84e0e659` / `f34f6b4e` for moved rows (`creation/cites-f34f6b4e.md`); the kloc-check instrument replicated without cargo — tokei 14.0.0 with `kloc_check.rs:294-318`'s argv: per-crate figures equal the pins and the aggregate 188504 the parent measured (`creation/tokei-f34f6b4e.json`); kernel physical lines by `wc -l` over the git-tracked kernel src = 26378 (pin).
+
+**Parent measurements (2026-10-28, at f34f6b4e, one cargo process):**
+1. `env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo cargo run -q --locked -p xtask -- kloc-check --json`: passed true, aggregate 188504; per-crate maos-a2a-core 4928, maos-a2a-tcp 1442, maos-control 1344, maos-cli 6155, maos-bin 29497, maos-bench 2359, xtask 47422, maos-kernel-core 20619 — identical to the creator's tokei replication.
+2. f4's per-binary CI Σ for D-19-7-10: junit artifact `workspace-test-suite-junit` of landing run 40609213235 (@b35c9284): testsuite `maos-bin::f4_pairing` 6 testcases, Σ testcase time 3.589 s (`xtask check-test-budget` on that junit: passed true). The 30 s per-binary budget (`xtask/test-budgets.toml:26`) leaves ≈ 26.4 s for the new D-19-7-10 vector.
+3. The derived kernel/aggregate endpoints (26390 / 20628 / 190055) remain owed to the 19-1 preflight's D-row (D-19-1-01); D-19-7-11's aggregate endpoints move with that ruling. Cross-reference only, not measured here.
+
+**Revert:** nothing to revert — no run modified a tracked file; no crate source changed.
+
+### Agent Model Used
+
+anthropic/claude-opus-5-5 (creation). Implementation: recorded by the dev pass.
+
+### Debug Log References
+
+- Creation evidence: `19-7-repin-consent-operator-surface-evidence/creation/cites-f34f6b4e.md`, `tokei-f34f6b4e.json`.
+
+### Completion Notes List
+
+- Creation only. D-19-7-01…12 PROPOSED; the story stays `backlog` until the operator rules.
+
+### File List
+
+- `_bmad-output/implementation-artifacts/19-7-repin-consent-operator-surface.md`
+- `_bmad-output/implementation-artifacts/19-7-repin-consent-operator-surface-evidence/creation/cites-f34f6b4e.md`
+- `_bmad-output/implementation-artifacts/19-7-repin-consent-operator-surface-evidence/creation/tokei-f34f6b4e.json`
+- `_bmad-output/planning-artifacts/epics/epic-19-founder-loop-w4.md` (§19-7 `:205,207` cites)
+
+### Change Log
+
+- 2026-10-28: Story created at `f34f6b4e` (D-19-7-01…12 PROPOSED; tracker row `:293` left `backlog` for the parent to flip after the ruling). Epic §19-7 cites corrected in place (`deferred-work.md:1010` → `:931`; default hook `router.rs:1235-1236` → `tofu.rs:186`). Kernel-Δ 0 by construction; kloc forecast +283–440 (× 1.3 ≈ +368–572) with the D19-1 cumulative-use line.
+- 2026-10-28: Parent measurements recorded (kloc-check --json at f34f6b4e: passed, aggregate 188504, per-crate identical to the tokei replication; f4_pairing CI Σ 3.589 s from run 40609213235, ≈ 26.4 s headroom under the 30 s budget); all [PENDING PARENT] markers replaced; item 3 left as a cross-reference to D-19-1-01.
+- 2026-10-28: Operator ruled D-19-7-01 … D-19-7-12 all **A** (Lunarpulse, via ask). D-19-7-11 A extends the D19-1 envelope once: maos-a2a-core 4928 → 5039 (+111), maos-control 1422 → 1539 (+117), maos-cli 6220 → 6318 (+98), maos-bin 30563 → 30810 (+247), aggregate hardfail 190055 → 190627 (+572). D-19-7-12 A: DIFFICULT tier on opus/glm only, no fable-5.1. Status backlog → ready-for-dev; tracker `sprint-status.yaml:293` flipped.
+- 2026-10-28: Development started (status ready-for-dev → in-progress; tracker `sprint-status.yaml:293` flipped; parallel units, candidate pins applied; reviews pending).

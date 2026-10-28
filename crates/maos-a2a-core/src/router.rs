@@ -1225,9 +1225,11 @@ impl A2ARouterCore {
                 // `map_a2a_error_to_iac_bus` turns into
                 // `IacBusError::CrossHostTransportFailure` — so the operator was told
                 // **the network broke**, and the action that implies, retry, is the
-                // one action that can never work: the pin is dead until a config is
-                // edited and a process restarted (`await_repin_consent` has zero
-                // production callers and its default hook returns `TimedOut`).
+                // one action that can never work: the pin stays invalidated until
+                // either a config edit + daemon restart, or operator consent on the
+                // receiver's `cohort-a2a-daemon` door (`maosctl a2a repin approve
+                // <peer> --boot-nonce <N>`; 300 s pending request, pinned fingerprint
+                // kept, in-memory only — Story 19-7).
                 // A permanent security refusal presented as a transient fault.
                 //
                 // It was structurally UNREACHABLE in rung 1: `if request.boot_nonce

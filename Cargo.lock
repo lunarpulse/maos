@@ -2631,6 +2631,7 @@ dependencies = [
  "maos-providers",
  "maos-spirit-abi",
  "maos-spirit-hello",
+ "orchestrator",
  "parking_lot",
  "researcher",
  "rusqlite",
@@ -3769,6 +3770,7 @@ dependencies = [
 name = "orchestrator"
 version = "0.1.0"
 dependencies = [
+ "maos-director-surface",
  "maos-domain",
  "maos-kernel-core",
  "maos-manifest",
@@ -3778,6 +3780,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "smallvec",
+ "tempfile",
  "tokio",
  "toml 0.8.23",
 ]

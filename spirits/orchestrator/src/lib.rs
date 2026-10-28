@@ -26,6 +26,13 @@
 //!    Architect completes → producer distills → Orchestrator references the
 //!    distillate in the dispatch to Reviewer → Reviewer critiques → its
 //!    distillate flows back. Every hop is FR21-clean.
+//! 4. **Splits an epic deterministically** (Story 19-1, [`split_epic`]): one
+//!    section per `### Story` heading, bound 1:1 in file order to the
+//!    host-bearing Workers; follow-ups go out through
+//!    [`Orchestrator::followup_dispatch_remote`]. Its Inference Port
+//!    ([`Orchestrator::with_deferred_inference_port`]) serves only
+//!    [`Orchestrator::judge_ambiguity`] — the `dispatch_ambiguity` scalar the
+//!    kernel halts on; dispatch stays deterministic (Decision E).
 //!
 //! ## Zero kernel KLOC (Story 0.2 invariant)
 //! This crate depends only on the Spirit SDK/ABI and the PURE `maos-domain`
@@ -43,14 +50,161 @@ use maos_domain::frame::{
     ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, PriorDistillateRef,
     TaskAssignPayload,
 };
-use maos_domain::invariants::i1::IntentClass;
+use maos_domain::invariants::i1::{CapabilityToken, IntentClass};
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::orchestrator::OrchestratorInstruction;
+use maos_domain::ports::context_budget::{ContextBudgetPort, ContextReportError, ContextStatus};
+use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
+use maos_domain::ports::InferencePort;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
+
+pub mod epic;
+pub use epic::{split_epic, EpicSection, EpicSplitError, STORY_HEADING};
+
+/// Story 19-1 (D-19-1-12 A) — the epistemic tag the ambiguity judgement
+/// reports; the manifest halts `on_value_above` 0.5 on it.
+pub const SCALAR_TAG_DISPATCH_AMBIGUITY: &str = "dispatch_ambiguity";
+
+/// The completion budget of one ambiguity judgement (one small JSON object).
+const AMBIGUITY_MAX_TOKENS: u32 = 64;
+
+/// Story 19-1 (AC3, mirrors `researcher::InferenceMint`) — mints a fresh
+/// `ProviderInfer` token and the admitted pid for ONE judgement.
+pub type InferenceMint = Arc<dyn Fn() -> Result<(CapabilityToken, u32), String> + Send + Sync>;
+
+/// Story 19-1 — a host's audited `ProviderInfer` issuance for `(pid,
+/// provider)` (the `maos run` root passes its seam's mint).
+pub type ProviderMint = Arc<dyn Fn(u32, &str) -> Result<CapabilityToken, String> + Send + Sync>;
+
+/// Story 19-1 — the Orchestrator's admitted pid once the scheduler assigned it.
+pub type PidSource = Arc<dyn Fn() -> Option<u32> + Send + Sync>;
+
+/// Story 19-1 (AC3, D19-4 A; mirrors `researcher::ResearcherInferenceBinding`)
+/// — the provider the token and every request name, and the per-pass mint.
+/// The composition root backfills it after admission.
+#[derive(Clone)]
+pub struct OrchestratorInferenceBinding {
+    pub provider_id: String,
+    pub mint: InferenceMint,
+}
+
+impl OrchestratorInferenceBinding {
+    /// Each judgement mints at the pid `pid_of` resolves then.
+    pub fn per_pass(provider_id: String, mint: ProviderMint, pid_of: PidSource) -> Self {
+        let provider = provider_id.clone();
+        Self {
+            provider_id,
+            mint: Arc::new(move || {
+                let pid = pid_of().ok_or("the Spirit has no admitted pid yet")?;
+                mint(pid, &provider).map(|token| (token, pid))
+            }),
+        }
+    }
+}
+
+/// The bound Inference Port and its deferred binding.
+#[derive(Clone)]
+struct OrchestratorInference {
+    port: Arc<dyn InferencePort + Send + Sync>,
+    binding: Arc<Mutex<Option<OrchestratorInferenceBinding>>>,
+}
+
+/// Story 19-1 (D-19-1-12 A) — why an ambiguity judgement produced no scalar.
+/// Every variant is typed; none falls back to a default value.
+#[derive(Debug)]
+pub enum OrchestratorInferenceError {
+    /// No Inference Port is wired (unset `MAOS_INFERENCE_MODE`, ADR-064).
+    NotWired,
+    /// The binding is not backfilled yet, or the per-pass mint refused.
+    Unbound(String),
+    /// The port refused or failed the completion.
+    Inference(InferenceError),
+    /// The context report after the completion was refused.
+    Context(ContextReportError),
+    /// The completion is not a `dispatch_ambiguity` judgement.
+    Completion(String),
+}
+
+impl std::fmt::Display for OrchestratorInferenceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotWired => f.write_str(
+                "orchestrator inference: no inference port is wired (the ambiguity judgement \
+                 needs an explicit MAOS_INFERENCE_MODE)",
+            ),
+            Self::Unbound(reason) => write!(f, "orchestrator inference: unbound: {reason}"),
+            Self::Inference(error) => write!(f, "orchestrator inference: {error}"),
+            Self::Context(error) => write!(f, "orchestrator inference: {error}"),
+            Self::Completion(reason) => write!(
+                f,
+                "orchestrator inference: completion is not a {SCALAR_TAG_DISPATCH_AMBIGUITY} \
+                 judgement: {reason}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for OrchestratorInferenceError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Inference(error) => Some(error),
+            Self::Context(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+/// Story 19-1 (D-19-1-12 A) — the ambiguity-judgement prompt for one epic
+/// section's text ([`EpicSection::text`]). Deterministic for a given text, so
+/// a recorded cassette's prompt hash is stable (the class corpus pins it).
+pub fn ambiguity_prompt(section_text: &str) -> String {
+    format!(
+        "You are the MAOS Orchestrator. Before this story section is dispatched to a \
+         Worker, judge how ambiguous its acceptance criteria are: could a competent Worker \
+         build the wrong thing from this text alone? Reply with exactly one JSON object and \
+         nothing else: {{\"{SCALAR_TAG_DISPATCH_AMBIGUITY}\": number in [0,1]}}. \
+         {SCALAR_TAG_DISPATCH_AMBIGUITY}: 0.0 = unambiguous, every criterion is testable as \
+         written; 1.0 = the section cannot be dispatched without the director's \
+         clarification.\n\nSection:\n{section_text}"
+    )
+}
+
+/// Story 19-1 (D-19-1-12 A) — parse a completion into its
+/// `dispatch_ambiguity` value. The completion must be ONE JSON object whose
+/// `dispatch_ambiguity` field is a number in `[0, 1]` (other fields are
+/// tolerated). Anything else — an array, a bare scalar, a missing or
+/// non-numeric field, a value outside `[0, 1]` — is a typed
+/// [`OrchestratorInferenceError::Completion`], never a default.
+pub fn parse_ambiguity(text: &str) -> Result<f64, OrchestratorInferenceError> {
+    let completion: serde_json::Value = serde_json::from_str(text.trim())
+        .map_err(|e| OrchestratorInferenceError::Completion(e.to_string()))?;
+    let object = completion.as_object().ok_or_else(|| {
+        OrchestratorInferenceError::Completion("the completion is not a JSON object".into())
+    })?;
+    let value = object
+        .get(SCALAR_TAG_DISPATCH_AMBIGUITY)
+        .ok_or_else(|| {
+            OrchestratorInferenceError::Completion(format!(
+                "field `{SCALAR_TAG_DISPATCH_AMBIGUITY}` is missing"
+            ))
+        })?
+        .as_f64()
+        .ok_or_else(|| {
+            OrchestratorInferenceError::Completion(format!(
+                "field `{SCALAR_TAG_DISPATCH_AMBIGUITY}` is not a number"
+            ))
+        })?;
+    if !(0.0..=1.0).contains(&value) {
+        return Err(OrchestratorInferenceError::Completion(format!(
+            "field `{SCALAR_TAG_DISPATCH_AMBIGUITY}` must be in [0, 1], got {value}"
+        )));
+    }
+    Ok(value)
+}
 
 /// j1-crosshost-1a AC1.4 — the consent intent a `developer-remote` delegation
 /// carries.
@@ -129,13 +283,33 @@ struct DispatchState {
 
 /// Orchestrator reference Spirit — the founder-loop coordinator. Holds its own
 /// Spirit id + the in-flight delegation bookkeeping. `Arc<Mutex<...>>` interior
-/// state keeps Orchestrator `Sync` as the `#[spirit]` macro requires.
-#[derive(Debug, Clone)]
+/// state keeps Orchestrator `Sync` as the `#[spirit]` macro requires; a clone
+/// shares the bookkeeping, the deferred inference binding and the context
+/// report (D-19-1-04 A: the root's loop drives a clone of the loaded instance).
+#[derive(Clone)]
 pub struct Orchestrator {
     /// This Orchestrator's own Spirit id (the `from` of every dispatch).
     orchestrator_id: String,
     /// In-flight delegation bookkeeping + last decision.
     state: Arc<Mutex<DispatchState>>,
+    /// Story 19-1 (AC3) — the Inference Port; it serves only the ambiguity
+    /// judgement, never a dispatch decision. `None` ⇒ deterministic (ADR-064).
+    inference: Option<OrchestratorInference>,
+    /// Story 19-1 (AC3) — the root's pid- and window-bound context reporter.
+    context: Option<Arc<dyn ContextBudgetPort>>,
+    /// The status of the most recent context report.
+    last_context: Arc<Mutex<Option<ContextStatus>>>,
+}
+
+impl std::fmt::Debug for Orchestrator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Orchestrator")
+            .field("orchestrator_id", &self.orchestrator_id)
+            .field("state", &self.state)
+            .field("inference_bound", &self.inference.is_some())
+            .field("context_bound", &self.context.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 #[spirit]
@@ -162,6 +336,9 @@ impl Default for Orchestrator {
         Self {
             orchestrator_id: "orchestrator".to_string(),
             state: Arc::new(Mutex::new(DispatchState::default())),
+            inference: None,
+            context: None,
+            last_context: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -178,6 +355,93 @@ impl Orchestrator {
     /// This Orchestrator's own Spirit id.
     pub fn orchestrator_id(&self) -> &str {
         &self.orchestrator_id
+    }
+
+    // ── Story 19-1 (AC3, D19-4 A) — the inference seam ──────────────────────
+
+    /// Wire the Inference Port before scheduler load (the Researcher shape:
+    /// the binding names the provider and mints per judgement; `None` until
+    /// the composition root backfills it after admission).
+    pub fn with_deferred_inference_port(
+        mut self,
+        port: Arc<dyn InferencePort + Send + Sync>,
+        binding: Arc<Mutex<Option<OrchestratorInferenceBinding>>>,
+    ) -> Self {
+        self.inference = Some(OrchestratorInference { port, binding });
+        self
+    }
+
+    /// Story 18-5 shape — the root's pid- and window-bound context reporter.
+    pub fn with_context_port(mut self, port: Arc<dyn ContextBudgetPort>) -> Self {
+        self.context = Some(port);
+        self
+    }
+
+    /// Whether the Inference Port is wired (any explicit inference mode).
+    pub fn is_inference_bound(&self) -> bool {
+        self.inference.is_some()
+    }
+
+    /// The status of the most recent context report.
+    pub fn last_context(&self) -> Option<ContextStatus> {
+        *self.last_context.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Story 19-1 (D-19-1-12 A) — judge one section's acceptance-criterion
+    /// ambiguity through the bound port: one mint, one completion of
+    /// [`ambiguity_prompt`], one context report, then [`parse_ambiguity`].
+    /// Returns `(tag, value, derived_from)` for the kernel's scalar path; the
+    /// kernel owns the halt. The judgement never changes the split, the
+    /// section ↔ entry binding or any frame (dispatch stays deterministic).
+    pub fn judge_ambiguity(
+        &self,
+        section: &EpicSection,
+    ) -> Result<(&'static str, f64, String), OrchestratorInferenceError> {
+        let live = self
+            .inference
+            .as_ref()
+            .ok_or(OrchestratorInferenceError::NotWired)?;
+        let binding = live
+            .binding
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .ok_or_else(|| {
+                OrchestratorInferenceError::Unbound("the inference binding is not ready".into())
+            })?;
+        let (token, pid) = (binding.mint)().map_err(OrchestratorInferenceError::Unbound)?;
+        let request = InferenceRequest::new(
+            pid,
+            token,
+            ambiguity_prompt(&section.text),
+            InferenceOptions {
+                max_tokens: AMBIGUITY_MAX_TOKENS,
+                temperature: Some(0.0),
+                model_id: None,
+            },
+            Some(binding.provider_id.clone()),
+            Vec::new(),
+        );
+        let response = live
+            .port
+            .complete(request)
+            .map_err(OrchestratorInferenceError::Inference)?;
+        if let Some(port) = &self.context {
+            let usage = &response.usage;
+            let status = port
+                .report_context_used(usage.input_tokens.saturating_add(usage.output_tokens))
+                .map_err(OrchestratorInferenceError::Context)?;
+            *self.last_context.lock().unwrap_or_else(|e| e.into_inner()) = Some(status);
+        }
+        let value = parse_ambiguity(&response.text)?;
+        Ok((
+            SCALAR_TAG_DISPATCH_AMBIGUITY,
+            value,
+            format!(
+                "completion:{}:section-{}",
+                binding.provider_id, section.ordinal
+            ),
+        ))
     }
 
     // ── FR20 safe-point gate (AC2) ───────────────────────────────────────────
@@ -398,6 +662,34 @@ impl Orchestrator {
     ) -> IacFrame {
         let payload = self.build_task_assign(goal, success_criteria, Some(prior));
         self.assign_frame(seq, to_id, to_role, payload, lineage)
+    }
+
+    /// Story 19-1 (AC4, D-19-1-06 A) — the REMOTE follow-up: the
+    /// [`Self::followup_dispatch`] contract on the wire path production uses.
+    /// `prior` is non-optional (FR21: a follow-up ALWAYS references the
+    /// producer's `Distillate`, never raw output), and the frame is built by
+    /// [`Self::assign_frame_remote`], so its lineage, host and consent rules
+    /// (granter == `frame.from`, ADR-012) apply unchanged. The local
+    /// [`Self::followup_dispatch`] stays the same-Host shape.
+    #[allow(clippy::too_many_arguments)]
+    pub fn followup_dispatch_remote(
+        &self,
+        seq: u64,
+        run_nonce: u64,
+        to_id: &str,
+        to_role: SpiritRole,
+        goal: impl Into<String>,
+        success_criteria: impl Into<String>,
+        prior: PriorDistillateRef,
+        lineage: IntentLineage,
+        to_host: &str,
+        from_host: &str,
+        intent: A2AIntent,
+    ) -> Result<IacFrame, RemoteFrameError> {
+        let payload = self.build_task_assign(goal, success_criteria, Some(prior));
+        self.assign_frame_remote(
+            seq, run_nonce, to_id, to_role, payload, lineage, to_host, from_host, intent,
+        )
     }
 
     /// The most recent dispatch decision (the `[output_shape]` surface).

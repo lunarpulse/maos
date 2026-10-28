@@ -1729,10 +1729,10 @@ fn scratch_dir(label: &str) -> PathBuf {
 // 3/3 green. `.github/workflows/discipline.yml` runs the suite in both profiles
 // and asserts 8 + 3 == 11 so the split cannot silently drop a vector.
 //
-// NOT covered here, and deliberately so: the designed `re-pin` recovery.
-// `TofuPinStore::await_repin_consent` has ZERO production callers and its
-// default hook returns `TimedOut` (`router.rs:1235-1236`), so the recovery
-// cannot be driven end to end at HEAD. Filed as a precondition on `19-4`.
+// NOT covered here, and deliberately so: the designed `re-pin` recovery. Since
+// Story 19-7 `TofuPinStore::await_repin_consent` has a production caller — the
+// `cohort-a2a-daemon` door behind `maosctl a2a repin approve` — and its
+// two-process vector lives in `crates/maos-bin/tests/f4_pairing.rs`.
 
 #[cfg(feature = "network")]
 mod cohort {
