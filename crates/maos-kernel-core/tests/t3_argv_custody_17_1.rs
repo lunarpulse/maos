@@ -61,12 +61,21 @@ fn resource_argv(
     env: &[(String, String)],
     spec: &SandboxSpec,
 ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+    let (_temp, directory) = state_dir();
+    runtime_argv(env, spec, &directory, None)
+}
+
+fn runtime_argv(
+    env: &[(String, String)],
+    spec: &SandboxSpec,
+    state: &Path,
+    workspace: Option<&Path>,
+) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
     let runtime = ContainerRuntime {
         kind: ContainerRuntimeKind::Podman,
         path: "/usr/bin/podman".into(),
         version: "unit".into(),
     };
-    let (_temp, directory) = state_dir();
     build_runtime_argv(
         &runtime,
         &verified_image(),
@@ -76,10 +85,53 @@ fn resource_argv(
         "worker",
         1,
         "worker-unit",
-        &directory,
+        state,
         Some(Path::new("/run/egress.sock")),
+        workspace,
         env,
     )
+}
+
+/// Story 19-3 AC2.1 (D-19-3-01 A) — a Worker workspace is a read-write,
+/// `:U`-chowned bind at `/workspace` and the payload's working directory,
+/// inserted right after the egress socket and before the environment names;
+/// nothing else in the argv moves.
+#[test]
+fn a_workspace_mounts_read_write_at_slash_workspace_as_the_working_directory() {
+    let (_temp, state) = state_dir();
+    let spec = SandboxSpec::new_for_test(SandboxTier::T3);
+    let env = [("SCOPED_TEST_VALUE".to_string(), "value".to_string())];
+    let workspace = Path::new("/data/maos/workspaces/maos-worker-1");
+    let without = runtime_argv(&env, &spec, &state, None).unwrap();
+    let with = runtime_argv(&env, &spec, &state, Some(workspace)).unwrap();
+    let socket = without
+        .iter()
+        .position(|arg| arg == "--volume=/run/egress.sock:/proxy/egress.sock:rw")
+        .expect("egress socket mount");
+    let mut expected = without.clone();
+    expected.splice(
+        socket + 1..socket + 1,
+        [
+            "--volume=/data/maos/workspaces/maos-worker-1:/workspace:rw,U".to_string(),
+            "--workdir=/workspace".to_string(),
+        ],
+    );
+    assert_eq!(
+        with, expected,
+        "the workspace adds exactly the mount and the workdir"
+    );
+}
+
+/// Story 19-3 AC2.1 — `None` keeps the pre-workspace argv: no mount, no
+/// working directory (every non-Worker `spawn_t3` caller).
+#[test]
+fn no_workspace_adds_no_mount_and_no_working_directory() {
+    let args = argv(&[]).unwrap();
+    assert!(
+        args.iter()
+            .all(|arg| !arg.contains("/workspace") && !arg.starts_with("--workdir")),
+        "a workspace-less spawn must not mount or chdir: {args:?}"
+    );
 }
 
 #[test]

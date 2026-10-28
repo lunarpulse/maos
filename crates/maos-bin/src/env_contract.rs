@@ -199,6 +199,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_TEST_ONLY_CRASH_SECTION_ONCE",
+        purpose: "Debug-build-only: on the first attempt of the named 1-based `--epic` section, the root kills that delegated Worker once it runs (no planned stop), so the kernel handles a real crash and the re-dispatch is proven (Story 19-6 AC3.2); release builds never read it",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_SPIRIT_ID",
         purpose: "Spirit identifier for one-shot lifecycle verbs",
         stability: EnvStability::UserFacing,

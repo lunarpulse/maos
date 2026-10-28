@@ -136,13 +136,14 @@ MAOS 바이너리가 빌드 타임에 **모든 네트워크 표면을 컴파일�
 - `rust-inproc` Spirits는 데몬 프로세스(`T0`)에서 실행되고 capability tokens로 중재되며, 프로세스 격리는 없습니다.
 - Linux에서 WASM-component Spirits는 seccomp allow-list, Landlock, 위임된 cgroup v2 subtree가 적용된 `T2` runner 프로세스에서 실행됩니다.
 - 각 Worker는 Linux 전용 `T3` rootless container에서 실행됩니다. 컨테이너는 `--network=none`, 읽기 전용 파일시스템을 사용하고 호스트 홈을 마운트하지 않으며, `/proxy/egress.sock`의 데몬 proxy socket을 통해서만 egress합니다.
+- 각 Worker 실행은 자신만의 workspace `<MAOS_HOME>/workspaces/<container_name>/`를 받으며, 이는 `/workspace`(`rw,U`)에 작업 디렉터리로 마운트됩니다. podman은 이를 컨테이너에 매핑된 subuid로 chown합니다. workspace는 Worker 종료 후에도 유지되며(`podman unshare rm -rf <workspace>`로 제거), MAOS는 실제 `codex` 또는 `claude` Worker가 effect를 만들었는지 판단하기 위해 이를 diff합니다. [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit)을 참고하세요.
 
 WASM log recall은 T2에 디스크립터, 소켓, 시스템 호출을 추가하지 않습니다. 요청과 응답은 runner의 기존 ADR-032 stdin/stdout 채널을 사용합니다. 데몬은 허용된 호출마다 capability를 발급하고 모든 호출과 거부를 감사 로그에 기록합니다. 새로운 배포 조건이나 T2 allow-list 변경은 없습니다.
 
 **설계상 격리되지 않는 항목:**
 
 - `rust-inproc` Spirits는 데몬 프로세스에서 실행됩니다.
-- 승인 probe는 호스트에서 실행됩니다.
+- repo에서 빌드한 Worker fixture의 승인 handshake는 호스트에서 실행됩니다. 실제 `codex`와 `claude` binary는 호스트에서 실행되지 않습니다.
 - T3 Worker manifest 리소스 제한은 CPU 백분율, memory MiB, PID/태스크 수, 파일 디스크립터별로 적용되며, 생략된 값은 runtime 기본값을 유지합니다. Native T2 cgroup/fallback 동작과 named-unit 로컬 smoke helper는 [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit)에 설명되어 있습니다.
 - T3에는 MAOS 전용 seccomp 또는 AppArmor 프로필이 없습니다.
 - T3는 Linux 전용이며, 다른 플랫폼에서는 실행이 거부됩니다.

@@ -12,7 +12,9 @@
 //! - With `--maos-fixture-mode=<mode>`: run the named Story-16-3 crash/hang
 //!   scene (ruling D-16-3-L) so the supervision corpora can drive real
 //!   subprocess deaths; unknown mode ⇒ exit 2. Modes: `hang`, `line-then-hang`,
-//!   `hang-chatty`, `hang-with-grandchild`, `sigkill-self`, `exit-nonzero`.
+//!   `hang-chatty`, `hang-with-grandchild`, `sigkill-self`, `exit-nonzero`,
+//!   and Story 19-6's `delay-then-complete` (sleep 2 s, then the default
+//!   completion below, so a root-side kill lands while the Worker runs).
 //! - Otherwise: echo the deterministic canned output (one line each) and exit 0.
 //!   This is the fixture-replayed "work product" captured to the Transparency
 //!   Log as `FrameKind::CliSubprocessOutput=21` rows.
@@ -36,6 +38,9 @@ const MODE_FLAG_PREFIX: &str = "--maos-fixture-mode=";
 
 /// The hang modes sleep in this loop step; the harness SIGKILLs the process.
 const HANG_POLL: Duration = Duration::from_secs(3600);
+
+/// Story 19-6 — how long `delay-then-complete` runs before completing.
+const DELAY_THEN_COMPLETE: Duration = Duration::from_secs(2);
 
 /// Exit code for an unrecognized `--maos-fixture-mode=<v>` value (D-16-3-L).
 const UNKNOWN_MODE_EXIT: i32 = 2;
@@ -82,6 +87,9 @@ fn main() {
             // The sanctioned non-crash failure: a clean `fault.non-zero-exit`
             // with `exit_code: 3`.
             "exit-nonzero" => std::process::exit(3),
+            // Story 19-6 — still running for a while, then the default
+            // completion path below, byte for byte.
+            "delay-then-complete" => std::thread::sleep(DELAY_THEN_COMPLETE),
             "exit-137" => {
                 flush_stdout();
                 let _ = std::io::stderr().flush();
@@ -92,7 +100,7 @@ fn main() {
                 eprintln!(
                     "worker-fixture: unknown fixture mode `{unknown}` (expected resource-probe, \
                      hang, line-then-hang, hang-chatty, hang-with-grandchild, sigkill-self, \
-                     exit-nonzero, exit-137 or oom)"
+                     exit-nonzero, delay-then-complete, exit-137 or oom)"
                 );
                 std::process::exit(UNKNOWN_MODE_EXIT);
             }

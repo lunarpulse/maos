@@ -475,6 +475,18 @@ impl Orchestrator {
         s.in_flight = s.in_flight.saturating_sub(1);
     }
 
+    /// Story 19-6 (D-19-6-03 A) — release a delegation whose Worker crashed,
+    /// once its kernel-sent orphan frame was drained. Not a completion: the
+    /// Worker produced nothing, so no distillate follows. `false` when nothing
+    /// was in flight — a second release of one orphan, which the caller
+    /// refuses rather than masking.
+    pub fn release_orphaned_delegation(&self) -> bool {
+        let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let released = s.in_flight > 0;
+        s.in_flight = s.in_flight.saturating_sub(1);
+        released
+    }
+
     /// Drain the next director instruction **only at a safe point**. `dequeue`
     /// is the real kernel buffer's `dequeue_at_safe_point` (passed as a closure
     /// so the kernel buffer stays a dev-dep — the Spirit owns the FR20 gate, the
@@ -764,6 +776,25 @@ mod unit_tests {
             )
         });
         assert!(drained.is_some(), "drains at the safe point");
+    }
+
+    #[test]
+    fn orphaned_delegation_release_reopens_the_safe_point_once() {
+        let o = Orchestrator::new("orchestrator");
+        o.begin_delegation();
+        assert!(
+            o.release_orphaned_delegation(),
+            "the in-flight delegation is released"
+        );
+        assert!(
+            o.is_safe_point(),
+            "FR20: the orphan re-opens the safe point"
+        );
+        assert!(
+            !o.release_orphaned_delegation(),
+            "a second release of the same orphan is refused, never a negative count"
+        );
+        assert_eq!(o.in_flight(), 0);
     }
 
     #[test]

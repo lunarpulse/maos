@@ -54,9 +54,10 @@ pub enum WorkerNonCompletion {
     /// non-`success` `subtype`. Distinct from [`Self::NoCompletionMarker`] —
     /// there the CLI said nothing legible; here it said it failed.
     TurnFailed,
-    /// The turn completed and claimed success, but the structured stream carries
-    /// no evidence the declared write-class work happened (codex: no
-    /// `item.completed` of type `file_change` with `status: "completed"`). This
+    /// The turn completed and claimed success, but there is no evidence the
+    /// declared write-class work happened: codex's stream has no `item.completed`
+    /// `file_change` with `status: "completed"`, or (Story 19-3,
+    /// [`gate_workspace_effect`]) the Worker's `/workspace` diff is empty. This
     /// is the ship-blocker's exact shape — a clean exit and a fluent final
     /// message over a working tree the worker never touched.
     NoEffectEvidence,
@@ -174,6 +175,12 @@ pub trait WorkerCli: Send + Sync {
         exit: WorkerExit,
     ) -> WorkerCompletion;
 
+    /// Story 19-3 (D-19-3-04 A) — a `Completed` verdict also needs a non-empty
+    /// `/workspace` diff ([`gate_workspace_effect`]). The fixtures write nothing.
+    fn requires_workspace_effect(&self) -> bool {
+        false
+    }
+
     /// The ambient auth file whose presence in the sandbox home lets this CLI use
     /// a credential MAOS never holds (codex's ChatGPT-login `~/.codex/auth.json`),
     /// making redaction unattestable → a failed Tier-2. `None` = no such footgun.
@@ -187,16 +194,13 @@ pub trait WorkerCli: Send + Sync {
     /// The kernel's Story 6.2 output-shape probe spawns the CLI with a
     /// `--maos-bridge-probe` flag and expects it to emit its `output_shape_version`
     /// — a MAOS-specific handshake that ONLY the hermetic fixture implements. A
-    /// real agent CLI (codex, claude) does not speak it and exits non-zero, so the
-    /// kernel probe can never admit a real worker. For those, the WorkerCli
-    /// adapter's [`parse_completion`](Self::parse_completion) IS the output-shape
-    /// contract (verified at COMPLETION time), so admission only needs a liveness
-    /// check that the binary is present and invokable. Default = a `--version`
-    /// liveness probe; the fixture overrides to the bridge handshake.
+    /// real agent CLI (codex, claude) does not speak it, and Story 19-3
+    /// (D-19-3-07 A) runs no real agent CLI on the host at all: the T3 spawn is
+    /// the invokability check and [`parse_completion`](Self::parse_completion)
+    /// the output-shape contract. Default = no host-side probe; the fixture
+    /// overrides to the bridge handshake.
     fn probe_strategy(&self) -> ProbeStrategy {
-        ProbeStrategy::Liveness {
-            argv: vec!["--version".to_string()],
-        }
+        ProbeStrategy::SpawnIsProbe
     }
 
     /// The argv token GROUPS this adapter REQUIRES in the manifest's hashed
@@ -250,59 +254,9 @@ pub enum ProbeStrategy {
     /// The kernel's Story 6.2 `--maos-bridge-probe` output-shape handshake.
     /// Fixture-only — the only CLI that answers the MAOS probe protocol.
     BridgeHandshake,
-    /// A liveness probe for a real adapter-backed CLI: run it with `argv` and
-    /// require a clean exit. The adapter (not a handshake) is the output-shape
-    /// contract, verified at completion.
-    Liveness { argv: Vec<String> },
-}
-
-/// Run a liveness probe: spawn `program argv`, require a clean exit within
-/// `timeout`. Fail-closed on spawn error, non-zero exit, or timeout. Output is
-/// discarded — a liveness probe checks invokability, NOT output shape (that is
-/// the adapter's completion oracle). Mirrors the kernel probe's poll+timeout
-/// shape so the real-CLI admission path has the same fail-loud guarantees.
-pub fn run_liveness_probe(
-    program: &str,
-    argv: &[String],
-    timeout: std::time::Duration,
-) -> Result<(), String> {
-    use std::process::{Command, Stdio};
-    let mut child = Command::new(program)
-        .env_clear()
-        .envs(
-            [
-                "PATH",
-                "HOME",
-                "XDG_RUNTIME_DIR",
-                "DBUS_SESSION_BUS_ADDRESS",
-            ]
-            .into_iter()
-            .filter_map(|name| std::env::var_os(name).map(|value| (name, value))),
-        )
-        .args(argv)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("spawn failed for {program}: {e}"))?;
-    let start = std::time::Instant::now();
-    loop {
-        match child
-            .try_wait()
-            .map_err(|e| format!("try_wait failed for {program}: {e}"))?
-        {
-            Some(status) if status.success() => return Ok(()),
-            Some(status) => return Err(format!("non-zero exit ({status}) for {program}")),
-            None => {
-                if start.elapsed() >= timeout {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(format!("timed out after {timeout:?} for {program}"));
-                }
-                std::thread::sleep(std::time::Duration::from_millis(50));
-            }
-        }
-    }
+    /// No host-side probe: the T3 spawn is the invokability check (19-3
+    /// D-19-3-07 A — a real agent CLI never executes on the host).
+    SpawnIsProbe,
 }
 
 /// The clean-home invariant (spec "Never"): on the live path, refuse if the CLI's
@@ -398,6 +352,22 @@ pub fn refuse_unsafe_argv(cli: &dyn WorkerCli, argv_prefix: &[String]) -> Result
         }
     }
     Ok(())
+}
+
+/// Story 19-3 (D-19-3-05 A) — applied right after [`WorkerCli::parse_completion`]
+/// (still a pure function of the journaled rows): an effect-requiring adapter's
+/// `Completed` over an empty diff or a refused walk is `NoEffectEvidence`.
+/// Never the reverse, so `file_change` and `permission_denials` still refuse.
+pub fn gate_workspace_effect(
+    cli: &dyn WorkerCli,
+    completion: WorkerCompletion,
+    effect: &Result<crate::worker_workspace::WorkspaceEffect, crate::worker_workspace::WalkError>,
+) -> WorkerCompletion {
+    let effect_proven = effect.as_ref().is_ok_and(|e| !e.is_empty());
+    if completion.is_completed() && cli.requires_workspace_effect() && !effect_proven {
+        return WorkerCompletion::NotCompleted(WorkerNonCompletion::NoEffectEvidence);
+    }
+    completion
 }
 /// The last non-empty, trimmed line of a captured stream (the "final message").
 fn final_nonempty_line(lines: &[String]) -> Option<&str> {
@@ -520,7 +490,9 @@ fn codex_jsonl_oracle(stdout: &[String], exit: WorkerExit) -> WorkerCompletion {
 /// `is_error: false`, and a model that simply declines *without attempting a tool
 /// call* leaves `permission_denials` empty and is indistinguishable from success.
 /// claude's JSON detects the permission-denial defect; it is not an effect oracle.
-/// That residual is claude's, is named here, and is not closed by this seam.
+/// Story 19-3 closes that residual at the seam, not here: [`gate_workspace_effect`]
+/// refuses a claude `Completed` over an empty `/workspace` diff. The diff proves
+/// *an* effect, not the requested one.
 fn claude_result_object_oracle(stdout: &[String], exit: WorkerExit) -> WorkerCompletion {
     if !exit.is_clean() {
         return WorkerCompletion::NotCompleted(WorkerNonCompletion::ProcessCrash {
@@ -767,6 +739,11 @@ impl WorkerCli for CodexCli {
         codex_jsonl_oracle(stdout, exit)
     }
 
+    /// Conjunctive with `file_change`: a change into the `/tmp` tmpfs is lost.
+    fn requires_workspace_effect(&self) -> bool {
+        true
+    }
+
     fn ambient_auth_path(&self, home: &std::path::Path) -> Option<std::path::PathBuf> {
         // ChatGPT-login writes a plaintext subscription token here. Note
         // `CODEX_API_KEY` actually takes PRECEDENCE over auth.json (manager.rs:1226
@@ -897,6 +874,10 @@ impl WorkerCli for ClaudeCli {
         exit: WorkerExit,
     ) -> WorkerCompletion {
         claude_result_object_oracle(stdout, exit)
+    }
+
+    fn requires_workspace_effect(&self) -> bool {
+        true
     }
 
     /// claude's OAuth/subscription credential file. Note the LEADING DOT on the

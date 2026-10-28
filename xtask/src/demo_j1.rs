@@ -28,7 +28,9 @@
 //!    `two-host-signed-run` rung belongs to `j1-crosshost-2d-paid-two-host-run`
 //!    (RF-0, 2026-08-18: `2c` owns the judge, `2d` owns the run).
 //! 3. A fixture take never claims the Tier-2 beat. Only `--live-codex` ending in
-//!    a verified sealed bundle earns `PROVEN_LIVE_SIGNED`.
+//!    a verified sealed bundle earns `PROVEN_LIVE_SIGNED`; the flag selects LIVE
+//!    and the `--codex-topology` Worker selects the adapter (codex or claude —
+//!    e.g. `spirits/topologies/j1-founder-loop-claude.toml`, Story 19-3 D-08 A).
 //!
 //! Every run is provisioned into an ISOLATED state home (`MAOS_HOME` +
 //! `XDG_DATA_HOME`). That is not tidiness: on the operator's shared
@@ -433,11 +435,8 @@ fn preflight(skip_build: bool) -> Result<Bins, String> {
             ));
         }
     }
-    // ABSOLUTE, never repo-relative: the live take spawns the daemon with
-    // `current_dir` set to a disposable workspace, and a relative program path is
-    // resolved against the CHILD's cwd — where `target/debug/maos` does not
-    // exist, so every live take would fail at spawn. Resolving once here fixes it
-    // for the PATH prepend and the `maosctl` sibling lookup at the same time.
+    // ABSOLUTE, never repo-relative: the PATH prepend and the `maosctl` sibling
+    // lookup must not depend on the cwd the daemon child happens to inherit.
     let dir = dir
         .canonicalize()
         .map_err(|e| format!("demo-j1: cannot resolve target/debug: {e}"))?;
@@ -478,7 +477,7 @@ fn provision_home(keep: Option<&Path>) -> Result<PathBuf, String> {
     };
     std::fs::create_dir_all(&home)
         .map_err(|e| format!("demo-j1: cannot create state home {}: {e}", home.display()))?;
-    // Absolute so the live child's `current_dir` change cannot reinterpret it.
+    // Absolute so no consumer's cwd can reinterpret it.
     home.canonicalize()
         .map_err(|e| format!("demo-j1: cannot resolve state home {}: {e}", home.display()))
 }
@@ -1205,17 +1204,16 @@ fn live_codex_take(
     codex_topology: Option<&Path>,
     home: &Path,
 ) -> Result<usize, String> {
-    // The codex worker manifest and its topology are OPERATOR-authored (the
-    // runbook has you transcribe the exact argv after pinning it by hand); the
-    // repo ships only the fixture profile, so the path must be supplied.
+    // The live topology names the Worker manifest, and that manifest selects the
+    // adapter; the repo ships `j1-founder-loop-codex.toml` and
+    // `j1-founder-loop-claude.toml`, but the path is always supplied explicitly.
     let topology = codex_topology
         .map(Path::to_path_buf)
         .or_else(|| std::env::var_os("MAOS_DEMO_J1_CODEX_TOPOLOGY").map(PathBuf::from))
         .ok_or_else(|| {
-            "no codex topology: pass --codex-topology <path> (or set \
-             MAOS_DEMO_J1_CODEX_TOPOLOGY). The repo ships only the fixture worker manifest; \
-             author the codex profile per \
-             _bmad-output/test-artifacts/runbook-j1-tier-2-signed-live-run.md Phase 1.5"
+            "no live topology: pass --codex-topology <path> (or set \
+             MAOS_DEMO_J1_CODEX_TOPOLOGY), e.g. spirits/topologies/j1-founder-loop-codex.toml \
+             or spirits/topologies/j1-founder-loop-claude.toml"
                 .to_string()
         })?;
     if !topology.exists() {
@@ -1328,11 +1326,10 @@ fn live_codex_take(
     }
     println!("  preflight        clean home, metered key, host grants, named signer, audit key");
 
-    // A disposable demo dir the worker may CRUD inside, outside the repo tree.
-    let demo_dir = home.join("demo-workspace");
-    std::fs::create_dir_all(&demo_dir)
-        .map_err(|e| format!("cannot create the disposable demo dir: {e}"))?;
-
+    // Story 19-3 (AC1.2) — no demo dir and no daemon `current_dir`: every Worker
+    // runs under T3 in its own per-run workspace (`/workspace`), which the daemon
+    // creates, diffs and reports.
+    //
     // `--once` is REQUIRED. Without it `maos run` falls through to the continuous
     // serving loop (`maos-bin/src/main.rs:5232`) while `.output()` waits for the
     // child to exit — so a SUCCESSFUL paid take would hang forever and never
@@ -1342,7 +1339,6 @@ fn live_codex_take(
         .arg(topology.canonicalize().unwrap_or(topology.clone()))
         .arg("--live")
         .arg("--once")
-        .current_dir(&demo_dir)
         .env("MAOS_HOME", home)
         .env("XDG_DATA_HOME", home)
         .env("MAOS_LIVE_AGENT", "1")
@@ -1415,6 +1411,13 @@ fn live_codex_take(
         "  live run         {identity} completed, worker TL ref {}",
         short_ref(&tl_ref)
     );
+    // Story 19-3 (AC1.2) — where the Worker's effect lives; the diff that made
+    // this run `completed` is over this directory.
+    let workspace = completion
+        .as_ref()
+        .and_then(|e| e["workspace"].as_str())
+        .unwrap_or("unknown");
+    println!("  worker workspace {workspace}");
 
     // AC3 records `redaction_result: "verified"`. VERIFY it rather than assert
     // it: `record-capture` only checks that the field reads "verified", so an

@@ -14,7 +14,12 @@
 //!
 //! * `lifecycle.crash` ≤ 2 s after the kill for ≥ 99/100 (NFR-Rel-1);
 //! * `task.orphaned` AND its disposition ≤ 5 s after the kill for ≥ 99/100
-//!   (FR12's second floor).
+//!   (FR12's second floor);
+//! * Story 19-6 (D-19-6-08 A) — the kernel-sent orphan DELIVERED to the
+//!   originator's mailbox ≤ 5 s after the kill for ≥ 99/100. Every Worker is
+//!   a `WorkerTask::Delegation` (distinct frame ids) whose originator, the
+//!   `orchestrator`, is a loaded SCB with a registered mailbox; the poller
+//!   drains that mailbox and stamps each frame as it arrives.
 //!
 //! What this corpus refuses (story §4 — the defects the old jobs hid):
 //!
@@ -68,7 +73,10 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use maos_bin::delegation;
 use maos_bin::supervision::{WorkerSupervisor, WorkerTask};
+use maos_domain::frame::FramePayload;
+use maos_domain::supervision::NullReplicaResolver;
 use maos_kernel_core::iac::transparency_log::{
     FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
 };
@@ -124,6 +132,8 @@ struct KernelWorld {
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
     policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
+    scheduler: Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
+    iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
     supervisor: Arc<WorkerSupervisor>,
 }
 
@@ -199,6 +209,8 @@ impl KernelWorld {
         Arc::get_mut(&mut scheduler)
             .expect("scheduler Arc strong_count == 1")
             .set_crash_detector(Arc::clone(&crash_detector));
+        let world_scheduler = Arc::clone(&scheduler);
+        let world_iac = Arc::clone(&iac);
         let supervisor = Arc::new(WorkerSupervisor::new(
             scheduler,
             crash_detector,
@@ -214,6 +226,8 @@ impl KernelWorld {
             tl,
             capability,
             policy,
+            scheduler: world_scheduler,
+            iac: world_iac,
             supervisor,
         }
     }
@@ -251,6 +265,30 @@ fn write_worker_manifest(dir: &Path, mode: &str) -> PathBuf {
     path
 }
 
+/// The task the kernel bound to a Worker's SCB — the id its rows will carry.
+/// `None` until the record is bound (the killer re-checks next tick).
+fn in_flight_task(
+    scheduler: &maos_kernel_core::scheduler::SpiritSchedulerAdapter,
+    spirit_pid: u32,
+) -> Option<String> {
+    let scbs = scheduler.scbs();
+    let scbs = scbs.read().ok()?;
+    let ledger = scbs
+        .get(&spirit_pid)?
+        .task_assignments_in_flight
+        .lock()
+        .ok()?;
+    ledger.first().map(|record| record.task_id.clone())
+}
+
+/// The corpus's delegation frame ids: `seq ‖ run_nonce`, distinct per Worker.
+fn delegation_frame_id(index: usize) -> [u8; 16] {
+    let mut id = [0u8; 16];
+    id[0..8].copy_from_slice(&(index as u64 + 1).to_le_bytes());
+    id[8..16].copy_from_slice(&NONCE.to_le_bytes());
+    id
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // The kill bookkeeping, shared by the killer thread, the ONE poller thread
 // and the asserting test task.
@@ -283,6 +321,14 @@ struct Ledger {
     grandchildren_killed: Mutex<HashSet<u32>>,
     kills_sent: AtomicU32,
     send_failures: Mutex<Vec<String>>,
+    /// Story 19-6 — orphan frame id → the delegation task id it orphans,
+    /// minted before the run from the production derivation.
+    orphans: HashMap<[u8; 16], String>,
+    /// task_id → wall-clock stamp of the orphan's arrival in the
+    /// Orchestrator's mailbox (first drain wins).
+    delivered: Mutex<HashMap<String, u64>>,
+    /// Anything else the Orchestrator's handle yielded — a defect, asserted empty.
+    foreign_frames: Mutex<Vec<String>>,
     /// Set by the test task when measurement is over; the threads exit.
     done: AtomicBool,
 }
@@ -467,12 +513,73 @@ impl Ledger {
             .count()
     }
 
+    /// Story 19-6 — one frame drained from the Orchestrator's handle, stamped
+    /// on arrival. Only the first kernel-sent orphan of a corpus delegation
+    /// counts; anything else (another frame, a second copy) is a defect.
+    fn deliver(
+        &self,
+        kind: maos_spirit_abi::identity::FrameKind,
+        frame: &maos_domain::frame::IacFrame,
+        arrived_ns: u64,
+    ) {
+        let is_orphan = kind == maos_spirit_abi::identity::FrameKind::TaskComplete
+            && frame.from.spirit_id.as_str()
+                == maos_kernel_core::iac::mailbox::KERNEL_SENDER_SPIRIT_ID
+            && matches!(
+                &frame.payload,
+                FramePayload::TaskComplete(p) if p.result == delegation::ORPHANED_RESULT
+            );
+        let fresh = match self.orphans.get(&frame.frame_id) {
+            Some(task_id) if is_orphan => self
+                .delivered
+                .lock()
+                .expect("delivery ledger")
+                .insert(task_id.clone(), arrived_ns)
+                .is_none(),
+            _ => false,
+        };
+        if !fresh {
+            self.foreign_frames
+                .lock()
+                .expect("foreign frames")
+                .push(format!(
+                    "{kind:?} {} from {}",
+                    hex::encode(frame.frame_id),
+                    frame.from.spirit_id.as_str()
+                ));
+        }
+    }
+
+    /// Delivery latency of every killed Worker whose orphan arrived.
+    fn delivery_latencies(&self) -> Vec<Duration> {
+        let workers = self.workers.lock().expect("worker ledger");
+        let delivered = self.delivered.lock().expect("delivery ledger");
+        workers
+            .values()
+            .filter_map(|tally| {
+                delivered
+                    .get(&tally.task_id)
+                    .map(|ns| Duration::from_nanos(ns.saturating_sub(tally.kill_wall_ns)))
+            })
+            .collect()
+    }
+
+    /// Killed Workers whose orphan arrived within `floor`; a missing delivery
+    /// counts as a failure.
+    fn delivered_within(&self, floor: Duration) -> usize {
+        self.delivery_latencies()
+            .into_iter()
+            .filter(|latency| *latency <= floor)
+            .count()
+    }
+
     fn observed_all(&self) -> bool {
         let workers = self.workers.lock().expect("worker ledger");
         workers.len() == WORKERS
             && workers.values().all(|t| {
                 t.crash_ns.is_some() && t.orphaned_ns.is_some() && t.disposition_ns.is_some()
             })
+            && self.delivered.lock().expect("delivery ledger").len() == WORKERS
     }
 }
 
@@ -525,6 +632,29 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
          be detected only after the pump, at +5 s"
     );
 
+    // Story 19-6 (D-19-6-08 A) — the originator every Worker's delegation
+    // names: a loaded `orchestrator` SCB (so it resolves to a Spirit on this
+    // root) with a registered mailbox, and the supervisor's delivery seam.
+    world
+        .scheduler
+        .load(
+            delegation::FROM_SPIRIT,
+            maos_kernel_core::scheduler::control_block::SpiritManifestBundle::default(),
+            maos_spirit_hello::HelloSpirit,
+            NONCE,
+        )
+        .await
+        .expect("load the Orchestrator SCB");
+    let mut orchestrator_handle = world
+        .iac
+        .mailbox()
+        .register_spirit(delegation::FROM_SPIRIT)
+        .expect("register the Orchestrator's mailbox");
+    supervisor
+        .install_originator_delivery(Arc::new(NullReplicaResolver))
+        .unwrap_or_else(|_| panic!("the set-once delivery seam installs"));
+    let frame_ids: Vec<[u8; 16]> = (0..WORKERS).map(delegation_frame_id).collect();
+
     let hang = write_worker_manifest(&dir, "hang");
     let grandchild = write_worker_manifest(&dir, "hang-with-grandchild");
     let manifests: HashMap<String, toml::Value> = [hang, grandchild]
@@ -543,7 +673,22 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
         })
         .collect();
 
-    let ledger = Arc::new(Ledger::default());
+    let ledger = Arc::new(Ledger {
+        orphans: frame_ids
+            .iter()
+            .map(|frame_id| {
+                (
+                    delegation::orphan_frame_id(*frame_id),
+                    WorkerTask::Delegation {
+                        frame_id: *frame_id,
+                    }
+                    .record_ids("worker")
+                    .0,
+                )
+            })
+            .collect(),
+        ..Ledger::default()
+    });
 
     // ONE poller thread, ONE keyset-cursor `query_frames` per 10 ms tick over
     // NEW rows (exclusive lower bound on (timestamp_ns, frame_id)). The
@@ -571,6 +716,16 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
                 // every row stamped in the rewind window, new or already seen.
                 let mut cursor_ts = 0u64;
                 while !ledger.done.load(Ordering::Acquire) {
+                    // Story 19-6 — drain the Orchestrator's handle FIRST and
+                    // stamp each frame as it arrives: the delivery floor is
+                    // the mailbox, not the row journaled before it.
+                    while let Ok(Some((kind, frame))) = orchestrator_handle.try_recv() {
+                        let arrived_ns = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("clock after epoch")
+                            .as_nanos() as u64;
+                        ledger.deliver(kind, &frame, arrived_ns);
+                    }
                     if let Ok(rows) = tl.query_frames(FrameFilter {
                         cursor_timestamp_ns: Some(cursor_ts),
                         cursor_frame_id: Some([0u8; 16]),
@@ -597,6 +752,7 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
         .name("crash-corpus-killer".to_string())
         .spawn({
             let supervisor = Arc::clone(&supervisor);
+            let scheduler = Arc::clone(&world.scheduler);
             let ledger = Arc::clone(&ledger);
             move || loop {
                 if ledger.done.load(Ordering::Acquire) {
@@ -609,10 +765,12 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
                     if ledger.not_yet_killable(view.spirit_pid, child_pid) {
                         continue;
                     }
-                    if !ledger.kill(
-                        view.spirit_pid,
-                        WorkerTask::Standalone.record_ids(&view.spirit_id).0,
-                    ) {
+                    // The delegation's task id, read from the kernel's own
+                    // in-flight record: the id every row of this Worker joins on.
+                    let Some(task_id) = in_flight_task(&scheduler, view.spirit_pid) else {
+                        continue;
+                    };
+                    if !ledger.kill(view.spirit_pid, task_id) {
                         continue;
                     }
                     match pidfd_send_signal(child.pidfd(), Signal::KILL) {
@@ -705,6 +863,9 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
             let capability = Arc::clone(&world.capability);
             let policy = Arc::clone(&world.policy);
             let supervisor = Arc::clone(&supervisor);
+            let task = WorkerTask::Delegation {
+                frame_id: frame_ids[index],
+            };
             joins.push(tokio::task::spawn_blocking(move || {
                 t0_worker::run_t0_worker(
                     &manifest_root,
@@ -712,7 +873,7 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
                     capability,
                     policy,
                     supervisor.as_ref(),
-                    WorkerTask::Standalone,
+                    task,
                 )
                 .map(|completion| completion.label().to_string())
             }));
@@ -762,6 +923,14 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
     let crash_ok = ledger.meet(CRASH_FLOOR, Which::Crash);
     let orphan_ok = ledger.meet(ORPHAN_FLOOR, Which::OrphanAndDisposition);
     let counters = supervisor.counters();
+    let delivered = ledger.delivery_latencies();
+    let delivered_total = ledger.delivered.lock().expect("delivery ledger").len();
+    let delivered_ok = ledger.delivered_within(ORPHAN_FLOOR);
+    let foreign_frames = ledger
+        .foreign_frames
+        .lock()
+        .expect("foreign frames")
+        .clone();
 
     let announced = ledger
         .grandchildren
@@ -796,6 +965,12 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
         "disposition (task.nacked at pid 0)",
         ORPHAN_FLOOR,
         &disposition,
+        WORKERS,
+    );
+    print_floor(
+        "orphan delivered to the Orchestrator's mailbox",
+        ORPHAN_FLOOR,
+        &delivered,
         WORKERS,
     );
 
@@ -854,5 +1029,25 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
         "FR12 floor (orphaned AND disposition ≤ {ORPHAN_FLOOR:?}) met by only \
          {orphan_ok}/{WORKERS} — the orphan record is not reaching the \
          originator in time"
+    );
+
+    // 4. Story 19-6 (D-19-6-08 A, AC5) — the orphan DELIVERED to the
+    //    originator's mailbox. Denominator first: one kernel-sent orphan per
+    //    killed delegation, and nothing else in the Orchestrator's handle.
+    //    With the delivery seam uninstalled this reads 0/100.
+    assert!(
+        foreign_frames.is_empty(),
+        "the Orchestrator's handle held frames other than one orphan per \
+         delegation: {foreign_frames:?}"
+    );
+    assert_eq!(
+        delivered_total, WORKERS,
+        "exactly one orphan per killed delegation must reach the Orchestrator's \
+         mailbox; got {delivered_total}/{WORKERS}"
+    );
+    assert!(
+        delivered_ok >= REQUIRED,
+        "FR12 / NFR-Rel-1 delivery floor (≤ {ORPHAN_FLOOR:?} after the kill) met by \
+         only {delivered_ok}/{WORKERS}"
     );
 }

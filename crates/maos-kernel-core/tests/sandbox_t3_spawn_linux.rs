@@ -77,6 +77,7 @@ fn verified_t3_applies_nonroot_namespace_and_argv_environment_custody() {
             payload_pidfd: true,
             env: &environment,
             launch_custody: None,
+            workspace: None,
         },
     )
     .expect("declared-capable runner must apply the verified OCI boundary");

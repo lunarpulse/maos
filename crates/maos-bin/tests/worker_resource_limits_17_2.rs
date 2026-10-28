@@ -605,6 +605,7 @@ fn verify_actual_runtime_fd_boundary(root: &Root) {
             &name,
             &state_dir,
             None,
+            None,
             &[],
         )
         .unwrap();

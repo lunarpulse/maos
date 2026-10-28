@@ -276,7 +276,8 @@ fn kernel_core_ceiling_has_not_moved_under_the_easing() {
     // verification and wire use; inference/mod.rs spawns RateLimited delivery
     // instead of dropping its unpolled future. The +23 allowance is not headroom:
     // the ceiling is the measured +22.
-    const RATIFIED_AT_EASING: i64 = 20_619;
+    const RATIFIED_AT_EASING: i64 = 20_628;
+    // 19-3 D-19-3-01 A K2 mount, D19-2 A FLAG-Winston grant: 20619 -> 20628 (+9), physical +11.
     // 20-15-ci-build-once-nextest-archive conmon_oom_cwd FLAG-Winston, operator2026-10-27:
     // exact20610 -> 20619 (+9), physical26367 -> 26378 (+11), security/sandbox/t3/spawn.rs only.
     // 18-7-live-skill-authoring-and-revisions D-01/02 A, operator2026-10-26:

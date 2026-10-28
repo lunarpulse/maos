@@ -1099,10 +1099,12 @@ enum Commands {
     /// including the beats that have NOT landed.
     #[command(name = "demo-j1")]
     DemoJ1 {
-        /// Take the paid Tier-2 leg: one real codex run, captured and sealed.
+        /// Take the paid Tier-2 leg: one real agent-CLI run (codex or claude, as
+        /// the topology's Worker declares), captured and sealed.
         #[arg(long)]
         live_codex: bool,
-        /// The operator-authored codex topology that `--live-codex` runs.
+        /// The live topology `--live-codex` runs; its Worker manifest selects the
+        /// adapter (e.g. `spirits/topologies/j1-founder-loop-claude.toml`).
         #[arg(long, value_name = "PATH")]
         codex_topology: Option<PathBuf>,
         /// Keep the isolated state home at this path instead of a temp dir.

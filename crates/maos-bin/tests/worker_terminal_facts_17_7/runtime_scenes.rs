@@ -62,6 +62,7 @@ fn spawn(
             payload_pidfd: pidfd,
             env: &[],
             launch_custody: None,
+            workspace: None,
         },
     )
     .map(|child| Spawned { child, _dir: dir })

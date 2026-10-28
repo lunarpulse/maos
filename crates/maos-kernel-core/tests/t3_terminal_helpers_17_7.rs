@@ -367,6 +367,7 @@ esac
             payload_pidfd: false,
             env: &[],
             launch_custody: Some(&custody),
+            workspace: None,
         },
     );
 

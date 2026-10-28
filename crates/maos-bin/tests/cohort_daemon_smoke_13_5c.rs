@@ -925,8 +925,10 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 18-3 — 29 → 30: `researcher_root.rs` joins it.
     // Story 19-7 — 31 → 32: `repin_door.rs` joins it.
     // Story 19-1 — 32 → 33: `orchestrator_root.rs` joins it.
+    // Story 19-3 — 33 → 34: `worker_workspace.rs` joins it.
+    // Story 19-6 — 34 → 35: `replica_resolver.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 33] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 35] = [
         ("main.rs", include_str!("../src/main.rs")),
         (
             "skill_authoring.rs",
@@ -1063,6 +1065,20 @@ fn composition_root_does_not_seed_manifest_scopes() {
         (
             "orchestrator_root.rs",
             include_str!("../src/orchestrator_root.rs"),
+        ),
+        // Story 19-3 — the per-Worker T3 workspace (create, snapshot, diff).
+        // It reads only the Worker's own workspace and must never seed the
+        // manifest-derived policy table.
+        (
+            "worker_workspace.rs",
+            include_str!("../src/worker_workspace.rs"),
+        ),
+        // Story 19-6 — the root's FR50 replica resolver. It reads only the
+        // root's armed state and must never seed the manifest-derived policy
+        // table.
+        (
+            "replica_resolver.rs",
+            include_str!("../src/replica_resolver.rs"),
         ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");

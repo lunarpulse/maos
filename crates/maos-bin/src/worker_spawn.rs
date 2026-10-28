@@ -812,8 +812,10 @@ pub fn run_cli_wrapper_manifest(
     //    adapter-backed CLI (codex/claude) does NOT implement that handshake —
     //    it exits non-zero on the probe flag, which is why the fixture was the
     //    only worker that ever admitted. For real CLIs the WorkerCli adapter's
-    //    `parse_completion` IS the output-shape contract (verified at COMPLETION),
-    //    so admission runs a liveness probe and re-asserts the T3 floor here.
+    //    `parse_completion` IS the output-shape contract (verified at COMPLETION)
+    //    and the T3 spawn is the invokability check: no real agent CLI executes
+    //    on the host (19-3 D-19-3-07 A). Admission checks egress and re-asserts
+    //    the T3 floor here.
     #[cfg(unix)]
     let proxy_configured = egress.is_some_and(crate::egress::EgressHandle::is_available);
     #[cfg(not(unix))]
@@ -830,7 +832,7 @@ pub fn run_cli_wrapper_manifest(
             )
             .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
         }
-        worker_cli::ProbeStrategy::Liveness { argv } => {
+        worker_cli::ProbeStrategy::SpawnIsProbe => {
             maos_kernel_core::lifecycle::cli_wrapper::admission::check_egress(
                 &config,
                 proxy_configured,
@@ -845,16 +847,6 @@ pub fn run_cli_wrapper_manifest(
                 };
                 return Err(format!("maos run: cli_wrapper admission failed: {e}").into());
             }
-            worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
-                .map_err(|e| {
-                    format!("maos run: cli_wrapper admission failed: liveness probe: {e}")
-                })?;
-            eprintln!(
-                "maos run: cli_wrapper '{}' admitted via liveness probe (real adapter-backed CLI; \
-                 output shape is verified at completion by the {} adapter, not a bridge handshake)",
-                resolved,
-                worker_cli.name()
-            );
         }
     }
 
@@ -1067,6 +1059,13 @@ pub fn run_cli_wrapper_manifest(
 
     let boot_nonce = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
     let container_name = format!("maos-{worker_spirit_id}-{boot_nonce}");
+    // Story 19-3 (D-19-3-02 A) — a fresh workspace per Worker run, retained
+    // after exit; the kernel mounts it at `/workspace` as the Worker's cwd. The
+    // pre-spawn snapshot is empty by construction (D-19-3-03 A).
+    let workspace =
+        crate::worker_workspace::create(&container_name).map_err(|e| format!("maos run: {e}"))?;
+    let workspace_before =
+        crate::worker_workspace::snapshot(&workspace, crate::worker_workspace::WALK_ENTRY_CAP)?;
     let state_dir = supervision
         .create_t3_state_dir()
         .map_err(crate::supervision::WorkerSupervisionError::Start)?;
@@ -1111,6 +1110,7 @@ pub fn run_cli_wrapper_manifest(
             state_dir: state_dir.clone(),
             payload_pidfd,
             launch_custody: Some(Arc::clone(&launch_custody)),
+            workspace: Some(workspace.clone()),
         }),
     };
     // Bound the completion read-back to THIS run's journaled CliSubprocessOutput
@@ -1166,6 +1166,7 @@ pub fn run_cli_wrapper_manifest(
             "child_pid": child_pid,
             "container_id": container_id,
             "live": run.live,
+            "workspace": workspace.display().to_string(),
         })
     );
 
@@ -1212,6 +1213,12 @@ pub fn run_cli_wrapper_manifest(
     // unload/root stop racing this point can never yield a completion.
     let may_complete = live.binding.finish(&exit);
     let worker_exit = worker_exit_from_finalized_bridge(may_complete, &exit);
+    // Story 19-3 (AC2.2, D-19-3-03 A) — the workspace diffed after the exit.
+    let workspace_effect =
+        crate::worker_workspace::snapshot(&workspace, crate::worker_workspace::WALK_ENTRY_CAP)
+            .map(|after| crate::worker_workspace::diff(&workspace_before, &after));
+    let workspace_path = workspace.display().to_string();
+    let workspace_effect_json = crate::worker_workspace::effect_json(&workspace_effect);
 
     println!(
         "{}",
@@ -1284,6 +1291,9 @@ pub fn run_cli_wrapper_manifest(
         }
     }
     let completion = worker_cli.parse_completion(&wc_stdout, &wc_stderr, worker_exit);
+    // Story 19-3 (AC2.3, D-19-3-05 A) — the effect gate, right after the oracle.
+    let completion =
+        worker_cli::gate_workspace_effect(worker_cli.as_ref(), completion, &workspace_effect);
     println!(
         "{}",
         serde_json::json!({
@@ -1291,6 +1301,8 @@ pub fn run_cli_wrapper_manifest(
             "worker_cli": worker_cli.name(),
             "completion": completion.label(),
             "completed": completion.is_completed(),
+            "workspace": workspace_path,
+            "workspace_effect": workspace_effect_json,
             // Non-secret: the last stdout CliSubprocessOutput frame_id (hex) — the
             // Worker-produced TL reference a digest cites. `null` if none captured.
             // NOT a completion witness: see the declaration above.
@@ -1334,6 +1346,9 @@ pub fn run_cli_wrapper_manifest(
         "spirit_id": worker_spirit_id,
         "verdict": completion.label(),
         "completed": completion.is_completed(),
+        // Story 19-3 (AC2.3) — the effect, journaled beside the verdict it gates.
+        "workspace": workspace_path,
+        "workspace_effect": workspace_effect_json,
         "last_stdout_tl_ref_is_not_a_completion_witness": true,
         "last_stdout_tl_ref":
             last_stdout_tl_ref.map(|id| id.iter().map(|b| format!("{b:02x}")).collect::<String>()),

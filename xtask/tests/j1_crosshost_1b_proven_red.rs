@@ -670,6 +670,30 @@ fn planting_an_unenrolled_19_1_test_file_must_red() {
     );
 }
 
+/// Story 19-3 AC3.2 / D-19-3-10 A — the `_19_3.rs` twin: `worker_workspace_19_3`'s
+/// suffix is derived, so an un-enrolled `*_19_3.rs` reds `completion-vectors-enrolled`.
+#[test]
+fn planting_an_unenrolled_19_3_test_file_must_red() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-bin/tests/xyz_19_3.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+    });
+    assert_red(
+        &v,
+        "--test xyz_19_3`",
+        "a new 19-3 J1 test file was added without enrolling it",
+    );
+    assert!(
+        v.stdout
+            .contains("\"check\":\"completion-vectors-enrolled\""),
+        "the finding must be filed under completion-vectors-enrolled\nstdout:\n{}",
+        v.stdout
+    );
+}
+
 /// Story 19-1 AC2.4 / D-19-1-11 A — a fourth host-bearing Worker in the epic
 /// topology breaks the one-section-per-entry mapping and reds leg 1.
 #[test]

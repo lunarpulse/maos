@@ -33,6 +33,7 @@ pub fn build_runtime_argv(
     container_name: &str,
     state_dir: &Path,
     egress_socket: Option<&Path>,
+    workspace: Option<&Path>,
     env: &[(String, String)],
 ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
     let mut seen_names = std::collections::HashSet::new();
@@ -97,6 +98,10 @@ pub fn build_runtime_argv(
             "--volume={}:/proxy/egress.sock:rw",
             socket.display()
         ));
+    }
+    if let Some(dir) = workspace {
+        argv.push(format!("--volume={}:/workspace:rw,U", dir.display()));
+        argv.push("--workdir=/workspace".to_string());
     }
     argv.extend(env.iter().map(|(name, _)| format!("--env={name}")));
     argv.push(image_ref);

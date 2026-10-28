@@ -441,6 +441,9 @@ fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
         routable_founder_loops,
         vec![
             "j1-founder-loop".to_string(),
+            // Story 19-3 (D-19-3-08 A) — the claude operator-lane twin; the only
+            // topology that reaches `manifest-claude.toml`.
+            "j1-founder-loop-claude".to_string(),
             "j1-founder-loop-codex".to_string(),
             // j1-crosshost-2b AC2.2 — the cross-host scene. Deliberately edited here
             // rather than named outside the `j1-founder-loop*` prefix: the prefix is
@@ -452,7 +455,7 @@ fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
             // Story 19-1 (AC1.3) — the `--epic` founder loop: three Workers.
             "j1-founder-loop-epic".to_string(),
         ],
-        "the hermetic founder loop, the ported codex profile, the cross-host scene AND the \
-         epic founder loop must all be routable"
+        "the hermetic founder loop, the claude and codex live profiles, the cross-host scene \
+         AND the epic founder loop must all be routable"
     );
 }

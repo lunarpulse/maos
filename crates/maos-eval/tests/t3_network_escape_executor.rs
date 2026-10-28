@@ -307,6 +307,7 @@ fn execute(arguments: &[&str], egress_socket: Option<&Path>) -> Execution {
             state_dir: state_dir.path().to_path_buf(),
             payload_pidfd: true,
             launch_custody: None,
+            workspace: None,
         }),
     };
     let mut bridge = spawn_and_bridge(spec)

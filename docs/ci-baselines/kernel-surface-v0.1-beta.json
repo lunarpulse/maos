@@ -465,7 +465,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::t3::argv::build_runtime_argv",
-      "signature_hash": "3e776bd100bde9e2a922219ef15897209bb2754e2c6b404f7c5ef29751a550a3"
+      "signature_hash": "b42b1f15957c4e70867b3958e599338c6ae9a1402a80875be5d78977430f30af"
     },
     {
       "kind": "fn",
@@ -755,7 +755,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::T3Launch",
-      "signature_hash": "43646caa1a4b49ed40fb76ab704d1dd603774dcaf1a6db931ab357872689a64d"
+      "signature_hash": "9cf4aa4119467d42e788235ffdabd8beaf7f7a44a4cc01d557243fca53ab22ad"
     },
     {
       "kind": "struct",
@@ -990,7 +990,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext",
-      "signature_hash": "43b1a333841fb76271ca66f2f05c000f6a494cb102bb579744549aee8c35a80b"
+      "signature_hash": "4f7d0b9c934cc4b50b60360538b97cebd5ca46b4610904d9036bb770a02101af"
     },
     {
       "kind": "struct",

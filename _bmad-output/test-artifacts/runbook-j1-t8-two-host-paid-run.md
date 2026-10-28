@@ -358,7 +358,7 @@ HOME=$HOME_A MAOS_HOME=$HOME_A ./target/release/maosctl audit query \
 ```bash
 export N_A=7196704562630440850        # ← host A가 출력한 값으로 교체
 export HOME_B=$LAB/home-b && mkdir -p $HOME_B
-export WORK_B=$LAB/work-b && mkdir -p $WORK_B     # 워커가 파일을 쓰는 cwd
+export WORK_B=$LAB/work-b && mkdir -p $WORK_B     # 데몬 cwd — 19-3 이후 워커는 여기에 쓰지 않음 (부록 B-9)
 
 cat > $LAB/host-b.daemon.toml <<EOF
 manifest_path = '$LAB/cohort-signed.toml'
@@ -616,7 +616,7 @@ cargo run -p xtask -- check-dev-record-completeness --json | jq .violation_count
 
 ---
 
-## 부록 B — 중단 조건 (하나라도 걸리면 서명 금지)
+## 부록 B — 중단 조건 (1–8 중 하나라도 걸리면 서명 금지; 9는 19-3 이후 권고)
 
 | # | 조건 | 이유 |
 |---|---|---|
@@ -625,41 +625,54 @@ cargo run -p xtask -- check-dev-record-completeness --json | jq .violation_count
 | 3 | `~/.claude/.credentials.json` 존재 | redaction 입증 불가 = Tier-2 실패 |
 | 4 | `FPR_A == FPR_B` | `SharedAttesterRoot` |
 | 5 | 서명자가 커밋된 지문과 불일치 | 약정한 런이 아님 |
-| 6 | 워커의 CRUD가 지정 cwd 밖 | capability 범위 이탈 |
+| 6 | 워커의 CRUD가 자기 workspace(`$HOME_B/workspaces/<container_name>/`) 밖 | capability 범위 이탈 |
 | 7 | TL이나 capture에 비밀값 잔존 | redaction 실패 |
 | 8 | nonce 전사 오류 후 재시도 | 핀 무효화 — host B 재시작 필요 |
-| **9** | **`completed=true`인데 워커가 실제로 파일을 쓰지 않음** | ⛔ **차단 조건.** `claude`의 판정은 **효과 oracle이 아닙니다** — 아래 참조 |
+| 9 | `completed=true`인데 `workspace_effect`에 요청한 파일이 없음 | **권고 (19-3 이후).** 빈 workspace는 MAOS가 이미 `not_completed:no_effect_evidence`로 거부합니다. 남은 것은 *요청한* 파일인지 확인하는 일입니다 — 아래 참조 |
 
-### ⛔ 부록 B-9 — `claude`의 `completed=true`는 "파일이 써졌다"는 증거가 아닙니다
+### 부록 B-9 (권고) — `completed=true`는 "workspace에 무언가 생겼다"까지만 증명합니다
 
-두 어댑터는 **비대칭**이고, 이 런에서 그게 중요합니다.
+19-3 이전에는 두 어댑터가 **비대칭**이었고, 이 런에서 그게 중요했습니다. 인용은 `c80964d8` 기준입니다.
 
 | | `codex` | `claude` (host B가 실행하는 쪽) |
 |---|---|---|
-| 완료 판정 근거 | **네이티브 효과 증거** — `item.completed` 타입 `file_change`, `status: "completed"`, 비어있지 않은 `changes` (`worker_cli.rs:462-465`) | `subtype == "success"` + `is_error == false` + **빈** `permission_denials` (`:498-537`) |
-| 효과 검사 | 있음 — 없으면 `NoEffectEvidence` | **없음** |
+| 어댑터 판정 근거 | **네이티브 효과 증거** — `item.completed` 타입 `file_change`, `status: "completed"`, 비어있지 않은 `changes` (`worker_cli.rs:462-475`) | `subtype == "success"` + `is_error == false` + **빈** `permission_denials` (`:524-563`) |
+| 19-3 이전 효과 검사 | 있음 — 없으면 `NoEffectEvidence` | **없음** |
+| 19-3 이후 효과 검사 | 네이티브 증거 **그리고** 비어 있지 않은 workspace diff | 빈 `permission_denials` **그리고** 비어 있지 않은 workspace diff |
 
-코드가 이 residual을 정확히 명시합니다(`:490-497`): *"도구 호출을 시도하지 않고 그냥 거절하는
+코드가 claude의 residual을 명시합니다(`:516-523`): *"도구 호출을 시도하지 않고 그냥 거절하는
 모델은 `permission_denials`를 비워 두므로 성공과 구별할 수 없다 … 효과 oracle이 아니다."*
-**T6(이미 서명됨)는 codex라서 효과 증거가 네이티브였습니다. 2-호스트 런은 host B에 claude를
-올리며 그 속성을 조용히 잃습니다.**
+T6(이미 서명됨)는 codex라서 효과 증거가 네이티브였고, 19-3 이전의 2-호스트 런은 host B에 claude를
+올리며 그 속성을 조용히 잃었습니다.
 
-2026-08-22 실측 (가짜 `claude` result object 3종을 실제 어댑터에 투입):
+**19-3 이후:** 워커마다 새 workspace `$HOME_B/workspaces/<container_name>/`(host B의 `MAOS_HOME`
+아래)가 만들어지고 `--volume=<dir>:/workspace:rw,U` + `--workdir=/workspace`로 마운트됩니다. 워커가
+쓸 수 있는 곳은 이 workspace와 컨테이너와 함께 사라지는 `/tmp` tmpfs뿐이며, 데몬의 cwd(`$WORK_B`)는
+워커에 전달되지 않습니다. 워커 종료 후 MAOS는 workspace를 metadata로만 walk합니다(상대 경로, 유형,
+크기, `mtime_ns`; 내용은 읽지 않음; symlink는 따라가지 않음; 10 000개 항목 상한, 초과는 잘라내지 않고
+typed refusal). `codex`/`claude`의 `Completed`는 diff가 비었거나 walk가 거부되면
+`not_completed:no_effect_evidence`가 됩니다. 결과는 `worker_completion` event와 TL
+`worker.completion-verdict` row에 `workspace`(절대 경로)와 `workspace_effect`
+(`{"created":n,"modified":n,"removed":n}` 또는 `{"refused":"…"}`)로 기록되므로 capture가 그것을 담습니다.
 
-| 입력 | 판정 | exit |
+2026-08-22 실측 (가짜 `claude` result object를 실제 어댑터에 투입)과 19-3 이후:
+
+| 입력 | 19-3 이전 판정 / exit | 19-3 이후 |
 |---|---|---|
-| `permission_denials` 비어있지 않음 | `not_completed:permission_denied`, `completed=false` | **1** ✅ ship-blocker의 그 형태는 잡힙니다 |
-| 깨끗한 객체 + *"I have written the file"* + 손대지 않은 트리 | **`completed=true`** | **0** ⚠ |
+| `permission_denials` 비어있지 않음 | `not_completed:permission_denied`, `completed=false` / **1** ✅ | 동일 (D-19-3-06 A: 거부 검사는 여전히 결합 조건) |
+| 깨끗한 객체 + *"I have written the file"* + 손대지 않은 트리 | **`completed=true`** / **0** ⚠ | `not_completed:no_effect_evidence`, `completed=false`, exit ≠ 0 — 커밋된 T3 벡터 `worker_workspace_19_3.rs` |
 
-**따라서 서명 전에 손으로 확인하고, 그 결과를 capture에 기록하세요:**
+**권고 — 서명 전에 요청한 파일이 workspace에 있는지 확인하고 capture에 기록하세요.** diff는 *어떤*
+효과를 증명할 뿐 *요청한* 효과를 증명하지 않습니다(스크래치 파일 하나도 diff를 채웁니다).
 
 ```bash
-ls -la $WORK_B                        # 워커가 실제로 만든 것
-git -C $WORK_B status --porcelain     # 워크트리라면
+WS=<worker_completion 의 workspace 경로>   # 예: $HOME_B/workspaces/<container_name>
+podman unshare ls -laR "$WS"             # 워커 파일은 컨테이너 subuid 소유 — podman unshare로 읽기
 ```
 
-아무것도 없으면 `completed=true`여도 **서명하지 마세요.** 서명은 판정을 덮고, 판정은 *거절이
-없었음*을 덮을 뿐 *효과가 있었음*을 덮지 않습니다. `RELEASE-HOLDS.md` row 16이 이 경계입니다.
+workspace는 런 후에도 남습니다(MAOS가 지우지 않음). 기록이 끝나면 `podman unshare rm -rf "$WS"`로
+지우세요. 요청한 파일이 없으면 서명은 여전히 *거절 없음 + 어떤 효과*만 덮습니다 —
+`RELEASE-HOLDS.md` row 16이 이 경계입니다.
 
 ---
 

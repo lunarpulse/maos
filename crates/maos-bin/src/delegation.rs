@@ -68,6 +68,9 @@ pub const TO_HOST: &str = "developer-remote-host";
 /// (`maos-a2a-core/src/router.rs:1087-1090`), so the accept side is keyed by the
 /// SOURCE host, not the destination.
 pub const FROM_HOST: &str = "founder-loop-host";
+/// Story 19-6 (D-19-6-02 A) — the `TaskComplete` result of the kernel-sent
+/// orphan a crashed delegation's originator receives.
+pub const ORPHANED_RESULT: &str = "orphaned";
 
 /// The largest accepted `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` value (one day), so
 /// `Instant + Duration` can never overflow (j1-crosshost-2e §A6 P4).
@@ -586,6 +589,35 @@ impl DelegationLeg {
             drained += 1;
         }
         Ok(drained)
+    }
+
+    /// Story 19-6 (D-19-6-03 A, CR-1) — drain the Orchestrator's handle after a
+    /// crashed delegation. `Ok(true)` iff it held exactly the kernel-sent
+    /// [`orphan_frame`] for `delegation_frame_id`; `Ok(false)` if it was empty.
+    /// Anything else fails closed: a dead Worker sent no completion, so any
+    /// other frame here is a protocol fault, never something to skip.
+    pub fn take_orphaned(&mut self, delegation_frame_id: [u8; 16]) -> Result<bool, String> {
+        let mut orphaned = false;
+        while let Some((kind, frame)) = self
+            .orchestrator
+            .try_recv()
+            .map_err(|e| format!("delegation: {FROM_SPIRIT} channel closed: {e}"))?
+        {
+            let is_orphan = matches!(kind, FrameKind::TaskComplete)
+                && frame.frame_id == orphan_frame_id(delegation_frame_id)
+                && frame.from.spirit_id.as_str()
+                    == maos_kernel_core::iac::mailbox::KERNEL_SENDER_SPIRIT_ID
+                && matches!(&frame.payload, FramePayload::TaskComplete(p) if p.result == ORPHANED_RESULT);
+            if orphaned || !is_orphan {
+                return Err(format!(
+                    "delegation: {FROM_SPIRIT} received {kind:?} from {} after a crashed \
+                     delegation, not the one kernel orphan",
+                    frame.from.spirit_id.as_str()
+                ));
+            }
+            orphaned = true;
+        }
+        Ok(orphaned)
     }
 
     /// **HOST B** — act on a frame another Host sent (j1-crosshost-2b AC1.3/AC1.4).
@@ -1129,5 +1161,47 @@ fn completion_frame(frame_id: [u8; 16], seq: u64, result: String) -> IacFrame {
         intent_lineage: IntentLineage::new(vec![A2AIntent::new(
             orchestrator::DELEGATION_CONSENT_INTENT,
         )]),
+    }
+}
+
+/// Story 19-6 (D-19-6-02 A) — the orphan's frame id: the delegation frame id
+/// with bit 62 of its little-endian head flipped. Deterministic and reversible
+/// like [`DelegationLeg::outcome_frame_id`] (bit 63) but distinct from it and
+/// from every small host-A `seq`, so a second delivery of the same orphan is
+/// the typed `Duplicate` and is never re-delivered.
+pub fn orphan_frame_id(delegation_frame_id: [u8; 16]) -> [u8; 16] {
+    let mut out = delegation_frame_id;
+    out[7] ^= 0x40;
+    out
+}
+
+/// Story 19-6 (D-19-6-02 A) — the kernel-sent `TaskComplete{"orphaned"}` to a
+/// crashed delegation's originator. The KERNEL is the author, not the dead
+/// Worker: `from` is `__kernel` (consent-gate exempt) and `auto_marker` is
+/// `Kernel`, so the empty lineage is the NFR-Aud-14 kernel carve-out. Cause and
+/// disposition stay in the kernel's `task.orphaned` row, joined by `task_id`.
+pub fn orphan_frame(delegation_frame_id: [u8; 16], originator: &str) -> IacFrame {
+    use maos_domain::frame::FrameAddress;
+    use maos_spirit_abi::identity::SpiritId;
+
+    let address = |spirit_id: &str| FrameAddress {
+        spirit_id: SpiritId::from(spirit_id),
+        host_id: None,
+        role: None,
+    };
+    IacFrame {
+        frame_id: orphan_frame_id(delegation_frame_id),
+        timestamp_ns: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+        logical_clock: 0,
+        from: address(maos_kernel_core::iac::mailbox::KERNEL_SENDER_SPIRIT_ID),
+        to: vec![address(originator)].into(),
+        kind: FrameKind::TaskComplete,
+        intent: maos_domain::invariants::i1::IntentClass::Standard,
+        payload: FramePayload::TaskComplete(TaskCompletePayload {
+            result: ORPHANED_RESULT.to_string(),
+        }),
+        auto_marker: maos_domain::invariants::i3::FrameOrigin::Kernel,
+        consent_envelope: None,
+        intent_lineage: Default::default(),
     }
 }

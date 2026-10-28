@@ -71,6 +71,10 @@ pub mod recall_mediation;
 /// the door is: `maos-a2a-core` is a non-optional edge. In the library so
 /// `crates/maos-bin/tests/` drives the real handler against a real pin store.
 pub mod repin_door;
+/// Story 19-6 (D-19-6-05 A) — the production FR50 replica resolver the root
+/// shares with the `CrashDetector`, the scheduler and the Worker supervisor.
+/// In the library so `crates/maos-bin/tests/` arms the real resolver.
+pub mod replica_resolver;
 /// Story 18-3 — the Researcher's Inference Port seam and `--once` verdict.
 #[cfg(feature = "network")]
 pub mod researcher_root;
@@ -112,6 +116,11 @@ pub mod worker_cli;
 /// (Trap 9: two suites assert its literal text via `include_str!`).
 #[cfg(feature = "network")]
 pub mod worker_spawn;
+/// Story 19-3 (AC2.2) — the per-Worker T3 workspace: created under the MAOS
+/// home, bind-mounted at `/workspace`, snapshotted before the spawn and diffed
+/// after the exit.
+#[cfg(feature = "network")]
+pub mod worker_workspace;
 
 /// `[topology]` manifest parsing. In the library, not `main.rs`, so
 /// `crates/maos-bin/tests/` can execute it — an in-`src` test module is

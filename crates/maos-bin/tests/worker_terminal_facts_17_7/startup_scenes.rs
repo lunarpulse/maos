@@ -101,6 +101,7 @@ async fn root_signal_during_init_joins_owned_cid_before_forced_exit() {
                     payload_pidfd: false,
                     env: &[],
                     launch_custody: Some(&custody),
+                    workspace: None,
                 },
             )
         });

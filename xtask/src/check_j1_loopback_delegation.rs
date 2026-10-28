@@ -126,7 +126,13 @@ const MAOS_BIN_TESTS_DIR: &str = "crates/maos-bin/tests";
 /// Story 19-1 D-19-1-10 A — `_19_1.rs` is a suffix in its own right, so
 /// `epic_dispatch_19_1.rs` (stem `epic_dispatch`) is derived while a story-numbered
 /// `*_19_1a.rs` stays excluded by D-2 under `_1a.rs`.
-const J1_TEST_SUFFIXES: &[&str] = &["_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs", "_19_1.rs"];
+///
+/// Story 19-3 D-19-3-10 A — `_19_3.rs` joins on the same rule, so
+/// `worker_workspace_19_3.rs` (the effect-oracle vectors) is derived and must be
+/// enrolled in the job step.
+const J1_TEST_SUFFIXES: &[&str] = &[
+    "_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs", "_19_1.rs", "_19_3.rs",
+];
 
 /// j1-crosshost-1b AC1 — the refusal proofs themselves, the gate's TENTH governed
 /// file. The gate can only check that the assertions are WRITTEN; only the CI

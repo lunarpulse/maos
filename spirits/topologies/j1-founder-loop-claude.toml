@@ -1,0 +1,42 @@
+# J1 Founder's Loop — LIVE profile (claude Developer-Worker).
+#
+# The twin of j1-founder-loop-codex.toml: identical EXCEPT the worker points at
+# the claude manifest (manifest-claude.toml). The fixture topology
+# (j1-founder-loop.toml) stays the CI/hermetic baseline; this is an operator-lane
+# topology, NEVER run in CI.
+#
+# Story 19-3 (D-19-3-08 A) — there is no `--live-claude` flag. The flag selects
+# LIVE, the topology selects the ADAPTER (`resolve_topology_worker` in
+# xtask/src/demo_j1.rs; `SIGNABLE_WORKER_CLIS` admits codex and claude):
+#
+#   cargo run -p xtask -- demo-j1 --live-codex \
+#     --codex-topology spirits/topologies/j1-founder-loop-claude.toml
+#
+# Run it LOCALLY with MAOS_LIVE_AGENT=1 (demo-j1 sets it) + MAOS_HOST_GRANTS
+# (attested_image="claude", signing_key_id="Anthropic", T3, egress covering
+# api.anthropic.com:443) + ANTHROPIC_API_KEY. The Worker runs under T3 in its own
+# per-run workspace mounted at /workspace; a `completed` verdict needs a
+# non-empty workspace diff (Story 19-3 effect oracle).
+
+[topology]
+name = "j1-founder-loop-claude"
+
+[[topology.spirits]]
+manifest = "../orchestrator/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../architect/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../reviewer/manifest.toml"
+
+# The host-authorized claude Developer-Worker. Admitted through the host-managed
+# grant + ClaudeCli adapter + live bridge; runs the delegated task, journaling its
+# output to the Transparency Log.
+#
+# The task is FRAME-BORNE: `host` makes the composition root emit a real
+# `task.assign` over the loopback A2A layer and hand the drained payload goal to
+# the worker. Without it the completion enforcement is bypassed entirely.
+[[topology.spirits]]
+manifest = "../worker/manifest-claude.toml"
+host = "developer-remote-host"

@@ -208,7 +208,7 @@ mod worker {
     use maos_domain::invariants::i1::{IntentClass, TokenId};
     use maos_domain::ports::task::TaskAssignmentRecord;
     use maos_domain::sandbox::{ContainerResidue, ContainerTerminalFacts};
-    use maos_domain::supervision::{CrashCause, FaultCause, OnCrashAction};
+    use maos_domain::supervision::{CrashCause, FaultCause, OnCrashAction, ReplicaResolver};
     use maos_kernel_core::halt::HaltRegistry;
     use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
     use maos_kernel_core::journal::JournalAdapter;
@@ -507,8 +507,14 @@ mod worker {
             self.classify_exit(spirit_pid, facts)
         }
         /// Spawn `handle_crash` on the executor's runtime. The returned handle
-        /// is owned by the binding; spawning does not block.
-        fn spawn_crash_handler(&self, spirit_pid: u32, cause: CrashCause) -> CrashHandlerHandle;
+        /// is owned by the binding; spawning does not block. `record` is the
+        /// binding's active record, if any: the orphan delivery's input.
+        fn spawn_crash_handler(
+            &self,
+            spirit_pid: u32,
+            cause: CrashCause,
+            record: Option<TaskAssignmentRecord>,
+        ) -> CrashHandlerHandle;
         /// Join a spawned handler within `budget`. `Err` returns the handle so
         /// the caller can park it for `join_outstanding`.
         fn join_crash_handler(
@@ -521,17 +527,20 @@ mod worker {
             &self,
             spirit_pid: u32,
             cause: CrashCause,
+            record: Option<TaskAssignmentRecord>,
             budget: Duration,
         ) -> Option<CrashOutcome>;
         /// Park a handler whose join timed out.
         fn park_outstanding(&self, handle: CrashHandlerHandle);
         /// Take the record out of the SCB ledger if it is still there, then
-        /// apply the FR50 disposition captured at bind.
+        /// apply the FR50 disposition captured at bind. `crashed` is the
+        /// crash-phase `NotLoaded` path, the only one that delivers an orphan.
         fn disposition(
             &self,
             spirit_pid: u32,
             action: OnCrashAction,
             record: &TaskAssignmentRecord,
+            crashed: bool,
         );
         /// Take the record out of the SCB ledger WITHOUT a disposition.
         fn take_record(&self, spirit_pid: u32, task_id: &str);
@@ -844,7 +853,8 @@ mod worker {
             let (next, action) = state.phase.on_exit(&cause);
             state.phase = next;
             if let BindingAction::SpawnCrashHandler(cause) = action {
-                state.handler = Some(self.exec.spawn_crash_handler(pid, cause));
+                let record = state.record_active.then(|| state.record.clone());
+                state.handler = Some(self.exec.spawn_crash_handler(pid, cause, record));
             }
         }
 
@@ -953,9 +963,13 @@ mod worker {
                     self.exec.unload(pid);
                 }
                 BindingAction::RunCrashHandlerThenMaybeDisposition(cause) => {
+                    let record = {
+                        let state = self.lock();
+                        state.record_active.then(|| state.record.clone())
+                    };
                     match self
                         .exec
-                        .run_crash_handler(pid, cause, CRASH_HANDLER_JOIN_BUDGET)
+                        .run_crash_handler(pid, cause, record, CRASH_HANDLER_JOIN_BUDGET)
                     {
                         Some(CrashOutcome::NotLoaded) => self.disposition(),
                         Some(CrashOutcome::Handled) => self.mark_dispositioned(),
@@ -1150,15 +1164,17 @@ mod worker {
         /// Idempotent: once `dispositioned` is set every `Disposition*`
         /// executor is a no-op.
         fn disposition(&self) {
-            let (action, record) = {
+            let (action, record, crashed) = {
                 let mut state = self.lock();
                 if state.dispositioned || !state.record_active {
                     return;
                 }
                 state.dispositioned = true;
-                (state.on_crash_action, state.record.clone())
+                let crashed = state.phase == BindingPhase::CrashHandled;
+                (state.on_crash_action, state.record.clone(), crashed)
             };
-            self.exec.disposition(self.spirit_pid(), action, &record);
+            self.exec
+                .disposition(self.spirit_pid(), action, &record, crashed);
         }
     }
 
@@ -1485,8 +1501,9 @@ mod worker {
     ///
     /// Incremented by `bind` AFTER the `stopping` latch check and decremented
     /// when the guard is consumed or dropped — never on entry to
-    /// `run_cli_wrapper_manifest`, where a 10 s real-CLI liveness probe running
-    /// during a SIGTERM would hold the count past the grace and trip a false
+    /// `run_cli_wrapper_manifest`, whose pre-bind admission (the fixtures' 2 s
+    /// host handshake; 19-3 D-19-3-07 A deleted the real-CLI liveness probe)
+    /// would, if counted, hold the count during a SIGTERM and trip a false
     /// descendant exit for a Worker that has no binding at all.
     pub struct ActivePathCount {
         tx: tokio::sync::watch::Sender<usize>,
@@ -1724,6 +1741,7 @@ mod worker {
                     handle,
                     registry: Arc::downgrade(&registry),
                     outstanding: Mutex::new(Vec::new()),
+                    originator_delivery: std::sync::OnceLock::new(),
                 }),
                 strategy,
                 counters,
@@ -1746,6 +1764,21 @@ mod worker {
         pub fn with_seams(mut self, seams: SupervisorSeams) -> Self {
             self.seams = seams;
             self
+        }
+
+        /// Story 19-6 (D-19-6-01 A / 05 A) — the root's set-once crash wiring.
+        /// Once installed, a crashed delegated Worker's originator receives the
+        /// kernel-sent [`crate::delegation::orphan_frame`] — iff it is a Spirit
+        /// loaded on THIS root (D-19-6-07 A: `operator`, `topology` and host
+        /// B's remote `orchestrator` stay journal-only) — and the executor's
+        /// `NotLoaded` disposition asks `resolver`, the same `Arc` the root
+        /// gave the `CrashDetector` and the scheduler. Uninstalled, both are
+        /// as before (journal-only; no resolver). `Err` returns `resolver`.
+        pub fn install_originator_delivery(
+            &self,
+            resolver: Arc<dyn ReplicaResolver>,
+        ) -> Result<(), Arc<dyn ReplicaResolver>> {
+            self.exec.originator_delivery.set(resolver)
         }
 
         /// The root's shutdown token — cancelled by the signal listener, read
@@ -1822,6 +1855,21 @@ mod worker {
             if let Some(core) = self.registry.by_pid(spirit_pid) {
                 core.stop_session();
             }
+        }
+
+        /// Story 19-6 harness plant only (`orchestrator_root::CRASH_PLANT_ENV`):
+        /// kill the Running Worker bound to `task_id` through the stop path's
+        /// signal/teardown but WITHOUT `begin_stop`, so its exit is a crash the
+        /// kernel handles. `false` until that Worker has a child or container.
+        pub(crate) fn test_only_crash_task(&self, task_id: &str) -> bool {
+            let target = self.registry.active().into_iter().find(|core| {
+                core.task_id() == task_id
+                    && core.phase() == BindingPhase::Running
+                    && (core.child_handle().is_some() || core.container_terminal().is_some())
+            });
+            target
+                .map(|core| core.signal(Instant::now() + TEARDOWN_BUDGET))
+                .is_some()
         }
 
         /// Report unresolved CIDs once, on the root's stderr sink.
@@ -2066,6 +2114,8 @@ mod worker {
         handle: tokio::runtime::Handle,
         registry: Weak<BindingRegistry>,
         outstanding: Mutex<Vec<CrashHandlerHandle>>,
+        /// Story 19-6 — set once by [`WorkerSupervisor::install_originator_delivery`].
+        originator_delivery: std::sync::OnceLock<Arc<dyn ReplicaResolver>>,
     }
 
     impl KernelBindingExecutor {
@@ -2194,11 +2244,30 @@ mod worker {
             }
         }
 
-        fn spawn_crash_handler(&self, spirit_pid: u32, cause: CrashCause) -> CrashHandlerHandle {
+        fn spawn_crash_handler(
+            &self,
+            spirit_pid: u32,
+            cause: CrashCause,
+            record: Option<TaskAssignmentRecord>,
+        ) -> CrashHandlerHandle {
             let detector = Arc::clone(&self.crash_detector);
+            let orphan = record
+                .filter(|_| self.originator_delivery.get().is_some())
+                .map(|record| (record, Arc::clone(&self.iac), Arc::clone(&self.scheduler)));
             CrashHandlerHandle(self.handle.spawn(async move {
                 match detector.handle_crash(spirit_pid, cause).await {
-                    Ok(_) => CrashOutcome::Handled,
+                    Ok(report) => {
+                        // Story 19-6 (D-19-6-01 A, CR-2) — the kernel has drained
+                        // the record and journaled `task.orphaned` and the
+                        // disposition; only then is the originator told. An
+                        // empty outcome drained nothing, so there is no orphan.
+                        if let Some((record, iac, scheduler)) =
+                            orphan.filter(|_| report.disposition_outcome != Default::default())
+                        {
+                            deliver_orphan(&iac, &scheduler, &record).await;
+                        }
+                        CrashOutcome::Handled
+                    }
                     Err(_) => CrashOutcome::NotLoaded,
                 }
             }))
@@ -2231,9 +2300,10 @@ mod worker {
             &self,
             spirit_pid: u32,
             cause: CrashCause,
+            record: Option<TaskAssignmentRecord>,
             budget: Duration,
         ) -> Option<CrashOutcome> {
-            let handle = self.spawn_crash_handler(spirit_pid, cause);
+            let handle = self.spawn_crash_handler(spirit_pid, cause, record);
             match self.join_crash_handler(handle, budget) {
                 Ok(outcome) => Some(outcome),
                 Err(handle) => {
@@ -2254,14 +2324,26 @@ mod worker {
             spirit_pid: u32,
             action: OnCrashAction,
             record: &TaskAssignmentRecord,
+            crashed: bool,
         ) {
             self.take_record(spirit_pid, &record.task_id);
+            // Story 19-6 (D-19-6-05 A) — the root's resolver, not `None`: the
+            // same `Arc` the `CrashDetector` and the scheduler hold.
+            let replica = self.originator_delivery.get();
             maos_kernel_core::supervision::enforce_disposition(
                 action,
                 std::slice::from_ref(record),
                 &self.iac,
-                None,
+                replica.map(|replica| &**replica),
             );
+            // Story 19-6 (D-19-6-01 A) — a concurrent unload removed the SCB
+            // first, so `handle_crash` journaled no `task.orphaned`; the
+            // disposition row above is the record and the originator is
+            // still told. Never on a planned stop or a clean exit.
+            if crashed && replica.is_some() {
+                self.handle
+                    .block_on(deliver_orphan(&self.iac, &self.scheduler, record));
+            }
         }
 
         fn take_record(&self, spirit_pid: u32, task_id: &str) {
@@ -2311,6 +2393,40 @@ mod worker {
                 }
             });
         }
+    }
+
+    /// Story 19-6 (D-19-6-01/02/07 A) — FR12's delivery clause. Delivers the
+    /// kernel-sent orphan for a `delegation:` record through `deliver_typed`
+    /// (journaled before delivery, I2) iff the originator is a Spirit loaded on
+    /// this root; a repeat is the typed `Duplicate` and delivers nothing.
+    async fn deliver_orphan(
+        iac: &maos_kernel_core::iac::IacBusAdapter,
+        scheduler: &SpiritSchedulerAdapter,
+        record: &TaskAssignmentRecord,
+    ) {
+        let local = scheduler
+            .resolve_pid(&record.originator_spirit_id)
+            .is_some();
+        let Some(frame_id) = delegation_frame_id(&record.task_id).filter(|_| local) else {
+            return;
+        };
+        let frame = crate::delegation::orphan_frame(frame_id, &record.originator_spirit_id);
+        if let Err(error) = iac.deliver_typed(frame, 0, None).await {
+            let originator = &record.originator_spirit_id;
+            eprintln!("maos run: orphan delivery to {originator} failed: {error}");
+        }
+    }
+
+    /// The inverse of [`WorkerTask::record_ids`] for a delegation: the frame id
+    /// behind `delegation:xxxxxxxx:xxxxxxxx:xxxxxxxx:xxxxxxxx`. `None` for any
+    /// other task id (standalone and topology runs have no delegation frame).
+    fn delegation_frame_id(task_id: &str) -> Option<[u8; 16]> {
+        let hex: String = task_id.strip_prefix("delegation:")?.split(':').collect();
+        let mut out = [0u8; 16];
+        for (index, byte) in out.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(hex.get(2 * index..2 * index + 2)?, 16).ok()?;
+        }
+        (hex.len() == 32).then_some(out)
     }
 
     // ── The Worker's Spirit (the door's reach into a Worker) ────────────

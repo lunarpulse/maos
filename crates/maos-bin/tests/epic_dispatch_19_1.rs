@@ -4,11 +4,15 @@
 //! through the production binary, each run on a fresh data home (the FR21
 //! 60 s proxy is per data home).
 //!
-//! * The three-Worker run, the pending-halt plant and the failing-second-
-//!   Worker run need the signed T3 substrate (`require_t3`: a named local
-//!   skip, never a green skip on a declared-capable runner).
+//! * The three-Worker run, the pending-halt plant and the crashed-Worker
+//!   runs need the signed T3 substrate (`require_t3`: a named local skip,
+//!   never a green skip on a declared-capable runner).
 //! * Every refusal fires before any Worker is spawned, so those vectors run
 //!   everywhere: they read stderr and the Transparency Log, never a skip.
+//! * Story 19-6 (D-19-6-09 A) — a crashed section's Worker reaches the
+//!   Orchestrator as a kernel-sent orphan, and the loop applies the declared
+//!   disposition: one vector per `nack` / `reassign-to-replica` (once, then
+//!   escalation on a second crash) / `escalate-to-operator`.
 //!
 //! Observables are the root's stdout events and the TL rows it wrote — never
 //! state this test set itself.
@@ -21,11 +25,16 @@ mod t3_substrate;
 
 const EPIC_TOPOLOGY: &str = "spirits/topologies/j1-founder-loop-epic.toml";
 const EPIC: &str = "tests/fixtures/j1/epic.md";
-/// `FrameKind::TaskAssign` / `FrameKind::EpistemicHalt` /
+/// `FrameKind::TaskAssign` / `FrameKind::TaskComplete` /
+/// `FrameKind::EpistemicHalt` / `FrameKind::CapabilityInvocation` /
 /// `FrameKind::Distillate` (maos-iac TL codes).
 const KIND_TASK_ASSIGN: i64 = 0;
+const KIND_TASK_COMPLETE: i64 = 1;
 const KIND_EPISTEMIC_HALT: i64 = 3;
+const KIND_CAPABILITY_INVOCATION: i64 = 7;
 const KIND_DISTILLATE: i64 = 11;
+/// FR12 / NFR-Rel-1: the orphan reaches its originator within 5 s.
+const DELIVERY_FLOOR_NS: i64 = 5_000_000_000;
 
 fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
@@ -119,37 +128,84 @@ fn sections(path: &str, entries: usize) -> Vec<orchestrator::EpicSection> {
     orchestrator::split_epic(&text, entries).expect("fixture epic splits")
 }
 
+fn open_tl(home: &DataHome) -> Option<rusqlite::Connection> {
+    let db = home.0.join("audit").join("transparency.sqlite");
+    if !db.exists() {
+        return None;
+    }
+    Some(
+        rusqlite::Connection::open_with_flags(
+            db,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .expect("open transparency log"),
+    )
+}
+
 /// `(frame_id hex, spirit_pid, payload JSON)` of every TL row of `kind`, in
 /// journal order. A run refused before the log was created has none.
 fn tl_rows(home: &DataHome, kind: i64) -> Vec<(String, i64, serde_json::Value)> {
-    let db = home.0.join("audit").join("transparency.sqlite");
-    if !db.exists() {
+    journal_rows(home, kind)
+        .into_iter()
+        .map(|row| (row.frame_id, row.spirit_pid, row.payload))
+        .collect()
+}
+
+/// One TL row with every column a 19-6 vector joins on.
+#[derive(Debug)]
+struct JournalRow {
+    frame_id: String,
+    timestamp_ns: i64,
+    spirit_pid: i64,
+    from: String,
+    intent: String,
+    payload: serde_json::Value,
+}
+
+/// Every TL row of `kind`, in journal order.
+fn journal_rows(home: &DataHome, kind: i64) -> Vec<JournalRow> {
+    let Some(connection) = open_tl(home) else {
         return Vec::new();
-    }
-    let connection = rusqlite::Connection::open_with_flags(
-        db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .expect("open transparency log");
+    };
     let mut statement = connection
         .prepare(
-            "SELECT frame_id, spirit_pid, payload_redacted FROM transparency_log \
-             WHERE kind = ?1 ORDER BY timestamp_ns, rowid",
+            "SELECT frame_id, timestamp_ns, spirit_pid, from_spirit_id, intent, payload_redacted \
+             FROM transparency_log WHERE kind = ?1 ORDER BY timestamp_ns, rowid",
         )
         .expect("prepare TL query");
     statement
         .query_map([kind], |row| {
             let frame_id: Vec<u8> = row.get(0)?;
-            let payload: Vec<u8> = row.get(2)?;
-            Ok((
-                hex::encode(frame_id),
-                row.get::<_, i64>(1)?,
-                serde_json::from_slice(&payload).unwrap_or(serde_json::Value::Null),
-            ))
+            let payload: Vec<u8> = row.get(5)?;
+            Ok(JournalRow {
+                frame_id: hex::encode(frame_id),
+                timestamp_ns: row.get(1)?,
+                spirit_pid: row.get(2)?,
+                from: row.get(3)?,
+                intent: row.get(4)?,
+                payload: serde_json::from_slice(&payload).unwrap_or(serde_json::Value::Null),
+            })
         })
         .expect("query TL rows")
         .collect::<Result<_, _>>()
         .expect("read TL rows")
+}
+
+/// `(recipient_pid, recipient_spirit_id)` recorded for one frame.
+fn recipients(home: &DataHome, frame_id_hex: &str) -> Vec<(i64, String)> {
+    let connection = open_tl(home).expect("the run created its transparency log");
+    let frame_id = hex::decode(frame_id_hex).expect("hex frame id");
+    let mut statement = connection
+        .prepare(
+            "SELECT recipient_pid, recipient_spirit_id FROM transparency_log_recipients \
+             WHERE frame_id = ?1 ORDER BY recipient_pid",
+        )
+        .expect("prepare recipients query");
+    statement
+        .query_map([frame_id], |row| Ok((row.get(0)?, row.get(1)?)))
+        .expect("query recipients")
+        .collect::<Result<_, _>>()
+        .expect("read recipients")
 }
 
 /// The `prior_distillate_ref` of a journaled `task.assign` payload.
@@ -190,6 +246,262 @@ fn assert_completions_at_safe_point(events: &[serde_json::Value]) {
             "a completed delegation leaves the Orchestrator at a safe point: {event}"
         );
     }
+}
+
+/// A T3 `worker-cli-fixture` manifest — the known-admitting shape — with an
+/// optional fixture mode and an optional declared `[on_crash]` action.
+fn worker_manifest(home: &DataHome, mode: Option<&str>, on_crash: Option<&str>) -> PathBuf {
+    let path = home.0.join(format!(
+        "worker-{}-{}.toml",
+        mode.unwrap_or("default"),
+        on_crash.unwrap_or("nack")
+    ));
+    let argv = match mode {
+        Some(mode) => format!("[\"--maos-worker\", \"--maos-fixture-mode={mode}\"]"),
+        None => "[\"--maos-worker\"]".to_string(),
+    };
+    let on_crash = on_crash
+        .map(|action| format!("\n[on_crash]\naction = \"{action}\"\n"))
+        .unwrap_or_default();
+    std::fs::write(
+        &path,
+        format!(
+            "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\nargv_prefix = {argv}\n\
+             output_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\n\
+             recovery_policy = \"respawn_fresh\"\n\n[cli_wrapper.posture]\n\
+             stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
+             shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n\
+             [author]\nname = \"MAOS Project\"\n{on_crash}"
+        ),
+    )
+    .expect("write Worker manifest");
+    path
+}
+
+/// The epic topology with `second` as section 2's entry (D-19-1-03 A:
+/// section k ↔ host-bearing entry k).
+fn topology_with_second_entry(home: &DataHome, second: &Path) -> PathBuf {
+    let topology = home.0.join("epic-second-entry.toml");
+    std::fs::write(
+        &topology,
+        format!(
+            "[topology]\nname = \"epic-second-entry-19-6\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/orchestrator/manifest.toml\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/architect/manifest.toml\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/reviewer/manifest.toml\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
+             host = \"developer-remote-host\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{second}\"\nhost = \"developer-remote-host\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
+             host = \"developer-remote-host\"\n",
+            root = workspace_root(),
+            second = second.display()
+        ),
+    )
+    .expect("write topology");
+    topology
+}
+
+/// `maos run <topology> --epic EPIC --once`, colour off so the notification
+/// channel's stderr line is plain text.
+fn run_epic(home: &DataHome, topology: &Path, env: &[(&str, &str)]) -> Output {
+    let mut env = env.to_vec();
+    env.push(("NO_COLOR", "1"));
+    run_maos(
+        home,
+        &[topology.to_str().expect("utf-8 path"), "--epic", EPIC],
+        &env,
+    )
+}
+
+/// One crashed delegation attempt, as the kernel and the delivery journaled it.
+struct CrashedAttempt {
+    task_id: String,
+    /// The kernel's classification, from its `task.orphaned` row.
+    cause: String,
+    worker_pid: i64,
+    delivered_ns: i64,
+}
+
+/// AC1.2 / AC2.2 / AC2.4 — one crashed attempt joined end to end on its
+/// delegation's `task.assign` frame id: the kernel's `task.orphaned` row at
+/// the Worker's pid (cause, originator) and its pid-0 disposition row
+/// (`disposition_intent`), both unchanged 16-3 rows; then exactly ONE
+/// kernel-sent `TaskComplete{"orphaned"}` at pid 0 whose id is derived from
+/// the delegation's, with ONE recipient row naming the admitted Orchestrator,
+/// journaled ≤ 5 s after the Worker's death as the kernel journaled it (the
+/// earliest of its `cli.subprocess.exit` and `task.orphaned` rows; the
+/// kill-stamped floor is the 16-3 corpus's, AC5). `cause: None` ⇒ any
+/// kernel-classified `fault.*` (a root-side kill's cause is the kernel's call).
+fn assert_orphan_reached_orchestrator(
+    home: &DataHome,
+    assign_frame_hex: &str,
+    orchestrator: u64,
+    cause: Option<&str>,
+    disposition_intent: &str,
+) -> CrashedAttempt {
+    let frame_id: [u8; 16] = hex::decode(assign_frame_hex)
+        .expect("hex frame id")
+        .try_into()
+        .expect("a 16-byte frame id");
+    let (task_id, _) =
+        maos_bin::supervision::WorkerTask::Delegation { frame_id }.record_ids("worker");
+    let complete = journal_rows(home, KIND_TASK_COMPLETE);
+    let of_task = |intent: &str| -> Vec<&JournalRow> {
+        complete
+            .iter()
+            .filter(|row| row.intent == intent && row.payload["task_id"] == task_id.as_str())
+            .collect()
+    };
+
+    let orphaned = of_task("task.orphaned");
+    assert_eq!(
+        orphaned.len(),
+        1,
+        "one task.orphaned for {task_id}: {complete:?}"
+    );
+    let worker_pid = orphaned[0].spirit_pid;
+    assert_ne!(worker_pid, 0, "task.orphaned sits at the Worker's own pid");
+    let observed_cause = orphaned[0].payload["cause"]
+        .as_str()
+        .expect("task.orphaned names a cause")
+        .to_string();
+    match cause {
+        Some(cause) => assert_eq!(observed_cause, cause),
+        None => assert!(observed_cause.starts_with("fault."), "{observed_cause}"),
+    }
+    assert_eq!(orphaned[0].payload["originator_spirit_id"], "orchestrator");
+    let disposition = of_task(disposition_intent);
+    assert_eq!(
+        disposition.len(),
+        1,
+        "one {disposition_intent} for {task_id}: {complete:?}"
+    );
+    assert_eq!(disposition[0].spirit_pid, 0, "dispositions sit at pid 0");
+
+    let orphan_id = hex::encode(maos_bin::delegation::orphan_frame_id(frame_id));
+    let delivered: Vec<&JournalRow> = complete
+        .iter()
+        .filter(|row| row.frame_id == orphan_id)
+        .collect();
+    assert_eq!(
+        delivered.len(),
+        1,
+        "exactly one kernel-sent orphan for {task_id}: {complete:?}"
+    );
+    let delivered = delivered[0];
+    assert_eq!(delivered.from, "__kernel", "the kernel is the author");
+    assert_eq!(delivered.spirit_pid, 0);
+    assert_eq!(delivered.payload["TaskComplete"]["result"], "orphaned");
+    assert_eq!(
+        recipients(home, &delivered.frame_id),
+        vec![(orchestrator as i64, "orchestrator".to_string())],
+        "the orphan is recorded as received by the admitted Orchestrator"
+    );
+    let died_ns = journal_rows(home, KIND_CAPABILITY_INVOCATION)
+        .iter()
+        .chain(orphaned.iter().copied())
+        .filter(|row| {
+            row.spirit_pid == worker_pid
+                && (row.intent == "cli.subprocess.exit" || row.intent == "task.orphaned")
+        })
+        .map(|row| row.timestamp_ns)
+        .min()
+        .expect("the kernel journaled the Worker's death");
+    assert!(
+        delivered.timestamp_ns - died_ns <= DELIVERY_FLOOR_NS,
+        "the orphan is delivered ≤ 5 s after the Worker's death ({} ns)",
+        delivered.timestamp_ns - died_ns
+    );
+    CrashedAttempt {
+        task_id,
+        cause: observed_cause,
+        worker_pid,
+        delivered_ns: delivered.timestamp_ns,
+    }
+}
+
+/// AC1.2 — one `delegation_orphaned` per crashed attempt, in order, each
+/// naming the kernel's cause and the APPLIED disposition and leaving the
+/// Orchestrator at a safe point (its in-flight task released).
+fn assert_orphaned_events(events: &[serde_json::Value], attempts: &[(&CrashedAttempt, &str)]) {
+    let orphaned = named(events, "delegation_orphaned");
+    assert_eq!(orphaned.len(), attempts.len(), "{events:?}");
+    for (event, (attempt, disposition)) in orphaned.iter().zip(attempts) {
+        assert_eq!(event["section"].as_u64(), Some(2), "{event}");
+        assert_eq!(event["task_id"].as_str(), Some(attempt.task_id.as_str()));
+        assert_eq!(
+            event["cause"].as_str(),
+            Some(attempt.cause.as_str()),
+            "{event}"
+        );
+        assert_eq!(event["disposition"].as_str(), Some(*disposition), "{event}");
+        assert_eq!(
+            event["orchestrator_safe_point"].as_bool(),
+            Some(true),
+            "the orphan releases the Orchestrator's in-flight delegation: {event}"
+        );
+    }
+}
+
+/// AC1.2 / AC3.3 — the typed stop names section, cause and disposition.
+fn assert_stopped(output: &Output, cause: &str, disposition: &str) {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "a crashed section fails the epic run; stderr:\n{stderr}"
+    );
+    let stop = format!(
+        "maos run: section 2 Worker crashed ({cause}); disposition {disposition}; dispatch stopped"
+    );
+    assert!(
+        stderr.contains(&stop),
+        "expected `{stop}`; stderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("did not complete"),
+        "a crash is no longer the generic non-completion; stderr:\n{stderr}"
+    );
+}
+
+/// AC3.3 (D-19-6-06 A) — one `AnomalyFlagged` from the crash detector about
+/// the crashed Worker, on the root dispatcher's terminal channel.
+fn assert_anomaly_flagged(output: &Output, worker_pid: i64) {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let subject = format!("pid:{worker_pid}");
+    let flagged: Vec<&str> = stderr
+        .lines()
+        .filter(|line| line.contains("Anomaly kernel.crash-detector"))
+        .collect();
+    assert_eq!(flagged.len(), 1, "one AnomalyFlagged; stderr:\n{stderr}");
+    assert!(
+        flagged[0].contains(&subject) && flagged[0].contains("section 2"),
+        "the notification names the Worker and the section: {}",
+        flagged[0]
+    );
+}
+
+/// Section 1 completed and was distilled before section 2 crashed; nothing
+/// after it was distilled, and section 3 was never assigned.
+fn assert_only_section_one_distilled(home: &DataHome, events: &[serde_json::Value]) {
+    let written = named(events, "distillate_written");
+    assert_eq!(written.len(), 1, "only section 1 is distilled: {events:?}");
+    assert_eq!(written[0]["section"].as_u64(), Some(1));
+    let distillates = tl_rows(home, KIND_DISTILLATE);
+    assert_eq!(distillates.len(), 1, "one Distillate row: {distillates:?}");
+    assert_eq!(
+        Some(distillates[0].0.as_str()),
+        written[0]["digest_frame_id"].as_str(),
+        "section 1's distillate row exists"
+    );
+    assert_eq!(
+        Some(distillates[0].1 as u64),
+        written[0]["producer_pid"].as_u64(),
+        "section 1's distillate sits at its Worker's pid"
+    );
+    assert_eq!(named(events, "delegation_completed").len(), 1);
+    assert_completions_at_safe_point(events);
+    assert!(named(events, "dispatch_halted").is_empty());
 }
 
 /// AC1.1 + AC4.1 — three sections, three Workers, in order; each Worker
@@ -402,91 +714,254 @@ fn a_pending_halt_before_section_two_stops_dispatch() {
     assert_completions_at_safe_point(&events);
 }
 
-/// TI-3 — the second Worker exits non-zero (`--maos-fixture-mode=exit-nonzero`,
-/// the known-admitting fixture shape): section 1's distillate stands, no
-/// second distillate is written, section 3 is never assigned, and the run
-/// fails.
+/// TI-3, cut over by 19-6 AC1 (default `nack`) — the second Worker exits
+/// non-zero (`--maos-fixture-mode=exit-nonzero`; `sigkill-self` cannot kill a
+/// T3 payload, which is its PID namespace's init): the crash reaches the
+/// Orchestrator as ONE kernel-sent orphan, `delegation_orphaned` names it,
+/// section 1's distillate stands, section 3 is never assigned, and the run
+/// fails typed naming section 2, the cause and `nack`.
 #[test]
-fn a_failing_second_worker_stops_the_epic_after_section_one() {
-    if !t3_substrate::require_t3("epic failing second Worker") {
+fn a_crashed_second_worker_reaches_the_orchestrator_and_nacks_the_epic() {
+    if !t3_substrate::require_t3("epic crashed second Worker (nack)") {
         return;
     }
-    let home = data_home("fail-two");
-    let failing = home.0.join("worker-exit-nonzero.toml");
-    std::fs::write(
-        &failing,
-        "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
-         argv_prefix = [\"--maos-worker\", \"--maos-fixture-mode=exit-nonzero\"]\n\
-         output_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\n\
-         recovery_policy = \"respawn_fresh\"\n\n[cli_wrapper.posture]\n\
-         stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
-         shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n\
-         [author]\nname = \"MAOS Project\"\n",
-    )
-    .expect("write failing Worker manifest");
-    let topology = home.0.join("epic-second-fails.toml");
-    std::fs::write(
-        &topology,
-        format!(
-            "[topology]\nname = \"epic-second-fails-19-1\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/orchestrator/manifest.toml\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/architect/manifest.toml\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/reviewer/manifest.toml\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
-             host = \"developer-remote-host\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{failing}\"\nhost = \"developer-remote-host\"\n\n\
-             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
-             host = \"developer-remote-host\"\n",
-            root = workspace_root(),
-            failing = failing.display()
-        ),
-    )
-    .expect("write topology");
-    let output = run_maos(
-        &home,
-        &[topology.to_str().expect("utf-8 path"), "--epic", EPIC],
-        &[],
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        !output.status.success(),
-        "a Worker that does not complete must fail the epic run; stderr:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("did not complete"),
-        "the refusal names the Worker's non-completion; stderr:\n{stderr}"
-    );
+    let home = data_home("crash-nack");
+    let second = worker_manifest(&home, Some("exit-nonzero"), None);
+    let output = run_epic(&home, &topology_with_second_entry(&home, &second), &[]);
     let events = events(&output);
-    let written = named(&events, "distillate_written");
-    assert_eq!(written.len(), 1, "only section 1 is distilled: {events:?}");
-    assert_eq!(written[0]["section"].as_u64(), Some(1));
-    let digest = written[0]["digest_frame_id"]
-        .as_str()
-        .expect("digest_frame_id");
-    let distillates = tl_rows(&home, KIND_DISTILLATE);
-    assert_eq!(
-        distillates.len(),
-        1,
-        "one Distillate TL row: {distillates:?}"
-    );
-    assert_eq!(
-        distillates[0].0, digest,
-        "section 1's distillate row exists"
-    );
-    assert_eq!(
-        Some(distillates[0].1 as u64),
-        written[0]["producer_pid"].as_u64(),
-        "section 1's distillate sits at its Worker's pid"
-    );
-    assert_eq!(named(&events, "delegation_completed").len(), 1);
-    assert_completions_at_safe_point(&events);
     let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
     assert_eq!(
         assigns.len(),
         2,
         "sections 1 and 2 were assigned and section 3 never was: {assigns:?}"
     );
+    let crashed = assert_orphan_reached_orchestrator(
+        &home,
+        &assigns[1].0,
+        orchestrator_pid(&events),
+        Some("fault.non-zero-exit"),
+        "task.nacked",
+    );
+    assert_orphaned_events(&events, &[(&crashed, "nack")]);
+    assert_stopped(&output, "fault.non-zero-exit", "nack");
+    assert_only_section_one_distilled(&home, &events);
+}
+
+/// AC3.2 (D-19-6-04 A) — section 2's entry declares `reassign-to-replica`
+/// and its FIRST Worker is killed while still running (the debug-only
+/// `MAOS_TEST_ONLY_CRASH_SECTION_ONCE` root hook; the entry's fixture mode
+/// `delay-then-complete` keeps it running for 2 s, then completes). The
+/// orphan reaches the Orchestrator, the kernel reassigns (`task.reassigned`
+/// naming the originator, rule 11), and section 2 is re-dispatched ONCE — a
+/// new `task.assign` with the same goal and the same `prior_distillate_ref`,
+/// after the delivery — to a fresh Worker that completes; the epic goes on
+/// to section 3 and exits 0 with three distillates.
+#[test]
+fn a_section_crashed_once_is_redispatched_to_a_fresh_worker_and_the_epic_completes() {
+    if !t3_substrate::require_t3("epic section crashed once, re-dispatched") {
+        return;
+    }
+    let home = data_home("crash-once");
+    let second = worker_manifest(
+        &home,
+        Some("delay-then-complete"),
+        Some("reassign-to-replica"),
+    );
+    let output = run_epic(
+        &home,
+        &topology_with_second_entry(&home, &second),
+        &[("MAOS_TEST_ONLY_CRASH_SECTION_ONCE", "2")],
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "a reassigned section that completes completes the epic; stderr:\n{stderr}"
+    );
+    let events = events(&output);
+    let orchestrator = orchestrator_pid(&events);
+
+    let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
+    assert_eq!(
+        assigns.len(),
+        4,
+        "section 1, section 2 twice, section 3: {assigns:?}"
+    );
+    let goal = |k: usize| assigns[k].2["TaskAssign"]["goal"].clone();
+    assert_eq!(goal(1), goal(2), "the re-dispatch carries section 2's goal");
+    assert_ne!(goal(1), goal(3));
+    assert_eq!(
+        prior_ref(&assigns[1].2),
+        prior_ref(&assigns[2].2),
+        "the re-dispatch carries the same prior_distillate_ref (FR21)"
+    );
+    assert_ne!(assigns[1].0, assigns[2].0, "a new task.assign frame");
+
+    let crashed = assert_orphan_reached_orchestrator(
+        &home,
+        &assigns[1].0,
+        orchestrator,
+        None,
+        "task.reassigned",
+    );
+    let complete = journal_rows(&home, KIND_TASK_COMPLETE);
+    let reassigned: Vec<&JournalRow> = complete
+        .iter()
+        .filter(|row| row.intent == "task.reassigned")
+        .collect();
+    assert_eq!(reassigned.len(), 1, "{complete:?}");
+    assert_eq!(
+        reassigned[0].payload["replica_spirit_id"], "orchestrator",
+        "rule 11: the row names the originator, which re-dispatches"
+    );
+    assert!(
+        complete.iter().all(|row| row.intent != "task.escalated"),
+        "one crash, one reassignment, no escalation"
+    );
+    assert_eq!(
+        complete.iter().filter(|row| row.from == "__kernel").count(),
+        1,
+        "one kernel-sent orphan for one crash"
+    );
+    let assign_rows = journal_rows(&home, KIND_TASK_ASSIGN);
+    assert!(
+        assign_rows[2].timestamp_ns > crashed.delivered_ns,
+        "the re-dispatch follows the orphan's delivery to the Orchestrator"
+    );
+    assert_orphaned_events(&events, &[(&crashed, "reassign-to-replica")]);
+
+    // The fresh Worker completes section 2, and the epic goes on.
+    let written = named(&events, "distillate_written");
+    let ordinals: Vec<Option<u64>> = written
+        .iter()
+        .map(|event| event["section"].as_u64())
+        .collect();
+    assert_eq!(ordinals, vec![Some(1), Some(2), Some(3)], "{events:?}");
+    assert_eq!(tl_rows(&home, KIND_DISTILLATE).len(), 3);
+    let producer = |k: usize| written[k]["producer_pid"].as_u64().expect("producer_pid") as i64;
+    assert_ne!(
+        producer(1),
+        crashed.worker_pid,
+        "section 2 is distilled at the FRESH Worker's pid, not the crashed one's"
+    );
+    assert_eq!(
+        hex_of_byte_array(&prior_ref(&assigns[3].2)["digest_frame_id"]),
+        written[1]["digest_frame_id"].as_str().expect("digest id"),
+        "section 3 is fed the re-run's distillate"
+    );
+    assert_eq!(named(&events, "delegation_routed").len(), 4);
+    assert_eq!(named(&events, "delegation_completed").len(), 3);
+    assert_completions_at_safe_point(&events);
     assert!(named(&events, "dispatch_halted").is_empty());
+    assert!(
+        !stderr.contains("dispatch stopped") && !stderr.contains("Anomaly kernel.crash-detector"),
+        "a reassigned crash neither stops nor escalates; stderr:\n{stderr}"
+    );
+}
+
+/// AC3.2 + AC3.3 (D-19-6-04 A) — an entry declaring `reassign-to-replica`
+/// whose Worker crashes on BOTH attempts (`exit-nonzero`): the first crash
+/// is reassigned and section 2 re-dispatched once to a fresh Worker; the
+/// second finds the budget spent and escalates (`task.escalated`,
+/// `AnomalyFlagged`, typed stop). No third `task.assign` for section 2, and
+/// section 3 is never assigned.
+#[test]
+fn a_reassigned_section_that_crashes_again_escalates_and_stops() {
+    if !t3_substrate::require_t3("epic reassigned section crashes twice") {
+        return;
+    }
+    let home = data_home("crash-twice");
+    let second = worker_manifest(&home, Some("exit-nonzero"), Some("reassign-to-replica"));
+    let output = run_epic(&home, &topology_with_second_entry(&home, &second), &[]);
+    let events = events(&output);
+    let orchestrator = orchestrator_pid(&events);
+    let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
+    assert_eq!(
+        assigns.len(),
+        3,
+        "section 1, section 2, section 2 once more — and nothing after: {assigns:?}"
+    );
+    let goal = |k: usize| assigns[k].2["TaskAssign"]["goal"].clone();
+    assert_eq!(goal(1), goal(2), "the re-dispatch carries section 2's goal");
+    assert_eq!(
+        prior_ref(&assigns[1].2),
+        prior_ref(&assigns[2].2),
+        "the re-dispatch carries the same prior_distillate_ref (FR21)"
+    );
+    assert_ne!(assigns[1].0, assigns[2].0, "a new task.assign frame");
+
+    let first = assert_orphan_reached_orchestrator(
+        &home,
+        &assigns[1].0,
+        orchestrator,
+        Some("fault.non-zero-exit"),
+        "task.reassigned",
+    );
+    let second = assert_orphan_reached_orchestrator(
+        &home,
+        &assigns[2].0,
+        orchestrator,
+        Some("fault.non-zero-exit"),
+        "task.escalated",
+    );
+    assert_ne!(
+        first.worker_pid, second.worker_pid,
+        "the re-dispatch ran on a fresh Worker"
+    );
+    let complete = journal_rows(&home, KIND_TASK_COMPLETE);
+    assert_eq!(
+        complete
+            .iter()
+            .filter(|row| row.intent == "task.reassigned")
+            .count(),
+        1,
+        "budget one: {complete:?}"
+    );
+    let assign_rows = journal_rows(&home, KIND_TASK_ASSIGN);
+    assert!(
+        assign_rows[2].timestamp_ns > first.delivered_ns,
+        "the re-dispatch follows the orphan's delivery to the Orchestrator"
+    );
+    assert_orphaned_events(
+        &events,
+        &[
+            (&first, "reassign-to-replica"),
+            (&second, "escalate-to-operator"),
+        ],
+    );
+    assert_stopped(&output, "fault.non-zero-exit", "escalate-to-operator");
+    assert_anomaly_flagged(&output, second.worker_pid);
+    assert_only_section_one_distilled(&home, &events);
+}
+
+/// AC3.3 (D-19-6-06 A) — an entry declaring `escalate-to-operator`: the
+/// kernel escalates, one `AnomalyFlagged` reaches the root's dispatcher, and
+/// dispatch stops typed naming `escalate-to-operator`; no re-dispatch.
+#[test]
+fn an_escalating_section_flags_the_operator_and_stops() {
+    if !t3_substrate::require_t3("epic escalating section") {
+        return;
+    }
+    let home = data_home("crash-escalate");
+    let second = worker_manifest(&home, Some("exit-nonzero"), Some("escalate-to-operator"));
+    let output = run_epic(&home, &topology_with_second_entry(&home, &second), &[]);
+    let events = events(&output);
+    let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
+    assert_eq!(
+        assigns.len(),
+        2,
+        "no re-dispatch, no section 3: {assigns:?}"
+    );
+    let crashed = assert_orphan_reached_orchestrator(
+        &home,
+        &assigns[1].0,
+        orchestrator_pid(&events),
+        Some("fault.non-zero-exit"),
+        "task.escalated",
+    );
+    assert_orphaned_events(&events, &[(&crashed, "escalate-to-operator")]);
+    assert_stopped(&output, "fault.non-zero-exit", "escalate-to-operator");
+    assert_anomaly_flagged(&output, crashed.worker_pid);
+    assert_only_section_one_distilled(&home, &events);
 }
 
 /// AC1.6 — the proven-red split: the fixture with its second heading

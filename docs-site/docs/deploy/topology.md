@@ -135,13 +135,14 @@ One host runs the MAOS daemon, which runs the kernel and first-party `rust-inpro
 - `rust-inproc` Spirits run in the daemon process (`T0`), mediated by capability tokens; there is no process isolation.
 - On Linux, WASM-component Spirits run in the `T2` runner process with seccomp allow-list, Landlock, and a delegated cgroup v2 subtree.
 - Each Worker runs in a Linux-only `T3` rootless container with `--network=none`, read-only filesystem, no host home mount, and egress only through its daemon proxy socket at `/proxy/egress.sock`.
+- Each Worker run gets its own workspace, `<MAOS_HOME>/workspaces/<container_name>/`, mounted at `/workspace` (`rw,U`) as its working directory; podman chowns it to the container's mapped subuid. It is kept after the Worker exits (remove it with `podman unshare rm -rf <workspace>`), and MAOS diffs it to decide whether a real `codex` or `claude` Worker produced an effect. See the [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit).
 
 WASM log recall adds no descriptor, socket, or syscall to T2. Requests and replies ride the runner's existing ADR-032 stdin/stdout channel; the daemon mints a capability for each admitted call and audits every call and refusal. This introduces no deployment condition or change to the T2 allow-list.
 
 **What stays unisolated by design:**
 
 - `rust-inproc` Spirits run in the daemon process.
-- The admission probe runs on the host.
+- The admission handshake of the repo-built Worker fixtures runs on the host; real `codex` and `claude` binaries are not executed on the host.
 - T3 Worker manifest resource limits are applied independently to CPU percentage, memory MiB, PID/task count, and file descriptors; omitted values retain runtime defaults. Native T2 cgroup/fallback behavior and the local named-unit smoke helper are documented in the [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit).
 - T3 has no MAOS-specific seccomp or AppArmor profile.
 - T3 is Linux-only; elsewhere the launch is refused.

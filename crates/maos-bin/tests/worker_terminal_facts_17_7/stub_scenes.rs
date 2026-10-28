@@ -112,6 +112,7 @@ pub(super) fn launch(
             payload_pidfd: false,
             env,
             launch_custody: None,
+            workspace: None,
         },
     )
 }

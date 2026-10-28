@@ -11,12 +11,15 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
+use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::distillation::{DigestPayload, DistillationRequest};
 use maos_domain::frame::{EpistemicHaltPayload, PriorDistillateRef};
 use maos_domain::halt::HaltState;
+use maos_domain::notification::{NotificationEvent, NotificationLevel};
 use maos_domain::ports::DistillationPort;
+use maos_domain::supervision::OnCrashAction;
 use maos_kernel_core::halt::{invoke_halt, HaltRegistry};
-use maos_kernel_core::iac::transparency_log::FrameKind;
+use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::journal::JournalAdapter;
 use orchestrator::{
@@ -32,6 +35,11 @@ use crate::worker_spawn::WorkerRun;
 /// the Orchestrator's pid through the kernel's `invoke_halt`. Release builds
 /// never read it.
 pub const HALT_PLANT_ENV: &str = "MAOS_TEST_ONLY_HALT_BEFORE_SECTION";
+
+/// The debug-build harness plant for 19-6 AC3.2: on the FIRST attempt of the
+/// section whose 1-based ordinal it names, the root kills that Worker once it
+/// runs (see [`plant_test_crash`]). Release builds never read it.
+pub const CRASH_PLANT_ENV: &str = "MAOS_TEST_ONLY_CRASH_SECTION_ONCE";
 
 /// D-19-1-04 A — the ONE Orchestrator binding: the context port through the
 /// seam's binder (18-5) on every path; under `--live` or an explicit mode the
@@ -258,6 +266,33 @@ pub fn plant_test_halt(
         .map_err(|e| format!("maos run: {HALT_PLANT_ENV}: {e}"))
 }
 
+/// The [`CRASH_PLANT_ENV`] plant: debug builds only, never on a re-dispatch.
+/// A root task polls until the Worker bound to `task_id` has a child, then
+/// kills it through the supervisor's signal/teardown without a planned stop,
+/// so the kernel handles a real crash. The caller aborts it after the run.
+pub fn plant_test_crash(
+    supervisor: &Arc<crate::supervision::WorkerSupervisor>,
+    task_id: &str,
+    ordinal: Option<usize>,
+    redispatched: bool,
+) -> Option<tokio::task::JoinHandle<()>> {
+    let planted = cfg!(debug_assertions)
+        && !redispatched
+        && ordinal.is_some()
+        && std::env::var(CRASH_PLANT_ENV)
+            .ok()
+            .and_then(|value| value.trim().parse::<usize>().ok())
+            == ordinal;
+    planted.then(|| {
+        let (supervisor, task_id) = (Arc::clone(supervisor), task_id.to_owned());
+        tokio::spawn(async move {
+            while !supervisor.test_only_crash_task(&task_id) {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+    })
+}
+
 /// D-19-1-08 A — the distillate's digest: non-raw facts only, so 18-6's forget
 /// cascade reaches it through its sources, never its body.
 pub fn section_digest(section: &EpicSection, run: &WorkerRun) -> serde_json::Value {
@@ -321,4 +356,98 @@ pub fn write_section_distillate(
         distillation_depth: receipt.effective_distillation_depth,
         intent_lineage: receipt.intent_lineage,
     })
+}
+
+/// D-19-6-04/05 A — whether a Worker entry's manifest declares
+/// `[on_crash] action = "reassign-to-replica"`: only then does the loop arm
+/// the root's replica resolver around its one delegated run.
+pub fn declares_reassign(manifest: &toml::Value) -> bool {
+    manifest
+        .get("on_crash")
+        .and_then(|section| section.get("action"))
+        .and_then(toml::Value::as_str)
+        == Some("reassign-to-replica")
+}
+
+/// D-19-6-03/04/06 A — the loop's disposition of a delegated Worker's crash,
+/// called once its orphan frame was drained and the Orchestrator's in-flight
+/// delegation released. Both facts are the Transparency Log's, joined on
+/// `task_id`: the cause is the kernel's `task.orphaned` row at the Worker's
+/// pid — absent on the crash-phase `NotLoaded` path (a concurrent unload
+/// removed the SCB first), where `fallback_cause`, the Worker's own verdict,
+/// stands in; the APPLIED disposition is the pid-0 row the kernel or the
+/// supervisor's executor wrote (an unarmed `reassign-to-replica` is already
+/// `task.escalated` there). Prints `delegation_orphaned`. `Ok` means
+/// re-dispatch the section once; otherwise the typed stop, after one
+/// `AnomalyFlagged` on escalation.
+pub fn dispose_orphan(
+    tl: &TransparencyLogAdapter,
+    notifications: &NotificationDispatcher,
+    section: Option<usize>,
+    task_id: &str,
+    worker_pid: u32,
+    fallback_cause: &str,
+    safe_point: bool,
+) -> Result<(), String> {
+    let joined = |pid: u32| -> Result<Vec<(String, serde_json::Value)>, String> {
+        Ok(tl
+            .query_frames(FrameFilter {
+                spirit_pid: Some(pid),
+                kind: Some(FrameKind::TaskComplete),
+                ..FrameFilter::default()
+            })
+            .map_err(|e| format!("maos run: crash rows for {task_id} unreadable: {e}"))?
+            .into_iter()
+            .filter_map(|row| {
+                let payload = serde_json::from_slice::<serde_json::Value>(&row.payload_redacted);
+                Some((row.intent, payload.ok()?))
+            })
+            .filter(|(_, payload)| payload["task_id"] == task_id)
+            .collect())
+    };
+    let cause = joined(worker_pid)?
+        .into_iter()
+        .filter(|(intent, _)| intent == "task.orphaned")
+        .find_map(|(_, payload)| payload["cause"].as_str().map(str::to_owned))
+        .unwrap_or_else(|| fallback_cause.to_owned());
+    let disposition = joined(0)?
+        .into_iter()
+        .find_map(|(intent, _)| match intent.as_str() {
+            "task.nacked" => Some(OnCrashAction::Nack),
+            "task.reassigned" => Some(OnCrashAction::ReassignToReplica),
+            "task.escalated" => Some(OnCrashAction::EscalateToOperator),
+            _ => None,
+        })
+        .ok_or_else(|| format!("maos run: no disposition row for crashed {task_id}"))?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "delegation_orphaned",
+            "section": section,
+            "task_id": task_id,
+            "cause": cause,
+            "disposition": disposition.to_string(),
+            "orchestrator_safe_point": safe_point,
+        })
+    );
+    if disposition == OnCrashAction::ReassignToReplica {
+        return Ok(());
+    }
+    let section = section.map_or_else(|| "-".to_owned(), |ordinal| ordinal.to_string());
+    if disposition == OnCrashAction::EscalateToOperator {
+        let event = NotificationEvent::anomaly_flagged(
+            "kernel.crash-detector",
+            format!("pid:{worker_pid}"),
+            format!("section {section}: {cause}, task {task_id}"),
+            1.0,
+        )
+        .map_err(|e| format!("maos run: escalation notification refused: {e}"))?;
+        notifications
+            .dispatch(event, NotificationLevel::Immediate)
+            .map_err(|e| format!("maos run: escalation notification failed: {e}"))?;
+    }
+    Err(format!(
+        "maos run: section {section} Worker crashed ({cause}); disposition {disposition}; \
+         dispatch stopped"
+    ))
 }

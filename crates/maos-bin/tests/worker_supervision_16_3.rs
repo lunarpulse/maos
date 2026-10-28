@@ -35,10 +35,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
+use maos_bin::delegation::{self, DelegationLeg};
+use maos_bin::replica_resolver::RootReplicaResolver;
 use maos_bin::supervision::{
     BindingAction, BindingPhase, PhaseRefusal, WorkerSupervision, WorkerSupervisor, WorkerTask,
 };
-use maos_domain::supervision::{CrashCause, FaultCause};
+use maos_domain::invariants::i8::A2AIntent;
+use maos_domain::supervision::{CrashCause, FaultCause, NullReplicaResolver, ReplicaResolver};
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
 
@@ -248,6 +251,16 @@ struct KernelWorld {
 
 impl KernelWorld {
     fn new(dir: &Path) -> Self {
+        Self::build(dir, None)
+    }
+
+    /// Story 19-6 (AC4.1) — the world with the root's replica resolver on the
+    /// detector, as `main.rs` installs it (`CrashDetector::with_replica_resolver`).
+    fn with_replica_resolver(dir: &Path, replica: Arc<dyn ReplicaResolver>) -> Self {
+        Self::build(dir, Some(replica))
+    }
+
+    fn build(dir: &Path, replica: Option<Arc<dyn ReplicaResolver>>) -> Self {
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(NONCE));
         let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
@@ -303,7 +316,7 @@ impl KernelWorld {
             maos_kernel_core::journal::JournalAdapter::open(&dir.join("lifecycle.ndjson"))
                 .expect("open lifecycle journal"),
         );
-        let crash_detector = Arc::new(maos_kernel_core::supervision::CrashDetector::new(
+        let crash_detector = maos_kernel_core::supervision::CrashDetector::new(
             scheduler.scbs(),
             Arc::clone(&tl),
             Arc::clone(&halt_registry),
@@ -311,7 +324,11 @@ impl KernelWorld {
             Arc::clone(&iac),
             Arc::clone(&telemetry),
             Arc::clone(&journal),
-        ));
+        );
+        let crash_detector = Arc::new(match replica {
+            Some(replica) => crash_detector.with_replica_resolver(replica),
+            None => crash_detector,
+        });
         // Trap 1 — before any clone of the scheduler Arc.
         Arc::get_mut(&mut scheduler)
             .expect("scheduler Arc strong_count == 1")
@@ -2255,4 +2272,575 @@ async fn unload_all_loaded_closes_a_live_workers_scb_and_reports_it() {
         supervisor.counters().signals_sent() >= 1,
         "an unload must END the process, not just flip an SCB state"
     );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// (11) Story 19-6 — the crash reaches the task originator (AC2, AC4).
+//
+// The Orchestrator side is built from production parts: `DelegationLeg::install`
+// registers the `orchestrator` mailbox handle exactly as the J1 root does, and
+// the root's recipient resolver maps admitted Spirits to pids. On the founder
+// host an SCB named `orchestrator` is loaded, so the originator resolves to a
+// Spirit on THIS root; host B registers the same handle WITHOUT that SCB.
+// ────────────────────────────────────────────────────────────────────────────
+
+struct Originator {
+    leg: DelegationLeg,
+    /// The Orchestrator's pid on this root; `None` is host B's shape.
+    pid: Option<u32>,
+}
+
+async fn originator(world: &KernelWorld, loaded_here: bool) -> Originator {
+    let leg = DelegationLeg::install(
+        Arc::clone(world.iac.mailbox()),
+        &A2AIntent::new(orchestrator::DELEGATION_CONSENT_INTENT),
+    )
+    .await
+    .expect("the delegation leg installs on the world's mailbox");
+    let pid = if loaded_here {
+        Some(
+            world
+                .scheduler
+                .load(
+                    delegation::FROM_SPIRIT,
+                    SpiritManifestBundle::default(),
+                    maos_spirit_hello::HelloSpirit,
+                    NONCE,
+                )
+                .await
+                .expect("load the Orchestrator SCB"),
+        )
+    } else {
+        None
+    };
+    let admitted: std::collections::BTreeMap<String, u32> = pid
+        .map(|pid| (delegation::FROM_SPIRIT.to_string(), pid))
+        .into_iter()
+        .collect();
+    world
+        .tl
+        .install_recipient_resolver(Arc::new(std::sync::RwLock::new(admitted)) as _)
+        .expect("one recipient resolver per world");
+    Originator { leg, pid }
+}
+
+/// A distinct delegation frame id per vector (the `seq ‖ run_nonce` shape).
+fn delegation_frame_id(seq: u64) -> [u8; 16] {
+    let mut id = [0u8; 16];
+    id[0..8].copy_from_slice(&seq.to_le_bytes());
+    id[8..16].copy_from_slice(&NONCE.to_le_bytes());
+    id
+}
+
+/// A T0 crasher, optionally declaring an `[on_crash]` action.
+fn crashing_manifest(dir: &Path, on_crash: Option<&str>) -> PathBuf {
+    let base = write_worker_manifest(dir, Some("sigkill-self"), None);
+    let Some(action) = on_crash else {
+        return base;
+    };
+    let manifest = dir.join(format!("crash-{action}.toml"));
+    let text = std::fs::read_to_string(base).expect("read base manifest");
+    std::fs::write(
+        &manifest,
+        format!("{text}\n[on_crash]\naction = \"{action}\"\n"),
+    )
+    .expect("write on_crash manifest");
+    manifest
+}
+
+/// Run one Worker to its end and return the pid of the binding it made.
+async fn run_and_name(
+    world: &KernelWorld,
+    supervisor: &Arc<WorkerSupervisor>,
+    manifest: PathBuf,
+    task: WorkerTask,
+) -> u32 {
+    let before: BTreeSet<u32> = supervisor
+        .bindings()
+        .iter()
+        .map(|view| view.spirit_pid)
+        .collect();
+    let outcome = run_worker(world, supervisor, manifest, task).await;
+    assert!(outcome.is_ok(), "the run reports a verdict: {outcome:?}");
+    let fresh: Vec<u32> = supervisor
+        .bindings()
+        .iter()
+        .map(|view| view.spirit_pid)
+        .filter(|pid| !before.contains(pid))
+        .collect();
+    assert_eq!(fresh.len(), 1, "one run, one binding: {fresh:?}");
+    fresh[0]
+}
+
+/// Every kernel-sent row: `TaskComplete` at pid 0 whose sender is `__kernel`.
+/// The kernel's own disposition rows sit at pid 0 too, but their sender is
+/// the originator, so the sender is what separates a delivery from a record.
+fn kernel_sent_rows(
+    world: &KernelWorld,
+) -> Vec<maos_kernel_core::iac::transparency_log::TransparencyLogEntry> {
+    world
+        .tl
+        .query_frames(FrameFilter {
+            kind: Some(FrameKind::TaskComplete),
+            spirit_pid: Some(0),
+            ..Default::default()
+        })
+        .expect("query transparency log")
+        .into_iter()
+        .filter(|row| row.from_spirit_id == maos_kernel_core::iac::mailbox::KERNEL_SENDER_SPIRIT_ID)
+        .collect()
+}
+
+/// Drain the Orchestrator's handle until it yields, within the 5 s floor.
+async fn take_orphan_within_floor(
+    originator: &mut Originator,
+    frame_id: [u8; 16],
+) -> Result<bool, String> {
+    let mut taken = Ok(false);
+    wait_for(Duration::from_secs(5), || {
+        taken = originator.leg.take_orphaned(frame_id);
+        !matches!(taken, Ok(false))
+    })
+    .await;
+    taken
+}
+
+fn task_row(world: &KernelWorld, intent: &str, task_id: &str, spirit_pid: Option<u32>) -> usize {
+    world
+        .rows(FrameKind::TaskComplete, spirit_pid)
+        .into_iter()
+        .filter(|row| row.intent == intent && row.payload["task_id"] == task_id)
+        .count()
+}
+
+#[test]
+fn the_orphan_frame_id_is_a_deterministic_derivation_of_the_delegation_id() {
+    // `orphan_frame` stamps `monotonic_now_ns()`, whose debug assertion needs
+    // the base set; nextest runs each test in its own process, and this test
+    // builds no `KernelWorld` (whose `build` sets it for the kernel-world tests).
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let id = delegation_frame_id(7);
+    let orphan = delegation::orphan_frame_id(id);
+    assert_eq!(orphan, delegation::orphan_frame_id(id), "deterministic");
+    assert_ne!(orphan, id, "never the task.assign row's own id");
+    assert_ne!(
+        orphan,
+        DelegationLeg::outcome_frame_id(id),
+        "never host B's outcome row id"
+    );
+    assert_eq!(orphan[8..], id[8..], "the run-nonce tail is kept");
+    assert_eq!(
+        delegation::orphan_frame_id(orphan),
+        id,
+        "reversible: the orphan names its delegation"
+    );
+    let frame = delegation::orphan_frame(id, delegation::FROM_SPIRIT);
+    assert_eq!(frame.frame_id, orphan);
+    assert_eq!(
+        frame.from.spirit_id.as_str(),
+        maos_kernel_core::iac::mailbox::KERNEL_SENDER_SPIRIT_ID
+    );
+    assert_eq!(
+        frame.auto_marker,
+        maos_domain::invariants::i3::FrameOrigin::Kernel
+    );
+    assert_eq!(frame.to.len(), 1);
+    assert_eq!(frame.to[0].spirit_id.as_str(), delegation::FROM_SPIRIT);
+    assert!(frame.to[0].host_id.is_none(), "a local address only");
+    assert!(matches!(
+        &frame.payload,
+        maos_domain::frame::FramePayload::TaskComplete(p) if p.result == delegation::ORPHANED_RESULT
+    ));
+}
+
+/// AC2.1–AC2.4 — a crashed delegated Worker's originator, loaded on this root,
+/// receives ONE kernel-sent `TaskComplete{"orphaned"}`: journaled at pid 0
+/// after the kernel's own rows (I2, CR-2), recorded as received by the
+/// Orchestrator's pid, drained by `take_orphaned` exactly once. The kernel's
+/// rows are the 16-3 rows, unchanged.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_crashed_delegation_reaches_its_local_orchestrators_mailbox_once() {
+    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    let dir = scratch_dir("orphan-delivery");
+    let world = KernelWorld::new(&dir);
+    let mut originator = originator(&world, true).await;
+    let orchestrator_pid = originator.pid.expect("loaded here");
+    let supervisor = world.supervisor(Default::default());
+    supervisor
+        .install_originator_delivery(Arc::new(NullReplicaResolver))
+        .unwrap_or_else(|_| panic!("the first install of the set-once seam succeeds"));
+    assert!(
+        supervisor
+            .install_originator_delivery(Arc::new(NullReplicaResolver))
+            .is_err(),
+        "the seam is set-once"
+    );
+    let frame_id = delegation_frame_id(1);
+    let (task_id, _) = WorkerTask::Delegation { frame_id }.record_ids("worker");
+
+    let pid = run_and_name(
+        &world,
+        &supervisor,
+        crashing_manifest(&dir, None),
+        WorkerTask::Delegation { frame_id },
+    )
+    .await;
+    assert_eq!(
+        take_orphan_within_floor(&mut originator, frame_id).await,
+        Ok(true),
+        "the Orchestrator's handle holds exactly the kernel orphan"
+    );
+    assert_eq!(
+        originator.leg.take_orphaned(frame_id),
+        Ok(false),
+        "drained once: nothing is released twice"
+    );
+
+    // The kernel's rows: unchanged in kind, pid and payload (AC2.4).
+    let orphaned: Vec<TlRow> = world
+        .rows(FrameKind::TaskComplete, Some(pid))
+        .into_iter()
+        .filter(|row| row.intent == "task.orphaned")
+        .collect();
+    assert_eq!(orphaned.len(), 1, "one task.orphaned at the Worker's pid");
+    assert_eq!(orphaned[0].payload["task_id"], task_id.as_str());
+    assert_eq!(orphaned[0].payload["cause"], "fault.signaled");
+    assert_eq!(
+        orphaned[0].payload["originator_spirit_id"],
+        delegation::FROM_SPIRIT
+    );
+    assert_eq!(task_row(&world, "task.nacked", &task_id, Some(0)), 1);
+
+    // The delivery row: one, kernel-authored, derived id, after the record.
+    let delivered = kernel_sent_rows(&world);
+    assert_eq!(
+        delivered.len(),
+        1,
+        "one kernel-sent frame per orphaned delegation"
+    );
+    let row = &delivered[0];
+    assert_eq!(row.frame_id, delegation::orphan_frame_id(frame_id));
+    assert_eq!(row.to_spirit_id, delegation::FROM_SPIRIT);
+    assert_eq!(row.origin, maos_domain::invariants::i3::FrameOrigin::Kernel);
+    let payload: serde_json::Value =
+        serde_json::from_slice(&row.payload_redacted).expect("payload is JSON");
+    assert_eq!(
+        payload["TaskComplete"]["result"],
+        delegation::ORPHANED_RESULT
+    );
+    let orphaned_at = world
+        .tl
+        .query_frames(FrameFilter {
+            kind: Some(FrameKind::TaskComplete),
+            spirit_pid: Some(pid),
+            intent: Some("task.orphaned".to_string()),
+            ..Default::default()
+        })
+        .expect("query task.orphaned")[0]
+        .timestamp_ns;
+    assert!(
+        row.timestamp_ns >= orphaned_at,
+        "CR-2: the kernel's task.orphaned row precedes the delivery"
+    );
+    assert!(
+        Duration::from_nanos(row.timestamp_ns - orphaned_at) <= Duration::from_secs(5),
+        "delivered within FR12's 5 s of the kernel's record"
+    );
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock after epoch")
+        .as_nanos() as u64;
+    assert!(
+        matches!(
+            world.tl.participant_access(
+                row.frame_id,
+                maos_kernel_core::iac::transparency_log::ParticipantScope {
+                    pid: orchestrator_pid,
+                    consent_now_ns: now_ns,
+                },
+            ),
+            Ok(Some(
+                maos_kernel_core::iac::transparency_log::ParticipantAccess::Payload { .. }
+            ))
+        ),
+        "the Orchestrator's pid is the frame's recorded recipient"
+    );
+}
+
+/// AC2.2 / CR-1 — a second delivery of the same orphan is the typed
+/// `Duplicate`: no second row, nothing re-delivered, nothing released twice.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_repeated_orphan_delivery_is_a_typed_duplicate_and_delivers_nothing() {
+    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    let dir = scratch_dir("orphan-duplicate");
+    let world = KernelWorld::new(&dir);
+    let mut originator = originator(&world, true).await;
+    let supervisor = world.supervisor(Default::default());
+    supervisor
+        .install_originator_delivery(Arc::new(NullReplicaResolver))
+        .unwrap_or_else(|_| panic!("the seam installs"));
+    let frame_id = delegation_frame_id(2);
+    run_and_name(
+        &world,
+        &supervisor,
+        crashing_manifest(&dir, None),
+        WorkerTask::Delegation { frame_id },
+    )
+    .await;
+    assert_eq!(
+        take_orphan_within_floor(&mut originator, frame_id).await,
+        Ok(true)
+    );
+
+    let replay = world
+        .iac
+        .deliver_typed(
+            delegation::orphan_frame(frame_id, delegation::FROM_SPIRIT),
+            0,
+            None,
+        )
+        .await
+        .expect("a replayed orphan is journaled-or-deduped, never an error");
+    assert_eq!(
+        replay.into_inner(),
+        maos_kernel_core::iac::transparency_log::FrameRowWrite::Duplicate,
+        "the derived id makes a second delivery the typed Duplicate"
+    );
+    assert_eq!(
+        originator.leg.take_orphaned(frame_id),
+        Ok(false),
+        "a Duplicate is never re-delivered"
+    );
+    assert_eq!(kernel_sent_rows(&world).len(), 1, "no second row");
+}
+
+/// AC2.3 (D-19-6-07 A) — host B's shape: the `orchestrator` handle is
+/// registered locally by the delegation leg, but the originator is not a
+/// Spirit on this root. The crash stays journal-only: the kernel's rows land,
+/// nothing is delivered and no recipient row names a local `orchestrator`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_originator_not_loaded_on_this_root_stays_journal_only() {
+    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    let dir = scratch_dir("orphan-host-b");
+    let world = KernelWorld::new(&dir);
+    let mut originator = originator(&world, false).await;
+    let supervisor = world.supervisor(Default::default());
+    supervisor
+        .install_originator_delivery(Arc::new(NullReplicaResolver))
+        .unwrap_or_else(|_| panic!("the seam installs"));
+    let frame_id = delegation_frame_id(3);
+    let (task_id, _) = WorkerTask::Delegation { frame_id }.record_ids("worker");
+    let pid = run_and_name(
+        &world,
+        &supervisor,
+        crashing_manifest(&dir, None),
+        WorkerTask::Delegation { frame_id },
+    )
+    .await;
+    let nacked = wait_for(Duration::from_secs(5), || {
+        task_row(&world, "task.nacked", &task_id, Some(0)) == 1
+    })
+    .await;
+    assert!(nacked, "the kernel's disposition still lands");
+    assert_eq!(task_row(&world, "task.orphaned", &task_id, Some(pid)), 1);
+    assert!(
+        kernel_sent_rows(&world).is_empty(),
+        "no delivery to an originator that is not a Spirit on this root"
+    );
+    assert_eq!(
+        originator.leg.take_orphaned(frame_id),
+        Ok(false),
+        "the locally registered handle is not the originator"
+    );
+}
+
+/// AC2.3 — `operator` (a standalone run) is not a Spirit: journal-only even
+/// with the seam installed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_standalone_crash_delivers_nothing_with_the_seam_installed() {
+    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    let dir = scratch_dir("orphan-standalone");
+    let world = KernelWorld::new(&dir);
+    let mut originator = originator(&world, true).await;
+    let supervisor = world.supervisor(Default::default());
+    supervisor
+        .install_originator_delivery(Arc::new(NullReplicaResolver))
+        .unwrap_or_else(|_| panic!("the seam installs"));
+    run_and_name(
+        &world,
+        &supervisor,
+        crashing_manifest(&dir, None),
+        WorkerTask::Standalone,
+    )
+    .await;
+    let nacked = wait_for(Duration::from_secs(5), || {
+        task_row(&world, "task.nacked", "run:worker", Some(0)) == 1
+    })
+    .await;
+    assert!(nacked, "the kernel's disposition still lands");
+    assert!(kernel_sent_rows(&world).is_empty());
+    assert_eq!(
+        originator.leg.take_orphaned(delegation_frame_id(0)),
+        Ok(false),
+        "nothing reached the Orchestrator's handle"
+    );
+}
+
+/// AC2.1 — a planned stop is not a crash: the stopped delegation is
+/// dispositioned (16-3) but nothing is delivered to its originator.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_planned_stop_of_a_delegated_worker_delivers_nothing() {
+    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    let dir = scratch_dir("orphan-planned-stop");
+    let world = KernelWorld::new(&dir);
+    let mut originator = originator(&world, true).await;
+    let supervisor = world.supervisor(Default::default());
+    supervisor
+        .install_originator_delivery(Arc::new(NullReplicaResolver))
+        .unwrap_or_else(|_| panic!("the seam installs"));
+    let frame_id = delegation_frame_id(4);
+    let (task_id, _) = WorkerTask::Delegation { frame_id }.record_ids("worker");
+    let run = tokio::spawn(run_worker_owned(
+        Arc::clone(&world.tl),
+        Arc::clone(&world.capability),
+        Arc::clone(&world.policy),
+        Arc::clone(&supervisor),
+        write_worker_manifest(&dir, Some("hang"), None),
+        WorkerTask::Delegation { frame_id },
+    ));
+    let spawned = wait_for(Duration::from_secs(10), || {
+        supervisor
+            .bindings()
+            .first()
+            .is_some_and(|view| view.child_pid.is_some())
+    })
+    .await;
+    supervisor.stop_workers();
+    let ended = tokio::time::timeout(Duration::from_secs(20), run).await;
+    assert!(spawned, "the Worker must reach its spawn");
+    assert!(ended.is_ok(), "a stopped Worker's run ends");
+    let dispositioned = wait_for(Duration::from_secs(5), || {
+        task_row(&world, "task.nacked", &task_id, Some(0)) == 1
+    })
+    .await;
+    assert!(
+        dispositioned,
+        "the stopped delegation is dispositioned, so the delivery path had its chance"
+    );
+    assert!(
+        kernel_sent_rows(&world).is_empty(),
+        "a planned stop never delivers an orphan"
+    );
+    assert_eq!(originator.leg.take_orphaned(frame_id), Ok(false));
+}
+
+/// AC4.2 — the root resolver answers by ROOT STATE: unarmed ⇒ `None`; armed
+/// ⇒ the originator's pid exactly once (budget one); the guard disarms.
+#[test]
+fn the_root_replica_resolver_is_unarmed_by_default_and_spends_one_answer() {
+    let resolver = RootReplicaResolver::new();
+    assert_eq!(resolver.find_replica("standard"), None, "unarmed ⇒ None");
+    {
+        let arm = resolver.arm(41);
+        assert!(!arm.spent());
+        assert_eq!(
+            resolver.find_replica("any-key-selects-nothing"),
+            Some(41),
+            "armed ⇒ the originator's pid, whatever the key"
+        );
+        assert!(arm.spent(), "the kernel took the budget");
+        assert_eq!(resolver.find_replica("standard"), None, "budget one");
+    }
+    {
+        let arm = resolver.arm(42);
+        drop(arm);
+    }
+    assert_eq!(
+        resolver.find_replica("standard"),
+        None,
+        "an unspent arm is disarmed on drop"
+    );
+    let arm = resolver.arm(0);
+    assert_eq!(
+        resolver.find_replica("standard"),
+        None,
+        "pid 0 arms nothing"
+    );
+    assert!(!arm.spent());
+}
+
+/// AC3.2 / AC4.1–AC4.3 (rule 11) — with the root resolver on the detector and
+/// the seam: a `reassign-to-replica` Worker crashing while the root is ARMED
+/// writes `task.reassigned` naming the ORIGINATOR as the re-dispatching party
+/// (the fresh Worker's identity is in the new assign/bind rows, not here); a
+/// second crash with the budget spent falls through to `task.escalated`. Both
+/// crashes reach the Orchestrator.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_armed_root_resolver_reassigns_once_then_escalates() {
+    LazyLock::force(&WORKER_FIXTURE_BUILT);
+    let dir = scratch_dir("orphan-reassign");
+    let resolver = RootReplicaResolver::new();
+    let world = KernelWorld::with_replica_resolver(&dir, Arc::clone(&resolver) as _);
+    let mut originator = originator(&world, true).await;
+    let orchestrator_pid = originator.pid.expect("loaded here");
+    let supervisor = world.supervisor(Default::default());
+    supervisor
+        .install_originator_delivery(Arc::clone(&resolver) as _)
+        .unwrap_or_else(|_| panic!("the seam installs"));
+    let manifest = crashing_manifest(&dir, Some("reassign-to-replica"));
+
+    let first = delegation_frame_id(5);
+    let (first_task, _) = WorkerTask::Delegation { frame_id: first }.record_ids("worker");
+    let spent = {
+        let arm = resolver.arm(orchestrator_pid);
+        run_and_name(
+            &world,
+            &supervisor,
+            manifest.clone(),
+            WorkerTask::Delegation { frame_id: first },
+        )
+        .await;
+        arm.spent()
+    };
+    assert!(spent, "the crash took the armed budget");
+    assert_eq!(
+        take_orphan_within_floor(&mut originator, first).await,
+        Ok(true)
+    );
+    let reassigned: Vec<TlRow> = world
+        .rows(FrameKind::TaskComplete, Some(0))
+        .into_iter()
+        .filter(|row| row.intent == "task.reassigned" && row.payload["task_id"] == first_task)
+        .collect();
+    assert_eq!(reassigned.len(), 1, "an armed root reassigns");
+    assert_eq!(
+        reassigned[0].payload["replica_spirit_id"],
+        delegation::FROM_SPIRIT,
+        "rule 11: the row names the originator, which re-dispatches"
+    );
+    assert_eq!(task_row(&world, "task.escalated", &first_task, Some(0)), 0);
+
+    let second = delegation_frame_id(6);
+    let (second_task, _) = WorkerTask::Delegation { frame_id: second }.record_ids("worker");
+    run_and_name(
+        &world,
+        &supervisor,
+        manifest,
+        WorkerTask::Delegation { frame_id: second },
+    )
+    .await;
+    assert_eq!(
+        take_orphan_within_floor(&mut originator, second).await,
+        Ok(true)
+    );
+    let escalated = wait_for(Duration::from_secs(5), || {
+        task_row(&world, "task.escalated", &second_task, Some(0)) == 1
+    })
+    .await;
+    assert!(escalated, "an unarmed root falls through to escalation");
+    assert_eq!(
+        task_row(&world, "task.reassigned", &second_task, Some(0)),
+        0
+    );
+    assert_eq!(kernel_sent_rows(&world).len(), 2, "both crashes delivered");
 }

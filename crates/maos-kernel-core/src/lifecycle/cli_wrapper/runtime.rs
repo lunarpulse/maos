@@ -265,6 +265,8 @@ pub struct T3Launch {
     pub payload_pidfd: bool,
     /// Shared launch/root custody, published before initialization begins.
     pub launch_custody: Option<std::sync::Arc<ContainerLaunchCustody>>,
+    /// Optional per-run workspace, bind-mounted rw at `/workspace`.
+    pub workspace: Option<std::path::PathBuf>,
 }
 
 /// A message handed from an OS reader thread to the kernel over the bounded mpsc.
@@ -576,6 +578,7 @@ fn spawn_child(spec: &mut BridgeSpawnSpec, argv: &[String]) -> Result<BridgeChil
                 payload_pidfd: launch.payload_pidfd,
                 env: &spec.env,
                 launch_custody: launch.launch_custody.as_ref(),
+                workspace: launch.workspace.as_deref(),
             };
             return spawn_t3(&spec.sandbox, &launch.image, argv, spawn_context)
                 .map(|child| BridgeChild::Container(child, launch.image))

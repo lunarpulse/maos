@@ -29,8 +29,9 @@
 # isolation: it is what makes "completed a turn and wrote nothing" a genuine
 # non-completion rather than a read-only task's legitimate silence. The FS jail it
 # creates is the ADAPTER's — declared by MAOS here, in a hashed manifest, and
-# enforced by codex. MAOS does not enforce it (the spawn has no namespace, no
-# rlimit and no process group).
+# enforced by codex. It nests INSIDE MAOS's T3 container (17-1: `--read-only`
+# root, `--network=none`, egress only through the proxy socket), whose only
+# persistent writable path is the Worker's per-run /workspace (Story 19-3).
 #
 # ┌─ ⚠️  VERIFY BEFORE THE SIGNED RUN ─────────────────────────────────────────┐
 # │ argv_prefix is TOCTOU-hashed, so it must be the EXACT argv you tested.      │
@@ -47,9 +48,10 @@
 # │ 3. Use codex's SANDBOXED autonomous mode (keeps the workspace-write jail).  │
 # │    DO NOT add a bypass flag (--dangerously-bypass-approvals-and-sandbox /   │
 # │    full-access / yolo) — c-constraint: no permission-skip, no auto-commit.  │
-# │ 4. codex's writable root follows its CWD, and MAOS does NOT set the child   │
-# │    CWD — it inherits `maos`'s. So launch `maos run` FROM $DEMO (see runbook)│
-# │    to bound codex's workspace-write jail to the disposable demo dir.        │
+# │ 4. codex's writable root follows its CWD. Under T3 that CWD is the          │
+# │    Worker's own per-run workspace mounted at /workspace (Story 19-3), so    │
+# │    the jail is bounded to it and MAOS diffs it after exit — `maos run`      │
+# │    no longer needs launching from $DEMO.                                    │
 # └────────────────────────────────────────────────────────────────────────────┘
 
 [cli_wrapper]
@@ -58,6 +60,10 @@ command = "codex"
 argv_prefix = ["exec", "--sandbox", "workspace-write", "--json"]
 output_shape_version = "1.0.0"
 recovery_policy = "respawn_fresh"
+# Story 19-3 (D-19-3-09 A) — the vendor API the Worker must reach. T3 runs
+# `--network=none`; this is a REQUEST, not a grant: admission refuses it unless
+# the MAOS_HOST_GRANTS entry's `permitted_egress_destinations` covers it.
+egress = ["api.openai.com:443"]
 
 [cli_wrapper.posture]
 stdio_shape = "ndjson_over_stdio"

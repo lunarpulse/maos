@@ -144,51 +144,18 @@ fn every_real_adapter_names_its_ambient_auth_footgun_but_the_fixture_is_immune()
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-// ── admission probe strategy — fixture handshake vs real-CLI liveness ────
+// ── admission probe strategy — fixture handshake vs no host-side probe ────
 
 #[test]
 fn only_the_fixture_speaks_the_bridge_handshake() {
-    // The gap this closes: the kernel `--maos-bridge-probe` handshake is
-    // fixture-only, so real CLIs must NOT be routed through it (they exit
-    // non-zero and never admit). The fixture keeps it; codex/claude get a
-    // `--version` liveness probe.
+    // The kernel `--maos-bridge-probe` handshake is fixture-only, so real CLIs
+    // must NOT be routed through it (they exit non-zero and never admit). Story
+    // 19-3 (D-19-3-07 A): codex/claude get NO host-side probe at all — a real
+    // agent CLI never executes on the host; the T3 spawn is the invokability
+    // check.
     assert_eq!(FixtureCli.probe_strategy(), ProbeStrategy::BridgeHandshake);
-    assert_eq!(
-        CodexCli.probe_strategy(),
-        ProbeStrategy::Liveness {
-            argv: s(&["--version"])
-        }
-    );
-    assert_eq!(
-        ClaudeCli.probe_strategy(),
-        ProbeStrategy::Liveness {
-            argv: s(&["--version"])
-        }
-    );
-}
-
-#[test]
-fn liveness_probe_passes_on_clean_exit_and_fails_closed_otherwise() {
-    use std::time::Duration;
-    let t = Duration::from_secs(5);
-    // A binary that exits 0 → admitted.
-    assert!(run_liveness_probe("true", &[], t).is_ok());
-    // A binary that exits non-zero → fail-closed (this is the codex-exit-2
-    // admission failure the operator hit, now a clean typed refusal).
-    let err = run_liveness_probe("false", &[], t).unwrap_err();
-    assert!(err.contains("non-zero exit"), "got: {err}");
-    // A missing binary → fail-closed on spawn.
-    let err = run_liveness_probe("maos-no-such-binary-xyz", &[], t).unwrap_err();
-    assert!(err.contains("spawn failed"), "got: {err}");
-}
-
-#[test]
-fn liveness_probe_times_out_and_fails_closed_on_a_hang() {
-    use std::time::Duration;
-    // `sleep 5` under a 200ms budget → killed + refused (a hanging CLI must
-    // not block admission), mirroring the kernel probe's 2s timeout guard.
-    let err = run_liveness_probe("sleep", &s(&["5"]), Duration::from_millis(200)).unwrap_err();
-    assert!(err.contains("timed out"), "got: {err}");
+    assert_eq!(CodexCli.probe_strategy(), ProbeStrategy::SpawnIsProbe);
+    assert_eq!(ClaudeCli.probe_strategy(), ProbeStrategy::SpawnIsProbe);
 }
 
 // ── the completion oracle — a raw exit is NEVER completion ──────────────
@@ -498,11 +465,12 @@ fn the_two_oracles_are_not_equivalent_and_the_asymmetry_is_asserted() {
         ClaudeCli
             .parse_completion(&claude_declined, &[], WorkerExit::Exited(0))
             .is_completed(),
-        "MEASURED RESIDUAL, not a bug in this test: a claude model that declines \
-         WITHOUT attempting a tool call leaves permission_denials empty and is \
-         indistinguishable from success. claude's JSON is a permission-denial \
-         detector, not an effect oracle. Closing this needs an effect oracle \
-         (deferred: it requires a kernel-core `cwd` on BridgeSpawnSpec)."
+        "the PARSE-level residual, asserted on purpose: a claude model that \
+         declines WITHOUT attempting a tool call leaves permission_denials empty \
+         and is indistinguishable from success at parse time. claude's JSON is a \
+         permission-denial detector, not an effect oracle; Story 19-3 closes the \
+         run-level gap with the workspace effect gate (`gate_workspace_effect`) \
+         at the composition-root seam (D-19-3-05 A), never inside `parse_completion`."
     );
 }
 
@@ -825,8 +793,8 @@ mod planted_refusal {
 
     /// A fake worker binary on a prepended `PATH`. `resolve_cli_binary` searches
     /// exe-sibling → parent → `$PATH`, first hit wins, so a script named `codex`
-    /// or `claude` is selected by `select_worker_cli`'s basename dispatch and
-    /// admitted by the `--version` liveness probe. It always exits 0 — that is the
+    /// or `claude` is selected by `select_worker_cli`'s basename dispatch; no
+    /// host-side probe runs it (19-3 D-19-3-07 A). It always exits 0 — that is the
     /// whole point: the defect was "exit 0 is treated as completion". As the T3
     /// payload it remains alive through bounded PID inspection first.
     fn plant_fake_cli(bindir: &std::path::Path, name: &str, body: &str) {

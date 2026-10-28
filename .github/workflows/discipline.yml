@@ -3424,8 +3424,11 @@ jobs:
       # three-Worker epic run (substrate provisioned above; `worker-cli-fixture` built
       # by `build-test-fixtures`); `epic_args_19_1` holds the `--epic` parse vectors.
       # Own-build job: no 20-15 archive is consumed.
-      - name: Run the epic dispatch loop + --epic parse vectors (19-1 AC1, AC2)
-        run: cargo test --color never -p maos-bin --test epic_dispatch_19_1 --test epic_args_19_1 -- --test-threads=1
+      # Story 19-3 AC3.2 / D-19-3-10 A — `_19_3.rs` joins the suffix set, so
+      # `worker_workspace_19_3` (the T3 workspace + effect-oracle vectors) is REQUIRED
+      # here too; AC3's sequence/distinct-pid clauses stay `epic_dispatch_19_1`'s.
+      - name: Run the epic dispatch loop, --epic parse vectors and workspace effect oracle (19-1 AC1, AC2; 19-3 AC2.4, AC3.2)
+        run: cargo test --color never -p maos-bin --test epic_dispatch_19_1 --test epic_args_19_1 --test worker_workspace_19_3 -- --test-threads=1
 
   # j1-crosshost-2c AC5.1/AC5.2 — the two-host signed-run judge. ONE always-Blocking
   # hermetic job. Deliberately NO `services:` block: the substrate-drift gate rejects

@@ -2993,9 +2993,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?,
     );
 
-    // Story 5.3 — Composition-root wiring for supervision adapters.
+    // Story 5.3 — Composition-root wiring for supervision adapters. Story 19-6
+    // (D-19-6-05 A) — the root's replica resolver: unarmed it answers `None`;
+    // the J1 loop arms it around one `reassign-to-replica` Worker run. The same
+    // `Arc` reaches the detector, the scheduler and the Worker supervisor.
+    let root_replicas = maos_bin::replica_resolver::RootReplicaResolver::new();
     let replica_resolver: Arc<dyn maos_domain::supervision::ReplicaResolver> =
-        Arc::new(maos_domain::supervision::NullReplicaResolver);
+        root_replicas.clone();
     let crash_detector = Arc::new(
         maos_kernel_core::supervision::CrashDetector::new(
             scheduler.scbs(),
@@ -3011,9 +3015,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheduler_mut =
         Arc::get_mut(&mut scheduler).expect("scheduler Arc strong_count == 1 at composition root");
     scheduler_mut.set_crash_detector(Arc::clone(&crash_detector));
-    // Share the exact resolver source with CrashDetector; production's
-    // NullReplicaResolver is the explicit no-replica implementation.
-    scheduler_mut.set_replica_resolver(Some(replica_resolver));
+    // Share the exact resolver source with CrashDetector and the supervisor.
+    scheduler_mut.set_replica_resolver(Some(Arc::clone(&replica_resolver)));
     eprintln!("maos: CrashDetector wired (Story 5.3)");
 
     // Story 17-4 (AC2) — ONE hook pump per composition root, after the
@@ -4574,6 +4577,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("root supervision was just armed")
                 .supervisor(),
         );
+        // Story 19-6 (D-19-6-01/05 A) — a crashed Worker's orphan reaches its
+        // local originator, and the supervisor's disposition executor shares
+        // the root's resolver. Host B's cohort arm installs neither (D-07 A).
+        root_worker_supervision
+            .install_originator_delivery(Arc::clone(&replica_resolver))
+            .map_err(|_| {
+                "maos run: worker supervision's originator delivery is already installed"
+            })?;
         let stop_after_unload = {
             let supervisor = Arc::downgrade(&root_worker_supervision);
             Arc::new(move |pid| {
@@ -4681,10 +4692,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut epic_next: usize = 0;
                 let mut epic_prior: Option<maos_domain::frame::PriorDistillateRef> = None;
                 let mut epic_halted = false;
+                // Story 19-6 (D-19-6-04 A) — a crashed section's entry, re-run
+                // ONCE on a fresh Worker before the next entry (`epic_next` and
+                // `epic_prior` unchanged), and whether that budget is spent.
+                let mut redispatch = None;
+                let mut redispatched = false;
+                let mut entries = topology_entries.into_iter().enumerate();
                 // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
                 // topology Worker with no `host`; `TopologyEntry` carries only
                 // `{manifest, host}`, so the position is the only stable handle.
-                for (topology_entry_index, entry) in topology_entries.into_iter().enumerate() {
+                while let Some((topology_entry_index, entry)) =
+                    redispatch.take().or_else(|| entries.next())
+                {
                     // A signal between entries stops the load: no further Spirit or
                     // Worker is admitted, and the teardown below still runs.
                     if root_shutdown.is_cancelled() {
@@ -4882,7 +4901,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let lineage = maos_domain::invariants::i13::IntentLineage::new(
                                     vec![intent.clone()],
                                 );
-                                let frame = match epic_prior.take() {
+                                // Story 19-6 (D-19-6-04 A) — cloned, not taken: a
+                                // re-dispatch of a crashed section carries the same ref.
+                                let frame = match epic_prior.clone() {
                                     // Story 19-1 (AC4, D-19-1-06 A) — section k+1
                                     // references section k's distillate through the
                                     // typed remote follow-up (FR21: never raw output).
@@ -5025,6 +5046,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 index: topology_entry_index,
                             },
                         };
+                        // Story 19-6 (D-19-6-04/05 A) — the resolver is armed around
+                        // this ONE run iff it is a section's first delegated attempt
+                        // whose manifest declares `reassign-to-replica`; the guard
+                        // disarms when the run returns.
+                        let task_id = worker_task.record_ids("").0;
+                        let replica_arm = (delegated_task.is_some()
+                            && !redispatched
+                            && maos_bin::orchestrator_root::declares_reassign(&child_root))
+                        .then(|| scheduler.resolve_pid(maos_bin::delegation::FROM_SPIRIT))
+                        .flatten()
+                        .map(|pid| root_replicas.arm(pid));
+                        let section_ordinal = epic
+                            .as_ref()
+                            .and_then(|sections| sections.get(epic_next))
+                            .map(|section| section.ordinal)
+                            .filter(|_| delegated_task.is_some());
+                        let crash_plant = maos_bin::orchestrator_root::plant_test_crash(
+                            &root_worker_supervision,
+                            &task_id,
+                            section_ordinal,
+                            redispatched,
+                        );
                         let worker_result = tokio::task::block_in_place(|| {
                             run_cli_wrapper_manifest(
                                 &child_root,
@@ -5046,6 +5089,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .and_then(|root| root.egress_handle()),
                             )
                         });
+                        drop(replica_arm);
+                        if let Some(plant) = crash_plant {
+                            plant.abort();
+                        }
                         // Story 16-3 — checked on BOTH arms and BEFORE any `?`: a
                         // SIGTERM during this Worker returns `Err` from the guard's
                         // "stopped before spawn" path or leaves a stopped Worker's
@@ -5069,6 +5116,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // becomes the EXISTING `TaskComplete` frame; a crash or
                         // missing completion marker must not close an in-flight
                         // delegation (FR20) — and must fail the run.
+                        //
+                        // Story 19-6 (D-19-6-03 A) — a delegated Worker's crash
+                        // reached the Orchestrator as the kernel-sent orphan: drain
+                        // it, release the in-flight delegation (never twice), then
+                        // apply the disposition — one re-dispatch of this entry, or
+                        // the typed stop. Other non-completions keep the error below.
+                        let crashed = matches!(
+                            completion,
+                            maos_bin::worker_cli::WorkerCompletion::NotCompleted(
+                                maos_bin::worker_cli::WorkerNonCompletion::ProcessCrash { .. }
+                            )
+                        );
+                        if let (true, Some(frame_id), Some((emitter, _))) =
+                            (crashed, delegation_frame_id, delegation_emitter.as_ref())
+                        {
+                            if !delegation_leg.take_orphaned(frame_id)?
+                                || !emitter.release_orphaned_delegation()
+                            {
+                                return Err(format!(
+                                    "maos run: {task_id} crashed but its orphan frame did not \
+                                     reach and release the Orchestrator"
+                                )
+                                .into());
+                            }
+                            maos_bin::orchestrator_root::dispose_orphan(
+                                &transparency_log,
+                                &notification_dispatcher,
+                                section_ordinal,
+                                &task_id,
+                                worker_run.spirit_pid,
+                                completion.label(),
+                                emitter.is_safe_point(),
+                            )?;
+                            redispatch = Some((topology_entry_index, entry));
+                            redispatched = true;
+                            continue;
+                        }
                         if !completion.is_completed() {
                             return Err(format!(
                                 "maos run: topology cli_wrapper worker did not complete ({})",
@@ -5114,6 +5198,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .await?;
                             emitter.complete_delegation();
                             delegation_seq += 1;
+                            redispatched = false;
                             println!(
                                 "{}",
                                 serde_json::json!({
@@ -7831,6 +7916,7 @@ description = "smoke test spirit successor"
                         payload_pidfd: true,
                         launch_custody: None,
                         env: &[],
+                        workspace: None,
                     };
                     match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
                         &spec,

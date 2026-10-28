@@ -51,11 +51,14 @@ command = "claude"                 # basename dispatch → ClaudeCli
 #                           (b) REPRODUCIBILITY: it also skips hooks, LSP, plugin
 #                               sync, attribution, auto-memory, background
 #                               prefetches and CLAUDE.md AUTO-DISCOVERY. The
-#                               spawn sets no cwd, so the child inherits `maos`'s
-#                               working directory — and this repository ships a
-#                               tracked CLAUDE.md, with another in the operator's
-#                               ~/.claude/. Without --bare a signed run's
-#                               behaviour is a function of instruction files that
+#                               Worker runs in a T3 container whose cwd is its
+#                               own fresh per-run workspace, mounted at
+#                               /workspace (Story 19-3), so neither this
+#                               repository's tracked CLAUDE.md nor the operator's
+#                               ~/.claude/ is in reach today — and --bare keeps
+#                               discovery off even if a workspace or image ever
+#                               carries one. Without it a signed run's behaviour
+#                               could be a function of instruction files that
 #                               appear in no manifest, no argv_prefix_hash and
 #                               possibly no git, so "reproducible from the repo"
 #                               would be a false claim inside a signed artifact.
@@ -78,10 +81,13 @@ command = "claude"                 # basename dispatch → ClaudeCli
 #
 # THE POSTURE THIS FILE RATIFIES, in three checkable clauses: the FS jail is the
 # ADAPTER's, DECLARED by MAOS here in a hashed manifest, ENFORCED by the adapter,
-# NOT by MAOS. MAOS's own spawn is a bare `Command::new` with no namespace, no
-# rlimit and no process group, and the adapter is selected by BASENAME with no
-# realpath, hash or signature check. `CaptureDoc::validate` refuses a capture that
-# claims otherwise (`fs_jail` must read `adapter-enforced-maos-declared`).
+# NOT by MAOS. Since 17-1 the adapter runs INSIDE MAOS's T3 container
+# (`--read-only` root, `--network=none` with egress only through the proxy
+# socket, `--user=65534:65534`); since 19-3 its only persistent writable path is
+# its per-run workspace at /workspace, which MAOS diffs after exit. The
+# adapter is selected by BASENAME with no realpath, hash or signature check.
+# `CaptureDoc::validate` refuses a capture that claims otherwise (`fs_jail` must
+# read `adapter-enforced-maos-declared`).
 argv_prefix = [
     "--print",
     "--output-format",
@@ -94,6 +100,10 @@ argv_prefix = [
 ]
 output_shape_version = "1.0.0"
 recovery_policy = "respawn_fresh"
+# Story 19-3 (D-19-3-09 A) — the vendor API the Worker must reach. T3 runs
+# `--network=none`; this is a REQUEST, not a grant: admission refuses it unless
+# the MAOS_HOST_GRANTS entry's `permitted_egress_destinations` covers it.
+egress = ["api.anthropic.com:443"]
 
 [cli_wrapper.posture]
 stdio_shape = "ndjson_over_stdio"

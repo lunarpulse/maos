@@ -51,6 +51,8 @@ pub struct T3SpawnContext<'a> {
     pub env: &'a [(String, String)],
     /// Shared root/binding custody registered before the create runtime call.
     pub launch_custody: Option<&'a std::sync::Arc<ContainerLaunchCustody>>,
+    /// Optional per-run workspace, bind-mounted rw at `/workspace`.
+    pub workspace: Option<&'a Path>,
 }
 
 /// Construct a runtime client command with ambient credentials removed.
@@ -417,6 +419,7 @@ pub fn launch_t3(
         &parent.container_name,
         parent.state_dir,
         parent.egress_socket,
+        parent.workspace,
         parent.env,
     )
     .map_err(|error| SpawnError::T3ImageInspect {
