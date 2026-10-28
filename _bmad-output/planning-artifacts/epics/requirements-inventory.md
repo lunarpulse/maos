@@ -597,7 +597,7 @@ Source: `../routing-audit-2026-10-22.md` — every row of the Recovery Coverage 
 | FR29 production consent granter + `ConsentGate`; native pid | 17-8 (rule-11 label: none in production) | `21-7-production-consent-granter-and-gate` (after 21-2) |
 | Success-criteria "three-protocol coherence" (ACP + MCP + A2A, one session) | none | `21-8-three-protocol-session-witness` (after 21-2) |
 | FR14 human task envelope, FR19 halt-policy schema/CLI, FR24 re-emission provenance | 19-1 (ACs are machine dispatch only) | 19-1 — ACs widened at the E19 preflight |
-| FR51(a)(d) bounded interruption, revocation; FR51(c) | 16-1 | 19-2 (with FR20) |
+| FR51(a)(d) bounded interruption, revocation; FR51(c) | 16-1 | 19-2 (with FR20) — (c) AC3; (a)(d) AC7/AC8, absorbed 2026-10-28 (D-19-2-01 B) |
 | FR21 fan-out floors, FR25 persona skills, FR40 startup refusal, FR4 1000-call proof | 19-1/19-3, 17-1, "LIVE" | 19-3 — ACs widened |
 | FR17 digest floors, FR58 zero-config Butler response | 18-1/19-4 (19-4 disclaims floors), 16-2 | 18-1 — ACs widened |
 | FR15 per-class halt floors; NFR-Test-4 Researcher/Orchestrator classes | 16-2; 18-2 (Butler only) | 18-2 — ACs widened |

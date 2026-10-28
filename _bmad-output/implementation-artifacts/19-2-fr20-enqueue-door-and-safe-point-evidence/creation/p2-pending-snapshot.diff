@@ -1,0 +1,18 @@
+--- a/crates/maos-kernel-core/src/orchestrator/buffer.rs
++++ b/crates/maos-kernel-core/src/orchestrator/buffer.rs
+@@ -79,6 +79,15 @@
+         }
+     }
+ 
++    /// Story 19-2 (I2) — a FIFO copy of the pending instructions, read
++    /// without removing any, so a recall can be journaled before it acts.
++    pub fn pending_snapshot(&self) -> Vec<OrchestratorInstruction> {
++        match self.queue.lock() {
++            Ok(q) => q.iter().cloned().collect(),
++            Err(_) => vec![],
++        }
++    }
++
+     /// Current pending count — surfaced by `maosctl orchestrator status`
+     /// (read-only inspection; not normative for the queue's correctness).
+     pub fn pending_count(&self) -> usize {

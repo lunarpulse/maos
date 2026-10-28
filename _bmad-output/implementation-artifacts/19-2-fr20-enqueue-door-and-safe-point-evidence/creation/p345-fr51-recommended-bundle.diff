@@ -1,0 +1,161 @@
+--- a/crates/maos-kernel-core/src/capability/mod.rs
++++ b/crates/maos-kernel-core/src/capability/mod.rs
+@@ -132,6 +132,9 @@
+     telemetry: Arc<TelemetryStreamAdapter>,
+     /// Story 18-5 — ADR-016 context-token ledger, built here on every path.
+     context: Arc<context_budget::ContextBudget>,
++    /// Story 19-2 (FR51 a) — pids the director paused: every mediated action
++    /// (issuance and verification) of a fenced pid fails closed until resume.
++    paused: std::sync::RwLock<std::collections::BTreeSet<u32>>,
+ }
+ 
+ impl std::fmt::Debug for CapabilityRegistryAdapter {
+@@ -173,6 +176,7 @@
+             working_memory,
+             telemetry,
+             context: Arc::default(),
++            paused: std::sync::RwLock::default(),
+         }
+     }
+ 
+@@ -195,6 +199,10 @@
+         posture_hash: [u8; 32],
+         intent_class: IntentClass,
+     ) -> Result<CapabilityToken, CapError> {
++        // 0. Story 19-2 (FR51 a) — a paused pid mints nothing.
++        if self.is_paused(spirit_pid) {
++            return Err(CapError::Revoked);
++        }
+         // 1. Policy check: derive Intent from the actual scope
+         let intent = scope_to_intent(&scope)?;
+         let cap = cap_policy::decision::Capability {
+@@ -308,10 +316,45 @@
+         posture_hash: [u8; 32],
+         sandbox: SandboxTier,
+     ) -> Result<(), CapError> {
+-        let result = self.tokens.verify(token, posture_hash, sandbox);
++        let result = if self.is_paused(token.spirit_pid) {
++            Err(CapError::Revoked)
++        } else {
++            self.tokens.verify(token, posture_hash, sandbox)
++        };
+         self.record_verification(token, VerifyOutcome::from_result(&result));
+         result
+     }
++
++    /// Story 19-2 (FR51 a) — fence (`true`) or release (`false`) every
++    /// mediated action of `spirit_pid`: an in-flight hook's next issuance or
++    /// verification fails closed, so the director's pause is bounded by the
++    /// time to set this flag, not by the hook.
++    pub fn set_paused(&self, spirit_pid: u32, paused: bool) {
++        let mut set = self.paused.write().unwrap_or_else(|e| e.into_inner());
++        if paused {
++            set.insert(spirit_pid);
++        } else {
++            set.remove(&spirit_pid);
++        }
++    }
++
++    /// Story 19-2 (FR51 a/d) — the post-call re-check of a token verified (and
++    /// audited) before a slow external call: refuses if the token was revoked
++    /// or its pid paused meanwhile. Silent — the pre-call row is the audit.
++    pub fn recheck(&self, token: &CapabilityToken) -> Result<(), CapError> {
++        if self.is_paused(token.spirit_pid) {
++            return Err(CapError::Revoked);
++        }
++        self.tokens.verify(token, [0u8; 32], SandboxTier(0))
++    }
++
++    /// Whether `spirit_pid` is fenced by a director pause.
++    pub fn is_paused(&self, spirit_pid: u32) -> bool {
++        self.paused
++            .read()
++            .unwrap_or_else(|e| e.into_inner())
++            .contains(&spirit_pid)
++    }
+ }
+ 
+ impl TokenIssuer for CapabilityRegistryAdapter {
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -453,6 +453,9 @@
+             payload.to_string().as_bytes(),
+             FrameOrigin::SpiritAuto,
+         );
++        // Story 19-2 (FR51 a) — fence before `on_pause`: from here every
++        // mediated action of this pid fails closed, in-flight hooks included.
++        self.capability.set_paused(spirit_pid, true);
+ 
+         let outcome = self.dispatcher.fire_on_pause(&scb).await;
+         self.check_hook_outcome("on_pause", spirit_pid, outcome)?;
+@@ -481,6 +484,9 @@
+             FrameOrigin::SpiritAuto,
+         );
+ 
++        // Story 19-2 (FR51 a) — lift the pause fence once Running again.
++        self.capability.set_paused(spirit_pid, false);
++
+         // Story 3.4 — replay buffered Orchestrator instructions.
+         if let Some(ref registry) = self.orchestrator_registry {
+             use maos_spirit_abi::identity::SpiritId;
+@@ -563,6 +569,7 @@
+         );
+         self.capability.revoke_all_for_pid(spirit_pid);
+         self.capability.context_budget().remove(spirit_pid);
++        self.capability.set_paused(spirit_pid, false);
+         // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
+         let _ = self._halt_registry.drain_for_spirit(spirit_pid);
+         {
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+@@ -283,6 +283,14 @@
+         !self.lock().kill_failed
+     }
+ 
++    /// Story 19-2 (FR51 a/b) — freeze (`podman pause`) or thaw (`podman
++    /// unpause`) the CID's cgroup, bounded like [`Self::kill`]. A frozen
++    /// Worker keeps its state and takes no further step until thawed.
++    pub fn set_frozen(&self, frozen: bool, by: Instant) -> bool {
++        let verb = if frozen { "pause" } else { "unpause" };
++        invoke_bounded(&self.runtime.path, &[verb, &self.cid], &[], by).succeeded()
++    }
++
+     /// Preserve an owning caller's absolute deadline for any Drop/join that
+     /// races its teardown request.
+     pub fn constrain_teardown_deadline(&self, deadline: Instant) {
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -443,7 +443,14 @@
+             }
+         }
+ 
+-        result
++        // Story 19-2 (FR51 a/d) — re-checked after the call: a token revoked,
++        // or a Spirit paused, while the request was on the wire fails closed
++        // here; the paid completion stays journaled above but is not returned.
++        let response = result?;
++        self.capabilities
++            .recheck(&req.capability_token)
++            .map_err(|_e| InferenceError::CapabilityDenied)?;
++        Ok(response)
+     }
+ }
+ 
+--- a/crates/maos-kernel-core/src/mcp/mod.rs
++++ b/crates/maos-kernel-core/src/mcp/mod.rs
+@@ -134,6 +134,15 @@
+                 .record_iac_rt(Service::Capability, Outcome::Ok, duration_us);
+         }
+ 
++        // Story 19-2 (FR51 a/d) — re-checked after the call: a token revoked,
++        // or a Spirit paused, mid-call fails closed; the journaled remote
++        // effect is not undone, but nothing builds on its response.
++        self.capability
++            .recheck(token)
++            .map_err(|_e| McpError::CapabilityDenied {
++                server: server.into(),
++                tool: tool.into(),
++            })?;
+         Ok(response)
+     }
+ }

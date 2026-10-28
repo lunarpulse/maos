@@ -1,0 +1,35 @@
+--- a/crates/maos-kernel-core/src/orchestrator/buffer.rs
++++ b/crates/maos-kernel-core/src/orchestrator/buffer.rs
+@@ -1,6 +1,6 @@
+ #![forbid(unsafe_code)]
+ 
+-use maos_domain::orchestrator::OrchestratorInstruction;
++use maos_domain::orchestrator::{OrchestratorInstruction, OrchestratorInstructionId};
+ use std::collections::VecDeque;
+ use std::sync::Mutex;
+ 
+@@ -78,6 +78,24 @@
+             Err(_) => vec![],
+         }
+     }
++
++    /// Story 19-2 (FR51 c) — remove ONE pending instruction by id, keeping
++    /// the rest in FIFO order. `None` when it is no longer pending (already
++    /// dequeued at a safe point, or recalled). On a poisoned mutex, `None`.
++    pub fn recall(&self, id: &OrchestratorInstructionId) -> Option<OrchestratorInstruction> {
++        let mut q = self.queue.lock().ok()?;
++        let index = q.iter().position(|instruction| &instruction.id == id)?;
++        q.remove(index)
++    }
++
++    /// Story 19-2 (I2) — a FIFO copy of the pending instructions, read
++    /// without removing any, so a recall can be journaled before it acts.
++    pub fn pending_snapshot(&self) -> Vec<OrchestratorInstruction> {
++        match self.queue.lock() {
++            Ok(q) => q.iter().cloned().collect(),
++            Err(_) => vec![],
++        }
++    }
+ 
+     /// Current pending count — surfaced by `maosctl orchestrator status`
+     /// (read-only inspection; not normative for the queue's correctness).

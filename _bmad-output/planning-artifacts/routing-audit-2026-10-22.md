@@ -37,7 +37,7 @@ Totals after ADD: E17 14 · E18 7 · E19 6 · E20 11 · E21 8 (remaining backlog
 | `18-3` | NFR-Aud-7 five thresholds binding per shipping class (faithfulness/hedge "never a CI floor" today); J-Researcher: eight-way tools, contradiction/resume, four output sections, citation/time floors | `epic-18:85-87` |
 | `18-4` | FR31 principal-namespace persistence of the acceptance ledger ("deferred" today); J-Butler persistent learning, actual option effects, variance-led halt reconciliation | `epic-18:62,93-94` |
 | `19-1` | FR14 human task envelope (goal/scope/success criteria/posture) with terminal/ACP/push delivery; FR19 per-Spirit per-tag halt-policy schema + CLI consumed live; FR24 whole re-emission provenance | `epic-19:59-62` — machine dispatch only |
-| `19-2` | FR51(a)(d) bounded director interruption and revocation (16-1 has no interrupt mechanism); FR51(c) already AC3 | `16-1…md:35-42`; `sprint-status.yaml:284` |
+| `19-2` | FR51(a)(d) bounded director interruption and revocation (16-1 has no interrupt mechanism); FR51(c) already AC3 | `16-1…md:35-42`; `sprint-status.yaml:284` — ✅ absorbed at 19-2 creation 2026-10-28 (D-19-2-01 B): AC7/AC8 |
 | `19-3` | FR21 fan-out floors (50 concurrent Workers, P99 ≤500 ms, zero drops at 10/s for 1 h, envelope fields); FR25 bridge/persona skills asserted in agent context; FR40 declared-version mismatch refuses startup for real adapters; FR4 1000-call mediation proof | `epic-19:76-78`; `worker_spawn.rs:759-805`; `17-1…md:111-121` |
 | `19-4` | J1 DAG/independent continuation, skill loading, overnight session; keep the 2026-09-21 re-pin precondition | `epic-19:78,84-88` |
 | `20-1` | FR36 authenticated control-plane install; FR37 post-promotion lapse/revocation consequences (tracker-only today); FR59 ≤5 min yank sync + vetter-origin propagation; FR13 quarantine isolation | `epic-20:76-79`; `sprint-status.yaml:289`; `17-1…md:143` |
@@ -169,7 +169,7 @@ See `epics/requirements-inventory.md` § "Routing audit corrections (2026-10-22)
 | FR13 | Declared revocation policies | 16-1 | PARTIAL: quarantine lacks isolation | `17-1…md:143` | widen `20-1` |
 | FR16 | Posture shifts within latency floors | 16-1 | PARTIAL | `16-1…md:378-382`; `epic-20:190` | `20-7` |
 | FR24 | Postures and preserved intent provenance | 16-1 | PARTIAL | `16-1…md:378-382` | widen `19-1` |
-| FR51 | Bounded director interruption, preservation, recall, revocation | 16-1 | PARTIAL: (a)(d) absent | `16-1…md:35-42`; `sprint-status.yaml:284,481-483` | widen `19-2` |
+| FR51 | Bounded director interruption, preservation, recall, revocation | 16-1 | PARTIAL: (a)(d) absent | `16-1…md:35-42`; `sprint-status.yaml:284,481-483` | widen `19-2` — done 2026-10-28 (D-19-2-01 B) |
 | FR10 | State/token-preserving upgrades, both forms | 16-1 | PARTIAL: subprocess parity unclaimed | `16-1…md:478-486` | ADD `19-5` |
 | FR11 | Reject archived predecessor without migrator | 16-1 | PARTIAL: admission lacks archive check | `05-fr1-20-scout.md:13` | ADD `19-5` |
 | FR49 | Hot, cold, migrator upgrade policies | 16-1 | PARTIAL: `ColdSwapUnsupported` | `16-1…md:43-46,484-486` | ADD `19-5` |

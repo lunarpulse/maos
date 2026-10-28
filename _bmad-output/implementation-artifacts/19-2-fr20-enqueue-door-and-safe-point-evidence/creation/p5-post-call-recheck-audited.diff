@@ -1,0 +1,38 @@
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -443,7 +443,12 @@
+             }
+         }
+ 
+-        result
++        // Story 19-2 (FR51 a/d) — re-checked after the call: a token revoked,
++        // or a Spirit paused, while the request was on the wire fails closed
++        // here; the paid completion stays journaled above but is not returned.
++        let response = result?;
++        self.check_capability(&req.capability_token, provider_id)?;
++        Ok(response)
+     }
+ }
+ 
+--- a/crates/maos-kernel-core/src/mcp/mod.rs
++++ b/crates/maos-kernel-core/src/mcp/mod.rs
+@@ -134,6 +134,19 @@
+                 .record_iac_rt(Service::Capability, Outcome::Ok, duration_us);
+         }
+ 
++        // Story 19-2 (FR51 a/d) — re-checked after the call: a token revoked,
++        // or a Spirit paused, mid-call fails closed; the journaled remote
++        // effect is not undone, but nothing builds on its response.
++        self.capability
++            .verify_and_audit(
++                token,
++                [0u8; 32],
++                maos_domain::invariants::i9::SandboxTier(0),
++            )
++            .map_err(|_e| McpError::CapabilityDenied {
++                server: server.into(),
++                tool: tool.into(),
++            })?;
+         Ok(response)
+     }
+ }

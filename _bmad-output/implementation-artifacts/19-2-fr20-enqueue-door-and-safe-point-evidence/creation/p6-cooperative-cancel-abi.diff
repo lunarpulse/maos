@@ -1,0 +1,133 @@
+--- a/crates/maos-spirit-abi/src/ctx.rs
++++ b/crates/maos-spirit-abi/src/ctx.rs
+@@ -208,6 +208,22 @@
+             deprecation_warnings: Vec::new(),
+         }
+     }
++
++    /// Story 19-2 (FR51 a) — [`Self::for_rust_inproc_hook`] with the kernel's
++    /// per-Spirit pause signal, so a hook polling `cancellation()` stops
++    /// cooperatively when the director pauses it.
++    pub fn for_rust_inproc_hook_cancellable(
++        capability_handle: CapabilityHandle,
++        mailbox_handle: MailboxHandle,
++        cancellation: &'static dyn CancellationSignal,
++    ) -> Self {
++        Self {
++            cancellation,
++            capability_handle,
++            mailbox_handle,
++            deprecation_warnings: Vec::new(),
++        }
++    }
+ }
+ 
+ impl core::fmt::Debug for Ctx {
+--- a/crates/maos-kernel-core/src/scheduler/control_block.rs
++++ b/crates/maos-kernel-core/src/scheduler/control_block.rs
+@@ -284,6 +284,25 @@
+     sandbox_report: RwLock<Option<SandboxInspectReport>>,
+     /// The only hot-swappable portion of a control block.
+     runtime: Arc<RwLock<ScbRuntimeSnapshot>>,
++    /// Story 19-2 (FR51 a) — the pause signal every in-proc hook's `Ctx`
++    /// carries; leaked once per control block (`Ctx` holds `&'static`).
++    pub pause_signal: &'static PauseSignal,
++}
++
++/// Story 19-2 (FR51 a) — set by `pause`, cleared by `resume`.
++#[derive(Debug, Default)]
++pub struct PauseSignal(std::sync::atomic::AtomicBool);
++
++impl PauseSignal {
++    pub fn set(&self, paused: bool) {
++        self.0.store(paused, Ordering::Release);
++    }
++}
++
++impl maos_spirit_abi::cancellation::CancellationSignal for PauseSignal {
++    fn is_cancelled(&self) -> bool {
++        self.0.load(Ordering::Acquire)
++    }
+ }
+ 
+ impl std::fmt::Debug for SpiritControlBlock {
+@@ -361,6 +380,7 @@
+                 on_revocation_action,
+                 sandbox_tier: SandboxTier::default(),
+             })),
++            pause_signal: Box::leak(Box::default()),
+         }
+     }
+     /// Record the report emitted by actual T3 admission/spawn work.
+--- a/crates/maos-kernel-core/src/scheduler/hook_dispatch.rs
++++ b/crates/maos-kernel-core/src/scheduler/hook_dispatch.rs
+@@ -374,13 +374,15 @@
+         let runtime = scb.runtime_cell();
+ 
+         let spirit_pid = scb.pid;
++        let pause_signal = scb.pause_signal;
+         let spirits = self.spirits.clone();
+         let snapshot_future = timeout(
+             Duration::from_secs(cap_seconds),
+             tokio::task::spawn_blocking(move || {
+-                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
++                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook_cancellable(
+                     maos_spirit_abi::ctx::CapabilityHandle(0),
+                     maos_spirit_abi::ctx::MailboxHandle(0),
++                    pause_signal,
+                 );
+                 let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
+                 if let Some(ref s) = spirits {
+@@ -459,13 +461,15 @@
+         let predecessor_state = predecessor_state.to_vec();
+ 
+         let spirit_pid = scb.pid;
++        let pause_signal = scb.pause_signal;
+         let spirits = self.spirits.clone();
+         let migrate_future = timeout(
+             Duration::from_secs(cap_seconds),
+             tokio::task::spawn_blocking(move || {
+-                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
++                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook_cancellable(
+                     maos_spirit_abi::ctx::CapabilityHandle(0),
+                     maos_spirit_abi::ctx::MailboxHandle(0),
++                    pause_signal,
+                 );
+                 let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
+                 if let Some(ref s) = spirits {
+@@ -567,13 +571,15 @@
+         let payload = payload.to_vec(); // clone for 'static closure
+ 
+         let spirit_pid = scb.pid;
++        let pause_signal = scb.pause_signal;
+         let spirits = self.spirits.clone();
+         let hook_future = timeout(
+             Duration::from_secs(cap_seconds),
+             tokio::task::spawn_blocking(move || {
+-                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook(
++                let mut ctx = maos_spirit_abi::ctx::Ctx::for_rust_inproc_hook_cancellable(
+                     maos_spirit_abi::ctx::CapabilityHandle(0),
+                     maos_spirit_abi::ctx::MailboxHandle(0),
++                    pause_signal,
+                 );
+                 let mut kernel_ctx = KernelCtx::new(&mut ctx).with_spirit_pid(spirit_pid);
+                 if let Some(ref s) = spirits {
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -454,6 +454,8 @@
+             FrameOrigin::SpiritAuto,
+         );
+ 
++        // Story 19-2 (FR51 a) — in-flight in-proc hooks see `is_cancelled()`.
++        scb.pause_signal.set(true);
+         let outcome = self.dispatcher.fire_on_pause(&scb).await;
+         self.check_hook_outcome("on_pause", spirit_pid, outcome)?;
+ 
+@@ -481,6 +483,7 @@
+             FrameOrigin::SpiritAuto,
+         );
+ 
++        scb.pause_signal.set(false);
+         // Story 3.4 — replay buffered Orchestrator instructions.
+         if let Some(ref registry) = self.orchestrator_registry {
+             use maos_spirit_abi::identity::SpiritId;

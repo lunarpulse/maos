@@ -1,0 +1,17 @@
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+@@ -283,6 +283,14 @@
+         !self.lock().kill_failed
+     }
+ 
++    /// Story 19-2 (FR51 a/b) — freeze (`podman pause`) or thaw (`podman
++    /// unpause`) the CID's cgroup, bounded like [`Self::kill`]. A frozen
++    /// Worker keeps its state and takes no further step until thawed.
++    pub fn set_frozen(&self, frozen: bool, by: Instant) -> bool {
++        let verb = if frozen { "pause" } else { "unpause" };
++        invoke_bounded(&self.runtime.path, &[verb, &self.cid], &[], by).succeeded()
++    }
++
+     /// Preserve an owning caller's absolute deadline for any Drop/join that
+     /// races its teardown request.
+     pub fn constrain_teardown_deadline(&self, deadline: Instant) {

@@ -1,0 +1,49 @@
+{
+ "measured_at": "d9bd59c4 (clean tree except siblings' untracked evidence dirs)",
+ "date": "2026-10-28",
+ "instrument": "tokei 14.0.0 with the exact argv of xtask/src/kloc_check.rs:294-318 (summing per-file Rust code by crates/<name> or top-level dir) — NOT `cargo run -p xtask -- kloc-check --json` (no cargo run by this creator; the parent confirms, Measurements owed #1)",
+ "aggregate_code": 189877,
+ "crates": {
+  "maos-bin": 30380,
+  "maos-control": 1442,
+  "maos-cli": 6317,
+  "maos-shell": 613,
+  "maos-bench": 2451,
+  "xtask": 47451,
+  "maos-a2a-core": 5037,
+  "maos-kernel-core": 20619,
+  "maos-domain": 9975,
+  "maos-iac": 8270,
+  "maos-journey-test": 946
+ },
+ "pins": {
+  "maos-bin": "30380 exact (xtask/kloc.toml:517)",
+  "maos-control": "1791 reserved ceiling (:484)",
+  "maos-cli": "6856 reserved ceiling (:489)",
+  "maos-shell": "613 exact (:691)",
+  "maos-domain": "9975 exact (:425)",
+  "maos-kernel-core": "20619 exact (:264)",
+  "xtask": "47451 exact (:339)",
+  "maos-bench": "2451 exact (:520)",
+  "_aggregate_hardfail": "189878 (:718)"
+ },
+ "kernel_physical": "26378 = git-tracked crates/maos-kernel-core/src/**/*.rs `xargs cat | wc -l`; pin xtask/kernel-core-baseline.toml:505",
+ "files_touched_candidates": {
+  "crates/maos-bin/src/main.rs": 12773,
+  "crates/maos-bin/src/operator_door.rs": 1778,
+  "crates/maos-bin/src/orchestrator_root.rs": 250,
+  "crates/maos-bin/src/butler_root.rs": 167,
+  "crates/maos-control/src/lib.rs": 1442,
+  "crates/maos-cli/src/cli.rs": 523,
+  "crates/maos-cli/src/subcommands.rs": 4912,
+  "crates/maos-shell/src/lib.rs": 613,
+  "crates/maos-kernel-core/src/orchestrator/buffer.rs": 170
+ },
+ "prototype_tokei_replication": {
+  "p0 orchestrator/mod.rs": "67 -> 67 (0); physical 97 -> 97 (0)",
+  "p1 buffer.rs recall(id)": "170 -> 175 (+5); physical 220 -> 229 (+9)",
+  "p2 buffer.rs pending_snapshot()": "170 -> 176 (+6); physical 220 -> 229 (+9)",
+  "p1+p2": "170 -> 181 (+11); physical 220 -> 238 (+18)"
+ },
+ "doc_comment_note": "tokei 14.0.0 on a scratch file: `///` lines are not counted as Rust code (a.rs `/// doc` x2 + `fn a() {}` → code 1, comments 0), `//` lines count as comments — doc text is uncharged"
+}

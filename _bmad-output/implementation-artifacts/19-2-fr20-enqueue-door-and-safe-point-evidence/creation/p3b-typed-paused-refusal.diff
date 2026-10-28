@@ -1,0 +1,33 @@
+--- a/crates/maos-domain/src/ports/capability.rs
++++ b/crates/maos-domain/src/ports/capability.rs
+@@ -144,6 +144,10 @@
+     /// The capability invocation could not be recorded by the audit sink.
+     #[error("audit sink unavailable")]
+     AuditSinkUnavailable,
++    /// Story 19-2 (FR51 a) — the Spirit is paused by the director; every
++    /// mediated action fails closed until resume.
++    #[error("Spirit {spirit_id} is paused by the director")]
++    SpiritPaused { spirit_id: u32 },
+ }
+ 
+ #[cfg(test)]
+--- a/crates/maos-capability/src/cap_audit/mod.rs
++++ b/crates/maos-capability/src/cap_audit/mod.rs
+@@ -108,6 +108,7 @@
+     PostureMismatch,
+     SpiritIdMismatch,
+     UnknownToken,
++    SpiritPaused,
+ }
+ 
+ impl VerifyOutcome {
+@@ -129,6 +130,9 @@
+                 maos_domain::ports::capability::CapError::UnknownToken => {
+                     VerifyOutcome::UnknownToken
+                 }
++                maos_domain::ports::capability::CapError::SpiritPaused { .. } => {
++                    VerifyOutcome::SpiritPaused
++                }
+                 _ => VerifyOutcome::UnknownToken,
+             },
+         }
