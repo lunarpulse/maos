@@ -349,8 +349,11 @@ fn a_pending_halt_before_section_two_stops_dispatch() {
         .map(|ids| ids.iter().filter_map(serde_json::Value::as_str).collect())
         .unwrap_or_default();
     assert_eq!(halt_ids.len(), 1, "the event names the one pending halt");
-    // TI-1 — the halt sits on the Orchestrator's ADMITTED pid, and the
-    // kernel's EpistemicHalt row is journaled at that same pid.
+    // TI-1 — the halt sits on the Orchestrator's ADMITTED pid, and every
+    // kernel EpistemicHalt row for it is journaled at that same pid: the
+    // raise row, plus — because the run unloads the Orchestrator with the
+    // halt still pending — the unload's closure, which journals a
+    // `HaltReceipt` row with `terminal_state: "Terminated"` (D-19-1-09 A).
     let orchestrator = orchestrator_pid(&events);
     assert_eq!(
         halted[0]["orchestrator_pid"].as_u64(),
@@ -361,10 +364,33 @@ fn a_pending_halt_before_section_two_stops_dispatch() {
         .into_iter()
         .filter(|(_, _, payload)| payload["halt_id"].as_str() == Some(halt_ids[0]))
         .collect();
-    assert_eq!(halt_rows.len(), 1, "one EpistemicHalt TL row for the halt");
+    for (frame_id, spirit_pid, payload) in &halt_rows {
+        assert_eq!(
+            *spirit_pid as u64, orchestrator,
+            "EpistemicHalt row {frame_id} for the halt is at the Orchestrator's pid: {payload}"
+        );
+    }
+    let raise_rows = halt_rows
+        .iter()
+        .filter(|(_, _, payload)| payload["terminal_state"].is_null())
+        .count();
     assert_eq!(
-        halt_rows[0].1 as u64, orchestrator,
-        "the EpistemicHalt row's spirit_pid is the Orchestrator's"
+        raise_rows, 1,
+        "exactly one EpistemicHalt raise row (no terminal_state) for the halt: {halt_rows:?}"
+    );
+    let closure_rows = halt_rows
+        .iter()
+        .filter(|(_, _, payload)| payload["terminal_state"] == "Terminated")
+        .count();
+    assert!(
+        closure_rows <= 1,
+        "at most one unload-closure (Terminated) receipt row for the halt: {halt_rows:?}"
+    );
+    assert_eq!(
+        raise_rows + closure_rows,
+        halt_rows.len(),
+        "no EpistemicHalt row for the halt carries a terminal state other than \
+         Terminated (a halted dispatch is never resumed or overridden): {halt_rows:?}"
     );
     assert_eq!(named(&events, "delegation_routed").len(), 1);
     assert_eq!(named(&events, "cli_wrapper_loaded").len(), 1);
