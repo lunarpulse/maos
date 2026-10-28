@@ -2,7 +2,7 @@ name: discipline
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/19x-validate]
   pull_request:
     branches: [main]
 
