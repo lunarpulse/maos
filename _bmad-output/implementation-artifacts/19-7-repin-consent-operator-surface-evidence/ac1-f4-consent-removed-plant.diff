@@ -1,0 +1,64 @@
+--- a/crates/maos-bin/tests/f4_pairing.rs
++++ b/crates/maos-bin/tests/f4_pairing.rs
+@@ -1317,61 +1317,6 @@
+         "the pending request must carry A's published nonce:\n{list_stdout}"
+     );
+ 
+-    // (e) THE CONSENT — the AC1.3 proven-red plant removes exactly this block.
+-    {
+-        let nonce = nonce_a.to_string();
+-        let approve = maosctl_on_door(
+-            &door,
+-            &[
+-                "a2a",
+-                "repin",
+-                "approve",
+-                delegation::FROM_HOST,
+-                "--boot-nonce",
+-                &nonce,
+-                "--actor",
+-                REPIN_ACTOR,
+-            ],
+-        );
+-        let (approve_stdout, approve_stderr) = output_text(&approve);
+-        assert!(
+-            approve.status.success(),
+-            "`maosctl a2a repin approve` must exit 0 (got {:?}); stdout:\n{approve_stdout}\n\
+-             stderr:\n{approve_stderr}",
+-            approve.status.code()
+-        );
+-        let reply: serde_json::Value = serde_json::from_str(approve_stdout.trim())
+-            .unwrap_or_else(|e| panic!("approve must print the decision ({e}):\n{approve_stdout}"));
+-        assert_eq!(
+-            reply["decision"].as_str(),
+-            Some("accepted"),
+-            "{approve_stdout}"
+-        );
+-        assert_eq!(
+-            reply["peer"].as_str(),
+-            Some(delegation::FROM_HOST),
+-            "{approve_stdout}"
+-        );
+-        assert_eq!(
+-            reply["boot_nonce"].as_str(),
+-            Some(nonce.as_str()),
+-            "{approve_stdout}"
+-        );
+-        let approval_id = reply["approval_id"]
+-            .as_str()
+-            .filter(|id| id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()))
+-            .unwrap_or_else(|| {
+-                panic!("approve must print a 16-byte hex approval id:\n{approve_stdout}")
+-            });
+-        // CR-2: the I4 row is written BEFORE the pin moves, so before this 200.
+-        assert!(
+-            repin_approval_rows(&fixture.host_b_log)
+-                .iter()
+-                .any(|row| row.4.contains(&format!("approval_id={approval_id}"))),
+-            "B's Approval Decision Log must hold the approval {approval_id} the door answered"
+-        );
+-    }
+-
+     // (f) A's next re-send of the SAME frame ACKs; A exits 0, routed cross-host.
+     let exit_deadline = Instant::now() + Duration::from_secs(REPIN_HOLD_SECS + 15);
+     let mut status = None;

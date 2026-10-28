@@ -4,9 +4,9 @@
 //! through the production binary, each run on a fresh data home (the FR21
 //! 60 s proxy is per data home).
 //!
-//! * The three-Worker run and the pending-halt plant need the signed T3
-//!   substrate (`require_t3`: a named local skip, never a green skip on a
-//!   declared-capable runner).
+//! * The three-Worker run, the pending-halt plant and the failing-second-
+//!   Worker run need the signed T3 substrate (`require_t3`: a named local
+//!   skip, never a green skip on a declared-capable runner).
 //! * Every refusal fires before any Worker is spawned, so those vectors run
 //!   everywhere: they read stderr and the Transparency Log, never a skip.
 //!
@@ -21,8 +21,10 @@ mod t3_substrate;
 
 const EPIC_TOPOLOGY: &str = "spirits/topologies/j1-founder-loop-epic.toml";
 const EPIC: &str = "tests/fixtures/j1/epic.md";
-/// `FrameKind::TaskAssign` / `FrameKind::Distillate` (maos-iac TL codes).
+/// `FrameKind::TaskAssign` / `FrameKind::EpistemicHalt` /
+/// `FrameKind::Distillate` (maos-iac TL codes).
 const KIND_TASK_ASSIGN: i64 = 0;
+const KIND_EPISTEMIC_HALT: i64 = 3;
 const KIND_DISTILLATE: i64 = 11;
 
 fn workspace_root() -> &'static str {
@@ -165,6 +167,31 @@ fn hex_of_byte_array(value: &serde_json::Value) -> String {
     hex::encode(bytes)
 }
 
+/// The admitted pid of the topology's `orchestrator` entry, from its
+/// `spirit_loaded` admission event.
+fn orchestrator_pid(events: &[serde_json::Value]) -> u64 {
+    let loaded: Vec<u64> = named(events, "spirit_loaded")
+        .into_iter()
+        .filter(|event| event["spirit_id"].as_str() == Some("orchestrator"))
+        .map(|event| event["pid"].as_u64().expect("spirit_loaded pid"))
+        .collect();
+    assert_eq!(loaded.len(), 1, "one Orchestrator admission: {events:?}");
+    assert_ne!(loaded[0], 0, "the Orchestrator is admitted at a real pid");
+    loaded[0]
+}
+
+/// Accept#9 — every `delegation_completed` leaves the Orchestrator at a
+/// safe point.
+fn assert_completions_at_safe_point(events: &[serde_json::Value]) {
+    for event in named(events, "delegation_completed") {
+        assert_eq!(
+            event["orchestrator_safe_point"].as_bool(),
+            Some(true),
+            "a completed delegation leaves the Orchestrator at a safe point: {event}"
+        );
+    }
+}
+
 /// AC1.1 + AC4.1 — three sections, three Workers, in order; each Worker
 /// distilled at its OWN pid; frames 2 and 3 reference the previous
 /// section's distillate, and the FR21 gate admits them on the real rows.
@@ -230,9 +257,23 @@ fn epic_dispatches_each_section_to_its_worker_with_distillate_fed_followups() {
         .iter()
         .map(|event| event["spirit_pid"].as_u64().expect("spirit_pid"))
         .collect();
+    assert_eq!(
+        worker_pids
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        3,
+        "three distinct Worker SCB pids: {worker_pids:?}"
+    );
 
     let written = named(&events, "distillate_written");
     let distillates = tl_rows(&home, KIND_DISTILLATE);
+    assert_eq!(written.len(), 3, "three distillate_written events");
+    assert_eq!(
+        distillates.len(),
+        3,
+        "three Distillate TL rows: {distillates:?}"
+    );
     for (k, event) in written.iter().enumerate() {
         assert_eq!(event["section"].as_u64(), Some(k as u64 + 1));
         assert_eq!(
@@ -271,6 +312,8 @@ fn epic_dispatches_each_section_to_its_worker_with_distillate_fed_followups() {
         );
         assert!(prior["distillation_depth"].as_u64() >= Some(1));
     }
+    assert_eq!(named(&events, "delegation_completed").len(), 3);
+    assert_completions_at_safe_point(&events);
     assert!(named(&events, "dispatch_halted").is_empty());
 }
 
@@ -301,11 +344,27 @@ fn a_pending_halt_before_section_two_stops_dispatch() {
         serde_json::json!([2, 3])
     );
     assert_eq!(halted[0]["dispatched_sections"].as_u64(), Some(1));
-    assert!(
-        halted[0]["halt_ids"]
-            .as_array()
-            .is_some_and(|ids| !ids.is_empty()),
-        "the event names the pending halt"
+    let halt_ids: Vec<&str> = halted[0]["halt_ids"]
+        .as_array()
+        .map(|ids| ids.iter().filter_map(serde_json::Value::as_str).collect())
+        .unwrap_or_default();
+    assert_eq!(halt_ids.len(), 1, "the event names the one pending halt");
+    // TI-1 — the halt sits on the Orchestrator's ADMITTED pid, and the
+    // kernel's EpistemicHalt row is journaled at that same pid.
+    let orchestrator = orchestrator_pid(&events);
+    assert_eq!(
+        halted[0]["orchestrator_pid"].as_u64(),
+        Some(orchestrator),
+        "dispatch_halted names the admitted Orchestrator pid"
+    );
+    let halt_rows: Vec<_> = tl_rows(&home, KIND_EPISTEMIC_HALT)
+        .into_iter()
+        .filter(|(_, _, payload)| payload["halt_id"].as_str() == Some(halt_ids[0]))
+        .collect();
+    assert_eq!(halt_rows.len(), 1, "one EpistemicHalt TL row for the halt");
+    assert_eq!(
+        halt_rows[0].1 as u64, orchestrator,
+        "the EpistemicHalt row's spirit_pid is the Orchestrator's"
     );
     assert_eq!(named(&events, "delegation_routed").len(), 1);
     assert_eq!(named(&events, "cli_wrapper_loaded").len(), 1);
@@ -314,6 +373,94 @@ fn a_pending_halt_before_section_two_stops_dispatch() {
         1,
         "no task.assign after the halt"
     );
+    assert_completions_at_safe_point(&events);
+}
+
+/// TI-3 — the second Worker exits non-zero (`--maos-fixture-mode=exit-nonzero`,
+/// the known-admitting fixture shape): section 1's distillate stands, no
+/// second distillate is written, section 3 is never assigned, and the run
+/// fails.
+#[test]
+fn a_failing_second_worker_stops_the_epic_after_section_one() {
+    if !t3_substrate::require_t3("epic failing second Worker") {
+        return;
+    }
+    let home = data_home("fail-two");
+    let failing = home.0.join("worker-exit-nonzero.toml");
+    std::fs::write(
+        &failing,
+        "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
+         argv_prefix = [\"--maos-worker\", \"--maos-fixture-mode=exit-nonzero\"]\n\
+         output_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\n\
+         recovery_policy = \"respawn_fresh\"\n\n[cli_wrapper.posture]\n\
+         stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
+         shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n\
+         [author]\nname = \"MAOS Project\"\n",
+    )
+    .expect("write failing Worker manifest");
+    let topology = home.0.join("epic-second-fails.toml");
+    std::fs::write(
+        &topology,
+        format!(
+            "[topology]\nname = \"epic-second-fails-19-1\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/orchestrator/manifest.toml\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/architect/manifest.toml\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/reviewer/manifest.toml\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
+             host = \"developer-remote-host\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{failing}\"\nhost = \"developer-remote-host\"\n\n\
+             [[topology.spirits]]\nmanifest = \"{root}/spirits/worker/manifest.toml\"\n\
+             host = \"developer-remote-host\"\n",
+            root = workspace_root(),
+            failing = failing.display()
+        ),
+    )
+    .expect("write topology");
+    let output = run_maos(
+        &home,
+        &[topology.to_str().expect("utf-8 path"), "--epic", EPIC],
+        &[],
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "a Worker that does not complete must fail the epic run; stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("did not complete"),
+        "the refusal names the Worker's non-completion; stderr:\n{stderr}"
+    );
+    let events = events(&output);
+    let written = named(&events, "distillate_written");
+    assert_eq!(written.len(), 1, "only section 1 is distilled: {events:?}");
+    assert_eq!(written[0]["section"].as_u64(), Some(1));
+    let digest = written[0]["digest_frame_id"]
+        .as_str()
+        .expect("digest_frame_id");
+    let distillates = tl_rows(&home, KIND_DISTILLATE);
+    assert_eq!(
+        distillates.len(),
+        1,
+        "one Distillate TL row: {distillates:?}"
+    );
+    assert_eq!(
+        distillates[0].0, digest,
+        "section 1's distillate row exists"
+    );
+    assert_eq!(
+        Some(distillates[0].1 as u64),
+        written[0]["producer_pid"].as_u64(),
+        "section 1's distillate sits at its Worker's pid"
+    );
+    assert_eq!(named(&events, "delegation_completed").len(), 1);
+    assert_completions_at_safe_point(&events);
+    let assigns = tl_rows(&home, KIND_TASK_ASSIGN);
+    assert_eq!(
+        assigns.len(),
+        2,
+        "sections 1 and 2 were assigned and section 3 never was: {assigns:?}"
+    );
+    assert!(named(&events, "dispatch_halted").is_empty());
 }
 
 /// AC1.6 — the proven-red split: the fixture with its second heading

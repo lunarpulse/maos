@@ -862,12 +862,12 @@ fn declared_providers(gated: &maos_bin::admission::GatedManifest) -> Vec<String>
 /// Story 18-1 / 18-3 — the door-staged TARGET manifest, gated (its declared
 /// providers name a successor's token).
 #[cfg(feature = "network")]
-fn gate_staged(staged: &std::path::Path) -> Option<maos_bin::admission::GatedManifest> {
+fn gate_staged(staged: &std::path::Path) -> Result<maos_bin::admission::GatedManifest, String> {
     maos_bin::admission::read_manifest(staged)
         .and_then(|text| {
             maos_bin::admission::gate_manifest(&text, &|name| classify_spirit(name).is_some())
         })
-        .ok()
+        .map_err(|refusal| format!("staged manifest {}: {refusal}", staged.display()))
 }
 
 /// Story 16-1 (D-16-1-W) — re-parse `[epistemic_policy]` from the TARGET
@@ -963,7 +963,7 @@ type ResearcherSlot = Arc<std::sync::Mutex<Option<maos_bin::researcher_root::Res
 /// inference bindings, mira's boot-loud scalar transport) that only exist in
 /// that composition root.
 ///
-/// `butler_manifest` is the target manifest path: a faithful butler re-parses
+/// `target_manifest` is the target manifest path: a faithful butler re-parses
 /// `[epistemic_policy]` from the file, because `SpiritManifestBundle` carries
 /// no such section and widening it is a kernel byte. A bare `Butler::new()`
 /// silently loses the halt.
@@ -971,7 +971,7 @@ type ResearcherSlot = Arc<std::sync::Mutex<Option<maos_bin::researcher_root::Res
 fn build_spirit_obj(
     deps: &SpiritBuildDeps,
     class_name: &str,
-    butler_manifest: Option<&std::path::Path>,
+    target_manifest: Option<&std::path::Path>,
 ) -> Result<Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>, String> {
     use maos_kernel_core::scheduler::make_spirit_obj;
 
@@ -1001,10 +1001,9 @@ fn build_spirit_obj(
                 .unwrap_or_else(|error| error.into_inner())
                 .clone()
                 .ok_or("butler seam not ready")?;
-            let declared = butler_manifest
-                .and_then(gate_staged)
-                .map(|gated| declared_providers(&gated))
-                .unwrap_or_default();
+            let staged = target_manifest
+                .ok_or("orchestrator requires the target manifest for its declared providers")?;
+            let declared = declared_providers(&gate_staged(staged)?);
             let (id, scheduler) = (class_name.to_owned(), Arc::clone(&deps.scheduler));
             let pid_of: ::orchestrator::PidSource = Arc::new(move || scheduler.resolve_pid(&id));
             make_spirit_obj(maos_bin::orchestrator_root::construct(
@@ -1026,7 +1025,7 @@ fn build_spirit_obj(
         // resolved pid, the `--live` MCP + recall ports, the TARGET manifest's
         // declared provider (or the legacy cassette's replay port).
         LoadedSpiritKind::Researcher => {
-            let staged = butler_manifest
+            let staged = target_manifest
                 .ok_or("researcher requires the target manifest to re-parse [epistemic_policy]")?;
             let policy = read_butler_epistemic_policy(staged).map_err(|e| e.to_string())?;
             let (id, scheduler) = (class_name.to_owned(), Arc::clone(&deps.scheduler));
@@ -1048,7 +1047,8 @@ fn build_spirit_obj(
                 .unwrap_or_else(|error| error.into_inner())
                 .clone()
                 .ok_or("butler seam not ready")?;
-            let gated = gate_staged(staged).ok_or("researcher staged manifest is unavailable")?;
+            let gated = gate_staged(staged)
+                .map_err(|e| format!("researcher staged manifest is unavailable: {e}"))?;
             let declared = declared_providers(&gated);
             let wiring = deps
                 .researcher
@@ -1086,7 +1086,7 @@ fn build_spirit_obj(
             Arc::clone(&deps.activity_sink),
         )),
         LoadedSpiritKind::Butler => {
-            let staged = butler_manifest
+            let staged = target_manifest
                 .ok_or("butler requires the target manifest to re-parse [epistemic_policy]")?;
             let policy = read_butler_epistemic_policy(staged).map_err(|e| e.to_string())?;
             let successor_id = class_name.to_owned();
@@ -1102,6 +1102,7 @@ fn build_spirit_obj(
             // The token names the TARGET manifest's first declared provider.
             let declared = || {
                 gate_staged(staged)
+                    .ok()
                     .as_ref()
                     .and_then(first_declared_provider)
             };
@@ -2798,6 +2799,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This is the paid path, and it is the only place where an absent
     // `MAOS_DELEGATED_GOAL` must fail closed rather than fall back.
     let cross_host_arm_active = cross_host_delegation_router.is_some();
+    // Story 19-1 (D-19-1-02 A) — `--epic` is refused on the cross-host arm HERE,
+    // before the boot-nonce row, its banner and the pairing hold below.
+    maos_bin::orchestrator_root::refuse_epic_on_cross_host(
+        run_args.as_ref().is_some_and(|run| run.epic.is_some()),
+        cross_host_arm_active,
+    )?;
     // ── j1-crosshost-2e AC5 (F4) — THE PAIRING RENDEZVOUS ────────────────────
     //
     // The documented procedure was not merely undocumented, it was TOPOLOGICALLY
@@ -4654,23 +4661,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     orchestrator::Orchestrator,
                     Arc<std::sync::atomic::AtomicU32>,
                 )> = None;
-                // Story 19-1 (D-19-1-02/03 A) — the epic is read and split before
+                // Story 19-1 (D-19-1-02/03 A) — the dispatch plan (the `--epic`
+                // split; the loopback refusals of a set MAOS_DELEGATED_GOAL and of
+                // several host-bearing Workers without `--epic`) is decided before
                 // ANY entry loads, so every refusal precedes every emit: section k
                 // goes to the k-th host-bearing entry, as the k-th `task.assign`.
-                let epic = match run.epic.as_deref() {
-                    Some(path) => Some(maos_bin::orchestrator_root::load_epic(
-                        std::path::Path::new(path),
-                        topology_entries
-                            .iter()
-                            .filter(|entry| entry.host.is_some())
-                            .count(),
-                        cross_host_arm_active,
-                    )?),
-                    None => None,
-                };
+                let epic = maos_bin::orchestrator_root::dispatch_plan(
+                    run.epic.as_deref().map(std::path::Path::new),
+                    topology_entries
+                        .iter()
+                        .filter(|entry| entry.host.is_some())
+                        .count(),
+                    cross_host_arm_active,
+                    std::env::var_os("MAOS_DELEGATED_GOAL").as_deref(),
+                )?;
                 // The next section's index, the previous section's distillate ref
-                // (FR21: frames 2…N carry it), and whether a pending halt stopped
-                // dispatch (D-19-1-09 A).
+                // (FR21: frames 2…N carry it), and whether dispatch stopped on a
+                // pending halt or an unloaded Orchestrator (D-19-1-09 A).
                 let mut epic_next: usize = 0;
                 let mut epic_prior: Option<maos_domain::frame::PriorDistillateRef> = None;
                 let mut epic_halted = false;
@@ -4746,10 +4753,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // frame; the `SentCrossHost` arm spawns nothing locally.
                         let mut delegation_frame_id: Option<[u8; 16]> = None;
                         let delegated_task = match &entry.host {
+                            // Story 19-1 (D-19-1-09 A) — dispatch stopped (a pending
+                            // halt, or the Orchestrator unloaded): no further Worker
+                            // is admitted, host-bearing or hostless.
+                            _ if epic_halted => continue,
                             None => None,
-                            // Story 19-1 (D-19-1-09 A) — dispatch stopped on a pending
-                            // halt: no further Worker is admitted.
-                            Some(_) if epic_halted => continue,
                             Some(to_host) => {
                                 let Some((emitter, emitter_pid)) = delegation_emitter.as_ref()
                                 else {
@@ -4762,6 +4770,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     )
                                     .into());
                                 };
+                                // D-19-1-04 A — nothing is dispatched from an
+                                // Orchestrator that was never admitted.
+                                let pid = maos_bin::orchestrator_root::admitted_pid(emitter_pid)?;
                                 let intent = maos_domain::invariants::i8::A2AIntent::new(
                                     orchestrator::DELEGATION_CONSENT_INTENT,
                                 );
@@ -4804,11 +4815,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 //     entry, else the rehearsal string. The loopback
                                 //     rehearsal and `demo-j1` set no goal and must stay
                                 //     green; they assert mechanism, not effect. Story
-                                //     19-1 (D-19-1-02 A): a goal set here on loopback is
-                                //     refused, naming `--epic`, never silently dropped.
-                                let operator_goal = std::env::var("MAOS_DELEGATED_GOAL")
-                                    .ok()
-                                    .filter(|goal| !goal.trim().is_empty());
+                                //     19-1 (D-19-1-02 A): a goal set on loopback was
+                                //     refused, naming `--epic`, before any entry loaded
+                                //     (`orchestrator_root::dispatch_plan`).
                                 let section = epic
                                     .as_ref()
                                     .map(|sections| {
@@ -4818,21 +4827,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         )
                                     })
                                     .transpose()?;
-                                let goal = match (operator_goal, cross_host_arm_active, section) {
-                                    (Some(_), false, _) => {
-                                        return Err(
-                                            "maos run: MAOS_DELEGATED_GOAL names a cross-host \
-                                             goal and this run delegates on the loopback arm. On \
-                                             loopback the goal comes from `--epic <file>` (one \
-                                             `### Story` section per host-bearing Worker); unset \
-                                             MAOS_DELEGATED_GOAL and pass --epic instead."
-                                                .to_string()
-                                                .into(),
-                                        );
-                                    }
-                                    (Some(goal), true, _) => goal,
-                                    (None, true, _) => {
-                                        return Err(
+                                let goal = if cross_host_arm_active {
+                                    std::env::var("MAOS_DELEGATED_GOAL")
+                                        .ok()
+                                        .filter(|goal| !goal.trim().is_empty())
+                                        .ok_or(
                                             "maos run: MAOS_DELEGATED_GOAL is required for any \
                                              cross-host delegation and is unset or blank. The \
                                              receiving host — not this one — decides whether a real \
@@ -4841,24 +4840,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                              goal states no task, so a live adapter's completion \
                                              oracle finds no effect evidence and the run fails \
                                              AFTER the agent is billed. Set it to the concrete, \
-                                             bounded task the remote worker must perform."
-                                                .to_string()
-                                                .into(),
-                                        );
-                                    }
-                                    (None, false, Some(section)) => section.text.clone(),
-                                    (None, false, None) => format!(
+                                             bounded task the remote worker must perform.",
+                                        )?
+                                } else if let Some(section) = section {
+                                    section.text.clone()
+                                } else {
+                                    format!(
                                         "founder-loop: execute the delegated assignment from {}",
                                         maos_bin::delegation::FROM_HOST
-                                    ),
+                                    )
                                 };
                                 // Story 19-1 (D-19-1-09 A) — before each `--epic`
-                                // `task.assign`, the Orchestrator's pending halts: one
-                                // stops dispatch here (no frame, no Worker) and the
-                                // run drains normally.
+                                // `task.assign`: a pending halt on the Orchestrator, or
+                                // the Orchestrator no longer resolving to its admitted
+                                // pid (unloaded through the door), stops dispatch here
+                                // (no frame, no Worker) and the run drains normally.
                                 if let Some(section) = section {
-                                    let pid =
-                                        emitter_pid.load(std::sync::atomic::Ordering::Acquire);
                                     maos_bin::orchestrator_root::plant_test_halt(
                                         &transparency_log,
                                         &shared_journal,
@@ -4868,21 +4865,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         boot_nonce,
                                         section.ordinal,
                                     )?;
-                                    let halt_ids =
-                                        maos_bin::orchestrator_root::pending_halts(&halt_registry, pid);
-                                    if !halt_ids.is_empty() {
-                                        let total = epic.as_ref().map_or(0, Vec::len);
-                                        println!(
-                                            "{}",
-                                            serde_json::json!({
-                                                "event": "dispatch_halted",
-                                                "orchestrator_pid": pid,
-                                                "halt_ids": halt_ids,
-                                                "dispatched_sections": section.ordinal - 1,
-                                                "undispatched_sections":
-                                                    (section.ordinal..=total).collect::<Vec<_>>(),
-                                            })
-                                        );
+                                    if let Some(stop) = maos_bin::orchestrator_root::dispatch_stop(
+                                        &halt_registry,
+                                        pid,
+                                        scheduler.resolve_pid(maos_bin::delegation::FROM_SPIRIT),
+                                        section.ordinal,
+                                        epic.as_ref().map_or(0, Vec::len),
+                                    ) {
+                                        println!("{stop}");
                                         epic_halted = true;
                                         continue;
                                     }
@@ -5102,6 +5092,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 )?;
                                 let prior = maos_bin::orchestrator_root::write_section_distillate(
                                     &*distillate_writer,
+                                    &transparency_log,
                                     section,
                                     &worker_run,
                                 )?;
@@ -5176,26 +5167,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // context port, and under `--live`/an explicit mode
                                 // the Inference Port with a per-pass mint at the pid
                                 // the load assigns (the fixup below, as Mira's).
-                                let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
-                                let pid_of: orchestrator::PidSource = {
-                                    let binding = Arc::clone(&pid_binding);
-                                    Arc::new(move || {
-                                        Some(binding.load(std::sync::atomic::Ordering::Acquire))
-                                            .filter(|pid| *pid != 0)
-                                    })
-                                };
-                                let seam = butler_seam
-                                    .lock()
-                                    .unwrap_or_else(|error| error.into_inner())
-                                    .clone()
-                                    .ok_or("maos run: butler seam not ready")?;
-                                let loaded = maos_bin::orchestrator_root::construct(
-                                    orchestrator::Orchestrator::new(&spirit_id),
-                                    &seam,
-                                    &declared_providers(&gated),
-                                    pid_of,
-                                )
-                                .map_err(|e| format!("maos run: {e}"))?;
+                                let (loaded, pid_binding) =
+                                    maos_bin::orchestrator_root::construct_at_admitted_pid(
+                                        &spirit_id,
+                                        &butler_seam,
+                                        &declared_providers(&gated),
+                                    )?;
                                 if spirit_id == maos_bin::delegation::FROM_SPIRIT {
                                     delegation_emitter =
                                         Some((loaded.clone(), Arc::clone(&pid_binding)));
@@ -6033,26 +6010,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Some(LoadedSpiritKind::Orchestrator) => {
                         // Story 19-1 (D-19-1-04 A) — the same ONE construction as
                         // the topology arm and the successor factory.
-                        let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
-                        let pid_of: orchestrator::PidSource = {
-                            let binding = Arc::clone(&pid_binding);
-                            Arc::new(move || {
-                                Some(binding.load(std::sync::atomic::Ordering::Acquire))
-                                    .filter(|pid| *pid != 0)
-                            })
-                        };
-                        let seam = butler_seam
-                            .lock()
-                            .unwrap_or_else(|error| error.into_inner())
-                            .clone()
-                            .ok_or("maos run: butler seam not ready")?;
-                        let loaded = maos_bin::orchestrator_root::construct(
-                            orchestrator::Orchestrator::new(&spirit_id),
-                            &seam,
-                            &declared_providers(&gated),
-                            pid_of,
-                        )
-                        .map_err(|e| format!("maos run: {e}"))?;
+                        let (loaded, pid_binding) =
+                            maos_bin::orchestrator_root::construct_at_admitted_pid(
+                                &spirit_id,
+                                &butler_seam,
+                                &declared_providers(&gated),
+                            )?;
                         pid_fixups.push(Box::new(move |pid| {
                             pid_binding.store(pid, std::sync::atomic::Ordering::Release);
                         }));

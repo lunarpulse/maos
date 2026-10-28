@@ -1,0 +1,14 @@
+diff --git a/spirits/orchestrator/src/epic.rs b/spirits/orchestrator/src/epic.rs
+--- a/spirits/orchestrator/src/epic.rs
++++ b/spirits/orchestrator/src/epic.rs
+@@ -124,7 +124,9 @@
+         }
+         let Some(line) = unindent(line) else { continue };
+         match atx_level(line) {
+-            Some(3) => openers.push((start, index + 1, line)),
++            Some(3) if openers.is_empty() || is_story_heading(line) => {
++                openers.push((start, index + 1, line))
++            }
+             Some(1 | 2) if !openers.is_empty() => openers.push((start, index + 1, line)),
+             _ => {}
+         }

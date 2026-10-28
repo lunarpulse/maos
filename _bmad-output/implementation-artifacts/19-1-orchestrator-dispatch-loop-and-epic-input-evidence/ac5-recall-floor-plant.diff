@@ -1,0 +1,11 @@
+--- a/crates/maos-bench/src/halt_eval.rs
++++ b/crates/maos-bench/src/halt_eval.rs
+@@ -134,7 +134,7 @@
+         cassette: Some("crates/maos-journey-test/cassettes/j1/orchestrator-halt-corpus-v0.1.json"),
+         floors: ClassFloors {
+             halt_recall_calendar_conflict: None,
+-            halt_recall_overall: NFR_TEST_4_RECALL_FLOOR,
++            halt_recall_overall: 0.60,
+             halt_precision_overall: HALT_PRECISION_FLOOR,
+         },
+         not_model_driven: None,

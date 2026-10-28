@@ -94,7 +94,11 @@ pub const REPIN_REQUEST_TTL: Duration = Duration::from_secs(300);
 
 /// Story 19-7 — one NFR-Rel-6 restart detection awaiting operator consent.
 /// `pinned_fingerprint` is the invalidated pin's identity, the one a
-/// consented re-pin keeps (D-19-7-04 A).
+/// consented re-pin keeps (D-19-7-04 A). `expired` is computed from the
+/// store's monotonic deadline by [`InMemoryTofuPinStore::pending_repins`];
+/// it is `false` in the value handed to the sink and in the one returned by
+/// [`InMemoryTofuPinStore::record_repin_decision`] (which refuses expired
+/// requests).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepinRequest {
     pub peer: PeerId,
@@ -103,6 +107,7 @@ pub struct RepinRequest {
     pub observed_boot_nonce: u64,
     pub detected_at: SystemTime,
     pub expires_at: SystemTime,
+    pub expired: bool,
 }
 
 /// Story 19-7 / D-19-7-05 A — the operator verdict recorded on a pending
@@ -128,13 +133,20 @@ pub enum RepinDecisionError {
     Expired { peer: String },
 }
 
-/// Story 19-7 / D-19-7-08 A — receives every new restart detection.
+/// Story 19-7 / D-19-7-08 A — receives every new restart detection, in
+/// detection order: it is invoked while the store's `window_lock` is held.
+/// It MUST therefore only hand the request off without blocking (e.g. a
+/// bounded channel `try_send`) and MUST NOT call back into the store — a
+/// blocking sink stalls every pin-lifecycle write, a re-entrant one deadlocks.
 pub type RepinSink = Arc<dyn Fn(&RepinRequest) + Send + Sync>;
 
 struct PendingRepin {
     request: RepinRequest,
     deadline: Instant,
     verdict: Option<RepinVerdict>,
+    /// Edge F4 — a rotation window was open for the peer at (any) detection
+    /// of this request; an approval is then refused by the store.
+    rotating: bool,
 }
 
 /// TOFU pin store trait — the persistence-backed implementation lives in
@@ -225,6 +237,16 @@ pub struct InMemoryTofuPinStore {
     /// written only under `window_lock`. A detection with a different
     /// observed nonce (or after expiry) supersedes the entry, dropping any
     /// recorded verdict; a repeat of the same nonce leaves it untouched.
+    /// No intake path re-detects an invalidated pin: router intake refuses it in
+    /// `verify_pinned` (`-32002`) before `invalidate_if_boot_nonce_differs`
+    /// runs, and over TCP the LISTEN-side TLS verifier
+    /// ([`InMemoryTofuPinStore::find_active_pin_by_fingerprint`]) refuses its
+    /// certificate even earlier. The supersede, repeat and post-expiry branches
+    /// are reachable only by direct store calls (tests); in production no
+    /// further detection occurs for that peer until consent re-activates the
+    /// pin or this host restarts. There is no public pin-removal or
+    /// manual-invalidation API; were one added, it should drop the peer's entry
+    /// here (consent re-checks the pin anyway).
     pending_repins: DashMap<String, PendingRepin>,
     repin_ttl: Duration,
     repin_sink: OnceLock<RepinSink>,
@@ -256,19 +278,26 @@ impl InMemoryTofuPinStore {
     }
 
     /// Story 19-7 / D-19-7-08 A — set-once detection sink, installable on a
-    /// bound (shared) store. Called outside `window_lock`, once per new or
-    /// superseding detection. `false`: one is already installed, `sink` dropped.
+    /// bound (shared) store. Called under `window_lock` (see [`RepinSink`] for
+    /// the non-blocking requirement), once per new or superseding detection,
+    /// so sink rows follow detection order. `false`: one is already
+    /// installed, `sink` dropped.
     #[must_use]
     pub fn install_repin_sink(&self, sink: RepinSink) -> bool {
         self.repin_sink.set(sink).is_ok()
     }
 
-    /// Story 19-7 — every pending request. Expired ones stay listed until
-    /// superseded so a decision on them reads `Expired`, not `NotPending`.
+    /// Story 19-7 — every pending request, `expired` stamped from the
+    /// monotonic deadline. Expired ones stay listed until superseded so a
+    /// decision on them reads `Expired`, not `NotPending`.
     pub fn pending_repins(&self) -> Vec<RepinRequest> {
+        let now = Instant::now();
         self.pending_repins
             .iter()
-            .map(|entry| entry.value().request.clone())
+            .map(|entry| RepinRequest {
+                expired: now >= entry.deadline,
+                ..entry.request.clone()
+            })
             .collect()
     }
 
@@ -723,7 +752,12 @@ impl TofuPinStore for InMemoryTofuPinStore {
     /// [`InMemoryTofuPinStore::record_repin_decision`]. No verdict, an
     /// expired or superseded request, or `new_boot_nonce` other than the
     /// pending observed nonce ⇒ `TimedOut` with nothing changed. A reject
-    /// consumes the request and leaves the pin invalidated.
+    /// consumes the request and leaves the pin invalidated. An approval is
+    /// consumed but refused (`RejectedByStore`, pin untouched) when the pin
+    /// is absent, no longer `Invalidated::SpiritRestarted`, holds a
+    /// fingerprint other than the request's `pinned_fingerprint`, or a
+    /// rotation window was open at detection — a consent never resurrects a
+    /// removed or manually invalidated pin.
     async fn await_repin_consent(
         &self,
         peer: &PeerId,
@@ -731,20 +765,29 @@ impl TofuPinStore for InMemoryTofuPinStore {
         new_boot_nonce: u64,
     ) -> RePinDecision {
         let _guard = self.lock_window();
-        let Some(mut entry) = self.pending_repins.get_mut(peer.as_str()) else {
+        let Some((_, pending)) = self.pending_repins.remove_if(peer.as_str(), |_, pending| {
+            Instant::now() < pending.deadline
+                && pending.request.observed_boot_nonce == new_boot_nonce
+                && pending.verdict.is_some()
+        }) else {
             return RePinDecision::TimedOut;
         };
-        if Instant::now() >= entry.deadline || entry.request.observed_boot_nonce != new_boot_nonce {
-            return RePinDecision::TimedOut;
-        }
-        let Some(verdict) = entry.verdict.take() else {
-            return RePinDecision::TimedOut;
-        };
-        drop(entry);
-        self.pending_repins.remove(peer.as_str());
-        match verdict {
-            RepinVerdict::Reject { reason } => RePinDecision::RejectedByOperator { reason },
-            RepinVerdict::Approve { approval_id } => {
+        match pending.verdict {
+            None => RePinDecision::TimedOut,
+            Some(RepinVerdict::Reject { reason }) => RePinDecision::RejectedByOperator { reason },
+            Some(RepinVerdict::Approve { approval_id }) => {
+                let awaits_consent = self.pins.get(peer.as_str()).is_some_and(|pin| {
+                    pin.fingerprint == pending.request.pinned_fingerprint
+                        && matches!(pin.invalidated, Some(Invalidated::SpiritRestarted { .. }))
+                });
+                if pending.rotating || !awaits_consent {
+                    return RePinDecision::RejectedByStore {
+                        error: EPinMismatch::Invalidated {
+                            peer: peer.as_str().to_string(),
+                            reason: "re-pin refused: pin changed or rotating at detection".into(),
+                        },
+                    };
+                }
                 if let Some(colliding_peer) = self.colliding_peer(peer, new_observed) {
                     return RePinDecision::RejectedByStore {
                         error: EPinMismatch::FingerprintCollision {
@@ -780,13 +823,15 @@ impl TofuPinStore for InMemoryTofuPinStore {
     /// a concurrent intake racing the same peer cannot interleave between the
     /// check and the act (the TOCTOU the router's prior `get_pin` + separate
     /// `invalidate_for_restart` exposed). Story 19-7: the pending re-pin
-    /// request is recorded under the same `window_lock` acquisition.
+    /// request is recorded, and the sink invoked, under the same
+    /// `window_lock` acquisition; whether a rotation window was open is read
+    /// before the window is cleared.
     async fn invalidate_if_boot_nonce_differs(
         &self,
         peer: &PeerId,
         observed_boot_nonce: u64,
     ) -> Result<Option<u64>, A2AError> {
-        let guard = self.lock_window();
+        let _guard = self.lock_window();
         let Some(mut entry) = self.pins.get_mut(peer.as_str()) else {
             return Ok(None);
         };
@@ -805,15 +850,16 @@ impl TofuPinStore for InMemoryTofuPinStore {
         }
         let pinned_fingerprint = entry.fingerprint.clone();
         drop(entry);
-        self.rotation_next.remove(peer.as_str());
+        let rotating = self.rotation_next.remove(peer.as_str()).is_some();
         let now = Instant::now();
-        let fresh = self
-            .pending_repins
-            .get(peer.as_str())
-            .is_none_or(|pending| {
+        let (fresh, rotating) = match self.pending_repins.get(peer.as_str()) {
+            Some(pending) => (
                 pending.request.observed_boot_nonce != observed_boot_nonce
-                    || now >= pending.deadline
-            });
+                    || now >= pending.deadline,
+                rotating || pending.rotating,
+            ),
+            None => (true, rotating),
+        };
         let detected = fresh.then(|| {
             let detected_at = SystemTime::now();
             let request = RepinRequest {
@@ -823,17 +869,18 @@ impl TofuPinStore for InMemoryTofuPinStore {
                 observed_boot_nonce,
                 detected_at,
                 expires_at: detected_at + self.repin_ttl,
+                expired: false,
             };
             let pending = PendingRepin {
                 request: request.clone(),
                 deadline: now + self.repin_ttl,
                 verdict: None,
+                rotating,
             };
             self.pending_repins
                 .insert(peer.as_str().to_string(), pending);
             request
         });
-        drop(guard);
         if let (Some(request), Some(sink)) = (detected, self.repin_sink.get()) {
             sink(&request);
         }

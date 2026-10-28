@@ -1,0 +1,12 @@
+diff --git a/crates/maos-bin/src/orchestrator_root.rs b/crates/maos-bin/src/orchestrator_root.rs
+--- a/crates/maos-bin/src/orchestrator_root.rs
++++ b/crates/maos-bin/src/orchestrator_root.rs
+@@ -212,7 +212,7 @@
+         .filter(|(_, state)| *state == HaltState::PendingResolution)
+         .map(|(id, _)| id.as_str().to_owned())
+         .collect();
+-    (unloaded || !halt_ids.is_empty()).then(|| {
++    (unloaded || false).then(|| {
+         serde_json::json!({
+             "event": "dispatch_halted",
+             "orchestrator_pid": pid,

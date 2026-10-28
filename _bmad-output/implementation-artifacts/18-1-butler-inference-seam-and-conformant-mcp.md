@@ -196,7 +196,7 @@ AC4 is an existing gate (`check-model-currency`), no plant. In CI: `epic-18-exit
 ### Tests and commands
 
 ```bash
-# local (agent shell exports CI=true); one cargo process; CARGO_TARGET_DIR=/mnt/build/cargo
+# local (agent shell exports CI=true); one cargo per checkout; inherit CARGO_TARGET_DIR (MAOS default /mnt/build/cargo-maos; worktree uses its dedicated target); never override to /mnt/build/cargo
 env -u CI -u GITHUB_ACTIONS cargo run --locked -p xtask -- build-test-fixtures
 env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p butler -p researcher -p maos-digest
 env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test butler_inference_18_1 --test butler_digest_18_1 \

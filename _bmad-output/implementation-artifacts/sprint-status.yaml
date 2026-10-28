@@ -334,7 +334,7 @@ development_status:
   ops-live-worker-under-17-1-profile: backlog  # live claude/codex Worker under the 17-1 egress-proxy profile: vendor key + signed T3 image (t3-image.lock + trust anchor); never in CI
   ops-nightly-cassette-rerecord: backlog  # nightly MAOS_INFERENCE_MODE=record leg with a provider key refreshes the 15-6/18-x cassettes; provenance live-record; never gating
   ops-google-calendar-oauth-mcp: backlog  # Google Calendar MCP with real OAuth for Butler (18-1); CI uses the conformant fixture server only
-  ops-j1-live-agent-signed-take: backlog  # demo-j1 --live-codex paid take that earns the tier2-live-agent-signed beat (19-4); PROVEN_LIVE_SIGNED stays operator-only
+  ops-j1-live-agent-signed-take: backlog  # demo-j1 --live-codex paid take that earns the tier2-live-agent-signed beat (19-4); PROVEN_LIVE_SIGNED stays operator-only; since 19-1 (2026-10-28) --live also needs a registered anthropic or openai provider for the Orchestrator's inference seam
   ops-j4-live-incident-recording: backlog  # paid recording of Mira/Nash model turns for the J4 incident corpus (21-1); the hermetic leg replays it
   ops-rc-signed-tag: backlog  # tag v1.0.0-rc.1 after 20-5 lands and ops-provisioning records the secrets; acceptance: release.yml green with prerelease: true, .deb + air-gap variant attached (moved out of the Epic-20 exit block, rule 2)
   ops-live-gemini-leg: backlog  # paid recording of the Gemini cassette for 20-4 with a real key; the hermetic exit replays it; never in CI

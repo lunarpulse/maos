@@ -1,0 +1,18 @@
+diff --git a/crates/maos-a2a-core/src/tofu.rs b/crates/maos-a2a-core/src/tofu.rs
+--- a/crates/maos-a2a-core/src/tofu.rs
++++ b/crates/maos-a2a-core/src/tofu.rs
+@@ -768,11 +768,12 @@
+         let Some((_, pending)) = self.pending_repins.remove_if(peer.as_str(), |_, pending| {
+             Instant::now() < pending.deadline
+                 && pending.request.observed_boot_nonce == new_boot_nonce
+-                && pending.verdict.is_some()
+         }) else {
+             return RePinDecision::TimedOut;
+         };
+-        match pending.verdict {
++        match Some(pending.verdict.unwrap_or(RepinVerdict::Approve {
++            approval_id: [0; 16],
++        })) {
+             None => RePinDecision::TimedOut,
+             Some(RepinVerdict::Reject { reason }) => RePinDecision::RejectedByOperator { reason },
+             Some(RepinVerdict::Approve { approval_id }) => {

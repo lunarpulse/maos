@@ -1163,7 +1163,9 @@ fn output_text(output: &std::process::Output) -> (String, String) {
 /// pre-pair it and A's first contact is a detected restart. A
 /// (`maos run --once`, cross-host arm, re-pin hold armed by
 /// `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS`) holds and re-sends the SAME frame;
-/// only `maosctl a2a repin approve` on B's door lets it ACK — no B restart.
+/// the operator approves only after A has narrated two re-sends refused at
+/// B's TLS layer (B no longer trusts A's invalidated pin) while still holding,
+/// and only `maosctl a2a repin approve` on B's door lets it ACK — no B restart.
 ///
 /// Proven red (AC1.3, planted in place by the parent): remove the CONSENT
 /// block below and A's hold expires after `REPIN_HOLD_SECS`, A exits non-zero,
@@ -1277,6 +1279,27 @@ fn restart_refusal_is_repinned_by_operator_consent_then_delivered() {
             "the detection row must carry {field}: {detection_payload}"
         );
     }
+    // (c2) The hold HOLDS: B's first refusal invalidated its pin for A, so B's
+    // listen-side TLS verifier now refuses A's certificate and every re-send
+    // fails as a transport failure, not as `-32002`. A must keep holding
+    // through at least two such refused re-sends (at +1 s and +3 s: the hold
+    // backs off 1 s, 2 s, 4 s, …) before consent; the next lands at +7 s, then
+    // +15 s, both inside `REPIN_HOLD_SECS`.
+    let refused_frame_hex = refusal_line
+        .split(" refused frame ")
+        .nth(1)
+        .and_then(|rest| rest.split(' ').next())
+        .unwrap_or_else(|| panic!("the hold banner must name the refused frame:\n{held}"));
+    let second_refusal = format!(
+        "maos: re-pin hold — re-send 2 of frame {refused_frame_hex} refused by peer {}; \
+         still holding: cross-host transport failure for peer ",
+        delegation::TO_HOST
+    );
+    let holding = wait_for_output(&a_pipes, &second_refusal);
+    assert!(
+        holding.contains(&second_refusal),
+        "host A must survive two TLS-refused re-sends, holding: `{second_refusal}`:\n{holding}"
+    );
     assert!(
         host_a.0.try_wait().expect("poll host A").is_none(),
         "host A must still be holding before consent:\n{}",

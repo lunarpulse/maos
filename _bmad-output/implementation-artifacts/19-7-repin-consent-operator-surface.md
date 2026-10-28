@@ -110,6 +110,8 @@ Not-recommended deltas: D-09 B −40–70 (maos-bin); D-08 B −10–15 (a2a-cor
 | aggregate | 188504 / 188505 | 190055 (derived, +1550; `:49`) | 1185 + kernel 9 | 283–440 | **no** — the +1550 excludes 19-7 |
 | Cumulative consumed at creation | | | | | 0 in every row (no 19-x landed) |
 
+**kloc record — E19 envelope raise (RULED 2026-10-28, Lunarpulse, ask `e19_kloc`: "Raise the envelope now"; `epics/epic-19-founder-loop-w4.md:40-48,138`).** 19-7 landed ≈ +403 maos-bin against its forecast +115–190 (19-1 ≈ +386 vs 205, Accept19x1 review). Rule: new endpoint = measured after the 19-1/19-7 correction round + Σ of the remaining stories' (19-2…19-6) D19-1 forecasts × 1.3, so 19-2…19-6 keep their original room. Split: maos-bin 30810 → **31166** (+356; measured 30366 + 800 = 615 × 1.3); maos-cli 6318 → **6382** (+64; measured 6317 + 65 = 50 × 1.3); maos-bench 2476 → **2490** (+14; measured 2451 + 39 = 30 × 1.3); aggregate hardfail endpoint 190627 → **191061** (+434 = Σ raises). Unchanged: xtask 47624 (measured 47451 + 169 = 47620 ≤ 47624), maos-control 1539 (1442 + 78 = 1520 ≤ 1539), maos-a2a-core 5039 (measured 5037; no remaining story charges it), maos-shell 626.
+
 ## Decisions — RULED A (all twelve, operator Lunarpulse, 2026-10-28, via ask; recommendations adopted)
 
 | ID | Question | Options | Recommendation and evidence | Status |
@@ -144,7 +146,7 @@ Not-recommended deltas: D-09 B −40–70 (maos-bin); D-08 B −10–15 (a2a-cor
 1. `TofuPinStore::await_repin_consent` (`tofu.rs:128-133`, impl `:612-646`) has a production caller: the door's re-pin handler on the `cohort-a2a-daemon` root, on `runtime.transport.pins()` (`transport.rs:526-528`; installed beside `install_cert_rotation`, `main.rs:11009-11014`). Trait signatures unchanged.
 2. The decision source replaces `test_repin_hook` (`tofu.rs:174-189`, D-19-7-05 A); with no recorded decision the call returns `TimedOut`. An accepted decision re-pins the CURRENT pinned fingerprint (D-19-7-04 A) with the pending observed nonce and `repin_approval_id = Some(id)`; the collision guard and `rotation_next` clear are kept (`:619-642`).
 3. Detection (`invalidate_if_boot_nonce_differs`, `tofu.rs:657-680`, called `router.rs:1355-1358`) records the pending entry atomically under the existing lock order (`window_lock` before any `pins` entry lock, `tofu.rs:169-173`); a later detection supersedes; the entry expires after 300 s (D-19-7-06 A).
-4. Every `with_repin_hook` caller is migrated (clean cutover). Store vectors in `crates/maos-a2a/tests/restart_invalidates_pin_nfr_rel_6.rs` (uncharged): accept re-pins and verifies with the new nonce; wrong nonce, expiry and reject leave the pin invalidated; no decision ⇒ `TimedOut` (scenario 4.5 `:128-145` stays).
+4. Every `with_repin_hook` caller is migrated (clean cutover). Store vectors in `crates/maos-a2a/tests/restart_invalidates_pin_nfr_rel_6.rs` (uncharged): accept re-pins and verifies with the new nonce; wrong nonce, expiry and reject leave the pin invalidated; no decision ⇒ `TimedOut` (`scenario_4_5_operator_timeout`, `:181`, stays; the pending-request default is `repin_19_7_detection_records_one_pending_request_and_no_decision_times_out`, `:222`).
 
 ### AC3 — the authenticated surface (security-critical)
 
@@ -209,7 +211,7 @@ The vector runs in `workspace-test-suite` per D-19-7-10 (T3 substrate; `CI` set 
 |---|---|---|
 | AC1 vector | remove the `maosctl a2a repin approve` call | A exits non-zero after its hold; `log_count_payloads_containing(host_b_log, goal) == 0`; the vector's delivery assertion fails |
 | AC3 nonce binding (route test) | echo N+1 | 409 `repin_nonce_mismatch`; `verify_pinned` still `Invalidated` |
-| AC2 default (existing) | no decision | `TimedOut` (`restart_invalidates_pin_nfr_rel_6.rs:128-145`) |
+| AC2 default (existing) | no decision | `TimedOut` (`repin_19_7_detection_records_one_pending_request_and_no_decision_times_out`, `restart_invalidates_pin_nfr_rel_6.rs:222`) |
 
 ### Tests and commands
 

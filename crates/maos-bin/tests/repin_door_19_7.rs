@@ -13,7 +13,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use maos_a2a_core::tofu::{EPinMismatch, InMemoryTofuPinStore, RePinDecision, TofuPinStore};
+use maos_a2a_core::tofu::{
+    EPinMismatch, InMemoryTofuPinStore, Invalidated, RePinDecision, TofuPinStore,
+};
 use maos_a2a_core::{PeerCertFingerprint, PeerId};
 use maos_bin::repin_door::{
     spawn_detection_journal, RepinControl, REPIN_CAPABILITY, REPIN_INTENT, REPIN_REQUESTED_INTENT,
@@ -171,6 +173,118 @@ async fn an_expired_request_is_a_conflict_and_the_pin_stays_invalidated() {
     assert_eq!(code_of(&outcome), ("conflict", "repin_request_expired"));
     assert!(journal.rows().is_empty());
     assert_still_invalidated(&store).await;
+}
+
+/// TI-2 — the `TimedOut` arm: the verdict is recorded, then the request
+/// passes the store's monotonic deadline while the I4 row is being written,
+/// so the consent finds it expired.
+///
+/// The store's clock is real (`std::time::Instant`), so a scheduler stall longer
+/// than the lifetime between detection and record makes the store refuse the
+/// record as expired before any row is written. That attempt is checked for
+/// what it is (the record-time refusal, nothing logged, pin invalidated) and
+/// retried with a doubled lifetime, so the sequencing never depends on a stall.
+#[tokio::test]
+async fn a_request_expiring_before_consent_is_expired_and_the_pin_stays_invalidated() {
+    let mut ttl = Duration::from_millis(300);
+    let (store, control, journal, outcome) = loop {
+        let store = restarted(InMemoryTofuPinStore::new().with_repin_ttl(ttl)).await;
+        let control = installed(&store);
+        let journal = Journal::default();
+        let outcome = {
+            let journal = journal.clone();
+            let store = Arc::clone(&store);
+            control
+                .decide(PEER, OBSERVED, true, "alice", move |row| {
+                    let deadline = std::time::Instant::now() + ttl + Duration::from_secs(10);
+                    while !store
+                        .pending_repins()
+                        .first()
+                        .is_some_and(|request| request.expired)
+                    {
+                        assert!(
+                            std::time::Instant::now() < deadline,
+                            "the request never expired"
+                        );
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    journal.0.lock().unwrap().push(row);
+                    Ok(())
+                })
+                .await
+        };
+        if !journal.rows().is_empty() {
+            break (store, control, journal, outcome);
+        }
+        assert_eq!(code_of(&outcome), ("conflict", "repin_request_expired"));
+        assert_still_invalidated(&store).await;
+        assert!(
+            ttl < Duration::from_secs(60),
+            "the record never beat a {ttl:?} request lifetime"
+        );
+        ttl *= 2;
+    };
+    assert_eq!(code_of(&outcome), ("conflict", "repin_request_expired"));
+    let OperatorOutcome::Conflict { detail, .. } = &outcome else {
+        panic!("expected a conflict, got {outcome:?}");
+    };
+    assert!(
+        detail.contains("`[[tcp.peer_pins]] boot_nonce` on host B and restarting it"),
+        "the detail names the only recovery: {detail}"
+    );
+    assert_eq!(
+        journal.rows().len(),
+        1,
+        "the verdict was recorded (and logged) BEFORE it expired"
+    );
+    assert_still_invalidated(&store).await;
+    let rows = control.pending().expect("installed");
+    assert_eq!(rows.len(), 1, "an expired request stays listed");
+    assert!(rows[0].expired, "marked by the store's own deadline");
+}
+
+/// TI-2 — the `RejectedByStore` arm: a restart detected while a rotation
+/// window was open for the peer is refused at consent; nothing is promoted.
+#[tokio::test]
+async fn a_restart_detected_during_rotation_is_refused_by_the_store_and_the_pin_is_unchanged() {
+    let store = Arc::new(InMemoryTofuPinStore::new());
+    store
+        .pin_first_contact(&peer(), &fingerprint(), &fingerprint(), PRIOR)
+        .await
+        .expect("first pin");
+    let next = PeerCertFingerprint::parse(&format!("sha256:{}", "cd".repeat(32))).expect("next");
+    store
+        .open_rotation_window(&peer(), &next)
+        .expect("a window opens on the active pin");
+    assert_eq!(
+        store
+            .invalidate_if_boot_nonce_differs(&peer(), OBSERVED)
+            .await
+            .expect("detection"),
+        Some(PRIOR)
+    );
+    let control = installed(&store);
+    let journal = Journal::default();
+    let outcome = control
+        .decide(PEER, OBSERVED, true, "alice", journal.accept())
+        .await;
+    assert_eq!(code_of(&outcome), ("conflict", "repin_refused_by_store"));
+    assert_eq!(
+        journal.rows().len(),
+        1,
+        "CR-2: the I4 row is written before the consent"
+    );
+    assert_still_invalidated(&store).await;
+    let pin = store.get_pin_sync(&peer()).expect("pin");
+    assert_eq!(pin.fingerprint, fingerprint(), "nothing promoted");
+    assert_eq!(
+        pin.invalidated,
+        Some(Invalidated::SpiritRestarted {
+            prior_boot_nonce: PRIOR
+        })
+    );
+    assert_eq!(store.rotation_next(&peer()), None);
+    assert_eq!(control.pending(), Some(Vec::new()), "request consumed");
 }
 
 #[tokio::test]
@@ -388,5 +502,11 @@ async fn each_detection_journals_one_repin_requested_row() {
         .invalidate_if_boot_nonce_differs(&peer(), OBSERVED + 1)
         .await
         .expect("superseding detection");
-    assert_eq!(rows(2).await.len(), 2);
+    // FIFO: the second row is the SUPERSEDING detection, not the repeat.
+    let both = rows(2).await;
+    assert_eq!(both.len(), 2, "one row per detection");
+    let second: serde_json::Value =
+        serde_json::from_slice(&both[1].payload_redacted).expect("payload JSON");
+    assert_eq!(second["prior_boot_nonce"], PRIOR.to_string());
+    assert_eq!(second["observed_boot_nonce"], (OBSERVED + 1).to_string());
 }

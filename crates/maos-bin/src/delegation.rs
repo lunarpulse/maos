@@ -43,6 +43,7 @@ use std::time::Duration;
 
 use maos_a2a::pairing::LoopbackEndpoint;
 use maos_a2a::LoopbackA2ARouter;
+use maos_a2a_core::tofu::REPIN_REQUEST_TTL;
 use maos_a2a_core::{map_a2a_error_to_iac_bus, A2AError};
 use maos_domain::frame::{FramePayload, IacFrame, TaskCompletePayload};
 use maos_domain::iac_bus_types::IacBusError;
@@ -71,8 +72,13 @@ pub const FROM_HOST: &str = "founder-loop-host";
 /// The largest accepted `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` value (one day), so
 /// `Instant + Duration` can never overflow (j1-crosshost-2e §A6 P4).
 const PAIRING_TIMEOUT_MAX_SECS: u64 = 86_400;
-/// How long the re-pin hold waits between two re-sends of the refused frame.
+/// How long the re-pin hold waits before its first re-send of the refused frame;
+/// each held re-send doubles the wait, up to [`REPIN_HOLD_RESEND_MAX_INTERVAL`].
 pub const REPIN_HOLD_RESEND_INTERVAL: Duration = Duration::from_secs(1);
+/// The longest wait between two re-sends of the re-pin hold's backoff. Every
+/// held re-send is refused at host B's TLS layer and journals one
+/// `ConsentRupture` row there, so the re-sends are kept sparse.
+pub const REPIN_HOLD_RESEND_MAX_INTERVAL: Duration = Duration::from_secs(16);
 
 /// Parse `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` (registered in `env_contract.rs`):
 /// `Ok(None)` when unset, `Ok(Some(secs))` for an integer in `1..=86400`, and a
@@ -104,11 +110,17 @@ pub fn pairing_timeout_secs_from_env() -> Result<Option<u64>, String> {
 ///
 /// When host B NACKs the delegation as a Spirit restart (`-32004`, surfaced as
 /// `PinInvalidated { awaiting_repin: true }`), B's operator can consent to this
-/// sender's new boot nonce. A `--once` sender that exits on the refusal can never
-/// be delivered to after that consent — a re-run mints a NEW nonce, which is a new
-/// restart. With a hold armed the sender prints what B's operator must approve and
-/// re-sends the SAME, already-journaled frame until it is ACKed, refused
-/// differently, or the hold expires. Opt-in: no hold ⇒ today's immediate exit.
+/// sender's new boot nonce. A `--once` sender that exits on the refusal never
+/// delivers that frame, even once B consents; and host B detects no further
+/// restart of it until B itself restarts — unless B's operator approves the
+/// still-pending request inside its [`REPIN_REQUEST_TTL`] lifetime, which
+/// re-activates the pin so the sender's next run is detected (and can be
+/// approved) again. With a hold armed the sender prints what B's operator must
+/// approve and re-sends the SAME, already-journaled frame with exponential
+/// backoff until it is ACKed, refused differently, or the hold expires. The hold
+/// ends after `min(timeout, REPIN_REQUEST_TTL)`: past B's request lifetime no
+/// consent can be recorded and nothing over TCP re-detects this sender, so
+/// holding longer is futile. Opt-in: no hold ⇒ today's immediate exit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RepinHold {
     own_boot_nonce: u64,
@@ -118,8 +130,10 @@ pub struct RepinHold {
 
 impl RepinHold {
     /// `own_boot_nonce` is this process's wire boot nonce (the value B's operator
-    /// echoes). `timeout` bounds the whole hold and must lie in `(0, 86400 s]`;
-    /// `resend_interval` must be non-zero so the hold can never spin.
+    /// echoes). `timeout` bounds the whole hold and must lie in `(0, 86400 s]`
+    /// (the hold itself stops earlier, at [`REPIN_REQUEST_TTL`]);
+    /// `resend_interval` is the first backoff step and must lie in
+    /// `(0, REPIN_HOLD_RESEND_MAX_INTERVAL]` so the hold can never spin.
     pub fn new(
         own_boot_nonce: u64,
         timeout: Duration,
@@ -131,10 +145,11 @@ impl RepinHold {
                  {PAIRING_TIMEOUT_MAX_SECS}s]"
             ));
         }
-        if resend_interval.is_zero() {
-            return Err(
-                "delegation: re-pin hold resend interval is zero — the hold would spin".to_string(),
-            );
+        if resend_interval.is_zero() || resend_interval > REPIN_HOLD_RESEND_MAX_INTERVAL {
+            return Err(format!(
+                "delegation: re-pin hold resend interval {resend_interval:?} is outside (0, \
+                 {REPIN_HOLD_RESEND_MAX_INTERVAL:?}]"
+            ));
         }
         Ok(Self {
             own_boot_nonce,
@@ -142,13 +157,19 @@ impl RepinHold {
             resend_interval,
         })
     }
+
+    /// The hold's real bound: `timeout`, capped at host B's re-pin request
+    /// lifetime ([`REPIN_REQUEST_TTL`]), both measured from the first refusal.
+    fn effective_timeout(&self) -> Duration {
+        self.timeout.min(REPIN_REQUEST_TTL)
+    }
 }
 
 /// How a re-pin hold ended.
 enum RepinHoldOutcome {
     /// A re-send was ACKed: the frame is delivered.
     Delivered,
-    /// A re-send was refused with anything other than the awaiting-re-pin refusal.
+    /// A re-send was refused with anything [`keeps_holding`] does not hold on.
     Refused { resends: u32, error: IacBusError },
     /// The bound elapsed while the peer still awaited consent.
     TimedOut { resends: u32, last: IacBusError },
@@ -179,6 +200,16 @@ fn awaiting_repin_peer(error: &IacBusError) -> Option<&str> {
         } if canonical_detail == *detail => Some(peer.as_str()),
         _ => None,
     }
+}
+
+/// Whether a re-send's `error` keeps the hold on `peer` going: the awaiting-re-pin
+/// refusal again, or a transport/handshake failure to `peer` — once host B has
+/// invalidated this sender's pin, B's TLS verifier refuses every handshake from it
+/// (`find_active_pin_by_fingerprint`), so re-sends fail before intake until B's
+/// operator approves.
+fn keeps_holding(error: &IacBusError, peer: &str) -> bool {
+    awaiting_repin_peer(error) == Some(peer)
+        || matches!(error, IacBusError::CrossHostTransportFailure { peer: p, .. } if p == peer)
 }
 
 /// What host B's intake consumer found in one inbound frame
@@ -443,13 +474,20 @@ impl DelegationLeg {
                 )),
                 RepinHoldOutcome::TimedOut { resends, last } => Err(format!(
                     "delegation re-pin hold expired after {:?} and {resends} re-send(s); frame {} \
-                     was never delivered. Last refusal: {last}. Host {} must run `maosctl a2a \
-                     repin approve {FROM_HOST} --boot-nonce {}` while this sender holds; a re-run \
-                     mints a NEW boot nonce, which that host sees as another restart.",
-                    hold.timeout,
+                     was never delivered. Last refusal: {last}. Inside a hold window, host {peer} \
+                     approves the nonce this sender printed: `maosctl a2a repin approve \
+                     {FROM_HOST} --boot-nonce {}`. After an expiry or a reject, or once this \
+                     sender exits, host {peer} will not detect a restart of {FROM_HOST} again \
+                     until it restarts — unless host {peer}'s operator approves the still-pending \
+                     request inside its {REPIN_REQUEST_TTL:?} lifetime (counted from the first \
+                     refusal), which re-activates the pin so a re-run of this sender is detected \
+                     again and can be approved under its new nonce. Otherwise recover by correcting \
+                     {FROM_HOST}'s `[[tcp.peer_pins]] boot_nonce` on host {peer} and restarting \
+                     host {peer}.",
+                    hold.effective_timeout(),
                     hex16(frame_id),
-                    peer.as_str(),
-                    hold.own_boot_nonce
+                    hold.own_boot_nonce,
+                    peer = peer.as_str()
                 )),
             };
         }
@@ -977,11 +1015,17 @@ fn emit_failure(error: IacBusError) -> String {
 ///
 /// Prints the consent the peer's operator must give, then re-sends `frame` — the
 /// row the emit already journaled — straight through the installed router, so no
-/// second emit row is written. Schedule: sleep `resend_interval` (clipped to the
-/// time left), re-send, repeat. Ends on the first ACK, the first refusal that is
-/// NOT the awaiting-re-pin refusal, or when `timeout` (measured from the first
-/// refusal) has elapsed; no re-send starts after the deadline, and one already in
-/// flight is bounded by the transport's own partition timeout.
+/// second emit row is written. Schedule: wait `resend_interval`, re-send, and
+/// double the wait after every held re-send up to
+/// [`REPIN_HOLD_RESEND_MAX_INTERVAL`] (re-sends at +1, +3, +7, +15, +31, +47 s, …
+/// for the production 1 s), each wait clipped to the time left. Every held
+/// re-send is refused at host B's TLS layer and journals one `ConsentRupture`
+/// row there, hence the backoff; each one is echoed on stderr. Ends on the first
+/// ACK, the first refusal that does not [`keeps_holding`] (a re-send's TLS
+/// handshake failure to the held peer is what a live host B returns after its
+/// first refusal), or when [`RepinHold::effective_timeout`] (measured from the
+/// first refusal) has elapsed; no re-send starts after the deadline, and one
+/// already in flight is bounded by the transport's own partition timeout.
 async fn hold_for_repin(
     router: &dyn A2ARouter,
     frame: IacFrame,
@@ -1002,17 +1046,28 @@ async fn hold_for_repin(
     );
     eprintln!("maosctl a2a repin approve {FROM_HOST} --boot-nonce {nonce}");
     eprintln!(
-        "maos: re-pin hold — re-sending the same frame every {:?} for up to {:?}; ends on ACK, \
-         a different refusal, or expiry",
-        hold.resend_interval, hold.timeout
+        "maos: re-pin hold — if `maosctl a2a repin list` on host {} shows no pending entry \
+         for {FROM_HOST}, this was not a restart detection (-32002 and -32004 both read 'pin \
+         invalidated'): fix the [[tcp.peer_pins]] configuration instead",
+        peer.as_str()
     );
-    // `RepinHold::new` caps `timeout` at one day, so this cannot overflow.
-    let deadline = tokio::time::Instant::now() + hold.timeout;
+    let bound = hold.effective_timeout();
+    eprintln!(
+        "maos: re-pin hold — re-sending the same frame with backoff from {:?} up to {:?} for up \
+         to {bound:?} (host {}'s {REPIN_REQUEST_TTL:?} re-pin request lifetime caps the hold); \
+         ends on ACK, a different refusal, or expiry",
+        hold.resend_interval,
+        REPIN_HOLD_RESEND_MAX_INTERVAL,
+        peer.as_str()
+    );
+    // `effective_timeout` is at most `REPIN_REQUEST_TTL`, so this cannot overflow.
+    let deadline = tokio::time::Instant::now() + bound;
+    let mut wait = hold.resend_interval;
     let mut last = refusal;
     let mut resends: u32 = 0;
     loop {
         let left = deadline.saturating_duration_since(tokio::time::Instant::now());
-        tokio::time::sleep(hold.resend_interval.min(left)).await;
+        tokio::time::sleep(wait.min(left)).await;
         if tokio::time::Instant::now() >= deadline {
             return RepinHoldOutcome::TimedOut { resends, last };
         }
@@ -1026,7 +1081,15 @@ async fn hold_for_repin(
                 );
                 return RepinHoldOutcome::Delivered;
             }
-            Err(error) if awaiting_repin_peer(&error).is_some() => last = error,
+            Err(error) if keeps_holding(&error, peer.as_str()) => {
+                eprintln!(
+                    "maos: re-pin hold — re-send {resends} of frame {frame_hex} refused by \
+                     peer {}; still holding: {error}",
+                    peer.as_str()
+                );
+                last = error;
+                wait = wait.saturating_mul(2).min(REPIN_HOLD_RESEND_MAX_INTERVAL);
+            }
             Err(error) => return RepinHoldOutcome::Refused { resends, error },
         }
     }

@@ -66,7 +66,6 @@ impl RepinControl {
     /// installed in this process (the route answers 404).
     pub fn pending(&self) -> Option<Vec<RepinRequestRow>> {
         let pins = self.pins.get()?;
-        let now = SystemTime::now();
         let mut rows: Vec<RepinRequestRow> = pins
             .pending_repins()
             .into_iter()
@@ -77,7 +76,7 @@ impl RepinControl {
                 observed_boot_nonce: request.observed_boot_nonce,
                 detected_at_secs: unix_secs(request.detected_at),
                 expires_at_secs: unix_secs(request.expires_at),
-                expired: now >= request.expires_at,
+                expired: request.expired,
             })
             .collect();
         rows.sort_by(|left, right| left.peer.cmp(&right.peer));
@@ -154,8 +153,10 @@ impl RepinControl {
             RePinDecision::TimedOut => {
                 return OperatorOutcome::Conflict {
                     code: "repin_request_expired".into(),
-                    detail: "the request expired or was superseded by a newer detection before \
-                             the consent applied; the pin stays invalidated"
+                    detail: "the request expired before the consent applied; the pin stays \
+                             invalidated; host B will not detect this peer again until it \
+                             restarts; recover by correcting `[[tcp.peer_pins]] boot_nonce` on \
+                             host B and restarting it"
                         .into(),
                 };
             }

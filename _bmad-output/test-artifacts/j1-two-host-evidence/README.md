@@ -212,9 +212,12 @@ where it is covered by the bundle signature. Anything added here must stay clear
    **refuses to dial** rather than spending its single non-retryable connect attempt.
 
    ⚠ The nonce is still a fresh random value per process, deliberately: making it stable or derived
-   would defeat `NFR-Rel-6` restart detection (`tofu.rs:351-372`). A wrong transcription is **worse than
-   a failure** — it invalidates the pin, and the second attempt fails *differently*
-   (`invalidate_if_boot_nonce_differs`). Two recoveries exist since Story 19-7:
+   would defeat `NFR-Rel-6` restart detection (`invalidate_if_boot_nonce_differs`, `tofu.rs`). A wrong
+   transcription is **worse than a failure** — host B's first refusal (`-32004`) invalidates its pin for
+   host A, and from then on host B's **listen-side TLS verifier refuses host A's certificate**
+   (`find_active_pin_by_fingerprint` skips invalidated pins): every later dial from host A fails at the
+   handshake as a cross-host transport failure and never reaches host B's intake, so host B **detects
+   nothing further from host A** until host B restarts. Two recoveries exist since Story 19-7:
    - **Config re-pair:** correct host B's `tcp.peer_pins[].boot_nonce` and restart host B.
    - **Operator consent on the running host B:** host B journals `a2a:repin-requested` and holds the
      request for **300 s**; on host B run `maosctl a2a repin list`, then
@@ -224,8 +227,20 @@ where it is covered by the bundle signature. Anything added here must stay clear
      after writing an Approval Decision Log row. The consent is **in memory only**: a host B restart
      rebuilds pins from config, so a durable fix is still the config re-pair (durable TOFU is
      `21-3`). Nothing consents automatically. Approve the nonce of the host A that is **still
-     running**: with `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` set it holds and re-sends the same frame
-     until ACK or the bound expires; a re-run of host A mints a new nonce, which is a new restart.
+     running**: with `MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS` set it re-sends the same frame and keeps
+     holding through host B's TLS refusals (each re-send fails as a transport failure while the pin
+     awaits consent) until ACK or the bound expires. The re-sends back off — 1 s, then doubling up to
+     16 s (re-sends at +1, +3, +7, +15, +31, +47 s, …) — because **each held re-send is refused at
+     host B's TLS layer and journals one HighPrivilege `ConsentRupture` (`PeerIdentityUnverified`)
+     row on host B**. The hold is also **capped at host B's 300 s request lifetime** (measured from
+     the first refusal), whatever the timeout: past it no consent can be recorded, so holding longer
+     is futile. A **re-run** of host A is **not** detected again while the pin stays invalidated:
+     its new nonce never reaches host B's intake (the TLS refusal above), so no new
+     `a2a:repin-requested` row appears and there is nothing new to approve — unless host B's
+     operator approves the still-pending request (the exited host A's nonce) inside its 300 s: that
+     re-activates the pin, so a re-run is detected again and can be approved under its new nonce.
+     Once the request expires or is rejected, the only recovery is the **config re-pair plus a
+     restart of host B**.
 2. **Host B's audit key, provisioned separately.** `reconcile_two_host_bundles` hard-refuses
    `key_a == key_b` with `SharedAttesterRoot`. Two processes on one box default to one `HOME` and
    therefore **one key file** — so without this step reconciliation fails by construction, and "two

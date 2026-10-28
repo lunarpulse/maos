@@ -119,9 +119,9 @@ else
 fi
 if [ -x "$SCCACHE_BIN" ]; then
     export RUSTC_WRAPPER="$SCCACHE_BIN"
-    export SCCACHE_DIR="${SCCACHE_DIR:-/mnt/build/sccache}"
+    export SCCACHE_DIR="${SCCACHE_DIR:-/mnt/build/sccache-maos}"
     add_to_shell_config "export RUSTC_WRAPPER=\"$SCCACHE_BIN\"" "$HOME/.zshrc"
     add_to_shell_config "export SCCACHE_DIR=\"$SCCACHE_DIR\"" "$HOME/.zshrc"
-    add_to_shell_config "export SCCACHE_CACHE_SIZE=\"${SCCACHE_CACHE_SIZE:-50G}\"" "$HOME/.zshrc"
+    add_to_shell_config "export SCCACHE_CACHE_SIZE=\"${SCCACHE_CACHE_SIZE:-12G}\"" "$HOME/.zshrc"
     "$SCCACHE_BIN" --show-stats 2>/dev/null | head -6 || true
 fi

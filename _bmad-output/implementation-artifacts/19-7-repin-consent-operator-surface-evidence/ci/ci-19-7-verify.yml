@@ -1,0 +1,124 @@
+# Branch-only Story 19-7 AC1.3 hosted T3 proof. Copy this workflow to
+# .github/workflows/ci-19-7-verify.yml on ci/19-7-verify ONLY; never merge it.
+# Commit the unplanted candidate and the evidence diff; the job applies the plant.
+name: 19-7-proven-red
+on:
+  push:
+    branches: ["ci/19-7-verify"]
+permissions:
+  contents: read
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: 19-7-proven-red
+      - name: Keep build and image temporaries off /tmp
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Record provenance
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ci-19-7-evidence"
+          {
+            git rev-parse HEAD
+            rustc -Vv
+            uname -a
+            cat /etc/os-release
+            podman --version
+          } 2>&1 | tee "$RUNNER_TEMP/ci-19-7-evidence/provenance.log"
+      - name: Build only V4's process and manifest-backed fixtures in this job
+        # f4_pairing.rs:301-318 resolves worker-cli-fixture in the test profile;
+        # :1098-1099 resolves maosctl through fixtures::profile_binary, which
+        # requires the builder's manifest. :365/:559 uses CARGO_BIN_EXE_maos.
+        # No nextest/archive transport or WASM guest is used by this witness.
+        # The worker-cli-fixture selector also builds its registry-coupled probe.
+        run: |
+          set -euo pipefail
+          cargo run --locked -p xtask -- build-test-fixtures --only worker-cli-fixture,maosctl
+          cargo build --locked -p maos-bin --bin maos
+      - name: Unplanted V4 control must run once and pass without T3 skips
+        run: |
+          set -euo pipefail
+          grep -q 'fn restart_refusal_is_repinned_by_operator_consent_then_delivered()' crates/maos-bin/tests/f4_pairing.rs \
+            || { echo '::error::19-7 AC1.3 V4 test name is absent; --exact could select zero tests'; exit 1; }
+          set +e
+          cargo test --color never -p maos-bin --test f4_pairing restart_refusal_is_repinned_by_operator_consent_then_delivered -- --exact --test-threads=1 --nocapture 2>&1 | tee "$RUNNER_TEMP/ci-19-7-evidence/control.log"
+          pipeline=("${PIPESTATUS[@]}")
+          set -e
+          test "${pipeline[0]}" -eq 0 && test "${pipeline[1]}" -eq 0 \
+            || { echo '::error::19-7 AC1.3 unplanted control or log capture failed'; exit 1; }
+          # require_t3's exact prefix (tests/harness/t3_substrate.rs:11,20 and ci.rs:28).
+          if grep -Fq 'SKIP: T3 ' "$RUNNER_TEMP/ci-19-7-evidence/control.log"; then
+            echo '::error::19-7 AC1.3 unplanted control printed a T3 SKIP'
+            exit 1
+          fi
+          grep -Eq '^test result: ok\. 1 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/ci-19-7-evidence/control.log" \
+            || { echo '::error::19-7 AC1.3 control did not report exactly one passing, non-ignored test'; exit 1; }
+      - name: Apply consent-removal plant and require the V4 expiry oracle
+        run: |
+          set -euo pipefail
+          plant=_bmad-output/implementation-artifacts/19-7-repin-consent-operator-surface-evidence/ac1-f4-consent-removed-plant.diff
+          echo "4f73e4cbc4186aad533952dee378e459741708dbee3e93f4d379226d2d83b6f3  $plant" | sha256sum -c - \
+            || { echo '::error::19-7 AC1.3 plant SHA256 mismatch'; exit 1; }
+          git apply --check "$plant" \
+            || { echo '::error::19-7 AC1.3 plant does not apply to the candidate'; exit 1; }
+          git apply "$plant" \
+            || { echo '::error::19-7 AC1.3 plant could not be applied'; exit 1; }
+          git diff --stat
+          git diff -- crates/maos-bin/tests/f4_pairing.rs > "$RUNNER_TEMP/ci-19-7-evidence/applied-plant.diff"
+          set +e
+          cargo test --color never -p maos-bin --test f4_pairing restart_refusal_is_repinned_by_operator_consent_then_delivered -- --exact --test-threads=1 --nocapture 2>&1 | tee "$RUNNER_TEMP/ci-19-7-evidence/ac1-f4-consent-removed-plant.log"
+          pipeline=("${PIPESTATUS[@]}")
+          set -e
+          test "${pipeline[1]}" -eq 0 \
+            || { echo '::error::19-7 AC1.3 planted log capture failed'; exit 1; }
+          test "${pipeline[0]}" -ne 0 \
+            || { echo '::error::19-7 AC1.3 consent-removal plant stayed GREEN'; exit 1; }
+          log="$RUNNER_TEMP/ci-19-7-evidence/ac1-f4-consent-removed-plant.log"
+          if grep -Fq 'SKIP: T3 ' "$log"; then
+            echo '::error::19-7 AC1.3 planted run printed a T3 SKIP'
+            exit 1
+          fi
+          grep -Eq '^test result: FAILED\. 0 passed; 1 failed; 0 ignored;' "$log" \
+            || { echo '::error::19-7 AC1.3 red was not exactly one failing test'; exit 1; }
+          # --nocapture can interleave the panic with libtest's "test ..." line;
+          # the failure-list entry names the test independently of that interleave.
+          grep -Fxq '    restart_refusal_is_repinned_by_operator_consent_then_delivered' "$log" \
+            || { echo '::error::19-7 AC1.3 red did not name V4 in the libtest failures list'; exit 1; }
+          # f4_pairing.rs:1410-1412 prints the captured sender output on this assert.
+          grep -Fq 'after consent the held frame must ACK and host A exit 0:' "$log" \
+            || { echo '::error::19-7 AC1.3 red was not the held-frame delivery assertion'; exit 1; }
+          # crates/maos-bin/src/delegation.rs:476 names the sender's timeout outcome.
+          grep -Fq 'delegation re-pin hold expired after' "$log" \
+            || { echo '::error::19-7 AC1.3 red did not contain the re-pin hold expiry'; exit 1; }
+      - name: Restore the planted test and require a clean tracked diff
+        if: always()
+        run: |
+          set -euo pipefail
+          git checkout -- crates/maos-bin/tests/f4_pairing.rs \
+            || { echo '::error::19-7 AC1.3 could not restore f4_pairing.rs'; exit 1; }
+          git diff --exit-code \
+            || { echo '::error::19-7 AC1.3 tracked tree differs after restore'; exit 1; }
+      - name: Announce the restored proven-red witness
+        run: echo '::notice title=19-7 AC1.3 PROVEN-RED::Unplanted V4 passed once without skips; removing operator consent made the held-frame assertion fail with re-pin hold expiry; tracked source restored'
+      - name: Upload control, provenance, plant logs, and diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 19-7-proven-red
+          path: |
+            ${{ runner.temp }}/ci-19-7-evidence/
+            _bmad-output/implementation-artifacts/19-7-repin-consent-operator-surface-evidence/ac1-f4-consent-removed-plant.diff
+          if-no-files-found: error

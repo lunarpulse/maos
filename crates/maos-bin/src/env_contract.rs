@@ -24,11 +24,12 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         // assignment" with no assignment writes nothing, so the oracle returned
         // NoEffectEvidence and the run errored AFTER the agent was billed.
         //
-        // Read ONLY at frame construction in the composition root. It is NEVER
-        // read at the spawn site: `j1-crosshost-1a` deleted MAOS_WORKER_TASK
-        // because a remote worker cannot inherit local env, so the task must be
-        // frame-borne, and check-j1-loopback-delegation reds any such read as a
-        // "decorative-frame shortcut".
+        // Read ONLY by the composition root: its presence before any topology
+        // entry loads (the loopback refusal), its value at frame construction.
+        // It is NEVER read at the spawn site: `j1-crosshost-1a` deleted
+        // MAOS_WORKER_TASK because a remote worker cannot inherit local env,
+        // so the task must be frame-borne, and check-j1-loopback-delegation
+        // reds any such read as a "decorative-frame shortcut".
         //
         // Story 19-1 (D-19-1-02 A): cross-host ONLY. On the loopback arm the
         // goal is `--epic <file>` (one `### Story` section per host-bearing

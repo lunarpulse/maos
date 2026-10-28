@@ -1,0 +1,17 @@
+diff --git a/spirits/topologies/j1-founder-loop-epic.toml b/spirits/topologies/j1-founder-loop-epic.toml
+--- a/spirits/topologies/j1-founder-loop-epic.toml
++++ b/spirits/topologies/j1-founder-loop-epic.toml
+@@ -23,9 +23,13 @@
+ host = "developer-remote-host"
+ 
+ [[topology.spirits]]
+ manifest = "../worker/manifest.toml"
+ host = "developer-remote-host"
+ 
+ [[topology.spirits]]
+ manifest = "../worker/manifest.toml"
+ host = "developer-remote-host"
++
++[[topology.spirits]]
++manifest = "../worker/manifest.toml"
++host = "developer-remote-host"

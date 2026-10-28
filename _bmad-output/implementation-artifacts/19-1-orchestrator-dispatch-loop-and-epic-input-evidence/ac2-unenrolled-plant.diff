@@ -1,0 +1,5 @@
+--- /dev/null
++++ b/crates/maos-bin/tests/xyz_19_1.rs
+@@ -0,0 +1,2 @@
++#[test]
++fn never_run_in_ci() {}

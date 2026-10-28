@@ -213,3 +213,131 @@ fn an_epic_with_no_story_section_is_refused() {
         );
     }
 }
+
+/// TI-5 — `~~~` fences hide headings exactly like backtick fences, and a
+/// backtick line inside a tilde fence does not close it.
+#[test]
+fn a_tilde_fence_hides_its_headings_and_ignores_backtick_lines() {
+    let epic = "### Story 1\n~~~\n```\n### Notes\n~~~\n### Story 2\nB\n";
+    let sections = split_epic(epic, 2).expect("headings inside `~~~` are body text");
+    assert_eq!(sections[0].text, "### Story 1\n~~~\n```\n### Notes\n~~~");
+    assert_eq!(sections[1].line, 6);
+}
+
+/// TI-5 — a fence line with text after its run is not a closing fence, so the
+/// heading after it stays inside the fence.
+#[test]
+fn a_closing_fence_with_trailing_text_does_not_close() {
+    let epic = "### Story 1\n```\n``` not a close\n### Notes\n```\n### Story 2\nB\n";
+    let sections = split_epic(epic, 2).expect("the fence closes only at the bare run");
+    assert_eq!(
+        sections[0].text,
+        "### Story 1\n```\n``` not a close\n### Notes\n```"
+    );
+    assert_eq!(sections[1].heading, "Story 2");
+}
+
+/// TI-5 — a longer fence wraps a shorter one: the inner ```` ``` ```` neither
+/// opens nor closes anything.
+#[test]
+fn a_longer_fence_wraps_a_shorter_one() {
+    let epic = "### Story 1\n````md\n```\n### Notes\n```\n````\n### Story 2\nB\n";
+    let sections = split_epic(epic, 2).expect("the four-tick fence closes only at four ticks");
+    assert_eq!(
+        sections[0].text,
+        "### Story 1\n````md\n```\n### Notes\n```\n````"
+    );
+    assert_eq!(sections[1].line, 7);
+}
+
+/// TI-5 — an unclosed fence swallows every later heading to end of file; the
+/// split fails closed through the count check rather than dispatching it.
+#[test]
+fn an_unclosed_fence_swallows_later_headings_and_fails_closed() {
+    let epic = "### Story 1\nA\n```\n### Story 2\nB\n### Story 3\nC\n";
+    assert_eq!(
+        split_epic(epic, 3),
+        Err(EpicSplitError::CountMismatch {
+            sections: 1,
+            entries: 3,
+        })
+    );
+}
+
+/// TI-5 — a fence line indented four spaces is indented code, not a fence, so
+/// the heading after it still opens a section.
+#[test]
+fn a_four_space_indented_fence_line_opens_no_fence() {
+    let epic = "### Story 1\n    ```\n### Story 2\nB\n";
+    let sections = split_epic(epic, 2).expect("an indented-code ``` line is body text");
+    assert_eq!(sections[0].text, "### Story 1\n    ```");
+    assert_eq!(sections[1].line, 3);
+}
+
+/// TI-5 — a leading U+FEFF on the first line is dropped: the first heading is
+/// recognised and no section's text carries the BOM. A BOM on a later line is
+/// not stripped, so that line is body text.
+#[test]
+fn a_bom_before_the_first_heading_is_dropped() {
+    let epic = "\u{feff}### Story 1\nA\n\u{feff}### Story 9\n### Story 2\nB\n";
+    let sections = split_epic(epic, 2).expect("a BOM-prefixed epic splits");
+    assert_eq!(sections[0].line, 1);
+    assert_eq!(sections[0].heading, "Story 1");
+    assert_eq!(sections[0].text, "### Story 1\nA\n\u{feff}### Story 9");
+    assert_eq!(sections[1].line, 4);
+    assert_eq!(
+        split_epic("\u{feff}### Notes\nA\n", 1),
+        Err(EpicSplitError::NotAStoryHeading {
+            section: 1,
+            line: 1,
+            heading: "### Notes".into(),
+            story_sections: 0,
+            entries: 1,
+        })
+    );
+}
+
+/// TI-5 — CommonMark ATX: a heading indented 1–3 spaces is a heading, so a
+/// non-Story one is refused and a Story one opens a section; four spaces is
+/// indented code and stays body text.
+#[test]
+fn a_heading_indented_one_to_three_spaces_is_still_a_heading() {
+    for indent in [" ", "  ", "   "] {
+        let epic = format!("### Story 1\nA\n{indent}### Notes\nB\n");
+        assert_eq!(
+            split_epic(&epic, 1),
+            Err(EpicSplitError::NotAStoryHeading {
+                section: 2,
+                line: 3,
+                heading: "### Notes".into(),
+                story_sections: 1,
+                entries: 1,
+            }),
+            "`{indent}### Notes` is a level-3 heading"
+        );
+        let epic = format!("### Story 1\nA\n{indent}## Appendix\nB\n");
+        assert!(
+            matches!(
+                split_epic(&epic, 1),
+                Err(EpicSplitError::NotAStoryHeading { section: 2, .. })
+            ),
+            "`{indent}## Appendix` is a level-2 heading"
+        );
+        let epic = format!("{indent}### Story 1\nA\n{indent}### Story 2\nB\n");
+        let sections = split_epic(&epic, 2).expect("an indented `### Story` opens a section");
+        assert_eq!(sections[0].heading, "Story 1");
+        assert_eq!(sections[0].text, format!("{indent}### Story 1\nA"));
+        assert_eq!(sections[1].line, 3);
+        assert_eq!(sections[1].heading, "Story 2");
+    }
+    let epic = "### Story 1\nA\n    ### Notes\n    ### Story 2\nB\n";
+    let sections = split_epic(epic, 1).expect("four spaces is indented code, never a heading");
+    assert_eq!(
+        sections[0].text,
+        "### Story 1\nA\n    ### Notes\n    ### Story 2\nB"
+    );
+    assert_eq!(
+        split_epic("    ### Story 1\nA\n", 1),
+        Err(EpicSplitError::NoStorySections)
+    );
+}

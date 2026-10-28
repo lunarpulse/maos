@@ -694,6 +694,73 @@ fn a_fourth_epic_host_entry_must_red_frame_borne_route() {
     );
 }
 
+/// Story 19-1 TI-6 — a host-bearing Worker dropped from the epic topology (two
+/// entries for three sections) reds leg 1 by count.
+#[test]
+fn a_dropped_epic_host_entry_must_red_frame_borne_route() {
+    let v = run_gate(|root| {
+        let two = GOOD_EPIC_TOPOLOGY
+            .strip_suffix(EPIC_WORKER)
+            .expect("the good epic topology ends with one Worker entry");
+        write_file(root, EPIC_TOPOLOGY, two);
+    });
+    assert_red(
+        &v,
+        "\"check\":\"frame-borne-route-intact\",\"detail\":\"spirits/topologies/j1-founder-loop-epic.toml \
+         must declare exactly 3",
+        "only two host entries in the epic topology",
+    );
+    assert!(
+        v.stdout.contains("found 2 `host` keys"),
+        "the finding must count the remaining entries\nstdout:\n{}",
+        v.stdout
+    );
+}
+
+/// Story 19-1 TI-6 — three host keys, but one names a host other than the
+/// delegation host: the count clause holds, so only the all-entries-name-
+/// `DELEGATION_HOST` clause can red it.
+#[test]
+fn an_epic_host_entry_naming_another_host_must_red_frame_borne_route() {
+    let v = run_gate(|root| {
+        let foreign = GOOD_EPIC_TOPOLOGY.replacen(
+            "host = \"developer-remote-host\"",
+            "host = \"other-remote-host\"",
+            1,
+        );
+        assert_ne!(
+            foreign, GOOD_EPIC_TOPOLOGY,
+            "the plant must change the topology"
+        );
+        write_file(root, EPIC_TOPOLOGY, &foreign);
+    });
+    assert_red(
+        &v,
+        "\"check\":\"frame-borne-route-intact\",\"detail\":\"spirits/topologies/j1-founder-loop-epic.toml \
+         must declare exactly 3",
+        "an epic host entry naming a different host",
+    );
+    assert!(
+        v.stdout.contains("found 3 `host` keys"),
+        "the count is intact, so the host clause alone must red\nstdout:\n{}",
+        v.stdout
+    );
+}
+
+/// Story 19-1 TI-6 — a missing epic topology is a finding, never a skip.
+#[test]
+fn a_missing_epic_topology_must_red_frame_borne_route() {
+    let v = run_gate(|root| {
+        std::fs::remove_file(root.join(EPIC_TOPOLOGY)).unwrap();
+    });
+    assert_red(
+        &v,
+        "\"check\":\"frame-borne-route-intact\",\"detail\":\"cannot read \
+         spirits/topologies/j1-founder-loop-epic.toml",
+        "a deleted epic topology",
+    );
+}
+
 /// Story 19-1 D-19-1-06 A / D-19-1-11 A — a follow-up built with the local
 /// `followup_dispatch` (host_id: None) would never route; leg 1 must red.
 #[test]

@@ -236,7 +236,7 @@ AC2 and AC3 are existing gates whose HEAD reds are recorded; AC4 changes tests, 
 ### Tests and commands
 
 ```bash
-# local (agent shell exports CI=true); one cargo process; CARGO_TARGET_DIR=/mnt/build/cargo
+# local (agent shell exports CI=true); one cargo per checkout; inherit CARGO_TARGET_DIR (MAOS default /mnt/build/cargo-maos; worktree uses its dedicated target); never override to /mnt/build/cargo
 env -u CI -u GITHUB_ACTIONS cargo deny check                       # cargo-deny 0.19.4 (release binary is fine)
 env -u CI -u GITHUB_ACTIONS cargo run --locked -p xtask -- build-test-fixtures
 env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-wasm-host

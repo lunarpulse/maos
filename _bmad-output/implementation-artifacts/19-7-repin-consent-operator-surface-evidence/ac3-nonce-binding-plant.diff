@@ -1,0 +1,11 @@
+--- a/crates/maos-a2a-core/src/tofu.rs
++++ b/crates/maos-a2a-core/src/tofu.rs
+@@ -291,7 +291,7 @@
+         if Instant::now() >= entry.deadline {
+             return Err(RepinDecisionError::Expired { peer: peer_name() });
+         }
+-        if entry.request.observed_boot_nonce != boot_nonce {
++        if false && entry.request.observed_boot_nonce != boot_nonce {
+             return Err(RepinDecisionError::NonceMismatch {
+                 peer: peer_name(),
+                 observed: entry.request.observed_boot_nonce,

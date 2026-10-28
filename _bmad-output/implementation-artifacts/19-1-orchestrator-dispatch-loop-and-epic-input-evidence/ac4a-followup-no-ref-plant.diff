@@ -1,0 +1,12 @@
+--- a/spirits/orchestrator/src/lib.rs
++++ b/spirits/orchestrator/src/lib.rs
+@@ -686,7 +686,8 @@
+         from_host: &str,
+         intent: A2AIntent,
+     ) -> Result<IacFrame, RemoteFrameError> {
+-        let payload = self.build_task_assign(goal, success_criteria, Some(prior));
++        let _ = prior;
++        let payload = self.build_task_assign(goal, success_criteria, None);
+         self.assign_frame_remote(
+             seq, run_nonce, to_id, to_role, payload, lineage, to_host, from_host, intent,
+         )

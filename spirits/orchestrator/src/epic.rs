@@ -14,6 +14,13 @@
 //!   they sit in;
 //! * section k binds to the k-th host-bearing topology entry, so a section
 //!   count that differs from the entry count is refused before any emit.
+//!
+//! Heading recognition follows CommonMark ATX: a leading U+FEFF on the first
+//! line is dropped (never part of any section's text), and a heading may be
+//! indented 0–3 spaces — four or more (or a tab) is indented code, i.e. body
+//! text. Setext headings (a line underlined with `===` / `---`) are NOT
+//! recognised: their text line is section body, so an epic must head every
+//! section with an ATX `### Story` line.
 
 /// The heading that opens one dispatchable section.
 pub const STORY_HEADING: &str = "### Story";
@@ -92,8 +99,9 @@ impl std::error::Error for EpicSplitError {}
 /// deterministic: the same bytes always yield the same sections or the same
 /// refusal.
 pub fn split_epic(markdown: &str, host_entries: usize) -> Result<Vec<EpicSection>, EpicSplitError> {
-    // (byte offset, 1-based line, heading line) of every section-opening
-    // heading from the first level-3 heading on.
+    let markdown = markdown.strip_prefix('\u{feff}').unwrap_or(markdown);
+    // (byte offset, 1-based line, unindented heading line) of every
+    // section-opening heading from the first level-3 heading on.
     let mut openers: Vec<(usize, usize, &str)> = Vec::new();
     let mut fence: Option<(u8, usize)> = None;
     let mut offset = 0;
@@ -114,6 +122,7 @@ pub fn split_epic(markdown: &str, host_entries: usize) -> Result<Vec<EpicSection
         if fence.is_some() {
             continue;
         }
+        let Some(line) = unindent(line) else { continue };
         match atx_level(line) {
             Some(3) => openers.push((start, index + 1, line)),
             Some(1 | 2) if !openers.is_empty() => openers.push((start, index + 1, line)),
@@ -164,6 +173,13 @@ pub fn split_epic(markdown: &str, host_entries: usize) -> Result<Vec<EpicSection
         .collect())
 }
 
+/// `line` without its 0–3 spaces of indent; `None` at four or more (indented
+/// code, never a heading or a fence).
+fn unindent(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start_matches(' ');
+    (line.len() - trimmed.len() <= 3).then_some(trimmed)
+}
+
 /// The ATX heading level (1–6) of an unindented `line`, if it is one.
 fn atx_level(line: &str) -> Option<usize> {
     let level = line.bytes().take_while(|b| *b == b'#').count();
@@ -172,7 +188,8 @@ fn atx_level(line: &str) -> Option<usize> {
         .then_some(level)
 }
 
-/// `### Story`, then end of line, whitespace or `:` (`### Stories` is not one).
+/// An unindented `### Story`, then end of line, whitespace or `:`
+/// (`### Stories` is not one).
 fn is_story_heading(line: &str) -> bool {
     line.strip_prefix(STORY_HEADING)
         .is_some_and(|rest| rest.is_empty() || rest.starts_with([' ', '\t', ':']))
@@ -181,10 +198,7 @@ fn is_story_heading(line: &str) -> bool {
 /// A fence line (```` ``` ```` or `~~~`, up to three spaces of indent): its
 /// marker byte and run length.
 fn fence_run(line: &str) -> Option<(u8, usize)> {
-    let trimmed = line.trim_start_matches(' ');
-    if line.len() - trimmed.len() > 3 {
-        return None;
-    }
+    let trimmed = unindent(line)?;
     let marker = *trimmed.as_bytes().first()?;
     if marker != b'`' && marker != b'~' {
         return None;

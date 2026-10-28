@@ -587,20 +587,20 @@ pub fn map_repin_response(
              (MAOS_ONE_SHOT=cohort-a2a-daemon) owns the pin store"
         }
         (404, "repin_not_pending") => {
-            "no restart detection is pending for this peer (never \
-             detected, or already decided); see `maosctl a2a repin list`"
+            "no restart detection is pending for this peer (never detected, or already decided); see \
+             `maosctl a2a repin list`; if it was rejected or expired, host B will not detect this peer again until it restarts; recover by correcting `[[tcp.peer_pins]] boot_nonce` on host B and restarting it"
         }
         (409, "repin_nonce_mismatch") => {
             "--boot-nonce is not the pending observed nonce; the pin \
              stays invalidated; read the nonce from the sender's published line or the list"
         }
         (409, "repin_request_expired") => {
-            "the pending detection expired before the decision; \
-             the pin stays invalidated; decide on a fresh detection (`maosctl a2a repin list`)"
+            "the pending detection expired before the decision; the pin stays invalidated; host B will \
+             not detect this peer again until it restarts; recover by correcting `[[tcp.peer_pins]] boot_nonce` on host B and restarting it"
         }
         (409, "repin_refused_by_store") => {
-            "the pin store refused the re-pin; the pin stays \
-             invalidated"
+            "the pin store refused the re-pin; the pin stays invalidated; host B will not detect this \
+             peer again until it restarts; recover by correcting `[[tcp.peer_pins]] boot_nonce` on host B and restarting it"
         }
         _ => "",
     };

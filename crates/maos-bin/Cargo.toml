@@ -127,7 +127,7 @@ rustix = { version = "1.1", features = ["fs", "process"] }
 maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["process"] }
+tokio = { version = "1", features = ["process", "test-util"] }   # test-util: story 19-7 re-pin hold tests run under paused time
 tempfile = "3"
 maos-eval = { path = "../maos-eval", features = ["benchmark-sidecar"] }   # Story 18-2 — verify the eval sidecar in eval_halt_18_2.rs
 wit-parser = "0.254"

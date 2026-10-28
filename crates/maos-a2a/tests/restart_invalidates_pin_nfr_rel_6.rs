@@ -2,7 +2,16 @@
 //! consent confirmation — 6-scenario integration test, plus the Story 19-7
 //! store vectors for the production decision source (AC2: pending request,
 //! supersede, TTL, accept, reject, nonce mismatch, expiry, concurrent
-//! detection during a decision, detection sink).
+//! detection during a decision, detection sink, rotation-at-detection
+//! refusal, monotonic `expired` flag, sink ordering).
+//!
+//! Not covered here: the consume-time refusals for an absent pin, a pin no
+//! longer `Invalidated::SpiritRestarted`, or a pin whose fingerprint differs
+//! from the request's. `InMemoryTofuPinStore` exposes no pin-removal or
+//! manual-invalidation method and nothing re-fingerprints an invalidated
+//! pin, so no public path reaches those states; the guards in
+//! `await_repin_consent` are defensive (a consent never resurrects a removed
+//! or manually invalidated pin should such an API be added).
 //!
 //! Scenarios per AC4:
 //!   4.1 First-contact pin + subsequent connection succeeds
@@ -16,7 +25,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use maos_a2a::tofu::{
-    RepinDecisionError, RepinRequest, RepinSink, RepinVerdict, REPIN_REQUEST_TTL,
+    Invalidated, RepinDecisionError, RepinRequest, RepinSink, RepinVerdict, REPIN_REQUEST_TTL,
 };
 use maos_a2a::{
     EPinMismatch, InMemoryTofuPinStore, PeerCertFingerprint, PeerId, RePinDecision, TofuPinStore,
@@ -271,6 +280,12 @@ async fn repin_19_7_accept_repins_the_current_fingerprint_with_the_observed_nonc
             approval_id: APPROVAL
         }
     );
+    // The consumed decision cannot be replayed: the SAME nonce re-awaited
+    // right after the accept is not accepted a second time.
+    assert_eq!(
+        store.await_repin_consent(&peer, &cert, 7).await,
+        RePinDecision::TimedOut
+    );
     let pin = store.get_pin(&peer).await.expect("re-pinned");
     assert_eq!(pin.fingerprint, cert);
     assert_eq!(pin.boot_nonce, 7);
@@ -296,7 +311,7 @@ async fn repin_19_7_accept_repins_the_current_fingerprint_with_the_observed_nonc
             .expect("next restart"),
         Some(7)
     );
-    // The consumed decision cannot be replayed.
+    // The re-armed detection carries no verdict of its own.
     assert_eq!(
         store.await_repin_consent(&peer, &cert, 8).await,
         RePinDecision::TimedOut
@@ -615,4 +630,155 @@ async fn repin_19_7_concurrent_detections_record_one_request() {
     }
     assert_eq!(seen.lock().expect("sink log").len(), 1);
     assert_eq!(store.pending_repins().len(), 1);
+}
+
+/// Edge F4 — a restart detected while a rotation window was open: the
+/// detection reads the window state BEFORE clearing it, the approval is
+/// recorded, and the store refuses to materialize it; the request is
+/// consumed and the pin is left exactly as the detection left it.
+#[tokio::test]
+async fn repin_19_7_approval_of_a_restart_detected_mid_rotation_is_refused_by_the_store() {
+    let store = InMemoryTofuPinStore::new();
+    let peer = PeerId::new("host-a");
+    let cert = fp("cert-a");
+    let next = fp("cert-a-next");
+    store
+        .pin_first_contact(&peer, &cert, &cert, 1)
+        .await
+        .expect("pin");
+    store
+        .open_rotation_window(&peer, &next)
+        .expect("window opens on the active pin");
+    assert_eq!(
+        store
+            .invalidate_if_boot_nonce_differs(&peer, 7)
+            .await
+            .expect("detect"),
+        Some(1)
+    );
+    assert_eq!(
+        store.rotation_next(&peer),
+        None,
+        "detection clears the window"
+    );
+
+    let request = store
+        .record_repin_decision(&peer, 7, approve())
+        .expect("the verdict itself is recorded");
+    assert!(matches!(
+        store
+            .await_repin_consent(&peer, &request.pinned_fingerprint, 7)
+            .await,
+        RePinDecision::RejectedByStore {
+            error: EPinMismatch::Invalidated { .. }
+        }
+    ));
+    assert!(store.pending_repins().is_empty(), "the request is consumed");
+    let pin = store.get_pin(&peer).await.expect("pin kept");
+    assert_eq!(pin.fingerprint, cert);
+    assert_eq!(pin.boot_nonce, 1);
+    assert_eq!(
+        pin.invalidated,
+        Some(Invalidated::SpiritRestarted {
+            prior_boot_nonce: 1
+        })
+    );
+    assert_eq!(pin.repin_approval_id, None);
+    assert_eq!(store.rotation_next(&peer), None);
+}
+
+/// Edge F4 — the rotation-at-detection mark survives a superseding
+/// detection (the first detection already cleared the window).
+#[tokio::test]
+async fn repin_19_7_rotation_mark_survives_a_superseding_detection() {
+    let store = InMemoryTofuPinStore::new();
+    let peer = PeerId::new("host-a");
+    let cert = fp("cert-a");
+    store
+        .pin_first_contact(&peer, &cert, &cert, 1)
+        .await
+        .expect("pin");
+    store
+        .open_rotation_window(&peer, &fp("cert-a-next"))
+        .expect("window opens");
+    store
+        .invalidate_if_boot_nonce_differs(&peer, 7)
+        .await
+        .expect("detect mid-rotation");
+    store
+        .invalidate_if_boot_nonce_differs(&peer, 9)
+        .await
+        .expect("supersede");
+    store
+        .record_repin_decision(&peer, 9, approve())
+        .expect("record accept");
+    assert!(matches!(
+        store.await_repin_consent(&peer, &cert, 9).await,
+        RePinDecision::RejectedByStore {
+            error: EPinMismatch::Invalidated { .. }
+        }
+    ));
+    assert!(store
+        .get_pin(&peer)
+        .await
+        .expect("pin")
+        .invalidated
+        .is_some());
+}
+
+/// Blind#6 / TI-8 — `expired` is stamped by `pending_repins()` from the
+/// store's monotonic deadline; the sink and `record_repin_decision` values
+/// carry `false`.
+#[tokio::test]
+async fn repin_19_7_pending_requests_carry_the_monotonic_expired_flag() {
+    let peer = PeerId::new("host-a");
+    let cert = fp("cert-a");
+
+    let lapsed = InMemoryTofuPinStore::new().with_repin_ttl(Duration::ZERO);
+    let (sink, seen) = recording_sink();
+    assert!(lapsed.install_repin_sink(sink));
+    detected(&lapsed, &peer, &cert, 7).await;
+    let pending = lapsed.pending_repins();
+    assert_eq!(pending.len(), 1);
+    assert!(pending[0].expired, "TTL 0 lapses at detection");
+    assert!(!seen.lock().expect("sink log")[0].expired);
+
+    let live = InMemoryTofuPinStore::new().with_repin_ttl(Duration::from_secs(3600));
+    detected(&live, &peer, &cert, 7).await;
+    assert!(!live.pending_repins()[0].expired);
+    let request = live
+        .record_repin_decision(&peer, 7, approve())
+        .expect("record accept");
+    assert!(!request.expired);
+    assert_eq!(live.pending_repins()[0], request);
+}
+
+/// Blind#5 — the sink runs under the store's lifecycle lock, so its rows
+/// follow detection order: under concurrent superseding detections the
+/// last row delivered is the request that ended up pending.
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn repin_19_7_sink_rows_follow_detection_order() {
+    let store = Arc::new(InMemoryTofuPinStore::new());
+    let (sink, seen) = recording_sink();
+    assert!(store.install_repin_sink(sink));
+    let peer = PeerId::new("host-a");
+    let cert = fp("cert-a");
+    store
+        .pin_first_contact(&peer, &cert, &cert, 1)
+        .await
+        .expect("pin");
+
+    let tasks: Vec<_> = (2..34)
+        .map(|nonce| {
+            let store = Arc::clone(&store);
+            let peer = peer.clone();
+            tokio::spawn(async move { store.invalidate_if_boot_nonce_differs(&peer, nonce).await })
+        })
+        .collect();
+    for task in tasks {
+        assert_eq!(task.await.expect("join").expect("detect"), Some(1));
+    }
+    let seen = seen.lock().expect("sink log");
+    assert_eq!(seen.len(), 32, "every distinct nonce supersedes");
+    assert_eq!(seen.last(), store.pending_repins().first());
 }
