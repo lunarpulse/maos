@@ -1,0 +1,59 @@
+diff -ruN base/crates/maos-kernel-core/src/hot_swap/archive.rs k3-archive-gate/crates/maos-kernel-core/src/hot_swap/archive.rs
+--- a/crates/maos-kernel-core/src/hot_swap/archive.rs
++++ b/crates/maos-kernel-core/src/hot_swap/archive.rs
+@@ -99,6 +99,55 @@
+     pub fn exists(&self, spirit_id: &str, version: &str) -> bool {
+         self.archive_dir(spirit_id, version).is_dir()
+     }
++
++    /// ADR-020 / FR11 — refuse a load when an archived predecessor of
++    /// `spirit_id` is cross-major to `successor` (the hot-swap step-7 rule,
++    /// `state_codec::detect_compat`) and `[migrates_from]` names none of it.
++    pub fn refuse_without_migrator(
++        &self,
++        spirit_id: &str,
++        successor: &crate::scheduler::control_block::SpiritManifestBundle,
++    ) -> Result<(), maos_domain::hot_swap::HotSwapError> {
++        let Some(class) = successor.class.as_ref() else {
++            return Ok(());
++        };
++        let successor_schema = successor
++            .hot_swap
++            .as_ref()
++            .map_or(1, |h| h.state_schema_version);
++        let Ok(entries) = fs::read_dir(self.base_dir.join(spirit_id)) else {
++            return Ok(());
++        };
++        for entry in entries.flatten() {
++            let version = entry.file_name().to_string_lossy().into_owned();
++            let manifest =
++                fs::read_to_string(entry.path().join("manifest.toml")).unwrap_or_default();
++            let schema = toml::from_str::<toml::Value>(&manifest)
++                .ok()
++                .and_then(|root| {
++                    root.get("hot_swap")?
++                        .get("state_schema_version")?
++                        .as_integer()
++                })
++                .map_or(1, |v| v as u32);
++            let cross = super::state_codec::detect_compat(schema, successor_schema)
++                == super::state_codec::SchemaCompat::CrossMajor;
++            let declared = successor.migrates_from.as_ref().is_some_and(|m| {
++                m.versions
++                    .iter()
++                    .any(|p| super::migrator::matches_version_pattern(p, &version))
++            });
++            if version != class.version && cross && !declared {
++                return Err(maos_domain::hot_swap::HotSwapError::EMigratorMissing {
++                    predecessor_class: class.name.clone(),
++                    predecessor_version: version,
++                    successor_class: class.name.clone(),
++                    successor_version: class.version.clone(),
++                });
++            }
++        }
++        Ok(())
++    }
+ }
+ 
+ #[cfg(test)]

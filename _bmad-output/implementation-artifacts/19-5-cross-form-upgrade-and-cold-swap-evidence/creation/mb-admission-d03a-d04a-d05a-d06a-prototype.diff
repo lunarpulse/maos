@@ -1,0 +1,184 @@
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -248,6 +248,12 @@
+     Admission { detail: String },
+     /// `on_start` failed, or the Spirit could not be started.
+     Start { detail: String },
++    /// Gate 0 — ADR-020 / FR11: an archived cross-major predecessor exists
++    /// and `[migrates_from]` names none of it (`EMigratorMissing`).
++    MigratorMissing {
++        archived_version: String,
++        successor_version: String,
++    },
+ }
+ 
+ impl AdmissionRefusal {
+@@ -255,6 +261,7 @@
+     pub fn code(&self) -> &'static str {
+         match self {
+             Self::ManifestUnreadable { .. } => "manifest_unreadable",
++            Self::MigratorMissing { .. } => "migrator_missing",
+             Self::ManifestParse { .. } => "manifest_parse_failed",
+             Self::CliWrapperClassConflict => "manifest_schema_conflict",
+             Self::CliWrapperUnsupported => "cli_wrapper_unsupported",
+@@ -286,6 +293,14 @@
+     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         match self {
+             Self::ManifestUnreadable { detail } => write!(f, "manifest unreadable: {detail}"),
++            Self::MigratorMissing {
++                archived_version,
++                successor_version,
++            } => write!(
++                f,
++                "EMigratorMissing: an archived predecessor v{archived_version} is cross-major to \
++                 v{successor_version} and [migrates_from] does not name it (ADR-020)"
++            ),
+             Self::ManifestParse { detail } => write!(f, "manifest is not valid TOML: {detail}"),
+             Self::CliWrapperClassConflict => f.write_str(
+                 "manifest declares both [cli_wrapper] and [class] — mutually exclusive \
+@@ -394,6 +409,10 @@
+     pub scheduling: SchedulingSection,
+     pub lifecycle: LifecycleSection,
+     pub budget: Option<Budget>,
++    /// Story 19-5 — the sections the ADR-020 swap decision tree reads.
++    pub hot_swap: Option<maos_manifest::HotSwapManifestSection>,
++    pub migrates_from: Option<maos_manifest::MigratesFromSection>,
++    pub halt_protocol_compatibility: Option<maos_manifest::HaltProtocolCompatibilitySection>,
+     /// The raw text, kept for the model-provenance gate, which parses its own
+     /// section out of the whole document.
+     pub manifest_toml: String,
+@@ -407,6 +426,9 @@
+             lifecycle: self.lifecycle.clone(),
+             class: Some(self.class_section.clone()),
+             budget: self.budget.clone(),
++            hot_swap: self.hot_swap.clone(),
++            migrates_from: self.migrates_from.clone(),
++            halt_protocol_compatibility: self.halt_protocol_compatibility.clone(),
+             ..Default::default()
+         }
+     }
+@@ -575,6 +597,24 @@
+     let budget = section("budget")
+         .map(|s| Budget::from_toml_str(&s).map_err(|e| parse_err("budget")(e.to_string())))
+         .transpose()?;
++    let hot_swap = section("hot_swap")
++        .map(|s| {
++            maos_manifest::HotSwapManifestSection::from_toml_str(&s)
++                .map_err(|e| parse_err("hot_swap")(e.to_string()))
++        })
++        .transpose()?;
++    let migrates_from = section("migrates_from")
++        .map(|s| {
++            maos_manifest::MigratesFromSection::from_toml_str(&s)
++                .map_err(|e| parse_err("migrates_from")(e.to_string()))
++        })
++        .transpose()?;
++    let halt_protocol_compatibility = section("halt_protocol_compatibility")
++        .map(|s| {
++            maos_manifest::HaltProtocolCompatibilitySection::from_toml_str(&s)
++                .map_err(|e| parse_err("halt_protocol_compatibility")(e.to_string()))
++        })
++        .transpose()?;
+     // The component's manifest has now passed every structural gate. The
+     // refusal is feature-selected because a published binary's engine closure
+     // is an export-control property, not runtime configuration.
+@@ -595,6 +635,9 @@
+         scheduling,
+         lifecycle,
+         budget,
++        hot_swap,
++        migrates_from,
++        halt_protocol_compatibility,
+         manifest_toml: manifest_toml.to_owned(),
+     })
+ }
+@@ -699,6 +742,8 @@
+     on_loaded: &mut (dyn FnMut(u32) + Send),
+ ) -> Result<Admitted, AdmissionRefusal> {
+     let spirit_id = gated.spirit_id.clone();
++    let archive_root = maos_audit::default_archive_dir();
++    refuse_without_migrator(&archive_root, gated)?;
+ 
+     // Gate 8 — model provenance, BEFORE a pid is allocated. Refusing after
+     // the load is what the topology arm did, and it meant a provenance-refused
+@@ -775,6 +820,7 @@
+             });
+         }
+     };
++    archive_admitted(&archive_root, gated);
+     emit_vetter_key_event(
+         deps.transparency_log,
+         &spirit_id,
+@@ -865,6 +911,72 @@
+     remove_pid_by_spirit_id(deps, spirit_id);
+ }
+ 
++/// ADR-020 / FR11 — the predecessor is the most recently archived record of
++/// this id at another version; cross-major is hot-swap step 7's rule.
++fn refuse_without_migrator(root: &Path, gated: &GatedManifest) -> Result<(), AdmissionRefusal> {
++    let Ok(entries) = std::fs::read_dir(root.join(&gated.spirit_id)) else {
++        return Ok(());
++    };
++    let latest = entries
++        .flatten()
++        .filter(|entry| entry.file_name().to_string_lossy() != gated.class_section.version)
++        .filter_map(|entry| Some((entry.metadata().ok()?.modified().ok()?, entry)))
++        .max_by_key(|(modified, _)| *modified);
++    let Some((_, entry)) = latest else {
++        return Ok(());
++    };
++    let archived_version = entry.file_name().to_string_lossy().into_owned();
++    let archived =
++        std::fs::read_to_string(entry.path().join("manifest.toml")).map_err(|error| {
++            AdmissionRefusal::ManifestUnreadable {
++                detail: format!("archived predecessor {archived_version}: {error}"),
++            }
++        })?;
++    let schema = |hot_swap: Option<&toml::Value>| {
++        hot_swap
++            .and_then(|h| h.get("state_schema_version")?.as_integer())
++            .map_or(1, |v| v as u32)
++    };
++    let archived_root: toml::Value =
++        toml::from_str(&archived).map_err(|error| AdmissionRefusal::ManifestParse {
++            detail: format!("archived predecessor {archived_version}: {error}"),
++        })?;
++    let predecessor = schema(archived_root.get("hot_swap"));
++    let successor = gated
++        .hot_swap
++        .as_ref()
++        .map_or(1, |h| h.state_schema_version);
++    let cross = maos_kernel_core::hot_swap::state_codec::detect_compat(predecessor, successor)
++        == maos_kernel_core::hot_swap::SchemaCompat::CrossMajor;
++    let declared = gated.migrates_from.as_ref().is_some_and(|m| {
++        m.versions
++            .iter()
++            .any(|p| maos_kernel_core::hot_swap::matches_version_pattern(p, &archived_version))
++    });
++    if cross && !declared {
++        return Err(AdmissionRefusal::MigratorMissing {
++            archived_version,
++            successor_version: gated.class_section.version.clone(),
++        });
++    }
++    Ok(())
++}
++
++/// ADR-020 / FR11 — record the admitted version once (write-if-absent); the
++/// snapshot is empty: state lives in the Spirit's own stores, not here.
++fn archive_admitted(root: &Path, gated: &GatedManifest) {
++    let archive = maos_kernel_core::hot_swap::SpiritArchive::new(root.to_path_buf());
++    let version = &gated.class_section.version;
++    if !archive.exists(&gated.spirit_id, version) {
++        if let Err(error) = archive.write(&gated.spirit_id, version, &gated.manifest_toml, &[]) {
++            eprintln!(
++                "maos: WARNING — archive record for {} v{version}: {error}",
++                gated.spirit_id
++            );
++        }
++    }
++}
++
+ /// Remove the door's lookup only; panic teardown retains scheduler ownership.
+ fn remove_pid_by_spirit_id(deps: &AdmissionDeps<'_>, spirit_id: &str) {
+     deps.pid_by_spirit_id

@@ -94,7 +94,7 @@ Body archived verbatim 2026-10-27 → deferred-work-archive-2026-10-27.md#journe
 
 ## Deferred from: code review of 7-5a-publish-and-enforce-v1-0-abi-stability-commitments (2026-05-31)
 
-- ColdSwap/HotSwap upgrade paths bypass `admit_spirit` entirely — directly insert successor SCB without ABI version checks. Pre-existing gap (Story 5.x). Story 5.5x tracks the fix. `crates/maos-kernel-core/src/lifecycle/upgrade.rs:131-171`
+- ColdSwap/HotSwap upgrade paths bypass `admit_spirit` entirely — directly insert successor SCB without ABI version checks. Pre-existing gap (Story 5.x). **Owner: `19-5-cross-form-upgrade-and-cold-swap`** (rule 10(a); re-homed 2026-10-28 at 19-5 creation — "Story 5.5x" never existed): cold-swap half by D-19-5-01 A (door-composed cold swap through the admission triple; kernel arm deleted), hot-swap half by D-19-5-09 A (`check_abi_triple` pre-check on every upgrade target) — RULED 2026-10-28 (ask `w3_19_5`). `crates/maos-kernel-core/src/lifecycle/upgrade.rs:139-233` @61af7461 (was `:131-171`)
 - ~~`POST_V1_SCHEMA_SECTIONS` must be manually maintained on future schema bumps~~ — FIXED: `check-manifest-schema-version` Step 5 now gates the constant; future bumps that forget it fail CI.
 
 ## Deferred from: code review of 7-4-author-skills-and-propose-revisions-with-output-shape-fail-loud (2026-05-31)

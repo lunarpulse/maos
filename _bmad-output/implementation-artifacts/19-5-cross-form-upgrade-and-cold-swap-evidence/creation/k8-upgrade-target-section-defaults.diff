@@ -1,0 +1,22 @@
+diff -ruN base/crates/maos-kernel-core/src/lifecycle/upgrade.rs k8-upgrade-target-defaults/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -398,8 +398,16 @@
+             .map_err(|e| ManifestError::Toml(format!("serialize [{section}]: {e}")))
+     };
+ 
+-    let scheduling = SchedulingSection::from_toml_str(&extract("scheduling")?)?;
+-    let lifecycle = LifecycleSection::from_toml_str(&extract("lifecycle")?)?;
++    // Story 19-5 — optional, as at admission (`maos-bin` `gate_manifest`): a
++    // shipped manifest is a valid upgrade target without these sections.
++    let scheduling = match root.get("scheduling") {
++        Some(_) => SchedulingSection::from_toml_str(&extract("scheduling")?)?,
++        None => SchedulingSection::default(),
++    };
++    let lifecycle = match root.get("lifecycle") {
++        Some(_) => LifecycleSection::from_toml_str(&extract("lifecycle")?)?,
++        None => LifecycleSection::default(),
++    };
+     // Story 7.5a — `[class]` is REQUIRED at parse time. A manifest without
+     // `[class]` is malformed: the ABI Stability Triple (min_substrate_version,
+     // manifest_schema_version) is part of the admission contract and cannot

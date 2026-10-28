@@ -1,0 +1,295 @@
+diff -ruN base/crates/maos-kernel-core/src/lifecycle/upgrade.rs krec-recommended/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -2,8 +2,9 @@
+ 
+ //! Upgrade orchestrator — three-policy upgrade verb body.
+ //!
+-//! Dispatches `hot-swap` (Story 5.2), `cold-swap` (sequenced unload+load),
+-//! and `migrator` (cross-major with explicit declaration check).
++//! Dispatches `hot-swap` (Story 5.2) and `migrator` (cross-major with explicit
++//! declaration check). Cold swap is composed by the operator door from the
++//! admission triple (Story 19-5), never by raw spirits-map writes here.
+ 
+ use std::io;
+ use std::path::Path;
+@@ -15,7 +16,7 @@
+ use crate::capability::cap_tokens::monotonic_now_ns;
+ use crate::halt::terminate_spirit;
+ use crate::hot_swap::HotSwapCoordinator;
+-use crate::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
++use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+ use crate::journal::JournalAdapter;
+ use crate::scheduler::control_block::{AnySpiritObj, SpiritManifestBundle};
+ use crate::scheduler::SpiritSchedulerAdapter;
+@@ -109,24 +110,21 @@
+ 
+         // 3. Resolve predecessor metadata and construct a fresh successor
+         // before any policy mutates the predecessor.
+-        let (predecessor_version, predecessor_scb, predecessor_state) =
+-            {
+-                let scbs = self.scheduler.scbs();
+-                let map = scbs.read().expect("spirits lock poisoned");
+-                let scb = Arc::clone(map.get(&predecessor_pid).ok_or_else(|| {
+-                    UpgradeError::NotLoaded {
+-                        spirit_id: spirit_id.into(),
+-                    }
+-                })?);
+-                let runtime = scb.runtime_snapshot();
+-                let version = runtime
+-                    .manifest
+-                    .class
+-                    .as_ref()
+-                    .map(|c| c.version.clone())
+-                    .unwrap_or_else(|| "unknown".into());
+-                (version, scb.clone(), scb.current_state())
+-            };
++        let predecessor_version = {
++            let scbs = self.scheduler.scbs();
++            let map = scbs.read().expect("spirits lock poisoned");
++            let scb = map
++                .get(&predecessor_pid)
++                .ok_or_else(|| UpgradeError::NotLoaded {
++                    spirit_id: spirit_id.into(),
++                })?;
++            scb.runtime_snapshot()
++                .manifest
++                .class
++                .as_ref()
++                .map(|c| c.version.clone())
++                .unwrap_or_else(|| "unknown".into())
++        };
+         let successor_spirit_obj = self.successor_factory.create(&successor_manifest)?;
+ 
+         let successor_version = successor_manifest
+@@ -135,7 +133,7 @@
+             .map(|c| c.version.clone())
+             .unwrap_or_else(|| "unknown".into());
+ 
+-        let mut halt_receipts_produced = 0usize;
++        let halt_receipts_produced = 0usize;
+         let mut outcome = UpgradeOutcome::Completed;
+ 
+         // 4. Dispatch per policy
+@@ -159,56 +157,6 @@
+                     }
+                 }
+             }
+-            UpgradePolicy::ColdSwap => {
+-                let unload_start_ns = monotonic_now_ns();
+-                if let Err(error) = self.scheduler.unload(predecessor_pid).await {
+-                    // Unload can transition before a hook fails. Restore the
+-                    // predecessor's lifecycle state on its still-stable Arc.
+-                    predecessor_scb.state.store(
+-                        predecessor_state as u8,
+-                        std::sync::atomic::Ordering::Release,
+-                    );
+-                    return Err(UpgradeError::Lifecycle(error));
+-                }
+-
+-                // Count receipts in the unload window.
+-                let entries = self
+-                    .tl
+-                    .query_frames(FrameFilter {
+-                        kind: Some(FrameKind::EpistemicHalt),
+-                        spirit_pid: Some(predecessor_pid),
+-                        since_ns: Some(unload_start_ns),
+-                        ..Default::default()
+-                    })
+-                    .unwrap_or_default();
+-                halt_receipts_produced = entries.len();
+-
+-                let boot_nonce = 0u64;
+-                let new_pid = crate::scheduler::scheduler_loop::allocate_pid();
+-                let new_scb = Arc::new(crate::scheduler::control_block::SpiritControlBlock::new(
+-                    new_pid,
+-                    spirit_id.into(),
+-                    successor_manifest,
+-                    successor_spirit_obj,
+-                    boot_nonce,
+-                ));
+-                {
+-                    let scbs = self.scheduler.scbs();
+-                    let mut map = scbs.write().expect("spirits lock poisoned");
+-                    map.insert(new_pid, new_scb);
+-                }
+-                if let Err(error) = self.scheduler.start(new_pid).await {
+-                    let scbs = self.scheduler.scbs();
+-                    let mut map = scbs.write().expect("spirits lock poisoned");
+-                    map.remove(&new_pid);
+-                    predecessor_scb.state.store(
+-                        predecessor_state as u8,
+-                        std::sync::atomic::Ordering::Release,
+-                    );
+-                    map.insert(predecessor_pid, Arc::clone(&predecessor_scb));
+-                    return Err(UpgradeError::Lifecycle(error));
+-                }
+-            }
+             UpgradePolicy::Migrator => {
+                 if successor_manifest.migrates_from.is_none() {
+                     return Err(UpgradeError::MigratorNotDeclared);
+@@ -300,7 +248,6 @@
+ #[serde(rename_all = "snake_case")]
+ pub enum UpgradePolicy {
+     HotSwap,
+-    ColdSwap,
+     Migrator,
+ }
+ 
+@@ -308,7 +255,6 @@
+     pub fn as_str(&self) -> &'static str {
+         match self {
+             Self::HotSwap => "hot-swap",
+-            Self::ColdSwap => "cold-swap",
+             Self::Migrator => "migrator",
+         }
+     }
+@@ -319,7 +265,6 @@
+     fn from_str(s: &str) -> Result<Self, Self::Err> {
+         match s {
+             "hot-swap" => Ok(Self::HotSwap),
+-            "cold-swap" => Ok(Self::ColdSwap),
+             "migrator" => Ok(Self::Migrator),
+             other => Err(format!("unknown upgrade policy: {other}")),
+         }
+@@ -370,8 +315,6 @@
+     MigratorNotDeclared,
+     #[error("hot-swap coordinator error: {0}")]
+     HotSwap(#[from] maos_domain::hot_swap::HotSwapError),
+-    #[error("lifecycle error during cold-swap: {0}")]
+-    Lifecycle(#[from] maos_domain::lifecycle::LifecycleError),
+ }
+ 
+ /// Load a `SpiritManifestBundle` from a TOML file path.
+@@ -398,8 +341,16 @@
+             .map_err(|e| ManifestError::Toml(format!("serialize [{section}]: {e}")))
+     };
+ 
+-    let scheduling = SchedulingSection::from_toml_str(&extract("scheduling")?)?;
+-    let lifecycle = LifecycleSection::from_toml_str(&extract("lifecycle")?)?;
++    // Story 19-5 — optional, as at admission (`maos-bin` `gate_manifest`): a
++    // shipped manifest is a valid upgrade target without these sections.
++    let scheduling = match root.get("scheduling") {
++        Some(_) => SchedulingSection::from_toml_str(&extract("scheduling")?)?,
++        None => SchedulingSection::default(),
++    };
++    let lifecycle = match root.get("lifecycle") {
++        Some(_) => LifecycleSection::from_toml_str(&extract("lifecycle")?)?,
++        None => LifecycleSection::default(),
++    };
+     // Story 7.5a — `[class]` is REQUIRED at parse time. A manifest without
+     // `[class]` is malformed: the ABI Stability Triple (min_substrate_version,
+     // manifest_schema_version) is part of the admission contract and cannot
+diff -ruN base/crates/maos-kernel-core/src/security/mod.rs krec-recommended/crates/maos-kernel-core/src/security/mod.rs
+--- a/crates/maos-kernel-core/src/security/mod.rs
++++ b/crates/maos-kernel-core/src/security/mod.rs
+@@ -280,52 +280,8 @@
+             spirit_id: spirit_id.into(),
+         })?;
+ 
+-        // Leg 1 — kernel_version vs declared min_substrate_version (FR8).
+-        // env!("CARGO_PKG_VERSION") inside kernel-core IS the kernel leg
+-        // (all crates share [workspace.package].version).
+-        let kernel_version = env!("CARGO_PKG_VERSION");
+-        let declared_min = class.min_substrate_version.clone();
+-        // Fail-loud on BOTH "too old" (Ok(false)) and "unparseable" (Err):
+-        // a version we cannot prove compatible is refused, never silently
+-        // admitted. No `unwrap_or_default()` — a silent default here would
+-        // admit a too-old kernel (a correctness/security bug).
+-        let satisfies_min = maos_domain::revocation::semver_range_contains(
+-            kernel_version,
+-            &format!(">={declared_min}"),
+-        )
+-        .map_err(|_| SecurityError::ESubstrateTooOld {
+-            spirit_id: spirit_id.into(),
+-            declared_min: declared_min.clone(),
+-            kernel_version: kernel_version.into(),
+-        })?;
+-        if !satisfies_min {
+-            return Err(SecurityError::ESubstrateTooOld {
+-                spirit_id: spirit_id.into(),
+-                declared_min,
+-                kernel_version: kernel_version.into(),
+-            });
+-        }
++        check_abi_triple(spirit_id, class)?;
+ 
+-        // Leg 2 — manifest_schema_version vs the kernel's supported window.
+-        // Fail-closed in BOTH directions per the §LOCKED Design Decision:
+-        // below MIN → EAbiTooOld (N-2 hard refusal); above MAX → EAbiTooNew
+-        // (forward case; NO warn-and-ignore window). The manifest parser
+-        // keeps its shape-only window check as defense-in-depth.
+-        let declared_schema = class.manifest_schema_version;
+-        let min_supported = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+-        let max_supported = maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+-        if declared_schema < min_supported {
+-            return Err(SecurityError::EAbiTooOld {
+-                declared_schema,
+-                min_supported,
+-            });
+-        }
+-        if declared_schema > max_supported {
+-            return Err(SecurityError::EAbiTooNew {
+-                declared_schema,
+-                max_supported,
+-            });
+-        }
+         // N-1 (declared < CURRENT but within window) — admit with documented
+         // WARN-level degradation paths (NFR-Maint-9). The WARN emission lives
+         // in maos-manifest so the same code path is exercised by the
+@@ -669,3 +625,55 @@
+         );
+     }
+ }
++
++/// Story 7.5a legs 1–2 of the ABI Stability Triple, shared by `admit_spirit`
++/// and the operator door's hot-swap successor pre-gate (Story 19-5).
++pub fn check_abi_triple(spirit_id: &str, class: &ClassSection) -> Result<(), SecurityError> {
++    // Leg 1 — kernel_version vs declared min_substrate_version (FR8).
++    // env!("CARGO_PKG_VERSION") inside kernel-core IS the kernel leg
++    // (all crates share [workspace.package].version).
++    let kernel_version = env!("CARGO_PKG_VERSION");
++    let declared_min = class.min_substrate_version.clone();
++    // Fail-loud on BOTH "too old" (Ok(false)) and "unparseable" (Err):
++    // a version we cannot prove compatible is refused, never silently
++    // admitted. No `unwrap_or_default()` — a silent default here would
++    // admit a too-old kernel (a correctness/security bug).
++    let satisfies_min = maos_domain::revocation::semver_range_contains(
++        kernel_version,
++        &format!(">={declared_min}"),
++    )
++    .map_err(|_| SecurityError::ESubstrateTooOld {
++        spirit_id: spirit_id.into(),
++        declared_min: declared_min.clone(),
++        kernel_version: kernel_version.into(),
++    })?;
++    if !satisfies_min {
++        return Err(SecurityError::ESubstrateTooOld {
++            spirit_id: spirit_id.into(),
++            declared_min,
++            kernel_version: kernel_version.into(),
++        });
++    }
++
++    // Leg 2 — manifest_schema_version vs the kernel's supported window.
++    // Fail-closed in BOTH directions per the §LOCKED Design Decision:
++    // below MIN → EAbiTooOld (N-2 hard refusal); above MAX → EAbiTooNew
++    // (forward case; NO warn-and-ignore window). The manifest parser
++    // keeps its shape-only window check as defense-in-depth.
++    let declared_schema = class.manifest_schema_version;
++    let min_supported = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
++    let max_supported = maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION;
++    if declared_schema < min_supported {
++        return Err(SecurityError::EAbiTooOld {
++            declared_schema,
++            min_supported,
++        });
++    }
++    if declared_schema > max_supported {
++        return Err(SecurityError::EAbiTooNew {
++            declared_schema,
++            max_supported,
++        });
++    }
++    Ok(())
++}

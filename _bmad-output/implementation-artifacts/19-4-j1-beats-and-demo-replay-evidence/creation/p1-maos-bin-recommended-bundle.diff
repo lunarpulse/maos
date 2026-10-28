@@ -1,0 +1,346 @@
+diff --git a/crates/maos-bin/src/env_contract.rs b/crates/maos-bin/src/env_contract.rs
+index d9caa22..7b30af1 100644
+--- a/crates/maos-bin/src/env_contract.rs
++++ b/crates/maos-bin/src/env_contract.rs
+@@ -343,6 +343,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+         purpose: "When set to '1', cassette prompt-hash drift is a hard error",
+         stability: EnvStability::HarnessOnly,
+     },
++    EnvVar {
++        name: "MAOS_EPIC_HALT_HOLD_SECS",
++        purpose: "Seconds an --epic run holds a halted section for a door resolution",
++        stability: EnvStability::UserFacing,
++    },
+     EnvVar {
+         name: "MAOS_UTC_OFFSET",
+         purpose: "Story 18-4 (D-18-4-06 A) — the director's fixed local offset `±HH:MM` (within ±18:00) the root's clock reads once at boot; Butler's morning digest rolls over on that local day. Unset ⇒ UTC; malformed ⇒ typed boot refusal. DST is not modelled",
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 98a53a4..3184f46 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -527,6 +527,8 @@ fn requires_epistemic_halt_port(
+                     | "diagnostic_confidence"
+                     | "methodology_conflict"
+                     | "load_bearing_confidence"
++                    | "dispatch_ambiguity"
++                    | "delegation_confidence"
+             )
+     })
+ }
+@@ -647,6 +649,45 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
+     }
+ }
+ 
++/// Story 19-4 (AC2, D-19-4-01 A) — the Orchestrator's scalar port: the same
++/// production adapter as Mira's, bound to the pid `pid_of` resolves and to the
++/// manifest's `[epistemic_policy]` (whose `dispatch_ambiguity` rule halts).
++#[cfg(feature = "network")]
++fn orchestrator_scalar_port(
++    orchestrator: &Arc<
++        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator,
++    >,
++    tl: &Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
++    journal: &Arc<maos_kernel_core::journal::JournalAdapter>,
++    policy: Option<maos_kernel_core::security::manifest::EpistemicPolicySection>,
++    boot_nonce: u64,
++    spirit_id: &str,
++) -> impl Fn(::orchestrator::PidSource) -> Result<Arc<dyn maos_domain::ports::EpistemicScalarPort>, String>
++{
++    let (orchestrator, tl, journal) = (
++        Arc::clone(orchestrator),
++        Arc::clone(tl),
++        Arc::clone(journal),
++    );
++    let spirit_id = spirit_id.to_owned();
++    move |pid_of| {
++        let policy = policy
++            .clone()
++            .ok_or("orchestrator manifest must declare [epistemic_policy]")?;
++        Ok(Arc::new(ButlerOrchestratorAdapter {
++            orchestrator: Arc::clone(&orchestrator),
++            tl: Arc::clone(&tl),
++            journal: Arc::clone(&journal),
++            policy,
++            boot_nonce,
++            last_receipt: Arc::new(std::sync::Mutex::new(None)),
++            spirit_pid_source: ButlerPidSource::Resolve(pid_of),
++            spirit_id: spirit_id.clone(),
++        })
++            as Arc<dyn maos_domain::ports::EpistemicScalarPort>)
++    }
++}
++
+ /// Story 16-1 (D-16-1-W) — ONE butler construction, shared by the `maos run`
+ /// admission path and the upgrade successor factory. Everything that makes a
+ /// butler THIS butler — the seeded calendar-conflict scenario (two overlapping
+@@ -1003,7 +1044,8 @@ fn build_spirit_obj(
+                 .ok_or("butler seam not ready")?;
+             let staged = target_manifest
+                 .ok_or("orchestrator requires the target manifest for its declared providers")?;
+-            let declared = declared_providers(&gate_staged(staged)?);
++            let gated = gate_staged(staged)?;
++            let declared = declared_providers(&gated);
+             let (id, scheduler) = (class_name.to_owned(), Arc::clone(&deps.scheduler));
+             let pid_of: ::orchestrator::PidSource = Arc::new(move || scheduler.resolve_pid(&id));
+             make_spirit_obj(maos_bin::orchestrator_root::construct(
+@@ -1011,6 +1053,14 @@ fn build_spirit_obj(
+                 &seam,
+                 &declared,
+                 pid_of,
++                &orchestrator_scalar_port(
++                    &deps.orchestrator,
++                    &deps.transparency_log,
++                    &deps.shared_journal,
++                    gated.epistemic_policy.clone(),
++                    deps.boot_nonce,
++                    class_name,
++                ),
+             )?)
+         }
+         LoadedSpiritKind::Architect => make_spirit_obj(
+@@ -4681,6 +4731,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                 let mut epic_next: usize = 0;
+                 let mut epic_prior: Option<maos_domain::frame::PriorDistillateRef> = None;
+                 let mut epic_halted = false;
++                // Story 19-4 (AC5, D-19-4-05 A) — how long a pending halt holds
++                // the next section for a resolution over the door; 0 = stop.
++                let epic_hold = std::time::Duration::from_secs(
++                    std::env::var("MAOS_EPIC_HALT_HOLD_SECS")
++                        .ok()
++                        .and_then(|secs| secs.trim().parse().ok())
++                        .unwrap_or(0),
++                );
+                 // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
+                 // topology Worker with no `host`; `TopologyEntry` carries only
+                 // `{manifest, host}`, so the position is the only stable handle.
+@@ -4855,6 +4913,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                                 // the Orchestrator no longer resolving to its admitted
+                                 // pid (unloaded through the door), stops dispatch here
+                                 // (no frame, no Worker) and the run drains normally.
++                                let mut goal = goal;
+                                 if let Some(section) = section {
+                                     maos_bin::orchestrator_root::plant_test_halt(
+                                         &transparency_log,
+@@ -4865,6 +4924,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                                         boot_nonce,
+                                         section.ordinal,
+                                     )?;
++                                    maos_bin::orchestrator_root::judge_section(emitter, section)?;
+                                     if let Some(stop) = maos_bin::orchestrator_root::dispatch_stop(
+                                         &halt_registry,
+                                         pid,
+@@ -4873,8 +4933,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                                         epic.as_ref().map_or(0, Vec::len),
+                                     ) {
+                                         println!("{stop}");
+-                                        epic_halted = true;
+-                                        continue;
++                                        let halt_ids: Vec<String> =
++                                            serde_json::from_value(stop["halt_ids"].clone())
++                                                .unwrap_or_default();
++                                        match maos_bin::orchestrator_root::hold_for_resolution(
++                                            &halt_registry,
++                                            memory.as_ref(),
++                                            pid,
++                                            &halt_ids,
++                                            epic_hold,
++                                            &root_shutdown,
++                                        )
++                                        .await
++                                        {
++                                            Ok(context) if stop["orchestrator_unloaded"] == false => {
++                                                println!(
++                                                    "{}",
++                                                    serde_json::json!({
++                                                        "event": "dispatch_resumed",
++                                                        "section": section.ordinal,
++                                                        "halt_ids": halt_ids,
++                                                        "provided_context": context.is_some(),
++                                                    })
++                                                );
++                                                if let Some(text) = context {
++                                                    goal = format!("{goal}\n\nClarification: {text}");
++                                                }
++                                            }
++                                            _ => {
++                                                epic_halted = true;
++                                                continue;
++                                            }
++                                        }
+                                     }
+                                 }
+                                 let success_criteria = "the worker reports completion through \
+@@ -5172,6 +5262,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                                         &spirit_id,
+                                         &butler_seam,
+                                         &declared_providers(&gated),
++                                        &orchestrator_scalar_port(
++                                            &orchestrator,
++                                            &transparency_log,
++                                            &journal,
++                                            epistemic_policy.clone(),
++                                            boot_nonce,
++                                            &spirit_id,
++                                        ),
+                                     )?;
+                                 if spirit_id == maos_bin::delegation::FROM_SPIRIT {
+                                     delegation_emitter =
+@@ -5341,6 +5439,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                         })
+                     );
+                 }
++                // Story 19-4 (AC3, D-19-4-03 A) — an `--epic` run's FR17 digest
++                // over this boot's frames, through the production renderer.
++                if run.epic.is_some() && topology_load.is_ok() {
++                    let seam = butler_seam
++                        .lock()
++                        .unwrap_or_else(|error| error.into_inner())
++                        .clone();
++                    let pid = scheduler.resolve_pid(maos_bin::delegation::FROM_SPIRIT);
++                    if let (Some(seam), Some(pid)) = (seam, pid) {
++                        if let Err(error) = seam.digest.render_scene_day(pid, boot_nonce) {
++                            eprintln!("maos run: epic digest: {error}");
++                        }
++                    }
++                }
+                 let topology_flush_error = cassette_recorder
+                     .as_ref()
+                     .filter(|_| topology_load.is_ok())
+@@ -6015,6 +6127,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                                 &spirit_id,
+                                 &butler_seam,
+                                 &declared_providers(&gated),
++                                &orchestrator_scalar_port(
++                                    &orchestrator,
++                                    &transparency_log,
++                                    &journal,
++                                    epistemic_policy.clone(),
++                                    boot_nonce,
++                                    &spirit_id,
++                                ),
+                             )?;
+                         pid_fixups.push(Box::new(move |pid| {
+                             pid_binding.store(pid, std::sync::atomic::Ordering::Release);
+diff --git a/crates/maos-bin/src/orchestrator_root.rs b/crates/maos-bin/src/orchestrator_root.rs
+index 1fe739e..867342e 100644
+--- a/crates/maos-bin/src/orchestrator_root.rs
++++ b/crates/maos-bin/src/orchestrator_root.rs
+@@ -38,12 +38,19 @@ pub const HALT_PLANT_ENV: &str = "MAOS_TEST_ONLY_HALT_BEFORE_SECTION";
+ /// Inference Port from the seam's builder (18-1) with a per-pass mint naming
+ /// the first declared provider the router registers. Unset mode returns it
+ /// unbound (ADR-064). The port serves only `judge_ambiguity`, never dispatch.
++/// Story 19-4 (D-19-4-01 A) — `scalar` is the root's `EpistemicScalarPort`
++/// minted over `pid_of`; the Orchestrator writes its judged ambiguity there.
++pub type ScalarPortFactory<'a> =
++    &'a dyn Fn(PidSource) -> Result<Arc<dyn maos_domain::ports::EpistemicScalarPort>, String>;
++
+ pub fn construct(
+     orchestrator: Orchestrator,
+     seam: &butler::ButlerSeam,
+     declared: &[String],
+     pid_of: PidSource,
++    scalar: ScalarPortFactory<'_>,
+ ) -> Result<Orchestrator, String> {
++    let orchestrator = orchestrator.with_scalar_port(scalar(Arc::clone(&pid_of))?);
+     let orchestrator = match &seam.context {
+         Some(bind) => orchestrator.with_context_port(bind(Arc::clone(&pid_of))),
+         None => orchestrator,
+@@ -66,6 +73,7 @@ pub fn construct_at_admitted_pid(
+     spirit_id: &str,
+     seam: &Mutex<Option<butler::ButlerSeam>>,
+     declared: &[String],
++    scalar: ScalarPortFactory<'_>,
+ ) -> Result<(Orchestrator, Arc<AtomicU32>), String> {
+     let cell = Arc::new(AtomicU32::new(0));
+     let pid_of: PidSource = {
+@@ -77,8 +85,14 @@ pub fn construct_at_admitted_pid(
+         .unwrap_or_else(std::sync::PoisonError::into_inner)
+         .clone()
+         .ok_or("maos run: butler seam not ready")?;
+-    let orchestrator = construct(Orchestrator::new(spirit_id), &seam, declared, pid_of)
+-        .map_err(|e| format!("maos run: {e}"))?;
++    let orchestrator = construct(
++        Orchestrator::new(spirit_id),
++        &seam,
++        declared,
++        pid_of,
++        scalar,
++    )
++    .map_err(|e| format!("maos run: {e}"))?;
+     Ok((orchestrator, cell))
+ }
+ 
+@@ -224,6 +238,73 @@ pub fn dispatch_stop(
+     })
+ }
+ 
++/// Story 19-4 (AC2, D-19-4-02 A) — judge section `section` before its frame:
++/// the Orchestrator's completion → `dispatch_ambiguity` through its scalar
++/// port; the kernel decides the halt. Unset mode (no port) is no judgement
++/// (ADR-064); every other failure refuses the run typed, never a default.
++pub fn judge_section(emitter: &Orchestrator, section: &EpicSection) -> Result<(), String> {
++    match emitter.assess_ambiguity(section) {
++        Ok((value, halted)) => {
++            println!(
++                "{}",
++                serde_json::json!({
++                    "event": "dispatch_judged",
++                    "section": section.ordinal,
++                    "tag": SCALAR_TAG_DISPATCH_AMBIGUITY,
++                    "value": value,
++                    "halt_id": halted.map(|receipt| receipt.halt_id.as_str().to_owned()),
++                })
++            );
++            Ok(())
++        }
++        Err(orchestrator::OrchestratorInferenceError::NotWired) => Ok(()),
++        Err(error) => Err(format!(
++            "maos run: section {} ambiguity judgement: {error}",
++            section.ordinal
++        )),
++    }
++}
++
++/// Story 19-4 (AC5, D-19-4-05 A) — hold before section `ordinal` while `pid`
++/// has a halt pending resolution (polled ≤ 100 ms; bounded by `deadline` and
++/// the root's shutdown). `Ok(Some(text))` = resolved with provided context,
++/// dispatch resumes with it; `Ok(None)` = resolved without context;
++/// `Err` = still pending at the bound (the 19-1 stop applies).
++pub async fn hold_for_resolution(
++    registry: &HaltRegistry,
++    memory: &dyn maos_domain::ports::MemoryPort,
++    pid: u32,
++    halt_ids: &[String],
++    deadline: std::time::Duration,
++    shutdown: &tokio_util::sync::CancellationToken,
++) -> Result<Option<String>, ()> {
++    let started = std::time::Instant::now();
++    loop {
++        let pending = registry
++            .drain_for_spirit_dry_run(pid)
++            .into_iter()
++            .any(|(_, state)| state == HaltState::PendingResolution);
++        if !pending {
++            break;
++        }
++        if started.elapsed() >= deadline || shutdown.is_cancelled() {
++            return Err(());
++        }
++        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
++    }
++    Ok(halt_ids.iter().find_map(|id| {
++        match memory.read(
++            pid,
++            maos_domain::memory::MemoryTier::Private,
++            &maos_domain::memory::MemoryNamespace::Default,
++            &format!("halt_context::{id}"),
++        ) {
++            Ok(Some(maos_domain::memory::MemoryValue::Text(text))) => Some(text),
++            _ => None,
++        }
++    }))
++}
++
+ /// The AC4.3(b) harness plant ([`HALT_PLANT_ENV`]): debug builds only, and
+ /// only before the named section. The halt is a real one — the kernel's
+ /// `invoke_halt` writes its TL row, Journal entry and registry insert.

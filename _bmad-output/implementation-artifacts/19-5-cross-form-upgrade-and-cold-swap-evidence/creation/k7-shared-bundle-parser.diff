@@ -1,0 +1,35 @@
+diff -ruN base/crates/maos-kernel-core/src/lifecycle/mod.rs k7-bundle-from-str/crates/maos-kernel-core/src/lifecycle/mod.rs
+--- a/crates/maos-kernel-core/src/lifecycle/mod.rs
++++ b/crates/maos-kernel-core/src/lifecycle/mod.rs
+@@ -14,6 +14,6 @@
+ pub mod upgrade;
+ 
+ pub use upgrade::{
+-    SuccessorSpiritFactory, UpgradeError, UpgradeOrchestrator, UpgradeOutcome, UpgradePolicy,
+-    UpgradeReport,
++    load_bundle_from_str, SuccessorSpiritFactory, UpgradeError, UpgradeOrchestrator,
++    UpgradeOutcome, UpgradePolicy, UpgradeReport,
+ };
+diff -ruN base/crates/maos-kernel-core/src/lifecycle/upgrade.rs k7-bundle-from-str/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -387,8 +387,18 @@
+             ManifestError::Toml(format!("read {}: {}", path.display(), e))
+         }
+     })?;
++    load_bundle_from_str(&toml_str)
++}
++
++/// Parse a `SpiritManifestBundle` from manifest text — the one parser the
++/// upgrade path and `maos-bin` admission share (Story 19-5).
++pub fn load_bundle_from_str(
++    toml_str: &str,
++) -> Result<SpiritManifestBundle, crate::security::manifest::ManifestError> {
++    use crate::security::manifest::*;
++
+     let root: toml::Value =
+-        toml::from_str(&toml_str).map_err(|e| ManifestError::Toml(format!("parse: {e}")))?;
++        toml::from_str(toml_str).map_err(|e| ManifestError::Toml(format!("parse: {e}")))?;
+ 
+     let extract = |section: &str| -> Result<String, ManifestError> {
+         let value = root

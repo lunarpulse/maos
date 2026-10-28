@@ -1,0 +1,134 @@
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -134,6 +134,10 @@
+         manifest: &Path,
+         pread: Option<Arc<String>>,
+     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
++
++    /// Story 19-5 — the manifest path this Spirit was admitted from (the cold
++    /// swap's restore source).
++    fn admitted_manifest(&self, spirit_id: &str) -> Option<PathBuf>;
+ }
+ 
+ /// The uninstall terminal as the door renders it: the serialized
+@@ -838,18 +842,6 @@
+         candidates: &[String],
+         create_plan: bool,
+     ) -> OperatorOutcome {
+-        if policy == UpgradePolicyRequest::ColdSwap {
+-            // The kernel's ColdSwap arm starts the successor under a NEW pid
+-            // without `admit_spirit` — a kernel byte routed to the Epic-16
+-            // retrospective; the door refuses it typed instead of leaving an
+-            // unadmitted Spirit running.
+-            return OperatorOutcome::Conflict {
+-                code: "cold_swap_unsupported".into(),
+-                detail: "cold-swap over the door is unsupported: it would start an \
+-                         unadmitted successor under a new pid"
+-                    .into(),
+-            };
+-        }
+         let Some(_pid) = self.scheduler.resolve_pid(spirit_id) else {
+             return Self::spirit_not_loaded(spirit_id);
+         };
+@@ -961,6 +953,10 @@
+         // The successor factory reads one process-wide slot, so upgrades of
+         // different Spirits must not overlap this stage/use/clear sequence.
+         let _upgrade_guard = self.upgrade_lock.lock().await;
++        #[cfg(feature = "network")]
++        if policy == UpgradePolicyRequest::ColdSwap {
++            return self.cold_swap(spirit_id, &target_path).await;
++        }
+         self.successor_manifest_slot.stage(target_path.clone());
+         let guarded = self
+             .private_ops
+@@ -984,6 +980,90 @@
+         }
+     }
+ 
++    /// FR49 cold swap (Story 19-5): unload the predecessor, then admit the
++    /// successor through the SAME `load → admit → start` triple as `maosctl
++    /// load`, at a new pid (re-init: tokens and working memory are not carried).
++    /// A refused successor restores the predecessor from its admitted manifest.
++    #[cfg(feature = "network")]
++    async fn cold_swap(&self, spirit_id: &str, target: &Path) -> OperatorOutcome {
++        let started_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
++        let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
++            return Self::spirit_not_loaded(spirit_id);
++        };
++        let predecessor_version = self.loaded_version(spirit_id).unwrap_or_default();
++        let Some(predecessor_manifest) = self.private_ops.admitted_manifest(spirit_id) else {
++            return OperatorOutcome::Conflict {
++                code: "cold_swap_predecessor_unknown".into(),
++                detail: format!("no admitted manifest is recorded for '{spirit_id}'"),
++            };
++        };
++        if let Err(error) = self.scheduler.unload(pid).await {
++            return OperatorOutcome::Failed {
++                code: "lifecycle_failed".into(),
++                detail: error.to_string(),
++            };
++        }
++        let (outcome, admitted) = match self.admit_and_start(target).await {
++            Ok(admitted) => ("completed", Ok(admitted)),
++            Err(error) => match self.admit_and_start(&predecessor_manifest).await {
++                Ok(restored) => ("reverted", Err((error, Some(restored)))),
++                Err(restore) => (
++                    "failed",
++                    Err((format!("{error}; restore: {restore}"), None)),
++                ),
++            },
++        };
++        let payload = serde_json::json!({
++            "spirit_id": spirit_id,
++            "predecessor_version": predecessor_version,
++            "policy": "cold-swap",
++            "outcome": outcome,
++            "latency_ns": maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
++                .saturating_sub(started_ns),
++        });
++        self.transparency_log.insert_frame_event(
++            maos_kernel_core::iac::transparency_log::FrameKind::CapabilityInvocation,
++            pid,
++            None,
++            "spirit.upgrade",
++            payload.to_string().as_bytes(),
++            maos_domain::invariants::i3::FrameOrigin::Kernel,
++        );
++        let _ = self
++            .private_ops
++            .append_lifecycle_journal(
++                maos_domain::invariants::i10::LifecycleEvent::Upgrade,
++                spirit_id,
++            )
++            .await;
++        match admitted {
++            Ok(admitted) => OperatorOutcome::Completed(serde_json::json!({
++                "spirit_id": spirit_id,
++                "policy": "cold-swap",
++                "pid": admitted.pid,
++                "reports": [payload],
++            })),
++            Err((detail, _)) => OperatorOutcome::Failed {
++                code: format!("cold_swap_{outcome}"),
++                detail,
++            },
++        }
++    }
++
++    #[cfg(feature = "network")]
++    async fn admit_and_start(&self, manifest: &Path) -> Result<crate::admission::Admitted, String> {
++        let admitted = self
++            .private_ops
++            .load_spirit(manifest, None)
++            .await
++            .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
++        self.scheduler
++            .start(admitted.pid)
++            .await
++            .map_err(|error| error.to_string())?;
++        Ok(admitted)
++    }
++
+     /// Precheck the LOADED SCB through the daemon's real coordinator. Writes
+     /// NO `lifecycle.load`/`lifecycle.admit` row — the HEAD arm loaded a
+     /// placeholder Spirit into a fresh scheduler, appending phantom rows to

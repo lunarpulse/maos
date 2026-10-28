@@ -1,0 +1,33 @@
+diff -ruN base/crates/maos-kernel-core/src/hot_swap/coordinator.rs k5-coordinator-archive-writer/crates/maos-kernel-core/src/hot_swap/coordinator.rs
+--- a/crates/maos-kernel-core/src/hot_swap/coordinator.rs
++++ b/crates/maos-kernel-core/src/hot_swap/coordinator.rs
+@@ -269,6 +269,7 @@
+         })?;
+ 
+         let payload = envelope.payload;
++        let predecessor_blob = payload.clone();
+ 
+         // Step 7: Cross-major? → run_migrator.
+         let compat = state_codec::detect_compat(
+@@ -374,6 +375,21 @@
+                 effective_sandbox_tier: None,
+             }));
+ 
++        // ADR-020 / FR11 — archive the committed predecessor: its identity,
++        // state schema and final-state snapshot, for the load-time gate.
++        let predecessor_record = format!(
++            "[class]\nname = {:?}\nversion = {:?}\n\n[hot_swap]\nstate_schema_version = {}\n",
++            spirit_id, predecessor_version, predecessor_state_schema_version
++        );
++        if let Err(error) = super::archive::SpiritArchive::new(self.archive_dir.clone()).write(
++            spirit_id,
++            &predecessor_version,
++            &predecessor_record,
++            &predecessor_blob,
++        ) {
++            eprintln!("[hot_swap] predecessor archive write failed for {spirit_id}: {error}");
++        }
++
+         // Step 11: Spawn PostSwapMonitor (30s window).
+         saga.advance_to(SagaPhase::Committed);
+ 

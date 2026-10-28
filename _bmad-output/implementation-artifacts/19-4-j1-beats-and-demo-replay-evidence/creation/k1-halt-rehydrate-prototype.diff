@@ -1,0 +1,55 @@
+diff --git a/crates/maos-kernel-core/src/halt/mod.rs b/crates/maos-kernel-core/src/halt/mod.rs
+index 09d25ba..ceeeef3 100644
+--- a/crates/maos-kernel-core/src/halt/mod.rs
++++ b/crates/maos-kernel-core/src/halt/mod.rs
+@@ -438,6 +438,50 @@ impl HaltRegistry {
+         let map = self.pending.read().expect("HaltRegistry lock poisoned");
+         map.get(halt_id).cloned()
+     }
++
++    /// Story 19-4 (D-19-4-05 C, PROTOTYPE) — a cold boot over the same home
++    /// re-pends `spirit_id`'s halts the log holds from earlier boots and no
++    /// `halt.resolve` decision names, re-keyed to the Spirit's new `pid`.
++    pub fn rehydrate_pending(
++        &self,
++        tl: &TransparencyLogAdapter,
++        boot_nonce: u64,
++        spirit_id: &str,
++        pid: u32,
++        resolved: &dyn Fn(&str) -> bool,
++    ) -> Result<Vec<HaltId>, InvokeHaltError> {
++        let rows = tl
++            .query_frames(crate::iac::transparency_log::FrameFilter {
++                kind: Some(FrameKind::EpistemicHalt),
++                ..Default::default()
++            })
++            .map_err(|e| InvokeHaltError::RegistryInsertFailed(e.to_string()))?;
++        let mut rehydrated = Vec::new();
++        for row in rows.into_iter().filter(|row| row.boot_nonce != boot_nonce) {
++            let Ok(payload) = serde_json::from_slice::<EpistemicHaltPayload>(&row.payload_redacted)
++            else {
++                continue;
++            };
++            let Ok(halt_id) = HaltId::new(payload.halt_id.clone()) else {
++                continue;
++            };
++            if resolved(halt_id.as_str()) || self.lookup_state(&halt_id).is_some() {
++                continue;
++            }
++            self.insert_pending_with_metadata(
++                halt_id.clone(),
++                HaltState::PendingResolution,
++                PendingHaltMetadata {
++                    spirit_pid: pid,
++                    spirit_id: spirit_id.to_owned(),
++                    payload,
++                    fired_ns: row.timestamp_ns,
++                },
++            )?;
++            rehydrated.push(halt_id);
++        }
++        Ok(rehydrated)
++    }
+ }
+ 
+ /// I14 enforcement entry-point — used by Story 5.2's Hot-Swap Coordinator

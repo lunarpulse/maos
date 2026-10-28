@@ -1,0 +1,166 @@
+diff -ruN base/crates/maos-kernel-core/src/lifecycle/mod.rs k2-coldswap-admitter/crates/maos-kernel-core/src/lifecycle/mod.rs
+--- a/crates/maos-kernel-core/src/lifecycle/mod.rs
++++ b/crates/maos-kernel-core/src/lifecycle/mod.rs
+@@ -14,6 +14,6 @@
+ pub mod upgrade;
+ 
+ pub use upgrade::{
+-    SuccessorSpiritFactory, UpgradeError, UpgradeOrchestrator, UpgradeOutcome, UpgradePolicy,
+-    UpgradeReport,
++    SuccessorAdmitter, SuccessorSpiritFactory, UpgradeError, UpgradeOrchestrator, UpgradeOutcome,
++    UpgradePolicy, UpgradeReport,
+ };
+diff -ruN base/crates/maos-kernel-core/src/lifecycle/upgrade.rs k2-coldswap-admitter/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -44,6 +44,12 @@
+     }
+ }
+ 
++/// Admits a cold-swap successor at its scheduler-assigned pid. Supplied by the
++/// composition root, which owns the admission gates the kernel does not.
++pub trait SuccessorAdmitter: Send + Sync {
++    fn admit(&self, pid: u32, manifest: &SpiritManifestBundle) -> Result<(), UpgradeError>;
++}
++
+ #[maos_attrs::i9_exempt(reason = "upgrade orchestrator composite; holds exempt adapter Arcs")]
+ pub struct UpgradeOrchestrator {
+     scheduler: Arc<SpiritSchedulerAdapter>,
+@@ -52,6 +58,7 @@
+     journal: Arc<JournalAdapter>,
+     telemetry: Arc<IacRtMetrics>,
+     successor_factory: Arc<dyn SuccessorSpiritFactory>,
++    admitter: Option<Arc<dyn SuccessorAdmitter>>,
+ }
+ 
+ impl UpgradeOrchestrator {
+@@ -70,9 +77,15 @@
+             journal,
+             telemetry,
+             successor_factory,
++            admitter: None,
+         }
+     }
+ 
++    pub fn with_admitter(mut self, admitter: Arc<dyn SuccessorAdmitter>) -> Self {
++        self.admitter = Some(admitter);
++        self
++    }
++
+     pub async fn upgrade(
+         &self,
+         spirit_id: &str,
+@@ -109,7 +122,7 @@
+ 
+         // 3. Resolve predecessor metadata and construct a fresh successor
+         // before any policy mutates the predecessor.
+-        let (predecessor_version, predecessor_scb, predecessor_state) =
++        let (predecessor_version, predecessor_scb) =
+             {
+                 let scbs = self.scheduler.scbs();
+                 let map = scbs.read().expect("spirits lock poisoned");
+@@ -125,7 +138,7 @@
+                     .as_ref()
+                     .map(|c| c.version.clone())
+                     .unwrap_or_else(|| "unknown".into());
+-                (version, scb.clone(), scb.current_state())
++                (version, scb.clone())
+             };
+         let successor_spirit_obj = self.successor_factory.create(&successor_manifest)?;
+ 
+@@ -160,16 +173,12 @@
+                 }
+             }
+             UpgradePolicy::ColdSwap => {
++                let admitter = self
++                    .admitter
++                    .as_ref()
++                    .ok_or(UpgradeError::ColdSwapWithoutAdmitter)?;
+                 let unload_start_ns = monotonic_now_ns();
+-                if let Err(error) = self.scheduler.unload(predecessor_pid).await {
+-                    // Unload can transition before a hook fails. Restore the
+-                    // predecessor's lifecycle state on its still-stable Arc.
+-                    predecessor_scb.state.store(
+-                        predecessor_state as u8,
+-                        std::sync::atomic::Ordering::Release,
+-                    );
+-                    return Err(UpgradeError::Lifecycle(error));
+-                }
++                self.scheduler.unload(predecessor_pid).await?;
+ 
+                 // Count receipts in the unload window.
+                 let entries = self
+@@ -183,30 +192,40 @@
+                     .unwrap_or_default();
+                 halt_receipts_produced = entries.len();
+ 
+-                let boot_nonce = 0u64;
+-                let new_pid = crate::scheduler::scheduler_loop::allocate_pid();
+-                let new_scb = Arc::new(crate::scheduler::control_block::SpiritControlBlock::new(
+-                    new_pid,
+-                    spirit_id.into(),
+-                    successor_manifest,
+-                    successor_spirit_obj,
+-                    boot_nonce,
+-                ));
+-                {
+-                    let scbs = self.scheduler.scbs();
+-                    let mut map = scbs.write().expect("spirits lock poisoned");
+-                    map.insert(new_pid, new_scb);
+-                }
+-                if let Err(error) = self.scheduler.start(new_pid).await {
+-                    let scbs = self.scheduler.scbs();
+-                    let mut map = scbs.write().expect("spirits lock poisoned");
+-                    map.remove(&new_pid);
+-                    predecessor_scb.state.store(
+-                        predecessor_state as u8,
+-                        std::sync::atomic::Ordering::Release,
+-                    );
+-                    map.insert(predecessor_pid, Arc::clone(&predecessor_scb));
+-                    return Err(UpgradeError::Lifecycle(error));
++                let boot_nonce = predecessor_scb.boot_nonce;
++                let new_pid = self
++                    .scheduler
++                    .load_obj(
++                        spirit_id,
++                        successor_manifest.clone(),
++                        successor_spirit_obj,
++                        boot_nonce,
++                    )
++                    .await?;
++                let admitted = admitter.admit(new_pid, &successor_manifest);
++                let started = match admitted {
++                    Ok(()) => self
++                        .scheduler
++                        .start(new_pid)
++                        .await
++                        .map_err(UpgradeError::from),
++                    Err(error) => Err(error),
++                };
++                if let Err(error) = started {
++                    let _ = self.scheduler.unload(new_pid).await;
++                    let runtime = predecessor_scb.runtime_snapshot();
++                    let restored = self
++                        .scheduler
++                        .load_obj(
++                            spirit_id,
++                            runtime.manifest.clone(),
++                            runtime.spirit_obj,
++                            boot_nonce,
++                        )
++                        .await?;
++                    admitter.admit(restored, &runtime.manifest)?;
++                    self.scheduler.start(restored).await?;
++                    return Err(error);
+                 }
+             }
+             UpgradePolicy::Migrator => {
+@@ -372,6 +391,8 @@
+     HotSwap(#[from] maos_domain::hot_swap::HotSwapError),
+     #[error("lifecycle error during cold-swap: {0}")]
+     Lifecycle(#[from] maos_domain::lifecycle::LifecycleError),
++    #[error("cold-swap needs a successor admitter; none is installed")]
++    ColdSwapWithoutAdmitter,
+ }
+ 
+ /// Load a `SpiritManifestBundle` from a TOML file path.

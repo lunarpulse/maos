@@ -1,0 +1,110 @@
+diff -ruN base/crates/maos-kernel-core/src/hot_swap/archive.rs k4-scheduler-archive-gate/crates/maos-kernel-core/src/hot_swap/archive.rs
+--- a/crates/maos-kernel-core/src/hot_swap/archive.rs
++++ b/crates/maos-kernel-core/src/hot_swap/archive.rs
+@@ -99,6 +99,55 @@
+     pub fn exists(&self, spirit_id: &str, version: &str) -> bool {
+         self.archive_dir(spirit_id, version).is_dir()
+     }
++
++    /// ADR-020 / FR11 — refuse a load when an archived predecessor of
++    /// `spirit_id` is cross-major to `successor` (the hot-swap step-7 rule,
++    /// `state_codec::detect_compat`) and `[migrates_from]` names none of it.
++    pub fn refuse_without_migrator(
++        &self,
++        spirit_id: &str,
++        successor: &crate::scheduler::control_block::SpiritManifestBundle,
++    ) -> Result<(), maos_domain::hot_swap::HotSwapError> {
++        let Some(class) = successor.class.as_ref() else {
++            return Ok(());
++        };
++        let successor_schema = successor
++            .hot_swap
++            .as_ref()
++            .map_or(1, |h| h.state_schema_version);
++        let Ok(entries) = fs::read_dir(self.base_dir.join(spirit_id)) else {
++            return Ok(());
++        };
++        for entry in entries.flatten() {
++            let version = entry.file_name().to_string_lossy().into_owned();
++            let manifest =
++                fs::read_to_string(entry.path().join("manifest.toml")).unwrap_or_default();
++            let schema = toml::from_str::<toml::Value>(&manifest)
++                .ok()
++                .and_then(|root| {
++                    root.get("hot_swap")?
++                        .get("state_schema_version")?
++                        .as_integer()
++                })
++                .map_or(1, |v| v as u32);
++            let cross = super::state_codec::detect_compat(schema, successor_schema)
++                == super::state_codec::SchemaCompat::CrossMajor;
++            let declared = successor.migrates_from.as_ref().is_some_and(|m| {
++                m.versions
++                    .iter()
++                    .any(|p| super::migrator::matches_version_pattern(p, &version))
++            });
++            if version != class.version && cross && !declared {
++                return Err(maos_domain::hot_swap::HotSwapError::EMigratorMissing {
++                    predecessor_class: class.name.clone(),
++                    predecessor_version: version,
++                    successor_class: class.name.clone(),
++                    successor_version: class.version.clone(),
++                });
++            }
++        }
++        Ok(())
++    }
+ }
+ 
+ #[cfg(test)]
+diff -ruN base/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs k4-scheduler-archive-gate/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -94,6 +94,7 @@
+     /// Shared validated CRL rules. When configured by the revocation
+     /// composition root, admission and CRL application serialize on its gate.
+     revocation_rules: Arc<RwLock<Option<Arc<crate::revocation::rules::ValidatedRevocationRules>>>>,
++    predecessor_archive: RwLock<Option<Arc<crate::hot_swap::SpiritArchive>>>,
+ }
+ 
+ impl SpiritSchedulerAdapter {
+@@ -142,6 +143,7 @@
+             crash_detector,
+             replica: None,
+             revocation_rules: Arc::new(RwLock::new(None)),
++            predecessor_archive: RwLock::new(None),
+         }
+     }
+ 
+@@ -174,6 +176,14 @@
+ 
+     /// Bind the validated CRL store once at the composition root.  The
+     /// revocation applier installs this before any daemon admission occurs.
++    /// ADR-020 / FR11 — the predecessor archive every `load_obj` consults.
++    pub fn set_predecessor_archive(&self, archive: Arc<crate::hot_swap::SpiritArchive>) {
++        *self
++            .predecessor_archive
++            .write()
++            .expect("predecessor archive lock poisoned") = Some(archive);
++    }
++
+     pub(crate) fn set_revocation_rules(
+         &self,
+         rules: Arc<crate::revocation::rules::ValidatedRevocationRules>,
+@@ -303,6 +313,16 @@
+                 spirit_id: spirit_id.into(),
+             });
+         }
++        let archive = self
++            .predecessor_archive
++            .read()
++            .expect("predecessor archive lock poisoned")
++            .clone();
++        if let Some(archive) = archive {
++            archive
++                .refuse_without_migrator(spirit_id, &manifest)
++                .map_err(|error| LifecycleError::Admission(error.to_string()))?;
++        }
+ 
+         let pid = allocate_pid();
+ 
