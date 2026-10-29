@@ -2155,7 +2155,7 @@ jobs:
       CARGO: /bin/false
       MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
       MAOS_FIXTURE_TRANSPORT: '1'
-      EPIC17_TERMINAL_SUITE_TESTS: 31
+      EPIC17_TERMINAL_SUITE_TESTS: 32
       EPIC17_TERMINAL_REQUIRED_TESTS: |
         root_crash::root_crash_retains_stopped_container_and_purge_reports_it
         runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
