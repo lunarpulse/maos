@@ -20,8 +20,9 @@
 //! therefore stops (or starts) delivery at the next event. The right to receive
 //! comes from the operator admitting the compiled-in class; each grant and
 //! revoke is a `governance:telemetry-subscription:*` row at the subscriber's
-//! pid. The check and the dispatch are not atomic: a pause or unload in
-//! between is FR51(a)'s known gap (E16-A6), shared with IdleWatchdog.
+//! pid. The check and the dispatch are not atomic: a pause in between does
+//! not interrupt the hook's computation; 19-2's capability fence refuses the
+//! paused Spirit's next issue or verify. IdleWatchdog shares this.
 //!
 //! ## Accounting
 //!

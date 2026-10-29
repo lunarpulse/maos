@@ -810,7 +810,10 @@ mod worker {
 
         /// Story 19-2 (D-19-2-14 A) — freeze or thaw the container, bounded by
         /// `TEARDOWN_BUDGET`; only a `Running` binding with a CID freezes. A
-        /// freeze that fails is undone best-effort: nothing is claimed.
+        /// freeze that fails is undone best-effort under its own fresh
+        /// `TEARDOWN_BUDGET` (a timed-out pause may still land), so nothing is
+        /// claimed; an undo that also fails leaves the CID marked possibly
+        /// frozen, so every teardown thaws before the kill.
         pub fn set_frozen(&self, frozen: bool) -> Result<(), &'static str> {
             let mut current = self.frozen.lock().unwrap_or_else(|e| e.into_inner());
             if *current == frozen {
@@ -825,13 +828,13 @@ mod worker {
             if let Some(terminal) = terminal {
                 if terminal.set_frozen(frozen, by) {
                     *current = frozen;
-                } else if frozen {
-                    let _ = terminal.set_frozen(false, by);
+                    return Ok(());
+                }
+                if frozen && !terminal.set_frozen(false, Instant::now() + TEARDOWN_BUDGET) {
+                    *current = true;
                 }
             }
-            (*current == frozen)
-                .then_some(())
-                .ok_or("worker_freeze_failed")
+            Err("worker_freeze_failed")
         }
 
         /// Every stop thaws first, so the runtime's kill reaches a frozen CID.

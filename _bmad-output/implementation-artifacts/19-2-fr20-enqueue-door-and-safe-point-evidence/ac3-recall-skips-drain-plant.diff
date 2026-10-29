@@ -1,0 +1,13 @@
+diff --git a/crates/maos-bin/src/operator_door.rs b/crates/maos-bin/src/operator_door.rs
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -1430,7 +1430,8 @@
+             return outcome;
+         }
+         let (mut recalled, mut failed) = (Vec::new(), false);
+-        for instruction in buffer.recall_all_pending() {
++        // PLANT (19-2 AC3): answer 200 without `recall_all_pending`.
++        for instruction in Vec::<maos_domain::orchestrator::OrchestratorInstruction>::new() {
+             let (id, text) = (instruction.id.0, instruction.goal);
+             if let Err(outcome) = row("recall", format!("id={id}: {text}")) {
+                 eprintln!("maos: orchestrator recall '{spirit_id}' id={id}: {outcome:?}");

@@ -143,6 +143,14 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         None
     }
 
+    /// Story 19-2 (CR-1) — whether `pid` is the live Butler, resolved before
+    /// the principal check and the intent row: a non-Butler is 404
+    /// `butler_not_found` with nothing written. A root that hosts no Butler
+    /// keeps this default.
+    fn is_live_butler(&self, _pid: u32) -> bool {
+        false
+    }
+
     /// Story 19-2 (D-19-2-07 A) — run a 1-based pick on the live,
     /// principal-bound Butler at `pid` off the runtime with its own MCP
     /// port, and map the result to the route's typed outcome.
@@ -1338,7 +1346,10 @@ impl DoorInner {
 
     /// Enqueue onto the daemon's REAL per-Spirit Orchestrator buffer — the
     /// same registry the scheduler's resume arm recalls from, so status
-    /// reports real occupancy and not a fresh `0/32`.
+    /// reports real occupancy and not a fresh `0/32`. Log before act
+    /// (I2/FR42): the row carrying the text lands BEFORE the instruction can
+    /// reach a safe point, so a failed row enqueues nothing; a refused
+    /// enqueue after it writes a `queue-refused` row naming the id.
     async fn orchestrator_enqueue_command(&self, spirit_id: &str, text: &str) -> OperatorOutcome {
         use maos_spirit_abi::identity::SpiritId;
 
@@ -1363,15 +1374,6 @@ impl DoorInner {
                 }
             }
         };
-        let buffer = self
-            .orchestrator_registry
-            .get_or_create(&SpiritId::from(spirit_id));
-        if let Err(error) = buffer.enqueue(instruction.clone()) {
-            return OperatorOutcome::Conflict {
-                code: "orchestrator_buffer_full".into(),
-                detail: error.to_string(),
-            };
-        }
         if let Err(error) = maos_kernel_core::orchestrator::journal_orchestrator_queue(
             &self.transparency_log,
             DIRECTOR,
@@ -1380,12 +1382,28 @@ impl DoorInner {
         ) {
             return OperatorOutcome::Failed {
                 code: "approval_log_failed".into(),
+                detail: format!("{error}; nothing was enqueued"),
+            };
+        }
+        let buffer = self
+            .orchestrator_registry
+            .get_or_create(&SpiritId::from(spirit_id));
+        let id = instruction.id.0;
+        if let Err(error) = buffer.enqueue(instruction) {
+            let reasoning = format!("id={id}: {error}");
+            if let Err(outcome) =
+                self.approval_row(spirit_id, "orchestrator.queue", "queue-refused", reasoning)
+            {
+                eprintln!("maos: orchestrator queue '{spirit_id}' id={id}: {outcome:?}");
+            }
+            return OperatorOutcome::Conflict {
+                code: "orchestrator_buffer_full".into(),
                 detail: error.to_string(),
             };
         }
         OperatorOutcome::Completed(serde_json::json!({
             "spirit_id": spirit_id,
-            "instruction_id": instruction.id.0,
+            "instruction_id": id,
             "pending": buffer.pending_count(),
             "capacity": buffer.capacity(),
         }))
@@ -1434,10 +1452,11 @@ impl DoorInner {
         OperatorOutcome::Completed(body)
     }
 
-    /// Story 19-2 (AC4, D-19-2-07/08 A) — a director's option pick reaches the
-    /// running Butler. No boot principal ⇒ 409 before anything is written;
-    /// the intent row precedes the call; the root runs the pick off the
-    /// runtime on the live Butler (id + pid checked) with its own MCP port.
+    /// Story 19-2 (AC4, D-19-2-07/08 A, CR-1) — a director's option pick
+    /// reaches the running Butler. A non-Butler is 404 `butler_not_found` and
+    /// no boot principal is 409, both before anything is written; the intent
+    /// row precedes the call; the root runs the pick off the runtime on the
+    /// live Butler (id + pid checked) with its own MCP port.
     async fn option_pick_command(
         &self,
         spirit_id: &str,
@@ -1447,6 +1466,12 @@ impl DoorInner {
         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
         };
+        if !self.private_ops.is_live_butler(pid) {
+            return Self::not_found(
+                "butler_not_found",
+                format!("'{spirit_id}' is not a running Butler; nothing was recorded"),
+            );
+        }
         let Some(principal) = self.private_ops.butler_principal() else {
             return OperatorOutcome::Conflict {
                 code: "principal_unbound".into(),

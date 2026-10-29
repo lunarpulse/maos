@@ -35,7 +35,7 @@ pub const ENV_TOKEN: &str = "MAOS_OPERATOR_BEARER_TOKEN";
 
 /// Route budget the server grants a default command (D-16-1-E).
 pub const DEFAULT_ROUTE_BUDGET: Duration = Duration::from_secs(10);
-/// Route budget for upgrade, uninstall, CRL import and hot-swap-precheck.
+/// For load, upgrade, uninstall, pause, resume, pick, revoke-token, CRL import, hot-swap-precheck.
 pub const LONG_ROUTE_BUDGET: Duration = Duration::from_secs(30);
 
 /// Hard cap for one operator response, including headers.

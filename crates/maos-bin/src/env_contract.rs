@@ -210,7 +210,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_BUTLER_PRINCIPAL",
-        purpose: "The director's principal id a serving root binds its Butler's acceptance record to at boot, so `maosctl spirit pick` records into that principal's namespace; unset ⇒ picks answer 409 `principal_unbound`; a `--scene` with a different principal refuses the boot (Story 19-2 D-19-2-08 A)",
+        purpose: "The director's principal id a serving root binds its Butler's acceptance record to at boot, so `maosctl spirit pick` records into that principal's namespace; unset or blank ⇒ none bound and picks answer 409 `principal_unbound`; a set value must be non-empty with no `:` and no control character (the scene header's principal rule) — a non-UTF-8 or malformed value, or a `--scene` with a different principal, refuses the boot (Story 19-2 D-19-2-08 A)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

@@ -1268,8 +1268,8 @@ where
     let mut order: Vec<usize> = (0..planned.len()).collect();
     order.sort_by_key(|index| std::cmp::Reverse(planned[*index].root.path.components().count()));
     let mut dispositions = vec![String::new(); planned.len()];
-    // Protected paths plus every workspaces root left as residue: deepest
-    // first, so a residue root is skipped by the walk of the root holding it
+    // Protected paths plus every workspaces tree left as residue: deepest
+    // first, so a residue tree is skipped by the walk of the root holding it
     // instead of failing it on a subuid-owned file.
     let mut skip = protected.to_vec();
     for index in order {
@@ -1317,9 +1317,10 @@ where
                 remove_tree_selective(&plan.root.path, &skip, left_files)?;
             }
             RootKind::WorkerWorkspaces => {
-                if !remove_worker_workspaces(&plan.root.path, &skip, left_files)? {
-                    skip.push(plan.root.path.clone());
-                    workspace_residue.push(plan.root.path.clone());
+                let residue = remove_worker_workspaces(&plan.root.path, &skip, left_files)?;
+                if !residue.is_empty() {
+                    skip.extend(residue.iter().cloned());
+                    workspace_residue.extend(residue);
                     dispositions[index] = WORKSPACES_RESIDUE.to_string();
                     record(index, &dispositions[index])?;
                     continue;
@@ -1336,7 +1337,7 @@ where
         };
         record(index, &dispositions[index])?;
     }
-    // A residue root is reported once, with its removal command — not as
+    // A residue tree is reported once, with its removal command — not as
     // every leaf the later walks collected beneath it.
     left_files.retain(|file| !workspace_residue.iter().any(|root| file.starts_with(root)));
     Ok(dispositions)
@@ -1346,25 +1347,71 @@ where
 /// first: it takes operator-owned entries and the empty workspaces of fixture
 /// runs without touching podman. What it cannot unlink — files a Worker wrote
 /// under its mapped subuid — goes to `podman unshare`, inside the user
-/// namespace that owns them. `Ok(false)`: the tree survives as residue for
-/// the operator, never a purge failure.
+/// namespace that owns them. A root holding a skipped path (a `--keep-log`
+/// audit database, a deeper residue tree) is never handed to `rm -rf`: the
+/// fallback then runs per child holding none. `Ok`: the trees left as residue
+/// for the operator, never a purge failure — empty when none survive.
 fn remove_worker_workspaces(
     path: &Path,
     skip: &[PathBuf],
     left_files: &mut Vec<PathBuf>,
-) -> Result<bool, PurgeError> {
+) -> Result<Vec<PathBuf>, PurgeError> {
     let collected = left_files.len();
     match remove_tree_selective(path, skip, left_files) {
         Ok(()) | Err(PurgeError::Io { .. }) => {}
         Err(error) => return Err(error),
     }
     if std::fs::symlink_metadata(path).is_err() {
-        return Ok(true);
+        return Ok(Vec::new());
     }
-    // The walk's leaves under this root are either removed below or covered
-    // by the residue line.
+    // The walk's leaves under this root are removed below, covered by the
+    // residue line, or collected again by the second walk.
     left_files.truncate(collected);
-    Ok(podman_unshare_remove(path) && std::fs::symlink_metadata(path).is_err())
+    if !skip.iter().any(|kept| kept.starts_with(path)) {
+        if podman_unshare_remove(path) && std::fs::symlink_metadata(path).is_err() {
+            return Ok(Vec::new());
+        }
+        return Ok(vec![path.to_path_buf()]);
+    }
+    let residue = podman_unshare_remove_children(path, skip);
+    // What survives outside the residue is skipped or foreign content: the
+    // second walk reports it as left files, and the root as partially removed.
+    let mut kept = skip.to_vec();
+    kept.extend(residue.iter().cloned());
+    match remove_tree_selective(path, &kept, left_files) {
+        Ok(()) | Err(PurgeError::Io { .. }) => {}
+        Err(error) => return Err(error),
+    }
+    Ok(residue)
+}
+
+/// The fallback for a root holding a skipped path: `podman unshare` per child
+/// directory of `root` that holds no skipped path and sits on the root's
+/// device — a mount passed as its own argument is what `--one-file-system`
+/// would empty. Returns the children that survived it.
+fn podman_unshare_remove_children(root: &Path, skip: &[PathBuf]) -> Vec<PathBuf> {
+    let (Ok(root_metadata), Ok(entries)) =
+        (std::fs::symlink_metadata(root), std::fs::read_dir(root))
+    else {
+        return Vec::new();
+    };
+    let mut residue = Vec::new();
+    for entry in entries.flatten() {
+        let child = entry.path();
+        if skip.iter().any(|kept| kept.starts_with(&child)) {
+            continue;
+        }
+        let Ok(metadata) = std::fs::symlink_metadata(&child) else {
+            continue;
+        };
+        if !metadata.is_dir() || !same_device(&root_metadata, &metadata) {
+            continue;
+        }
+        if !podman_unshare_remove(&child) || std::fs::symlink_metadata(&child).is_ok() {
+            residue.push(child);
+        }
+    }
+    residue
 }
 
 /// The removal run inside podman's user namespace — and, verbatim, the
@@ -1871,6 +1918,12 @@ fn absolute_path(path: &Path) -> Result<PathBuf, PurgeError> {
     }
 }
 
+#[cfg(unix)]
+fn same_device(parent: &std::fs::Metadata, child: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt as _;
+    parent.dev() == child.dev()
+}
+
 #[cfg(not(unix))]
 fn same_device(_parent: &std::fs::Metadata, _child: &std::fs::Metadata) -> bool {
     false
@@ -1892,7 +1945,7 @@ fn leaf_name(path: &Path) -> String {
         .unwrap_or_else(|| path.display().to_string())
 }
 
-/// `workspace_residue`: Worker workspaces roots neither the walk nor
+/// `workspace_residue`: Worker workspaces trees neither the walk nor
 /// `podman unshare` removed (Story 19-3), each with its exact command.
 fn print_report_only_residue(workspace_residue: &[PathBuf]) {
     let mut printed_heading = false;

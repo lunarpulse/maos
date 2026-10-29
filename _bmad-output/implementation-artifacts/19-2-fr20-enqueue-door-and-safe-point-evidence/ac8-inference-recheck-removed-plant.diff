@@ -1,0 +1,13 @@
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -447,9 +447,6 @@
+         // or a Spirit paused, while the request was on the wire fails closed
+         // here; the paid completion stays journaled above but is not returned.
+         let response = result?;
+-        self.capabilities
+-            .recheck(&req.capability_token)
+-            .map_err(|_e| InferenceError::CapabilityDenied)?;
+         Ok(response)
+     }
+ }

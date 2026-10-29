@@ -248,8 +248,9 @@ const MAX_WORKERS: usize = 16;
 /// How long a route waits for its kernel transition before answering 503.
 const DEFAULT_ROUTE_BUDGET: Duration = Duration::from_secs(10);
 
-/// The budget for the four routes measured to run long: upgrade, uninstall,
-/// CRL import and hot-swap precheck.
+/// The budget for the routes that run long; `route_budget` names each one
+/// (upgrade, uninstall, CRL import, hot-swap precheck, load, pick, revoke,
+/// pause and resume).
 const LONG_ROUTE_BUDGET: Duration = Duration::from_secs(30);
 
 /// A submitted command that has not been picked up yet.
@@ -471,7 +472,13 @@ impl OperatorCommand {
             | Self::Load { .. }
             // Story 19-2 — a pick may run the option's MCP effect (a remote
             // call on the Butler's own port) inside the request.
-            | Self::OptionPick { .. } => LONG_ROUTE_BUDGET,
+            | Self::OptionPick { .. }
+            // Story 19-2 (AC7/AC8) — revoke waits on the Worker stop and
+            // pause/resume on the Worker freeze, each bounded by the root's
+            // 25 s `TEARDOWN_BUDGET`, which a 10 s route would cut short.
+            | Self::RevokeToken { .. }
+            | Self::Pause { .. }
+            | Self::Resume { .. } => LONG_ROUTE_BUDGET,
             // Story 19-7 — explicit, never inherited from `_`: a re-pin
             // decision is a store lookup, one Approval Decision Log row and a
             // non-blocking consent read. Story 19-2's recall is a buffer drain

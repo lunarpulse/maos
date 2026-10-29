@@ -1,0 +1,31 @@
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -839,6 +839,27 @@
+                 &permitted_egress,
+             )
+             .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
++            // PLANT (19-3 AC4.2): the deleted host-side liveness probe, re-inserted
++            // (`run_liveness_probe` before c535e434: `<cli> --version` on the host).
++            let probe = std::process::Command::new(&resolved)
++                .env_clear()
++                .envs(
++                    ["PATH", "HOME", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"]
++                        .into_iter()
++                        .filter_map(|name| std::env::var_os(name).map(|value| (name, value))),
++                )
++                .arg("--version")
++                .stdin(std::process::Stdio::null())
++                .stdout(std::process::Stdio::null())
++                .stderr(std::process::Stdio::null())
++                .status()
++                .map_err(|e| format!("maos run: cli_wrapper admission failed: liveness probe: {e}"))?;
++            if !probe.success() {
++                return Err(format!(
++                    "maos run: cli_wrapper admission failed: liveness probe: {probe}"
++                )
++                .into());
++            }
+             // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
+             // this; preserve it on the real-CLI path, typed — Story 17-6 D-17-6-C).
+             if !matches!(granted_tier, SandboxTier::T3) {

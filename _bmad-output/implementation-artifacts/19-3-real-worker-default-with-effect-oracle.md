@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 19.3: Fixture Worker hermetically, real Worker on the operator lane, with an effect oracle ◆ FLAG-Winston
 
-Status: ready-for-dev (RULED 2026-10-28)
+Status: in-progress (RULED 2026-10-28; dev candidate c535e434 + review corrections 2026-10-29)
 
 <!-- Created 2026-10-28 at d9bd59c4 (19-1 + 19-7 implemented and reviewed, not yet on origin/main b35c9284) by bmad-create-story under the lighter creation contract, in parallel with 19-2 and 19-6 (wave 2; each depends only on 19-1, whose code is in the tree). D-19-3-01…11 are PROPOSED, not ruled — the operator rules; the parent flips `sprint-status.yaml:289` (records-owed R3). NO cargo was run (another cargo process held the host): every cite re-read at HEAD; per-crate kloc by the kloc-check instrument replicated (tokei 14.0.0, argv `xtask/src/kloc_check.rs:294-318`); kernel physical lines by `git ls-files | xargs cat | wc -l`; the K2 prototype, its keep-id variant and the D-19-3-07 A deletion measured on scratch copies under /tmp built from `git show d9bd59c4:`. No crate source changed, even temporarily. Cargo confirmations are listed as "Measurements owed". Evidence: `19-3-real-worker-default-with-effect-oracle-evidence/creation/`. -->
 
@@ -134,6 +134,18 @@ Test literal sites (uncharged): `T3SpawnContext` in `worker_terminal_facts_17_7/
 1. Per D-07 A: no real agent CLI binary executes on the host during admission — `run_liveness_probe` and `ProbeStrategy::Liveness` are deleted; the T3 floor and `check_egress` stay (`worker_spawn.rs:834-847`). The fixtures' kernel handshake (`admission.rs:48-170`) is unchanged and the row is narrowed to it.
 2. **Proven red (T3):** a fake `claude` whose `--version` branch writes a marker to a host path outside its workspace → after a run the marker is absent. **Plant:** re-insert the `run_liveness_probe` call → marker present → red.
 3. `deferred-work.md:1044` updated (narrowed, owner per the operator); published lines narrowed (`cli-wrapper-spirit.md:57,79`, `topology.md:144`, ko `:58,:80`); `supervision.rs:1488` comment.
+
+### Amendment — review corrections and rulings (2026-10-29)
+
+Recorded as amendments to the ACs above; the AC text is not rewritten and no task is marked done — the vectors and the dev record carry these.
+
+- **Refused-walk semantics (D-03 A; Blind19x3 P2-1):** only a `RootUnlistable` walk is an unproven effect; an OverCap walk or an I/O error below the root PROVES an effect — the gate treats both as effect-bearing, never as a silent empty diff.
+- **Adapters gated by default:** `requires_workspace_effect` defaults to gated; adapters opt out (the fixtures), not in.
+- **Empty workspace removed on spawn failure:** a workspace created for a spawn that then fails is removed, not retained.
+- **`MAOS_WORKER_WORKSPACES_ROOT` + post-run free-space warning (ruling `r19_3_disk`):** the workspaces root is relocatable via `MAOS_WORKER_WORKSPACES_ROOT`, and after a run a free-space warning fires at the root.
+- **RELEASE-HOLDS Claim boundaries row 20 (ruling `r19_3_hold_kind` — non-blocking):** row 20 recorded; non-blocking.
+- **Purge handles subuid-owned workspaces:** removal of subuid-owned workspace trees goes through `podman unshare`, with protected paths honoured.
+- **demo-j1 relative workspace print and cleanup:** the live take prints the Worker's workspace path relative and performs cleanup.
 
 ## Tasks / Subtasks
 
@@ -267,3 +279,4 @@ anthropic/claude-opus-5-5 (creation).
 
 - 2026-10-28: Story created at `d9bd59c4` (ready-for-dev pending the operator's rulings on D-19-3-01…11). Epic §19-3 cites re-measured (14 substitutions owed, records-owed R1); `deferred-work.md:1125` → `:1044`; K2 re-measured by scratch replication (+11 / +9; endpoints 26389 / 20628 under the confirmed 26390 / 20628); cargo confirmations owed.
 - 2026-10-28: Operator rulings recorded (ask `w2_19_3`): D-19-3-01…10 RULED **A**; D-19-3-11 RULED **C** (ask `w2_19_3_d11`) — an operator-approved scope cut: AC3's real-spawn bench clause struck from AC3.3 and routed to `20-7-stable-runner-perf-gates`; kloc forecast line pinned to maos-bench **0**; Status → ready-for-dev (RULED 2026-10-28).
+- 2026-10-29: Review corrections and rulings recorded as an amendment block under the ACs: refused-walk semantics (only `RootUnlistable` is unproven; OverCap / I/O below the root prove an effect — Blind19x3 P2-1); adapters gated by default; empty workspace removed on spawn failure; `MAOS_WORKER_WORKSPACES_ROOT` + post-run free-space warning (ruling `r19_3_disk`); RELEASE-HOLDS Claim boundaries row 20 (ruling `r19_3_hold_kind` — non-blocking); purge handles subuid-owned workspaces (`podman unshare`, protected paths honoured); demo-j1 relative workspace print and cleanup. Tasks not marked done; status stays in-progress.

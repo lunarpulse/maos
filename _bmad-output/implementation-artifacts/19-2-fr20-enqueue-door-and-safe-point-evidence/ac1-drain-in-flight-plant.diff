@@ -1,0 +1,24 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -5102,6 +5102,20 @@
+                                             section.map(|section| section.ordinal),
+                                         )
+                                         .await?;
++                                        // PLANT (19-2 AC1): drain with this section's delegation in
++                                        // flight, bypassing `drain_next`'s FR20 gate.
++                                        if let Some(instruction) = orchestrator_registry
++                                            .get(&maos_bin::delegation::FROM_SPIRIT.into())
++                                            .and_then(|buffer| buffer.dequeue_at_safe_point())
++                                        {
++                                            maos_bin::orchestrator_root::record_safe_point_drain(
++                                                &transparency_log,
++                                                &instruction,
++                                                section.map_or(0, |section| section.ordinal),
++                                                &delegation_frame_id.unwrap_or_default(),
++                                                false,
++                                            )?;
++                                        }
+                                         Some(goal)
+                                     }
+                                     maos_bin::delegation::DelegationOutcome::SentCrossHost {

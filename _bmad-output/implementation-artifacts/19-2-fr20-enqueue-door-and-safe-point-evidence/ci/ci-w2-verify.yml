@@ -1,0 +1,376 @@
+# Stories 19-2, 19-3, 19-6 — branch-only hosted (T3) planted-red run
+# (docs/testing/proof-contract.md:24-31), plus 19-2's T0 spike #15. Copy to
+# `.github/workflows/ci-w2-verify.yml` on `ci/w2-verify` ONLY; never merge this
+# workflow or a planted tree; delete the branch after the run.
+#
+# Pattern: 19-1-…-evidence/ci/ci-19-1-verify.yml. T3 setup mirrors the
+# `check-j1-loopback-delegation` job (.github/workflows/discipline.yml:3334-3431):
+# the composite provisioning action, then `build-test-fixtures` (here also
+# `maosctl`, which the 19-2 vectors resolve through `fixtures::profile_binary`).
+# GitHub sets CI=true, so `require_t3` fails closed and never skips quietly.
+#
+# Order: spike #15, then per T3 target an unplanted control (green, no SKIP,
+# every named vector ran and none was ignored) followed by that target's plants.
+# Each plant: sha256 check → apply → run ONE test `--exact` (tee'd) → require
+# rc != 0, `running 1 test`, the test FAILED, the panic at the recorded site and
+# the oracle text → `git checkout -- <files>` → `git diff --exit-code`.
+# A plant runs only if its target's control passed (the Worker-freeze plant also
+# needs the spike). Plant table and expected reds: each story's plants.md.
+#   19-2 AC1   ac1-drain-in-flight-plant.diff          orchestrator_queue_19_2
+#   19-2 AC3   ac3-recall-skips-drain-plant.diff       orchestrator_queue_19_2
+#   19-2 AC7w  ac7-worker-freeze-noop-plant.diff       worker_freeze_19_2
+#   19-3 AC2.4 ac2-effect-gate-removed-plant.diff      worker_workspace_19_3
+#   19-3 AC4.2 ac4-host-probe-reinserted-plant.diff    worker_workspace_19_3
+#   19-6 AC1   ac1-delivery-removed-plant.diff         epic_dispatch_19_1
+#   19-6 AC3.2 ac3-resolver-none-plant.diff            epic_dispatch_19_1
+name: w2-proven-red
+on:
+  push:
+    branches: ["ci/w2-verify"]
+permissions:
+  contents: read
+env:
+  E2: _bmad-output/implementation-artifacts/19-2-fr20-enqueue-door-and-safe-point-evidence
+  E3: _bmad-output/implementation-artifacts/19-3-real-worker-default-with-effect-oracle-evidence
+  E6: _bmad-output/implementation-artifacts/19-6-crash-originator-delivery-and-disposition-evidence
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: w2-proven-red
+      # Same composite action as discipline.yml:3346: exports MAOS_T3_RUNTIME,
+      # MAOS_T3_IMAGE_LOCK_PATH and the trust anchor through GITHUB_ENV.
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Record provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git status --short
+          rustc -Vv
+          cargo -V
+          uname -a
+          cat /etc/os-release
+          podman --version
+          echo "MAOS_T3_RUNTIME=${MAOS_T3_RUNTIME:-<unset>}"
+          sha256sum "$E2"/*-plant.diff "$E3"/*-plant.diff "$E6"/*-plant.diff
+      # Shared shell functions, sourced by every control and plant step.
+      - name: Write the control/plant harness
+        run: |
+          set -euo pipefail
+          logs="$RUNNER_TEMP/w2-logs"
+          mkdir -p "$logs"
+          echo "LOGS=$logs" >> "$GITHUB_ENV"
+          echo "W2=$RUNNER_TEMP/w2-harness.sh" >> "$GITHUB_ENV"
+          cat > "$RUNNER_TEMP/w2-harness.sh" <<'HARNESS'
+          set -euo pipefail
+
+          # Run "$@" with stdout+stderr tee'd to $1; the command's rc lands in RC.
+          run_logged() {
+            local log=$1
+            shift
+            set +e
+            "$@" 2>&1 | tee "$log"
+            RC=${PIPESTATUS[0]}
+            set -e
+          }
+
+          # Unplanted control: the whole target, serial, captured output shown
+          # with --show-output (so a `SKIP:` line from tests/harness/ci.rs would
+          # be visible without breaking libtest's `test … ok` lines). rc 0, no
+          # SKIP, a clean result line, and every named vector ran and was not
+          # ignored (rc 0 with `0 failed` then means it passed).
+          control() {
+            local label=$1 target=$2
+            shift 2
+            local log="$LOGS/control-${target}.log" name
+            git diff --exit-code \
+              || { echo "::error title=${label} control::the tree is not clean before the control"; return 1; }
+            run_logged "$log" cargo test --locked --color never -p maos-bin --test "$target" \
+              -- --test-threads=1 --show-output
+            if [ "$RC" -ne 0 ]; then
+              echo "::error title=${label} control::unplanted ${target} exited ${RC}"
+              return 1
+            fi
+            if grep -n 'SKIP:' "$log"; then
+              echo "::error title=${label} control::${target} printed SKIP on the provisioned runner"
+              return 1
+            fi
+            grep -Eq '^test result: ok\. [0-9]+ passed; 0 failed;' "$log" \
+              || { echo "::error title=${label} control::no clean test result line"; return 1; }
+            for name in "$@"; do
+              grep -q "^test ${name} \.\.\. " "$log" \
+                || { echo "::error title=${label} control::${name} did not run"; return 1; }
+              if grep -q "^test ${name} \.\.\. ignored" "$log"; then
+                echo "::error title=${label} control::${name} was ignored"
+                return 1
+              fi
+            done
+            echo "::notice title=${label} control GREEN::unplanted ${target} passed on T3 with no SKIP"
+          }
+
+          restore_tree() {
+            # shellcheck disable=SC2086 # RESTORE_FILES is a space-separated path list
+            git checkout -- $RESTORE_FILES
+            git diff --exit-code \
+              || { echo "::error title=restore::tree not restored byte-identically"; exit 1; }
+          }
+
+          # plant LABEL DIFF SHA256 TARGET TEST SITE FILES ORACLE...
+          # SITE is <test file>:<line> of the assertion the red must panic at;
+          # it is checked to be an assertion in THIS tree before planting.
+          plant() {
+            local label=$1 diff=$2 sha=$3 target=$4 name=$5 site=$6 files=$7
+            shift 7
+            local log
+            log="$LOGS/$(basename "${diff%.diff}").log"
+            local site_file=${site%:*} site_line=${site##*:} verdict=ok oracle
+            sed -n "${site_line}p" "$site_file" | grep -Eq 'assert|panic!' \
+              || { echo "::error title=${label}::${site} is not an assertion in this tree"; return 1; }
+            RESTORE_FILES=$files
+            # Safety net: the tree is restored even if a command below aborts the step.
+            trap restore_tree EXIT
+            # Explicit failures: never rely on errexit inside the function.
+            echo "${sha}  ${diff}" | sha256sum -c - \
+              || { echo "::error title=${label}::${diff} is not the recorded diff (sha256)"; return 1; }
+            git diff --exit-code \
+              || { echo "::error title=${label}::the tree is not clean before planting"; return 1; }
+            git apply --check "$diff" \
+              || { echo "::error title=${label}::${diff} does not apply to this tree"; return 1; }
+            git apply "$diff" || { echo "::error title=${label}::git apply failed"; return 1; }
+            git diff --stat
+            git diff
+            run_logged "$log" cargo test --locked --color never -p maos-bin --test "$target" \
+              -- --exact "$name" --test-threads=1
+            [ "$RC" -ne 0 ] \
+              || { echo "::error title=${label}::planted tree stayed GREEN (rc=0)"; verdict=bad; }
+            grep -q '^running 1 test$' "$log" \
+              || { echo "::error title=${label}::--exact did not select exactly one test"; verdict=bad; }
+            grep -q "^test ${name} \.\.\. FAILED\$" "$log" \
+              || { echo "::error title=${label}::${name} did not FAIL"; verdict=bad; }
+            grep -qF "panicked at ${site}:" "$log" \
+              || { echo "::error title=${label}::red did not panic at ${site}"; verdict=bad; }
+            for oracle in "$@"; do
+              grep -qF -- "$oracle" "$log" \
+                || { echo "::error title=${label}::red lacks the oracle text: ${oracle}"; verdict=bad; }
+            done
+            trap - EXIT
+            restore_tree
+            git diff --stat
+            [ "$verdict" = ok ] || return 1
+            echo "::notice title=${label} PROVEN-RED::${name} failed at ${site}; restored byte-identically"
+          }
+          HARNESS
+      - name: Build the worker CLI and maosctl fixtures (xtask build-test-fixtures, Story 20-12)
+        id: fixtures
+        run: cargo run --locked -p xtask -- build-test-fixtures --only worker-cli-fixture --only maosctl
+      - name: Build the four T3 test targets once
+        id: build
+        run: >-
+          cargo test --locked --color never --no-run -p maos-bin
+          --test orchestrator_queue_19_2 --test worker_freeze_19_2
+          --test worker_workspace_19_3 --test epic_dispatch_19_1
+
+      # ── 19-2 T0 spike #15 (D-19-2-14; story T0, AC7.2) ─────────────────────
+      # Rootless `podman pause`/`unpause` ×20 on a `hang-chatty` Worker through
+      # the production door: the unplanted `twenty_door_pauses…` vector. Green ⇒
+      # D-19-2-14 A holds on this image; red ⇒ the C fallback (409
+      # `worker_pause_unsupported`, FR51(a) in-process only for Workers) is owed.
+      - name: 19-2 spike #15 — rootless podman pause/unpause x20 on a hang-chatty Worker
+        id: spike
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          log="$LOGS/spike-15-podman-pause.log"
+          {
+            podman info --format 'cgroups={{.Host.CgroupsVersion}} manager={{.Host.CgroupManager}} rootless={{.Host.Security.Rootless}}' || true
+            cat /proc/self/cgroup
+          } | tee "$LOGS/spike-15-podman-info.log"
+          git diff --exit-code
+          run_logged "$log" cargo test --locked --color never -p maos-bin --test worker_freeze_19_2 \
+            -- --exact twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds \
+            --test-threads=1 --show-output
+          if [ "$RC" -ne 0 ]; then
+            echo "::error title=19-2 spike #15::rootless pause/unpause x20 FAILED (rc=$RC): D-19-2-14 C fallback indicated"
+            exit 1
+          fi
+          grep -q '^running 1 test$' "$log"
+          if grep -n 'SKIP:' "$log"; then
+            echo "::error title=19-2 spike #15::the freeze vector printed SKIP"; exit 1
+          fi
+          grep -Eq '^test result: ok\. 1 passed; 0 failed;' "$log"
+          measured=$(grep -m1 'AC7 T3 Worker pause -> silent: n=20' "$log" || true)
+          test -n "$measured" || { echo "::error title=19-2 spike #15::no measured line"; exit 1; }
+          echo "::notice title=19-2 spike #15 GREEN::rootless podman pause/unpause x20 held (D-19-2-14 A): ${measured}"
+
+      # ── 19-2: orchestrator_queue_19_2 (AC1, AC3) ───────────────────────────
+      - name: 19-2 control — orchestrator_queue_19_2 must pass with no T3 SKIP
+        id: control-queue
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          control "19-2 queue" orchestrator_queue_19_2 \
+            queued_mid_delegation_one_instruction_reaches_each_next_section_and_the_rest_stays_queued \
+            a_recalled_instruction_never_reaches_a_worker_and_is_journaled_before_removal \
+            a_paused_orchestrator_holds_dispatch_until_resume \
+            a_pick_without_a_boot_principal_is_refused_and_records_nothing \
+            a_pick_on_a_principal_bound_serving_butler_runs_the_declared_action \
+            a_scene_with_a_different_env_principal_refuses_the_boot
+      - name: 19-2 AC1 plant (drain in flight, bypassing drain_next) must be RED
+        if: ${{ !cancelled() && steps.control-queue.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          plant "19-2 AC1" "$E2/ac1-drain-in-flight-plant.diff" \
+            ffdb2356994fd97e1089410219adc94f7733abde62ee39e3f63a7e479633464d \
+            orchestrator_queue_19_2 \
+            queued_mid_delegation_one_instruction_reaches_each_next_section_and_the_rest_stays_queued \
+            crates/maos-bin/tests/orchestrator_queue_19_2.rs:545 \
+            crates/maos-bin/src/main.rs \
+            'one instruction per safe point: ' \
+            ' right: 2'
+      - name: 19-2 AC3 plant (recall answers 200 without recall_all_pending) must be RED
+        if: ${{ !cancelled() && steps.control-queue.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          plant "19-2 AC3" "$E2/ac3-recall-skips-drain-plant.diff" \
+            c22f84abb7093668f6c518b571ebf1338b0787f02b5a572938b640f7a7d7d76d \
+            orchestrator_queue_19_2 \
+            a_recalled_instruction_never_reaches_a_worker_and_is_journaled_before_removal \
+            crates/maos-bin/tests/orchestrator_queue_19_2.rs:672 \
+            crates/maos-bin/src/operator_door.rs \
+            'assertion `left == right` failed'
+
+      # ── 19-2: worker_freeze_19_2 (AC7 Worker; AC8 leg 3 control) ───────────
+      - name: 19-2 control — worker_freeze_19_2 must pass with no T3 SKIP
+        id: control-freeze
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          control "19-2 freeze" worker_freeze_19_2 \
+            twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds \
+            twenty_spawn_token_revokes_stop_the_worker_within_the_teardown_budget
+      - name: 19-2 AC7 Worker plant (freeze acknowledged, never run) must be RED
+        if: ${{ !cancelled() && steps.spike.outcome == 'success' && steps.control-freeze.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          plant "19-2 AC7 Worker" "$E2/ac7-worker-freeze-noop-plant.diff" \
+            bdeaf0363b6aa0647ff23f19b713afc78abc35657210e5cdf7d57fe540fbd751 \
+            worker_freeze_19_2 \
+            twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds \
+            crates/maos-bin/tests/worker_freeze_19_2.rs:454 \
+            crates/maos-bin/src/supervision.rs \
+            'cycle 0: ' \
+            'journaled after the freeze was acknowledged'
+
+      # ── 19-3: worker_workspace_19_3 (AC2.4, AC4.2; T0 `--volume …:U` check) ─
+      - name: 19-3 control — worker_workspace_19_3 must pass with no T3 SKIP
+        id: control-workspace
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          control "19-3 workspace" worker_workspace_19_3 \
+            t3_runs::claude_claiming_a_write_over_an_untouched_workspace_fails_the_run \
+            t3_runs::claude_that_writes_into_its_workspace_completes \
+            t3_runs::codex_file_change_without_a_workspace_diff_fails_the_run \
+            t3_runs::admission_never_executes_the_real_cli_on_the_host \
+            t3_runs::a_configured_workspaces_root_holds_the_workspace \
+            t3_runs::each_epic_worker_gets_its_own_workspace
+      - name: 19-3 AC2.4 plant (effect gate deleted) must be RED
+        if: ${{ !cancelled() && steps.control-workspace.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          plant "19-3 AC2.4" "$E3/ac2-effect-gate-removed-plant.diff" \
+            efefe5069bc736791747861b1e85885c51bab107fd9871d067f81fd408ee2a67 \
+            worker_workspace_19_3 \
+            t3_runs::claude_claiming_a_write_over_an_untouched_workspace_fails_the_run \
+            crates/maos-bin/tests/worker_workspace_19_3.rs:745 \
+            crates/maos-bin/src/worker_spawn.rs \
+            'a claimed write over an empty diff must FAIL the run.'
+      - name: 19-3 AC4.2 plant (host liveness probe re-inserted) must be RED
+        if: ${{ !cancelled() && steps.control-workspace.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          plant "19-3 AC4.2" "$E3/ac4-host-probe-reinserted-plant.diff" \
+            a305fb805dd84d31712485f026914c0287926fb2c8a759b89a24edddd15a7fac \
+            worker_workspace_19_3 \
+            t3_runs::admission_never_executes_the_real_cli_on_the_host \
+            crates/maos-bin/tests/worker_workspace_19_3.rs:857 \
+            crates/maos-bin/src/worker_spawn.rs \
+            'the fake claude ran outside /workspace' \
+            ': --version'
+
+      # ── 19-6: epic_dispatch_19_1 crash vectors (AC1, AC3.2) ────────────────
+      - name: 19-6 control — epic_dispatch_19_1 must pass with no T3 SKIP
+        id: control-epic
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          control "19-6 epic" epic_dispatch_19_1 \
+            epic_dispatches_each_section_to_its_worker_with_distillate_fed_followups \
+            a_pending_halt_before_section_two_stops_dispatch \
+            a_crashed_second_worker_reaches_the_orchestrator_and_nacks_the_epic \
+            a_section_crashed_once_is_redispatched_to_a_fresh_worker_and_the_epic_completes \
+            a_reassigned_section_that_crashes_again_escalates_and_stops \
+            an_escalating_section_flags_the_operator_and_stops \
+            a_reassigning_first_section_that_crashes_escalates_without_a_prior_distillate
+      - name: 19-6 AC1 plant (seam never calls deliver_typed) must be RED
+        if: ${{ !cancelled() && steps.control-epic.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          plant "19-6 AC1" "$E6/ac1-delivery-removed-plant.diff" \
+            53081da166f9f918859497be6672add420e9e3cb888563dce0b999e9e8598f5c \
+            epic_dispatch_19_1 \
+            a_crashed_second_worker_reaches_the_orchestrator_and_nacks_the_epic \
+            crates/maos-bin/tests/epic_dispatch_19_1.rs:408 \
+            crates/maos-bin/src/supervision.rs \
+            'exactly one kernel-sent orphan for delegation:' \
+            '  left: 0' \
+            ' right: 1'
+      - name: 19-6 AC3.2 plant (armed resolver answers None) must be RED
+        if: ${{ !cancelled() && steps.control-epic.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W2"
+          plant "19-6 AC3.2" "$E6/ac3-resolver-none-plant.diff" \
+            7b7d958137337cbdcf6d43dfffa809ac56c4232fae82c388e59ccbbc0b7e7d34 \
+            epic_dispatch_19_1 \
+            a_section_crashed_once_is_redispatched_to_a_fresh_worker_and_the_epic_completes \
+            crates/maos-bin/tests/epic_dispatch_19_1.rs:807 \
+            crates/maos-bin/src/replica_resolver.rs \
+            'a reassigned section that completes completes the epic; stderr:' \
+            'disposition escalate-to-operator; dispatch stopped'
+
+      - name: Upload plant evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w2-proven-red
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/w2-logs/
+            ${{ env.E2 }}/*-plant.diff
+            ${{ env.E2 }}/plants.md
+            ${{ env.E2 }}/ci/ci-w2-verify.yml
+            ${{ env.E3 }}/*-plant.diff
+            ${{ env.E3 }}/plants.md
+            ${{ env.E6 }}/*-plant.diff
+            ${{ env.E6 }}/plants.md

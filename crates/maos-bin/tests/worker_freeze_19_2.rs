@@ -9,20 +9,37 @@
 //!   per second): each `maosctl pause worker` answers `frozen: true,
 //!   fenced: true`, and no heartbeat is journaled after the freeze is
 //!   acknowledged (a line the payload wrote just before the freeze may land
-//!   within `ACK_SLACK`). Latency = POST → the later of the acknowledgement
-//!   and the last heartbeat journaled after the POST; P99 ≤ 2 s. Every
-//!   resume thaws the SAME container (state kept, FR51(b)), and a root
-//!   SIGTERM still tears down a frozen Worker.
-//! * 20 revokes of a Worker's `CliSubprocessSpawn` token (one root each, in
-//!   `LANES` parallel lanes): `maosctl revoke-token` answers
-//!   `worker_stopped: "worker"` and the container is gone within
-//!   `TEARDOWN_BUDGET` (25 s). Latency = POST → container terminal.
+//!   within `ACK_SLACK_NS`) for the whole quiet window, which ends
+//!   `QUIET_MARGIN_NS` after the first line an unfrozen payload would have
+//!   journaled past that slack (≈ 1.4 s after the cycle's heartbeat, never a
+//!   fixed sleep). Latency = POST → the later of
+//!   the acknowledgement and the last heartbeat journaled after the POST;
+//!   all 20 ≤ 2 s. At n=20 the nearest-rank P99 IS the max, so this is
+//!   AC7.4's "P99 ≤ 2 s over 20 pauses" read strictly; the P99 / P99.9
+//!   claim (n=1000) is `fr51_pause_fence_19_2.rs`'s. Every resume thaws the
+//!   SAME container (state kept, FR51(b)), and a root SIGTERM still tears
+//!   down a frozen Worker.
+//! * 20 revokes of a Worker's `CliSubprocessSpawn` token — 20 because AC8.3
+//!   and D-19-2-19 A(2) fix the count; one root each, because the revoke
+//!   stops the root's only Worker — in `LANES` parallel lanes: `maosctl
+//!   revoke-token` answers `worker_stopped: "worker"` and the container is
+//!   gone within `TEARDOWN_BUDGET` (25 s), all 20 (again the max, not a
+//!   P99). Latency = POST → container terminal.
 //!
 //! Measured figures are printed for the Dev Agent Record.
 //!
-//! Proven red (story §Proven-red controls): a freeze hook made a no-op
-//! (`BindingCore::set_frozen` skipping `terminal.set_frozen`) keeps the
-//! heartbeats flowing after the acknowledgement → the pause vector fails.
+//! Wall: nextest's default profile kills a test at 120 s and
+//! `[[profile.default.overrides]]` may not set a slow-timeout
+//! (`.config/nextest.toml`), so each test stays well under 100 s on a loaded
+//! runner — expected walls are on each test [INFERENCE: not yet timed on the
+//! hosted T3 runner; ≈ 4 s per `maos` boot measured by
+//! `researcher_inference_18_3`, plus the T3 container start].
+//!
+//! Planted red (story §Proven-red controls; T3-only): a freeze hook made a
+//! no-op (`BindingCore::set_frozen` skipping `terminal.set_frozen`) keeps
+//! the heartbeats flowing after the acknowledgement → the pause vector
+//! fails. The plant is described here; its run is recorded in the story's
+//! `19-2-fr20-enqueue-door-and-safe-point-evidence/plants.md`.
 
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -36,19 +53,29 @@ mod fixtures;
 mod t3_substrate;
 
 const PAUSES: usize = 20;
+/// AC8.3 / D-19-2-19 A(2): 20 runs, not a tunable.
 const REVOKES: usize = 20;
-const LANES: usize = 4;
+/// 4 sequential boot→revoke runs per lane.
+const LANES: usize = 5;
+const _: () = assert!(REVOKES % LANES == 0, "every lane runs the same count");
 const HEARTBEAT: &str = "worker: fixture heartbeat";
-/// FR51(a) — P99 bound for a pause (`functional-requirements.md:55`).
-const P99_BOUND: Duration = Duration::from_secs(2);
+/// FR51(a) — the pause bound (`functional-requirements.md:55`); at n=20 it
+/// is asserted on the max.
+const PAUSE_BOUND: Duration = Duration::from_secs(2);
 /// `t3/child.rs` `TEARDOWN_BUDGET` — the revoke stop's confirmation bound.
 const TEARDOWN_BUDGET: Duration = Duration::from_secs(25);
-/// How long a frozen Worker must stay silent (> one heartbeat interval).
-const QUIET: Duration = Duration::from_millis(1500);
+/// The `hang-chatty` payload's line period (`worker-cli-fixture.rs`: one
+/// `println!` then `sleep(1 s)`).
+const BEAT_NS: i64 = 1_000_000_000;
+/// How long past the first line an unfrozen payload would journal the quiet
+/// window still waits (pipe read + TL insert jitter on a loaded runner).
+const QUIET_MARGIN_NS: i64 = 400_000_000;
 /// A heartbeat written just before the freeze may be journaled just after
 /// the acknowledgement (pipe read + TL insert); never a full interval.
 const ACK_SLACK_NS: i64 = 250_000_000;
-const STARTUP_BOUND: Duration = Duration::from_secs(90);
+/// Ceilings, not sleeps: each stays under nextest's 120 s kill so a stuck
+/// boot or exit reports its own stderr.
+const STARTUP_BOUND: Duration = Duration::from_secs(45);
 const EXIT_BOUND: Duration = Duration::from_secs(40);
 /// `(timestamp_ns, spirit_pid, intent, capability_token column, payload)`.
 type Row = (i64, i64, String, Option<Vec<u8>>, serde_json::Value);
@@ -283,11 +310,21 @@ impl WorkerRoot {
         .expect("the Worker's spawn grant is journaled at its pid")
     }
 
-    fn wait_new_heartbeat(&self) {
+    /// Waits for a heartbeat journaled after the call; returns the newest
+    /// heartbeat's timestamp.
+    fn wait_new_heartbeat(&self) -> i64 {
         let seen = self.heartbeats().len();
+        let mut newest = None;
         self.wait_for("a fresh heartbeat", Duration::from_secs(10), |root| {
-            root.heartbeats().len() > seen
+            newest = root
+                .heartbeats()
+                .get(seen..)
+                .and_then(|fresh| fresh.last())
+                .map(|(ts, _, _)| *ts);
+            newest.is_some()
         });
+        newest
+            .unwrap_or_else(|| unreachable!("wait_for returns only once a fresh heartbeat is seen"))
     }
 
     fn wait_exit(&mut self) -> ExitStatus {
@@ -354,16 +391,26 @@ fn wait_container_gone(container_id: &str, bound: Duration) -> Duration {
     started.elapsed()
 }
 
-fn p99(mut sample: Vec<Duration>) -> (Duration, Duration) {
+/// `(median, max)`. At n=20 the nearest-rank P99 is the max, so the vectors
+/// assert the max and never call it a P99.
+fn median_max(mut sample: Vec<Duration>) -> (Duration, Duration) {
     sample.sort_unstable();
-    let rank = (sample.len() * 99).div_ceil(100).max(1);
-    (sample[rank - 1], sample[sample.len() - 1])
+    (sample[sample.len() / 2], sample[sample.len() - 1])
+}
+
+fn sleep_until_ns(at: i64) {
+    if let Ok(rest) = u64::try_from(at - now_ns()) {
+        std::thread::sleep(Duration::from_nanos(rest));
+    }
 }
 
 // AC7.2 / AC7.4 — 20 door pauses freeze the Worker within the FR51(a) bound;
 // resume thaws the same container; a frozen Worker is still torn down.
+// Expected wall ≈ 40–60 s: one boot (≈ 5–15 s) + 20 cycles of ≈ 1.6–2.1 s
+// (pause ctl, the quiet window ≈ 1.4 s past the cycle's heartbeat, resume
+// ctl; a thawed payload's expired sleep heartbeats at once) + teardown.
 #[test]
-fn twenty_door_pauses_freeze_a_chatty_worker_within_p99_two_seconds() {
+fn twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds() {
     if !t3_substrate::require_t3("19-2 Worker freeze") {
         return;
     }
@@ -372,7 +419,7 @@ fn twenty_door_pauses_freeze_a_chatty_worker_within_p99_two_seconds() {
 
     let mut latencies = Vec::with_capacity(PAUSES);
     for cycle in 0..PAUSES {
-        root.wait_new_heartbeat();
+        let beat = root.wait_new_heartbeat();
         let posted = now_ns();
         let paused = root.ctl_json(&["pause", "worker"]);
         let acked = now_ns();
@@ -389,7 +436,11 @@ fn twenty_door_pauses_freeze_a_chatty_worker_within_p99_two_seconds() {
             "cycle {cycle}: the pid is fenced: {paused}"
         );
 
-        std::thread::sleep(QUIET);
+        // The shortest window that proves the freeze: unfrozen, the payload
+        // journals a line every `BEAT_NS` after `beat`; wait out the first
+        // such line due after `acked + ACK_SLACK_NS`, plus the margin.
+        let beats_due = (acked + ACK_SLACK_NS - beat).div_euclid(BEAT_NS) + 1;
+        sleep_until_ns(beat + beats_due * BEAT_NS + QUIET_MARGIN_NS);
         let after: Vec<i64> = root
             .heartbeats()
             .into_iter()
@@ -433,11 +484,11 @@ fn twenty_door_pauses_freeze_a_chatty_worker_within_p99_two_seconds() {
         "one child across 20 freezes: {children:?}"
     );
 
-    let (p99, max) = p99(latencies);
-    eprintln!("AC7 T3 Worker pause -> silent: n={PAUSES} p99={p99:?} max={max:?}");
+    let (median, max) = median_max(latencies);
+    eprintln!("AC7 T3 Worker pause -> silent: n={PAUSES} median={median:?} max={max:?}");
     assert!(
-        p99 <= P99_BOUND,
-        "Worker pause P99 {p99:?} exceeds {P99_BOUND:?}"
+        max <= PAUSE_BOUND,
+        "all {PAUSES} ≤ 2 s (P99 at n={PAUSES} = max): the slowest Worker pause took {max:?}"
     );
 
     // Root teardown still kills a frozen container.
@@ -470,7 +521,9 @@ fn revoke_once(tag: &str) -> Duration {
 }
 
 // AC8 leg 3 — revoking a Worker's spawn token stops it within the teardown
-// budget, 20 times.
+// budget, 20 times (AC8.3). Expected wall ≈ 30–50 s: `LANES` lanes of 4
+// sequential runs of ≈ 7–12 s (init + boot + first heartbeat, revoke,
+// container gone, root exit).
 #[test]
 fn twenty_spawn_token_revokes_stop_the_worker_within_the_teardown_budget() {
     if !t3_substrate::require_t3("19-2 Worker revoke-stop") {
@@ -490,10 +543,10 @@ fn twenty_spawn_token_revokes_stop_the_worker_within_the_teardown_budget() {
         .flat_map(|lane| lane.join().expect("a revoke lane panicked"))
         .collect();
     assert_eq!(latencies.len(), REVOKES);
-    let (p99, max) = p99(latencies);
-    eprintln!("AC8 T3 revoke -> container terminal: n={REVOKES} p99={p99:?} max={max:?}");
+    let (median, max) = median_max(latencies);
+    eprintln!("AC8 T3 revoke -> container terminal: n={REVOKES} median={median:?} max={max:?}");
     assert!(
         max <= TEARDOWN_BUDGET,
-        "a revoke stop exceeded {TEARDOWN_BUDGET:?}"
+        "all {REVOKES} ≤ 25 s (P99 at n={REVOKES} = max): the slowest revoke stop took {max:?}"
     );
 }

@@ -568,6 +568,9 @@ fn run_scene(bins: &Bins, home: &Path) -> Result<SceneObservation, String> {
         .env("PATH", path_var)
         // A fixture take must never be able to spawn a paid agent.
         .env_remove("MAOS_LIVE_AGENT")
+        // Keep the fixture Worker's workspace inside the temporary home, where
+        // `remove_worker_workspaces(home)` reaches it.
+        .env_remove("MAOS_WORKER_WORKSPACES_ROOT")
         .output()
         .map_err(|e| format!("demo-j1: cannot run the daemon: {e}"))?;
     let wall = started.elapsed();

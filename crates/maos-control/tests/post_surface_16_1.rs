@@ -864,7 +864,9 @@ fn a_byte_dripping_client_is_cut_at_the_read_deadline() {
 fn a_command_that_overruns_its_budget_is_503_with_the_ports_operation_id() {
     let port = Arc::new(FakePort::new(PortBehaviour::StartAndOverrun));
     let server = server_with(Arc::clone(&port));
-    let response = post(&server, "/v1/spirits/butler/pause", "{}");
+    // `start` keeps `DEFAULT_ROUTE_BUDGET` (10 s), which the port's 11 s
+    // overrun exceeds; `pause` now carries the 30 s `LONG_ROUTE_BUDGET`.
+    let response = post(&server, "/v1/spirits/butler/start", "{}");
     assert_eq!(status_of(&response), 503, "{response}");
     let body = json_of(&response);
     assert_eq!(body["error"], "handler_still_running");
@@ -890,7 +892,9 @@ fn a_command_that_overruns_its_budget_is_503_with_the_ports_operation_id() {
 fn a_command_still_queued_at_the_deadline_is_withdrawn_and_reported_as_spirit_busy() {
     let port = Arc::new(FakePort::new(PortBehaviour::StayQueued));
     let server = server_with(Arc::clone(&port));
-    let response = post(&server, "/v1/spirits/butler/pause", "{}");
+    // `start` keeps `DEFAULT_ROUTE_BUDGET` (10 s): its deadline falls well
+    // inside the queued port's 30 s hold and the falsifier's 11 s overrun.
+    let response = post(&server, "/v1/spirits/butler/start", "{}");
     assert_eq!(status_of(&response), 503, "{response}");
     assert_eq!(
         body_of(&response).as_bytes(),
@@ -903,7 +907,7 @@ fn a_command_still_queued_at_the_deadline_is_withdrawn_and_reported_as_spirit_bu
     // `handler_still_running` WITH an id, so the two 503s are told apart by the
     // shared word and not by the clock.
     let started = server_with(Arc::new(FakePort::new(PortBehaviour::StartAndOverrun)));
-    let response = post(&started, "/v1/spirits/butler/pause", "{}");
+    let response = post(&started, "/v1/spirits/butler/start", "{}");
     assert_eq!(json_of(&response)["error"], "handler_still_running");
 }
 
@@ -1526,4 +1530,103 @@ fn malformed_skill_decision_never_submits_and_custom_roots_reach_the_read_port()
         "GET /v1/skills HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()));
     assert_eq!(status_of(&response), 200);
     assert_eq!(json_of(&response)["roots"][0], "/scratch/skills");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 19-2 (AC4.1/AC6) — recall and pick at the route
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RECALL: &str = "/v1/orchestrator/orchestrator/recall";
+const PICK: &str = "/v1/spirits/butler/pick";
+const BAD_RECALL: &str = "/v1/orchestrator/bad!/recall";
+const BAD_PICK: &str = "/v1/spirits/bad!/pick";
+
+#[test]
+fn recall_and_pick_authenticate_before_routing_and_refuse_get() {
+    let port = Arc::new(FakePort::new(PortBehaviour::Complete));
+    let server = server_with(Arc::clone(&port));
+    for path in [RECALL, PICK, BAD_RECALL, BAD_PICK] {
+        for method in ["GET", "POST"] {
+            let anonymous = exchange(
+                &server,
+                &format!("{method} {path} HTTP/1.1\r\nConnection: close\r\n\r\n"),
+            );
+            assert_eq!(status_of(&anonymous), 401, "anonymous {method} {path}");
+            let wrong = request(&server, method, path, "wrong-token");
+            assert_eq!(status_of(&wrong), 401, "wrong bearer {method} {path}");
+        }
+    }
+    for path in [RECALL, PICK] {
+        let response = request(&server, "GET", path, TOKEN);
+        assert_eq!(status_of(&response), 405, "GET {path}: {response}");
+        assert_eq!(body_of(&response).as_bytes(), METHOD_NOT_ALLOWED_BODY);
+    }
+    for path in [BAD_RECALL, BAD_PICK] {
+        let response = post(&server, path, r#"{"pick":1,"work_mode":"focus"}"#);
+        assert_eq!(status_of(&response), 400, "POST {path}: {response}");
+        assert_eq!(json_of(&response)["error"], "bad_request");
+    }
+    assert_eq!(port.submissions.load(Ordering::Acquire), 0);
+
+    // Falsifier: the same route with the bearer, POST and a good id submits.
+    let recall = post(&server, RECALL, "");
+    assert_eq!(status_of(&recall), 200, "{recall}");
+    let body = json_of(&recall);
+    let command = body["command"].as_str().unwrap_or_default();
+    assert!(command.contains("OrchestratorRecall"), "{command}");
+    assert!(command.contains(r#""orchestrator""#), "{command}");
+    assert_eq!(port.submissions.load(Ordering::Acquire), 1);
+}
+
+#[test]
+fn a_pick_body_must_carry_a_positive_integer_and_a_non_blank_work_mode() {
+    let port = Arc::new(FakePort::new(PortBehaviour::Complete));
+    let server = server_with(Arc::clone(&port));
+    for body in [
+        r#"{"pick":0,"work_mode":"focus"}"#,
+        r#"{"pick":-1,"work_mode":"focus"}"#,
+        r#"{"pick":1.5,"work_mode":"focus"}"#,
+        r#"{"pick":"1","work_mode":"focus"}"#,
+        r#"{"work_mode":"focus"}"#,
+        r#"{"pick":1,"work_mode":"   "}"#,
+        r#"{"pick":1,"work_mode":""}"#,
+        r#"{"pick":1,"work_mode":7}"#,
+        r#"{"pick":1}"#,
+    ] {
+        let response = post(&server, PICK, body);
+        assert_eq!(status_of(&response), 400, "{body}: {response}");
+        assert_eq!(json_of(&response)["error"], "bad_request", "{body}");
+    }
+    assert_eq!(port.submissions.load(Ordering::Acquire), 0);
+
+    // Falsifier: a 1-based pick with a real work mode reaches the port intact.
+    let response = post(&server, PICK, r#"{"pick":1,"work_mode":"focus"}"#);
+    assert_eq!(status_of(&response), 200, "{response}");
+    let body = json_of(&response);
+    let command = body["command"].as_str().unwrap_or_default();
+    assert!(command.contains("OptionPick"), "{command}");
+    assert!(command.contains("pick: 1,"), "{command}");
+    assert!(command.contains(r#"work_mode: "focus""#), "{command}");
+    assert_eq!(port.submissions.load(Ordering::Acquire), 1);
+}
+
+/// Edge19x2 P3 / Accept F6 — revoke waits on the Worker stop and pause/resume
+/// on the Worker freeze (each bounded at 25 s), so none inherits the 10 s `_`.
+#[test]
+fn revoke_pause_and_resume_get_the_long_route_budget() {
+    let spirit_id = String::from("butler");
+    let (token_id, long) = ("ab".repeat(16), Duration::from_secs(30));
+    for command in [
+        OperatorCommand::RevokeToken { token_id },
+        OperatorCommand::Pause {
+            spirit_id: spirit_id.clone(),
+        },
+        OperatorCommand::Resume {
+            spirit_id: spirit_id.clone(),
+        },
+    ] {
+        assert_eq!(command.route_budget(), long, "{command:?}");
+    }
+    let recall = OperatorCommand::OrchestratorRecall { spirit_id };
+    assert_eq!(recall.route_budget(), Duration::from_secs(10), "falsifier");
 }

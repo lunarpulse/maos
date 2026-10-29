@@ -135,9 +135,10 @@ pub fn deprecation_warnings(&self) -> &[DeprecationWarning]
 Construct a kernel-internal `Ctx` for rust-inproc hook dispatch.
 
 Story 5.1 closure: the kernel-side `HookDispatcher` requires a
-`Ctx` to pass to each hook fire. At v0.3-β the rust-inproc form
-uses a `&'static NeverCancel` because the kernel mediates
-cancellation through `KernelCtx`'s SCB state, not through `Ctx`.
+`Ctx` to pass to each hook fire. The rust-inproc form uses a
+`&'static NeverCancel`: `Ctx` carries no cancel signal (D-15 A).
+A pause instead fences the paused Spirit's capability issue and
+verify, so a running hook's next mediated action fails closed.
 Real handles are zero-valued (rust-inproc form does not use them;
 Story 5.5x's subprocess form will populate them from the wire
 decode handshake).

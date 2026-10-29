@@ -1,0 +1,13 @@
+diff --git a/crates/maos-bin/src/supervision.rs b/crates/maos-bin/src/supervision.rs
+--- a/crates/maos-bin/src/supervision.rs
++++ b/crates/maos-bin/src/supervision.rs
+@@ -826,7 +826,8 @@
+             let terminal = self.container_terminal().filter(|_| live);
+             let by = Instant::now() + TEARDOWN_BUDGET;
+             if let Some(terminal) = terminal {
+-                if terminal.set_frozen(frozen, by) {
++                // PLANT (19-2 AC7 Worker): the freeze is acknowledged, never run.
++                if true || terminal.set_frozen(frozen, by) {
+                     *current = frozen;
+                     return Ok(());
+                 }

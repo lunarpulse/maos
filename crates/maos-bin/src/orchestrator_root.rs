@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::distillation::{DigestPayload, DistillationRequest};
-use maos_domain::frame::{EpistemicHaltPayload, PriorDistillateRef};
+use maos_domain::frame::{EpistemicHaltPayload, FramePayload, IacFrame, PriorDistillateRef};
 use maos_domain::halt::HaltState;
 use maos_domain::invariants::i4::ApprovalDecision;
 use maos_domain::notification::{NotificationEvent, NotificationLevel};
@@ -304,36 +304,69 @@ pub fn plant_test_crash(
     })
 }
 
-/// Story 19-2 (D-19-2-02 B / 03 A) — at a NEW `--epic` section's safe point
-/// (`safe_point`: never a 19-6 re-dispatch, never off `--epic`) take ONE
-/// director instruction through the Orchestrator's FR20 gate from the
-/// buffer the door enqueues on, and append it to `goal`. Anything else stays
-/// queued (D-03 A).
-pub fn drain_at_safe_point(
+/// Story 19-2 (D-19-2-02 B / 03 A) — the director instruction section's
+/// `frame` carries, folded into its `task.assign` goal. The caller builds
+/// the frame and re-checks the Orchestrator's pause BEFORE this runs, so an
+/// instruction leaves the buffer only once its frame exists and dispatch is
+/// not paused: nothing is ever handed back (the kernel buffer has no
+/// push-front, so a hand-back would reorder the FIFO).
+///
+/// `carried` is a 19-6 re-dispatch's instruction: its crashed first attempt
+/// already consumed it, so it is re-folded into the NEW frame without
+/// draining. Otherwise, at a NEW `--epic` section's safe point
+/// (`safe_point`: never a re-dispatch, never off `--epic`), ONE instruction
+/// is taken through the Orchestrator's FR20 gate from the buffer the door
+/// enqueues on. Anything else stays queued (D-03 A).
+pub fn fold_at_safe_point(
     emitter: &Orchestrator,
     registry: &OrchestratorBufferRegistry,
-    goal: String,
+    frame: &mut IacFrame,
+    carried: Option<OrchestratorInstruction>,
     safe_point: bool,
-) -> (String, Option<OrchestratorInstruction>) {
-    let instruction = registry
-        .get(&crate::delegation::FROM_SPIRIT.into())
-        .filter(|_| safe_point)
-        .and_then(|buffer| emitter.drain_next(|| buffer.dequeue_at_safe_point()));
-    match instruction {
-        Some(instruction) => (fold_instruction(goal, &instruction), Some(instruction)),
-        None => (goal, None),
+) -> Result<Option<OrchestratorInstruction>, String> {
+    let FramePayload::TaskAssign(payload) = &mut frame.payload else {
+        return Err(format!(
+            "maos run: frame {} is not a task.assign; no director instruction was folded",
+            hex::encode(frame.frame_id)
+        ));
+    };
+    let Some(instruction) = carried.or_else(|| {
+        registry
+            .get(&crate::delegation::FROM_SPIRIT.into())
+            .filter(|_| safe_point)
+            .and_then(|buffer| emitter.drain_next(|| buffer.dequeue_at_safe_point()))
+    }) else {
+        return Ok(None);
+    };
+    payload.goal = fold_instruction(std::mem::take(&mut payload.goal), &instruction);
+    Ok(Some(instruction))
+}
+
+/// The goal back out of a section frame that was built but is not delivered
+/// (the Orchestrator was paused after the build): the loop holds, then
+/// rebuilds the frame from it.
+pub fn reclaim_goal(frame: IacFrame) -> Result<String, String> {
+    match frame.payload {
+        FramePayload::TaskAssign(payload) => Ok(payload.goal),
+        _ => Err(format!(
+            "maos run: frame {} is not a task.assign; its goal cannot be re-dispatched",
+            hex::encode(frame.frame_id)
+        )),
     }
 }
 
-/// Story 19-2 (AC1.2, CR-2) — journal the instruction drained into section
+/// Story 19-2 (AC1.2, CR-2) — journal the instruction folded into section
 /// `ordinal`'s frame `frame_id` BEFORE the frame is delivered, then print
 /// `orchestrator_instruction_dispatched`. A failed row fails the run: the
-/// frame is never delivered.
+/// frame is never delivered. A 19-6 re-dispatch (`redispatch`) writes a
+/// second row naming the NEW frame, so the log never claims only the frame
+/// whose Worker crashed.
 pub fn record_safe_point_drain(
     tl: &TransparencyLogAdapter,
     instruction: &OrchestratorInstruction,
     ordinal: usize,
     frame_id: &[u8; 16],
+    redispatch: bool,
 ) -> Result<(), String> {
     let frame = hex::encode(frame_id);
     tl.insert_approval_decision(ApprovalDecision {
@@ -343,8 +376,9 @@ pub fn record_safe_point_drain(
         intent: "safe-point".into(),
         decision: true,
         reasoning: Some(format!(
-            "id={} section={ordinal} frame={frame}",
-            instruction.id.0
+            "id={} section={ordinal} frame={frame}{}",
+            instruction.id.0,
+            if redispatch { " re-dispatch" } else { "" }
         )),
     })
     .map_err(|e| {
@@ -360,9 +394,19 @@ pub fn record_safe_point_drain(
             "instruction_id": instruction.id.0,
             "section": ordinal,
             "frame_id": frame,
+            "redispatch": redispatch,
         })
     );
     Ok(())
+}
+
+/// Story 19-2 (D-19-2-17 A) — whether the Orchestrator at `pid` is Paused.
+pub fn orchestrator_paused(scheduler: &SpiritSchedulerAdapter, pid: u32) -> bool {
+    let scbs = scheduler.scbs();
+    let guard = scbs.read().unwrap_or_else(|e| e.into_inner());
+    guard
+        .get(&pid)
+        .is_some_and(|scb| scb.current_state() == ScbLifecycleState::Paused)
 }
 
 /// Story 19-2 (D-19-2-17 A) — before section `ordinal`'s frame, wait while
@@ -374,20 +418,13 @@ pub async fn hold_while_paused(
     ordinal: usize,
     shutdown: &tokio_util::sync::CancellationToken,
 ) -> bool {
-    let paused = || {
-        let scbs = scheduler.scbs();
-        let guard = scbs.read().unwrap_or_else(|e| e.into_inner());
-        guard
-            .get(&pid)
-            .is_some_and(|scb| scb.current_state() == ScbLifecycleState::Paused)
-    };
-    if paused() {
+    if orchestrator_paused(scheduler, pid) {
         println!(
             "{}",
             serde_json::json!({"event": "dispatch_paused", "section": ordinal})
         );
     }
-    while paused() {
+    while orchestrator_paused(scheduler, pid) {
         tokio::select! {
             () = shutdown.cancelled() => return false,
             () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
@@ -557,7 +594,11 @@ pub fn orphan_recorded(
 /// supervisor's executor wrote (an unarmed `reassign-to-replica` is already
 /// `task.escalated` there). Prints `delegation_orphaned`. `Ok(cause)` means
 /// re-dispatch the section once; otherwise the typed stop, after one
-/// `AnomalyFlagged` on escalation.
+/// `AnomalyFlagged` on escalation. `reassign_without_prior` (r19_6_d04): the
+/// entry declared `reassign-to-replica` but the loop left the resolver
+/// unarmed for want of a prior distillate (FR21) — the escalation's event
+/// carries `"reason":"no_prior_distillate"` and its stop names that reason.
+#[allow(clippy::too_many_arguments)]
 pub fn dispose_orphan(
     tl: &TransparencyLogAdapter,
     notifications: &NotificationDispatcher,
@@ -566,6 +607,7 @@ pub fn dispose_orphan(
     worker_pid: u32,
     fallback_cause: &str,
     safe_point: bool,
+    reassign_without_prior: bool,
 ) -> Result<String, String> {
     let cause = task_rows(tl, task_id, worker_pid)?
         .into_iter()
@@ -581,17 +623,19 @@ pub fn dispose_orphan(
             _ => None,
         })
         .ok_or_else(|| format!("maos run: no disposition row for crashed {task_id}"))?;
-    println!(
-        "{}",
-        serde_json::json!({
-            "event": "delegation_orphaned",
-            "section": section,
-            "task_id": task_id,
-            "cause": cause,
-            "disposition": disposition.to_string(),
-            "orchestrator_safe_point": safe_point,
-        })
-    );
+    let no_prior = reassign_without_prior && disposition == OnCrashAction::EscalateToOperator;
+    let mut event = serde_json::json!({
+        "event": "delegation_orphaned",
+        "section": section,
+        "task_id": task_id,
+        "cause": cause,
+        "disposition": disposition.to_string(),
+        "orchestrator_safe_point": safe_point,
+    });
+    if no_prior {
+        event["reason"] = "no_prior_distillate".into();
+    }
+    println!("{event}");
     if disposition == OnCrashAction::ReassignToReplica {
         return Ok(cause);
     }
@@ -608,8 +652,13 @@ pub fn dispose_orphan(
             .dispatch(event, NotificationLevel::Immediate)
             .map_err(|e| format!("maos run: escalation notification failed: {e}"))?;
     }
+    let reason = if no_prior {
+        " (reassign-to-replica needs a prior distillate)"
+    } else {
+        ""
+    };
     Err(format!(
-        "maos run: section {section} Worker crashed ({cause}); disposition {disposition}; \
+        "maos run: section {section} Worker crashed ({cause}); disposition {disposition}{reason}; \
          dispatch stopped"
     ))
 }

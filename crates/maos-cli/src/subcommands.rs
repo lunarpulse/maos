@@ -2150,7 +2150,7 @@ fn dispatch_pause(args: &PauseArgs, _color: ColorChoice) -> ExitCode {
             "POST",
             &format!("/v1/spirits/{}/pause", args.spirit),
             None,
-            DEFAULT_ROUTE_BUDGET,
+            LONG_ROUTE_BUDGET,
         )
     })
 }
@@ -2165,7 +2165,7 @@ fn dispatch_resume(args: &ResumeArgs, _color: ColorChoice) -> ExitCode {
             "POST",
             &format!("/v1/spirits/{}/resume", args.spirit),
             None,
-            DEFAULT_ROUTE_BUDGET,
+            LONG_ROUTE_BUDGET,
         )
     })
 }
@@ -2278,7 +2278,7 @@ fn dispatch_revoke_token(args: &RevokeTokenArgs, _color: ColorChoice) -> ExitCod
             "POST",
             &format!("/v1/tokens/{}/revoke", args.token_id),
             None,
-            DEFAULT_ROUTE_BUDGET,
+            LONG_ROUTE_BUDGET,
         )
     })
 }

@@ -1,0 +1,15 @@
+diff --git a/crates/maos-bin/tests/worker_crash_corpus_16_3.rs b/crates/maos-bin/tests/worker_crash_corpus_16_3.rs
+--- a/crates/maos-bin/tests/worker_crash_corpus_16_3.rs
++++ b/crates/maos-bin/tests/worker_crash_corpus_16_3.rs
+@@ -650,9 +650,8 @@
+         .mailbox()
+         .register_spirit(delegation::FROM_SPIRIT)
+         .expect("register the Orchestrator's mailbox");
+-    supervisor
+-        .install_originator_delivery(Arc::new(NullReplicaResolver))
+-        .unwrap_or_else(|_| panic!("the set-once delivery seam installs"));
++    // PLANT (19-6 AC5): the corpus world runs without the delivery seam.
++    let _ = Arc::new(NullReplicaResolver);
+     let frame_ids: Vec<[u8; 16]> = (0..WORKERS).map(delegation_frame_id).collect();
+ 
+     let hang = write_worker_manifest(&dir, "hang");

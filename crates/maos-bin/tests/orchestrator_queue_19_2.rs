@@ -25,11 +25,19 @@
 //! the roots wrote (Transparency Log + Approval Decision Log), never state
 //! this test set itself.
 //!
-//! Proven red (story §Proven-red controls): draining at the in-flight hold
+//! Planted red (story §Proven-red controls): draining at the in-flight hold
 //! (bypassing `drain_next`) reads `0/` during the hold and names section 1;
 //! a recall handler that skips `recall_all_pending` lets the instruction
-//! reach section 2's goal; a pick handler that answers a canned 200 leaves no
-//! `butler:acceptance` row.
+//! reach section 2's goal (both T3-only); a pick handler that answers a
+//! canned 200 leaves no `butler:acceptance` row. Each plant is described
+//! here; its run is recorded in the story's
+//! `19-2-fr20-enqueue-door-and-safe-point-evidence/plants.md`.
+//!
+//! Wall: nextest's default profile kills a test at 120 s and
+//! `[[profile.default.overrides]]` may not set a slow-timeout
+//! (`.config/nextest.toml`), so each test stays well under 100 s on a loaded
+//! runner; the expected wall is on each test. One root per test: merging the
+//! epic vectors into one run would lengthen that test, not shorten any.
 
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -54,11 +62,14 @@ const PRINCIPAL: &str = "director-ada";
 /// `FrameKind::TaskAssign` / `FrameKind::EpistemicHalt` (maos-iac TL codes).
 const KIND_TASK_ASSIGN: i64 = 0;
 const KIND_EPISTEMIC_HALT: i64 = 3;
-/// Every wait is bounded; these are ceilings, not sleeps.
-const EVENT_BOUND: Duration = Duration::from_secs(90);
-const RUN_BOUND: Duration = Duration::from_secs(180);
-/// How long a paused Orchestrator must hold section 2 before it is resumed.
-const PAUSED_WINDOW: Duration = Duration::from_millis(1500);
+/// Every wait is bounded; these are ceilings, not sleeps. Each single wait
+/// stays under nextest's 120 s kill so a stuck root reports its own
+/// stdout/stderr.
+const EVENT_BOUND: Duration = Duration::from_secs(60);
+const RUN_BOUND: Duration = Duration::from_secs(90);
+/// How long a paused Orchestrator must hold section 2 before it is resumed:
+/// ten of `hold_while_paused`'s 100 ms polls.
+const PAUSED_WINDOW: Duration = Duration::from_millis(1000);
 
 fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
@@ -488,6 +499,10 @@ fn epic_root(tag: &str) -> Root {
 /// 1 is in flight: none is consumed in flight; section 2's goal carries the
 /// first, section 3's the second, each journaled before its frame; the third
 /// stays queued and the drain event says so.
+///
+/// Expected wall ≈ 15–35 s [INFERENCE: not yet timed on the hosted T3
+/// runner]: one `maos` boot (≈ 4 s, `researcher_inference_18_3`) and three
+/// T3 sections, no fixed sleep.
 #[test]
 fn queued_mid_delegation_one_instruction_reaches_each_next_section_and_the_rest_stays_queued() {
     if !t3_substrate::require_t3("19-2 safe-point drain") {
@@ -638,6 +653,9 @@ fn queued_mid_delegation_one_instruction_reaches_each_next_section_and_the_rest_
 /// AC3 (FR51(c), D-19-2-05/06 A) — an instruction queued and then recalled
 /// during the section-1 hold never reaches a Worker; the intent row precedes
 /// the per-instruction row; an empty recall is a 200 with `recalled: []`.
+///
+/// Expected wall ≈ 15–35 s [INFERENCE, as the drain vector]: one boot and
+/// three T3 sections, no fixed sleep.
 #[test]
 fn a_recalled_instruction_never_reaches_a_worker_and_is_journaled_before_removal() {
     if !t3_substrate::require_t3("19-2 recall") {
@@ -755,6 +773,9 @@ fn a_recalled_instruction_never_reaches_a_worker_and_is_journaled_before_removal
 /// AC7.3 (D-19-2-17 A) — while the Orchestrator is Paused the loop holds
 /// before section 2's frame (`dispatch_paused` once, no `task.assign`), and
 /// continues after resume; the pause body reads the fence back.
+///
+/// Expected wall ≈ 16–36 s [INFERENCE, as the drain vector]: one boot, three
+/// T3 sections and the 1 s `PAUSED_WINDOW`.
 #[test]
 fn a_paused_orchestrator_holds_dispatch_until_resume() {
     if !t3_substrate::require_t3("19-2 paused Orchestrator holds dispatch") {
@@ -822,6 +843,7 @@ fn acceptance_rows(root: &Root) -> Vec<TlRow> {
 
 /// AC4 / D-19-2-08 A — a serving Butler booted with no principal answers a
 /// pick 409 `principal_unbound` and records nothing; an unknown Spirit is 404.
+/// Wall ≈ 1 s (0.87 s in a local nextest run; no T3).
 #[test]
 fn a_pick_without_a_boot_principal_is_refused_and_records_nothing() {
     let root = butler_root("pick-unbound", &[]);
@@ -853,6 +875,7 @@ fn a_pick_without_a_boot_principal_is_refused_and_records_nothing() {
 /// a director's pick reaches the RUNNING Butler: the declared action runs,
 /// the decision is attested at the Butler's pid after the door's intent row,
 /// and the notification is consumed (a second pick is 409).
+/// Wall ≈ 1 s (1.20 s in a local nextest run; no T3).
 #[test]
 fn a_pick_on_a_principal_bound_serving_butler_runs_the_declared_action() {
     let root = butler_root("pick-bound", &[(PRINCIPAL_ENV, PRINCIPAL)]);
@@ -924,7 +947,7 @@ fn a_pick_on_a_principal_bound_serving_butler_runs_the_declared_action() {
 }
 
 /// D-19-2-08 A — a scene and a different `MAOS_BUTLER_PRINCIPAL` refuse the
-/// boot, typed, before any pass.
+/// boot, typed, before any pass. Wall < 1 s (0.41 s in a local nextest run).
 #[test]
 fn a_scene_with_a_different_env_principal_refuses_the_boot() {
     let home = data_home("principal-conflict");

@@ -1,0 +1,21 @@
+diff --git a/crates/maos-bin/src/operator_door.rs b/crates/maos-bin/src/operator_door.rs
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -1486,9 +1486,14 @@
+         {
+             return outcome;
+         }
+-        self.private_ops
+-            .option_pick(spirit_id, pid, pick, work_mode)
+-            .await
++        // PLANT (19-2 AC4): a canned 200; the live Butler's pick never runs.
++        OperatorOutcome::Completed(serde_json::json!({
++            "spirit_id": spirit_id,
++            "action": "reminder",
++            "accepted": true,
++            "effect": "stub (live send v0.4)",
++            "message": "planted: the Slack reminder was never sent",
++        }))
+     }
+ 
+     /// Token revocation through the canonical adapter path. D-16-1-V: an

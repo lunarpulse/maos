@@ -1,0 +1,11 @@
+diff --git a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -455,7 +455,6 @@
+         );
+         // Story 19-2 (FR51 a) — fence before `on_pause`: from here every
+         // mediated action of this pid fails closed, in-flight hooks included.
+-        self.capability.set_paused(spirit_pid, true);
+ 
+         let outcome = self.dispatcher.fire_on_pause(&scb).await;
+         self.check_hook_outcome("on_pause", spirit_pid, outcome)?;

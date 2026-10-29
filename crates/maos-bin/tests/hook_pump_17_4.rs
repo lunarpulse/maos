@@ -739,8 +739,10 @@ async fn consolidation_repeats_every_quiescent_window_and_only_while_running() {
     );
 
     world.scheduler.pause(pid).await.unwrap();
-    // A Running check may legitimately precede pause while its dispatch
-    // finishes afterwards (FR51(a)). Join that work before sampling.
+    // A Running check may precede the pause while its dispatch finishes
+    // afterwards: a pause does not interrupt a hook's computation (19-2's
+    // capability fence refuses only its next issue or verify, `hook_pump.rs`).
+    // Join that work before sampling.
     watchdog.shutdown().await;
     let paused_at = counts.count.load(Ordering::SeqCst);
     let watchdog = fast(&world.pump);

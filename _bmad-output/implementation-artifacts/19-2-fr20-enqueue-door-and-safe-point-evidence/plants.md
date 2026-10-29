@@ -1,0 +1,55 @@
+# 19-2 proven-red plants
+
+## Plant set (prepared 2026-10-29)
+
+These plants were prepared against the working tree `75e1e493` plus the uncommitted correction round 2, which is to be committed as-is. No plant was applied and no cargo command was run while preparing them. All six diffs pass a forward `git apply --check` against that tree and fail `git apply --check -R` (they are not already applied). The sha256 values below are those of the diff files in this directory.
+
+The procedure follows `docs/testing/proof-contract.md:24-31`. Each plant goes in place in the real tree and is applied alone, then restored byte-identically before the next one. Local runs use the same steps as `19-1-…-evidence/plants.md`:
+
+1. Copy the file aside.
+2. `git apply <diff>`.
+3. Run the target, which must go red.
+4. Copy the file back and check it with `cmp`.
+5. `touch` the file.
+6. Run the target again, which must go green.
+
+Every local run uses `env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/mnt/build/cargo` and one cargo process. Hosted runs restore with `git checkout -- <file>` followed by `git diff --exit-code`.
+
+Plant count: AC1 ×1, AC3 ×1, AC4 ×1, AC7 ×2 (the fence and the Worker freeze, both named in AC7.5 and §Proven-red controls), AC8 ×1. No plant touches the AC2 kernel-Δ claim; AC2 is a code-reading AC.
+
+| Plant (diff · sha256) | Planted site (current tree) | Asserting test → panic site | Expected red | Tier | Command | Status |
+|---|---|---|---|---|---|---|
+| AC1 safe point: `ac1-drain-in-flight-plant.diff` · `ffdb2356994fd97e1089410219adc94f7733abde62ee39e3f63a7e479633464d` | `crates/maos-bin/src/main.rs:5101-5104`. Right after the D-04 hold returns, with section k's delegation still in flight (`begin_delegation` ran, `complete_delegation` not yet), the root calls `buffer.dequeue_at_safe_point()` directly, bypassing `Orchestrator::drain_next`'s `in_flight > 0` gate. It journals the drained instruction through `record_safe_point_drain` with section k's ordinal and frame id | `queued_mid_delegation_one_instruction_reaches_each_next_section_and_the_rest_stays_queued` (`crates/maos-bin/tests/orchestrator_queue_19_2.rs:507`) → `:545` | ``assertion `left == right` failed: one instruction per safe point: […]``, with `left: 3` and `right: 2`. Instruction A is consumed in flight and named section 1, B at section 2's safe point, and C in flight in section 2 | hosted (T3) | `cargo test --locked --color never -p maos-bin --test orchestrator_queue_19_2 -- --exact queued_mid_delegation_one_instruction_reaches_each_next_section_and_the_rest_stays_queued --test-threads=1` | PENDING (hosted `ci/w2-verify`) |
+| AC3 recall: `ac3-recall-skips-drain-plant.diff` · `c22f84abb7093668f6c518b571ebf1338b0787f02b5a572938b640f7a7d7d76d` | `crates/maos-bin/src/operator_door.rs:1433`. `orchestrator_recall_command` iterates an empty `Vec` instead of `buffer.recall_all_pending()`. The intent row is still written and the handler still answers 200 | `a_recalled_instruction_never_reaches_a_worker_and_is_journaled_before_removal` (`orchestrator_queue_19_2.rs:660`) → `:672` | ``assertion `left == right` failed``. The body reads `recalled: []`, `pending: 1` against the expected `[{instruction_id, text}]`, `pending: 0` | hosted (T3) | `cargo test --locked --color never -p maos-bin --test orchestrator_queue_19_2 -- --exact a_recalled_instruction_never_reaches_a_worker_and_is_journaled_before_removal --test-threads=1` | PENDING (hosted `ci/w2-verify`) |
+| AC4 pick: `ac4-pick-canned-200-plant.diff` · `30cffa7dcf267982458fabeb6b519528a82f4d60703192dbf109ae12f7c6a5d4` | `crates/maos-bin/src/operator_door.rs:1489-1491`. `option_pick_command` writes its intent row, then answers a canned `Completed` body (`reminder`, `accepted: true`, `stub (live send v0.4)`, a message naming Slack) without calling `BinPrivateOps::option_pick`, so `Butler::handle_option_pick` never runs | `a_pick_on_a_principal_bound_serving_butler_runs_the_declared_action` (`orchestrator_queue_19_2.rs:880`) → `:912` | ``assertion `left == right` failed: one attested decision: []``, with `left: 0` and `right: 1`. No `butler:acceptance` row was written. The body assertions at `:899-909` pass on the canned body, so the red is the missing record | local (T0; no T3) | `cargo run -q --locked -p xtask -- build-test-fixtures --only worker-cli-fixture --only maosctl`, then `cargo nextest run --locked --color never --no-fail-fast -p maos-bin --test orchestrator_queue_19_2`. Expect 6 run, 5 passed, 1 failed; the three T3 vectors print a named SKIP and pass locally | PENDING (orchestrator run) |
+| AC7 fence: `ac7-fence-unset-plant.diff` · `50bfa02f05d472108af9f36ca79ce8d8e30b2b05e35979568fdf272f7b74caef` | `crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:458`. The `self.capability.set_paused(spirit_pid, true)` line in `SpiritSchedulerAdapter::pause` is deleted, so the pause transitions and journals but never fences | `pause_refuses_an_in_flight_hooks_next_action_within_p99_two_seconds` (`crates/maos-kernel-core/tests/fr51_pause_fence_19_2.rs:284`) → `:334`; also `fence_is_set_on_pause_lifted_on_resume_and_cleared_on_unload` (`:365`) → `:390` | ``cycle 0: the in-flight hook kept acting 10s after `pause` — no fence``: the in-flight hook's next mint succeeds. Also `pause sets the fence` | local (T0) | `cargo nextest run --locked --color never --no-fail-fast -p maos-kernel-core --test fr51_pause_fence_19_2`. Expect 5 run, 3 passed, 2 failed (the two named); the inference and MCP vectors call `set_paused` directly, or not at all, and stay green | PENDING (orchestrator run) |
+| AC7 Worker freeze: `ac7-worker-freeze-noop-plant.diff` · `bdeaf0363b6aa0647ff23f19b713afc78abc35657210e5cdf7d57fe540fbd751` | `crates/maos-bin/src/supervision.rs:829`. In `BindingCore::set_frozen`, `if terminal.set_frozen(frozen, by)` becomes `if true \|\| …`. The freeze or thaw is acknowledged (`frozen: true`), but `podman pause` never runs | `twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds` (`crates/maos-bin/tests/worker_freeze_19_2.rs:413`) → `:454` | `cycle 0: N heartbeat(s) journaled after the freeze was acknowledged — the Worker was not frozen`. The `frozen`/`fenced` body asserts at `:426-437` pass, so heartbeats keep flowing after the acknowledgement | hosted (T3) | `cargo test --locked --color never -p maos-bin --test worker_freeze_19_2 -- --exact twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds --test-threads=1` | PENDING (hosted `ci/w2-verify`; also gated on spike #15) |
+| AC8 re-check: `ac8-inference-recheck-removed-plant.diff` · `4def91c367ce367514b7a2df0bb81c9e66ccfea80753aa91bda18c14236e4b4f` | `crates/maos-kernel-core/src/inference/mod.rs:450-452`. The post-call `self.capabilities.recheck(&req.capability_token)` in `InferencePortAdapter::complete` is deleted | `a_revoke_mid_inference_refuses_the_response_and_keeps_the_call_journaled` (`fr51_pause_fence_19_2.rs:548`) → `:566`; also `a_pause_mid_inference_refuses_the_response_until_resume` (`:584`) → `:592` | `call 0: a completion revoked on the wire was returned (…) — no post-call re-check`: the stubbed completion is returned after the revoke. Also `a response that arrives after the pause is refused: Ok(…)` | local (T0) | `cargo nextest run --locked --color never --no-fail-fast -p maos-kernel-core --test fr51_pause_fence_19_2`. Expect 5 run, 3 passed, 2 failed (the two named); the MCP vector has its own re-check and stays green | PENDING (orchestrator run) |
+
+### Where the reds differ from the story's table
+
+- **AC1.** The story table (`19-2-…md:307`) expects "`status` reads 0 during the hold; consumed row names section k". The hold is a wait loop in `orchestrator_root::hold_test_section` with no reach into the buffer, so a drain *during* the wait would make the red depend on timing: it could land on the `pending` asserts at `:523` or the `: 3/` assert at `:528`, depending on a 20 ms poll. This plant drains at the in-flight point instead, right after the hold returns and before section k's Worker runs. The consumed row and the `orchestrator_instruction_dispatched` event name section k (1, then 2), and the vector's first red is deterministic: the safe-point count at `:545`. The FIFO assertion (`:551`) and `orchestrator_instructions_pending` (`:639`) would also red if reached.
+- **AC3.** The story expects "instruction reaches section k+1's goal". The vector checks the recall's own 200 body first (`:672`). A handler that skips `recall_all_pending` cannot report the instruction as recalled, because the buffer has no peek. The vector therefore reds at the response, before section 2 is released. That is still a red of this control; the section-2 observable (`:704-721`) is not reached.
+
+## T0 spike #15 (D-19-2-14, story T0 / AC7.2)
+
+Rootless `podman pause`/`unpause` ×20 on a `hang-chatty` Worker, run on the hosted image as the unplanted `twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds` (20 door pauses, each frozen, silent and thawed on the SAME container). It is the `19-2 spike #15` step of `ci/ci-w2-verify.yml`. It records `podman info` (cgroup version and manager, rootless) and the measured `AC7 T3 Worker pause -> silent: n=20 median=… max=…` line.
+
+- Green ⇒ D-19-2-14 A holds on `ubuntu-24.04`, and `WORKER_FREEZE_ENABLED = true` (`supervision.rs:242`) stands.
+- Red ⇒ the ruled C fallback is owed: 409 `worker_pause_unsupported`, FR51(a) labelled in-process only for Workers, never B.
+
+Status: PENDING (hosted `ci/w2-verify`).
+
+## Hosted plants (T3; `ci/w2-verify`)
+
+One branch-only workflow covers 19-2, 19-3 and 19-6: `19-2-fr20-enqueue-door-and-safe-point-evidence/ci/ci-w2-verify.yml`. Copy it to `.github/workflows/` on branch `ci/w2-verify` only, never merge it, and delete the branch after the run. It mirrors `ci-19-1-verify.yml`:
+
+- T3 comes from `./.github/actions/provision-t3-test-substrate`.
+- `build-test-fixtures --only worker-cli-fixture --only maosctl` builds the fixtures; the 19-2 vectors resolve `maosctl` through `fixtures::profile_binary`.
+- Before each target's plants, an unplanted control runs that whole target with `--test-threads=1 --show-output`. It must exit rc 0 with no `SKIP:` line, every named vector must run and none may be ignored, and the result line must read `0 failed`.
+- Each plant then goes through: sha256 check → `git apply` → the one test `--exact`, tee'd → rc ≠ 0, `running 1 test`, `test … FAILED`, `panicked at <site>:` and the oracle text above → `git checkout -- <file>` → `git diff --exit-code` → notice.
+- The logs are uploaded as artifact `w2-proven-red`.
+
+The 19-2 controls are `orchestrator_queue_19_2` (six vectors) and `worker_freeze_19_2` (both vectors, including the 20-revoke AC8 leg-3 vector). Their logs carry the measured AC7.4 and AC8.3 figures the Dev Agent Record owes. This workflow does not run `check-test-budget`: libtest has no per-test kill, so the TI-1/TI-4 budget and slow-timeout findings are still owed to the landing run.
+
+Run id: PENDING.

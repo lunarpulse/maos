@@ -46,7 +46,11 @@ async fn lifecycle_journal_write_1000_corpus() {
     let mut resume_row_us = Vec::with_capacity(N);
 
     let log = setup_in_memory_log();
+    let spirit = SpiritId::from("hello-spirit");
     let registry = OrchestratorBufferRegistry::new();
+    // Create the (empty) buffer up front so the resume leg's lookup hits and
+    // `recall_all_pending` runs on the measured path.
+    registry.get_or_create(&spirit);
 
     for _ in 0..N {
         let t0 = Instant::now();
@@ -55,10 +59,12 @@ async fn lifecycle_journal_write_1000_corpus() {
 
         let t1 = Instant::now();
         write_lifecycle_row(&log, "hello-spirit", "resume");
-        if let Some(buf) = registry.get(&SpiritId::from("hello-spirit")) {
-            let _ = buf.recall_all_pending();
-        }
+        let recalled = registry.get(&spirit).map(|buf| buf.recall_all_pending());
         resume_row_us.push(t1.elapsed().as_micros() as u64);
+        assert!(
+            recalled.is_some_and(|instructions| instructions.is_empty()),
+            "the resume leg recalls the (empty) buffer"
+        );
     }
 
     pause_row_us.sort();

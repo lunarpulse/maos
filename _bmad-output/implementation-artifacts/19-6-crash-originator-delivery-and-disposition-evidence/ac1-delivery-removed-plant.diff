@@ -1,0 +1,16 @@
+diff --git a/crates/maos-bin/src/supervision.rs b/crates/maos-bin/src/supervision.rs
+--- a/crates/maos-bin/src/supervision.rs
++++ b/crates/maos-bin/src/supervision.rs
+@@ -2508,10 +2508,8 @@
+             return;
+         };
+         let frame = crate::delegation::orphan_frame(frame_id, &record.originator_spirit_id);
+-        if let Err(error) = iac.deliver_typed(frame, 0, None).await {
+-            let originator = &record.originator_spirit_id;
+-            eprintln!("maos run: orphan delivery to {originator} failed: {error}");
+-        }
++        // PLANT (19-6 AC1): the seam never calls `deliver_typed`.
++        let _ = (iac, frame);
+     }
+ 
+     /// The inverse of [`WorkerTask::record_ids`] for a delegation: the frame id

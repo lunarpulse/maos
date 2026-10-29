@@ -1056,7 +1056,12 @@ fn a_reassigning_first_section_that_crashes_escalates_without_a_prior_distillate
         "an unarmed resolver never claims a re-dispatch: {complete:?}"
     );
     assert_orphaned_events(&events, 1, &[(&crashed, "escalate-to-operator")]);
-    assert_stopped(&output, 1, "fault.non-zero-exit", "escalate-to-operator");
+    assert_stopped(
+        &output,
+        1,
+        "fault.non-zero-exit",
+        "escalate-to-operator (reassign-to-replica needs a prior distillate)",
+    );
     assert_anomaly_flagged(&output, 1, crashed.worker_pid);
     assert!(
         named(&events, "distillate_written").is_empty(),

@@ -1,0 +1,14 @@
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -1306,9 +1306,7 @@
+         }
+     }
+     let completion = worker_cli.parse_completion(&wc_stdout, &wc_stderr, worker_exit);
+-    // Story 19-3 (AC2.3, D-19-3-05 A) — the effect gate, right after the oracle.
+-    let completion =
+-        worker_cli::gate_workspace_effect(worker_cli.as_ref(), completion, &workspace_effect);
++    // PLANT (19-3 AC2.4): the effect gate is deleted; the oracle's verdict stands.
+     println!(
+         "{}",
+         serde_json::json!({

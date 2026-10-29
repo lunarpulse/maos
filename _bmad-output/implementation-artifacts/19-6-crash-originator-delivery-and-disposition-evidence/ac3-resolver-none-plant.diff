@@ -1,0 +1,14 @@
+diff --git a/crates/maos-bin/src/replica_resolver.rs b/crates/maos-bin/src/replica_resolver.rs
+--- a/crates/maos-bin/src/replica_resolver.rs
++++ b/crates/maos-bin/src/replica_resolver.rs
+@@ -51,7 +51,9 @@
+     /// Budget one: the first call while armed takes the pid; every later call,
+     /// and every call while unarmed, is `None`. The key is ignored (module doc).
+     fn find_replica(&self, _intent_class: &str) -> Option<u32> {
+-        Some(self.armed_pid.swap(0, Ordering::SeqCst)).filter(|pid| *pid != 0)
++        // PLANT (19-6 AC3.2): the budget is taken, but an armed root answers `None`.
++        let _ = self.armed_pid.swap(0, Ordering::SeqCst);
++        None
+     }
+ }
+ 

@@ -137,9 +137,10 @@ pub fn deprecation_warnings(&self) -> &[DeprecationWarning]
 rust-inproc 훅 디스패치를 위한 kernel 내부 `Ctx`를 생성합니다.
 
 Story 5.1 마감: kernel 측 `HookDispatcher`는
-각 훅 발화에 전달할 `Ctx`가 필요합니다. v0.3-β에서 rust-inproc 폼은
-`&'static NeverCancel`을 사용하는데, kernel이 `Ctx`가 아닌
-`KernelCtx`의 SCB 상태를 통해 취소를 중재하기 때문입니다.
+각 훅 발화에 전달할 `Ctx`가 필요합니다. rust-inproc 폼은
+`&'static NeverCancel`을 사용합니다: `Ctx`에는 취소 신호가 없습니다(D-15 A).
+대신 pause가 일시 정지된 Spirit의 capability 발급과 검증을
+차단하므로, 실행 중인 훅의 다음 중재 작업은 안전하게 실패합니다.
 실제 핸들은 0 값입니다(rust-inproc 폼은 이를 사용하지 않습니다;
 Story 5.5x의 서브프로세스 폼이 와이어
 디코드 핸드셰이크에서 이를 채웁니다).
