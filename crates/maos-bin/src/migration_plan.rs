@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
+use maos_bin::operator_door::{check_upgrade_abi, ManifestSnapshot, UpgradeFailure};
 use maos_cohort::{resolve_migration_chain, MigrationCandidate, MigrationPlan};
 use maos_kernel_core::lifecycle::{UpgradeOrchestrator, UpgradePolicy, UpgradeReport};
 use sha2::{Digest, Sha256};
@@ -44,13 +45,20 @@ pub async fn upgrade_with_plan_guard(
     spirit_id: &str,
     successor_manifest: &Path,
     policy: UpgradePolicy,
-) -> Result<Vec<UpgradeReport>, String> {
+    mut before_hop: impl FnMut(&Path),
+    mut committed: impl FnMut(&str),
+) -> Result<Vec<UpgradeReport>, UpgradeFailure> {
     let Some((plan_path, plan)) = load_plan(spirit_id)? else {
-        return orchestrator
-            .upgrade(spirit_id, successor_manifest, policy)
-            .await
-            .map(|report| vec![report])
-            .map_err(|error| error.to_string());
+        return upgrade_hop(
+            orchestrator,
+            spirit_id,
+            successor_manifest,
+            policy,
+            &mut before_hop,
+            &mut committed,
+        )
+        .await
+        .map(|report| vec![report]);
     };
 
     if plan.spirit_id != spirit_id {
@@ -59,7 +67,8 @@ pub async fn upgrade_with_plan_guard(
             plan_path.display(),
             plan.spirit_id,
             spirit_id
-        ));
+        )
+        .into());
     }
 
     let requested_to = MigrationCandidate::from_manifest_file(successor_manifest)
@@ -72,7 +81,8 @@ pub async fn upgrade_with_plan_guard(
             plan_path.display(),
             plan.to_version,
             requested_to
-        ));
+        )
+        .into());
     }
 
     let candidates = load_candidates(&plan.candidate_manifest_paths)?;
@@ -94,12 +104,18 @@ pub async fn upgrade_with_plan_guard(
                     hop.predecessor_version, hop.successor.version
                 )
             })?;
-        let report = match orchestrator
-            .upgrade(spirit_id, Path::new(manifest_path), policy)
-            .await
+        let report = match upgrade_hop(
+            orchestrator,
+            spirit_id,
+            Path::new(manifest_path),
+            policy,
+            &mut before_hop,
+            &mut committed,
+        )
+        .await
         {
             Ok(report) => report,
-            Err(error) => {
+            Err(mut error) => {
                 // Mid-chain failure: the plan is a hash-committed one-shot approval,
                 // not a retry journal. Clear it and require an explicit re-plan from
                 // the spirit's current live version rather than silently re-running
@@ -110,14 +126,16 @@ pub async fn upgrade_with_plan_guard(
                         plan_path.display()
                     );
                 }
-                return Err(format!(
-                    "migration hop {} -> {} failed: {error}; the spirit remains at {}. \
+                error.detail = format!(
+                    "migration hop {} -> {} failed: {}; the spirit remains at {}. \
                      The consumed plan was cleared — re-plan with --plan from {} to resume.",
                     hop.predecessor_version,
                     hop.successor.version,
+                    error.detail,
                     hop.predecessor_version,
                     hop.predecessor_version
-                ));
+                );
+                return Err(error);
             }
         };
         reports.push(report);
@@ -130,6 +148,36 @@ pub async fn upgrade_with_plan_guard(
         );
     }
     Ok(reports)
+}
+/// Each successful hop is a committed incarnation, even if a later hop
+/// fails. Check its ABI and stage its own constructor source before mutation,
+/// then record its accepted text before executing any following hop.
+async fn upgrade_hop(
+    orchestrator: &UpgradeOrchestrator,
+    spirit_id: &str,
+    manifest: &Path,
+    policy: UpgradePolicy,
+    before_hop: &mut impl FnMut(&Path),
+    committed: &mut impl FnMut(&str),
+) -> Result<UpgradeReport, UpgradeFailure> {
+    let text = std::fs::read_to_string(manifest)
+        .map_err(|error| format!("read upgrade hop {}: {error}", manifest.display()))?;
+    check_upgrade_abi(spirit_id, text.as_bytes())?;
+    let snapshot = ManifestSnapshot::new(text.as_bytes()).map_err(|error| error.to_string())?;
+    before_hop(&snapshot.0);
+    let report = orchestrator
+        .upgrade(spirit_id, &snapshot.0, policy)
+        .await
+        .map_err(|error| error.to_string())?;
+    committed(&text);
+    Ok(report)
+}
+
+/// Story 19-5 (CR-1) — whether a persisted plan awaits `spirit_id`. Plans are
+/// hot-swap / migrator hops, so the door refuses a cold swap while one exists;
+/// an unanswerable existence check counts as pending (fail-closed).
+pub fn plan_pending(spirit_id: &str) -> bool {
+    optional_plan_path(spirit_id).is_some_and(|path| path.try_exists().unwrap_or(true))
 }
 
 fn load_plan(spirit_id: &str) -> Result<Option<(PathBuf, MigrationPlan)>, String> {

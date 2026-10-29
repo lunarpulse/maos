@@ -2,24 +2,22 @@
 
 //! Upgrade orchestrator — three-policy upgrade verb body.
 //!
-//! Dispatches `hot-swap` (Story 5.2), `cold-swap` (sequenced unload+load),
-//! and `migrator` (cross-major with explicit declaration check).
+//! Dispatches `hot-swap` (Story 5.2) and `migrator` (cross-major with explicit
+//! declaration check). Cold swap is composed by the operator door from the
+//! admission triple (Story 19-5), never by raw spirits-map writes here.
 
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
-use maos_domain::halt::TerminationKind;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 
 use crate::capability::cap_tokens::monotonic_now_ns;
-use crate::halt::terminate_spirit;
 use crate::hot_swap::HotSwapCoordinator;
-use crate::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
+use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::journal::JournalAdapter;
 use crate::scheduler::control_block::{AnySpiritObj, SpiritManifestBundle};
 use crate::scheduler::SpiritSchedulerAdapter;
-use crate::security::manifest::{ClassSection, GatewaysSection};
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 use maos_domain::invariants::i3::FrameOrigin;
 
@@ -109,24 +107,21 @@ impl UpgradeOrchestrator {
 
         // 3. Resolve predecessor metadata and construct a fresh successor
         // before any policy mutates the predecessor.
-        let (predecessor_version, predecessor_scb, predecessor_state) =
-            {
-                let scbs = self.scheduler.scbs();
-                let map = scbs.read().expect("spirits lock poisoned");
-                let scb = Arc::clone(map.get(&predecessor_pid).ok_or_else(|| {
-                    UpgradeError::NotLoaded {
-                        spirit_id: spirit_id.into(),
-                    }
-                })?);
-                let runtime = scb.runtime_snapshot();
-                let version = runtime
-                    .manifest
-                    .class
-                    .as_ref()
-                    .map(|c| c.version.clone())
-                    .unwrap_or_else(|| "unknown".into());
-                (version, scb.clone(), scb.current_state())
-            };
+        let predecessor_version = {
+            let scbs = self.scheduler.scbs();
+            let map = scbs.read().expect("spirits lock poisoned");
+            let scb = map
+                .get(&predecessor_pid)
+                .ok_or_else(|| UpgradeError::NotLoaded {
+                    spirit_id: spirit_id.into(),
+                })?;
+            scb.runtime_snapshot()
+                .manifest
+                .class
+                .as_ref()
+                .map(|c| c.version.clone())
+                .unwrap_or_else(|| "unknown".into())
+        };
         let successor_spirit_obj = self.successor_factory.create(&successor_manifest)?;
 
         let successor_version = successor_manifest
@@ -135,8 +130,8 @@ impl UpgradeOrchestrator {
             .map(|c| c.version.clone())
             .unwrap_or_else(|| "unknown".into());
 
-        let mut halt_receipts_produced = 0usize;
-        let mut outcome = UpgradeOutcome::Completed;
+        let halt_receipts_produced = 0usize;
+        let outcome = UpgradeOutcome::Completed;
 
         // 4. Dispatch per policy
         match policy {
@@ -150,63 +145,8 @@ impl UpgradeOrchestrator {
                     )
                     .await
                 {
-                    Ok(_result) => {
-                        outcome = UpgradeOutcome::Completed;
-                    }
-                    Err(e) => {
-                        outcome = UpgradeOutcome::Failed;
-                        return Err(UpgradeError::HotSwap(e));
-                    }
-                }
-            }
-            UpgradePolicy::ColdSwap => {
-                let unload_start_ns = monotonic_now_ns();
-                if let Err(error) = self.scheduler.unload(predecessor_pid).await {
-                    // Unload can transition before a hook fails. Restore the
-                    // predecessor's lifecycle state on its still-stable Arc.
-                    predecessor_scb.state.store(
-                        predecessor_state as u8,
-                        std::sync::atomic::Ordering::Release,
-                    );
-                    return Err(UpgradeError::Lifecycle(error));
-                }
-
-                // Count receipts in the unload window.
-                let entries = self
-                    .tl
-                    .query_frames(FrameFilter {
-                        kind: Some(FrameKind::EpistemicHalt),
-                        spirit_pid: Some(predecessor_pid),
-                        since_ns: Some(unload_start_ns),
-                        ..Default::default()
-                    })
-                    .unwrap_or_default();
-                halt_receipts_produced = entries.len();
-
-                let boot_nonce = 0u64;
-                let new_pid = crate::scheduler::scheduler_loop::allocate_pid();
-                let new_scb = Arc::new(crate::scheduler::control_block::SpiritControlBlock::new(
-                    new_pid,
-                    spirit_id.into(),
-                    successor_manifest,
-                    successor_spirit_obj,
-                    boot_nonce,
-                ));
-                {
-                    let scbs = self.scheduler.scbs();
-                    let mut map = scbs.write().expect("spirits lock poisoned");
-                    map.insert(new_pid, new_scb);
-                }
-                if let Err(error) = self.scheduler.start(new_pid).await {
-                    let scbs = self.scheduler.scbs();
-                    let mut map = scbs.write().expect("spirits lock poisoned");
-                    map.remove(&new_pid);
-                    predecessor_scb.state.store(
-                        predecessor_state as u8,
-                        std::sync::atomic::Ordering::Release,
-                    );
-                    map.insert(predecessor_pid, Arc::clone(&predecessor_scb));
-                    return Err(UpgradeError::Lifecycle(error));
+                    Ok(_result) => {}
+                    Err(e) => return Err(UpgradeError::HotSwap(e)),
                 }
             }
             UpgradePolicy::Migrator => {
@@ -222,13 +162,8 @@ impl UpgradeOrchestrator {
                     )
                     .await
                 {
-                    Ok(_result) => {
-                        outcome = UpgradeOutcome::Completed;
-                    }
-                    Err(e) => {
-                        outcome = UpgradeOutcome::Failed;
-                        return Err(UpgradeError::HotSwap(e));
-                    }
+                    Ok(_result) => {}
+                    Err(e) => return Err(UpgradeError::HotSwap(e)),
                 }
             }
         }
@@ -300,7 +235,6 @@ impl UpgradeOrchestrator {
 #[serde(rename_all = "snake_case")]
 pub enum UpgradePolicy {
     HotSwap,
-    ColdSwap,
     Migrator,
 }
 
@@ -308,7 +242,6 @@ impl UpgradePolicy {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::HotSwap => "hot-swap",
-            Self::ColdSwap => "cold-swap",
             Self::Migrator => "migrator",
         }
     }
@@ -319,7 +252,6 @@ impl std::str::FromStr for UpgradePolicy {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "hot-swap" => Ok(Self::HotSwap),
-            "cold-swap" => Ok(Self::ColdSwap),
             "migrator" => Ok(Self::Migrator),
             other => Err(format!("unknown upgrade policy: {other}")),
         }
@@ -370,8 +302,6 @@ pub enum UpgradeError {
     MigratorNotDeclared,
     #[error("hot-swap coordinator error: {0}")]
     HotSwap(#[from] maos_domain::hot_swap::HotSwapError),
-    #[error("lifecycle error during cold-swap: {0}")]
-    Lifecycle(#[from] maos_domain::lifecycle::LifecycleError),
 }
 
 /// Load a `SpiritManifestBundle` from a TOML file path.
@@ -398,8 +328,16 @@ pub(crate) fn load_bundle_from_file(
             .map_err(|e| ManifestError::Toml(format!("serialize [{section}]: {e}")))
     };
 
-    let scheduling = SchedulingSection::from_toml_str(&extract("scheduling")?)?;
-    let lifecycle = LifecycleSection::from_toml_str(&extract("lifecycle")?)?;
+    // Story 19-5 — optional, as at admission (`maos-bin` `gate_manifest`): a
+    // shipped manifest is a valid upgrade target without these sections.
+    let scheduling = match root.get("scheduling") {
+        Some(_) => SchedulingSection::from_toml_str(&extract("scheduling")?)?,
+        None => SchedulingSection::default(),
+    };
+    let lifecycle = match root.get("lifecycle") {
+        Some(_) => LifecycleSection::from_toml_str(&extract("lifecycle")?)?,
+        None => LifecycleSection::default(),
+    };
     // Story 7.5a — `[class]` is REQUIRED at parse time. A manifest without
     // `[class]` is malformed: the ABI Stability Triple (min_substrate_version,
     // manifest_schema_version) is part of the admission contract and cannot

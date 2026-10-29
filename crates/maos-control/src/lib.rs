@@ -279,12 +279,18 @@ const UNAUTHORIZED_BODY: &[u8] = br#"{"error":"unauthorized"}"#;
 /// Which upgrade policy the operator asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpgradePolicyRequest {
-    /// The default, and the only one the door performs.
+    /// The default: the kernel's hot-swap coordinator, same pid.
     HotSwap,
-    /// Refused typed (D-16-1-W): the kernel's cold-swap arm starts the
-    /// successor under a NEW pid without `admit_spirit`, so it would leave an
-    /// unadmitted Spirit running. Fixing that is a kernel change.
+    /// Story 19-5 (D-19-5-01 A): the door unloads the predecessor and admits
+    /// the successor through the daemon's `load → admit → start` triple, at a
+    /// new pid; a refused successor restores the predecessor (`reverted`).
+    /// Before unload, `cold_swap_unrestorable` (409) refuses incomplete
+    /// retained manifests, identity/version drift from the live SCB, and
+    /// classes the door cannot reconstruct (including scalar-port Mira).
     ColdSwap,
+    /// Story 19-5 (D-19-5-08 A): the kernel's migrator policy — a hot swap
+    /// that requires the successor to declare `[migrates_from]`.
+    Migrator,
 }
 
 /// Every state-changing operation the door carries.
@@ -502,8 +508,8 @@ pub enum OperatorOutcome {
     /// 404 — no such Spirit, halt, token or principal.
     NotFound { code: String, detail: String },
     /// 409 — the transition is not legal from the current state, or the request
-    /// asks for something the door refuses on principle (cold swap, a
-    /// non-increasing version).
+    /// asks for something the door refuses on principle (a non-increasing
+    /// version, a `[cli_wrapper]` upgrade target).
     Conflict { code: String, detail: String },
     /// 400 — the request itself is malformed in a way only the handler can see
     /// (an unreadable manifest, an unparseable CRL).
@@ -1535,6 +1541,7 @@ fn spirit_command<S: SandboxReportSource>(
             let policy = match policy_value.as_deref() {
                 None | Some("hot-swap") => UpgradePolicyRequest::HotSwap,
                 Some("cold-swap") => UpgradePolicyRequest::ColdSwap,
+                Some("migrator") => UpgradePolicyRequest::Migrator,
                 Some(other) => {
                     return Response::error(
                         400,

@@ -1157,8 +1157,10 @@ fn leg_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>) -> (LegAudit, 
 
 /// Does `line` carry `flag value` at a token boundary? `-p maos-a2a-tcp` must
 /// not match `-p maos-a2a-tcp2`, and neither flag may be satisfied by a
-/// different line of the job (§A6 review 2026-08-18, P11).
-fn has_flag_arg(line: &str, flag: &str, value: &str) -> bool {
+/// different line of the job (§A6 review 2026-08-18, P11). Story 19-4
+/// (D-19-4-11 A) — shared with `check-j1-loopback-delegation`'s crate-qualified
+/// enrolment leg, so the two J1 enrolment controls apply one rule.
+pub(crate) fn has_flag_arg(line: &str, flag: &str, value: &str) -> bool {
     let needle = format!("{flag} {value}");
     let mut start = 0;
     while let Some(i) = line[start..].find(&needle) {

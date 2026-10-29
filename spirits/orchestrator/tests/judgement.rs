@@ -9,15 +9,17 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use maos_domain::halt::{HaltId, HaltReceipt};
 use maos_domain::invariants::i1::{CapabilityToken, TokenId};
 use maos_domain::ports::context_budget::{
     ContextBudgetPort, ContextLevel, ContextReportError, ContextStatus,
 };
+use maos_domain::ports::epistemic_scalar::ScalarPortError;
 use maos_domain::ports::inference::{
     InferenceError, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
     TokenUsage,
 };
-use maos_domain::ports::InferencePort;
+use maos_domain::ports::{EpistemicScalarPort, InferencePort};
 use orchestrator::{
     ambiguity_prompt, parse_ambiguity, split_epic, EpicSection, Orchestrator,
     OrchestratorInferenceBinding, OrchestratorInferenceError, ProviderMint,
@@ -329,5 +331,175 @@ fn a_well_formed_completion_parses_at_both_bounds() {
     assert_eq!(
         parse_ambiguity(r#"{"dispatch_ambiguity": 0.42, "reason": "two readings"}"#).unwrap(),
         0.42
+    );
+}
+
+// ── Story 19-4 (AC2.1, D-19-4-01 A) — the judged scalar reaches the kernel ──
+
+/// One recorded `write_scalar` call: (pid, spirit id, tag, value, derived_from).
+type ScalarWrite = (u32, String, String, f64, String);
+/// What the stand-in kernel answers a write with.
+type KernelAnswer = fn() -> Result<Option<HaltReceipt>, ScalarPortError>;
+
+/// A scalar port standing in for the root's kernel adapter: records every
+/// write and answers with the receipt (or refusal) the KERNEL would — the
+/// Spirit decides nothing about the halt.
+struct Scalar {
+    writes: Mutex<Vec<ScalarWrite>>,
+    answer: KernelAnswer,
+}
+
+impl Scalar {
+    fn answering(answer: KernelAnswer) -> Arc<Self> {
+        Arc::new(Self {
+            writes: Mutex::new(Vec::new()),
+            answer,
+        })
+    }
+
+    fn writes(&self) -> Vec<ScalarWrite> {
+        self.writes.lock().unwrap().clone()
+    }
+}
+
+impl EpistemicScalarPort for Scalar {
+    fn write_scalar(
+        &self,
+        spirit_pid: u32,
+        spirit_id: &str,
+        tag: &str,
+        value: f64,
+        derived_from: &str,
+    ) -> Result<Option<HaltReceipt>, ScalarPortError> {
+        self.writes.lock().unwrap().push((
+            spirit_pid,
+            spirit_id.to_owned(),
+            tag.to_owned(),
+            value,
+            derived_from.to_owned(),
+        ));
+        (self.answer)()
+    }
+}
+
+fn kernel_halted() -> Result<Option<HaltReceipt>, ScalarPortError> {
+    Ok(Some(HaltReceipt::new(
+        HaltId::new("01J19D4AMBIGU0USSECT10N200").unwrap(),
+        1,
+        PID,
+        7,
+        [0x19; 16],
+    )))
+}
+
+fn kernel_passed() -> Result<Option<HaltReceipt>, ScalarPortError> {
+    Ok(None)
+}
+
+fn kernel_refused() -> Result<Option<HaltReceipt>, ScalarPortError> {
+    Err(ScalarPortError::Backend("policy path unavailable".into()))
+}
+
+/// The judged `dispatch_ambiguity` is written ONCE through the scalar port —
+/// the judgement's tag, value and provenance, under the Orchestrator's id and
+/// pid 0 (the host binds the pid, D-16-3-N) — and the kernel's receipt is
+/// returned as-is: `Some` when its policy halted, `None` when it did not.
+#[test]
+fn assess_writes_the_judged_scalar_once_and_returns_the_kernels_receipt() {
+    for (answer, halted) in [
+        (kernel_halted as KernelAnswer, true),
+        (kernel_passed as KernelAnswer, false),
+    ] {
+        let scalar = Scalar::answering(answer);
+        let o = bound(
+            Port::answering(r#"{"dispatch_ambiguity": 0.86}"#),
+            Some(binding(&Arc::new(AtomicUsize::new(0)))),
+        )
+        .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>);
+        let (value, receipt) = o.assess_ambiguity(&section()).expect("assessed");
+        assert_eq!(value, 0.86);
+        assert_eq!(
+            receipt,
+            answer().unwrap(),
+            "the kernel's receipt, untouched"
+        );
+        assert_eq!(receipt.is_some(), halted);
+        assert_eq!(
+            scalar.writes(),
+            vec![(
+                0,
+                "orchestrator".to_owned(),
+                SCALAR_TAG_DISPATCH_AMBIGUITY.to_owned(),
+                0.86,
+                format!("completion:{PROVIDER}:section-2"),
+            )]
+        );
+        assert_eq!(o.dispatched_count(), 0, "assessing never dispatches");
+        assert!(o.is_safe_point());
+    }
+}
+
+/// No scalar port ⇒ `NotWired` before any completion is spent; a scalar port
+/// with no Inference Port (unset mode, ADR-064) ⇒ `NotWired` and no write.
+#[test]
+fn assess_without_either_port_is_not_wired_and_spends_nothing() {
+    let port = Port::answering(r#"{"dispatch_ambiguity": 0.9}"#);
+    let o = bound(
+        Arc::clone(&port),
+        Some(binding(&Arc::new(AtomicUsize::new(0)))),
+    );
+    assert!(matches!(
+        o.assess_ambiguity(&section()),
+        Err(OrchestratorInferenceError::NotWired)
+    ));
+    assert!(
+        port.requests().is_empty(),
+        "no completion without a scalar port"
+    );
+
+    let scalar = Scalar::answering(kernel_halted);
+    let o = Orchestrator::new("orchestrator")
+        .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>);
+    assert!(matches!(
+        o.assess_ambiguity(&section()),
+        Err(OrchestratorInferenceError::NotWired)
+    ));
+    assert!(scalar.writes().is_empty(), "no write without a judgement");
+}
+
+/// A refused scalar write is a typed refusal (never a default "no halt"),
+/// and a refused judgement never reaches the scalar port.
+#[test]
+fn a_refused_scalar_write_or_judgement_is_typed_never_defaulted() {
+    let scalar = Scalar::answering(kernel_refused);
+    let o = bound(
+        Port::answering(r#"{"dispatch_ambiguity": 0.2}"#),
+        Some(binding(&Arc::new(AtomicUsize::new(0)))),
+    )
+    .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>);
+    let err = o.assess_ambiguity(&section()).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            OrchestratorInferenceError::Scalar(ScalarPortError::Backend(_))
+        ),
+        "{err:?}"
+    );
+    assert!(err.to_string().contains("scalar write refused"), "{err}");
+    assert_eq!(scalar.writes().len(), 1);
+
+    let scalar = Scalar::answering(kernel_halted);
+    let o = bound(
+        Port::answering("I think it is fine"),
+        Some(binding(&Arc::new(AtomicUsize::new(0)))),
+    )
+    .with_scalar_port(Arc::clone(&scalar) as Arc<dyn EpistemicScalarPort>);
+    assert!(matches!(
+        o.assess_ambiguity(&section()),
+        Err(OrchestratorInferenceError::Completion(_))
+    ));
+    assert!(
+        scalar.writes().is_empty(),
+        "a non-judgement is never written"
     );
 }

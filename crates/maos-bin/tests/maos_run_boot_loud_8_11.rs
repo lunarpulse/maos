@@ -11,10 +11,14 @@
 //!   (specific `Err`, not a panic); the serving loop is never reached. Goes RED
 //!   the moment anyone re-adds a `None`/store-only escape.
 //! - (b) a Spirit whose declared Halt rules are all OUTSIDE the halt-port set
-//!   (the Orchestrator: `dispatch_ambiguity` / `delegation_confidence`) with no
-//!   port must boot **SUCCESSFULLY** — the guard that the posture-keyed
-//!   predicate does not over-fire on any declared halt (written to pass, NOT
-//!   panic).
+//!   with no port must boot **SUCCESSFULLY** — the guard that the
+//!   posture-keyed predicate does not over-fire on any declared halt (written
+//!   to pass, NOT panic). Story 19-4 (D-19-4-03 B) admitted the
+//!   Orchestrator's `dispatch_ambiguity` into the set, so no shipped manifest
+//!   is outside it any more: the guard boots a TEST-ONLY manifest
+//!   (`tests/fixtures/boot_loud_unlisted_halt_manifest.toml`) whose one Halt
+//!   tag no transport lists, and the shipped Orchestrator now boots WITH the
+//!   port requirement.
 
 use std::process::Command;
 
@@ -83,27 +87,27 @@ fn halt_posture_spirit_without_port_fatally_fails_boot() {
     );
 }
 
-/// (b) A Spirit with Halt rules outside the halt-port set, no port → boots clean
-/// (the over-fire guard). Story 18-3 (D-18-3-09 A) moved the Researcher's tags
-/// into the set; review AA-6/TIA-10: the guard now boots the Orchestrator,
-/// whose `[epistemic_policy]` Halt rules need no port.
-#[test]
-fn deterministic_posture_spirit_without_port_boots_clean() {
+/// The test-only over-fire subject (Story 19-4, D-19-4-03 B): the Orchestrator
+/// class with ONE Halt rule whose tag is outside the halt-port set.
+const UNLISTED_HALT_MANIFEST: &str =
+    "crates/maos-bin/tests/fixtures/boot_loud_unlisted_halt_manifest.toml";
+
+/// `maos run <manifest> --once` on a doorless home; the `spirit_loaded` event's
+/// `boot_loud_port`, after asserting a clean boot.
+fn boot_loud_port_of(manifest: &str, tag: &str) -> Option<bool> {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
-        .args(["run", "spirits/orchestrator/manifest.toml", "--once"])
+        .args(["run", manifest, "--once"])
         .env("HOME", doorless_home::doorless_home())
-        .env(
-            "XDG_DATA_HOME",
-            isolated_data_home("bootloud-b").path.clone(),
-        )
+        .env("XDG_DATA_HOME", isolated_data_home(tag).path.clone())
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos-bin");
 
     assert!(
         output.status.success(),
-        "Orchestrator (Halt rules outside the port set, no port) MUST boot clean — the \
-         posture-keyed boot-loud predicate must not over-fire; stderr:\n{}",
+        "{manifest} MUST boot clean — the posture-keyed boot-loud predicate must not \
+         over-fire; stderr:\n{}",
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -111,10 +115,34 @@ fn deterministic_posture_spirit_without_port_boots_clean() {
         .lines()
         .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
         .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("spirit_loaded"))
-        .expect("Orchestrator must load");
+        .unwrap_or_else(|| panic!("{manifest} must load; stdout:\n{stdout}"));
+    loaded.get("boot_loud_port").and_then(|v| v.as_bool())
+}
+
+/// (b) A Spirit with Halt rules outside the halt-port set, no port → boots clean
+/// (the over-fire guard). Story 18-3 (D-18-3-09 A) moved the Researcher's tags
+/// into the set; Story 19-4 (D-19-4-03 B) moved the Orchestrator's
+/// `dispatch_ambiguity` in, so the guard boots the test-only manifest whose one
+/// Halt tag is unlisted.
+#[test]
+fn deterministic_posture_spirit_without_port_boots_clean() {
     assert_eq!(
-        loaded.get("boot_loud_port").and_then(|v| v.as_bool()),
+        boot_loud_port_of(UNLISTED_HALT_MANIFEST, "bootloud-b"),
         Some(false),
-        "Orchestrator must boot WITHOUT requiring an EpistemicScalarPort"
+        "a Spirit whose only Halt rule is outside the halt-port set must boot WITHOUT \
+         requiring an EpistemicScalarPort"
+    );
+}
+
+/// Story 19-4 (AC2.4, D-19-4-03 B) — the flip itself, at process level: the
+/// shipped Orchestrator's `dispatch_ambiguity` Halt rule now has a writer, so its
+/// boot requires (and is bound to) the scalar port.
+#[test]
+fn the_shipped_orchestrator_boots_with_the_halt_port_required() {
+    assert_eq!(
+        boot_loud_port_of("spirits/orchestrator/manifest.toml", "bootloud-c"),
+        Some(true),
+        "the Orchestrator's `dispatch_ambiguity` Halt rule is in the halt-port set \
+         (D-19-4-03 B): its boot requires the EpistemicScalarPort"
     );
 }

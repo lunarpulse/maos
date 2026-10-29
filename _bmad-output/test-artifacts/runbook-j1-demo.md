@@ -11,12 +11,22 @@
 ## The free take (default — no cost, no network, no keys)
 
 ```
-cargo run -p xtask -- demo-j1
+MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j1/founder-loop.json cargo run -p xtask -- demo-j1
 ```
 
-That is the whole thing. It builds the workspace, provisions a throwaway state
-home, runs the founder loop once, calls the Blocking delegation gate as the judge,
-and prints the claim table.
+That is the whole thing (the Epic-19 exit line; CI's `epic-19-exit` job adds
+`MAOS_REPLAY_STRICT=1`). It builds the workspace, provisions a throwaway state
+home, `maos init`s it (the operator door), and runs the founder-loop EPIC once
+(`spirits/topologies/j1-founder-loop-epic.toml --epic
+tests/fixtures/j1/founder-loop-epic.md`, Story 19-4): the Orchestrator splits three
+sections and judges each before its frame from the replayed cassette; the kernel
+halts the ambiguous section 2; the demo answers the halt over the door
+(`maosctl halt resolve … --kind provided-context`) while the child's stdout streams;
+section 2 resumes with the answer; the run ends with an FR17 digest. Then it calls
+the Blocking delegation gate as the judge and prints the claim table. The env pair
+is the ONE inference selector (ADR-064, no flag): without it the Orchestrator judges
+nothing and the halt and resume beats FAIL. A T3 substrate is required
+(`scripts/provision_t3_tests.py`, then source its `t3.env`).
 
 **Flags**
 
@@ -28,11 +38,12 @@ and prints the claim table.
 | `--live-codex` | The paid Tier-2 take — see below. |
 | `--codex-topology <PATH>` | The operator-authored codex topology for `--live-codex`. |
 
-**Expected shape** (re-measured 2026-08-22 at `dd4cf959`, `j1-crosshost-2d` AC3.13):
-exit 0, founder loop ≈**0.18s**, **22 beats — 19 `PROVEN_BLOCKING`, 3 `ABSENT`**.
-The previous line here read *"eight executed beats `PROVEN_BLOCKING`, four `ABSENT`"*,
-a count taken on 2026-08-14 and never re-measured across `j1-crosshost-1b`, `2a`, `2b`
-and `2c`. **Read the table below, not a remembered count.**
+**Expected shape:** exit 0 with every EXECUTED beat `PROVEN_BLOCKING` and exactly one
+`ABSENT` beat (`tier2-live-agent-signed`); `two-host-signed-run` renders
+`INDETERMINATE` while a two-host capture is committed. The beat count changed with
+Story 19-4's epic scene and has not been re-measured here (the last count, 22 beats
+at `dd4cf959`, was the one-Worker scene). **Read the table below, not a remembered
+count.**
 
 ---
 
@@ -41,15 +52,15 @@ and `2c`. **Read the table below, not a remembered count.**
 | Beat | Reads | Meaning |
 |---|---|---|
 | `topology-spirits-loaded` | PROVEN_BLOCKING | orchestrator + architect + reviewer came up from the topology. |
-| `delegation-frame-crosses-loopback` | PROVEN_BLOCKING | a real `task.assign` carried an ADR-012 consent envelope to `developer-remote`. **v0.8 rung — loopback rehearsal.** |
-| `worker-admitted-under-host-grant` | PROVEN_BLOCKING | host-managed grant, T3, real `child_pid`. Admission by grant, not by trust. |
-| `worker-completed-by-adapter-oracle` | PROVEN_BLOCKING | completion came from the adapter's own structured output + a worker TL ref — never from an exit code. |
-| `delegation-closed-at-safe-point` | PROVEN_BLOCKING | `TaskComplete` journaled, no frame left in flight. |
-| `worker-exited-and-loop-went-idle` | PROVEN_BLOCKING | the child reaped and the serving loop returned to idle — no orphan, no spin. |
+| `delegation-frame-crosses-loopback` | PROVEN_BLOCKING | every section's `task.assign` (three) carried an ADR-012 consent envelope to `developer-remote`. **v0.8 rung — loopback rehearsal.** |
+| `worker-admitted-under-host-grant` | PROVEN_BLOCKING | three host-managed grants, T3, three distinct real `child_pid`s. Admission by grant, not by trust. |
+| `worker-completed-by-adapter-oracle` | PROVEN_BLOCKING | each section's completion came from the adapter's own structured output — never from an exit code. |
+| `delegation-closed-at-safe-point` | PROVEN_BLOCKING | `TaskComplete` journaled for each section, no frame left in flight. |
+| `worker-exited-and-loop-went-idle` | PROVEN_BLOCKING | every child reaped without a crash and every class Spirit fired `on_idle`. |
 | `state-home-clean` | PROVEN_BLOCKING | zero `journal:` warnings in a fresh home. |
-| `lifecycle-stages-in-order` | PROVEN_BLOCKING | 5 stages, each exactly once, in sequence. |
+| `lifecycle-stages-in-order` | PROVEN_BLOCKING | per section: routed → loaded → completion → closed, each once, sections in order, then the drain once. |
 | `audit-drain-clean` | PROVEN_BLOCKING | every queued audit row reached SQLite before exit. |
-| `sealed-export-covers-the-run` | PROVEN_BLOCKING | what an independent reader sees in the window is what the signer sealed (19 rows queried, 19 covered). |
+| `sealed-export-covers-the-run` | PROVEN_BLOCKING | what an independent reader sees in the window is what the signer sealed (rows queried ≤ rows covered). |
 | `frame-borne-route-intact` | PROVEN_BLOCKING | `check-j1-loopback-delegation` (hermetic, Blocking) agrees. |
 | `loopback-from-host-unverified` | PROVEN_BLOCKING | the wire-identity boundary is exactly where rung 1 says it is. |
 | `completion-oracle-per-adapter` | PROVEN_BLOCKING | each adapter reads its OWN structured output; codex and claude are not interchangeable. |
@@ -60,8 +71,11 @@ and `2c`. **Read the table below, not a remembered count.**
 | `disallowed-intent-refused-blocking` | PROVEN_BLOCKING | a disallowed intent is REFUSED (`-32001`, distinct from `-32009`). **Landed by `j1-crosshost-1b`; this row read `ABSENT` until 2026-08-22.** |
 | `two-host-delegation` | PROVEN_BLOCKING | two real hosts over mTLS/TOFU, a frame crossed, a worker ran on the far side, both logs carry the same sixteen bytes. |
 | `tier2-live-agent-signed` | **ABSENT** | earned only by `--live-codex` (operator-local, never CI). |
-| `two-host-signed-run` | **ABSENT** | owned by **`j1-crosshost-2d-paid-two-host-run`**. *(This row named `j1-crosshost-2` until 2026-08-22; that key was split into 2a/2b/2c on 2026-08-15 and no longer exists. `xtask/src/demo_j1.rs:911` has always held the correct owner, and `check_j1_two_host_signed_run.rs:879-889` is a Blocking leg that REDs if it stops doing so — the runbook, not the machine, was stale.)* |
-| `halt-resume-referential-identity` | **ABSENT** | owned by `FOLLOWUP-J1-RESUME-SEAM`. |
+| `two-host-signed-run` | **INDETERMINATE** (`--`) / **ABSENT** without a capture | owned by **`j1-crosshost-2d-paid-two-host-run`**. A committed capture renders `INDETERMINATE` — validated, never claimed; with no capture it is `ABSENT`. |
+| `epic-decomposed-n-frames` | PROVEN_BLOCKING | the epic split into three frames, one per `### Story` section, dispatched and closed in section order (Story 19-4). |
+| `ambiguity-halt-within-2-frames` | PROVEN_BLOCKING | the Orchestrator judged section 2 from the replayed cassette (`dispatch_ambiguity` > 0.5) and the KERNEL halted it before its frame. |
+| `digest-cites-source-refs` | PROVEN_BLOCKING | the FR17 digest at drain cites ≥ 3 completions and the halt, each ref resolving to a row of `maosctl audit query`. |
+| `halt-resume-referential-identity` | PROVEN_BLOCKING | the halt was answered over the door, section 2 resumed with the answer, and the post-resume digest cites the exact pre-halt frame under `resolved_halts`. **Landed by Story 19-4; this row read `ABSENT` (`FOLLOWUP-J1-RESUME-SEAM`) until then.** |
 
 `ABSENT` never becomes green and never fails the run — it is a visible placeholder,
 not a silent skip. **Read the table, never the exit code:** the scene exits 0 with
@@ -83,8 +97,9 @@ ABSENT beats outstanding, because that is J1's honest state today.
   registers the manifest with `SecurityManager`). The `CapabilityInvocation` exit
   row IS journaled either way.
 - **Egress is `declared-not-enforced`** (`FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT`).
-- **Halt/resume**: safe shutdown with no in-flight delegation is proven; the
-  post-resume digest citing the exact pre-halt ref is not.
+- **Halt/resume is in-boot only** (Story 19-4 D-19-4-05 A): the halt is answered
+  over the door while the same process holds the section. A halt still pending
+  when the process exits is not resumed by a later boot.
 
 ---
 
@@ -138,7 +153,9 @@ verifies with `verify-bundle`, and flips `tier2-live-agent-signed` to
 | Symptom | Cause |
 |---|---|
 | `maos not found at target/debug/maos` | You passed `--skip-build` without building. Drop it. |
-| `spirits/topologies/j1-founder-loop.toml not found` | Run from the repository root. |
+| `spirits/topologies/j1-founder-loop-epic.toml not found` (or `tests/fixtures/j1/founder-loop-epic.md`) | Run from the repository root. |
+| `ambiguity-halt-within-2-frames` reads FAIL with "no dispatch_judged" (and the resume beat with it) | `MAOS_INFERENCE_MODE` / `MAOS_REPLAY_CASSETTE` were not set: the Orchestrator judges nothing without them (ADR-064). Use the command at the top. |
+| `halt-resume-referential-identity` reads FAIL with "resumed false" | The door answer did not land (look for `resolve FAILED` in the streamed output); the hold expired into the 19-1 stop. |
 | `audit-drain-clean` reads FAIL | A drain regression: queued rows may be lost, so a sealed export over that window could sign an incomplete bundle. Do not sign; see the story's AC4 and `crates/maos-bin/tests/drain_once_audit_writer.rs`. |
 | `state-home-clean` reads FAIL | The run itself produced a journal warning — a real finding, not ambient noise. |
 | Worker hangs at "Reading additional input from stdin…" | Stale `maos` binary predating the stdin-EOF fix. Rebuild. |

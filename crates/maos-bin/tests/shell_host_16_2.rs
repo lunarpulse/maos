@@ -934,7 +934,7 @@ impl BinPrivateOps for UnwiredBinOps {
         _spirit_id: &str,
         _target_manifest: &Path,
         _policy: maos_kernel_core::lifecycle::UpgradePolicy,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
         unreachable!("the halt-resolve race never touches the bin-private ops");
     }
 
@@ -945,6 +945,18 @@ impl BinPrivateOps for UnwiredBinOps {
         _target_manifest: &Path,
         _candidates: &[String],
     ) -> Result<serde_json::Value, String> {
+        unreachable!("the halt-resolve race never touches the bin-private ops");
+    }
+
+    fn admitted_manifest(&self, _spirit_id: &str) -> Option<Arc<String>> {
+        unreachable!("the halt-resolve race never touches the bin-private ops");
+    }
+
+    fn record_upgraded_manifest(&self, _spirit_id: &str, _text: &str) {
+        unreachable!("the halt-resolve race never touches the bin-private ops");
+    }
+
+    fn migration_plan_pending(&self, _spirit_id: &str) -> bool {
         unreachable!("the halt-resolve race never touches the bin-private ops");
     }
 }

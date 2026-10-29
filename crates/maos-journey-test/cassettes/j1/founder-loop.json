@@ -1,0 +1,64 @@
+{
+  "entries": [
+    {
+      "prompt_len": 665,
+      "prompt_sha256": "5f14eb962d91196fdd9979c81ef1baf3915bef9eb6718c89afe626d259b96440",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/founder-loop",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.12}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 0
+    },
+    {
+      "prompt_len": 639,
+      "prompt_sha256": "70d163fa425fbc253fcc03f03e6f566a55f33acbbbf6fca4593b213e1c400cc5",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/founder-loop",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.86}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "prompt_len": 697,
+      "prompt_sha256": "2179994e23fe836fe7bfabf935d7752bc912299d5539035e543436165dfc638b",
+      "response": {
+        "provider_attribution": {
+          "endpoint_url": "cassette://j1/founder-loop",
+          "model_id": "hand-authored-seed",
+          "provider_id": "replay"
+        },
+        "stop_reason": "stop_sequence",
+        "text": "{\"dispatch_ambiguity\":0.14}",
+        "usage": {
+          "input_tokens": 300,
+          "output_tokens": 12
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model_id": "hand-authored-seed",
+  "provenance": "seed",
+  "recorded_at": "2026-10-28T00:00:00Z",
+  "schema_version": "maos.journey.cassette/v1",
+  "session": "founder-loop",
+  "spirit_id": "orchestrator"
+}

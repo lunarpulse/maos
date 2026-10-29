@@ -2,9 +2,11 @@
 //! construction every Orchestrator of the root goes through (topology arm,
 //! standalone arm, hot-swap successor; D-19-1-04 A), the `--epic` load and
 //! its refusals (D-19-1-02/03 A), the stop check before each `task.assign`
-//! (D-19-1-09 A) and the per-section distillate at the Worker's pid
-//! (D-19-1-07/08 A). In the library, not `main.rs`, so
-//! `crates/maos-bin/tests/` drives the production functions.
+//! (D-19-1-09 A) — preceded by Story 19-4's ambiguity judgement and followed
+//! by its hold for the halt's resolution over the door (D-19-4-02/05 A) — and
+//! the per-section distillate at the Worker's pid (D-19-1-07/08 A). In the
+//! library, not `main.rs`, so `crates/maos-bin/tests/` drives the production
+//! functions.
 
 use std::ffi::OsStr;
 use std::path::Path;
@@ -14,16 +16,18 @@ use std::sync::{Arc, Mutex};
 use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::distillation::{DigestPayload, DistillationRequest};
 use maos_domain::frame::{EpistemicHaltPayload, FramePayload, IacFrame, PriorDistillateRef};
-use maos_domain::halt::HaltState;
+use maos_domain::halt::{HaltId, HaltReceipt, HaltState};
 use maos_domain::invariants::i4::ApprovalDecision;
+use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::notification::{NotificationEvent, NotificationLevel};
 use maos_domain::orchestrator::OrchestratorInstruction;
-use maos_domain::ports::DistillationPort;
+use maos_domain::ports::{DistillationPort, EpistemicScalarPort, MemoryManagerPort};
 use maos_domain::supervision::OnCrashAction;
 use maos_kernel_core::halt::{invoke_halt, HaltRegistry};
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
 use maos_kernel_core::iac::TransparencyLogAdapter;
 use maos_kernel_core::journal::JournalAdapter;
+use maos_kernel_core::memory::MemoryManagerAdapter;
 use maos_kernel_core::orchestrator::OrchestratorBufferRegistry;
 use maos_kernel_core::scheduler::control_block::ScbLifecycleState;
 use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
@@ -52,17 +56,27 @@ pub const CRASH_PLANT_ENV: &str = "MAOS_TEST_ONLY_CRASH_SECTION_ONCE";
 /// [`hold_test_section`]). Release builds never read it.
 pub const HOLD_SECTION_ENV: &str = "MAOS_TEST_ONLY_HOLD_SECTION";
 
-/// D-19-1-04 A — the ONE Orchestrator binding: the context port through the
-/// seam's binder (18-5) on every path; under `--live` or an explicit mode the
-/// Inference Port from the seam's builder (18-1) with a per-pass mint naming
-/// the first declared provider the router registers. Unset mode returns it
-/// unbound (ADR-064). The port serves only `judge_ambiguity`, never dispatch.
+/// Story 19-4 (D-19-4-01 A) — the root's ONE Orchestrator scalar-port factory
+/// (`main.rs`, beside `ButlerOrchestratorAdapter`): the production adapter
+/// over the manifest's `[epistemic_policy]`, writing at the pid `PidSource`
+/// resolves. A manifest without the policy is refused, never a bare port.
+pub type ScalarPortFactory<'a> =
+    &'a dyn Fn(PidSource) -> Result<Arc<dyn EpistemicScalarPort>, String>;
+
+/// D-19-1-04 A — the ONE Orchestrator binding: the scalar port (19-4,
+/// D-19-4-01 A) and the context port through the seam's binder (18-5) on
+/// every path; under `--live` or an explicit mode the Inference Port from the
+/// seam's builder (18-1) with a per-pass mint naming the first declared
+/// provider the router registers. Unset mode returns it unbound (ADR-064).
+/// The port serves only `judge_ambiguity`, never dispatch.
 pub fn construct(
     orchestrator: Orchestrator,
     seam: &butler::ButlerSeam,
     declared: &[String],
     pid_of: PidSource,
+    scalar: ScalarPortFactory<'_>,
 ) -> Result<Orchestrator, String> {
+    let orchestrator = orchestrator.with_scalar_port(scalar(Arc::clone(&pid_of))?);
     let orchestrator = match &seam.context {
         Some(bind) => orchestrator.with_context_port(bind(Arc::clone(&pid_of))),
         None => orchestrator,
@@ -85,6 +99,7 @@ pub fn construct_at_admitted_pid(
     spirit_id: &str,
     seam: &Mutex<Option<butler::ButlerSeam>>,
     declared: &[String],
+    scalar: ScalarPortFactory<'_>,
 ) -> Result<(Orchestrator, Arc<AtomicU32>), String> {
     let cell = Arc::new(AtomicU32::new(0));
     let pid_of: PidSource = {
@@ -96,9 +111,66 @@ pub fn construct_at_admitted_pid(
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone()
         .ok_or("maos run: butler seam not ready")?;
-    let orchestrator = construct(Orchestrator::new(spirit_id), &seam, declared, pid_of)
-        .map_err(|e| format!("maos run: {e}"))?;
+    let orchestrator = construct(
+        Orchestrator::new(spirit_id),
+        &seam,
+        declared,
+        pid_of,
+        scalar,
+    )
+    .map_err(|e| format!("maos run: {e}"))?;
     Ok((orchestrator, cell))
+}
+
+type RuntimeObject = dyn maos_kernel_core::scheduler::control_block::AnySpiritObj;
+type LiveJudgement = (std::sync::Weak<RuntimeObject>, Orchestrator);
+static LIVE_JUDGEMENTS: std::sync::LazyLock<Mutex<Vec<LiveJudgement>>> =
+    std::sync::LazyLock::new(|| Mutex::new(Vec::new()));
+
+/// Associate the complete judgement binding with the exact committed runtime.
+/// Weak runtime keys do not retain discarded candidates; stale bindings are
+/// pruned on registration and lookup. Staging never publishes a new binding.
+pub fn judgement_runtime(
+    emitter: Orchestrator,
+    scalar: Arc<dyn EpistemicScalarPort>,
+) -> Arc<RuntimeObject> {
+    let emitter = emitter.with_scalar_port(scalar);
+    let object = maos_kernel_core::scheduler::make_spirit_obj(emitter.clone());
+    let mut live = LIVE_JUDGEMENTS.lock().unwrap_or_else(|e| e.into_inner());
+    live.retain(|(object, _)| object.strong_count() != 0);
+    live.push((Arc::downgrade(&object), emitter));
+    object
+}
+
+/// Resolve both inference and scalar policy through the committed SCB. An
+/// unload racing the pre-judgement stop check is left to `dispatch_stop`.
+pub fn judge_live_section(
+    scheduler: &SpiritSchedulerAdapter,
+    pid: u32,
+    emitter: &Orchestrator,
+    section: &EpicSection,
+) -> Result<Option<HaltReceipt>, String> {
+    let object = {
+        let scbs = scheduler.scbs();
+        let scbs = scbs.read().unwrap_or_else(|e| e.into_inner());
+        let Some(scb) = scbs
+            .get(&pid)
+            .filter(|scb| scb.spirit_id == emitter.orchestrator_id())
+        else {
+            return Ok(None);
+        };
+        scb.runtime_snapshot().spirit_obj
+    };
+    let runtime_key = Arc::downgrade(&object);
+    let mut live = LIVE_JUDGEMENTS.lock().unwrap_or_else(|e| e.into_inner());
+    live.retain(|(runtime, _)| runtime.strong_count() != 0);
+    let emitter = live
+        .iter()
+        .find(|(runtime, _)| runtime.ptr_eq(&runtime_key))
+        .map(|(_, emitter)| emitter.clone())
+        .ok_or("maos run: live Orchestrator judgement binding is not wired")?;
+    drop(live);
+    judge_section(&emitter, section)
 }
 
 /// D-19-1-04 A — the pid the Orchestrator's admission stored in `cell`. 0
@@ -241,6 +313,275 @@ pub fn dispatch_stop(
             "undispatched_sections": (ordinal..=total).collect::<Vec<_>>(),
         })
     })
+}
+
+/// Include the judgement's identity even after the resolver removed its pending
+/// metadata. A terminal resolution still belongs to this section, not the next.
+pub fn judged_dispatch_stop(
+    registry: &HaltRegistry,
+    pid: u32,
+    resolved: Option<u32>,
+    ordinal: usize,
+    total: usize,
+    judged: Option<&HaltReceipt>,
+) -> Option<serde_json::Value> {
+    let stop = dispatch_stop(registry, pid, resolved, ordinal, total);
+    let Some(receipt) = judged else {
+        return stop;
+    };
+    let mut stop = stop.unwrap_or_else(|| {
+        serde_json::json!({
+            "event": "dispatch_halted",
+            "orchestrator_pid": pid,
+            "orchestrator_unloaded": resolved != Some(pid),
+            "halt_ids": [],
+            "dispatched_sections": ordinal.saturating_sub(1),
+            "undispatched_sections": (ordinal..=total).collect::<Vec<_>>(),
+        })
+    });
+    if let Some(ids) = stop["halt_ids"].as_array_mut() {
+        if !ids
+            .iter()
+            .any(|id| id.as_str() == Some(receipt.halt_id.as_str()))
+        {
+            ids.push(serde_json::Value::String(
+                receipt.halt_id.as_str().to_owned(),
+            ));
+        }
+    }
+    Some(stop)
+}
+
+/// Story 19-4 (AC2.3, D-19-4-02 A) — judge a NEW section before its frame
+/// (never a 19-6 re-dispatch): the Orchestrator's completion becomes the
+/// `dispatch_ambiguity` scalar through its port and the kernel's policy
+/// decides the halt; prints `dispatch_judged`. Unset mode (`NotWired`) is no
+/// judgement and no event (ADR-064); every other failure refuses the run
+/// typed, never a default (D-19-1-12 A).
+pub fn judge_section(
+    emitter: &Orchestrator,
+    section: &EpicSection,
+) -> Result<Option<HaltReceipt>, String> {
+    let (value, receipt) = match emitter.assess_ambiguity(section) {
+        Ok(judged) => judged,
+        Err(orchestrator::OrchestratorInferenceError::NotWired) => return Ok(None),
+        Err(error) => {
+            return Err(format!(
+                "maos run: section {} ambiguity judgement refused the run: {error}",
+                section.ordinal
+            ))
+        }
+    };
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "dispatch_judged",
+            "section": section.ordinal,
+            "tag": SCALAR_TAG_DISPATCH_AMBIGUITY,
+            "value": value,
+            "halt_id": receipt.as_ref().map(|r| r.halt_id.as_str().to_owned()),
+            "halt_frame_id": receipt.as_ref().map(|r| hex::encode(r.frame_id)),
+        })
+    );
+    Ok(receipt)
+}
+
+/// Story 19-4 (AC5.2, D-19-4-05 A) — `MAOS_EPIC_HALT_HOLD_SECS`, read once
+/// per `--epic` run before any entry loads: unset ⇒ 0 (the 19-1 stop);
+/// anything but whole seconds is refused typed.
+pub fn epic_halt_hold() -> Result<std::time::Duration, String> {
+    let Some(raw) = std::env::var_os("MAOS_EPIC_HALT_HOLD_SECS") else {
+        return Ok(std::time::Duration::ZERO);
+    };
+    let secs = raw
+        .to_str()
+        .and_then(|text| text.trim().parse::<u64>().ok());
+    secs.map(std::time::Duration::from_secs).ok_or_else(|| {
+        format!("maos run: MAOS_EPIC_HALT_HOLD_SECS must be whole seconds, got {raw:?}")
+    })
+}
+
+/// Story 19-4 (D-19-4-05 A) — what joins a resumed section's goal before the
+/// operator's `provided-context` clarification.
+pub const HALT_CLARIFICATION_DELIMITER: &str = "\n\nOperator clarification (halt resolved): ";
+
+/// Story 19-4 (AC5.1, D-19-4-05 A) — after `dispatch_stop`'s `stop` event,
+/// hold section `ordinal` (no frame, no Worker) while the Orchestrator at
+/// `pid` has a halt pending, polled every 100 ms, bounded by `bound` and the
+/// root's shutdown; a halt raised during the hold is held on too. `Some(goal)`
+/// = every held halt was resolved over the door without `accepted-halt`:
+/// `dispatch_resumed` is printed and each `provided-context` text (the
+/// resolver's `halt_context::<id>`) is appended to `goal`; `authorized-override`
+/// leaves it unchanged. `None` = the 19-1 stop: a zero bound (the default),
+/// an unloaded Orchestrator, `accepted-halt`, the bound or shutdown.
+#[allow(clippy::too_many_arguments)]
+pub async fn hold_for_resolution(
+    tl: &TransparencyLogAdapter,
+    registry: &HaltRegistry,
+    memory: &MemoryManagerAdapter,
+    resolved: impl Fn() -> Option<u32>,
+    stop: &serde_json::Value,
+    ordinal: usize,
+    goal: String,
+    bound: std::time::Duration,
+    shutdown: &tokio_util::sync::CancellationToken,
+) -> Option<String> {
+    if shutdown.is_cancelled()
+        || bound.is_zero()
+        || stop["orchestrator_unloaded"].as_bool() != Some(false)
+    {
+        return None;
+    }
+    let pid = u32::try_from(stop["orchestrator_pid"].as_u64()?).ok()?;
+    let mut held: Vec<HaltId> = stop["halt_ids"]
+        .as_array()?
+        .iter()
+        .filter_map(|id| HaltId::new(id.as_str()?.to_owned()).ok())
+        .collect();
+    // The registry drops terminal metadata. The TL retains ownership and IDs,
+    // including a halt both raised and resolved between two registry polls.
+    let started = tokio::time::Instant::now();
+    let boot_nonce = tl.boot_nonce();
+    let before = halt_ids_at_pid(tl, pid, boot_nonce)?;
+    // Include intervening rows already terminal at entry too: the first held
+    // halt marks this hold interval, not the first polling wake.
+    if let Some(first) = before.iter().position(|id| held.contains(id)) {
+        for id in &before[first..] {
+            if !held.contains(id) {
+                held.push(id.clone());
+            }
+        }
+    }
+    loop {
+        if shutdown.is_cancelled() || started.elapsed() >= bound || resolved() != Some(pid) {
+            return None;
+        }
+        for id in halt_ids_at_pid(tl, pid, boot_nonce)? {
+            if !before.contains(&id) && !held.contains(&id) {
+                held.push(id);
+            }
+        }
+        for (id, _) in registry.drain_for_spirit_dry_run(pid) {
+            if !held.contains(&id) {
+                held.push(id);
+            }
+        }
+        // Re-check after the registry/identity reads, before accepting even an
+        // already-empty pending set.
+        if shutdown.is_cancelled() || started.elapsed() >= bound {
+            return None;
+        }
+        let terminal = held.iter().all(|id| {
+            registry
+                .lookup_state(id)
+                .is_some_and(|state| state != HaltState::PendingResolution)
+        });
+        let approvals = if terminal {
+            tl.query_approvals(None).ok()?
+        } else {
+            Vec::new()
+        };
+        if terminal
+            && held.iter().all(|id| {
+                let intent = match registry.lookup_state(id) {
+                    Some(HaltState::Resumed) => "provided_context",
+                    Some(HaltState::Overridden) => "authorized_override",
+                    Some(HaltState::Terminated) => "accepted_halt",
+                    _ => return false,
+                };
+                // Resolver publication precedes this durable door approval.
+                let prefix = format!("halt={}: {intent}", id.as_str());
+                approvals.iter().any(|row| {
+                    row.decision
+                        && row.actor == "director"
+                        && row.target == crate::delegation::FROM_SPIRIT
+                        && row.capability == "halt.resolve"
+                        && row.intent == intent
+                        && row.reasoning.as_deref().is_some_and(|text| {
+                            text == prefix
+                                || text
+                                    .strip_prefix(&prefix)
+                                    .is_some_and(|rest| rest.starts_with(": "))
+                        })
+                })
+            })
+        {
+            // Close the interval with a second log snapshot: a halt may have
+            // been raised AND resolved while the registry was being inspected.
+            let mut discovered = false;
+            for id in halt_ids_at_pid(tl, pid, boot_nonce)? {
+                if !before.contains(&id) && !held.contains(&id) {
+                    held.push(id);
+                    discovered = true;
+                }
+            }
+            if discovered {
+                continue;
+            }
+            break;
+        }
+        let left = bound.saturating_sub(started.elapsed());
+        tokio::select! {
+            biased;
+            () = shutdown.cancelled() => return None,
+            () = tokio::time::sleep(left.min(std::time::Duration::from_millis(100))) => {}
+        }
+    }
+    let mut goal = goal;
+    let mut provided_context = false;
+    for id in &held {
+        match registry.lookup_state(id)? {
+            // The resolver writes the text BEFORE the state flips (resolver.rs);
+            // a clarification that cannot be read is never dropped silently.
+            HaltState::Resumed => {
+                let key = format!("halt_context::{}", id.as_str());
+                match memory.read(pid, MemoryTier::Private, &MemoryNamespace::Default, &key) {
+                    Ok(Some(MemoryValue::Text(text))) => {
+                        goal = format!("{goal}{HALT_CLARIFICATION_DELIMITER}{text}");
+                        provided_context = true;
+                    }
+                    _ => return None,
+                }
+            }
+            HaltState::Overridden => {}
+            // `accepted-halt`, or a resolution rolled back to pending.
+            HaltState::Terminated | HaltState::PendingResolution => return None,
+        }
+    }
+    if resolved() != Some(pid) || shutdown.is_cancelled() || started.elapsed() >= bound {
+        return None;
+    }
+    let halt_ids: Vec<&str> = held.iter().map(HaltId::as_str).collect();
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "dispatch_resumed",
+            "section": ordinal,
+            "halt_ids": halt_ids,
+            "provided_context": provided_context,
+        })
+    );
+    Some(goal)
+}
+
+fn halt_ids_at_pid(tl: &TransparencyLogAdapter, pid: u32, boot_nonce: u64) -> Option<Vec<HaltId>> {
+    Some(
+        tl.query_frames(FrameFilter {
+            spirit_pid: Some(pid),
+            boot_nonce: Some(boot_nonce),
+            kind: Some(FrameKind::EpistemicHalt),
+            ..FrameFilter::default()
+        })
+        .ok()?
+        .into_iter()
+        // Termination markers and receipts share this kind, but are not raises.
+        .filter_map(|row| {
+            let payload: EpistemicHaltPayload =
+                serde_json::from_slice(&row.payload_redacted).ok()?;
+            HaltId::new(payload.halt_id).ok()
+        })
+        .collect(),
+    )
 }
 
 /// The AC4.3(b) harness plant ([`HALT_PLANT_ENV`]): debug builds only, and
@@ -430,7 +771,23 @@ pub async fn hold_while_paused(
             () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
         }
     }
-    true
+    !shutdown.is_cancelled()
+}
+
+/// Judgement is a one-shot operation behind the pause/cancellation gate.
+/// Keeping the closure here also makes "no inference while paused" observable
+/// without a real provider or a Worker process.
+pub async fn judge_after_pause<T>(
+    scheduler: &SpiritSchedulerAdapter,
+    pid: u32,
+    ordinal: usize,
+    shutdown: &tokio_util::sync::CancellationToken,
+    judge: impl FnOnce() -> Result<T, String>,
+) -> Result<Option<T>, String> {
+    if !hold_while_paused(scheduler, pid, ordinal, shutdown).await {
+        return Ok(None);
+    }
+    judge().map(Some)
 }
 
 /// The [`HOLD_SECTION_ENV`] hold: debug builds only, only at the named

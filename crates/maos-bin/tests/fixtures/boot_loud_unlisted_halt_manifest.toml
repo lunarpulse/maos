@@ -1,0 +1,51 @@
+# TEST-ONLY manifest — the boot-loud over-fire guard's subject
+# (`maos_run_boot_loud_8_11.rs`, Story 19-4 AC2.4, D-19-4-03 B). Never shipped.
+#
+# Story 19-4 admitted the Orchestrator's `dispatch_ambiguity` into the halt-port
+# set (it gained a writer), so no shipped manifest keeps a Halt rule outside the
+# set any longer. This copy of the Orchestrator's manifest declares ONE Halt
+# rule whose tag no halt-port transport lists: the posture-keyed boot-loud
+# predicate must not fire on it, so the Orchestrator boots without requiring an
+# EpistemicScalarPort (`boot_loud_port: false`).
+[class]
+name = "orchestrator"
+version = "0.8.0"
+abi = "1.0"
+manifest_schema_version = 2
+min_substrate_version = "0.1.0-alpha"
+forms = ["rust-inproc"]
+trust_tier = "local"
+description = "TEST-ONLY Orchestrator manifest for the Story 8.11 boot-loud over-fire guard: one declared Halt rule whose tag is outside the halt-port set."
+
+[posture]
+default = "autonomous-with-halt"
+allowed_max = "autonomous-with-halt"
+
+[output_shape]
+required_fields = ["target_role", "goal", "has_distillate_ref", "distillation_depth"]
+
+[budget]
+context_window_size = 8192
+time_cap_seconds = 30
+
+[resources]
+cpu_max_pct = 15
+memory_max_mb = 128
+
+[sandbox]
+tier = "T0"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"
+
+[capabilities.required]
+provider.complete = ["anthropic.claude-haiku-4-5-20251001", "openai.gpt-4o-mini"]
+
+[epistemic_policy]
+default_action = "verbalize_only"
+
+[[epistemic_policy.rules]]
+tag = "boot_loud_guard_unlisted_tag"
+action = "halt"
+on_value_above = { threshold = 0.5 }

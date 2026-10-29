@@ -91,6 +91,8 @@ Measured at HEAD `61af7461`; the working tree carries uncommitted 19-3/19-6 code
 
 Room (endpoint − tree) at creation: maos-bin 506 → after 19-2 (196–279) and 19-5's reservation (195): **32–115** for 19-4's 239 (×1.3). xtask 170 for ≈ 234. Aggregate 892 → 282–382 for ≈ 473. → D-19-4-12, **superseded 2026-10-28 by ask `w3_kloc`**: endpoints maos-bin **31710**, xtask **47688**, aggregate hardfail **191669** (room now maos-bin 863, xtask 234, aggregate 1313 against the tree).
 
+**Landing envelope ruling 2026-10-29 (Lunarpulse, ask `w5_kloc`, "Raise to measured + ~150"):** maos-bin 32086 (`w4_kloc`) → **32860** (+774), aggregate hardfail ~192045 → **~192685**; measured 19-4/19-5 review corrections round 3 maos-bin **32826**, xtask **47682** ≤ 47688, maos-cli **6371** ≤ 6382, maos-control **1496** ≤ 1539, aggregate **192650** (strict pin **192651** = measured + 1); exact pins retain zero headroom, not the envelope.
+
 ## Decisions — RULED 2026-10-28 (D-19-4-01…11 as recommended, ask `w3_19_4`; D-19-4-12 superseded by ask `w3_kloc`)
 
 | ID | Question | Options | Recommendation and evidence | Status |

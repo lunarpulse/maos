@@ -209,6 +209,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_TEST_ONLY_UPGRADE_PRECHECKED",
+        purpose: "Debug-build-only: writes this marker after upgrade prechecks and waits at most two seconds for its removal, allowing deterministic successor-path replacement; release builds never read it",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_BUTLER_PRINCIPAL",
         purpose: "The director's principal id a serving root binds its Butler's acceptance record to at boot, so `maosctl spirit pick` records into that principal's namespace; unset or blank ⇒ none bound and picks answer 409 `principal_unbound`; a set value must be non-empty with no `:` and no control character (the scene header's principal rule) — a non-UTF-8 or malformed value, or a `--scene` with a different principal, refuses the boot (Story 19-2 D-19-2-08 A)",
         stability: EnvStability::UserFacing,
@@ -357,6 +362,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         name: "MAOS_REPLAY_STRICT",
         purpose: "When set to '1', cassette prompt-hash drift is a hard error",
         stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_EPIC_HALT_HOLD_SECS",
+        purpose: "Story 19-4 (D-19-4-05 A) — whole seconds an `--epic` run holds a section whose Orchestrator halt is pending, polling every 100 ms for its resolution over the operator door (`maosctl halt resolve`): provided-context resumes the section with the clarification appended to its goal, authorized-override resumes it unchanged, accepted-halt, the bound or shutdown stop dispatch. Unset or 0 ⇒ the 19-1 stop (no hold); malformed ⇒ typed refusal before any entry loads",
+        stability: EnvStability::UserFacing,
     },
     EnvVar {
         name: "MAOS_UTC_OFFSET",

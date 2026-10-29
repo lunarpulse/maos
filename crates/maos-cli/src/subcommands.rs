@@ -2392,16 +2392,10 @@ fn dispatch_spirit(args: &SpiritArgs, _color: ColorChoice) -> ExitCode {
             keyring,
             policy,
         } => {
-            // `--policy migrator` names the kernel's multi-hop executor, which
-            // the door does not expose: D-16-1-W is hot-swap only, because the
-            // cold-swap arm starts an unadmitted successor under a new pid.
-            if policy == &UpgradePolicyArg::Migrator {
-                eprintln!(
-                    "maosctl: spirit upgrade — --policy migrator is not on the operator \
-                     door surface (hot-swap only, D-16-1-W)"
-                );
-                return ExitCode::from(2);
-            }
+            // Cold swap may refuse `cold_swap_unrestorable` (HTTP 409) before
+            // unload: retained recovery text must be admission-complete, match
+            // the live class/version, and be constructible by the door (not
+            // scalar-port Mira). A refused successor otherwise restores it.
             // ⚠ `--plan` IS carried. The execution guard that reads a
             // persisted plan runs daemon-side either way, so refusing only the
             // CREATION half would leave a guard nothing could ever arm and a
@@ -2450,7 +2444,7 @@ fn dispatch_spirit(args: &SpiritArgs, _color: ColorChoice) -> ExitCode {
                 "policy": match policy {
                     UpgradePolicyArg::HotSwap => "hot-swap",
                     UpgradePolicyArg::ColdSwap => "cold-swap",
-                    UpgradePolicyArg::Migrator => unreachable!("refused above"),
+                    UpgradePolicyArg::Migrator => "migrator",
                 },
                 "attestation": attestation,
                 "vetter_keyring": keyring,

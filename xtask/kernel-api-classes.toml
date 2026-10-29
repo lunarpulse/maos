@@ -585,6 +585,9 @@
 "maos_kernel_core::lifecycle::upgrade::UpgradeError"                     = "supervision"
 "maos_kernel_core::lifecycle::upgrade::UpgradePolicy"                    = "supervision"
 "maos_kernel_core::lifecycle::upgrade::UpgradeOutcome"                   = "supervision"
+# Story 19-5 (D-19-5-09 A) — ABI Stability Triple legs 1–2 extracted from
+# `admit_spirit`; the operator door pre-gates every upgrade target with it.
+"maos_kernel_core::security::check_abi_triple"                          = "supervision"
 "maos_kernel_core::revocation::applier::RevocationApplier"              = "supervision"
 "maos_kernel_core::revocation::poller::RevocationPoller"                = "supervision"
 "maos_kernel_core::revocation::parser::parse_signed_crl"                = "data-movement"

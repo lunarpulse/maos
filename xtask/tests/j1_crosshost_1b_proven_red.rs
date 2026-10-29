@@ -694,6 +694,152 @@ fn planting_an_unenrolled_19_3_test_file_must_red() {
     );
 }
 
+/// Story 19-4 AC6.3 / D-19-4-11 A (the 15-1 "`_2c.rs` J1 blind spot", closed at
+/// origin) — the derivation walks every `crates/*/tests`, not only maos-bin's: an
+/// un-enrolled J1-suffixed file in ANOTHER crate (`crates/maos-iac/tests/xyz_2b.rs`)
+/// reds `completion-vectors-enrolled`, and the finding names the crate-qualified
+/// command it is missing.
+#[test]
+fn planting_an_unenrolled_2b_file_outside_maos_bin_must_red() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-iac/tests/xyz_2b.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+    });
+    assert_red(
+        &v,
+        "`cargo test -p maos-iac --test xyz_2b`",
+        "a J1 test file outside crates/maos-bin/tests was added without enrolling it",
+    );
+    assert!(
+        v.stdout
+            .contains("\"check\":\"completion-vectors-enrolled\""),
+        "the finding must be filed under completion-vectors-enrolled\nstdout:\n{}",
+        v.stdout
+    );
+}
+
+/// D-19-4-11 A twin — enrolment is crate-qualified: the same stem enrolled under
+/// the WRONG crate (`-p maos-bin --test xyz_2b`) does not run the maos-iac file,
+/// so the gate stays red.
+#[test]
+fn enrolling_an_outside_2b_file_under_the_wrong_crate_must_red() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-iac/tests/xyz_2b.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+        write_file(
+            root,
+            WORKFLOW,
+            &format!(
+                "{GOOD_WORKFLOW}\x20     - run: cargo test -p maos-bin --test xyz_2b -- --test-threads=1\n"
+            ),
+        );
+    });
+    assert_red(
+        &v,
+        "`cargo test -p maos-iac --test xyz_2b`",
+        "an outside J1 file enrolled under the wrong crate",
+    );
+}
+
+/// D-19-4-11 A twin — `-p` and `--test` must sit in ONE command: a `-p maos-iac`
+/// command chained (`&&`) to a separate `--test xyz_2b` command enrols nothing.
+#[test]
+fn splitting_the_crate_and_the_target_across_two_commands_must_red() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-iac/tests/xyz_2b.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+        write_file(
+            root,
+            WORKFLOW,
+            &format!(
+                "{GOOD_WORKFLOW}\x20     - run: cargo build -p maos-iac && cargo test --test xyz_2b\n"
+            ),
+        );
+    });
+    assert_red(
+        &v,
+        "`cargo test -p maos-iac --test xyz_2b`",
+        "the crate and the target split across two shell commands",
+    );
+}
+
+/// The positive control of the three vectors above: the outside file enrolled
+/// crate-qualified, in one command (here `\`-continued over two lines, which is
+/// layout, not structure), turns the gate GREEN — the reds are the missing
+/// enrolment, not an unconditional finding on any outside file.
+#[test]
+fn enrolling_an_outside_2b_file_crate_qualified_is_green() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-iac/tests/xyz_2b.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+        write_file(
+            root,
+            WORKFLOW,
+            &format!(
+                "{GOOD_WORKFLOW}\x20     - run: |\n\
+                 \x20         cargo test -p maos-iac \\\n\
+                 \x20           --test xyz_2b -- --test-threads=1\n"
+            ),
+        );
+    });
+    assert!(
+        v.passed && v.success,
+        "a crate-qualified enrolment of crates/maos-iac/tests/xyz_2b.rs must satisfy the \
+         gate\nstdout:\n{}",
+        v.stdout
+    );
+}
+
+/// D-19-4-11 A — `_2e.rs` joins the derived suffixes (`maos-cli::cohort_sign_2e`):
+/// an un-enrolled `crates/maos-cli/tests/xyz_2e.rs` reds.
+#[test]
+fn planting_an_unenrolled_2e_file_must_red() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-cli/tests/xyz_2e.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+    });
+    assert_red(
+        &v,
+        "`cargo test -p maos-cli --test xyz_2e`",
+        "a new _2e J1 test file was added without enrolling it",
+    );
+}
+
+/// D-19-4-11 A — the `_2c` lane is `check-j1-two-host-signed-run` leg 10's
+/// (`two-host-vectors-enrolled`), never this gate's: an un-enrolled `*_2c.rs`
+/// leaves THIS gate green (one control, one job).
+#[test]
+fn planting_an_unenrolled_2c_file_stays_green_here() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-bin/tests/xyz_2c.rs",
+            "#[test]\nfn leg_ten_owns_me() {}\n",
+        );
+    });
+    assert!(
+        v.passed && v.success,
+        "the _2c lane is enrolled by check-j1-two-host-signed-run leg 10; this gate must \
+         not derive it\nstdout:\n{}",
+        v.stdout
+    );
+}
+
 /// Story 19-1 AC2.4 / D-19-1-11 A — a fourth host-bearing Worker in the epic
 /// topology breaks the one-section-per-entry mapping and reds leg 1.
 #[test]

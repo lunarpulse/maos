@@ -38,16 +38,53 @@
 //! warnings that have nothing to do with this run, and a demo that narrates
 //! ambient noise as its own output is lying quietly. With a fresh home, a
 //! `journal:` warning is a real finding.
+//!
+//! ## The epic scene (Story 19-4)
+//!
+//! The hermetic default replays the whole founder loop on
+//! `j1-founder-loop-epic.toml` with `--epic tests/fixtures/j1/founder-loop-epic.md`
+//! (D-19-4-09 A): the Orchestrator splits three `### Story` sections, judges each
+//! before its frame (the replayed cassette is the env pair `MAOS_INFERENCE_MODE` /
+//! `MAOS_REPLAY_CASSETTE` — no flag, ADR-064), the KERNEL halts the ambiguous
+//! section, this runner answers the halt over the operator door while the child's
+//! stdout streams, the section resumes with the answer, and the run ends with an
+//! FR17 digest whose every cited ref must resolve to an audit row. The halt is
+//! resolved in the same boot (D-19-4-05 A): a halt still pending at exit is not
+//! resumed by a later boot, and this runner never claims it is.
 
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Instant;
 
 use crate::gate_common::EvidenceState;
 
-/// The scene's topology. The `host` key on its worker entry is what makes the
-/// delegation frame-borne (`j1-crosshost-1a` AC1.1).
-const TOPOLOGY: &str = "spirits/topologies/j1-founder-loop.toml";
+/// The scene's topology: the Orchestrator, two class Spirits and one
+/// frame-borne Developer-Worker per epic section (Story 19-4 D-19-4-09 A). The
+/// `host` key on each worker entry is what makes the delegation frame-borne
+/// (`j1-crosshost-1a` AC1.1).
+const TOPOLOGY: &str = "spirits/topologies/j1-founder-loop-epic.toml";
+
+/// Story 19-4 D-19-4-04 A — the epic the scene decomposes: three `### Story`
+/// sections, section 2 under-specified on purpose (its acceptance names no
+/// measurable bound).
+const EPIC: &str = "tests/fixtures/j1/founder-loop-epic.md";
+/// One Worker per section: the topology's three host-bearing entries.
+const EPIC_SECTIONS: usize = 3;
+/// The section whose replayed judgement exceeds the manifest's 0.5 rule.
+const AMBIGUOUS_SECTION: u64 = 2;
+/// The scalar tag the Orchestrator's halt is journaled under (D-19-4-08 A).
+const AMBIGUITY_TAG: &str = "dispatch_ambiguity";
+/// D-19-4-05 A — how long the child holds a halted section for the door's
+/// answer. Generous on purpose: this runner resolves the halt within one read
+/// of the stream, and the bound only decides how long a lost answer takes to
+/// surface as the 19-1 stop.
+const HALT_HOLD_ENV: &str = "MAOS_EPIC_HALT_HOLD_SECS";
+const HALT_HOLD_SECS: &str = "120";
+/// The operator's answer to the ambiguity halt, sent over the door as
+/// `provided-context`; the resumed section's goal must carry it verbatim.
+const CLARIFICATION: &str = "The nightly import of the 10,000-row fixture must finish in \
+                             under 60 seconds; acceptance is one timed run under that bound.";
 
 /// Destination peer id / topology `host` the delegation must reach.
 const DELEGATION_HOST: &str = "developer-remote-host";
@@ -147,10 +184,12 @@ pub fn run(
 ) -> Result<(), String> {
     banner("J1 founder loop — an orchestrator, a reviewer, and a remote that is still loopback");
 
-    if !Path::new(TOPOLOGY).exists() {
-        return Err(format!(
-            "demo-j1: {TOPOLOGY} not found — run this from the repository root"
-        ));
+    for required in [TOPOLOGY, EPIC] {
+        if !Path::new(required).exists() {
+            return Err(format!(
+                "demo-j1: {required} not found — run this from the repository root"
+            ));
+        }
     }
 
     let bins = preflight(skip_build)?;
@@ -170,20 +209,28 @@ pub fn run(
             "three class Spirits load from the topology",
         ),
         (
-            "P2  task.assign -> developer-remote",
-            "a real consent-carrying frame over the loopback A2A layer",
+            "E   epic -> three judged sections",
+            "the Orchestrator splits the epic and judges each section before its frame",
         ),
         (
-            "P3  Developer-Worker admitted",
-            "host-managed grant, T3, real child process",
+            "P2  task.assign -> developer-remote",
+            "a real consent-carrying frame per section over the loopback A2A layer",
+        ),
+        (
+            "P3  Developer-Workers admitted",
+            "host-managed grant, T3, a real child process per section",
         ),
         (
             "P4  completion parsed by the adapter",
             "the oracle decides completion — never the exit code",
         ),
         (
-            "P5  delegation closed at a safe point",
+            "P5  delegations closed at a safe point",
             "TaskComplete journaled, no frame left in flight",
+        ),
+        (
+            "H   the kernel halts section 2",
+            "answered over the door, section 2 resumes; the FR17 digest cites real rows",
         ),
         (
             "P6  audit drain + clean exit",
@@ -206,6 +253,14 @@ pub fn run(
     );
 
     let mut beats = evaluate_beats(&obs);
+
+    // Story 19-4 AC3 — the digest's citations, joined to an independent read of
+    // the same window. An unreadable window cites nothing, so the beat fails.
+    let audit_rows = audit_query(&bins, &home).unwrap_or_else(|why| {
+        println!("  audit query      FAILED: {why}");
+        String::new()
+    });
+    beats.push(digest_cites_source_refs(&obs, &audit_rows));
 
     // T5 — the sealed-export parity control. The drain fix is only meaningful if
     // the rows it flushed are actually COVERED by a signature, so cross-check an
@@ -306,9 +361,9 @@ pub fn run(
     println!("  fs jail          {FS_JAIL_POSTURE} — verified T3 container, read-only root,");
     println!("                   non-root payload and bounded tmpfs; adapter restrictions are");
     println!("                   additional controls, not the MAOS boundary.");
-    println!("  halt/resume      safe shutdown with no in-flight delegation is proven; the");
-    println!("                   post-resume digest citing the exact pre-halt ref is NOT —");
-    println!("                   FOLLOWUP-J1-RESUME-SEAM.");
+    println!("  halt/resume      the ambiguity halt is resolved over the door IN THE SAME BOOT");
+    println!("                   (D-19-4-05 A); a halt still pending when the process exits");
+    println!("                   is not resumed by a later boot, and nothing here claims it.");
 
     section("Where it landed");
     match &keep_home {
@@ -525,13 +580,7 @@ fn sealed_export_parity(bins: &Bins, home: &Path) -> Result<(usize, usize), Stri
         "audit keygen",
     )?;
 
-    let queried = run_checked(
-        Command::new(&maosctl)
-            .args(["audit", "query", "--range", "1d", "--format", "ndjson"])
-            .env("MAOS_HOME", home)
-            .env("XDG_DATA_HOME", home),
-        "audit query",
-    )?;
+    let queried = audit_query(bins, home)?;
     let rows = queried
         .lines()
         .filter(|l| l.trim_start().starts_with('{'))
@@ -550,6 +599,25 @@ fn sealed_export_parity(bins: &Bins, home: &Path) -> Result<(usize, usize), Stri
     Ok((rows, entry_count(&exported)))
 }
 
+/// One `maosctl audit query --range 1d --format ndjson` over the isolated home —
+/// the independent reader both the sealed-export parity and the digest's
+/// citations are judged against.
+fn audit_query(bins: &Bins, home: &Path) -> Result<String, String> {
+    run_checked(
+        Command::new(bins.dir.join("maosctl"))
+            .args(["audit", "query", "--range", "1d", "--format", "ndjson"])
+            .env("MAOS_HOME", home)
+            .env("XDG_DATA_HOME", home),
+        "audit query",
+    )
+}
+
+/// Story 19-4 (D-19-4-09 A, D-19-4-05 A) — run the epic scene with its stdout
+/// STREAMED (read line by line while stderr drains on its own thread). The
+/// moment the child prints `dispatch_halted` naming pending halts, this runner
+/// answers each over the operator door (`maosctl halt resolve … --kind
+/// provided-context`) while the child holds the section. The door exists
+/// because the home is `maos init`ed first (the J0 `init_world` shape).
 fn run_scene(bins: &Bins, home: &Path) -> Result<SceneObservation, String> {
     let path_var = match std::env::var_os("PATH") {
         Some(existing) => {
@@ -559,39 +627,125 @@ fn run_scene(bins: &Bins, home: &Path) -> Result<SceneObservation, String> {
         }
         None => bins.dir.clone().into_os_string(),
     };
+    run_checked(
+        Command::new(&bins.maos)
+            .arg("init")
+            .env("MAOS_HOME", home)
+            .env("XDG_DATA_HOME", home)
+            .env("PATH", &path_var),
+        "demo-j1: the operator door (maos init)",
+    )?;
 
     let started = Instant::now();
-    let out = Command::new(&bins.maos)
-        .args(["run", TOPOLOGY, "--once"])
+    let mut child = Command::new(&bins.maos)
+        .args(["run", TOPOLOGY, "--epic", EPIC, "--once"])
         .env("MAOS_HOME", home)
         .env("XDG_DATA_HOME", home)
-        .env("PATH", path_var)
+        .env("PATH", &path_var)
+        .env(HALT_HOLD_ENV, HALT_HOLD_SECS)
         // A fixture take must never be able to spawn a paid agent.
         .env_remove("MAOS_LIVE_AGENT")
         // Keep the fixture Worker's workspace inside the temporary home, where
         // `remove_worker_workspaces(home)` reaches it.
         .env_remove("MAOS_WORKER_WORKSPACES_ROOT")
-        .output()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("demo-j1: cannot run the daemon: {e}"))?;
-    let wall = started.elapsed();
-
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let events = stdout
+    let (Some(stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
+        return Err("demo-j1: the daemon's output was not captured".to_string());
+    };
+    let stderr_drain = std::thread::spawn(move || {
+        let mut text = String::new();
+        let _ = std::io::Read::read_to_string(&mut stderr, &mut text);
+        text
+    });
+    let mut events: Vec<serde_json::Value> = Vec::new();
+    for line in std::io::BufReader::new(stdout)
         .lines()
-        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line.trim()).ok())
-        .filter(|v: &serde_json::Value| v.get("event").is_some())
-        .collect();
-
+        .map_while(Result::ok)
+    {
+        // A non-JSON line parses to `null` and carries no event name.
+        let event: serde_json::Value = serde_json::from_str(line.trim()).unwrap_or_default();
+        let Some(name) = event["event"].as_str() else {
+            continue;
+        };
+        // Streamed as it arrives: the judgement, halt and resume beats.
+        if name.starts_with("dispatch_") || matches!(name, "morning_digest" | "drain") {
+            let at = event.get("section").or(event.get("halt_ids"));
+            println!(
+                "  > {name} {}",
+                at.map(ToString::to_string).unwrap_or_default()
+            );
+        }
+        let halted = (name == "dispatch_halted").then(|| event["halt_ids"].clone());
+        events.push(event);
+        let pending = halted.iter().filter_map(|ids| ids.as_array()).flatten();
+        for halt_id in pending.filter_map(serde_json::Value::as_str) {
+            match resolve_halt(bins, home, halt_id) {
+                Ok(_) => println!("  > resolved {halt_id} over the door (provided-context)"),
+                Err(why) => println!("  > resolve FAILED for {halt_id}: {why}"),
+            }
+        }
+    }
+    let status = child
+        .wait()
+        .map_err(|e| format!("demo-j1: cannot wait for the daemon: {e}"))?;
     Ok(SceneObservation {
         events,
-        stderr: String::from_utf8_lossy(&out.stderr).to_string(),
-        wall,
-        exit_ok: out.status.success(),
+        stderr: stderr_drain.join().unwrap_or_default(),
+        wall: started.elapsed(),
+        exit_ok: status.success(),
     })
+}
+
+/// Answer one pending halt the way an operator does: `maosctl halt resolve` over
+/// the door of the running root, with [`CLARIFICATION`] as the provided context.
+fn resolve_halt(bins: &Bins, home: &Path, halt_id: &str) -> Result<String, String> {
+    run_checked(
+        Command::new(bins.dir.join("maosctl"))
+            .args(["halt", "resolve", halt_id, "--spirit"])
+            .arg(maos_bin::delegation::FROM_SPIRIT)
+            .args(["--kind", "provided-context", "--text", CLARIFICATION])
+            .env("MAOS_HOME", home)
+            .env("XDG_DATA_HOME", home),
+        "maosctl halt resolve",
+    )
+}
+
+/// The `### Story <n>` number a delegated goal opens with — the section it was
+/// split from, since the goal is the section's text (plus any appended answer).
+fn story_number(goal: &str) -> Option<usize> {
+    let rest = goal.trim_start().strip_prefix("### Story")?.trim_start();
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    digits.parse().ok()
+}
+
+/// Story 19-4 (D-19-4-09 A) — `(arrived, held)`: how many `name` events the
+/// scene printed and how many of them satisfy `held`. A per-section beat holds
+/// only when both equal [`EPIC_SECTIONS`], so one section that held can never
+/// stand in for two that did not.
+fn per_section(
+    obs: &SceneObservation,
+    name: &str,
+    held: impl Fn(&serde_json::Value) -> bool,
+) -> (usize, usize) {
+    let events = obs.events_named(name);
+    (
+        events.len(),
+        events.into_iter().filter(|&e| held(e)).count(),
+    )
+}
+
+fn every_section((arrived, held): (usize, usize)) -> bool {
+    arrived == EPIC_SECTIONS && held == EPIC_SECTIONS
 }
 
 /// Turn the observation into beats. Every assertion is on a NAMED event field —
 /// never on topology internals, which 1a rewrote and rung 2 will rewrite again.
+/// P2–P6 are judged PER SECTION (Story 19-4 D-19-4-09 A); details render
+/// `(arrived, held)` pairs against [`EPIC_SECTIONS`].
 fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
     let mut beats = Vec::new();
 
@@ -611,125 +765,74 @@ fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
         format!("loaded {loaded:?}"),
     ));
 
-    // P2 — frame-borne delegation over loopback.
-    let admit_frame_borne = obs
-        .event("topology_worker_admit")
-        .and_then(|e| e["frame_borne"].as_bool())
-        .unwrap_or(false);
-    let (delegation_ok, delegation_detail) = match obs.event("delegation_routed") {
-        Some(ev) => {
-            let to_host = ev["to_host"].as_str().unwrap_or_default();
-            let recipient = ev["recipient"].as_str().unwrap_or_default();
-            let intent = ev["intent"].as_str().unwrap_or_default();
-            let goal_present = ev["goal"].as_str().is_some_and(|g| !g.trim().is_empty());
-            let ok = to_host == DELEGATION_HOST
-                && recipient == DELEGATION_RECIPIENT
-                && !intent.is_empty()
-                && goal_present
-                && admit_frame_borne;
-            (
-                ok,
-                format!(
-                    "v0.8 rung — loopback rehearsal; -> {to_host} as {recipient}, \
-                     intent {intent}, frame_borne={admit_frame_borne}"
-                ),
-            )
-        }
-        None => (
-            false,
-            "no delegation_routed event — the worker task was not frame-borne".to_string(),
-        ),
-    };
+    // P2 — every section's delegation is frame-borne over loopback.
+    let routed = per_section(obs, "delegation_routed", |e| {
+        e["to_host"] == DELEGATION_HOST
+            && e["recipient"] == DELEGATION_RECIPIENT
+            && e["intent"]
+                .as_str()
+                .is_some_and(|intent| !intent.is_empty())
+            && e["goal"]
+                .as_str()
+                .is_some_and(|goal| !goal.trim().is_empty())
+    });
+    let frame_borne = per_section(obs, "topology_worker_admit", |e| e["frame_borne"] == true);
     beats.push(Beat::executed(
         "delegation-frame-crosses-loopback",
-        "a real task.assign carried the consent envelope to developer-remote",
-        state_of(delegation_ok),
-        delegation_detail,
+        "every section's task.assign carried the consent envelope to developer-remote",
+        state_of(every_section(routed) && every_section(frame_borne)),
+        format!(
+            "v0.8 rung — loopback rehearsal; frames to {DELEGATION_HOST} as \
+             {DELEGATION_RECIPIENT} {routed:?}, frame-borne admits {frame_borne:?}"
+        ),
     ));
 
-    // P3 — host-managed grant + real subprocess.
-    let grant = obs.event("host_grant_disposition");
-    let wrapper = obs.event("cli_wrapper_loaded");
-    let child_pid = wrapper.and_then(|e| e["child_pid"].as_u64()).unwrap_or(0);
-    let tier = wrapper
-        .and_then(|e| e["granted_tier"].as_str())
-        .or_else(|| grant.and_then(|e| e["granted_tier"].as_str()))
-        .unwrap_or("unknown");
-    let egress = grant
-        .and_then(|e| e["egress"].as_str())
-        .unwrap_or("unreported");
+    // P3 — a host-managed grant and a real, DISTINCT subprocess per section.
+    let grants = per_section(obs, "host_grant_disposition", |_| true);
+    let child_pids: std::collections::BTreeSet<u64> = obs
+        .events_named("cli_wrapper_loaded")
+        .iter()
+        .filter_map(|e| e["child_pid"].as_u64().filter(|pid| *pid > 0))
+        .collect();
     beats.push(Beat::executed(
         "worker-admitted-under-host-grant",
-        "the Developer-Worker was admitted by a host-managed grant, not by trust",
-        state_of(grant.is_some() && child_pid > 0),
-        format!("granted_tier {tier}, real child_pid {child_pid}, egress {egress}"),
+        "each Developer-Worker was admitted by a host-managed grant, not by trust",
+        state_of(every_section(grants) && child_pids.len() == EPIC_SECTIONS),
+        format!("grants {grants:?}, distinct real child_pids {child_pids:?}"),
     ));
 
-    // P4 — the completion oracle.
-    let completion = obs.event("worker_completion");
-    let completed = completion
-        .and_then(|e| e["completed"].as_bool())
-        .unwrap_or(false);
-    // j1-crosshost-2a AC1.6 — `last_stdout_tl_ref` (renamed from
-    // `completion_tl_ref`) is assigned on EVERY stdout row, independently of the
-    // oracle. This beat used to score `completed && !tl_ref.is_empty()`, which
-    // conjoined two causally unrelated facts and made the tl_ref half a NULL
-    // CONTROL: it was true whenever the worker printed anything at all. The beat
-    // now asserts the oracle's verdict alone; the TL ref is reported as the
-    // evidence pointer it is, and is deliberately still emitted on a FAILED run.
-    let tl_ref = completion
-        .and_then(|e| e["last_stdout_tl_ref"].as_str())
-        .unwrap_or_default();
-    let label = completion
-        .and_then(|e| e["completion"].as_str())
-        .unwrap_or("none");
+    // P4 — the completion oracle, per section. j1-crosshost-2a AC1.6: the beat
+    // asserts the oracle's verdict alone, never `last_stdout_tl_ref` (assigned on
+    // every stdout row, independently of the oracle).
+    let completed = per_section(obs, "worker_completion", |e| e["completed"] == true);
     beats.push(Beat::executed(
         "worker-completed-by-adapter-oracle",
         "completion came from the adapter's structured-output oracle, never from an exit code",
-        state_of(completed),
-        format!(
-            "completion `{label}`; last worker stdout TL ref {} (evidence pointer, not the verdict)",
-            short_ref(tl_ref)
-        ),
+        state_of(every_section(completed)),
+        format!("completed by the oracle {completed:?}"),
     ));
 
-    // P5 — the delegation closed cleanly.
-    let closed = obs.event("delegation_completed");
-    let safe_point = closed
-        .and_then(|e| e["orchestrator_safe_point"].as_bool())
-        .unwrap_or(false);
+    // P5 — every delegation closed cleanly.
+    let closed = per_section(obs, "delegation_completed", |e| {
+        e["orchestrator_safe_point"] == true
+    });
     beats.push(Beat::executed(
         "delegation-closed-at-safe-point",
-        "TaskComplete was journaled and no frame was left in flight",
-        state_of(closed.is_some() && safe_point),
-        match closed {
-            Some(ev) => format!(
-                "result `{}`, frames drained {}, safe_point {safe_point}",
-                ev["result"].as_str().unwrap_or("?"),
-                ev["orchestrator_frames_drained"].as_u64().unwrap_or(0)
-            ),
-            None => "no delegation_completed event".to_string(),
-        },
+        "TaskComplete was journaled for each section and no frame was left in flight",
+        state_of(every_section(closed)),
+        format!("closed at a safe point {closed:?}"),
     ));
 
-    // P5b — AC1 also names the wrapped CLI's exit row and the three idle
-    // callbacks. Without them the scene could narrate a clean loop while the
-    // subprocess never reported an exit and no Spirit ever went idle.
-    let exit_ev = obs.event("cli_wrapper_exit");
-    let crashed = exit_ev
-        .and_then(|e| e["is_crash"].as_bool())
-        .unwrap_or(true);
+    // P5b — every wrapped CLI reported a non-crash exit and every class Spirit
+    // went idle; without them the scene could narrate a clean loop over a
+    // subprocess that never exited.
+    let exited = per_section(obs, "cli_wrapper_exit", |e| e["is_crash"] == false);
     let idle_fired = obs.events_named("on_idle_fired").len();
     beats.push(Beat::executed(
         "worker-exited-and-loop-went-idle",
-        "the wrapped CLI reported a non-crash exit and every class Spirit fired on_idle",
-        state_of(exit_ev.is_some() && !crashed && idle_fired == EXPECTED_IDLE_FIRES),
-        format!(
-            "exit_cause {}, is_crash {crashed}, on_idle_fired {idle_fired}/{EXPECTED_IDLE_FIRES}",
-            exit_ev
-                .and_then(|e| e["exit_cause"].as_str())
-                .unwrap_or("absent")
-        ),
+        "every wrapped CLI reported a non-crash exit and every class Spirit fired on_idle",
+        state_of(every_section(exited) && idle_fired == EXPECTED_IDLE_FIRES),
+        format!("non-crash exits {exited:?}, on_idle_fired {idle_fired}/{EXPECTED_IDLE_FIRES}"),
     ));
 
     // P6a — the isolated home stayed clean.
@@ -745,58 +848,44 @@ fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
         format!("{journal_warnings} journal warning(s) in an isolated home"),
     ));
 
-    // P6a-order — the claim table is titled "execution order", so verify the
-    // order instead of implying it. Each stage must appear EXACTLY once and in
-    // sequence; a duplicate or a completion that precedes its own delegation
-    // could otherwise satisfy every beat independently.
-    const ORDERED_STAGES: [&str; 5] = [
+    // P6a-order — the claim table is titled "execution order", so verify it:
+    // each section's stages EXACTLY once and in sequence, sections in order, the
+    // drain once and last. A duplicate, a completion before its own delegation or
+    // overlapping sections could otherwise satisfy every beat independently.
+    const SECTION_STAGES: [&str; 4] = [
         "delegation_routed",
         "cli_wrapper_loaded",
         "worker_completion",
         "delegation_completed",
-        "drain",
     ];
-    let mut previous = None;
-    let mut order_problem = None;
-    for stage in ORDERED_STAGES {
-        let hits: Vec<usize> = obs
-            .events
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| e["event"].as_str() == Some(stage))
-            .map(|(i, _)| i)
-            .collect();
-        match hits.as_slice() {
-            [] => order_problem = Some(format!("`{stage}` never arrived")),
-            [at] => {
-                if previous.is_some_and(|prev| *at < prev) {
-                    order_problem = Some(format!("`{stage}` arrived out of order"));
-                }
-                previous = Some(*at);
-            }
-            many => {
-                order_problem = Some(format!("`{stage}` arrived {} times, not once", many.len()))
-            }
-        }
-    }
+    let observed: Vec<&str> = obs
+        .events
+        .iter()
+        .filter_map(|e| e["event"].as_str())
+        .filter(|name| SECTION_STAGES.contains(name) || *name == "drain")
+        .collect();
+    let mut ordered = SECTION_STAGES.repeat(EPIC_SECTIONS);
+    ordered.push("drain");
     beats.push(Beat::executed(
         "lifecycle-stages-in-order",
-        "one delegation, one worker run, one completion — in that sequence, each exactly once",
-        state_of(order_problem.is_none()),
-        match &order_problem {
-            Some(why) => format!("stream order NOT proven: {why}"),
-            None => format!("{} stages, each once, in sequence", ORDERED_STAGES.len()),
-        },
+        "per section: one delegation, one worker run, one completion — in order, drain last",
+        state_of(observed == ordered),
+        format!(
+            "{}expected {} stages (per section then drain), observed {observed:?}",
+            if observed == ordered {
+                ""
+            } else {
+                "stream order NOT proven: "
+            },
+            ordered.len()
+        ),
     ));
 
     // P6b — the drain. This is the beat the 2026-08-14 rehearsal caught: a
-    // timeout here means queued capability rows can be lost, so a later
-    // sealed-export over this window would sign an incomplete bundle.
+    // timeout means queued capability rows can be lost, so a sealed-export over
+    // this window would sign an incomplete bundle. The writer-failure diagnostic
+    // is NON-FATAL (the process still exits 0), so it must not read green either.
     let drain_timed_out = obs.stderr.contains("audit writer topology drain timed out");
-    // The daemon also has a NON-FATAL writer-failure diagnostic
-    // (`maos-bin/src/main.rs:4314`): the join returns an error, the message is
-    // printed, and the process still exits 0. Queued rows are not proven
-    // persisted in that case, so this beat must not read green.
     let writer_failed = obs.stderr.contains("audit writer task failed");
     let drained = obs.event("drain").is_some();
     beats.push(Beat::executed(
@@ -821,7 +910,167 @@ fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
         },
     ));
 
+    // Story 19-4 AC1.2 — one frame per section, opened in section order, closed.
+    let stories: Vec<Option<usize>> = obs
+        .events_named("delegation_routed")
+        .iter()
+        .map(|e| e["goal"].as_str().and_then(story_number))
+        .collect();
+    let in_order = stories.iter().copied().eq((1..=EPIC_SECTIONS).map(Some));
+    beats.push(Beat::executed(
+        "epic-decomposed-n-frames",
+        "the Orchestrator split the epic into one frame per `### Story` section, in order",
+        state_of(in_order && closed.0 == EPIC_SECTIONS),
+        format!(
+            "{EPIC}: frames open stories {stories:?}, {} closed",
+            closed.0
+        ),
+    ));
+
+    // Story 19-4 AC2 — the ambiguous section was judged and the KERNEL halted it
+    // within two frames (one under D-19-4-02 A: the judgement precedes its frame).
+    let judged = obs
+        .events_named("dispatch_judged")
+        .into_iter()
+        .find(|e| e["section"].as_u64() == Some(AMBIGUOUS_SECTION));
+    let halt_id = judged.and_then(|e| e["halt_id"].as_str());
+    let halt_frame = judged.and_then(|e| e["halt_frame_id"].as_str());
+    let names_halt = |e: &serde_json::Value, kind: &str| {
+        e["event"] == kind
+            && e["halt_ids"]
+                .as_array()
+                .is_some_and(|ids| halt_id.is_some() && ids.iter().any(|x| x.as_str() == halt_id))
+    };
+    let halted_at = obs
+        .events
+        .iter()
+        .position(|e| names_halt(e, "dispatch_halted"));
+    let frames_before = halted_at.map(|at| {
+        obs.events[..at]
+            .iter()
+            .filter(|e| e["event"] == "delegation_routed")
+            .count()
+    });
+    let why = match (judged, halt_id) {
+        (None, _) => "no dispatch_judged (an unset MAOS_INFERENCE_MODE judges nothing)",
+        (Some(_), None) => "the kernel raised no halt",
+        (Some(_), Some(_)) => "the kernel halted it",
+    };
+    beats.push(Beat::executed(
+        "ambiguity-halt-within-2-frames",
+        "the Orchestrator judged the ambiguous section and the kernel halted it within two frames",
+        state_of(
+            judged.is_some_and(|e| e["tag"] == AMBIGUITY_TAG)
+                && frames_before.is_some_and(|frames| frames <= 2),
+        ),
+        format!(
+            "section {AMBIGUOUS_SECTION} judged {:?}: {why}; halt {halt_id:?}, frames before \
+             dispatch_halted {frames_before:?}",
+            judged.map(|e| (&e["tag"], &e["value"]))
+        ),
+    ));
+
+    // Story 19-4 AC5 — answered over the door, resumed WITH the answer, and the
+    // post-resume digest cites the exact pre-halt frame as RESOLVED, never open.
+    let resumed_at = obs.events.iter().position(|e| {
+        names_halt(e, "dispatch_resumed")
+            && e["section"].as_u64() == Some(AMBIGUOUS_SECTION)
+            && e["provided_context"] == true
+    });
+    let clarified = obs.events_named("delegation_routed").iter().any(|e| {
+        e["goal"].as_str().is_some_and(|goal| {
+            story_number(goal) == usize::try_from(AMBIGUOUS_SECTION).ok()
+                && goal.contains(CLARIFICATION)
+        })
+    });
+    let digest_at = obs
+        .events
+        .iter()
+        .rposition(|e| e["event"] == "morning_digest");
+    let digest = digest_at.map(|at| &obs.events[at]["digest"]);
+    // The digest's `field` entries citing the halt's own frame.
+    let listing = |field: &'static str| {
+        let halts = digest
+            .and_then(|d| d[field].as_array())
+            .into_iter()
+            .flatten();
+        halts.filter(move |h| halt_frame.is_some() && h["source_log_ref"].as_str() == halt_frame)
+    };
+    let resolved = listing("resolved_halts")
+        .any(|h| h["halt_id"].as_str() == halt_id && h["resolution"] == "provided_context");
+    let still_open = listing("open_halts").next().is_some();
+    let post_resume = matches!((resumed_at, digest_at), (Some(r), Some(d)) if d > r);
+    beats.push(Beat::executed(
+        "halt-resume-referential-identity",
+        "the post-resume digest cites the exact pre-halt typed ref",
+        state_of(post_resume && clarified && resolved && !still_open),
+        format!(
+            "halt frame {halt_frame:?}: resumed {}, answer in section {AMBIGUOUS_SECTION}'s \
+             goal {clarified}, digest after resume {post_resume}, cited as resolved {resolved}, \
+             still listed open {still_open}",
+            resumed_at.is_some()
+        ),
+    ));
+
     beats
+}
+
+/// Story 19-4 AC3 — the digest beat's name.
+const DIGEST_BEAT: &str = "digest-cites-source-refs";
+
+/// Story 19-4 AC3.3 (D-19-4-06 A) — join the run's ONE `morning_digest` to an
+/// independent `audit query` over the same window (`audit_ndjson`, one row per
+/// line). Every `completed[].source_log_ref` must name a `task.complete` or
+/// `cli.subprocess.output` row, every `open_halts[]`/`resolved_halts[]` ref an
+/// `epistemic.halt` row, and the digest must cite at least one completion per
+/// section. Pure over its inputs so a vector can plant a hallucinated ref.
+fn digest_cites_source_refs(obs: &SceneObservation, audit_ndjson: &str) -> Beat {
+    let rows: Vec<serde_json::Value> = audit_ndjson
+        .lines()
+        .filter_map(|line| serde_json::from_str(line.trim()).ok())
+        .collect();
+    let digests = obs.events_named("morning_digest");
+    let digest = match digests.as_slice() {
+        [one] => one["digest"].as_object(),
+        _ => None,
+    };
+    // `(listed, uncited)`: how many refs the digest's `field` lists, and those
+    // that name no audit row of one of `kinds`.
+    let check = |field: &str, kinds: &[&str]| {
+        let listed = digest.and_then(|d| d.get(field)).and_then(|v| v.as_array());
+        let refs: Vec<&str> = listed.map_or_else(Vec::new, |items| {
+            items
+                .iter()
+                .map(|item| item["source_log_ref"].as_str().unwrap_or_default())
+                .collect()
+        });
+        let uncited: Vec<String> = refs
+            .iter()
+            .filter(|r| {
+                !rows.iter().any(|row| {
+                    row["frame_id"] == **r
+                        && row["kind"].as_str().is_some_and(|k| kinds.contains(&k))
+                })
+            })
+            .map(|r| short_ref(r))
+            .collect();
+        (refs.len(), uncited)
+    };
+    let (completed, mut uncited) = check("completed", &["task.complete", "cli.subprocess.output"]);
+    for field in ["open_halts", "resolved_halts"] {
+        uncited.extend(check(field, &["epistemic.halt"]).1);
+    }
+    Beat::executed(
+        DIGEST_BEAT,
+        "every completion and halt the FR17 digest cites resolves to a Transparency-Log row",
+        state_of(digests.len() == 1 && completed >= EPIC_SECTIONS && uncited.is_empty()),
+        format!(
+            "{} morning_digest(s), {completed} completion ref(s) (>= {EPIC_SECTIONS}); refs that \
+             name no matching audit row of their kind among {} row(s): {uncited:?}",
+            digests.len(),
+            rows.len()
+        ),
+    )
 }
 
 /// What each published gate leg MEANS, for the claim table. Hard-matched on the
@@ -909,7 +1158,8 @@ fn absent_two_host_delegation() -> Beat {
 ///
 /// `disallowed-intent-refused-blocking` LEFT this list in `j1-crosshost-1b`: the
 /// refusal proofs landed, so leaving it here would have made the narrated artifact
-/// state that this work was never done.
+/// state that this work was never done. `halt-resume-referential-identity` LEFT it
+/// in Story 19-4 (AC5): it is an executed beat of the epic scene now.
 fn unlanded_beats() -> Vec<Beat> {
     vec![
         Beat::absent(
@@ -921,11 +1171,6 @@ fn unlanded_beats() -> Vec<Beat> {
             "two-host-signed-run",
             "two real hosts over mTLS/TOFU, heterogeneous worker, one reconciled signed bundle",
             "j1-crosshost-2d-paid-two-host-run",
-        ),
-        Beat::absent(
-            "halt-resume-referential-identity",
-            "the post-resume digest cites the exact pre-halt typed ref",
-            "FOLLOWUP-J1-RESUME-SEAM",
         ),
     ]
 }

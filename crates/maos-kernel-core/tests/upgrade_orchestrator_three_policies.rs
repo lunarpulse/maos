@@ -121,8 +121,11 @@ state_schema_version = 131072
 versions = ["0.1.0"]
 "#;
 
+/// Story 19-5 (D-19-5-01 A) — the kernel verb carries hot swap and migrator
+/// only; cold swap is composed by the operator door from the admission triple,
+/// so the kernel has no unadmitted cold-swap path left to exercise here.
 #[tokio::test(flavor = "multi_thread")]
-async fn orchestrator_executes_hot_cold_and_migrator_with_fresh_successors() {
+async fn orchestrator_executes_hot_and_migrator_with_fresh_successors() {
     let seen_versions = Arc::new(Mutex::new(Vec::new()));
     let harness = UpgradeHarness::new(Arc::new(RecordingFactory {
         seen_versions: Arc::clone(&seen_versions),
@@ -173,48 +176,6 @@ async fn orchestrator_executes_hot_cold_and_migrator_with_fresh_successors() {
     );
     assert_eq!(after.current_state(), ScbLifecycleState::Running);
 
-    let cold_pid = harness
-        .scheduler
-        .load("worker-cold", predecessor.clone(), CorpusSpirit, 0x1002)
-        .await
-        .expect("load cold predecessor");
-    harness
-        .scheduler
-        .start(cold_pid)
-        .await
-        .expect("start cold predecessor");
-    let cold_before = scb_for(&harness.scheduler, cold_pid);
-    let report = harness
-        .orchestrator
-        .upgrade("worker-cold", &hot_path, UpgradePolicy::ColdSwap)
-        .await
-        .expect("cold-swap upgrade");
-    assert_eq!(
-        report.outcome,
-        maos_kernel_core::lifecycle::UpgradeOutcome::Completed
-    );
-    assert!(
-        !harness
-            .scheduler
-            .scbs()
-            .read()
-            .unwrap()
-            .contains_key(&cold_pid),
-        "cold-swap must retire the predecessor PID"
-    );
-    let cold_after = scb_for(
-        &harness.scheduler,
-        harness
-            .scheduler
-            .resolve_pid("worker-cold")
-            .expect("successor PID"),
-    );
-    assert!(
-        !Arc::ptr_eq(&cold_before, &cold_after),
-        "cold-swap must allocate a successor SCB"
-    );
-    assert_eq!(cold_after.current_state(), ScbLifecycleState::Running);
-
     let migrator_pid = harness
         .scheduler
         .load("worker-migrator", predecessor, CorpusSpirit, 0x1003)
@@ -257,5 +218,15 @@ async fn orchestrator_executes_hot_cold_and_migrator_with_fresh_successors() {
     );
     assert_eq!(migrator_after.current_state(), ScbLifecycleState::Running);
 
-    assert_eq!(&*seen_versions.lock(), &["0.2.0", "0.2.0", "1.0.0"]);
+    assert_eq!(&*seen_versions.lock(), &["0.2.0", "1.0.0"]);
+}
+
+#[test]
+fn cold_swap_is_not_a_kernel_upgrade_policy() {
+    assert!("hot-swap".parse::<UpgradePolicy>().is_ok());
+    assert!("migrator".parse::<UpgradePolicy>().is_ok());
+    assert_eq!(
+        "cold-swap".parse::<UpgradePolicy>(),
+        Err("unknown upgrade policy: cold-swap".to_string())
+    );
 }

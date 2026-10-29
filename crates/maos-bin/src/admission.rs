@@ -47,14 +47,16 @@
 //! Seeding or consuming it is `admit_spirit`'s job, not the caller's.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use maos_kernel_core::scheduler::control_block::{AnySpiritObj, SpiritManifestBundle};
 use maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter;
 use maos_kernel_core::security::manifest::{
-    Budget, CapabilitiesRequired, ClassSection, EpistemicPolicySection, LifecycleSection,
-    OutputShape, Posture, PostureSection, ResourceCaps, SandboxConfig, SchedulingSection,
+    Budget, CapabilitiesRequired, ClassSection, EpistemicPolicySection,
+    HaltProtocolCompatibilitySection, HotSwapManifestSection, LifecycleSection,
+    MigratesFromSection, OnCrashSection, OnRevocationSection, OutputShape, Posture, PostureSection,
+    ResourceCaps, SandboxConfig, SchedulingSection, SupervisionSection,
 };
 use maos_kernel_core::security::SecurityManagerAdapter;
 
@@ -248,6 +250,16 @@ pub enum AdmissionRefusal {
     Admission { detail: String },
     /// `on_start` failed, or the Spirit could not be started.
     Start { detail: String },
+    /// Story 19-5 (D-19-5-05 A) — ADR-020 / FR11 `EMigratorMissing`: an
+    /// archived predecessor of this `spirit_id` is cross-major to the
+    /// successor and `[migrates_from]` names none of it. Refused by the
+    /// daemon's admission chokepoint (`load_admit_start`), not by
+    /// `maos-kernel-core`, before a pid is allocated.
+    MigratorMissing {
+        spirit_id: String,
+        archived_version: String,
+        successor_version: String,
+    },
 }
 
 impl AdmissionRefusal {
@@ -272,6 +284,7 @@ impl AdmissionRefusal {
             Self::Load { .. } => "load_refused",
             Self::Admission { .. } => "admission_refused",
             Self::Start { .. } => "start_failed",
+            Self::MigratorMissing { .. } => "migrator_missing",
         }
     }
 
@@ -333,6 +346,17 @@ impl std::fmt::Display for AdmissionRefusal {
             Self::Load { detail } => write!(f, "scheduler refused the load: {detail}"),
             Self::Admission { detail } => write!(f, "admission rejected: {detail}"),
             Self::Start { detail } => write!(f, "start failed: {detail}"),
+            Self::MigratorMissing {
+                spirit_id,
+                archived_version,
+                successor_version,
+            } => write!(
+                f,
+                "migrator_missing: EMigratorMissing — archived predecessor '{spirit_id}' \
+                 v{archived_version} is cross-major to v{successor_version} and \
+                 [migrates_from] names no pattern matching it (ADR-020 / FR11, refused at \
+                 the daemon's admission chokepoint)"
+            ),
         }
     }
 }
@@ -394,8 +418,18 @@ pub struct GatedManifest {
     pub scheduling: SchedulingSection,
     pub lifecycle: LifecycleSection,
     pub budget: Option<Budget>,
+    /// Story 19-5 (D-19-5-06 A) — the sections the ADR-020 swap decision tree
+    /// reads; carried into the SCB so a hot swap sees the real predecessor.
+    pub hot_swap: Option<HotSwapManifestSection>,
+    pub migrates_from: Option<MigratesFromSection>,
+    pub halt_protocol_compatibility: Option<HaltProtocolCompatibilitySection>,
+    /// Story 19-5 (ruling r19_x1) — the crash-disposition and supervision
+    /// sections a class Spirit declares; `None` keeps the scheduler default.
+    pub on_crash: Option<OnCrashSection>,
+    pub on_revocation: Option<OnRevocationSection>,
+    pub supervision: Option<SupervisionSection>,
     /// The raw text, kept for the model-provenance gate, which parses its own
-    /// section out of the whole document.
+    /// section out of the whole document, and for the FR11 archive record.
     pub manifest_toml: String,
 }
 
@@ -407,6 +441,12 @@ impl GatedManifest {
             lifecycle: self.lifecycle.clone(),
             class: Some(self.class_section.clone()),
             budget: self.budget.clone(),
+            hot_swap: self.hot_swap.clone(),
+            migrates_from: self.migrates_from.clone(),
+            halt_protocol_compatibility: self.halt_protocol_compatibility.clone(),
+            on_crash: self.on_crash.clone(),
+            on_revocation: self.on_revocation.clone(),
+            supervision: self.supervision.clone(),
             ..Default::default()
         }
     }
@@ -468,6 +508,48 @@ pub fn read_manifest(path: &Path) -> Result<String, AdmissionRefusal> {
         detail: format!("{}: {error}", path.display()),
     })
 }
+/// Extract the validated class identity without imposing admission-only
+/// mediation gates on an already accepted upgrade.
+pub fn manifest_identity(text: &str) -> Result<ClassSection, AdmissionRefusal> {
+    let root: toml::Value =
+        toml::from_str(text).map_err(|error| AdmissionRefusal::ManifestParse {
+            detail: error.to_string(),
+        })?;
+    class_identity(&root)
+}
+
+fn class_identity(root: &toml::Value) -> Result<ClassSection, AdmissionRefusal> {
+    let class = root
+        .get("class")
+        .ok_or_else(|| AdmissionRefusal::ClassSection {
+            detail: "section is required and absent".into(),
+        })?;
+    let body = toml::to_string(class).map_err(|error| AdmissionRefusal::ClassSection {
+        detail: error.to_string(),
+    })?;
+    ClassSection::from_toml_str(&body).map_err(|error| AdmissionRefusal::ClassSection {
+        detail: error.to_string(),
+    })
+}
+
+/// Structural refusals occur before `load_admit_start` can emit its vetter
+/// row. Keep the rejected successor identity, without re-running its gates.
+pub fn emit_structural_rejection(
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+    text: &str,
+    refusal: &AdmissionRefusal,
+) {
+    if let Ok(class) = manifest_identity(text) {
+        emit_vetter_key_event(
+            tl,
+            &class.name,
+            &class.version,
+            false,
+            "N/A",
+            &format!("admission rejected: {refusal}"),
+        );
+    }
+}
 
 /// Gates 2–7 — parse the document and every section the triple needs.
 ///
@@ -510,14 +592,7 @@ pub fn gate_manifest(
     };
 
     // Gate 4 — `[class]` present and parsing.
-    let class_toml = section("class").ok_or(AdmissionRefusal::ClassSection {
-        detail: "section is required and absent".into(),
-    })?;
-    let class_section = ClassSection::from_toml_str(&class_toml).map_err(|error| {
-        AdmissionRefusal::ClassSection {
-            detail: error.to_string(),
-        }
-    })?;
+    let class_section = class_identity(&root)?;
 
     let wasm = class_section.forms == ["wasm-component"];
 
@@ -575,6 +650,19 @@ pub fn gate_manifest(
     let budget = section("budget")
         .map(|s| Budget::from_toml_str(&s).map_err(|e| parse_err("budget")(e.to_string())))
         .transpose()?;
+    // Story 19-5 (D-19-5-06 A + r19_x1) — parsed here, carried by `bundle()`.
+    let hot_swap = optional_section(&root, "hot_swap", HotSwapManifestSection::from_toml_str)?;
+    let migrates_from =
+        optional_section(&root, "migrates_from", MigratesFromSection::from_toml_str)?;
+    let halt_protocol_compatibility = optional_section(
+        &root,
+        "halt_protocol_compatibility",
+        HaltProtocolCompatibilitySection::from_toml_str,
+    )?;
+    let on_crash = optional_section(&root, "on_crash", OnCrashSection::from_toml_str)?;
+    let on_revocation =
+        optional_section(&root, "on_revocation", OnRevocationSection::from_toml_str)?;
+    let supervision = optional_section(&root, "supervision", SupervisionSection::from_toml_str)?;
     // The component's manifest has now passed every structural gate. The
     // refusal is feature-selected because a published binary's engine closure
     // is an export-control property, not runtime configuration.
@@ -595,8 +683,34 @@ pub fn gate_manifest(
         scheduling,
         lifecycle,
         budget,
+        hot_swap,
+        migrates_from,
+        halt_protocol_compatibility,
+        on_crash,
+        on_revocation,
+        supervision,
         manifest_toml: manifest_toml.to_owned(),
     })
+}
+
+/// An optional `[name]` section, serialized the way `gate_manifest` serializes
+/// every section and parsed by its manifest type. Absent ⇒ `None`; present and
+/// malformed ⇒ the gate-7 refusal.
+fn optional_section<T, E: std::fmt::Display>(
+    root: &toml::Value,
+    name: &'static str,
+    parse: fn(&str) -> Result<T, E>,
+) -> Result<Option<T>, AdmissionRefusal> {
+    root.get(name)
+        .map(|value| {
+            let text = toml::to_string(value).map_err(|error| error.to_string())?;
+            parse(&text).map_err(|error| error.to_string())
+        })
+        .transpose()
+        .map_err(|detail| AdmissionRefusal::SectionParse {
+            section: name,
+            detail,
+        })
 }
 
 /// `[capabilities.required]`, or the empty set. Absent capabilities are a
@@ -699,6 +813,15 @@ pub async fn load_admit_start(
     on_loaded: &mut (dyn FnMut(u32) + Send),
 ) -> Result<Admitted, AdmissionRefusal> {
     let spirit_id = gated.spirit_id.clone();
+    let archive_root = maos_audit::default_archive_dir();
+
+    // Story 19-5 (D-19-5-05 A) — FR11, BEFORE a pid is allocated: a
+    // cross-major successor of an archived predecessor must declare a
+    // migrator for it.
+    if let Err(refusal) = refuse_without_migrator(&archive_root, gated) {
+        emit_structural_rejection(deps.transparency_log, &gated.manifest_toml, &refusal);
+        return Err(refusal);
+    }
 
     // Gate 8 — model provenance, BEFORE a pid is allocated. Refusing after
     // the load is what the topology arm did, and it meant a provenance-refused
@@ -783,6 +906,9 @@ pub async fn load_admit_start(
         &format!("{:?}", spec.tier),
         "admission granted",
     );
+    // Story 19-5 (D-19-5-03 A) — only a GRANTED admission leaves the FR11
+    // identity record a later cross-major load is checked against.
+    archive_admitted(&archive_root, gated);
 
     deps.pid_by_spirit_id
         .write()
@@ -863,6 +989,123 @@ async fn rollback(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
         );
     }
     remove_pid_by_spirit_id(deps, spirit_id);
+}
+
+/// Story 19-5 (D-19-5-04/05 A) — ADR-020 / FR11: refuse a load whose archived
+/// predecessor is cross-major and undeclared (`EMigratorMissing`).
+///
+/// This is the daemon's admission chokepoint (`load_admit_start`), not
+/// `maos-kernel-core`: `maos run` (standalone and topology) and `maosctl load`
+/// all reach it before a pid is allocated. The predecessor is the most
+/// recently written record of this `spirit_id` at another version (directory
+/// mtime; ties go to the greater version name); cross-major is hot-swap step
+/// 7's rule (`detect_compat` on `[hot_swap] state_schema_version`, default 1);
+/// declared is `run_migrator`'s rule (a `[migrates_from]` pattern matches the
+/// archived version). Fail-closed (CR-1): only "no record" admits — an
+/// unreadable directory or record, or an unparseable one, refuses naming it.
+fn refuse_without_migrator(root: &Path, gated: &GatedManifest) -> Result<(), AdmissionRefusal> {
+    let version = &gated.class_section.version;
+    if !is_path_component(version) {
+        return Err(AdmissionRefusal::ClassSection {
+            detail: format!("version '{version}' cannot key an FR11 archive record"),
+        });
+    }
+    let spirit_dir = root.join(&gated.spirit_id);
+    let unreadable = |path: &Path, error: std::io::Error| AdmissionRefusal::ManifestUnreadable {
+        detail: format!("archived predecessor record {}: {error}", path.display()),
+    };
+    let entries = match std::fs::read_dir(&spirit_dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(unreadable(&spirit_dir, error)),
+    };
+    let mut latest: Option<(std::time::SystemTime, String, PathBuf)> = None;
+    for entry in entries {
+        let entry = entry.map_err(|error| unreadable(&spirit_dir, error))?;
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let meta = entry.metadata().map_err(|error| unreadable(&path, error))?;
+        if !meta.is_dir() || name == *version {
+            continue;
+        }
+        let modified = meta.modified().map_err(|error| unreadable(&path, error))?;
+        if latest
+            .as_ref()
+            .is_none_or(|(at, seen, _)| (modified, &name) > (*at, seen))
+        {
+            latest = Some((modified, name, path));
+        }
+    }
+    let Some((_, archived_version, dir)) = latest else {
+        return Ok(());
+    };
+    let path = dir.join("manifest.toml");
+    let text = std::fs::read_to_string(&path).map_err(|error| unreadable(&path, error))?;
+    let unparseable = |detail: String| AdmissionRefusal::ManifestParse {
+        detail: format!("archived predecessor record {}: {detail}", path.display()),
+    };
+    let archived: toml::Value =
+        toml::from_str(&text).map_err(|error| unparseable(error.to_string()))?;
+    class_identity(&archived).map_err(|refusal| unparseable(refusal.to_string()))?;
+    let predecessor =
+        optional_section(&archived, "hot_swap", HotSwapManifestSection::from_toml_str)
+            .map_err(|refusal| unparseable(refusal.to_string()))?
+            .map_or(1, |section| section.state_schema_version);
+    let successor = gated
+        .hot_swap
+        .as_ref()
+        .map_or(1, |section| section.state_schema_version);
+    let cross_major = matches!(
+        maos_kernel_core::hot_swap::state_codec::detect_compat(predecessor, successor),
+        maos_kernel_core::hot_swap::SchemaCompat::CrossMajor
+    );
+    let declared = gated.migrates_from.as_ref().is_some_and(|section| {
+        section.versions.iter().any(|pattern| {
+            maos_kernel_core::hot_swap::matches_version_pattern(pattern, &archived_version)
+        })
+    });
+    if cross_major && !declared {
+        return Err(AdmissionRefusal::MigratorMissing {
+            spirit_id: gated.spirit_id.clone(),
+            archived_version,
+            successor_version: version.clone(),
+        });
+    }
+    Ok(())
+}
+
+/// Story 19-5 (D-19-5-03 A) — the FR11 record of an admitted (or upgraded-to)
+/// version: `<root>/<spirit_id>/<version>/manifest.toml` = the admitted text,
+/// `snapshot.cbor` empty. An IDENTITY record, not a state archive — state lives
+/// in the Spirit's own stores. Write-if-absent, so a re-admission never
+/// rewrites it; a failed write warns and never un-admits the Spirit.
+pub fn archive_admitted(root: &Path, gated: &GatedManifest) {
+    archive_manifest(root, &gated.class_section, &gated.manifest_toml);
+}
+
+/// Write an accepted identity/text without the stricter full admission gate.
+pub fn archive_manifest(root: &Path, class: &ClassSection, text: &str) {
+    let version = &class.version;
+    let archive = maos_kernel_core::hot_swap::SpiritArchive::new(root.to_path_buf());
+    let dir = archive.archive_dir(&class.name, version);
+    if !is_path_component(version) || dir.join("manifest.toml").exists() {
+        return;
+    }
+    if let Err(error) = archive.write(&class.name, version, text, &[]) {
+        eprintln!(
+            "maos: WARNING — FR11 archive record {}: {error}",
+            dir.display()
+        );
+    }
+}
+
+/// Whether a manifest version can name one archive directory: no separator,
+/// no `.`/`..`, so a record can never be written outside its Spirit's root.
+fn is_path_component(text: &str) -> bool {
+    !matches!(text, "" | "." | "..")
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+' | b'_'))
 }
 
 /// Remove the door's lookup only; panic teardown retains scheduler ownership.

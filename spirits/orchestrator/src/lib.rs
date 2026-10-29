@@ -52,14 +52,16 @@ use maos_domain::frame::{
     ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, PriorDistillateRef,
     TaskAssignPayload,
 };
+use maos_domain::halt::HaltReceipt;
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass};
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::orchestrator::OrchestratorInstruction;
 use maos_domain::ports::context_budget::{ContextBudgetPort, ContextReportError, ContextStatus};
+use maos_domain::ports::epistemic_scalar::ScalarPortError;
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
-use maos_domain::ports::InferencePort;
+use maos_domain::ports::{EpistemicScalarPort, InferencePort};
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
@@ -129,6 +131,9 @@ pub enum OrchestratorInferenceError {
     Context(ContextReportError),
     /// The completion is not a `dispatch_ambiguity` judgement.
     Completion(String),
+    /// Story 19-4 (D-19-4-01 A) — the root's scalar port refused the judged
+    /// `dispatch_ambiguity` write (the kernel decided nothing).
+    Scalar(ScalarPortError),
 }
 
 impl std::fmt::Display for OrchestratorInferenceError {
@@ -146,6 +151,9 @@ impl std::fmt::Display for OrchestratorInferenceError {
                 "orchestrator inference: completion is not a {SCALAR_TAG_DISPATCH_AMBIGUITY} \
                  judgement: {reason}"
             ),
+            Self::Scalar(error) => {
+                write!(f, "orchestrator inference: scalar write refused: {error}")
+            }
         }
     }
 }
@@ -155,6 +163,7 @@ impl std::error::Error for OrchestratorInferenceError {
         match self {
             Self::Inference(error) => Some(error),
             Self::Context(error) => Some(error),
+            Self::Scalar(error) => Some(error),
             _ => None,
         }
     }
@@ -314,6 +323,9 @@ pub struct Orchestrator {
     context: Option<Arc<dyn ContextBudgetPort>>,
     /// The status of the most recent context report.
     last_context: Arc<Mutex<Option<ContextStatus>>>,
+    /// Story 19-4 (D-19-4-01 A) — the root's epistemic-scalar write port: the
+    /// judged `dispatch_ambiguity` goes through it and the kernel owns the halt.
+    scalar: Option<Arc<dyn EpistemicScalarPort>>,
 }
 
 impl std::fmt::Debug for Orchestrator {
@@ -323,6 +335,7 @@ impl std::fmt::Debug for Orchestrator {
             .field("state", &self.state)
             .field("inference_bound", &self.inference.is_some())
             .field("context_bound", &self.context.is_some())
+            .field("scalar_bound", &self.scalar.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -354,6 +367,7 @@ impl Default for Orchestrator {
             inference: None,
             context: None,
             last_context: Arc::new(Mutex::new(None)),
+            scalar: None,
         }
     }
 }
@@ -389,6 +403,12 @@ impl Orchestrator {
     /// Story 18-5 shape — the root's pid- and window-bound context reporter.
     pub fn with_context_port(mut self, port: Arc<dyn ContextBudgetPort>) -> Self {
         self.context = Some(port);
+        self
+    }
+
+    /// Story 19-4 (D-19-4-01 A) — the root's epistemic-scalar write port.
+    pub fn with_scalar_port(mut self, port: Arc<dyn EpistemicScalarPort>) -> Self {
+        self.scalar = Some(port);
         self
     }
 
@@ -457,6 +477,26 @@ impl Orchestrator {
                 binding.provider_id, section.ordinal
             ),
         ))
+    }
+
+    /// Story 19-4 (AC2.1, D-19-4-01 A) — [`Self::judge_ambiguity`], then the
+    /// judged scalar through the scalar port: the kernel's `[epistemic_policy]`
+    /// decides whether it halts (`Some` receipt). No port ⇒ `NotWired`, before
+    /// any completion is spent. The pid argument is the host's to bind (the
+    /// adapter ignores a Spirit-supplied pid, D-16-3-N), so `0` is passed.
+    pub fn assess_ambiguity(
+        &self,
+        section: &EpicSection,
+    ) -> Result<(f64, Option<HaltReceipt>), OrchestratorInferenceError> {
+        let port = self
+            .scalar
+            .as_ref()
+            .ok_or(OrchestratorInferenceError::NotWired)?;
+        let (tag, value, derived_from) = self.judge_ambiguity(section)?;
+        let receipt = port
+            .write_scalar(0, &self.orchestrator_id, tag, value, &derived_from)
+            .map_err(OrchestratorInferenceError::Scalar)?;
+        Ok((value, receipt))
     }
 
     // ── FR20 safe-point gate (AC2) ───────────────────────────────────────────

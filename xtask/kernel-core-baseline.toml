@@ -502,7 +502,12 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26463
+src_lines = 26409
+# HISTORY: 19-5 review/implementation, 2026-10-29, FLAG-Winston D-19-5-01 A / 07 B / 09 A:
+# exact formatted 26463 -> 26409 (-54 physical), tokei20674 -> 20618 (-56), 95 files unchanged;
+# lower re-pin inside <=26483/20686. Driver: remove kernel cold swap, extract check_abi_triple,
+# default upgrade-target scheduling/lifecycle; measured via check-kernel-baseline / --emit-pin
+# and kloc-check --json after cargo fmt --all. Forecast -41/-43 superseded by measured values.
 # HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass, FR51 FLAG-Winston kernel grant
 # D-19-2-20 B (cap +93/+58), 2026-10-28: exact formatted 26389 -> 26463 (+74), tokei20628 -> 20674
 # (+46), 95 files unchanged; FR51 pause fence/post-call re-check/Worker freeze hook in only
@@ -887,7 +892,7 @@ src_lines = 26463
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "adba6dc9b1afa335c1d3088358bae1a0b259f165d05a4bbf4196a267807345d9"
+set_hash = "66dc2e2464dd42dedc57ced2a364d201dedbb1e74b4c9477990f58d1a9e4e524"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -926,7 +931,7 @@ set_hash = "adba6dc9b1afa335c1d3088358bae1a0b259f165d05a4bbf4196a267807345d9"
 "lifecycle/cli_wrapper/mod.rs" = "048746e1d08c93a64aba4745a532883a96899526bf825ff7f67eb3d2ee2270d5"
 "lifecycle/cli_wrapper/runtime.rs" = "3a7c5986c4b7578b7d600be694eb097bc6eebafc479704e4ca690b4c44b5c59c"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
-"lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
+"lifecycle/upgrade.rs" = "9c315e76975a2b92b2305afad058b895c184bd641fb78d7621691104b08862f9"
 "mcp/mod.rs" = "12604548a8daa78a2786b820733f4639f06759f893856745027c8083c8a42bfd"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
 "memory/mod.rs" = "8599e7bc36380446e124e03f922d415ff27eef8614c857f9fc1af681a598ca1b"
@@ -960,7 +965,7 @@ set_hash = "adba6dc9b1afa335c1d3088358bae1a0b259f165d05a4bbf4196a267807345d9"
 "security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"
 "security/drift.rs" = "875b2c652bc10ca1aa2f4dc1f4b6bd410e5c91ef37750b98fceb6058fb926328"
 "security/manifest.rs" = "d2e02fe45059446d55437e9d9e03893c96945741ec7d9ca4b13882d2bc5a4e85"
-"security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
+"security/mod.rs" = "8143ffb5d1ed5366fdaa545ee201cc6be5fdf1e3fde3cee4ffc64003d7720eed"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
 "security/sandbox/linux.rs" = "54d0125650e886fe6dc3aee42cbc8575c8c9ab36d5f8604ed486438e01ce1096"

@@ -42,6 +42,10 @@ pub struct UpgradeHarness {
     pub orchestrator: Arc<UpgradeOrchestrator>,
     pub journal: Arc<JournalAdapter>,
     pub transparency_log: Arc<TransparencyLogAdapter>,
+    /// Story 19-5 (AC4.2) — the registry the scheduler and hot swap share,
+    /// and its policy table, so a witness can mint at a pid and read back.
+    pub capability: Arc<CapabilityRegistryAdapter>,
+    pub policy: Arc<PolicyTable>,
     _tmp: tempfile::TempDir,
 }
 
@@ -51,11 +55,12 @@ impl UpgradeHarness {
         let tmp = tempfile::TempDir::new().expect("upgrade harness tempdir");
         let transparency_log = Arc::new(TransparencyLogAdapter::open_in_memory(0x5A54));
         let telemetry = Arc::new(IacRtMetrics::new());
+        let policy = Arc::new(PolicyTable::new());
         let capability = Arc::new(CapabilityRegistryAdapter::new(
             Arc::new(RingCryptoProvider),
             Ed25519SigningKey::new([0u8; 32]),
             0x5A54,
-            Arc::new(PolicyTable::new()),
+            Arc::clone(&policy),
             cap_audit::channel().0,
             CapQuotaTracker::new(),
             Arc::new(WorkingMemoryStore::new()),
@@ -104,7 +109,7 @@ impl UpgradeHarness {
             Arc::clone(&journal),
             Arc::clone(&transparency_log),
             halt_registry,
-            capability,
+            Arc::clone(&capability),
             iac,
             dispatcher,
             Arc::clone(&telemetry),
@@ -123,6 +128,8 @@ impl UpgradeHarness {
             orchestrator,
             journal,
             transparency_log,
+            capability,
+            policy,
             _tmp: tmp,
         }
     }

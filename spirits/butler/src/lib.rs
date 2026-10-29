@@ -704,6 +704,21 @@ pub struct OpenHalt {
     pub source_log_ref: String,
 }
 
+/// Story 19-4 (D-19-4-07 A) — a halt the director resolved inside the
+/// window: its `epistemic.halt` frame joined to the `halt.resolve` approval
+/// decision (`reasoning` = `halt=<id>: …`) that answered it. FR17(b) lists
+/// only OPEN halts; a resolved one is reported here, never there.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ResolvedHalt {
+    pub intent: String,
+    pub halt_id: String,
+    /// The resolution kind label: `provided_context`, `accepted_halt` or
+    /// `authorized_override`.
+    pub resolution: String,
+    /// 32-char hex of the halt's Transparency-Log frame id (the cite).
+    pub source_log_ref: String,
+}
+
 /// A flagged anomaly that cleared the confidence floor.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AnomalyItem {
@@ -724,6 +739,8 @@ pub struct MorningDigest {
     pub completed: Vec<CompletedTask>,
     /// (b) open halts requiring resolution.
     pub open_halts: Vec<OpenHalt>,
+    /// Story 19-4 (D-19-4-07 A) — halts the window also resolved.
+    pub resolved_halts: Vec<ResolvedHalt>,
     /// (c) flagged anomalies with confidence ≥ the floor.
     pub anomalies: Vec<AnomalyItem>,
     /// (d) trust bar reflecting yesterday's predicate-fire rate (1.0 = full trust).
@@ -737,6 +754,9 @@ pub const ANOMALY_CONFIDENCE_FLOOR: f32 = 0.6;
 const FRAME_KIND_TASK_COMPLETE: &str = "task.complete";
 const FRAME_KIND_EPISTEMIC_HALT: &str = "epistemic.halt";
 const FRAME_KIND_TELEMETRY_EVENT: &str = "telemetry.event";
+/// Story 19-4 (D-19-4-07 A) — the approval-decision capability a halt
+/// resolution is journaled under (`journal_halt_resolution`).
+const CAPABILITY_HALT_RESOLVE: &str = "halt.resolve";
 
 /// Nanoseconds in a day (the digest's day is the [`Clock`]'s local day).
 pub const NANOS_PER_DAY: u64 = maos_spirit_sdk::clock::NANOS_PER_DAY;
@@ -1757,8 +1777,30 @@ impl Butler {
                 && matches!(&e.payload, ComposedPayload::Frame { frame_kind, .. } if frame_kind == "epistemic.halt")
         });
 
+        // Story 19-4 (D-19-4-07 A) — the window's halt resolutions: each
+        // `halt.resolve` approval decision names its halt in `reasoning`
+        // (`halt=<id>: …`, `journal_halt_resolution`); its kind label is the
+        // row's intent.
+        let resolutions: std::collections::HashMap<&str, &str> = composed
+            .iter()
+            .filter_map(|e| match &e.payload {
+                ComposedPayload::Approval {
+                    capability,
+                    intent,
+                    decision: true,
+                    reasoning: Some(reasoning),
+                    ..
+                } if capability == CAPABILITY_HALT_RESOLVE => reasoning
+                    .strip_prefix("halt=")?
+                    .split_once(": ")
+                    .map(|(halt_id, _)| (halt_id, intent.as_str())),
+                _ => None,
+            })
+            .collect();
+
         let mut completed = Vec::new();
         let mut open_halts = Vec::new();
+        let mut resolved_halts = Vec::new();
         for e in entries {
             // Validate the frame id early — a malformed hex here indicates
             // corruption in the audit trail and must not propagate to the
@@ -1777,10 +1819,22 @@ impl Butler {
                     outcome: outcome_tag(&e.intent),
                     source_log_ref: e.frame_id_hex.clone(),
                 }),
-                FRAME_KIND_EPISTEMIC_HALT => open_halts.push(OpenHalt {
-                    intent: e.intent.clone(),
-                    source_log_ref: e.frame_id_hex.clone(),
-                }),
+                FRAME_KIND_EPISTEMIC_HALT => {
+                    let payload = serde_json::from_str::<serde_json::Value>(&e.payload).ok();
+                    let halt_id = payload.as_ref().and_then(|p| p.get("halt_id")?.as_str());
+                    match halt_id.and_then(|id| Some((id, *resolutions.get(id)?))) {
+                        Some((halt_id, resolution)) => resolved_halts.push(ResolvedHalt {
+                            intent: e.intent.clone(),
+                            halt_id: halt_id.to_owned(),
+                            resolution: resolution.to_owned(),
+                            source_log_ref: e.frame_id_hex.clone(),
+                        }),
+                        None => open_halts.push(OpenHalt {
+                            intent: e.intent.clone(),
+                            source_log_ref: e.frame_id_hex.clone(),
+                        }),
+                    }
+                }
                 _ => {}
             }
         }
@@ -1788,7 +1842,7 @@ impl Butler {
         // a divergence would mean Butler is narrating from a different window.
         // This is a regular assertion (not debug-only) because a mismatch
         // indicates a serious consistency bug that must not go to production.
-        if composed_has_halt != !open_halts.is_empty() {
+        if composed_has_halt != !(open_halts.is_empty() && resolved_halts.is_empty()) {
             return Err(ButlerError::Internal(
                 "composed and query views disagree on halt presence — journal/schema drift?".into(),
             ));
@@ -1806,6 +1860,7 @@ impl Butler {
         Ok(MorningDigest {
             completed,
             open_halts,
+            resolved_halts,
             anomalies,
             trust_bar,
         })
@@ -1867,10 +1922,21 @@ impl Butler {
                     },
                 )
                 .map_err(ButlerError::Audit)?;
-                let stamps = entries.iter().map(|e| e.timestamp_ns);
-                let range = LogRange {
-                    since_ns: stamps.clone().min().unwrap_or(since_ns),
-                    until_ns: stamps.max().unwrap_or(since_ns),
+                // Story 19-4 (D-19-4-07 A) — a non-empty pass's composed view
+                // runs open-ended like the citeable query: a halt's
+                // `halt.resolve` approval follows its halt and may follow the
+                // boot's last frame (an `accepted_halt` stop), and an approval
+                // row is matched only below the range's end (`i64::MAX`:
+                // SQLite's INTEGER bound).
+                let range = match entries.iter().map(|e| e.timestamp_ns).min() {
+                    Some(first) => LogRange {
+                        since_ns: first,
+                        until_ns: i64::MAX as u64,
+                    },
+                    None => LogRange {
+                        since_ns,
+                        until_ns: since_ns,
+                    },
                 };
                 let basis = fire_rate(&entries, local_day(now_ns, utc_offset_secs));
                 (range, entries, basis)
@@ -1896,8 +1962,9 @@ impl Butler {
     }
 
     /// Build the I11 distillation request for a digest. `source_log_ref` is the
-    /// union of every cited completion + open-halt frame id (deduped, order
-    /// preserved). The kernel re-validates this chain at write time.
+    /// union of every cited completion + open-halt + resolved-halt frame id
+    /// (deduped, order preserved). The kernel re-validates this chain at write
+    /// time.
     pub fn digest_to_distillation_request(
         &self,
         digest: &MorningDigest,
@@ -1909,6 +1976,7 @@ impl Butler {
             .iter()
             .map(|c| &c.source_log_ref)
             .chain(digest.open_halts.iter().map(|h| &h.source_log_ref))
+            .chain(digest.resolved_halts.iter().map(|h| &h.source_log_ref))
         {
             let id = decode_frame_id_hex(hex)?;
             if seen.insert(id) {

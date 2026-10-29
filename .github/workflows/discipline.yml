@@ -2776,6 +2776,102 @@ jobs:
             ${{ runner.temp }}/line4-twin.err
           if-no-files-found: warn
 
+  # Story 19-4 AC1.3 (D-19-4-10 A, D19-3 A) — the Epic-19 hermetic exit job.
+  # OWN-BUILD (not a 20-15 consumer): the exit line is `cargo run -p xtask --
+  # demo-j1`, which builds the workspace itself, so `CARGO=/bin/false` could not
+  # run it verbatim. The exit block is unchanged; the job provisions the T3
+  # substrate first (D19-3 A — every Worker runs under real T3) and sets
+  # MAOS_REPLAY_STRICT=1, which reaches the daemon child because `demo-j1` spawns
+  # it without `env_clear`. Line 1 must exit 0 with every EXECUTED beat ok, the
+  # four 19-4 beats executed, and `tier2-live-agent-signed` the ONLY ABSENT beat
+  # (`two-host-signed-run` renders INDETERMINATE, never ABSENT). Its proven-red
+  # twin (AC2.6) runs the same line over the clear-judgement twin cassette
+  # (section 2 judged 0.31 ≤ 0.5): three frames, no halt, and `demo-j1` must exit
+  # non-zero naming `ambiguity-halt-within-2-frames`. The AC5 resume vector
+  # (`epic_halt_resume_19_4`: halt → door resolve → resumed section) runs last.
+  epic-19-exit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      MAOS_REPLAY_STRICT: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Epic-19 exit line 1 — demo-j1 replays the founder loop (Story 19-4)
+        shell: bash
+        run: |
+          set +e
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_LIVE_AGENT
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j1/founder-loop.json cargo run -p xtask -- demo-j1 > "$RUNNER_TEMP/line1.out" 2> "$RUNNER_TEMP/line1.err"
+          rc=$?
+          cat "$RUNNER_TEMP/line1.out" "$RUNNER_TEMP/line1.err"
+          for beat in epic-decomposed-n-frames ambiguity-halt-within-2-frames digest-cites-source-refs halt-resume-referential-identity; do
+            if ! grep -qE "^  ok +${beat} +PROVEN_BLOCKING" "$RUNNER_TEMP/line1.out"; then
+              rc=1
+              echo "::error title=Epic-19 exit line 1::beat ${beat} did not render ok"
+            fi
+          done
+          if grep -qE '^  FAIL ' "$RUNNER_TEMP/line1.out"; then
+            rc=1
+            echo "::error title=Epic-19 exit line 1::an executed beat rendered FAIL"
+          fi
+          absent="$(grep -E '^  -- +[a-z0-9-]+ +ABSENT ' "$RUNNER_TEMP/line1.out" | awk '{print $2}' | sort -u | paste -sd' ' -)"
+          if [ "$absent" != "tier2-live-agent-signed" ]; then
+            rc=1
+            echo "::error title=Epic-19 exit line 1::ABSENT set is '${absent}', expected exactly tier2-live-agent-signed"
+          fi
+          if ! grep -qE '^  (--|ok) +two-host-signed-run +(INDETERMINATE|PROVEN_BLOCKING|PROVEN_LIVE_SIGNED) ' "$RUNNER_TEMP/line1.out"; then
+            rc=1
+            echo "::error title=Epic-19 exit line 1::two-host-signed-run must render INDETERMINATE or PROVEN, never ABSENT"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-19 exit line 1::rc=${rc} $(tail -n 3 "$RUNNER_TEMP/line1.err" | paste -sd' ' -)"
+          else
+            echo "::notice title=Epic-19 exit line 1::rc=0, every executed beat ok, ABSENT = {tier2-live-agent-signed}"
+          fi
+          exit "$rc"
+      - name: Epic-19 exit line 1 twin — a clear judgement must red the ambiguity beat (Story 19-4 AC2.6)
+        shell: bash
+        run: |
+          set +e
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_LIVE_AGENT
+          MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j1/founder-loop.clear-twin.json cargo run -p xtask -- demo-j1 > "$RUNNER_TEMP/twin.out" 2> "$RUNNER_TEMP/twin.err"
+          rc=$?
+          cat "$RUNNER_TEMP/twin.out" "$RUNNER_TEMP/twin.err"
+          if [ "$rc" -eq 0 ]; then
+            echo "::error title=Epic-19 exit line 1 twin::the clear-judgement twin exited 0 — the ambiguity halt is not a control"
+            exit 1
+          fi
+          if ! grep -q 'executed beat(s) did not hold: .*ambiguity-halt-within-2-frames' "$RUNNER_TEMP/twin.out" "$RUNNER_TEMP/twin.err"; then
+            echo "::error title=Epic-19 exit line 1 twin::rc=${rc} but the failure does not name ambiguity-halt-within-2-frames: $(tail -n 3 "$RUNNER_TEMP/twin.err" | paste -sd' ' -)"
+            exit 1
+          fi
+          if ! grep -qE '^  ok +epic-decomposed-n-frames ' "$RUNNER_TEMP/twin.out"; then
+            echo "::error title=Epic-19 exit line 1 twin::the twin did not dispatch all three sections — it red for a reason other than the missing halt"
+            exit 1
+          fi
+          echo "::notice title=Epic-19 exit line 1 twin::rc=${rc}, three frames, ambiguity-halt-within-2-frames FAIL"
+      - name: Build maosctl and the worker CLI fixture (the AC5 vector resolves over the door)
+        run: cargo build -p maos-cli --bin maosctl && cargo run -p xtask -- build-test-fixtures --only worker-cli-fixture
+      - name: Run the halt → door resolve → resumed-section vector (Story 19-4 AC5)
+        run: cargo test --color never -p maos-bin --test epic_halt_resume_19_4 -- --test-threads=1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-19-exit
+          path: |
+            ${{ runner.temp }}/line1.out
+            ${{ runner.temp }}/line1.err
+            ${{ runner.temp }}/twin.out
+            ${{ runner.temp }}/twin.err
+          if-no-files-found: warn
+
   # Story 5.5b — multi-provider drift-check tool tests
   multi-provider-drift-tests:
     runs-on: ubuntu-latest
@@ -3378,12 +3474,19 @@ jobs:
       # thing connecting the linter to the judge. Delete it and the gate still finds
       # the right words in `consent_refusal_1b.rs` and goes green while the test
       # never runs. The gate's `completion-vectors-enrolled` leg DERIVES the required
-      # set from `crates/maos-bin/tests/*_{1a,1b,2a,2b,19_1}.rs`, so a new J1 test file that
-      # is not named here reds the gate by construction, not by remembering.
-      - name: Run the frame-borne delegation + consent-refusal legs (AC2.4-2.5, AC3.1-3.4; 1b AC1)
+      # set from every `crates/*/tests/*_{1a,1b,2a,2b,2e,19_1,19_3}.rs` and checks
+      # `-p <crate> --test <stem>` in ONE command, so a new J1 test file that is not
+      # named here — under its own crate — reds the gate by construction, not by
+      # remembering. Story 19-4 D-19-4-11 A widened the walk past `crates/maos-bin`:
+      # the two J1-lane files outside it (`maos-iac`'s duplicate-discrimination
+      # negative, `maos-cli`'s cohort-sign regressions) are enrolled below. The `_2c`
+      # lane is `check-j1-two-host-signed-run` leg 10's, not this job's.
+      - name: Run the frame-borne delegation + consent-refusal legs (AC2.4-2.5, AC3.1-3.4; 1b AC1; 19-4 AC6.2)
         run: |
           cargo test -p maos-iac --test mailbox_a2a_router_installer_1a
           cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a --test consent_refusal_1b -- --test-threads=1
+          cargo test -p maos-iac --test transparency_duplicate_discrimination_2b
+          cargo test -p maos-cli --test cohort_sign_2e
       # j1-crosshost-2a AC1.8 — the completion-oracle vectors and the worker-manifest
       # reader. Enrolled HERE, on a job that is already BindingClass::Blocking, in
       # `gate-registry.toml`, and a `needs` of the aggregate — rather than in a sixth
@@ -6363,6 +6466,7 @@ jobs:
       - t3-smoke-busybox
       - epic-17-exit
       - epic-18-exit
+      - epic-19-exit
       - multi-provider-drift-tests
       - retract-corpus-tests
       - check-serde-error-handling

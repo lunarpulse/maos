@@ -160,28 +160,20 @@ fn a_missing_delegation_event_fails_the_frame_borne_beat() {
 }
 
 /// A delegation routed to the wrong host must not pass just because the event
-/// exists.
+/// exists — even when it is ONE of the three sections and the other two held.
 #[test]
 fn a_delegation_to_the_wrong_host_fails() {
-    let observation = obs(
-        vec![
-            serde_json::json!({
-                "event": "delegation_routed",
-                "to_host": "somewhere-else",
-                "recipient": DELEGATION_RECIPIENT,
-                "intent": "development-task:write-workspace",
-                "goal": "do the thing",
-            }),
-            serde_json::json!({"event": "topology_worker_admit", "frame_borne": true}),
-        ],
-        "",
-    );
-    let beats = evaluate_beats(&observation);
-    let beat = beats
+    let mut events = epic_stream();
+    let second = events
         .iter()
-        .find(|b| b.name == "delegation-frame-crosses-loopback")
-        .expect("beat present");
-    assert!(beat.failed());
+        .enumerate()
+        .filter(|(_, e)| e["event"] == "delegation_routed")
+        .map(|(at, _)| at)
+        .nth(1)
+        .expect("three routed frames");
+    events[second]["to_host"] = serde_json::json!("somewhere-else");
+    let beat = beat_named(&obs(events, ""), "delegation-frame-crosses-loopback");
+    assert!(beat.failed(), "{}", beat.detail);
 }
 
 /// A raw exit code is never completion — only the adapter's oracle is.
@@ -195,135 +187,512 @@ fn a_delegation_to_the_wrong_host_fails() {
 /// and this test proves BOTH directions of that.
 #[test]
 fn completion_comes_from_the_oracle_not_from_a_tl_ref() {
-    // (a) The oracle said completed. A missing evidence pointer does not overturn
-    //     the verdict — and the ref is deliberately still emitted on failures, so
-    //     absence here means the worker printed nothing, not that it failed.
-    let observation = obs(
-        vec![serde_json::json!({
+    let completion = |completed: bool, tl_ref: serde_json::Value| {
+        serde_json::json!({
             "event": "worker_completion",
             "worker_cli": "worker-cli-fixture",
-            "completion": "completed",
-            "completed": true,
-            "last_stdout_tl_ref": serde_json::Value::Null,
-        })],
+            "completion": if completed { "completed" } else { "not_completed:no_effect_evidence" },
+            "completed": completed,
+            "last_stdout_tl_ref": tl_ref,
+        })
+    };
+    // (a) The oracle said completed for every section. A missing evidence
+    //     pointer does not overturn the verdict — and the ref is deliberately
+    //     still emitted on failures, so absence here means the worker printed
+    //     nothing, not that it failed.
+    let observation = obs(
+        (0..EPIC_SECTIONS)
+            .map(|_| completion(true, serde_json::Value::Null))
+            .collect(),
         "",
     );
-    let beats = evaluate_beats(&observation);
-    let beat = beats
-        .iter()
-        .find(|b| b.name == "worker-completed-by-adapter-oracle")
-        .expect("beat present");
+    let beat = beat_named(&observation, "worker-completed-by-adapter-oracle");
     assert!(
         !beat.failed(),
         "the oracle's verdict is the beat; the TL ref is an evidence pointer"
     );
 
-    // (b) The load-bearing direction: a NON-completion with a perfectly good TL
-    //     ref must fail. Under the old conjunction this case was reachable only by
-    //     accident; it is the whole point now.
+    // (b) The load-bearing direction: ONE section's NON-completion with a
+    //     perfectly good TL ref must fail the beat, even behind two that held.
     let observation = obs(
-        vec![serde_json::json!({
-            "event": "worker_completion",
-            "worker_cli": "codex",
-            "completion": "not_completed:no_effect_evidence",
-            "completed": false,
-            "last_stdout_tl_ref": "01a003bfb38d20e97fcb08c16274374c",
-        })],
+        vec![
+            completion(true, serde_json::json!("01a003bfb38d20e97fcb08c16274374c")),
+            completion(false, serde_json::json!("01a003bfb38d20e97fcb08c16274374d")),
+            completion(true, serde_json::json!("01a003bfb38d20e97fcb08c16274374e")),
+        ],
         "",
     );
-    let beats = evaluate_beats(&observation);
-    let beat = beats
-        .iter()
-        .find(|b| b.name == "worker-completed-by-adapter-oracle")
-        .expect("beat present");
+    let beat = beat_named(&observation, "worker-completed-by-adapter-oracle");
     assert!(
         beat.failed(),
         "a citable TL ref must never launder a non-completion into a pass"
     );
 }
 
-/// The verbatim post-1a stream from the 2026-08-14 isolated run: every executed
-/// beat must hold against the real event shapes, not against invented ones.
+// ── Story 19-4 — the recorded epic scene (D-19-4-09 A) ──────────────────────
+
+/// The judged halt's kernel id and its Transparency-Log frame id.
+const HALT_ID: &str = "01J19D4AMBIGU0USSECT10N200";
+const HALT_FRAME: &str = "03190000000000000000000000000002";
+/// The three Workers' TaskComplete frame ids (the digest's cites).
+const COMPLETION_REFS: [&str; 3] = [
+    "01190000000000000000000000000001",
+    "01190000000000000000000000000002",
+    "01190000000000000000000000000003",
+];
+
+/// Section `k`'s goal as the root routes it: the section text verbatim, the
+/// ambiguous one with the operator's answer appended.
+fn section_goal(k: usize) -> String {
+    let text = format!("### Story {k}: section {k}\n\nDo part {k}.");
+    if k as u64 == AMBIGUOUS_SECTION {
+        format!("{text}\n\nOperator clarification (halt resolved): {CLARIFICATION}")
+    } else {
+        text
+    }
+}
+
+fn judged(k: usize) -> serde_json::Value {
+    let ambiguous = k as u64 == AMBIGUOUS_SECTION;
+    serde_json::json!({
+        "event": "dispatch_judged",
+        "section": k,
+        "tag": AMBIGUITY_TAG,
+        "value": if ambiguous { 0.86 } else { 0.12 },
+        "halt_id": if ambiguous { serde_json::json!(HALT_ID) } else { serde_json::Value::Null },
+        "halt_frame_id": if ambiguous { serde_json::json!(HALT_FRAME) } else { serde_json::Value::Null },
+    })
+}
+
+fn dispatch_halted() -> serde_json::Value {
+    serde_json::json!({
+        "event": "dispatch_halted",
+        "halt_ids": [HALT_ID],
+        "dispatched_sections": 1,
+        "undispatched_sections": [2, 3],
+        "orchestrator_unloaded": false,
+    })
+}
+
+fn dispatch_resumed() -> serde_json::Value {
+    serde_json::json!({
+        "event": "dispatch_resumed",
+        "section": AMBIGUOUS_SECTION,
+        "halt_ids": [HALT_ID],
+        "provided_context": true,
+    })
+}
+
+/// One section's frame, Worker run and completion, in the root's order.
+fn section_events(k: usize) -> Vec<serde_json::Value> {
+    let child_pid = 1_308_068 + k as u64;
+    vec![
+        serde_json::json!({
+            "event": "delegation_routed",
+            "to_host": DELEGATION_HOST,
+            "recipient": DELEGATION_RECIPIENT,
+            "intent": "development-task:write-workspace",
+            "goal": section_goal(k),
+        }),
+        serde_json::json!({"event": "topology_worker_admit", "frame_borne": true}),
+        serde_json::json!({
+            "event": "host_grant_disposition",
+            "granted_tier": "SandboxTier(3)",
+            "egress": "enforced",
+        }),
+        serde_json::json!({
+            "event": "cli_wrapper_loaded",
+            "granted_tier": "SandboxTier(3)",
+            "child_pid": child_pid,
+        }),
+        serde_json::json!({
+            "event": "worker_completion",
+            "worker_cli": "worker-cli-fixture",
+            "completion": "completed",
+            "completed": true,
+            "last_stdout_tl_ref": COMPLETION_REFS[k - 1],
+        }),
+        serde_json::json!({
+            "event": "cli_wrapper_exit",
+            "child_pid": child_pid,
+            "exit_cause": "Exited { code: 0 }",
+            "is_crash": false,
+        }),
+        serde_json::json!({
+            "event": "delegation_completed",
+            "result": "completed",
+            "orchestrator_frames_drained": 1,
+            "orchestrator_safe_point": true,
+        }),
+    ]
+}
+
+fn morning_digest(
+    completed: &[&str],
+    open_halts: &[&str],
+    resolved_halts: &[&str],
+) -> serde_json::Value {
+    serde_json::json!({
+        "event": "morning_digest",
+        "now_ns": 1_761_000_000_000_000_000u64,
+        "digest": {
+            "completed": completed
+                .iter()
+                .map(|r| serde_json::json!({"intent": "task.complete", "outcome": "succeeded", "source_log_ref": r}))
+                .collect::<Vec<_>>(),
+            "open_halts": open_halts
+                .iter()
+                .map(|r| serde_json::json!({"intent": AMBIGUITY_TAG, "source_log_ref": r}))
+                .collect::<Vec<_>>(),
+            "resolved_halts": resolved_halts
+                .iter()
+                .map(|r| serde_json::json!({
+                    "intent": AMBIGUITY_TAG,
+                    "halt_id": HALT_ID,
+                    "resolution": "provided_context",
+                    "source_log_ref": r,
+                }))
+                .collect::<Vec<_>>(),
+            "anomalies": [],
+            "trust_bar": 1.0,
+        },
+    })
+}
+
+fn idle_and_drain(digest: serde_json::Value) -> Vec<serde_json::Value> {
+    vec![
+        serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
+        serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
+        serde_json::json!({"event": "on_idle_fired", "spirit_id": "reviewer"}),
+        digest,
+        serde_json::json!({"event": "drain", "topology": true}),
+    ]
+}
+
+/// The recorded shape of the whole hermetic epic scene: three class Spirits,
+/// section 1, the section-2 judgement and kernel halt, the door's resolution
+/// releasing section 2 with the answer, section 3, the idle passes, the FR17
+/// digest citing every completion and the RESOLVED halt, the drain.
+fn epic_stream() -> Vec<serde_json::Value> {
+    let mut events = vec![
+        serde_json::json!({"event": "spirit_loaded", "spirit_id": "orchestrator"}),
+        serde_json::json!({"event": "spirit_loaded", "spirit_id": "architect"}),
+        serde_json::json!({"event": "spirit_loaded", "spirit_id": "reviewer"}),
+        judged(1),
+    ];
+    events.extend(section_events(1));
+    events.extend([judged(2), dispatch_halted(), dispatch_resumed()]);
+    events.extend(section_events(2));
+    events.push(judged(3));
+    events.extend(section_events(3));
+    events.extend(idle_and_drain(morning_digest(
+        &COMPLETION_REFS,
+        &[],
+        &[HALT_FRAME],
+    )));
+    events
+}
+
+/// The `maosctl audit query --format ndjson` rows the digest beat joins on.
+fn audit_rows() -> String {
+    COMPLETION_REFS
+        .iter()
+        .map(|r| (*r, "task.complete"))
+        .chain([(HALT_FRAME, "epistemic.halt")])
+        .map(|(frame_id, kind)| {
+            serde_json::json!({"frame_id": frame_id, "kind": kind, "intent": "x"}).to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn replace_event(
+    events: &mut [serde_json::Value],
+    pred: impl Fn(&serde_json::Value) -> bool,
+    with: serde_json::Value,
+) {
+    let at = events
+        .iter()
+        .position(pred)
+        .expect("the event to replace is in the stream");
+    events[at] = with;
+}
+
+fn is_event(name: &'static str) -> impl Fn(&serde_json::Value) -> bool {
+    move |e| e["event"].as_str() == Some(name)
+}
+
+/// AC1.2 — every executed beat holds against the recorded epic stream: the
+/// nine per-section beats (P1–P6) and the three new epic beats, and the digest
+/// beat against its audit rows.
 #[test]
-fn the_full_post_1a_stream_proves_every_executed_beat() {
-    let observation = obs(
-        vec![
-            serde_json::json!({"event": "spirit_loaded", "spirit_id": "orchestrator"}),
-            serde_json::json!({"event": "spirit_loaded", "spirit_id": "architect"}),
-            serde_json::json!({"event": "spirit_loaded", "spirit_id": "reviewer"}),
-            serde_json::json!({
-                "event": "delegation_routed",
-                "to_host": DELEGATION_HOST,
-                "recipient": DELEGATION_RECIPIENT,
-                "intent": "development-task:write-workspace",
-                "goal": "founder-loop: execute the delegated assignment from founder-loop-host",
-            }),
-            serde_json::json!({"event": "topology_worker_admit", "frame_borne": true}),
-            serde_json::json!({
-                "event": "host_grant_disposition",
-                "granted_tier": "SandboxTier(3)",
-                "egress": "enforced",
-            }),
-            serde_json::json!({
-                "event": "cli_wrapper_loaded",
-                "granted_tier": "SandboxTier(3)",
-                "child_pid": 1308069,
-            }),
-            serde_json::json!({
-                "event": "worker_completion",
-                "worker_cli": "worker-cli-fixture",
-                "completion": "completed",
-                "completed": true,
-                "last_stdout_tl_ref": "01a003bfb38d20e97fcb08c16274374c",
-            }),
-            serde_json::json!({
-                "event": "cli_wrapper_exit",
-                "child_pid": 1308069,
-                "stdout_lines": 3,
-                "stderr_lines": 0,
-                "exit_cause": "Exited { code: 0 }",
-                "is_crash": false,
-            }),
-            serde_json::json!({
-                "event": "delegation_completed",
-                "result": "completed",
-                "orchestrator_frames_drained": 1,
-                "orchestrator_safe_point": true,
-            }),
-            serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
-            serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
-            serde_json::json!({"event": "on_idle_fired", "spirit_id": "reviewer"}),
-            serde_json::json!({"event": "drain"}),
-        ],
-        "",
-    );
+fn the_full_epic_stream_proves_every_executed_beat() {
+    let observation = obs(epic_stream(), "");
     let beats = evaluate_beats(&observation);
-    let failed: Vec<&str> = beats
+    let failed: Vec<(&str, &str)> = beats
         .iter()
         .filter(|b| b.failed())
-        .map(|b| b.name)
+        .map(|b| (b.name, b.detail.as_str()))
         .collect();
     assert!(failed.is_empty(), "unexpected failures: {failed:?}");
-    assert_eq!(beats.len(), 9, "all nine executed beats must be evaluated");
+    let names: Vec<&str> = beats.iter().map(|b| b.name).collect();
+    assert_eq!(
+        names,
+        vec![
+            "topology-spirits-loaded",
+            "delegation-frame-crosses-loopback",
+            "worker-admitted-under-host-grant",
+            "worker-completed-by-adapter-oracle",
+            "delegation-closed-at-safe-point",
+            "worker-exited-and-loop-went-idle",
+            "state-home-clean",
+            "lifecycle-stages-in-order",
+            "audit-drain-clean",
+            "epic-decomposed-n-frames",
+            "ambiguity-halt-within-2-frames",
+            "halt-resume-referential-identity",
+        ],
+        "all twelve executed scene beats, in claim-table order"
+    );
+    assert!(beats.iter().all(|b| b.executed));
+    let digest = digest_cites_source_refs(&observation, &audit_rows());
+    assert_eq!(digest.name, DIGEST_BEAT);
+    assert!(!digest.failed(), "{}", digest.detail);
+}
+
+/// AC1.2 — `unlanded_beats()` keeps exactly the two beats only an operator or
+/// two paid hosts can earn; the resume beat is executed now, never declared.
+#[test]
+fn only_the_tier2_and_two_host_beats_stay_unlanded() {
+    let names: Vec<&str> = unlanded_beats().iter().map(|b| b.name).collect();
+    assert_eq!(names, vec![TIER2_BEAT, "two-host-signed-run"]);
+}
+
+/// AC1.2 — a section dispatched out of order (frames 2 and 3 swapped) is not a
+/// decomposition in section order.
+#[test]
+fn sections_dispatched_out_of_order_fail_the_decomposition_beat() {
+    let mut events = epic_stream();
+    let goals: Vec<usize> = events
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e["event"] == "delegation_routed")
+        .map(|(at, _)| at)
+        .collect();
+    let (second, third) = (events[goals[1]].clone(), events[goals[2]].clone());
+    events[goals[1]] = third;
+    events[goals[2]] = second;
+    let beat = beat_named(&obs(events, ""), "epic-decomposed-n-frames");
+    assert!(beat.failed(), "{}", beat.detail);
+}
+
+/// AC2.6 — the proven-red twin, in-tree: the clear-judgement cassette's stream
+/// (section 2 judged 0.31, no halt id, no `dispatch_halted`, no resume) must
+/// FAIL `ambiguity-halt-within-2-frames` — the beat is the kernel's halt, not
+/// the presence of a judgement.
+#[test]
+fn a_clear_judgement_stream_fails_the_ambiguity_halt_beat() {
+    let mut events = epic_stream();
+    events.retain(|e| !matches!(e["event"].as_str(), Some("dispatch_halted" | "dispatch_resumed")));
+    replace_event(
+        &mut events,
+        |e| e["event"] == "dispatch_judged" && e["section"] == 2,
+        serde_json::json!({
+            "event": "dispatch_judged",
+            "section": 2,
+            "tag": AMBIGUITY_TAG,
+            "value": 0.31,
+            "halt_id": null,
+            "halt_frame_id": null,
+        }),
+    );
+    let beat = beat_named(&obs(events, ""), "ambiguity-halt-within-2-frames");
+    assert!(beat.failed(), "a clear judgement raises no halt: {}", beat.detail);
+    assert!(beat.detail.contains("the kernel raised no halt"), "{}", beat.detail);
+}
+
+/// ADR-064 — an unset inference mode judges nothing: no `dispatch_judged` at
+/// all is never read as a halt.
+#[test]
+fn a_stream_without_judgements_fails_the_ambiguity_halt_beat() {
+    let mut events = epic_stream();
+    events.retain(|e| e["event"] != "dispatch_judged");
+    let beat = beat_named(&obs(events, ""), "ambiguity-halt-within-2-frames");
+    assert!(beat.failed());
+    assert!(beat.detail.contains("no dispatch_judged"), "{}", beat.detail);
+}
+
+/// AC1.2 — a halt that lands only after three frames is not "within 2 frames".
+#[test]
+fn a_halt_after_three_frames_fails_the_ambiguity_halt_beat() {
+    let mut events = epic_stream();
+    events.retain(|e| e["event"] != "dispatch_halted");
+    let drain_at = events
+        .iter()
+        .position(is_event("on_idle_fired"))
+        .expect("idle passes");
+    events.insert(drain_at, dispatch_halted());
+    let beat = beat_named(&obs(events, ""), "ambiguity-halt-within-2-frames");
+    assert!(beat.failed(), "{}", beat.detail);
+}
+
+/// AC5.4 — the proven-red twin, over the recorded stream of the plant (the
+/// demo's resolve step removed): the hold expires, the 19-1 stop drains after
+/// ONE frame, the digest lists the halt as OPEN — the halt beat still holds,
+/// but `halt-resume-referential-identity` FAILS.
+#[test]
+fn the_resolve_step_removed_fails_the_resume_beat() {
+    let mut events = vec![
+        serde_json::json!({"event": "spirit_loaded", "spirit_id": "orchestrator"}),
+        serde_json::json!({"event": "spirit_loaded", "spirit_id": "architect"}),
+        serde_json::json!({"event": "spirit_loaded", "spirit_id": "reviewer"}),
+        judged(1),
+    ];
+    events.extend(section_events(1));
+    events.extend([judged(2), dispatch_halted()]);
+    events.extend(idle_and_drain(morning_digest(
+        &COMPLETION_REFS[..1],
+        &[HALT_FRAME],
+        &[],
+    )));
+    let observation = obs(events, "");
+    let halt = beat_named(&observation, "ambiguity-halt-within-2-frames");
+    assert!(!halt.failed(), "the halt itself held: {}", halt.detail);
+    let resume = beat_named(&observation, "halt-resume-referential-identity");
+    assert!(resume.failed(), "no resolution, no resume: {}", resume.detail);
+    assert!(resume.detail.contains("resumed false"), "{}", resume.detail);
+    assert!(
+        beat_named(&observation, "epic-decomposed-n-frames").failed(),
+        "one frame of three is not the decomposed epic"
+    );
+}
+
+/// AC3.2 / AC5.3 — a digest that still lists the resolved halt as OPEN (the
+/// mislabel D-19-4-07 B would have read) fails the resume beat even though the
+/// resume itself happened.
+#[test]
+fn a_resolved_halt_listed_open_fails_the_resume_beat() {
+    let mut events = epic_stream();
+    replace_event(
+        &mut events,
+        is_event("morning_digest"),
+        morning_digest(&COMPLETION_REFS, &[HALT_FRAME], &[]),
+    );
+    let beat = beat_named(&obs(events, ""), "halt-resume-referential-identity");
+    assert!(beat.failed(), "{}", beat.detail);
+}
+
+/// AC5.3 — the digest must cite the EXACT pre-halt frame: a resolved halt with
+/// another frame id is a different halt.
+#[test]
+fn a_resolved_halt_citing_another_frame_fails_the_resume_beat() {
+    let mut events = epic_stream();
+    replace_event(
+        &mut events,
+        is_event("morning_digest"),
+        morning_digest(&COMPLETION_REFS, &[], &["03190000000000000000000000000099"]),
+    );
+    let beat = beat_named(&obs(events, ""), "halt-resume-referential-identity");
+    assert!(beat.failed(), "{}", beat.detail);
+}
+
+/// AC5.1 — a resume whose section-2 goal does not carry the operator's answer
+/// did not resume WITH it.
+#[test]
+fn a_resumed_section_without_the_clarification_fails_the_resume_beat() {
+    let mut events = epic_stream();
+    for event in events.iter_mut() {
+        if event["event"] == "delegation_routed" {
+            let goal = event["goal"].as_str().unwrap_or_default().replace(CLARIFICATION, "");
+            event["goal"] = serde_json::json!(goal);
+        }
+    }
+    let beat = beat_named(&obs(events, ""), "halt-resume-referential-identity");
+    assert!(beat.failed(), "{}", beat.detail);
+}
+
+/// AC3.3 — the proven-red plant: ONE extra completion ref the audit log does
+/// not hold (a hallucinated completion) fails `digest-cites-source-refs` and is
+/// named in the finding.
+#[test]
+fn a_digest_citing_an_extra_completion_fails_the_digest_beat() {
+    let hallucinated = "01190000000000000000000000000004";
+    let mut events = epic_stream();
+    let mut cited = COMPLETION_REFS.to_vec();
+    cited.push(hallucinated);
+    replace_event(
+        &mut events,
+        is_event("morning_digest"),
+        morning_digest(&cited, &[], &[HALT_FRAME]),
+    );
+    let beat = digest_cites_source_refs(&obs(events, ""), &audit_rows());
+    assert!(beat.failed(), "{}", beat.detail);
+    assert!(
+        beat.detail.contains("name no matching audit row of their kind")
+            && beat.detail.contains(&format!("{:?}", short_ref(hallucinated))),
+        "the finding names the hallucinated ref: {}",
+        beat.detail
+    );
+}
+
+/// AC3.3 — a ref of the WRONG kind (a halt ref naming a completion row) is not
+/// a citation of a halt.
+#[test]
+fn a_halt_ref_naming_a_completion_row_fails_the_digest_beat() {
+    let mut events = epic_stream();
+    replace_event(
+        &mut events,
+        is_event("morning_digest"),
+        morning_digest(&COMPLETION_REFS, &[], &[COMPLETION_REFS[0]]),
+    );
+    let beat = digest_cites_source_refs(&obs(events, ""), &audit_rows());
+    assert!(beat.failed(), "{}", beat.detail);
+}
+
+/// AC3.3 — fewer completions than sections, no digest, or two digests are
+/// never "the digest cites the run".
+#[test]
+fn a_missing_short_or_duplicated_digest_fails_the_digest_beat() {
+    let mut short = epic_stream();
+    replace_event(
+        &mut short,
+        is_event("morning_digest"),
+        morning_digest(&COMPLETION_REFS[..2], &[], &[HALT_FRAME]),
+    );
+    let mut missing = epic_stream();
+    missing.retain(|e| e["event"] != "morning_digest");
+    let mut doubled = epic_stream();
+    doubled.push(morning_digest(&COMPLETION_REFS, &[], &[HALT_FRAME]));
+    for (label, events) in [("short", short), ("missing", missing), ("doubled", doubled)] {
+        let beat = digest_cites_source_refs(&obs(events, ""), &audit_rows());
+        assert!(beat.failed(), "{label}: {}", beat.detail);
+    }
 }
 
 /// The claim table is titled "execution order". Before the 2026-08-15 review each
 /// beat independently took the FIRST event with a matching name, so a stream whose
 /// completion preceded its own delegation — or which repeated a stage — could
-/// satisfy every beat and still be printed as an execution-order proof.
+/// satisfy every beat and still be printed as an execution-order proof. Both
+/// plants below go into the otherwise-green epic stream (Story 19-4).
 #[test]
 fn a_completion_before_its_own_delegation_fails_the_order_beat() {
-    let observation = obs(
-        vec![
-            serde_json::json!({"event": "worker_completion", "completed": true}),
-            serde_json::json!({"event": "delegation_routed", "to_host": DELEGATION_HOST}),
-            serde_json::json!({"event": "cli_wrapper_loaded", "child_pid": 7}),
-            serde_json::json!({"event": "delegation_completed", "result": "completed"}),
-            serde_json::json!({"event": "drain"}),
-        ],
-        "",
-    );
-    let beat = beat_named(&observation, "lifecycle-stages-in-order");
+    let mut events = epic_stream();
+    let routed = events
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e["event"] == "delegation_routed")
+        .map(|(at, _)| at)
+        .nth(1)
+        .expect("section 2's frame");
+    let completion = events
+        .iter()
+        .skip(routed)
+        .position(is_event("worker_completion"))
+        .map(|offset| routed + offset)
+        .expect("section 2's completion");
+    let moved = events.remove(completion);
+    events.insert(routed, moved);
+    let beat = beat_named(&obs(events, ""), "lifecycle-stages-in-order");
     assert!(
         beat.failed(),
         "a completion that precedes its delegation is not an execution order"
@@ -332,25 +701,21 @@ fn a_completion_before_its_own_delegation_fails_the_order_beat() {
 
 #[test]
 fn a_repeated_lifecycle_stage_fails_the_order_beat() {
-    let observation = obs(
-        vec![
-            serde_json::json!({"event": "delegation_routed", "to_host": DELEGATION_HOST}),
-            serde_json::json!({"event": "cli_wrapper_loaded", "child_pid": 7}),
-            serde_json::json!({"event": "worker_completion", "completed": true}),
-            serde_json::json!({"event": "worker_completion", "completed": false}),
-            serde_json::json!({"event": "delegation_completed", "result": "completed"}),
-            serde_json::json!({"event": "drain"}),
-        ],
-        "",
-    );
-    let beat = beat_named(&observation, "lifecycle-stages-in-order");
+    let mut events = epic_stream();
+    let completion = events
+        .iter()
+        .position(is_event("worker_completion"))
+        .expect("section 1's completion");
+    let duplicate = events[completion].clone();
+    events.insert(completion + 1, duplicate);
+    let beat = beat_named(&obs(events, ""), "lifecycle-stages-in-order");
     assert!(
         beat.failed(),
         "two worker_completion rows means the run cannot claim one correlated worker run"
     );
     assert!(
-        beat.detail.contains("not once"),
-        "the narration must name the duplicate, got {:?}",
+        beat.detail.contains("stream order NOT proven"),
+        "the narration must name the broken order, got {:?}",
         beat.detail
     );
 }
@@ -374,32 +739,29 @@ fn a_missing_worker_exit_row_fails_the_idle_beat() {
 
 #[test]
 fn a_crashed_worker_exit_fails_the_idle_beat() {
-    let observation = obs(
-        vec![
-            serde_json::json!({
-                "event": "cli_wrapper_exit",
-                "exit_cause": "Signaled { signal: 9 }",
-                "is_crash": true,
-            }),
-            serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
-            serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
-            serde_json::json!({"event": "on_idle_fired", "spirit_id": "reviewer"}),
-        ],
-        "",
-    );
-    let beat = beat_named(&observation, "worker-exited-and-loop-went-idle");
+    let mut events = epic_stream();
+    let exit = events
+        .iter()
+        .rposition(is_event("cli_wrapper_exit"))
+        .expect("section 3's exit");
+    events[exit]["exit_cause"] = serde_json::json!("Signaled { signal: 9 }");
+    events[exit]["is_crash"] = serde_json::json!(true);
+    let beat = beat_named(&obs(events, ""), "worker-exited-and-loop-went-idle");
     assert!(beat.failed(), "a crash is never a clean exit");
 }
 
 #[test]
 fn a_spirit_that_never_idled_fails_the_idle_beat() {
+    let exit = serde_json::json!({
+        "event": "cli_wrapper_exit",
+        "exit_cause": "Exited { code: 0 }",
+        "is_crash": false,
+    });
     let observation = obs(
         vec![
-            serde_json::json!({
-                "event": "cli_wrapper_exit",
-                "exit_cause": "Exited { code: 0 }",
-                "is_crash": false,
-            }),
+            exit.clone(),
+            exit.clone(),
+            exit,
             serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
             serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
         ],
@@ -410,6 +772,7 @@ fn a_spirit_that_never_idled_fails_the_idle_beat() {
         beat.failed(),
         "two idle callbacks for three class Spirits is not proof the loop went idle"
     );
+    assert!(beat.detail.contains("on_idle_fired 2/3"), "{}", beat.detail);
 }
 
 /// The daemon prints `audit writer task failed during topology drain` and STILL

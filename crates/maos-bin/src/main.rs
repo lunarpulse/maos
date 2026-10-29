@@ -506,9 +506,10 @@ fn render_j3_digest_scene(
 /// Story 9.6 — boot-loud predicate keyed to synchronous scalar halt transport,
 /// not posture. The current manifests expose transport structurally through the
 /// scalar tags consumed by in-process ports: Butler's belief/preference scalars,
-/// Mira's diagnostic-confidence scalar and (Story 18-3, D-18-3-09 A) the
-/// Researcher's methodology/load-bearing scalars require a port; founder-loop
-/// dispatch ambiguity rules are deterministic and do not.
+/// Mira's diagnostic-confidence scalar, (Story 18-3, D-18-3-09 A) the
+/// Researcher's methodology/load-bearing scalars and (Story 19-4, D-19-4-03 B)
+/// the Orchestrator's judged `dispatch_ambiguity` require a port. A Halt tag
+/// with no scalar writer (`delegation_confidence`) stays outside the set.
 #[cfg(feature = "network")]
 fn requires_epistemic_halt_port(
     policy: Option<&maos_kernel_core::security::manifest::EpistemicPolicySection>,
@@ -527,6 +528,7 @@ fn requires_epistemic_halt_port(
                     | "diagnostic_confidence"
                     | "methodology_conflict"
                     | "load_bearing_confidence"
+                    | "dispatch_ambiguity"
             )
     })
 }
@@ -644,6 +646,48 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
             maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
         );
         Ok(receipt)
+    }
+}
+
+/// Story 19-4 (AC2.2, D-19-4-01 A) — the ONE Orchestrator scalar-port factory
+/// every construction site hands `orchestrator_root::construct`: the
+/// production adapter above over the manifest's `[epistemic_policy]` (whose
+/// `dispatch_ambiguity` rule halts), writing at the pid the Orchestrator's
+/// `PidSource` resolves. A manifest without the policy is refused typed.
+#[cfg(feature = "network")]
+fn orchestrator_scalar_port(
+    orchestrator: &Arc<
+        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator,
+    >,
+    tl: &Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+    journal: &Arc<maos_kernel_core::journal::JournalAdapter>,
+    policy: Option<maos_kernel_core::security::manifest::EpistemicPolicySection>,
+    boot_nonce: u64,
+    spirit_id: &str,
+) -> impl Fn(::orchestrator::PidSource) -> Result<Arc<dyn maos_domain::ports::EpistemicScalarPort>, String>
+{
+    let (orchestrator, tl, journal) = (
+        Arc::clone(orchestrator),
+        Arc::clone(tl),
+        Arc::clone(journal),
+    );
+    let spirit_id = spirit_id.to_owned();
+    move |pid_of| {
+        let policy = policy.clone().ok_or(
+            "orchestrator manifest must declare [epistemic_policy]: its judged \
+             dispatch_ambiguity has no rule to halt on",
+        )?;
+        Ok(Arc::new(ButlerOrchestratorAdapter {
+            orchestrator: Arc::clone(&orchestrator),
+            tl: Arc::clone(&tl),
+            journal: Arc::clone(&journal),
+            policy,
+            boot_nonce,
+            last_receipt: Arc::default(),
+            spirit_pid_source: ButlerPidSource::Resolve(pid_of),
+            spirit_id: spirit_id.clone(),
+        })
+            as Arc<dyn maos_domain::ports::EpistemicScalarPort>)
     }
 }
 
@@ -991,9 +1035,10 @@ fn build_spirit_obj(
         .ok_or_else(|| format!("no loader registered for class '{class_name}'"))?;
     Ok(match kind {
         // Story 19-1 (D-19-1-04 A) — the boot arms' ONE construction: the
-        // context port at the resolved pid and, under the seam's inference, the
-        // TARGET manifest's declared provider. A successor without the port
-        // would be the forbidden fallback (D-18-1-R1).
+        // scalar port (19-4, D-19-4-01 A) and the context port at the resolved
+        // pid and, under the seam's inference, the TARGET manifest's declared
+        // provider. A successor without the port would be the forbidden
+        // fallback (D-18-1-R1).
         LoadedSpiritKind::Orchestrator => {
             let seam = deps
                 .butler_seam
@@ -1003,15 +1048,26 @@ fn build_spirit_obj(
                 .ok_or("butler seam not ready")?;
             let staged = target_manifest
                 .ok_or("orchestrator requires the target manifest for its declared providers")?;
-            let declared = declared_providers(&gate_staged(staged)?);
+            let gated = gate_staged(staged)?;
+            let declared = declared_providers(&gated);
             let (id, scheduler) = (class_name.to_owned(), Arc::clone(&deps.scheduler));
             let pid_of: ::orchestrator::PidSource = Arc::new(move || scheduler.resolve_pid(&id));
-            make_spirit_obj(maos_bin::orchestrator_root::construct(
+            let scalar = orchestrator_scalar_port(
+                &deps.orchestrator,
+                &deps.transparency_log,
+                &deps.shared_journal,
+                gated.epistemic_policy,
+                deps.boot_nonce,
+                class_name,
+            )(Arc::clone(&pid_of))?;
+            let loaded = maos_bin::orchestrator_root::construct(
                 ::orchestrator::Orchestrator::new(class_name),
                 &seam,
                 &declared,
                 pid_of,
-            )?)
+                &|_| Ok(Arc::clone(&scalar)),
+            )?;
+            maos_bin::orchestrator_root::judgement_runtime(loaded, scalar)
         }
         LoadedSpiritKind::Architect => make_spirit_obj(
             ::architect::Architect::new(class_name).with_pending_spec("upgrade successor"),
@@ -2691,6 +2747,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // pid — consistent with the rest of this composition root).
     let pid_by_spirit_id: Arc<std::sync::RwLock<std::collections::BTreeMap<String, u32>>> =
         Arc::new(std::sync::RwLock::new(std::collections::BTreeMap::new()));
+    // Story 19-5 (D-19-5-02 A) — the manifest each Spirit was last admitted
+    // (or upgraded) from: a refused cold-swap successor restores from it.
+    let admitted_manifests = AdmittedManifests::default();
     // Story 17-8 AC2.3 — the ONE recipient resolver is the admitted-incarnation
     // map itself (no second map): every routed write records only addressees
     // admission put here, and every rupture names only those incarnations.
@@ -3519,6 +3578,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             scheduler: Arc::clone(&scheduler),
             security: Arc::clone(&security),
             pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
+            admitted_manifests: Arc::clone(&admitted_manifests),
+            successor_manifest_slot: successor_manifest_slot.clone(),
             spirit_build: Arc::new(SpiritBuildDeps {
                 orchestrator: Arc::clone(&orchestrator),
                 transparency_log: Arc::clone(&transparency_log),
@@ -4730,6 +4791,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     cross_host_arm_active,
                     std::env::var_os("MAOS_DELEGATED_GOAL").as_deref(),
                 )?;
+                // Story 19-4 (D-19-4-05 A) — how long a pending halt holds a
+                // section for its resolution over the door; 0 (unset) is the
+                // 19-1 stop. Malformed is refused here, before any entry loads.
+                let epic_hold = match &epic {
+                    Some(_) => maos_bin::orchestrator_root::epic_halt_hold()?,
+                    None => std::time::Duration::ZERO,
+                };
+                // The resumed goal of the current section (its clarification
+                // included), which a 19-6 re-dispatch of that section re-sends.
+                let mut epic_resumed_goal: Option<String> = None;
                 // The next section's index, the previous section's distillate ref
                 // (FR21: frames 2…N carry it), and whether dispatch stopped on a
                 // pending halt or an unloaded Orchestrator (D-19-1-09 A).
@@ -4923,7 +4994,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // `task.assign`: a pending halt on the Orchestrator, or
                                 // the Orchestrator no longer resolving to its admitted
                                 // pid (unloaded through the door), stops dispatch here
-                                // (no frame, no Worker) and the run drains normally.
+                                // (no frame, no Worker) and the run drains normally —
+                                // unless 19-4's hold sees the halt resolved first.
                                 if let Some(section) = section {
                                     maos_bin::orchestrator_root::plant_test_halt(
                                         &transparency_log,
@@ -4934,7 +5006,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         boot_nonce,
                                         section.ordinal,
                                     )?;
+                                    // Story 19-4 (D-19-4-02 A) — a NEW section is judged
+                                    // before its frame (the kernel decides the halt); a
+                                    // 19-6 re-dispatch is not, and re-sends the goal the
+                                    // section resumed with.
+                                    if redispatched {
+                                        if let Some(resumed) = epic_resumed_goal.clone() {
+                                            goal = resumed;
+                                        }
+                                    } else {
+                                        epic_resumed_goal = None;
+                                        // Judgement runs below, after the pause hold.
+                                    }
                                 }
+                                let mut judged = redispatched;
+                                let mut judged_halt = None;
                                 let success_criteria = "the worker reports completion through \
                                                         its adapter's parse_completion oracle";
                                 // Story 19-2 (Blind19x2) — the frame is built BEFORE any
@@ -4960,32 +5046,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             topology_interrupted = true;
                                             break 'entries;
                                         }
+                                        if root_shutdown.is_cancelled() {
+                                            topology_interrupted = true;
+                                            break 'entries;
+                                        }
+                                        if !judged && scheduler.resolve_pid(
+                                            maos_bin::delegation::FROM_SPIRIT,
+                                        ) == Some(pid) {
+                                            let result = maos_bin::orchestrator_root::judge_after_pause(
+                                                &scheduler, pid, section.ordinal, &root_shutdown,
+                                                || maos_bin::orchestrator_root::judge_live_section(
+                                                    &scheduler, pid, emitter, section,
+                                                ),
+                                            ).await?;
+                                            let Some(receipt) = result else {
+                                                topology_interrupted = true;
+                                                break 'entries;
+                                            };
+                                            judged_halt = receipt;
+                                            judged = true;
+                                        }
                                         if let Some(stop) =
-                                            maos_bin::orchestrator_root::dispatch_stop(
+                                            maos_bin::orchestrator_root::judged_dispatch_stop(
                                                 &halt_registry,
                                                 pid,
                                                 scheduler
                                                     .resolve_pid(maos_bin::delegation::FROM_SPIRIT),
                                                 section.ordinal,
                                                 epic.as_ref().map_or(0, Vec::len),
+                                                judged_halt.as_ref(),
                                             )
                                         {
                                             println!("{stop}");
-                                            // Story 19-6 (D-19-6-03 A) — a crashed
-                                            // section that is never re-run is not a
-                                            // completed epic: the run fails typed.
-                                            if redispatched {
-                                                return Err(format!(
-                                                    "maos run: section {} Worker crashed ({}); \
-                                                     disposition reassign-to-replica \
-                                                     (re-dispatch stopped)",
-                                                    section.ordinal, redispatch_cause
-                                                )
-                                                .into());
+                                            // Story 19-4 (D-19-4-05 A) — under
+                                            // MAOS_EPIC_HALT_HOLD_SECS > 0 the section
+                                            // holds for resolution before frame build.
+                                            match maos_bin::orchestrator_root::hold_for_resolution(
+                                                &transparency_log,
+                                                &halt_registry,
+                                                &memory,
+                                                || scheduler.resolve_pid(maos_bin::delegation::FROM_SPIRIT),
+                                                &stop,
+                                                section.ordinal,
+                                                goal,
+                                                epic_hold,
+                                                &root_shutdown,
+                                            )
+                                            .await
+                                            {
+                                                Some(resumed) => {
+                                                    // Cache before the safe-point fold:
+                                                    // a retry re-folds its carried instruction
+                                                    // on top of this clarified goal.
+                                                    epic_resumed_goal = Some(resumed.clone());
+                                                    goal = resumed;
+                                                    judged_halt = None;
+                                                }
+                                                None => {
+                                                    // Story 19-6 (D-19-6-03 A) — a
+                                                    // stopped retry needs the operator.
+                                                    // No-prior escalations already fail
+                                                    // typed in dispose_orphan.
+                                                    if redispatched {
+                                                        return Err(format!(
+                                                            "maos run: section {} Worker crashed \
+                                                             ({}); disposition escalate-to-operator \
+                                                             (re-dispatch stopped); dispatch stopped",
+                                                            section.ordinal, redispatch_cause
+                                                        )
+                                                        .into());
+                                                    }
+                                                    epic_halted = true;
+                                                    continue 'entries;
+                                                }
                                             }
-                                            epic_halted = true;
-                                            continue 'entries;
                                         }
+                                    }
+                                    if root_shutdown.is_cancelled() {
+                                        topology_interrupted = true;
+                                        break 'entries;
                                     }
                                     let intent = maos_domain::invariants::i8::A2AIntent::new(
                                         orchestrator::DELEGATION_CONSENT_INTENT,
@@ -5064,6 +5203,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         &frame.frame_id,
                                         redispatched,
                                     )?;
+                                }
+                                if root_shutdown.is_cancelled() {
+                                    topology_interrupted = true;
+                                    break 'entries;
                                 }
                                 emitter.begin_delegation();
                                 // j1-crosshost-2b AC2.1 — the two arms diverge here.
@@ -5400,14 +5543,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         match kind {
                             LoadedSpiritKind::Orchestrator => {
                                 // Story 19-1 (D-19-1-04 A) — the ONE construction:
-                                // context port, and under `--live`/an explicit mode
-                                // the Inference Port with a per-pass mint at the pid
-                                // the load assigns (the fixup below, as Mira's).
+                                // the scalar port (19-4, D-19-4-01 A), the context
+                                // port, and under `--live`/an explicit mode the
+                                // Inference Port with a per-pass mint at the pid the
+                                // load assigns (the fixup below, as Mira's).
+                                if needs_port && strip_port {
+                                    return Err(format!(
+                                        "maos run: FATAL boot — topology Spirit '{spirit_id}' \
+                                         declares a synchronous dispatch_ambiguity scalar halt \
+                                         transport but no EpistemicScalarPort could be wired"
+                                    )
+                                    .into());
+                                }
+                                let scalar_slot = std::sync::Mutex::new(None);
+                                let scalar_factory = orchestrator_scalar_port(
+                                    &orchestrator,
+                                    &transparency_log,
+                                    &journal,
+                                    epistemic_policy.clone(),
+                                    boot_nonce,
+                                    &spirit_id,
+                                );
                                 let (loaded, pid_binding) =
                                     maos_bin::orchestrator_root::construct_at_admitted_pid(
                                         &spirit_id,
                                         &butler_seam,
                                         &declared_providers(&gated),
+                                        &|pid_of| {
+                                            let scalar = scalar_factory(pid_of)?;
+                                            *scalar_slot.lock().unwrap_or_else(|e| e.into_inner()) =
+                                                Some(Arc::clone(&scalar));
+                                            Ok(scalar)
+                                        },
                                     )?;
                                 if spirit_id == maos_bin::delegation::FROM_SPIRIT {
                                     delegation_emitter =
@@ -5416,7 +5583,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 pid_fixups.push(Box::new(move |pid| {
                                     pid_binding.store(pid, std::sync::atomic::Ordering::Release);
                                 }));
-                                maos_kernel_core::scheduler::make_spirit_obj(loaded)
+                                let scalar = scalar_slot
+                                    .into_inner()
+                                    .unwrap_or_else(|e| e.into_inner())
+                                    .ok_or("maos run: Orchestrator scalar construction missing")?;
+                                maos_bin::orchestrator_root::judgement_runtime(loaded, scalar)
                             }
                             LoadedSpiritKind::Architect => {
                                 maos_kernel_core::scheduler::make_spirit_obj(
@@ -5516,6 +5687,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .map_err(|refusal| format!("maos run: topology entry '{spirit_id}': {refusal}"))?;
                     let pid = admitted.pid;
+                    record_admitted_manifest(&admitted_manifests, &spirit_id, &gated.manifest_toml);
                     println!(
                         "{}",
                         serde_json::json!({
@@ -5576,6 +5748,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "outcome": format!("{outcome:?}")
                         })
                     );
+                }
+                // Story 19-4 (AC3, D-19-4-06 A) — an `--epic` run's FR17 digest
+                // over this boot's frames, through the production renderer
+                // (a bare, inference-free `Butler`); other topology runs render none.
+                if run.epic.is_some() && topology_load.is_ok() {
+                    let seam = butler_seam
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner())
+                        .clone();
+                    let pid = scheduler.resolve_pid(maos_bin::delegation::FROM_SPIRIT);
+                    if let (Some(seam), Some(pid)) = (seam, pid) {
+                        if let Err(error) = seam.digest.render_scene_day(pid, boot_nonce) {
+                            eprintln!("maos run: epic digest: {error}");
+                        }
+                    }
                 }
                 let topology_flush_error = cassette_recorder
                     .as_ref()
@@ -6252,12 +6439,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Some(LoadedSpiritKind::Orchestrator) => {
                         // Story 19-1 (D-19-1-04 A) — the same ONE construction as
-                        // the topology arm and the successor factory.
+                        // the topology arm and the successor factory, scalar port
+                        // included (19-4, D-19-4-01 A).
+                        if needs_port && strip_port {
+                            return Err(format!(
+                                "maos run: FATAL boot — Spirit '{spirit_id}' declares a \
+                                 synchronous dispatch_ambiguity scalar halt transport but no \
+                                 EpistemicScalarPort could be wired"
+                            )
+                            .into());
+                        }
                         let (loaded, pid_binding) =
                             maos_bin::orchestrator_root::construct_at_admitted_pid(
                                 &spirit_id,
                                 &butler_seam,
                                 &declared_providers(&gated),
+                                &orchestrator_scalar_port(
+                                    &orchestrator,
+                                    &transparency_log,
+                                    &journal,
+                                    epistemic_policy.clone(),
+                                    boot_nonce,
+                                    &spirit_id,
+                                ),
                             )?;
                         pid_fixups.push(Box::new(move |pid| {
                             pid_binding.store(pid, std::sync::atomic::Ordering::Release);
@@ -6369,6 +6573,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|refusal| format!("maos run: {refusal}"))?;
             drop(pid_fixups);
             let pid = admitted.pid;
+            record_admitted_manifest(&admitted_manifests, &gated.spirit_id, &gated.manifest_toml);
             // Story 17-10 (D-17-10-FW-05) — the tail correlates this pid's kill
             // facts against its manifest-declared `[sandbox] tier` (not the
             // effective admitted tier, which admission may lower).
@@ -7735,8 +7940,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Step 2: Hot-swap upgrade — actually exercise the upgrade orchestrator
             // (Story 5.4 backfill review Finding #34: Step 1 was a stage-show
             // println — now invokes upgrade_orchestrator.upgrade(.., HotSwap)).
-            // Write the successor manifest once, reuse for both hot-swap and
-            // cold-swap.
+            // Story 19-5 (D-19-5-01 A) — cold swap is door-composed now (unload,
+            // then the admission triple); the kernel arm this smoke drove is gone.
             let dummy_manifest_path = std::path::PathBuf::from("/tmp/maos-smoke-successor.toml");
             std::fs::write(
                 &dummy_manifest_path,
@@ -7754,7 +7959,7 @@ name = "smoke-spirit"
 version = "0.1.1"
 abi = "1.0"
 manifest_schema_version = 1
-min_substrate_version = "0.1.0"
+min_substrate_version = "0.1.0-alpha"
 forms = ["rust-inproc"]
 trust_tier = "local"
 description = "smoke test spirit successor"
@@ -7767,6 +7972,8 @@ description = "smoke test spirit successor"
                 "smoke-spirit",
                 &dummy_manifest_path,
                 maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
+                |_| {},
+                |_| {},
             )
             .await
             {
@@ -7786,25 +7993,7 @@ description = "smoke test spirit successor"
                 hot_swap_outcome
             );
 
-            // Step 3: Cold-swap upgrade (orchestrator handles unload + reload)
-            let cold_reports = migration_plan::upgrade_with_plan_guard(
-                &upgrade_orchestrator,
-                "smoke-spirit",
-                &dummy_manifest_path,
-                maos_kernel_core::lifecycle::UpgradePolicy::ColdSwap,
-            )
-            .await
-            .map_err(|error| format!("smoke: cold-swap upgrade failed: {error}"))?;
-            let cold_report = cold_reports
-                .last()
-                .ok_or("smoke: cold-swap upgrade completed without a report")?;
-            println!(
-                "{{\"step\":2,\"surface\":\"upgrade_orchestrator\",\"policy\":\"cold-swap\",\"outcome\":\"{}\",\"halt_receipts_produced\":{}}}",
-                cold_report.outcome.as_str(),
-                cold_report.halt_receipts_produced
-            );
-
-            // Step 4: Admit the upgraded Spirit through the canonical security
+            // Step 3: Admit the upgraded Spirit through the canonical security
             // path, then issue a real token before applying a real signed CRL.
             let revoked_pid = scheduler
                 .resolve_pid("smoke-spirit")
@@ -7926,11 +8115,11 @@ description = "smoke test spirit successor"
                 .map_err(|e| format!("smoke: CRL apply failed: {e}"))?;
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             println!(
-                "{{\"step\":3,\"surface\":\"revocation_applier\",\"outcome\":\"completed\",\"revoked_count\":{},\"halt_receipts_produced\":{}}}",
+                "{{\"step\":2,\"surface\":\"revocation_applier\",\"outcome\":\"completed\",\"revoked_count\":{},\"halt_receipts_produced\":{}}}",
                 report.revoked_count, report.halt_receipts_produced
             );
 
-            // Step 5: The already-issued token must now be denied by the real
+            // Step 4: The already-issued token must now be denied by the real
             // verification path; the output is derived from that observation.
             match capability.verify_and_audit(
                 &token,
@@ -7939,7 +8128,7 @@ description = "smoke test spirit successor"
             ) {
                 Err(maos_domain::ports::capability::CapError::Revoked) => {
                     println!(
-                        "{{\"step\":4,\"surface\":\"capability_registry\",\"outcome\":\"denied_after_revocation\"}}"
+                        "{{\"step\":3,\"surface\":\"capability_registry\",\"outcome\":\"denied_after_revocation\"}}"
                     );
                 }
                 Ok(()) => return Err("smoke: revoked token remained valid".into()),
@@ -9631,6 +9820,16 @@ impl UninstallCascadeTerminal {
         }
     }
 }
+/// Story 19-5 — immutable admitted/committed text keyed by Spirit id.
+/// A refused cold swap restores this incarnation, never a mutable pathname.
+type AdmittedManifests = Arc<std::sync::RwLock<std::collections::BTreeMap<String, Arc<String>>>>;
+
+fn record_admitted_manifest(map: &AdmittedManifests, spirit_id: &str, text: &str) {
+    map.write()
+        .unwrap_or_else(|error| error.into_inner())
+        .insert(spirit_id.to_owned(), Arc::new(text.to_owned()));
+}
+
 /// Story 16-1 (D-16-1-N) — the composition-root implementation of the four
 /// bin-private operations the door's port trait reaches for. It holds the
 /// REAL kernel composites (not re-instantiated copies), which is what makes
@@ -9652,6 +9851,9 @@ struct BinPrivateOpsImpl {
     scheduler: Arc<maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter>,
     security: Arc<maos_kernel_core::security::SecurityManagerAdapter>,
     pid_by_spirit_id: Arc<std::sync::RwLock<std::collections::BTreeMap<String, u32>>>,
+    /// Story 19-5 — the restore source of a refused cold-swap successor.
+    admitted_manifests: AdmittedManifests,
+    successor_manifest_slot: maos_bin::operator_door::SuccessorManifestSlot,
     /// The composition-root handles the shared class-construction switch
     /// needs. Held so the door builds Spirits through the SAME switch the
     /// hot-swap successor factory uses — not a fifth copy.
@@ -9736,15 +9938,18 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         spirit_id: &str,
         target_manifest: &std::path::Path,
         policy: maos_kernel_core::lifecycle::UpgradePolicy,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
         let reports = migration_plan::upgrade_with_plan_guard(
             &self.upgrade_orchestrator,
             spirit_id,
             target_manifest,
             policy,
+            |path| self.successor_manifest_slot.stage(path.to_path_buf()),
+            |text| self.record_upgraded_manifest(spirit_id, text),
         )
         .await?;
-        serde_json::to_value(&reports).map_err(|error| format!("serialize upgrade report: {error}"))
+        serde_json::to_value(&reports)
+            .map_err(|error| format!("serialize upgrade report: {error}").into())
     }
 
     async fn create_migration_plan(
@@ -9775,23 +9980,23 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
     /// exists for (butler's live MCP port, the boot-loud scalar bindings)
     /// belong to `maos run`'s composition root and a door-loaded Spirit has
     /// none of them.
-    async fn load_spirit(
+    fn prepare_spirit(
         &self,
         manifest: &std::path::Path,
-        pread: Option<std::sync::Arc<String>>,
-    ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
-        let manifest_toml = match pread {
-            Some(text) => text,
-            None => std::sync::Arc::new(maos_bin::admission::read_manifest(manifest)?),
-        };
+        manifest_toml: &str,
+    ) -> Result<
+        (
+            maos_bin::admission::GatedManifest,
+            Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>,
+        ),
+        maos_bin::admission::AdmissionRefusal,
+    > {
         let gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
             classify_spirit(name).is_some()
         })?;
         gated.require_in_process("operator door")?;
-        let kind = classify_spirit(&gated.class_section.name)
-            .expect("gate_manifest accepted a class that classify_spirit rejects");
         if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
-            && matches!(kind, LoadedSpiritKind::Mira)
+            && classify_spirit(&gated.class_section.name) == Some(LoadedSpiritKind::Mira)
         {
             return Err(
                 maos_bin::admission::AdmissionRefusal::EpistemicPortRequired {
@@ -9808,7 +10013,29 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             Some(manifest),
         )
         .map_err(|detail| maos_bin::admission::AdmissionRefusal::ClassBuild { detail })?;
-        maos_bin::admission::load_admit_start(
+        Ok((gated, spirit_obj))
+    }
+
+    async fn load_spirit(
+        &self,
+        manifest: &std::path::Path,
+        pread: Option<std::sync::Arc<String>>,
+    ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
+        let manifest_toml = match pread {
+            Some(text) => text,
+            None => std::sync::Arc::new(maos_bin::admission::read_manifest(manifest)?),
+        };
+        let (gated, spirit_obj) =
+            self.prepare_spirit(manifest, &manifest_toml)
+                .map_err(|refusal| {
+                    maos_bin::admission::emit_structural_rejection(
+                        &self.transparency_log,
+                        &manifest_toml,
+                        &refusal,
+                    );
+                    refusal
+                })?;
+        let admitted = maos_bin::admission::load_admit_start(
             &maos_bin::admission::AdmissionDeps {
                 scheduler: &self.scheduler,
                 security: &self.security,
@@ -9826,7 +10053,41 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             maos_bin::admission::StartPolicy::LeaveLoaded,
             &mut |_pid| {},
         )
-        .await
+        .await?;
+        record_admitted_manifest(
+            &self.admitted_manifests,
+            &gated.spirit_id,
+            &gated.manifest_toml,
+        );
+        Ok(admitted)
+    }
+
+    fn admitted_manifest(&self, spirit_id: &str) -> Option<Arc<String>> {
+        self.admitted_manifests
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .get(spirit_id)
+            .cloned()
+    }
+
+    /// Each committed hop retains its accepted text and FR11 identity record.
+    /// No admission-only gates run after the kernel has committed the upgrade.
+    fn record_upgraded_manifest(&self, spirit_id: &str, text: &str) {
+        record_admitted_manifest(&self.admitted_manifests, spirit_id, text);
+        match maos_bin::admission::manifest_identity(text) {
+            Ok(class) => maos_bin::admission::archive_manifest(
+                &maos_audit::default_archive_dir(),
+                &class,
+                text,
+            ),
+            Err(refusal) => eprintln!(
+                "maos: WARNING — FR11 identity record for '{spirit_id}' upgrade: {refusal}"
+            ),
+        }
+    }
+
+    fn migration_plan_pending(&self, spirit_id: &str) -> bool {
+        migration_plan::plan_pending(spirit_id)
     }
 
     fn butler_principal(&self) -> Option<String> {
@@ -14687,8 +14948,9 @@ mod tests {
             )
             .unwrap();
         assert!(
-            !requires_epistemic_halt_port(Some(&orchestrator_policy)),
-            "deterministic founder-loop policy must not require a scalar port"
+            requires_epistemic_halt_port(Some(&orchestrator_policy)),
+            "Story 19-4 (D-19-4-03 B) — the Orchestrator writes its judged dispatch_ambiguity \
+             through the scalar port, so its Halt rule requires one"
         );
 
         let mira_policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
@@ -14968,26 +15230,29 @@ mod tests {
 
     #[test]
     fn story_9_6_halt_port_non_allowlisted_tag_returns_false() {
+        // Story 19-4 (D-19-4-03 B) — `delegation_confidence` has no writer, so it
+        // stays outside the set until a story gives it one.
         let policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
             r#"
             default_action = "verbalize_only"
 
             [[rules]]
-            tag = "dispatch_ambiguity"
+            tag = "delegation_confidence"
             action = "halt"
-            on_value_above = { threshold = 0.5 }
+            on_value_below = { threshold = 0.5 }
             "#,
         )
         .unwrap();
         assert!(
             !requires_epistemic_halt_port(Some(&policy)),
-            "dispatch_ambiguity is deterministic and must not require a scalar port"
+            "a Halt tag with no scalar writer must not require a scalar port"
         );
     }
 
     #[test]
-    fn story_9_6_halt_port_orchestrator_deterministic_no_port() {
-        // Orchestrator uses dispatch_ambiguity — deterministic, no port needed.
+    fn story_9_6_halt_port_orchestrator_dispatch_ambiguity_requires_port() {
+        // Story 19-4 (D-19-4-03 B) — the Orchestrator's judged dispatch_ambiguity
+        // goes through the scalar port; the kernel decides the halt.
         let policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
             r#"
             default_action = "verbalize_only"
@@ -14999,7 +15264,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        assert!(!requires_epistemic_halt_port(Some(&policy)));
+        assert!(requires_epistemic_halt_port(Some(&policy)));
     }
 
     #[test]

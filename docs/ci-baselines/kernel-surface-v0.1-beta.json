@@ -160,7 +160,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::lifecycle::upgrade::UpgradeError",
-      "signature_hash": "65e09c857aa665e4f1ef88049f52b8fffd0958e517829d2a43a7bcb897d2a787"
+      "signature_hash": "e116086bfc00e6401f7e4f4c93167abefc54897e031514914bc171e885b24b08"
     },
     {
       "kind": "enum",
@@ -170,7 +170,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::lifecycle::upgrade::UpgradePolicy",
-      "signature_hash": "1ee6a8c9ad65235ee5c5dc6202d9375f2355610100f7660c9aaaa130b9e3e014"
+      "signature_hash": "92a722dad5c08836415f4941c9c4da1ec46e4abd246e3b7c61072c9b90cedb9e"
     },
     {
       "kind": "enum",
@@ -406,6 +406,11 @@
       "kind": "fn",
       "path": "maos_kernel_core::scheduler::scheduler_loop::pick_next_spirit_from_slice",
       "signature_hash": "a0534e8eb72ead6c751569b73ce22040ac840e447202fb50691912a9f0eaefc6"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::check_abi_triple",
+      "signature_hash": "80967fd1216a3de282c3aca438a097e8338973f0ce225696109a7ef9a9dcd027"
     },
     {
       "kind": "fn",

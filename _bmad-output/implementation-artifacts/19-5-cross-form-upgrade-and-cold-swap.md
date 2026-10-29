@@ -119,6 +119,8 @@ Not-recommended deltas: D-01 B kernel 0 instead of −53, maos-bin +16 (the smok
 | kernel tokei | 20619 | 20628 | 20686 | 58 (19-2's cap) | 19-2 +46 (≤ 58) | −43 | yes (frees 43) |
 | aggregate hardfail | 189878 | 190356 | **191669** (was 191248) | 1313 | — | ≈ +140…+155 | yes |
 
+**Landing envelope ruling 2026-10-29 (Lunarpulse, ask `w5_kloc`, "Raise to measured + ~150"):** maos-bin 32086 (`w4_kloc`) → **32860** (+774), aggregate hardfail ~192045 → **~192685**; measured 19-4/19-5 review corrections round 3 maos-bin **32826**, xtask **47682** ≤ 47688, maos-cli **6371** ≤ 6382, maos-control **1496** ≤ 1539, aggregate **192650** (strict pin **192651** = measured + 1); kernel LOWER re-pin **26463 → 26409 physical / 20674 → 20618 tokei**, inside the <=26483/20686 grant.
+
 ## Decisions — RULED 2026-10-28 (Lunarpulse; asks `w3_19_5`, `w3_19_5_d10`, `w3_kloc`)
 
 | ID | Question | Options | Recommendation and evidence | Status |

@@ -1,5 +1,10 @@
 #![forbid(unsafe_code)]
 
+//! Story 19-5 (D-19-5-01 A) — re-targeted from the deleted kernel cold-swap
+//! arm at the hot-swap saga: a successor the factory refuses aborts the
+//! upgrade before any policy mutates the predecessor, so its SCB, runtime and
+//! in-flight task ledger are untouched.
+
 mod common;
 
 use std::sync::Arc;
@@ -17,14 +22,14 @@ yield_every_polls = 64
 idle_window_ms = 30000
 
 [class]
-name = "cold-worker"
+name = "inflight-worker"
 version = "0.1.0"
 abi = "1.0"
 min_substrate_version = "0.1.0"
 manifest_schema_version = 1
 trust_tier = "local"
 forms = ["rust-inproc"]
-description = "cold-upgrade predecessor"
+description = "hot-swap predecessor with in-flight tasks"
 
 [lifecycle]
 enabled_hooks = []
@@ -37,21 +42,21 @@ yield_every_polls = 64
 idle_window_ms = 30000
 
 [class]
-name = "cold-worker"
+name = "inflight-worker"
 version = "0.2.0"
 abi = "1.0"
 min_substrate_version = "0.1.0"
 manifest_schema_version = 1
 trust_tier = "local"
 forms = ["rust-inproc"]
-description = "cold-upgrade successor"
+description = "hot-swap successor the factory refuses"
 
 [lifecycle]
 enabled_hooks = []
 "#;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn cold_upgrade_factory_failure_preserves_scb_runtime_and_inflight_tasks() {
+async fn hot_swap_factory_failure_preserves_scb_runtime_and_inflight_tasks() {
     let factory: Arc<dyn SuccessorSpiritFactory> = Arc::new(
         |_manifest: &SpiritManifestBundle| -> Result<
             Arc<dyn maos_kernel_core::scheduler::AnySpiritObj>,
@@ -64,10 +69,10 @@ async fn cold_upgrade_factory_failure_preserves_scb_runtime_and_inflight_tasks()
     );
     let harness = UpgradeHarness::new(factory);
     let predecessor = parse_manifest_bundle(PREDECESSOR).expect("predecessor manifest");
-    let successor_path = harness.write_manifest("cold-successor.toml", SUCCESSOR);
+    let successor_path = harness.write_manifest("inflight-successor.toml", SUCCESSOR);
     let pid = harness
         .scheduler
-        .load("cold-worker", predecessor, CorpusSpirit, 0xCAFE)
+        .load("inflight-worker", predecessor, CorpusSpirit, 0xCAFE)
         .await
         .expect("load predecessor");
     harness
@@ -95,9 +100,9 @@ async fn cold_upgrade_factory_failure_preserves_scb_runtime_and_inflight_tasks()
 
     let error = harness
         .orchestrator
-        .upgrade("cold-worker", &successor_path, UpgradePolicy::ColdSwap)
+        .upgrade("inflight-worker", &successor_path, UpgradePolicy::HotSwap)
         .await
-        .expect_err("factory failure must abort cold-swap");
+        .expect_err("factory failure must abort the hot swap");
     assert!(matches!(error, UpgradeError::SuccessorFactory { .. }));
 
     let after = {

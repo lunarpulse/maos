@@ -222,6 +222,7 @@ fn empty_digest_rejected_by_distillation_request() {
     let digest = butler::MorningDigest {
         completed: vec![],
         open_halts: vec![],
+        resolved_halts: vec![],
         anomalies: vec![],
         trust_bar: 1.0,
     };
@@ -236,4 +237,129 @@ fn empty_digest_rejected_by_distillation_request() {
         ),
         "empty digest must fail with AuditChainMissing, got {err:?}"
     );
+}
+
+/// The halt id the resolved-halt vectors raise and resolve.
+const RESOLVED_HALT_ID: &str = "01J19D4RES0LVEDHA1T0000000";
+
+/// Story 19-4 (AC3.2, D-19-4-07 A) — [`seed_tl`] plus a second halt whose
+/// payload names its `halt_id` (the kernel's raise-row shape) and, unless
+/// `resolve` is `None`, a resolution journaled by the production writer
+/// (`journal_halt_resolution`: a `halt.resolve` approval decision whose
+/// reasoning is `halt=<id>: …`). Returns (TL, completion ids, the unresolved
+/// halt's frame id, the second halt's frame id).
+fn seed_tl_with_resolution(
+    db: &std::path::Path,
+    resolve: Option<(&str, maos_domain::halt::Resolution)>,
+) -> (
+    Arc<TransparencyLogAdapter>,
+    [u8; 16],
+    [u8; 16],
+    [u8; 16],
+    [u8; 16],
+) {
+    let (tl, c1, c2, h1) = seed_tl(db);
+    let _ = tl.insert_frame_event(
+        FrameKind::EpistemicHalt,
+        1,
+        None,
+        "dispatch_ambiguity",
+        format!("{{\"halt_id\":\"{RESOLVED_HALT_ID}\",\"tag\":\"dispatch_ambiguity\"}}").as_bytes(),
+        FrameOrigin::Kernel,
+    );
+    let h2 = tl.last_frame_id();
+    if let Some((halt_id, resolution)) = resolve {
+        maos_kernel_core::halt::journal_halt_resolution(
+            &tl,
+            "director",
+            "orchestrator",
+            &maos_domain::halt::HaltId::new(halt_id).expect("non-empty halt id"),
+            &resolution,
+        )
+        .expect("the resolution is journaled");
+    }
+    (tl, c1, c2, h1, h2)
+}
+
+/// AC3.2 — a halt resolved inside the window is reported in `resolved_halts`
+/// (its frame cite and the resolution kind), never in `open_halts`; the
+/// unresolved halt stays open; and the distillation request cites every
+/// completion, open halt and resolved halt, all resolvable kernel-side.
+#[test]
+fn a_halt_resolved_in_the_window_is_reported_resolved_never_open() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let db = tmp.path().join("transparency.sqlite");
+    let journal = tmp.path().join("journal.ndjson");
+    std::fs::write(&journal, "").unwrap();
+    let resolution = maos_domain::halt::Resolution::provided_context("bound = p95 under 200 ms")
+        .expect("non-empty context");
+    let (tl, c1, c2, h1, h2) = seed_tl_with_resolution(&db, Some((RESOLVED_HALT_ID, resolution)));
+
+    let butler = Butler::new();
+    let digest = butler
+        .morning_digest(&db, &journal, now_ns(), &[], 0.0)
+        .expect("digest composes");
+
+    assert_eq!(digest.completed.len(), 2, "two task.complete frames");
+    let open: Vec<&str> = digest
+        .open_halts
+        .iter()
+        .map(|h| h.source_log_ref.as_str())
+        .collect();
+    assert_eq!(
+        open,
+        vec![hex(&h1).as_str()],
+        "only the unresolved halt is open: {digest:?}"
+    );
+    assert_eq!(digest.resolved_halts.len(), 1, "{digest:?}");
+    let resolved = &digest.resolved_halts[0];
+    assert_eq!(resolved.source_log_ref, hex(&h2));
+    assert_eq!(resolved.halt_id, RESOLVED_HALT_ID);
+    assert_eq!(resolved.resolution, "provided_context");
+    assert_eq!(resolved.intent, "dispatch_ambiguity");
+
+    let request = butler
+        .digest_to_distillation_request(&digest)
+        .expect("request builds");
+    let cited: std::collections::BTreeSet<[u8; 16]> =
+        request.source_log_ref.iter().copied().collect();
+    assert_eq!(
+        cited,
+        [c1, c2, h1, h2].into_iter().collect(),
+        "completions ++ open halts ++ resolved halts"
+    );
+    let memory: Arc<dyn std::any::Any + Send + Sync> = Arc::new(0u8);
+    DistillateWriter::new(Arc::clone(&tl), memory)
+        .write_distillate(1, request)
+        .expect("every cited ref, the resolved halt's included, resolves kernel-side");
+}
+
+/// AC3.2 negative twins — a resolution naming ANOTHER halt id, or none at
+/// all, leaves the halt open: the join is on the raise row's `halt_id`, never
+/// on "some resolution happened in the window".
+#[test]
+fn a_halt_without_its_own_resolution_stays_open() {
+    for resolve in [
+        Some((
+            "01J19D4S0MEOTHERHA1T000000",
+            maos_domain::halt::Resolution::AcceptedHalt,
+        )),
+        None,
+    ] {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let db = tmp.path().join("transparency.sqlite");
+        let journal = tmp.path().join("journal.ndjson");
+        std::fs::write(&journal, "").unwrap();
+        let (_tl, _c1, _c2, h1, h2) = seed_tl_with_resolution(&db, resolve);
+        let digest = Butler::new()
+            .morning_digest(&db, &journal, now_ns(), &[], 0.0)
+            .expect("digest composes");
+        assert!(digest.resolved_halts.is_empty(), "{digest:?}");
+        let open: std::collections::BTreeSet<String> = digest
+            .open_halts
+            .iter()
+            .map(|h| h.source_log_ref.clone())
+            .collect();
+        assert_eq!(open, [hex(&h1), hex(&h2)].into_iter().collect());
+    }
 }

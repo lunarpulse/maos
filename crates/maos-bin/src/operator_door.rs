@@ -86,7 +86,7 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         spirit_id: &str,
         target_manifest: &Path,
         policy: maos_kernel_core::lifecycle::UpgradePolicy,
-    ) -> Result<serde_json::Value, String>;
+    ) -> Result<serde_json::Value, UpgradeFailure>;
 
     /// `migration_plan::create_plan` — resolve, validate, hash and persist a
     /// multi-hop migration plan.
@@ -135,6 +135,40 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         pread: Option<Arc<String>>,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
 
+    /// Recovery uses precisely the same structural gate and constructor as load.
+    #[cfg(feature = "network")]
+    fn prepare_spirit(
+        &self,
+        _manifest: &Path,
+        _text: &str,
+    ) -> Result<
+        (
+            crate::admission::GatedManifest,
+            Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>,
+        ),
+        crate::admission::AdmissionRefusal,
+    > {
+        Err(crate::admission::AdmissionRefusal::ClassBuild {
+            detail: "door recovery preparation unavailable".into(),
+        })
+    }
+
+    /// Story 19-5 — immutable text of the last admitted/committed incarnation.
+    /// `None` refuses a cold swap before unload; the original path is not a
+    /// restore source because an operator may overwrite or remove it.
+    #[cfg(feature = "network")]
+    fn admitted_manifest(&self, spirit_id: &str) -> Option<Arc<String>>;
+
+    /// Record EACH committed hot-swap/migrator hop, before the next hop runs.
+    /// `text` is the accepted target, not a fresh read of its mutable pathname.
+    #[cfg(feature = "network")]
+    fn record_upgraded_manifest(&self, spirit_id: &str, text: &str);
+
+    /// Story 19-5 (CR-1) — a persisted migration plan exists for this Spirit.
+    /// Plans are hot-swap/migrator hops, so a cold swap refuses on `true`.
+    #[cfg(feature = "network")]
+    fn migration_plan_pending(&self, spirit_id: &str) -> bool;
+
     /// Story 19-2 (D-19-2-08 A) — the principal bound at boot for a serving
     /// Butler (`MAOS_BUTLER_PRINCIPAL` or the scene header). `None` ⇒ a pick
     /// is 409 `principal_unbound` before anything is written. A root that
@@ -162,6 +196,128 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         _work_mode: &str,
     ) -> OperatorOutcome {
         DoorInner::not_found("butler_not_found", format!("no live Butler '{spirit_id}'"))
+    }
+}
+
+/// A guard failure preserves the door's typed ABI response even mid-plan.
+#[derive(Debug)]
+pub struct UpgradeFailure {
+    pub code: &'static str,
+    pub detail: String,
+    pub invalid: bool,
+}
+
+impl UpgradeFailure {
+    pub fn into_outcome(self) -> OperatorOutcome {
+        if self.invalid {
+            OperatorOutcome::Invalid {
+                code: self.code.into(),
+                detail: self.detail,
+            }
+        } else {
+            OperatorOutcome::Failed {
+                code: self.code.into(),
+                detail: self.detail,
+            }
+        }
+    }
+}
+
+impl From<String> for UpgradeFailure {
+    fn from(detail: String) -> Self {
+        Self {
+            code: "upgrade_failed",
+            detail,
+            invalid: false,
+        }
+    }
+}
+
+impl std::fmt::Display for UpgradeFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.code, self.detail)
+    }
+}
+
+/// D-19-5-09: schema-window refusals must precede the validated class parser,
+/// which otherwise rejects them as syntax errors. Valid schemas still use the
+/// shared kernel ABI helper (including its substrate comparator).
+pub fn check_upgrade_abi(spirit_id: &str, target: &[u8]) -> Result<(), UpgradeFailure> {
+    let invalid = |code, detail| UpgradeFailure {
+        code,
+        detail,
+        invalid: true,
+    };
+    let text = std::str::from_utf8(target)
+        .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;
+    let root: toml::Value = toml::from_str(text)
+        .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;
+    if let Some(schema) = root
+        .get("class")
+        .and_then(|class| class.get("manifest_schema_version"))
+        .and_then(toml::Value::as_integer)
+        .and_then(|schema| u32::try_from(schema).ok())
+    {
+        let min = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+        let max = maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+        if schema < min {
+            return Err(invalid(
+                "abi_too_old",
+                format!("manifest schema {schema} is below {min}"),
+            ));
+        }
+        if schema > max {
+            return Err(invalid(
+                "abi_too_new",
+                format!("manifest schema {schema} is above {max}"),
+            ));
+        }
+    }
+    let class = root.get("class").ok_or_else(|| {
+        invalid(
+            "target_manifest_unparseable",
+            "upgrade target lacks [class]".into(),
+        )
+    })?;
+    let class_text = toml::to_string(class)
+        .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;
+    let class = maos_manifest::ClassSection::from_toml_str(&class_text)
+        .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;
+    maos_kernel_core::security::check_abi_triple(spirit_id, &class).map_err(|error| {
+        use maos_kernel_core::security::SecurityError as Abi;
+        let code = match &error {
+            Abi::ESubstrateTooOld { .. } => "substrate_too_old",
+            Abi::EAbiTooOld { .. } => "abi_too_old",
+            Abi::EAbiTooNew { .. } => "abi_too_new",
+            _ => "abi_check_failed",
+        };
+        invalid(code, error.to_string())
+    })
+}
+
+pub struct ManifestSnapshot(pub PathBuf);
+
+impl ManifestSnapshot {
+    pub fn new(bytes: &[u8]) -> std::io::Result<Self> {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!("maos-restore-{}.toml", ulid::Ulid::new()));
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&path)?;
+        let guard = Self(path);
+        file.write_all(bytes)?;
+        Ok(guard)
+    }
+}
+
+impl Drop for ManifestSnapshot {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
     }
 }
 
@@ -484,6 +640,13 @@ impl DoorInner {
             "spirit_not_loaded",
             format!("spirit '{spirit_id}' is not loaded in this daemon"),
         )
+    }
+
+    fn target_unparseable(detail: String) -> OperatorOutcome {
+        OperatorOutcome::Invalid {
+            code: "target_manifest_unparseable".into(),
+            detail,
+        }
     }
 
     /// Dispatch one STARTED command to its handler. Called only after the
@@ -963,8 +1126,13 @@ impl DoorInner {
         }
     }
 
-    /// Upgrade over the door (D-16-1-W): hot-swap only, forward only,
-    /// faithful successor. Attestation/keyring arrive as command PARAMETERS.
+    /// Upgrade over the door (D-16-1-W, Story 19-5): forward only, every FR49
+    /// policy. Hot swap and migrator run the kernel orchestrator at the SAME
+    /// pid with a faithful successor; cold swap is composed here from the
+    /// admission triple at a new pid ([`Self::cold_swap`]). Every target is
+    /// pre-checked — shape, identity, forward-only, vetting, ABI triple —
+    /// before anything is unloaded or swapped. Attestation/keyring arrive as
+    /// command PARAMETERS.
     #[allow(clippy::too_many_arguments)]
     async fn upgrade_command(
         &self,
@@ -977,21 +1145,6 @@ impl DoorInner {
         candidates: &[String],
         create_plan: bool,
     ) -> OperatorOutcome {
-        if policy == UpgradePolicyRequest::ColdSwap {
-            // The kernel's ColdSwap arm starts the successor under a NEW pid
-            // without `admit_spirit` — a kernel byte routed to the Epic-16
-            // retrospective; the door refuses it typed instead of leaving an
-            // unadmitted Spirit running.
-            return OperatorOutcome::Conflict {
-                code: "cold_swap_unsupported".into(),
-                detail: "cold-swap over the door is unsupported: it would start an \
-                         unadmitted successor under a new pid"
-                    .into(),
-            };
-        }
-        let Some(_pid) = self.scheduler.resolve_pid(spirit_id) else {
-            return Self::spirit_not_loaded(spirit_id);
-        };
         let target_path = PathBuf::from(target_manifest);
         let target = match std::fs::read(&target_path) {
             Ok(bytes) => bytes,
@@ -1005,14 +1158,28 @@ impl DoorInner {
                 }
             }
         };
-        let target_identity = match manifest_class_identity(&target) {
+        let root = match std::str::from_utf8(&target)
+            .map_err(|error| format!("upgrade target manifest is not UTF-8: {error}"))
+            .and_then(|text| {
+                toml::from_str::<toml::Table>(text)
+                    .map_err(|error| format!("parse upgrade target TOML: {error}"))
+            }) {
+            Ok(root) => root,
+            Err(detail) => return Self::target_unparseable(detail),
+        };
+        // D-19-5-10 C — ADR-060: `[cli_wrapper]` is a third manifest shape, not
+        // a Spirit form; the spawned-form swap is routed to 20-9.
+        if root.contains_key("cli_wrapper") {
+            return OperatorOutcome::Conflict {
+                code: "cli_wrapper_is_not_a_spirit_form".into(),
+                detail: "a `[cli_wrapper]` Worker is spawned per task; a manifest change takes \
+                         effect at its next spawn (ADR-060)"
+                    .into(),
+            };
+        }
+        let target_identity = match manifest_class_identity(&root) {
             Ok(identity) => identity,
-            Err(detail) => {
-                return OperatorOutcome::Invalid {
-                    code: "target_manifest_unparseable".into(),
-                    detail,
-                }
-            }
+            Err(detail) => return Self::target_unparseable(detail),
         };
         let (target_name, target_version) = target_identity;
         if target_name != spirit_id {
@@ -1023,6 +1190,9 @@ impl DoorInner {
                 ),
             };
         }
+        let Some(_pid) = self.scheduler.resolve_pid(spirit_id) else {
+            return Self::spirit_not_loaded(spirit_id);
+        };
         // Forward-only comparison uses SemVer, including prerelease ordering.
         let target_semver = match semver::Version::parse(&target_version) {
             Ok(version) => version,
@@ -1052,11 +1222,15 @@ impl DoorInner {
                 };
             }
         }
+        let snapshot = match ManifestSnapshot::new(&target) {
+            Ok(snapshot) => snapshot,
+            Err(error) => return Self::target_unparseable(error.to_string()),
+        };
         if let Err(rejection) = self
             .private_ops
             .enforce_vetted_upgrade_precondition(
                 spirit_id,
-                &target_path,
+                &snapshot.0,
                 attestation,
                 vetter_keyring,
             )
@@ -1066,6 +1240,10 @@ impl DoorInner {
                 code: "vetting_precondition_failed".into(),
                 detail: rejection,
             };
+        }
+        // D-19-5-09 A — the same helper checks direct AND intermediate targets.
+        if let Err(error) = check_upgrade_abi(spirit_id, &target) {
+            return error.into_outcome();
         }
         // Plan creation is a plan-only operation. The persisted plan is
         // consumed by a later upgrade command's guard.
@@ -1097,30 +1275,250 @@ impl DoorInner {
                 },
             };
         }
+        // D-19-5-08 A — refused typed before any swap (the kernel arm keeps
+        // its own `MigratorNotDeclared` as defense in depth).
+        if policy == UpgradePolicyRequest::Migrator && !root.contains_key("migrates_from") {
+            return OperatorOutcome::Conflict {
+                code: "migrator_not_declared".into(),
+                detail: "--policy migrator needs a successor that declares [migrates_from]".into(),
+            };
+        }
+        // Deterministic pathname-replacement regression seam; inert in normal boots.
+        #[cfg(debug_assertions)]
+        if let Some(marker) = std::env::var_os("MAOS_TEST_ONLY_UPGRADE_PRECHECKED") {
+            let marker = PathBuf::from(marker);
+            if let Err(error) = std::fs::write(&marker, b"prechecked") {
+                return Self::target_unparseable(error.to_string());
+            }
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+            while marker.exists() {
+                if tokio::time::Instant::now() >= deadline {
+                    return Self::target_unparseable("upgrade test handshake timed out".into());
+                }
+                tokio::task::yield_now().await;
+            }
+        }
         // The successor factory reads one process-wide slot, so upgrades of
-        // different Spirits must not overlap this stage/use/clear sequence.
+        // different Spirits must not overlap this stage/use/clear sequence; a
+        // cold swap holds it too, so its unload → admit window never
+        // interleaves another upgrade.
         let _upgrade_guard = self.upgrade_lock.lock().await;
+        let target_path = &snapshot.0;
+        let kernel_policy = match policy {
+            UpgradePolicyRequest::HotSwap => maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
+            UpgradePolicyRequest::Migrator => maos_kernel_core::lifecycle::UpgradePolicy::Migrator,
+            #[cfg(feature = "network")]
+            UpgradePolicyRequest::ColdSwap => {
+                return self
+                    .cold_swap(spirit_id, &target_path, &target_version)
+                    .await
+            }
+            #[cfg(not(feature = "network"))]
+            UpgradePolicyRequest::ColdSwap => {
+                return OperatorOutcome::Conflict {
+                    code: "cold_swap_unavailable".into(),
+                    detail: "this binary was built without the `network` feature, so the \
+                             admission path a cold swap re-admits through is absent"
+                        .into(),
+                }
+            }
+        };
         self.successor_manifest_slot.stage(target_path.clone());
         let guarded = self
             .private_ops
-            .upgrade_with_plan_guard(
-                spirit_id,
-                &target_path,
-                maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
-            )
+            .upgrade_with_plan_guard(spirit_id, &target_path, kernel_policy)
             .await;
         self.successor_manifest_slot.take();
         match guarded {
-            Err(error) => OperatorOutcome::Failed {
-                code: "upgrade_failed".into(),
-                detail: error,
-            },
+            Err(error) => error.into_outcome(),
             Ok(reports) => OperatorOutcome::Completed(serde_json::json!({
                 "spirit_id": spirit_id,
-                "policy": "hot-swap",
+                "policy": kernel_policy.as_str(),
                 "reports": reports,
             })),
         }
+    }
+
+    /// FR49 cold swap with re-init (Story 19-5, D-19-5-01 A / 02 A): unload
+    /// the predecessor, then admit the successor through the SAME `load →
+    /// admit → start` triple `maosctl load` uses, at a new pid — its tokens
+    /// are revoked by the unload and working memory is not carried. A refused
+    /// successor restores the predecessor from the manifest it was admitted
+    /// from (`reverted`); a refused restore leaves the Spirit absent
+    /// (`cold_swap_failed`, naming both refusals). Never a raw spirits-map
+    /// write: the kernel's unadmitted cold-swap arm is deleted.
+    /// Recovery preflight refuses `cold_swap_unrestorable` (409) before unload
+    /// for incomplete, runtime-desynchronized, or door-unconstructible sources.
+    #[cfg(feature = "network")]
+    async fn cold_swap(
+        &self,
+        spirit_id: &str,
+        target: &Path,
+        successor_version: &str,
+    ) -> OperatorOutcome {
+        use maos_domain::invariants::i10::LifecycleEvent;
+
+        let started_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+        let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
+            return Self::spirit_not_loaded(spirit_id);
+        };
+        // CR-1 — everything that can refuse runs BEFORE the unload.
+        let Some(predecessor_manifest) = self.private_ops.admitted_manifest(spirit_id) else {
+            return OperatorOutcome::Conflict {
+                code: "cold_swap_predecessor_unknown".into(),
+                detail: format!(
+                    "no admitted manifest is recorded for '{spirit_id}'; cold swap refused \
+                     before unload"
+                ),
+            };
+        };
+        if self.private_ops.migration_plan_pending(spirit_id) {
+            return OperatorOutcome::Conflict {
+                code: "cold_swap_plan_pending".into(),
+                detail: format!(
+                    "a persisted migration plan exists for '{spirit_id}'; plans are \
+                     hot-swap/migrator hops, so cold swap is refused before unload"
+                ),
+            };
+        }
+        // Constructors re-read behavioural sections from a path. Materialize
+        // the retained bytes, never the old mutable admission pathname.
+        let restore_manifest = match ManifestSnapshot::new(predecessor_manifest.as_bytes()) {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                return OperatorOutcome::Failed {
+                    code: "cold_swap_restore_unavailable".into(),
+                    detail: error.to_string(),
+                }
+            }
+        };
+        let predecessor_version = self
+            .loaded_version(spirit_id)
+            .unwrap_or_else(|| "unknown".into());
+        let restorable = self
+            .private_ops
+            .prepare_spirit(&restore_manifest.0, &predecessor_manifest)
+            .map_err(|error| format!("{}: {error}", error.code()))
+            .and_then(|(gated, _)| {
+                if gated.spirit_id == spirit_id
+                    && gated.class_section.version == predecessor_version
+                {
+                    Ok(())
+                } else {
+                    Err("retained manifest identity/version differs from live SCB".into())
+                }
+            });
+        if let Err(detail) = restorable {
+            return OperatorOutcome::Conflict {
+                code: "cold_swap_unrestorable".into(),
+                detail,
+            };
+        }
+        let unloaded = self.scheduler.unload(pid).await;
+        self.stop_worker_after_unload(pid).await;
+        if let Err(error) = unloaded {
+            return OperatorOutcome::Failed {
+                code: "unload_failed".into(),
+                detail: error.to_string(),
+            };
+        }
+        let (outcome, journal, result) = match self.admit_and_start(spirit_id, target).await {
+            Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
+            Err(refused) => match self.admit_and_start(spirit_id, &restore_manifest.0).await {
+                Ok(restored) => (
+                    "reverted",
+                    None,
+                    Err(OperatorOutcome::Conflict {
+                        code: "cold_swap_reverted".into(),
+                        detail: format!(
+                            "successor refused: {refused}; predecessor {predecessor_version} \
+                             restored at pid {restored}"
+                        ),
+                    }),
+                ),
+                Err(restore) => (
+                    "failed",
+                    Some(LifecycleEvent::Unload),
+                    Err(OperatorOutcome::Failed {
+                        code: "cold_swap_failed".into(),
+                        detail: format!(
+                            "successor refused: {refused}; restore refused: {restore}; spirit \
+                             '{spirit_id}' is not loaded"
+                        ),
+                    }),
+                ),
+            },
+        };
+        // The row the kernel orchestrator writes for hot swap, same shape.
+        let payload = serde_json::json!({
+            "spirit_id": spirit_id,
+            "predecessor_version": predecessor_version,
+            "successor_version": successor_version,
+            "policy": "cold-swap",
+            "outcome": outcome,
+            "latency_ns": maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
+                .saturating_sub(started_ns),
+            "halt_receipts_produced": 0,
+        });
+        let _ = self.transparency_log.insert_frame_event(
+            maos_kernel_core::iac::transparency_log::FrameKind::CapabilityInvocation,
+            pid,
+            None,
+            "spirit.upgrade",
+            payload.to_string().as_bytes(),
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+        if let Some(event) = journal {
+            if let Err(error) = self
+                .private_ops
+                .append_lifecycle_journal(event, spirit_id)
+                .await
+            {
+                eprintln!(
+                    "maos: WARNING — cold swap of '{spirit_id}' {outcome} but lifecycle journal \
+                     failed: {error}"
+                );
+            }
+        }
+        match result {
+            Ok(new_pid) => OperatorOutcome::Completed(serde_json::json!({
+                "spirit_id": spirit_id,
+                "policy": "cold-swap",
+                "outcome": outcome,
+                "pid": new_pid,
+                "predecessor_pid": pid,
+                "reports": [payload],
+            })),
+            Err(refusal) => refusal,
+        }
+    }
+
+    /// The cold swap's half of `maosctl load` + `maosctl start`: the admission
+    /// triple leaves `Loaded`, so the Spirit is started explicitly. A start
+    /// failure is a refusal like any other, unwound by `unload` (as the
+    /// triple's own rollback does) so the restore can re-admit the id.
+    #[cfg(feature = "network")]
+    async fn admit_and_start(&self, spirit_id: &str, manifest: &Path) -> Result<u32, String> {
+        let admitted = self
+            .private_ops
+            .load_spirit(manifest, None)
+            .await
+            .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
+        if admitted.spirit_id != spirit_id {
+            let unwound = self.scheduler.unload(admitted.pid).await;
+            return Err(format!(
+                "target_manifest_mismatch: admitted {}; unwind: {unwound:?}",
+                admitted.spirit_id
+            ));
+        }
+        if let Err(error) = self.scheduler.start(admitted.pid).await {
+            let unwound = self.scheduler.unload(admitted.pid).await;
+            return Err(match unwound {
+                Ok(_) => format!("start_failed: {error}"),
+                Err(unwind) => format!("start_failed: {error}; unwind unload failed: {unwind}"),
+            });
+        }
+        Ok(admitted.pid)
     }
 
     /// Precheck the LOADED SCB through the daemon's real coordinator. Writes
@@ -2180,11 +2578,7 @@ fn parse_token_id_hex(s: &str) -> Result<[u8; 16], String> {
 
 /// Extract `[class] name/version` (or legacy `[spirit]`) from a target
 /// manifest, mirroring `enforce_vetted_upgrade_precondition`'s extraction.
-fn manifest_class_identity(manifest: &[u8]) -> Result<(String, String), String> {
-    let text = std::str::from_utf8(manifest)
-        .map_err(|error| format!("upgrade target manifest is not UTF-8: {error}"))?;
-    let root: toml::Value =
-        toml::from_str(text).map_err(|error| format!("parse upgrade target TOML: {error}"))?;
+fn manifest_class_identity(root: &toml::Table) -> Result<(String, String), String> {
     let section = root
         .get("class")
         .or_else(|| root.get("spirit"))

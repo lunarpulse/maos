@@ -280,57 +280,13 @@ impl SecurityManagerAdapter {
             spirit_id: spirit_id.into(),
         })?;
 
-        // Leg 1 — kernel_version vs declared min_substrate_version (FR8).
-        // env!("CARGO_PKG_VERSION") inside kernel-core IS the kernel leg
-        // (all crates share [workspace.package].version).
-        let kernel_version = env!("CARGO_PKG_VERSION");
-        let declared_min = class.min_substrate_version.clone();
-        // Fail-loud on BOTH "too old" (Ok(false)) and "unparseable" (Err):
-        // a version we cannot prove compatible is refused, never silently
-        // admitted. No `unwrap_or_default()` — a silent default here would
-        // admit a too-old kernel (a correctness/security bug).
-        let satisfies_min = maos_domain::revocation::semver_range_contains(
-            kernel_version,
-            &format!(">={declared_min}"),
-        )
-        .map_err(|_| SecurityError::ESubstrateTooOld {
-            spirit_id: spirit_id.into(),
-            declared_min: declared_min.clone(),
-            kernel_version: kernel_version.into(),
-        })?;
-        if !satisfies_min {
-            return Err(SecurityError::ESubstrateTooOld {
-                spirit_id: spirit_id.into(),
-                declared_min,
-                kernel_version: kernel_version.into(),
-            });
-        }
+        check_abi_triple(spirit_id, class)?;
 
-        // Leg 2 — manifest_schema_version vs the kernel's supported window.
-        // Fail-closed in BOTH directions per the §LOCKED Design Decision:
-        // below MIN → EAbiTooOld (N-2 hard refusal); above MAX → EAbiTooNew
-        // (forward case; NO warn-and-ignore window). The manifest parser
-        // keeps its shape-only window check as defense-in-depth.
-        let declared_schema = class.manifest_schema_version;
-        let min_supported = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
-        let max_supported = maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION;
-        if declared_schema < min_supported {
-            return Err(SecurityError::EAbiTooOld {
-                declared_schema,
-                min_supported,
-            });
-        }
-        if declared_schema > max_supported {
-            return Err(SecurityError::EAbiTooNew {
-                declared_schema,
-                max_supported,
-            });
-        }
         // N-1 (declared < CURRENT but within window) — admit with documented
         // WARN-level degradation paths (NFR-Maint-9). The WARN emission lives
         // in maos-manifest so the same code path is exercised by the
         // manifest N-1 field-coverage test (AC4).
-        let _degraded = maos_manifest::warn_n_minus_1_degradations(declared_schema);
+        let _degraded = maos_manifest::warn_n_minus_1_degradations(class.manifest_schema_version);
 
         {
             let declared_scopes = capabilities_required_to_scopes(caps_required);
@@ -562,6 +518,58 @@ impl SecurityManagerPort for SecurityManagerAdapter {
             reasoning: Some("v0.1-β placeholder approval".into()),
         }
     }
+}
+
+/// Story 7.5a legs 1–2 of the ABI Stability Triple, shared by `admit_spirit`
+/// and the operator door's hot-swap successor pre-gate (Story 19-5).
+pub fn check_abi_triple(spirit_id: &str, class: &ClassSection) -> Result<(), SecurityError> {
+    // Leg 1 — kernel_version vs declared min_substrate_version (FR8).
+    // env!("CARGO_PKG_VERSION") inside kernel-core IS the kernel leg
+    // (all crates share [workspace.package].version).
+    let kernel_version = env!("CARGO_PKG_VERSION");
+    let declared_min = class.min_substrate_version.clone();
+    // Fail-loud on BOTH "too old" (Ok(false)) and "unparseable" (Err):
+    // a version we cannot prove compatible is refused, never silently
+    // admitted. No `unwrap_or_default()` — a silent default here would
+    // admit a too-old kernel (a correctness/security bug).
+    let satisfies_min = maos_domain::revocation::semver_range_contains(
+        kernel_version,
+        &format!(">={declared_min}"),
+    )
+    .map_err(|_| SecurityError::ESubstrateTooOld {
+        spirit_id: spirit_id.into(),
+        declared_min: declared_min.clone(),
+        kernel_version: kernel_version.into(),
+    })?;
+    if !satisfies_min {
+        return Err(SecurityError::ESubstrateTooOld {
+            spirit_id: spirit_id.into(),
+            declared_min,
+            kernel_version: kernel_version.into(),
+        });
+    }
+
+    // Leg 2 — manifest_schema_version vs the kernel's supported window.
+    // Fail-closed in BOTH directions per the §LOCKED Design Decision:
+    // below MIN → EAbiTooOld (N-2 hard refusal); above MAX → EAbiTooNew
+    // (forward case; NO warn-and-ignore window). The manifest parser
+    // keeps its shape-only window check as defense-in-depth.
+    let declared_schema = class.manifest_schema_version;
+    let min_supported = maos_spirit_abi::MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+    let max_supported = maos_spirit_abi::MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION;
+    if declared_schema < min_supported {
+        return Err(SecurityError::EAbiTooOld {
+            declared_schema,
+            min_supported,
+        });
+    }
+    if declared_schema > max_supported {
+        return Err(SecurityError::EAbiTooNew {
+            declared_schema,
+            max_supported,
+        });
+    }
+    Ok(())
 }
 
 #[cfg(test)]

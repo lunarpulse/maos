@@ -1417,6 +1417,51 @@ fn upgrade_options_reject_present_values_of_the_wrong_type() {
     }
 }
 
+/// Story 19-5 (D-19-5-08 A, AC5.2) — all three FR49 policies parse into the
+/// command the port receives (`migrator` is new; the door no longer needs the
+/// CLI to refuse it), and an unknown policy stays a typed `400 bad_request`
+/// that never reaches the port.
+#[test]
+fn upgrade_policy_parses_migrator_and_refuses_an_unknown_policy() {
+    let port = Arc::new(FakePort::new(PortBehaviour::Complete));
+    let server = server_with(Arc::clone(&port));
+    for (wire, parsed) in [
+        (None, "HotSwap"),
+        (Some("hot-swap"), "HotSwap"),
+        (Some("cold-swap"), "ColdSwap"),
+        (Some("migrator"), "Migrator"),
+    ] {
+        let body = match wire {
+            Some(policy) => format!(r#"{{"target_manifest":"/m","policy":"{policy}"}}"#),
+            None => r#"{"target_manifest":"/m"}"#.to_owned(),
+        };
+        let response = post(&server, "/v1/spirits/butler/upgrade", &body);
+        assert_eq!(status_of(&response), 200, "{wire:?}: {response}");
+        let command = json_of(&response)["command"]
+            .as_str()
+            .unwrap_or_else(|| panic!("completed response must identify its command: {response}"))
+            .to_owned();
+        assert!(
+            command.contains(&format!("policy: {parsed}")),
+            "{wire:?} must reach the port as {parsed}: {command}"
+        );
+    }
+
+    let submitted = port.submissions.load(Ordering::Acquire);
+    let response = post(
+        &server,
+        "/v1/spirits/butler/upgrade",
+        r#"{"target_manifest":"/m","policy":"warp-swap"}"#,
+    );
+    assert_eq!(status_of(&response), 400, "{response}");
+    assert_eq!(json_of(&response)["error"], "bad_request", "{response}");
+    assert_eq!(
+        port.submissions.load(Ordering::Acquire),
+        submitted,
+        "an unknown policy must never reach the port"
+    );
+}
+
 #[test]
 fn halt_body_spirit_id_uses_the_route_identifier_rules() {
     let server = server_with(Arc::new(FakePort::new(PortBehaviour::Complete)));

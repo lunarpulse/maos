@@ -36,10 +36,13 @@
 //!    completion from "clean exit + a non-empty final stdout line".
 //! 4. **`worker-cli-under-library`** (`2a`) — `worker_cli` stays under the library,
 //!    or every relocated vector ceases to exist rather than failing.
-//! 5. **`completion-vectors-enrolled`** (`2a`, derivation by `1b`) — every J1
-//!    `crates/maos-bin/tests/` target is named in THIS gate's Blocking job. The
-//!    enrolled set is DERIVED from the directory, never hand-listed: a const list is
-//!    one forgotten line away from a dead test behind a green gate.
+//! 5. **`completion-vectors-enrolled`** (`2a`, derivation by `1b`, widened by 19-4)
+//!    — every J1 `crates/*/tests/` target is named, crate-qualified
+//!    (`-p <crate> --test <stem>` in one command), in THIS gate's Blocking job. The
+//!    enrolled set is DERIVED from the directories, never hand-listed: a const list
+//!    is one forgotten line away from a dead test behind a green gate. The `_2c`
+//!    lane is not this leg's: `check-j1-two-host-signed-run` leg 10
+//!    (`two-host-vectors-enrolled`) derives and enrols it.
 //! 6. **`consent-refusal-proofs`** (`1b`) — the ADR-012 refusal assertions exist and
 //!    are correctly shaped in `crates/maos-bin/tests/consent_refusal_1b.rs`: the
 //!    `-32001` typed deny, both `-32009` seams with a typed reason, the both-ways
@@ -62,6 +65,7 @@
 //! `cargo`-invoking leg would inherit the proven-red tempdir (which has no
 //! `Cargo.toml`), vacuum every planted vector, and report green.
 
+use crate::check_j1_two_host_signed_run::has_flag_arg;
 use crate::gate_common::{dev_enforced_red_blocks, vacuous_legs, BindingClass, LegAudit};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -99,18 +103,25 @@ const BIN_LIB_RS: &str = "crates/maos-bin/src/lib.rs";
 /// `check_epic_6_bridge`'s `discipline_yml_has_step`); this is the third.
 const WORKFLOW: &str = ".github/workflows/discipline.yml";
 
-/// The DIRECTORY the enrolled `cargo test` set is DERIVED from, and the filename
-/// suffixes that mark a target as J1-lane.
+/// The workspace directory whose `<crate>/tests/` directories the enrolled
+/// `cargo test` set is DERIVED from, and the filename suffixes that mark a target
+/// as J1-lane.
 ///
 /// `2a` shipped this leg against a hand-maintained `ENROLLED_TEST_TARGETS` const.
 /// `1b` replaced the const with this derivation, because a hand-maintained list is
 /// `smoke_cli_wrapper_8_12`'s failure re-created inside the gate built to prevent
 /// it: add a J1 test file, forget the const line, and the file is dead in CI while
 /// the gate stays green. Derived from the filesystem, an un-enrolled J1 test reds
-/// the gate BY CONSTRUCTION rather than by remembering. No CI job runs
-/// `-p maos-bin` unscoped — every invocation names explicit `--test` targets — so
-/// 24 of the 30 files in this directory are invoked by no job at all.
-const MAOS_BIN_TESTS_DIR: &str = "crates/maos-bin/tests";
+/// the gate BY CONSTRUCTION rather than by remembering. No CI job runs a crate's
+/// tests unscoped for this lane — every invocation names explicit `--test` targets.
+///
+/// Story 19-4 D-19-4-11 A (the 15-1 "`_2c.rs` J1 blind spot") — `1b` walked only
+/// `crates/maos-bin/tests`, so the J1-lane files outside it
+/// (`maos-iac::transparency_duplicate_discrimination_2b`,
+/// `maos-cli::cohort_sign_2e`) were derived by nothing. The walk now covers every
+/// `crates/*/tests` (the 2c gate's leg-10 walk), and a target is enrolled only by a
+/// command naming `-p <crate>` AND `--test <stem>` together.
+const CRATES_DIR: &str = "crates";
 /// j1-crosshost-2b AC4.3 — `_2b.rs` is added here BEFORE any
 /// `crates/maos-bin/tests/*_2b.rs` file exists, because `derive_enrolled_targets`
 /// reads this list: a `_2b.rs` file written first would be invisible to the
@@ -130,8 +141,13 @@ const MAOS_BIN_TESTS_DIR: &str = "crates/maos-bin/tests";
 /// Story 19-3 D-19-3-10 A — `_19_3.rs` joins on the same rule, so
 /// `worker_workspace_19_3.rs` (the effect-oracle vectors) is derived and must be
 /// enrolled in the job step.
+///
+/// Story 19-4 D-19-4-11 A — `_2e.rs` joins (`maos-cli::cohort_sign_2e`, the
+/// `j1-crosshost-2e` signer regressions). `_2c.rs` is deliberately ABSENT: the 2c
+/// lane's enrolment control is `check-j1-two-host-signed-run` leg 10, and enrolling
+/// it here too would duplicate one control across two jobs.
 const J1_TEST_SUFFIXES: &[&str] = &[
-    "_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs", "_19_1.rs", "_19_3.rs",
+    "_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs", "_2e.rs", "_19_1.rs", "_19_3.rs",
 ];
 
 /// j1-crosshost-1b AC1 — the refusal proofs themselves, the gate's TENTH governed
@@ -567,7 +583,7 @@ fn leg_loopback_from_host_unverified(
 ///    alone cannot tell an executing test from an assertion-shaped dead function —
 ///    the `smoke_cli_wrapper_8_12` failure mode).
 /// 2. [`leg_completion_vectors_enrolled`] refuses to let the file go un-run: the
-///    enrolled target set is DERIVED from `crates/maos-bin/tests/`, and `_2b.rs` is
+///    enrolled target set is DERIVED from `crates/*/tests/`, and `_2b.rs` is
 ///    in [`J1_TEST_SUFFIXES`], so an un-enrolled `*_2b.rs` reds this gate by
 ///    construction. No CI job runs `-p maos-bin` unscoped.
 ///
@@ -812,50 +828,72 @@ fn leg_worker_cli_under_library(root: &Path, findings: &mut Vec<Finding>, audit:
     }
 }
 
-/// The J1 `cargo test` targets DERIVED from `crates/maos-bin/tests/`, sorted.
+/// The J1 `cargo test` targets DERIVED from every `crates/*/tests/`, as sorted
+/// `(crate, stem)` pairs.
 ///
-/// A missing directory is a FINDING, never a skip — same rule as [`read`]: a gate
-/// that silently passes when its subject is absent is the null control this lane
-/// keeps catching. An EMPTY derived set is not a finding here; it is caught by the
-/// vacuity guard, because a leg whose input set is empty checks nothing.
+/// An unreadable `crates/` or `<crate>/tests` is a FINDING, never a skip — same
+/// rule as [`read`]: a gate that silently passes when its subject is absent is the
+/// null control this lane keeps catching. A crate with no `tests/` is normal. An
+/// EMPTY derived set is not a finding here; it is caught by the vacuity guard,
+/// because a leg whose input set is empty checks nothing.
 fn derive_enrolled_targets(
     root: &Path,
     findings: &mut Vec<Finding>,
     check: &'static str,
-) -> Vec<String> {
-    let dir = root.join(MAOS_BIN_TESTS_DIR);
-    let entries = match fs::read_dir(&dir) {
-        Ok(entries) => entries,
+) -> Vec<(String, String)> {
+    let mut unreadable = |path: String, e: std::io::Error| {
+        findings.push(Finding {
+            check,
+            detail: format!(
+                "cannot read {path}: {e} — the enrolled `cargo test` set is DERIVED from every \
+                 {CRATES_DIR}/*/tests, so a directory that cannot be walked is a silent gap in \
+                 the J1 enrolment control"
+            ),
+        })
+    };
+    let members = match fs::read_dir(root.join(CRATES_DIR)) {
+        Ok(members) => members,
         Err(e) => {
-            findings.push(Finding {
-                check,
-                detail: format!(
-                    "cannot read {MAOS_BIN_TESTS_DIR}: {e} — the enrolled `cargo test` set is \
-                     DERIVED from this directory, so an unreadable one means the gate cannot \
-                     tell whether any J1 vector runs in CI"
-                ),
-            });
+            unreadable(CRATES_DIR.to_string(), e);
             return Vec::new();
         }
     };
-    let mut targets: Vec<String> = entries
-        .filter_map(Result::ok)
-        .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| {
-            // Story 15-1 AC1 / D-2: an underscore-delimited decimal segment
-            // immediately before the J1 suffix is an epic-numbered foreign lane.
-            // `cert_rotation_trigger_14_2a` is executed by the cert-rotation gate;
-            // `j1_2a` has no such segment and remains in the derived set.
-            J1_TEST_SUFFIXES.iter().any(|suffix| {
-                name.strip_suffix(suffix).is_some_and(|stem| {
-                    !stem.rsplit_once('_').is_some_and(|(_, segment)| {
-                        !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit())
+    let mut targets: Vec<(String, String)> = Vec::new();
+    for member in members.filter_map(Result::ok) {
+        let tests_dir = member.path().join("tests");
+        if !tests_dir.is_dir() {
+            continue;
+        }
+        let crate_name = member.file_name().to_string_lossy().into_owned();
+        let entries = match fs::read_dir(&tests_dir) {
+            Ok(entries) => entries,
+            Err(e) => {
+                unreadable(format!("{CRATES_DIR}/{crate_name}/tests"), e);
+                continue;
+            }
+        };
+        targets.extend(
+            entries
+                .filter_map(Result::ok)
+                .filter_map(|entry| entry.file_name().into_string().ok())
+                .filter(|name| {
+                    // Story 15-1 AC1 / D-2: an underscore-delimited decimal segment
+                    // immediately before the J1 suffix is an epic-numbered foreign
+                    // lane. `cert_rotation_trigger_14_2a` is executed by the
+                    // cert-rotation gate; `j1_2a` has no such segment and remains in
+                    // the derived set.
+                    J1_TEST_SUFFIXES.iter().any(|suffix| {
+                        name.strip_suffix(suffix).is_some_and(|stem| {
+                            !stem.rsplit_once('_').is_some_and(|(_, segment)| {
+                                !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit())
+                            })
+                        })
                     })
                 })
-            })
-        })
-        .filter_map(|name| name.strip_suffix(".rs").map(str::to_string))
-        .collect();
+                .filter_map(|name| name.strip_suffix(".rs").map(str::to_string))
+                .map(|stem| (crate_name.clone(), stem)),
+        );
+    }
     targets.sort();
     targets
 }
@@ -869,11 +907,12 @@ fn derive_enrolled_targets(
 /// proven-red tempdir.
 ///
 /// `1b` replaced `2a`'s hand-maintained `ENROLLED_TEST_TARGETS` const with a
-/// derivation over `crates/maos-bin/tests/`. The const was one forgotten line away
-/// from a dead test behind a green gate — `smoke_cli_wrapper_8_12`'s exact failure
-/// re-created inside the gate built to prevent it. Derived, an un-enrolled J1 test
-/// file reds this gate BY CONSTRUCTION. `2a`'s job-scoping is unchanged; only the
-/// source of the list moved.
+/// derivation over `crates/maos-bin/tests/`; 19-4 (D-19-4-11 A) widened it to every
+/// `crates/*/tests/` and made the enrolment crate-qualified. The const was one
+/// forgotten line away from a dead test behind a green gate —
+/// `smoke_cli_wrapper_8_12`'s exact failure re-created inside the gate built to
+/// prevent it. Derived, an un-enrolled J1 test file reds this gate BY
+/// CONSTRUCTION. `2a`'s job-scoping is unchanged.
 fn leg_completion_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>, audit: &mut LegAudit) {
     const CHECK: &'static str = "completion-vectors-enrolled";
     audit.entered();
@@ -907,48 +946,70 @@ fn leg_completion_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>, aud
     // a step `name:` or an `echo` inside the job block is enrollment in prose:
     // the token survives while the behavioural test stops running. Collect the
     // `run:` lines (single-line and `run: |` block bodies — a continuation is
-    // any line indented deeper than its opening `run:`), then match each target
-    // at TOKEN boundaries so `--test foo_1b_extra` cannot satisfy `foo_1b`.
-    let mut run_lines: Vec<String> = Vec::new();
+    // any line indented deeper than its opening `run:`; a shell `#` comment is
+    // prose and is dropped).
+    let mut run_lines: Vec<&str> = Vec::new();
     let mut open_run: Option<usize> = None;
     for line in job_block.lines() {
         let trimmed = line.trim_start();
         let indent = line.len() - trimmed.len();
         if let Some(run_indent) = open_run {
             if indent > run_indent {
-                run_lines.push(structural(line));
+                if !trimmed.starts_with('#') {
+                    run_lines.push(trimmed.trim_end());
+                }
                 continue;
             }
             open_run = None;
         }
         if trimmed.starts_with("run:") || trimmed.starts_with("- run:") {
             open_run = Some(indent);
-            run_lines.push(structural(line));
+            run_lines.push(trimmed.trim_end());
         }
     }
-    let token_bounded = |flat: &str, needle: &str| {
-        flat.find(needle)
-            .map(|at| {
-                let after = &flat[at + needle.len()..];
-                after.is_empty()
-                    || !(after.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
-            })
-            .unwrap_or(false)
-    };
-    for target in derive_enrolled_targets(root, findings, CHECK) {
+    // Story 19-4 D-19-4-11 A — enrolment is CRATE-QUALIFIED: `-p <crate>` and
+    // `--test <stem>` must sit in ONE shell command, each at a token boundary
+    // (the 2c gate's `has_flag_arg` rule), so `--test foo_1b_extra` cannot satisfy
+    // `foo_1b`, `-p maos-iac` is not `-p maos-iac2`, and a `maos-bin` command
+    // cannot enrol a `maos-iac` target of the same stem. A `\`-continued command
+    // is joined first (layout is not structure); `&&`, `||` and `;` end one.
+    let mut commands: Vec<String> = Vec::new();
+    let mut joined = String::new();
+    for line in run_lines {
+        let (body, continued) = match line.strip_suffix('\\') {
+            Some(body) => (body, true),
+            None => (line, false),
+        };
+        joined.push(' ');
+        joined.push_str(body);
+        if !continued {
+            commands.extend(
+                joined
+                    .replace("&&", ";")
+                    .replace("||", ";")
+                    .split(';')
+                    .map(|command| command.split_whitespace().collect::<Vec<_>>().join(" ")),
+            );
+            joined.clear();
+        }
+    }
+    for (crate_name, stem) in derive_enrolled_targets(root, findings, CHECK) {
         audit.checked();
-        let needle = format!("--test{target}");
-        if !run_lines.iter().any(|flat| token_bounded(flat, &needle)) {
+        let enrolled = commands.iter().any(|command| {
+            has_flag_arg(command, "--test", &stem) && has_flag_arg(command, "-p", &crate_name)
+        });
+        if !enrolled {
             findings.push(Finding {
                 check: CHECK,
                 detail: format!(
                     "{WORKFLOW}'s `check-j1-loopback-delegation` JOB does not invoke `cargo \
-                     test -p maos-bin --test {target}` (an occurrence in a DIFFERENT job does \
-                     not count — only this job is Blocking, in gate-registry.toml, and a needs \
-                     of the aggregate). An un-enrolled test target is a suggestion, not a \
-                     control: no CI job runs `-p maos-bin` unscoped, so the vectors would \
-                     never execute. The set is DERIVED from {MAOS_BIN_TESTS_DIR} — adding a J1 \
-                     test file without enrolling it reds this gate by construction",
+                     test -p {crate_name} --test {stem}` (`-p` and `--test` in ONE command; an \
+                     occurrence in a DIFFERENT job does not count — only this job is Blocking, \
+                     in gate-registry.toml, and a needs of the aggregate). An un-enrolled test \
+                     target is a suggestion, not a control: no CI job runs `-p {crate_name}` \
+                     unscoped for this lane, so the vectors would never execute. The set is \
+                     DERIVED from {CRATES_DIR}/*/tests — adding a J1 test file without enrolling \
+                     it reds this gate by construction",
                 ),
             });
         }

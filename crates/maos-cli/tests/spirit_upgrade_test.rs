@@ -18,10 +18,12 @@
 //!    `attestation`/`vetter_keyring` as body fields — never the daemon's
 //!    environment; `--plan` arms the body with `create_plan`,
 //!    `from_version` and absolute `candidates`; and
-//! 2. the MAPPING: every typed response maps to its D-16-1-P exit, with
-//!    `--policy cold-swap` answered by the door's typed 409
-//!    `cold_swap_unsupported`, and `--policy migrator` refused LOCALLY
-//!    (exit 2 — the kernel multi-hop executor is not on the door surface).
+//! 2. the MAPPING: every typed response maps to its D-16-1-P exit. Story
+//!    19-5 (D-19-5-01 A, D-19-5-08 A): all three FR49 policies travel to the
+//!    door — `--policy cold-swap` is performed there (200 `completed`, or the
+//!    typed 409 `cold_swap_unrestorable` / `cold_swap_reverted`, or 500 `cold_swap_failed`), and
+//!    `--policy migrator` is no longer refused locally with exit 2: the door
+//!    answers it (200, or the typed 409 `migrator_not_declared`).
 
 #[path = "support/fixture_door.rs"]
 mod fixture_door;
@@ -157,32 +159,38 @@ fn attestation_and_keyring_travel_in_the_body() {
     );
 }
 
-/// `--policy cold-swap` reaches the door (the body names it) and the
-/// door's typed refusal maps to exit 1 (D-16-1-W: the cold-swap kernel arm
-/// starts an unadmitted successor — the door refuses it, typed).
+/// Story 19-5 (D-19-5-01 A, D-19-5-02 A) — `--policy cold-swap` reaches the
+/// door (the body names it) and each of the door's cold-swap outcomes maps
+/// to its D-16-1-P exit: `completed` is a 200 printed verbatim (exit 0); a
+/// preflight refusal is 409 `cold_swap_unrestorable`, a restored predecessor
+/// is 409 `cold_swap_reverted`, and a failed restore is 500 `cold_swap_failed`
+/// (all refusals exit 1, detail included).
 #[test]
-fn cold_swap_reaches_the_door_and_409_cold_swap_unsupported_maps_to_1() {
-    let door = FixtureDoor::spawn_replying(409, r#"{"error":"cold_swap_unsupported"}"#);
+fn cold_swap_reaches_the_door_and_its_outcomes_map_to_exits() {
+    let completed = r#"{"spirit_id":"butler","policy":"cold-swap","outcome":"completed","pid":7,"predecessor_pid":3,"reports":[]}"#;
+    let door = FixtureDoor::spawn_replying(200, completed);
     let successor = scratch_manifest(door.maos_home(), "successor.toml");
-    let out = door.run(&[
+    let to = successor.to_str().expect("utf8 manifest").to_owned();
+    let args = [
         "spirit",
         "upgrade",
         "butler",
         "--to",
-        successor.to_str().expect("utf8 manifest"),
+        &to,
         "--policy",
         "cold-swap",
-    ]);
+    ];
+    let out = door.run(&args);
     assert_eq!(
         out.status.code(),
-        Some(1),
-        "cold-swap refusal must exit 1 — stderr: {}",
+        Some(0),
+        "a completed cold swap must exit 0 — stderr: {}",
         String::from_utf8_lossy(&out.stderr),
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("cold_swap_unsupported"),
-        "stderr must name the typed error — got: {stderr}"
+    assert_eq!(
+        out.stdout,
+        format!("{completed}\n").into_bytes(),
+        "the 200 report prints verbatim"
     );
     let body = door.requests()[0].json_body();
     assert_eq!(
@@ -190,12 +198,105 @@ fn cold_swap_reaches_the_door_and_409_cold_swap_unsupported_maps_to_1() {
         Some("cold-swap"),
         "the policy flag must reach the door — got {body}"
     );
+
+    for (status, code, detail) in [
+        (
+            409,
+            "cold_swap_unrestorable",
+            "epistemic_port_required: Mira cannot be reconstructed by the door",
+        ),
+        (
+            409,
+            "cold_swap_reverted",
+            "successor refused: rust_inproc_requires_t0: tier T2; predecessor 0.3.0 restored at pid 9",
+        ),
+        (
+            500,
+            "cold_swap_failed",
+            "successor refused: rust_inproc_requires_t0: tier T2; restore refused: manifest_unreadable: gone; spirit 'butler' is not loaded",
+        ),
+    ] {
+        let door = FixtureDoor::spawn_replying(
+            status,
+            &serde_json::json!({ "error": code, "detail": detail }).to_string(),
+        );
+        let successor = scratch_manifest(door.maos_home(), "successor.toml");
+        let to = successor.to_str().expect("utf8 manifest").to_owned();
+        let out = door.run(&[
+            "spirit",
+            "upgrade",
+            "butler",
+            "--to",
+            &to,
+            "--policy",
+            "cold-swap",
+        ]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(
+            out.status.code(),
+            Some(1),
+            "{code} must exit 1 — stderr: {stderr}"
+        );
+        for needle in [code, detail, &format!("HTTP {status}")] {
+            assert!(
+                stderr.contains(needle),
+                "stderr must carry {needle:?} — got: {stderr}"
+            );
+        }
+        assert_eq!(door.request_count(), 1, "exactly one round trip");
+    }
 }
 
-/// `--policy migrator` names the kernel's multi-hop executor, which the
-/// door does not expose — refused LOCALLY, exit 2, no round trip.
+/// Story 19-5 (D-19-5-08 A) — `--policy migrator` is no longer refused
+/// locally (it exited 2 with no round trip at 16-1): it reaches the door as
+/// `"policy":"migrator"`, a 200 exits 0, and the door's typed 409
+/// `migrator_not_declared` exits 1 naming it.
 #[test]
-fn migrator_policy_refused_locally_without_a_round_trip() {
+fn migrator_policy_reaches_the_door_and_its_outcomes_map_to_exits() {
+    let door = FixtureDoor::spawn();
+    let successor = scratch_manifest(door.maos_home(), "successor.toml");
+    let to = successor.to_str().expect("utf8 manifest").to_owned();
+    let args = [
+        "spirit", "upgrade", "butler", "--to", &to, "--policy", "migrator",
+    ];
+    let out = door.run(&args);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "the migrator policy is a door verb now, not a local exit 2 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
+    );
+    let requests = door.requests();
+    assert_eq!(requests.len(), 1, "exactly one round trip");
+    assert_eq!(requests[0].path, ROUTE);
+    let body = requests[0].json_body();
+    assert_eq!(
+        body.get("policy").and_then(|v| v.as_str()),
+        Some("migrator"),
+        "the policy flag must reach the door — got {body}"
+    );
+
+    let door = FixtureDoor::spawn_replying(
+        409,
+        r#"{"error":"migrator_not_declared","detail":"successor declares no [migrates_from]"}"#,
+    );
+    let successor = scratch_manifest(door.maos_home(), "successor.toml");
+    let to = successor.to_str().expect("utf8 manifest").to_owned();
+    let out = door.run(&[
+        "spirit", "upgrade", "butler", "--to", &to, "--policy", "migrator",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "stderr: {stderr}");
+    assert!(
+        stderr.contains("migrator_not_declared") && stderr.contains("HTTP 409"),
+        "stderr must name the typed refusal — got: {stderr}"
+    );
+}
+
+/// An unknown policy is still a local usage error (exit 2, no round trip):
+/// clap's value enum is the only parser of `--policy`.
+#[test]
+fn an_unknown_policy_is_refused_locally_without_a_round_trip() {
     let door = FixtureDoor::spawn();
     let successor = scratch_manifest(door.maos_home(), "successor.toml");
     let out = door.run(&[
@@ -205,14 +306,10 @@ fn migrator_policy_refused_locally_without_a_round_trip() {
         "--to",
         successor.to_str().expect("utf8 manifest"),
         "--policy",
-        "migrator",
+        "warp-swap",
     ]);
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(
-        door.request_count(),
-        0,
-        "a locally-refused policy must not touch the door"
-    );
+    assert_eq!(door.request_count(), 0);
 }
 
 /// `--from`/`--candidates` are plan-building inputs: without `--plan` they
