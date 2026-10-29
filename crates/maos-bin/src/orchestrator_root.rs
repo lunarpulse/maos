@@ -278,9 +278,10 @@ pub fn plant_test_halt(
 }
 
 /// The [`CRASH_PLANT_ENV`] plant: debug builds only, never on a re-dispatch.
-/// A root task polls until the Worker bound to `task_id` has a child, then
-/// kills it through the supervisor's signal/teardown without a planned stop,
-/// so the kernel handles a real crash. The caller aborts it after the run.
+/// A root task polls until the Worker bound to `task_id` has finished launch
+/// and entered exit observation, then kills it without a planned stop, so
+/// the kernel handles a real crash. CID ownership alone is not readiness:
+/// it is published before `init`/`start`. The caller aborts it after the run.
 pub fn plant_test_crash(
     supervisor: &Arc<crate::supervision::WorkerSupervisor>,
     task_id: &str,

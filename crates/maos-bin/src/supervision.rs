@@ -1956,12 +1956,17 @@ mod worker {
         /// Story 19-6 harness plant only (`orchestrator_root::CRASH_PLANT_ENV`):
         /// kill the Running Worker bound to `task_id` through the stop path's
         /// signal/teardown but WITHOUT `begin_stop`, so its exit is a crash the
-        /// kernel handles. `false` until that Worker has a child or container.
-        pub(crate) fn test_only_crash_task(&self, task_id: &str) -> bool {
+        /// kernel handles. Wait for `watch`, which runs only AFTER launch and
+        /// spawn-report commit: a CID is published during `create`, before
+        /// `init`/`start`, and signalling then cancels launch instead of crashing
+        /// a Worker. The recorded client PID also covers no-pidfd observation.
+        #[doc(hidden)]
+        pub fn test_only_crash_task(&self, task_id: &str) -> bool {
             let target = self.registry.active().into_iter().find(|core| {
-                core.task_id() == task_id
-                    && core.phase() == BindingPhase::Running
-                    && (core.child_handle().is_some() || core.container_terminal().is_some())
+                let state = core.lock();
+                state.record.task_id == task_id
+                    && state.phase == BindingPhase::Running
+                    && state.child_pid.is_some()
             });
             target
                 .map(|core| core.signal(Instant::now() + TEARDOWN_BUDGET))
