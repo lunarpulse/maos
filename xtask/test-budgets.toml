@@ -24,7 +24,7 @@
 # `pkgid` are `// cargo-query:` instead and need no row.
 
 default_seconds = 30
-total_seconds = 800
+total_seconds = 1100   # 800 -> 1100 (x1.25 of 880.6 s hosted CI Σ, run 40955589411 @ cf78d16e): E19 wave-2 adds the T3 Worker/queue/effect-oracle vectors (19-2, 19-3, 19-6); recalibrate on the landing junit
 
 # Story 18-5-context-token-budget-accounting: context_budget_18_5,
 # context_refusal_18_5, context_signal_18_5, context_budget_gate_18_5 and
@@ -61,6 +61,12 @@ binary = "maos-eval::t3_network_escape_executor"
 seconds = 40
 reason = "20-3a AC11 versioned containment scenarios (24 executed) through verified production T3, plus the M3 socket-custody pair; CI Σ 19.9-32.1 s on the five post-20-12 main junits (20-12-evidence/ci-after.json + run 40080259088); 40 is the ruled figure (R3)"
 owner = "18-0-green-main-ci-baseline"
+
+[[exception]]
+binary = "maos-bin::worker_freeze_19_2"
+seconds = 66
+reason = "19-2 AC7 Worker pause and spawn-token revoke latency vectors: 20 door pauses and 20 real-operator-door revokes on a real T3 chatty Worker; CI Σ 52.978 s on hosted run 40955589411 @ cf78d16e; budget = observed + 25 %"
+owner = "19-2-fr20-enqueue-door-and-safe-point"
 
 # --- Expensive tests (ignored in the default run) ---------------------------
 
