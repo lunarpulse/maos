@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 19.3: Fixture Worker hermetically, real Worker on the operator lane, with an effect oracle ◆ FLAG-Winston
 
-Status: in-progress (RULED 2026-10-28; dev candidate c535e434 + review corrections 2026-10-29)
+Status: in-progress (RULED 2026-10-28; candidate 9fea84c0 (earlier: c535e434) + review corrections 2026-10-29)
 
 <!-- Created 2026-10-28 at d9bd59c4 (19-1 + 19-7 implemented and reviewed, not yet on origin/main b35c9284) by bmad-create-story under the lighter creation contract, in parallel with 19-2 and 19-6 (wave 2; each depends only on 19-1, whose code is in the tree). D-19-3-01…11 are PROPOSED, not ruled — the operator rules; the parent flips `sprint-status.yaml:289` (records-owed R3). NO cargo was run (another cargo process held the host): every cite re-read at HEAD; per-crate kloc by the kloc-check instrument replicated (tokei 14.0.0, argv `xtask/src/kloc_check.rs:294-318`); kernel physical lines by `git ls-files | xargs cat | wc -l`; the K2 prototype, its keep-id variant and the D-19-3-07 A deletion measured on scratch copies under /tmp built from `git show d9bd59c4:`. No crate source changed, even temporarily. Cargo confirmations are listed as "Measurements owed". Evidence: `19-3-real-worker-default-with-effect-oracle-evidence/creation/`. -->
 
@@ -88,6 +88,8 @@ Measured at `d9bd59c4`. `git diff --stat f34f6b4e..d9bd59c4` touches no `maos-ke
 | aggregate | ≈ +45 central (+20…+95) → ≤ 189973 of 191061 | Σ |
 
 Test literal sites (uncharged): `T3SpawnContext` in `worker_terminal_facts_17_7/{runtime,startup,stub}_scenes.rs:56,95,106`, `maos-kernel-core/tests/sandbox_t3_spawn_linux.rs:71`, `t3_terminal_helpers_17_7.rs:361`; `T3Launch` `maos-eval/tests/t3_network_escape_executor.rs:302`; `build_runtime_argv` `worker_resource_limits_17_2.rs:597`, `t3_argv_custody_17_1.rs:70`.
+
+**Round 2 (2026-10-29, @`9fea84c0`, ask `w4_kloc`):** the E19 endpoints move to maos-bin **32086** / aggregate **192045** (`epics/epic-19-founder-loop-w4.md:40,48`); measured xtask **47474** inside 47688 (`xtask/kloc.toml:339`: 47473 → 47474, +1 — the demo-j1 hermetic run drops `MAOS_WORKER_WORKSPACES_ROOT`). Cross-story table: 19-2's Dev Agent Record round-2 entry.
 
 ## Decisions — RULED 2026-10-28 (operator rulings via ask; letters and ask ids in the Status column)
 
@@ -270,8 +272,14 @@ anthropic/claude-opus-5-5 (creation).
 ### Debug Log References
 
 - `19-3-real-worker-default-with-effect-oracle-evidence/creation/{measurements.md, cites-d9bd59c4.md, records-owed.md, tokei-d9bd59c4.json, k2-prototype-d9bd59c4.diff, k2-keepid-variant-d9bd59c4.diff, d1044-a-liveness-removal-sketch.diff}`.
+- Round-2 plants (written, NOT yet compiled or run): `19-3-…-evidence/plants.md` with `ac2-effect-gate-removed-`, `ac3-unenrolled-`, `ac4-host-probe-reinserted-plant.diff`; hosted run via `19-2-…-evidence/ci/ci-w2-verify.yml` (shared with 19-2/19-6).
 
 ### Completion Notes List
+- **Review correction round 2 (2026-10-29, tree @`9fea84c0`; candidate `9fea84c0`, earlier `c535e434`).** Cites re-read at `9fea84c0`:
+- The demo-j1 hermetic daemon run no longer inherits `MAOS_WORKER_WORKSPACES_ROOT` (`xtask/src/demo_j1.rs:572-573`; the live run already dropped it, `:1369-1370`).
+- `maos purge`'s `podman unshare` fallback honours protected paths: a root holding a skipped path is never handed to `rm -rf` wholesale — the fallback runs per child holding none (`crates/maos-bin/src/purge.rs:1348-1392`; `protected_paths` `:1112-1141`).
+- Measured kloc: xtask 47474 of envelope 47688 (`xtask/kloc.toml:339`, +1); aggregate 191405 (`:718`) inside the `w4_kloc` envelope 192045. Cross-story table and local gate evidence: 19-2's Dev Agent Record round-2 entry.
+- Open: the round-2 plants and `ci/ci-w2-verify.yml` are NOT yet compiled or run; the hosted proof is pending — Status stays in-progress.
 
 ### File List
 
@@ -280,3 +288,4 @@ anthropic/claude-opus-5-5 (creation).
 - 2026-10-28: Story created at `d9bd59c4` (ready-for-dev pending the operator's rulings on D-19-3-01…11). Epic §19-3 cites re-measured (14 substitutions owed, records-owed R1); `deferred-work.md:1125` → `:1044`; K2 re-measured by scratch replication (+11 / +9; endpoints 26389 / 20628 under the confirmed 26390 / 20628); cargo confirmations owed.
 - 2026-10-28: Operator rulings recorded (ask `w2_19_3`): D-19-3-01…10 RULED **A**; D-19-3-11 RULED **C** (ask `w2_19_3_d11`) — an operator-approved scope cut: AC3's real-spawn bench clause struck from AC3.3 and routed to `20-7-stable-runner-perf-gates`; kloc forecast line pinned to maos-bench **0**; Status → ready-for-dev (RULED 2026-10-28).
 - 2026-10-29: Review corrections and rulings recorded as an amendment block under the ACs: refused-walk semantics (only `RootUnlistable` is unproven; OverCap / I/O below the root prove an effect — Blind19x3 P2-1); adapters gated by default; empty workspace removed on spawn failure; `MAOS_WORKER_WORKSPACES_ROOT` + post-run free-space warning (ruling `r19_3_disk`); RELEASE-HOLDS Claim boundaries row 20 (ruling `r19_3_hold_kind` — non-blocking); purge handles subuid-owned workspaces (`podman unshare`, protected paths honoured); demo-j1 relative workspace print and cleanup. Tasks not marked done; status stays in-progress.
+- 2026-10-29: Review correction round 2 at candidate `9fea84c0` (earlier: `c535e434`): the demo-j1 hermetic daemon run drops `MAOS_WORKER_WORKSPACES_ROOT` (`xtask/src/demo_j1.rs:572-573`); `maos purge`'s `podman unshare` fallback honours protected paths (`purge.rs:1348-1392`, `protected_paths` `:1112-1141`); xtask measured 47474 of envelope 47688 (`xtask/kloc.toml:339`, +1) inside the `w4_kloc` envelope (maos-bin 32086, aggregate 192045) — cross-story table in 19-2's round-2 entry. Plants + `ci/ci-w2-verify.yml` not yet run; hosted proof pending; tasks not marked done; status stays in-progress.
