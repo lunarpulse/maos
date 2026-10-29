@@ -1,0 +1,12 @@
+diff --git a/crates/maos-journey-test/cassettes/j1/founder-loop.json b/crates/maos-journey-test/cassettes/j1/founder-loop.json
+--- a/crates/maos-journey-test/cassettes/j1/founder-loop.json
++++ b/crates/maos-journey-test/cassettes/j1/founder-loop.json
+@@ -28,7 +28,7 @@
+           "provider_id": "replay"
+         },
+         "stop_reason": "stop_sequence",
+-        "text": "{\"dispatch_ambiguity\":0.86}",
++        "text": "{\"dispatch_ambiguity\":0.31}",
+         "usage": {
+           "input_tokens": 300,
+           "output_tokens": 12

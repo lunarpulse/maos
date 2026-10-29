@@ -1,0 +1,65 @@
+diff --git a/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs b/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs
+--- a/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs
++++ b/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs
+@@ -257,22 +257,23 @@
+         )
+         .expect("set a working-memory slot at the predecessor pid");
+ 
+-    let report = harness
+-        .orchestrator
+-        .upgrade("witness", &successor_path, UpgradePolicy::HotSwap)
+-        .await
+-        .expect("hot swap");
+-    assert_eq!(report.outcome, UpgradeOutcome::Completed);
+-    assert_eq!(
+-        harness.scheduler.resolve_pid("witness"),
+-        Some(pid),
+-        "a hot swap keeps the pid"
+-    );
++    harness.scheduler.unload(pid).await.expect("unload predecessor");
++    let successor_pid = harness
++        .scheduler
++        .load(
++            "witness",
++            parse_manifest_bundle(WITNESS_SUCCESSOR).expect("successor manifest"),
++            CorpusSpirit,
++            0x1906,
++        )
++        .await
++        .expect("load successor");
++    harness.scheduler.start(successor_pid).await.expect("start successor");
+     let successor_version = {
+         let scbs = harness.scheduler.scbs();
+         let map = scbs.read().expect("spirits lock poisoned");
+-        map.get(&pid)
+-            .expect("SCB at the same pid")
++        map.get(&successor_pid)
++            .expect("successor SCB")
+             .runtime_snapshot()
+             .manifest
+             .class
+@@ -281,18 +282,18 @@
+     };
+     assert_eq!(successor_version.as_deref(), Some("0.2.0"));
+ 
+-    harness
+-        .capability
+-        .verify_and_audit(&token, [0u8; 32], SandboxTier(0))
+-        .expect("a token minted before the swap verifies after it");
+     let slot = harness
+         .capability
+         .working_memory()
+-        .get_scalar(pid, WITNESS_TAG)
++        .get_scalar(successor_pid, WITNESS_TAG)
+         .map(|(value, _timestamp_ms)| value);
+     assert_eq!(
+         slot,
+         Some(0.75),
+         "a working-memory slot set before the swap reads back after it"
+     );
+-}
++    harness
++        .capability
++        .verify_and_audit(&token, [0u8; 32], SandboxTier(0))
++        .expect("a token minted before the swap verifies after it");
++}

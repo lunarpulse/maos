@@ -1,0 +1,44 @@
+diff --git a/crates/maos-bin/src/operator_door.rs b/crates/maos-bin/src/operator_door.rs
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -1518,26 +1518,31 @@
+     /// triple's own rollback does) so the restore can re-admit the id.
+     #[cfg(feature = "network")]
+     async fn admit_and_start(&self, spirit_id: &str, manifest: &Path) -> Result<u32, String> {
+-        let admitted = self
++        let text = std::fs::read_to_string(manifest).map_err(|error| error.to_string())?;
++        let (gated, spirit) = self
+             .private_ops
+-            .load_spirit(manifest, None)
++            .prepare_spirit(manifest, &text)
++            .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
++        let pid = self
++            .scheduler
++            .load_obj(&gated.spirit_id, gated.bundle(), spirit, 0)
+             .await
+-            .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
+-        if admitted.spirit_id != spirit_id {
+-            let unwound = self.scheduler.unload(admitted.pid).await;
++            .map_err(|error| error.to_string())?;
++        if gated.spirit_id != spirit_id {
++            let unwound = self.scheduler.unload(pid).await;
+             return Err(format!(
+                 "target_manifest_mismatch: admitted {}; unwind: {unwound:?}",
+-                admitted.spirit_id
++                gated.spirit_id
+             ));
+         }
+-        if let Err(error) = self.scheduler.start(admitted.pid).await {
+-            let unwound = self.scheduler.unload(admitted.pid).await;
++        if let Err(error) = self.scheduler.start(pid).await {
++            let unwound = self.scheduler.unload(pid).await;
+             return Err(match unwound {
+                 Ok(_) => format!("start_failed: {error}"),
+                 Err(unwind) => format!("start_failed: {error}; unwind unload failed: {unwind}"),
+             });
+         }
+-        Ok(admitted.pid)
++        Ok(pid)
+     }
+ 
+     /// Precheck the LOADED SCB through the daemon's real coordinator. Writes

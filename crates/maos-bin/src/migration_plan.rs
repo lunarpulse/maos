@@ -5,6 +5,10 @@
 //! This composition-root module deliberately owns orchestration only: the
 //! cohort crate resolves and hashes candidate chains, while every hop still
 //! calls the kernel's existing single-hop `UpgradeOrchestrator::upgrade`.
+//! The final candidate is bound to the door's vetted snapshot, not reopened.
+//! Each intermediate hop checks its single read against the planned class and
+//! version before mutation; identity drift is a typed, non-destructive refusal.
+//! Every execution snapshot also passes the caller's direct-target vetting gate.
 
 use std::path::{Path, PathBuf};
 
@@ -44,15 +48,17 @@ pub async fn upgrade_with_plan_guard(
     orchestrator: &UpgradeOrchestrator,
     spirit_id: &str,
     successor_manifest: &Path,
+    original_target: &Path,
     policy: UpgradePolicy,
-    mut before_hop: impl FnMut(&Path),
+    mut before_hop: impl FnMut(&Path) -> Result<(), UpgradeFailure>,
     mut committed: impl FnMut(&str),
 ) -> Result<Vec<UpgradeReport>, UpgradeFailure> {
-    let Some((plan_path, plan)) = load_plan(spirit_id)? else {
+    let Some((plan_path, mut plan)) = load_plan(spirit_id)? else {
         return upgrade_hop(
             orchestrator,
             spirit_id,
             successor_manifest,
+            None,
             policy,
             &mut before_hop,
             &mut committed,
@@ -85,29 +91,63 @@ pub async fn upgrade_with_plan_guard(
         .into());
     }
 
+    // Substitute the vetted final snapshot BEFORE any candidate is reopened.
+    // Repointed aliases deliberately fail closed, even for byte-identical contents.
+    let original_target = original_target.to_string_lossy();
+    let mut bound = false;
+    for path in &mut plan.candidate_manifest_paths {
+        if same_manifest_path(path, &original_target) {
+            *path = successor_manifest.display().to_string();
+            bound = true;
+        }
+    }
+    let target_mismatch = || UpgradeFailure {
+        code: "migration_target_mismatch",
+        detail: "persisted plan does not execute the requested target snapshot; re-plan".into(),
+        invalid: true,
+    };
+    if !bound {
+        return Err(target_mismatch());
+    }
     let candidates = load_candidates(&plan.candidate_manifest_paths)?;
     let live_chain = resolve_migration_chain(&plan.from_version, &plan.to_version, &candidates)
         .map_err(|error| error.to_string())?;
     plan.verify_live_chain(&live_chain)
         .map_err(|error| error.to_string())?;
+    let hop_source = |successor: &MigrationCandidate| {
+        plan.candidate_manifest_paths
+            .iter()
+            .zip(&candidates)
+            .find_map(|(path, candidate)| (candidate == successor).then_some(Path::new(path)))
+    };
+    if live_chain
+        .hops()
+        .last()
+        .is_some_and(|hop| hop_source(&hop.successor) != Some(successor_manifest))
+    {
+        return Err(target_mismatch());
+    }
+    #[cfg(debug_assertions)]
+    if let Some(marker) = std::env::var_os("MAOS_TEST_ONLY_UPGRADE_PRECHECKED") {
+        maos_bin::operator_door::upgrade_test_checkpoint(
+            &PathBuf::from(marker).with_extension("hop"),
+        )
+        .await?;
+    }
 
     let mut reports = Vec::with_capacity(live_chain.hops().len());
     for hop in live_chain.hops() {
-        let manifest_path = plan
-            .candidate_manifest_paths
-            .iter()
-            .zip(&candidates)
-            .find_map(|(path, candidate)| (candidate == &hop.successor).then_some(path))
-            .ok_or_else(|| {
-                format!(
-                    "approved migration hop {} -> {} has no candidate manifest path",
-                    hop.predecessor_version, hop.successor.version
-                )
-            })?;
+        let manifest_path = hop_source(&hop.successor).ok_or_else(|| {
+            format!(
+                "approved migration hop {} -> {} has no candidate manifest path",
+                hop.predecessor_version, hop.successor.version
+            )
+        })?;
         let report = match upgrade_hop(
             orchestrator,
             spirit_id,
-            Path::new(manifest_path),
+            manifest_path,
+            Some(&hop.successor),
             policy,
             &mut before_hop,
             &mut committed,
@@ -150,21 +190,38 @@ pub async fn upgrade_with_plan_guard(
     Ok(reports)
 }
 /// Each successful hop is a committed incarnation, even if a later hop
-/// fails. Check its ABI and stage its own constructor source before mutation,
+/// fails. Check its planned identity/ABI and stage its own constructor source before mutation,
 /// then record its accepted text before executing any following hop.
 async fn upgrade_hop(
     orchestrator: &UpgradeOrchestrator,
     spirit_id: &str,
     manifest: &Path,
+    expected: Option<&MigrationCandidate>,
     policy: UpgradePolicy,
-    before_hop: &mut impl FnMut(&Path),
+    before_hop: &mut impl FnMut(&Path) -> Result<(), UpgradeFailure>,
     committed: &mut impl FnMut(&str),
 ) -> Result<UpgradeReport, UpgradeFailure> {
     let text = std::fs::read_to_string(manifest)
         .map_err(|error| format!("read upgrade hop {}: {error}", manifest.display()))?;
-    check_upgrade_abi(spirit_id, text.as_bytes())?;
+    let class = check_upgrade_abi(spirit_id, text.as_bytes())?;
+    if class.name != spirit_id
+        || expected.is_some_and(|hop| class.name != hop.class || class.version != hop.version)
+    {
+        return Err(UpgradeFailure {
+            code: "migration_hop_identity_mismatch",
+            detail: format!(
+                "upgrade hop {} changed identity to {}@{}; expected {}@{}",
+                manifest.display(),
+                class.name,
+                class.version,
+                spirit_id,
+                expected.map_or("requested successor", |hop| hop.version.as_str())
+            ),
+            invalid: true,
+        });
+    }
     let snapshot = ManifestSnapshot::new(text.as_bytes()).map_err(|error| error.to_string())?;
-    before_hop(&snapshot.0);
+    before_hop(&snapshot.0)?;
     let report = orchestrator
         .upgrade(spirit_id, &snapshot.0, policy)
         .await

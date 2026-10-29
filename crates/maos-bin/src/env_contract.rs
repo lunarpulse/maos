@@ -210,7 +210,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_TEST_ONLY_UPGRADE_PRECHECKED",
-        purpose: "Debug-build-only: writes this marker after upgrade prechecks and waits at most two seconds for its removal, allowing deterministic successor-path replacement; release builds never read it",
+        purpose: "Debug-build-only: writes this marker after door upgrade prechecks, and the same path with extension `hop` after plan verification; each waits at most two seconds for removal, allowing deterministic successor/candidate-path replacement; release builds never read it",
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {

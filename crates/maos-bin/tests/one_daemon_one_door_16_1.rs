@@ -1678,18 +1678,14 @@ fn cold_swap_admits_the_prechecked_successor_when_the_target_path_changes() {
     let target = write_fixture(fixtures.path(), "successor.toml", &checked);
     std::thread::scope(|scope| {
         let command = scope.spawn(|| upgrade(&root, &target, Some("cold-swap")));
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while !marker.exists() {
-            assert!(Instant::now() < deadline, "door never reached prechecks");
-            std::thread::yield_now();
-        }
-        std::fs::write(
-            &target,
-            std::fs::read(workspace_root().join("spirits/nash/manifest.toml"))
-                .expect("Nash source"),
-        )
-        .expect("replace target");
-        std::fs::remove_file(&marker).expect("release precheck");
+        release_upgrade_checkpoint(&marker, || {
+            std::fs::write(
+                &target,
+                std::fs::read(workspace_root().join("spirits/nash/manifest.toml"))
+                    .expect("Nash source"),
+            )
+            .expect("replace target");
+        });
         let out = command.join().expect("upgrade thread");
         assert_eq!(code(&out), 0, "{}", stderr(&out));
     });
@@ -1700,6 +1696,181 @@ fn cold_swap_admits_the_prechecked_successor_when_the_target_path_changes() {
             .expect("admitted bytes"),
         checked
     );
+}
+
+fn release_upgrade_checkpoint(marker: &Path, mutate: impl FnOnce()) {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while !marker.exists() {
+        assert!(
+            Instant::now() < deadline,
+            "upgrade never reached {}",
+            marker.display()
+        );
+        std::thread::yield_now();
+    }
+    mutate();
+    std::fs::remove_file(marker).expect("release upgrade checkpoint");
+}
+
+#[test]
+fn planned_upgrade_uses_the_vetted_final_snapshot() {
+    replace_planned_candidate(CandidateReplacement::FinalTrust);
+}
+
+#[test]
+fn planned_upgrade_refuses_an_intermediate_identity_change_before_mutation() {
+    replace_planned_candidate(CandidateReplacement::IntermediateIdentity);
+}
+
+#[test]
+fn planned_upgrade_refuses_an_initially_unvetted_intermediate() {
+    replace_planned_candidate(CandidateReplacement::IntermediateTrustInitially);
+}
+
+#[test]
+fn planned_upgrade_vets_the_intermediate_snapshot_after_path_replacement() {
+    replace_planned_candidate(CandidateReplacement::IntermediateTrustAfterVerification);
+}
+
+#[derive(Clone, Copy)]
+enum CandidateReplacement {
+    FinalTrust,
+    IntermediateIdentity,
+    IntermediateTrustInitially,
+    IntermediateTrustAfterVerification,
+}
+
+fn replace_planned_candidate(replacement: CandidateReplacement) {
+    let intermediate = !matches!(replacement, CandidateReplacement::FinalTrust);
+    let fixtures = tempfile::TempDir::new().expect("plan handshake");
+    let marker = fixtures.path().join("prechecked");
+    let root = Root::butler_with(
+        "plan-snapshot",
+        &[("MAOS_TEST_ONLY_UPGRADE_PRECHECKED", utf8(&marker))],
+    );
+    let checked = butler_at("0.3.2", "[migrates_from]\nversions = [\"0.3.1\"]\n");
+    let mut middle_text = butler_at("0.3.1", "[migrates_from]\nversions = [\"0.3.0\"]\n");
+    if matches!(
+        replacement,
+        CandidateReplacement::IntermediateTrustInitially
+    ) {
+        middle_text =
+            middle_text.replace("trust_tier = \"local\"", "trust_tier = \"public-vetted\"");
+    }
+    let target = write_fixture(fixtures.path(), "final.toml", &checked);
+    let middle = write_fixture(fixtures.path(), "middle.toml", &middle_text);
+    let candidates = format!("{},{}", utf8(&middle), utf8(&target));
+    let plan = root.ctl(&[
+        "spirit",
+        "upgrade",
+        "butler",
+        "--to",
+        utf8(&target),
+        "--plan",
+        "--candidates",
+        &candidates,
+    ]);
+    assert_eq!(code(&plan), 0, "{}", stderr(&plan));
+    let pid = pid_of(&root, "butler");
+    let rows = root.tl_frames().len();
+    let out = std::thread::scope(|scope| {
+        let command = scope.spawn(|| upgrade(&root, &target, None));
+        release_upgrade_checkpoint(&marker, || {
+            if !intermediate {
+                let swapped =
+                    checked.replace("trust_tier = \"local\"", "trust_tier = \"public-vetted\"");
+                assert_ne!(swapped, checked);
+                std::fs::write(&target, swapped).expect("replace vetted final candidate");
+            }
+        });
+        release_upgrade_checkpoint(&marker.with_extension("hop"), || {
+            let swapped = match replacement {
+                CandidateReplacement::IntermediateIdentity => Some(
+                    middle_text
+                        .replace("name = \"butler\"", "name = \"nash\"")
+                        .replace("version = \"0.3.1\"", "version = \"9.0.0\""),
+                ),
+                CandidateReplacement::IntermediateTrustAfterVerification => Some(
+                    middle_text.replace("trust_tier = \"local\"", "trust_tier = \"public-vetted\""),
+                ),
+                _ => None,
+            };
+            if let Some(swapped) = swapped {
+                assert_ne!(swapped, middle_text);
+                std::fs::write(&middle, swapped).expect("replace validated intermediate");
+            }
+        });
+        command.join().expect("planned upgrade thread")
+    });
+    assert_eq!(pid_of(&root, "butler"), pid);
+    assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+    if intermediate {
+        assert_eq!(code(&out), 1, "{}", stderr(&out));
+        let reason = if matches!(replacement, CandidateReplacement::IntermediateIdentity) {
+            "migration_hop_identity_mismatch"
+        } else {
+            "vetting_precondition_failed"
+        };
+        for needle in [reason, "HTTP 400"] {
+            assert!(stderr(&out).contains(needle), "{}", stderr(&out));
+        }
+        assert!(!root.archives.join("butler/0.3.1").exists());
+        assert!(!root
+            .tl_frames()
+            .iter()
+            .skip(rows)
+            .any(|frame| frame.intent == "spirit.upgrade"));
+    } else {
+        assert_eq!(code(&out), 0, "{}", stderr(&out));
+        assert!(
+            root.archives.join("butler/0.3.1/manifest.toml").is_file(),
+            "the intermediate hop committed"
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.archives.join("butler/0.3.2/manifest.toml"))
+                .expect("final archive"),
+            checked
+        );
+    }
+}
+
+#[test]
+fn planned_upgrade_refuses_an_alternate_final_candidate_instead_of_the_vetted_target() {
+    let root = Root::butler("alternate-final");
+    let target = write_fixture(&root.scratch, "requested.toml", &butler_at("0.3.1", ""));
+    let alternate = write_fixture(
+        &root.scratch,
+        "alternate.toml",
+        &butler_at("0.3.1", "[migrates_from]\nversions = [\"0.3.0\"]\n")
+            .replace("trust_tier = \"local\"", "trust_tier = \"public-vetted\""),
+    );
+    let candidates = format!("{},{}", utf8(&alternate), utf8(&target));
+    let plan = root.ctl(&[
+        "spirit",
+        "upgrade",
+        "butler",
+        "--to",
+        utf8(&target),
+        "--plan",
+        "--candidates",
+        &candidates,
+    ]);
+    assert_eq!(code(&plan), 0, "{}", stderr(&plan));
+    let pid = pid_of(&root, "butler");
+    let rows = root.tl_frames().len();
+    let out = upgrade(&root, &target, None);
+    assert_eq!(code(&out), 1, "{}", stderr(&out));
+    for needle in ["migration_target_mismatch", "HTTP 400"] {
+        assert!(stderr(&out).contains(needle), "{}", stderr(&out));
+    }
+    assert_eq!(pid_of(&root, "butler"), pid);
+    assert_eq!(root.lifecycle_state("butler").as_deref(), Some("Running"));
+    assert!(!root.archives.join("butler/0.3.1").exists());
+    assert!(!root
+        .tl_frames()
+        .iter()
+        .skip(rows)
+        .any(|frame| frame.intent == "spirit.upgrade"));
 }
 
 /// Intermediate targets receive the same door ABI codes as a direct target.

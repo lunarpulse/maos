@@ -768,6 +768,22 @@ fn a_malformed_hold_bound_is_refused_before_any_emit() {
     );
 }
 
+/// Stop before Worker admission so the real epic shutdown path runs without
+/// a T3 prerequisite; its last Orchestrator must release the audit sender.
+#[test]
+fn an_epic_once_halted_before_its_first_worker_drains_without_timeout() {
+    let home = tempfile::TempDir::new().expect("data home");
+    let run = EpicRun::spawn(home.path(), &[(HALT_PLANT_ENV, "1")]);
+    let (status, events, stderr) = run.finish(Duration::from_secs(20), "the epic shutdown drain");
+    assert!(status.success(), "stderr:\n{stderr}");
+    assert_eq!(named(&events, "dispatch_halted").len(), 1, "{events:?}");
+    assert!(named(&events, "delegation_routed").is_empty(), "{events:?}");
+    assert!(
+        !stderr.contains("audit writer topology drain timed out"),
+        "stderr:\n{stderr}"
+    );
+}
+
 /// Fast deterministic race vectors: real halt invocation/resolver/memory and
 /// the production hold/judgement seams, without subprocesses or networking.
 mod races {
@@ -1343,6 +1359,29 @@ mod races {
             root::dispatch_stop(&f.registry, pid, Some(successor), 2, 3).unwrap()
                 ["orchestrator_unloaded"],
             true
+        );
+    }
+
+    #[test]
+    fn dropping_the_last_runtime_releases_its_judgement_binding_without_pruning() {
+        let f = Fixture::new();
+        let scalar: Arc<dyn EpistemicScalarPort> = Arc::new(Scalar {
+            fixture: Arc::downgrade(&f),
+            pid: 19,
+            threshold: 0.5,
+            calls: Arc::new(AtomicUsize::new(0)),
+            name: "runtime-lifetime",
+        });
+        let weak = Arc::downgrade(&scalar);
+        let runtime = root::judgement_runtime(emitter(Arc::clone(&scalar)), scalar);
+        let last = Arc::clone(&runtime);
+        drop(runtime);
+        assert!(weak.upgrade().is_some(), "a live runtime owns its binding");
+        drop(last);
+        // No subsequent registration, lookup, or explicit registry prune.
+        assert!(
+            weak.upgrade().is_none(),
+            "the static registry must not retain the scalar's audit sender"
         );
     }
 

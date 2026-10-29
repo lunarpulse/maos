@@ -123,22 +123,51 @@ pub fn construct_at_admitted_pid(
 }
 
 type RuntimeObject = dyn maos_kernel_core::scheduler::control_block::AnySpiritObj;
-type LiveJudgement = (std::sync::Weak<RuntimeObject>, Orchestrator);
+type LiveJudgement = (
+    std::sync::Weak<RuntimeObject>,
+    std::sync::Weak<Orchestrator>,
+);
 static LIVE_JUDGEMENTS: std::sync::LazyLock<Mutex<Vec<LiveJudgement>>> =
     std::sync::LazyLock::new(|| Mutex::new(Vec::new()));
 
+// Only the runtime owns this lifetime port. Its binding uses the original
+// scalar, not this wrapper, so there is no ownership cycle or static sender.
+struct JudgementLifetime {
+    _binding: Arc<Orchestrator>,
+    scalar: Arc<dyn EpistemicScalarPort>,
+}
+impl EpistemicScalarPort for JudgementLifetime {
+    fn write_scalar(
+        &self,
+        pid: u32,
+        spirit_id: &str,
+        tag: &str,
+        value: f64,
+        derived_from: &str,
+    ) -> Result<Option<HaltReceipt>, maos_domain::ports::epistemic_scalar::ScalarPortError> {
+        self.scalar
+            .write_scalar(pid, spirit_id, tag, value, derived_from)
+    }
+}
+
 /// Associate the complete judgement binding with the exact committed runtime.
-/// Weak runtime keys do not retain discarded candidates; stale bindings are
-/// pruned on registration and lookup. Staging never publishes a new binding.
+/// Both registry references are weak: dropping the last runtime releases its
+/// binding immediately, including on final unload or candidate discard.
 pub fn judgement_runtime(
     emitter: Orchestrator,
     scalar: Arc<dyn EpistemicScalarPort>,
 ) -> Arc<RuntimeObject> {
-    let emitter = emitter.with_scalar_port(scalar);
-    let object = maos_kernel_core::scheduler::make_spirit_obj(emitter.clone());
+    let emitter = Arc::new(emitter.with_scalar_port(Arc::clone(&scalar)));
+    let port = Arc::new(JudgementLifetime {
+        _binding: Arc::clone(&emitter),
+        scalar,
+    });
+    let object = maos_kernel_core::scheduler::make_spirit_obj(
+        emitter.as_ref().clone().with_scalar_port(port),
+    );
     let mut live = LIVE_JUDGEMENTS.lock().unwrap_or_else(|e| e.into_inner());
     live.retain(|(object, _)| object.strong_count() != 0);
-    live.push((Arc::downgrade(&object), emitter));
+    live.push((Arc::downgrade(&object), Arc::downgrade(&emitter)));
     object
 }
 
@@ -167,7 +196,7 @@ pub fn judge_live_section(
     let emitter = live
         .iter()
         .find(|(runtime, _)| runtime.ptr_eq(&runtime_key))
-        .map(|(_, emitter)| emitter.clone())
+        .and_then(|(_, emitter)| emitter.upgrade())
         .ok_or("maos run: live Orchestrator judgement binding is not wired")?;
     drop(live);
     judge_section(&emitter, section)

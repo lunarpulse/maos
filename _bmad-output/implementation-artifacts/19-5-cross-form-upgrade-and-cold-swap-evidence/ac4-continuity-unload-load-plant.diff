@@ -1,0 +1,27 @@
+diff --git a/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs b/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs
+--- a/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs
++++ b/crates/maos-kernel-core/tests/hot_swap_same_major_lifecycle.rs
+@@ -257,12 +257,18 @@
+         )
+         .expect("set a working-memory slot at the predecessor pid");
+ 
+-    let report = harness
+-        .orchestrator
+-        .upgrade("witness", &successor_path, UpgradePolicy::HotSwap)
++    harness.scheduler.unload(pid).await.expect("unload predecessor");
++    let successor_pid = harness
++        .scheduler
++        .load(
++            "witness",
++            parse_manifest_bundle(WITNESS_SUCCESSOR).expect("successor manifest"),
++            CorpusSpirit,
++            0x1906,
++        )
+         .await
+-        .expect("hot swap");
+-    assert_eq!(report.outcome, UpgradeOutcome::Completed);
++        .expect("load successor");
++    harness.scheduler.start(successor_pid).await.expect("start successor");
+     assert_eq!(
+         harness.scheduler.resolve_pid("witness"),
+         Some(pid),

@@ -1,0 +1,14 @@
+diff --git a/crates/maos-bin/src/admission.rs b/crates/maos-bin/src/admission.rs
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -818,10 +818,6 @@
+     // Story 19-5 (D-19-5-05 A) — FR11, BEFORE a pid is allocated: a
+     // cross-major successor of an archived predecessor must declare a
+     // migrator for it.
+-    if let Err(refusal) = refuse_without_migrator(&archive_root, gated) {
+-        emit_structural_rejection(deps.transparency_log, &gated.manifest_toml, &refusal);
+-        return Err(refusal);
+-    }
+ 
+     // Gate 8 — model provenance, BEFORE a pid is allocated. Refusing after
+     // the load is what the topology arm did, and it meant a provenance-refused

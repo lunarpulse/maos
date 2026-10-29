@@ -933,7 +933,10 @@ impl BinPrivateOps for UnwiredBinOps {
         &self,
         _spirit_id: &str,
         _target_manifest: &Path,
+        _original_target: &Path,
         _policy: maos_kernel_core::lifecycle::UpgradePolicy,
+        _attestation: Option<&str>,
+        _vetter_keyring: Option<&str>,
     ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
         unreachable!("the halt-resolve race never touches the bin-private ops");
     }

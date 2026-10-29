@@ -1,0 +1,290 @@
+# Story 19-4 — branch-only T3 controls and proven-red plants.
+# Copy to .github/workflows/ci-w3-verify.yml on ci/w3-verify ONLY.
+# Never merge the workflow or a planted tree; delete the branch after the run.
+# Pattern: 19-2-...-evidence/ci/ci-w2-verify.yml. Provisioning is identical.
+# Story 19-5's five plants are local in-process witnesses (see its plants.md).
+name: w3-proven-red
+on:
+  push:
+    branches: ["ci/w3-verify"]
+permissions:
+  contents: read
+env:
+  E4: _bmad-output/implementation-artifacts/19-4-j1-beats-and-demo-replay-evidence
+  MAOS_REPLAY_STRICT: '1'
+jobs:
+  proven-red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: w3-proven-red
+      # Same action as ci-w2-verify.yml: MAOS_T3_RUNTIME, the signed image lock,
+      # and its trust anchor are exported through GITHUB_ENV. CI fails closed.
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Record provenance
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git status --short
+          rustc -Vv
+          cargo -V
+          uname -a
+          cat /etc/os-release
+          podman --version
+          echo "MAOS_T3_RUNTIME=${MAOS_T3_RUNTIME:-<unset>}"
+          sha256sum "$E4"/*-plant.diff
+      - name: Write the control and plant harness
+        run: |
+          set -euo pipefail
+          logs="$RUNNER_TEMP/w3-logs"
+          mkdir -p "$logs"
+          echo "LOGS=$logs" >> "$GITHUB_ENV"
+          echo "W3=$RUNNER_TEMP/w3-harness.sh" >> "$GITHUB_ENV"
+          cat > "$RUNNER_TEMP/w3-harness.sh" <<'HARNESS'
+          set -euo pipefail
+          unset MAOS_OLLAMA_URL MAOS_ANTHROPIC_API_KEY MAOS_OPENAI_API_KEY MAOS_LIVE_AGENT
+
+          run_logged() {
+            local log=$1 started ended
+            shift
+            started=$(date +%s%N)
+            set +e
+            "$@" 2>&1 | tee "$log"
+            RC=${PIPESTATUS[0]}
+            set -e
+            ended=$(date +%s%N)
+            printf 'exit=%s wall_ms=%s\n' "$RC" "$(((ended-started)/1000000))" | tee "${log%.log}.timing"
+          }
+
+          # A clean summary alone is insufficient: show captured output so T3
+          # SKIP cannot hide, and require every named vector to run, not ignore.
+          control() {
+            local package=$1 target=$2 log name
+            shift 2
+            log="$LOGS/control-${target}.log"
+            git diff --exit-code
+            run_logged "$log" cargo test --locked --color never -p "$package" --test "$target" \
+              -- --test-threads=1 --show-output
+            [ "$RC" -eq 0 ] || { echo "::error::unplanted ${target} exited ${RC}"; return 1; }
+            if grep -n 'SKIP:' "$log"; then
+              echo "::error::${target} skipped on the provisioned T3 runner"; return 1
+            fi
+            grep -Eq '^test result: ok\. [0-9]+ passed; 0 failed; 0 ignored;' "$log" \
+              || { echo "::error::${target} has no clean unignored result"; return 1; }
+            for name in "$@"; do
+              grep -q "^test ${name} \.\.\. " "$log" \
+                || { echo "::error::${name} did not run"; return 1; }
+              if grep -q "^test ${name} \.\.\. ignored" "$log"; then
+                echo "::error::${name} was ignored"; return 1
+              fi
+            done
+            echo "::notice::unplanted ${target} GREEN, all named vectors ran, no T3 SKIP"
+          }
+
+          demo() {
+            # Verbatim exit command, with strict replay set at job scope.
+            MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j1/founder-loop.json cargo run -p xtask -- demo-j1
+          }
+
+          demo_control() {
+            local log="$LOGS/control-demo-j1.log" beat
+            git diff --exit-code
+            run_logged "$log" demo
+            [ "$RC" -eq 0 ] || { echo "::error::unplanted demo-j1 exited ${RC}"; return 1; }
+            if grep -Eq 'SKIP:|^  FAIL ' "$log"; then
+              echo "::error::unplanted demo-j1 skipped or failed an executed beat"; return 1
+            fi
+            for beat in epic-decomposed-n-frames ambiguity-halt-within-2-frames digest-cites-source-refs halt-resume-referential-identity; do
+              grep -Eq "^  ok +${beat} +PROVEN_BLOCKING" "$log" \
+                || { echo "::error::unplanted beat ${beat} did not hold"; return 1; }
+            done
+            grep -Eq '^  -- +tier2-live-agent-signed +ABSENT ' "$log"
+            grep -Eq '^  (--|ok) +two-host-signed-run +(INDETERMINATE|PROVEN_BLOCKING|PROVEN_LIVE_SIGNED) ' "$log"
+            echo '::notice::unplanted demo-j1 GREEN, executed epic beats proven'
+          }
+
+          restore_tree() {
+            local file
+            for file in "${RESTORE_FILES[@]}"; do
+              cp "$PRISTINE/$file" "$file"
+              cmp "$PRISTINE/$file" "$file"
+              touch "$file"
+              sha256sum "$PRISTINE/$file" "$file"
+            done
+            git diff --exit-code \
+              || { echo '::error::tree not restored byte-identically'; exit 1; }
+            echo "::notice::restored byte-identically from ${PRISTINE}; cp/cmp/touch all succeeded"
+          }
+
+          begin_plant() {
+            local diff=$1 sha=$2 file
+            shift 2
+            RESTORE_FILES=("$@")
+            PRISTINE=$(mktemp -d /tmp/w3-plant.XXXXXX)
+            git diff --exit-code
+            echo "${sha}  ${diff}" | sha256sum -c -
+            for file in "${RESTORE_FILES[@]}"; do
+              cp --parents "$file" "$PRISTINE/"
+            done
+            trap restore_tree EXIT
+            git apply --check "$diff"
+            git apply "$diff"
+            git diff --stat
+            git diff
+          }
+
+          end_plant() {
+            restore_tree
+            trap - EXIT
+          }
+
+          # libtest red matcher from ci-w2-verify.yml: do not rely on the
+          # interruptible progress line; require summary + exact failure header
+          # + assertion site + oracle, and reject a green or unrelated failure.
+          test_red() {
+            local label=$1 package=$2 target=$3 name=$4 site=$5 log oracle
+            shift 5
+            log="$LOGS/${label}.log"
+            run_logged "$log" cargo test --locked --color never -p "$package" --test "$target" \
+              -- --exact "$name" --test-threads=1
+            [ "$RC" -ne 0 ] || { echo "::error::${label} stayed GREEN"; return 1; }
+            grep -q '^running 1 test$' "$log"
+            grep -Eq '^test result: FAILED\. 0 passed; 1 failed;' "$log"
+            grep -qFx -- "---- ${name} stdout ----" "$log"
+            grep -qF "panicked at ${site}:" "$log"
+            for oracle in "$@"; do
+              grep -qF -- "$oracle" "$log"
+            done
+            echo "::notice::${label} PROVEN-RED: ${name} panicked at ${site}"
+          }
+
+          # demo-j1 returns Err (not a libtest panic). Its equivalent oracle is
+          # the named FAIL row AND the final executed-beat error, plus the
+          # control-specific stream detail, never merely a nonzero cargo exit.
+          demo_red() {
+            local label=$1 beat=$2 log oracle
+            shift 2
+            log="$LOGS/${label}.log"
+            run_logged "$log" demo
+            [ "$RC" -ne 0 ] || { echo "::error::${label} stayed GREEN"; return 1; }
+            grep -Eq "^  FAIL +${beat} +INDETERMINATE " "$log"
+            grep -Eq "executed beat\(s\) did not hold: .*${beat}" "$log"
+            for oracle in "$@"; do
+              grep -qF -- "$oracle" "$log"
+            done
+            if grep -q 'SKIP:' "$log"; then
+              echo "::error::${label} skipped on T3"; return 1
+            fi
+            echo "::notice::${label} PROVEN-RED: ${beat} FAIL with its named oracle"
+          }
+          HARNESS
+      - name: Build the worker CLI and maosctl fixtures (Story 20-12)
+        id: fixtures
+        run: cargo run --locked -p xtask -- build-test-fixtures --only worker-cli-fixture --only maosctl
+      - name: Unplanted epic_halt_resume_19_4 control — every T3 vector must run
+        id: control-halt
+        shell: bash
+        run: |
+          . "$W3"
+          control maos-bin epic_halt_resume_19_4 \
+            an_ambiguous_section_halts_resolves_over_the_door_and_resumes_with_the_clarification \
+            a_clear_judgement_twin_never_halts_and_dispatches_three_frames \
+            a_planted_halt_resolved_with_context_resumes_section_two \
+            an_accepted_halt_releases_the_hold_into_the_19_1_stop \
+            an_unresolved_hold_expires_into_the_19_1_stop \
+            a_malformed_hold_bound_is_refused_before_any_emit \
+            an_epic_once_halted_before_its_first_worker_drains_without_timeout \
+            races::judged_then_resolved_before_stop_consumes_that_halt \
+            races::a_halt_raised_and_resolved_between_polls_keeps_its_context \
+            races::cancellation_at_entry_and_deadline_before_empty_pending_stop \
+            races::cancellation_at_the_final_identity_boundary_cannot_resume \
+            races::resolution_while_paused_never_runs_judgement_until_resume \
+            races::prior_boot_markers_and_receipts_do_not_abort_current_hold \
+            races::uncommitted_resolution_and_rollback_keep_dispatch_held \
+            races::unload_between_sections_or_during_pause_reaches_clean_stop \
+            races::dropping_the_last_runtime_releases_its_judgement_binding_without_pruning \
+            races::judgement_follows_the_committed_runtime_scalar_after_swap
+      - name: Unplanted demo-j1 exit command control
+        id: control-demo
+        if: ${{ !cancelled() && steps.control-halt.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W3"
+          demo_control
+      - name: Unplanted journey control — resume and clear twin must run, not SKIP
+        id: control-journey
+        if: ${{ !cancelled() && steps.control-demo.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W3"
+          control maos-journey-test journey_j1 \
+            j1_founder_loop_topology_run_once \
+            j1_founder_class_standalone_load_succeeds \
+            j1_resume_continuity_ref_identity_oracle \
+            j1_clear_judgement_twin_completes_without_halt_or_resume
+      - name: AC2.6 clear-judgement plant — exit ambiguity beat and journey must be RED
+        if: ${{ !cancelled() && steps.control-journey.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W3"
+          begin_plant "$E4/ac2-clear-judgement-twin-plant.diff" \
+            5903fc4cfe7944d24dccdd1f8336c84b21c33ad49c6e588257bba968e139477b \
+            crates/maos-journey-test/cassettes/j1/founder-loop.json
+          demo_red ac2-clear-judgement ambiguity-halt-within-2-frames 'the kernel raised no halt'
+          grep -Eq '^  ok +epic-decomposed-n-frames +PROVEN_BLOCKING' "$LOGS/ac2-clear-judgement.log"
+          test_red ac2-journey maos-journey-test journey_j1 \
+            j1_resume_continuity_ref_identity_oracle \
+            crates/maos-journey-test/tests/journey_j1.rs:399 \
+            'no halt reached the door (exited early: true)'
+          end_plant
+      - name: AC2.6 exit-job clear-twin cassette command — named ambiguity red, three frames
+        if: ${{ !cancelled() && steps.control-journey.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W3"
+          git diff --exit-code
+          clear_twin() {
+            MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/j1/founder-loop.clear-twin.json cargo run -p xtask -- demo-j1
+          }
+          log="$LOGS/ac2-exit-job-clear-twin.log"
+          run_logged "$log" clear_twin
+          [ "$RC" -ne 0 ]
+          grep -Eq '^  FAIL +ambiguity-halt-within-2-frames +INDETERMINATE ' "$log"
+          grep -Eq 'executed beat\(s\) did not hold: .*ambiguity-halt-within-2-frames' "$log"
+          grep -qF 'the kernel raised no halt' "$log"
+          grep -Eq '^  ok +epic-decomposed-n-frames +PROVEN_BLOCKING' "$log"
+          if grep -q 'SKIP:' "$log"; then exit 1; fi
+          git diff --exit-code
+      - name: AC5.4 actual demo-j1 resolve-step removal — hold expires and resume beat is RED
+        if: ${{ !cancelled() && steps.control-journey.outcome == 'success' }}
+        shell: bash
+        run: |
+          . "$W3"
+          begin_plant "$E4/ac5-resolve-step-removed-plant.diff" \
+            0c2e7c714d64c11624635a06b5baf5a60a66354783453f1add0e7dbcbdfe09fa \
+            xtask/src/demo_j1.rs
+          demo_red ac5-resolve-step-removed halt-resume-referential-identity \
+            'resumed false' 'cited as resolved false' 'still listed open true' \
+            'frames before dispatch_halted Some(1)'
+          grep -Eq '^  ok +ambiguity-halt-within-2-frames +PROVEN_BLOCKING' "$LOGS/ac5-resolve-step-removed.log"
+          grep -q '^  > dispatch_halted ' "$LOGS/ac5-resolve-step-removed.log"
+          if grep -q '^  > dispatch_resumed ' "$LOGS/ac5-resolve-step-removed.log"; then exit 1; fi
+          end_plant
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: w3-proven-red
+          path: |
+            ${{ runner.temp }}/w3-logs/
+            ${{ env.E4 }}/*-plant.diff
+            ${{ env.E4 }}/plants.md
+            ${{ env.E4 }}/ci/ci-w3-verify.yml
+          if-no-files-found: warn

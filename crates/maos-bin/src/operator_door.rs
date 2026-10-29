@@ -85,7 +85,10 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         &self,
         spirit_id: &str,
         target_manifest: &Path,
+        original_target: &Path,
         policy: maos_kernel_core::lifecycle::UpgradePolicy,
+        attestation: Option<&str>,
+        vetter_keyring: Option<&str>,
     ) -> Result<serde_json::Value, UpgradeFailure>;
 
     /// `migration_plan::create_plan` — resolve, validate, hash and persist a
@@ -242,7 +245,10 @@ impl std::fmt::Display for UpgradeFailure {
 /// D-19-5-09: schema-window refusals must precede the validated class parser,
 /// which otherwise rejects them as syntax errors. Valid schemas still use the
 /// shared kernel ABI helper (including its substrate comparator).
-pub fn check_upgrade_abi(spirit_id: &str, target: &[u8]) -> Result<(), UpgradeFailure> {
+pub fn check_upgrade_abi(
+    spirit_id: &str,
+    target: &[u8],
+) -> Result<maos_manifest::ClassSection, UpgradeFailure> {
     let invalid = |code, detail| UpgradeFailure {
         code,
         detail,
@@ -292,7 +298,8 @@ pub fn check_upgrade_abi(spirit_id: &str, target: &[u8]) -> Result<(), UpgradeFa
             _ => "abi_check_failed",
         };
         invalid(code, error.to_string())
-    })
+    })?;
+    Ok(class)
 }
 
 pub struct ManifestSnapshot(pub PathBuf);
@@ -319,6 +326,20 @@ impl Drop for ManifestSnapshot {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
     }
+}
+
+/// Bounded debug-only checkpoint shared by door and planned-hop race proofs.
+#[cfg(debug_assertions)]
+pub async fn upgrade_test_checkpoint(marker: &Path) -> Result<(), String> {
+    std::fs::write(marker, b"prechecked").map_err(|error| error.to_string())?;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+    while marker.exists() {
+        if tokio::time::Instant::now() >= deadline {
+            return Err("upgrade test handshake timed out".into());
+        }
+        tokio::task::yield_now().await;
+    }
+    Ok(())
 }
 
 /// The uninstall terminal as the door renders it: the serialized
@@ -1286,16 +1307,8 @@ impl DoorInner {
         // Deterministic pathname-replacement regression seam; inert in normal boots.
         #[cfg(debug_assertions)]
         if let Some(marker) = std::env::var_os("MAOS_TEST_ONLY_UPGRADE_PRECHECKED") {
-            let marker = PathBuf::from(marker);
-            if let Err(error) = std::fs::write(&marker, b"prechecked") {
-                return Self::target_unparseable(error.to_string());
-            }
-            let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
-            while marker.exists() {
-                if tokio::time::Instant::now() >= deadline {
-                    return Self::target_unparseable("upgrade test handshake timed out".into());
-                }
-                tokio::task::yield_now().await;
+            if let Err(error) = upgrade_test_checkpoint(Path::new(&marker)).await {
+                return Self::target_unparseable(error);
             }
         }
         // The successor factory reads one process-wide slot, so upgrades of
@@ -1303,14 +1316,13 @@ impl DoorInner {
         // cold swap holds it too, so its unload → admit window never
         // interleaves another upgrade.
         let _upgrade_guard = self.upgrade_lock.lock().await;
-        let target_path = &snapshot.0;
         let kernel_policy = match policy {
             UpgradePolicyRequest::HotSwap => maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
             UpgradePolicyRequest::Migrator => maos_kernel_core::lifecycle::UpgradePolicy::Migrator,
             #[cfg(feature = "network")]
             UpgradePolicyRequest::ColdSwap => {
                 return self
-                    .cold_swap(spirit_id, &target_path, &target_version)
+                    .cold_swap(spirit_id, &snapshot.0, &target_version)
                     .await
             }
             #[cfg(not(feature = "network"))]
@@ -1323,10 +1335,17 @@ impl DoorInner {
                 }
             }
         };
-        self.successor_manifest_slot.stage(target_path.clone());
+        self.successor_manifest_slot.stage(snapshot.0.clone());
         let guarded = self
             .private_ops
-            .upgrade_with_plan_guard(spirit_id, &target_path, kernel_policy)
+            .upgrade_with_plan_guard(
+                spirit_id,
+                &snapshot.0,
+                &target_path,
+                kernel_policy,
+                attestation,
+                vetter_keyring,
+            )
             .await;
         self.successor_manifest_slot.take();
         match guarded {

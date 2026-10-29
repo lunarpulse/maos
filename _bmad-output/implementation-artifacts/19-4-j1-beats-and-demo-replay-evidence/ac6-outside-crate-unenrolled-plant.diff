@@ -1,0 +1,13 @@
+diff --git a/xtask/src/check_j1_loopback_delegation.rs b/xtask/src/check_j1_loopback_delegation.rs
+--- a/xtask/src/check_j1_loopback_delegation.rs
++++ b/xtask/src/check_j1_loopback_delegation.rs
+@@ -865,6 +865,9 @@
+             continue;
+         }
+         let crate_name = member.file_name().to_string_lossy().into_owned();
++        if crate_name != "maos-bin" {
++            continue;
++        }
+         let entries = match fs::read_dir(&tests_dir) {
+             Ok(entries) => entries,
+             Err(e) => {

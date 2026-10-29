@@ -1,0 +1,20 @@
+diff --git a/crates/maos-bin/src/operator_door.rs b/crates/maos-bin/src/operator_door.rs
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -289,16 +289,6 @@
+         .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;
+     let class = maos_manifest::ClassSection::from_toml_str(&class_text)
+         .map_err(|error| invalid("target_manifest_unparseable", error.to_string()))?;
+-    maos_kernel_core::security::check_abi_triple(spirit_id, &class).map_err(|error| {
+-        use maos_kernel_core::security::SecurityError as Abi;
+-        let code = match &error {
+-            Abi::ESubstrateTooOld { .. } => "substrate_too_old",
+-            Abi::EAbiTooOld { .. } => "abi_too_old",
+-            Abi::EAbiTooNew { .. } => "abi_too_new",
+-            _ => "abi_check_failed",
+-        };
+-        invalid(code, error.to_string())
+-    })?;
+     Ok(class)
+ }
+ 

@@ -1,0 +1,19 @@
+diff --git a/xtask/src/demo_j1.rs b/xtask/src/demo_j1.rs
+--- a/xtask/src/demo_j1.rs
++++ b/xtask/src/demo_j1.rs
+@@ -679,15 +679,7 @@
+                 at.map(ToString::to_string).unwrap_or_default()
+             );
+         }
+-        let halted = (name == "dispatch_halted").then(|| event["halt_ids"].clone());
+         events.push(event);
+-        let pending = halted.iter().filter_map(|ids| ids.as_array()).flatten();
+-        for halt_id in pending.filter_map(serde_json::Value::as_str) {
+-            match resolve_halt(bins, home, halt_id) {
+-                Ok(_) => println!("  > resolved {halt_id} over the door (provided-context)"),
+-                Err(why) => println!("  > resolve FAILED for {halt_id}: {why}"),
+-            }
+-        }
+     }
+     let status = child
+         .wait()

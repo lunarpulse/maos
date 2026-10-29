@@ -1,0 +1,11 @@
+diff --git a/crates/maos-bin/src/admission.rs b/crates/maos-bin/src/admission.rs
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -441,7 +441,6 @@
+             lifecycle: self.lifecycle.clone(),
+             class: Some(self.class_section.clone()),
+             budget: self.budget.clone(),
+-            hot_swap: self.hot_swap.clone(),
+             migrates_from: self.migrates_from.clone(),
+             halt_protocol_compatibility: self.halt_protocol_compatibility.clone(),
+             on_crash: self.on_crash.clone(),

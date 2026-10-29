@@ -7971,8 +7971,12 @@ description = "smoke test spirit successor"
                 &upgrade_orchestrator,
                 "smoke-spirit",
                 &dummy_manifest_path,
+                &dummy_manifest_path,
                 maos_kernel_core::lifecycle::UpgradePolicy::HotSwap,
-                |_| {},
+                |path| {
+                    enforce_vetted_upgrade_precondition("smoke-spirit", path, None, None)
+                        .map_err(Into::into)
+                },
                 |_| {},
             )
             .await
@@ -9937,14 +9941,27 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         &self,
         spirit_id: &str,
         target_manifest: &std::path::Path,
+        original_target: &std::path::Path,
         policy: maos_kernel_core::lifecycle::UpgradePolicy,
+        attestation: Option<&str>,
+        vetter_keyring: Option<&str>,
     ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
         let reports = migration_plan::upgrade_with_plan_guard(
             &self.upgrade_orchestrator,
             spirit_id,
             target_manifest,
+            original_target,
             policy,
-            |path| self.successor_manifest_slot.stage(path.to_path_buf()),
+            |path| {
+                enforce_vetted_upgrade_precondition(spirit_id, path, attestation, vetter_keyring)
+                    .map_err(|detail| maos_bin::operator_door::UpgradeFailure {
+                    code: "vetting_precondition_failed",
+                    detail,
+                    invalid: true,
+                })?;
+                self.successor_manifest_slot.stage(path.to_path_buf());
+                Ok(())
+            },
             |text| self.record_upgraded_manifest(spirit_id, text),
         )
         .await?;

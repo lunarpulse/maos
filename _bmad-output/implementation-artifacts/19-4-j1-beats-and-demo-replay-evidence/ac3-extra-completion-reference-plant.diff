@@ -1,0 +1,12 @@
+diff --git a/xtask/src/demo_j1.rs b/xtask/src/demo_j1.rs
+--- a/xtask/src/demo_j1.rs
++++ b/xtask/src/demo_j1.rs
+@@ -1063,7 +1063,7 @@
+     Beat::executed(
+         DIGEST_BEAT,
+         "every completion and halt the FR17 digest cites resolves to a Transparency-Log row",
+-        state_of(digests.len() == 1 && completed >= EPIC_SECTIONS && uncited.is_empty()),
++        state_of(digests.len() == 1 && completed >= EPIC_SECTIONS),
+         format!(
+             "{} morning_digest(s), {completed} completion ref(s) (>= {EPIC_SECTIONS}); refs that \
+              name no matching audit row of their kind among {} row(s): {uncited:?}",
