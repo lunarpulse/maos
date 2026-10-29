@@ -242,7 +242,7 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
     assert_eq!(images, ["ubuntu-24.04", "ubuntu-26.04"]);
     assert_eq!(job["runs-on"].as_str(), Some("${{ matrix.image }}"));
     assert_eq!(job["env"]["MAOS_FIXTURE_TRANSPORT"].as_str(), Some("1"));
-    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(31));
+    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(32));
     assert!(job["env"]["MAOS_CGROUP_CANARY_ARCHIVE"].is_null());
     for value in job["env"].as_mapping().expect("job environment").values() {
         assert!(
