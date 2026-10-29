@@ -2,8 +2,9 @@
 
 //! Story 19-2 AC7.2/AC7.4 + AC8 leg 3 (D-19-2-14 A, D-19-2-16 A, D-19-2-19
 //! A(2)) — FR51(a)(d) for a T3 Worker, through the production `maos` root
-//! and `maosctl`, on the signed T3 substrate (`require_t3`: a named local
-//! skip, never a green skip on a declared-capable runner).
+//! for pause and an explicitly token-bearing in-process root for revoke.
+//! Both use the real operator HTTP door and `maosctl` on the signed T3
+//! substrate (`require_t3`: a named local skip, never a green CI skip).
 //!
 //! * 20 door pauses of a standalone `hang-chatty` Worker (one heartbeat line
 //!   per second): each `maosctl pause worker` answers `frozen: true,
@@ -20,20 +21,22 @@
 //!   SAME container (state kept, FR51(b)), and a root SIGTERM still tears
 //!   down a frozen Worker.
 //! * 20 revokes of a Worker's `CliSubprocessSpawn` token — 20 because AC8.3
-//!   and D-19-2-19 A(2) fix the count; one root each, because the revoke
-//!   stops the root's only Worker — in `LANES` parallel lanes: `maosctl
-//!   revoke-token` answers `worker_stopped: "worker"` and the container is
-//!   gone within `TEARDOWN_BUDGET` (25 s), all 20 (again the max, not a
-//!   P99). Latency = POST → container terminal.
+//!   and D-19-2-19 A(2) fix the count; one test root each, because the revoke
+//!   stops its only Worker — in `LANES` parallel lanes. Each isolated child
+//!   prepares the exact spawn scope at the actual bound pid, then runs the
+//!   production T3 spawn/supervision path. Unlike an ordinary standalone root
+//!   (which may use tokenless AC5 host-grant authority), it really mints a
+//!   grant. `maosctl revoke-token` answers `worker_stopped: "worker"` and the
+//!   container is gone within `TEARDOWN_BUDGET` (25 s), all 20 (again the max,
+//!   not a P99). Latency = POST → container terminal.
 //!
 //! Measured figures are printed for the Dev Agent Record.
 //!
 //! Wall: nextest's default profile kills a test at 120 s and
 //! `[[profile.default.overrides]]` may not set a slow-timeout
-//! (`.config/nextest.toml`), so each test stays well under 100 s on a loaded
-//! runner — expected walls are on each test [INFERENCE: not yet timed on the
-//! hosted T3 runner; ≈ 4 s per `maos` boot measured by
-//! `researcher_inference_18_3`, plus the T3 container start].
+//! (`.config/nextest.toml`). The revoke lanes share a 55 s wall deadline,
+//! including child startup and cleanup; no extra runtime-boot sleep is added.
+//! Hosted timing for the corrected revoke root still requires a rerun.
 //!
 //! Planted red (story §Proven-red controls; T3-only): a freeze hook made a
 //! no-op (`BindingCore::set_frozen` skipping `terminal.set_frozen`) keeps
@@ -51,12 +54,16 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod fixtures;
 #[path = "../../../tests/harness/t3_substrate.rs"]
 mod t3_substrate;
+#[path = "support/worker_revoke_root.rs"]
+mod worker_revoke_root;
 
 const PAUSES: usize = 20;
 /// AC8.3 / D-19-2-19 A(2): 20 runs, not a tunable.
 const REVOKES: usize = 20;
 /// 4 sequential boot→revoke runs per lane.
 const LANES: usize = 5;
+const REVOKE_CHILD: &str = "MAOS_19_2_REVOKE_CHILD";
+const REVOKE_SAMPLE: &str = "AC8_SAMPLE_NS=";
 const _: () = assert!(REVOKES % LANES == 0, "every lane runs the same count");
 const HEARTBEAT: &str = "worker: fixture heartbeat";
 /// FR51(a) — the pause bound (`functional-requirements.md:55`); at n=20 it
@@ -295,19 +302,29 @@ impl WorkerRoot {
         .collect()
     }
 
-    /// The Worker's `CliSubprocessSpawn` grant, as `maosctl revoke-token` takes it.
+    /// The actual pid's spawn grant; the audit writer is asynchronous even
+    /// though minting and binding precede spawn. Never search another pid or
+    /// accept another token kind to make an absent grant appear.
     fn spawn_token_hex(&self, worker_pid: i64) -> String {
-        self.rows(
-            "SELECT timestamp_ns, spirit_pid, intent, capability_token, payload_redacted \
-             FROM transparency_log WHERE intent LIKE 'cap.issue%' ORDER BY rowid",
-        )
-        .into_iter()
-        .find(|(_, pid, _, _, payload)| {
-            *pid == worker_pid && payload.get("CliSubprocessSpawn").is_some()
-        })
-        .and_then(|(_, _, _, column, _)| column.filter(|column| column.len() >= 16))
-        .map(|column| hex::encode(&column[..16]))
-        .expect("the Worker's spawn grant is journaled at its pid")
+        let mut token = None;
+        self.wait_for(
+            "the Worker's spawn grant journaled at its pid",
+            Duration::from_secs(5),
+            |root| {
+                token = root.rows(
+                    "SELECT timestamp_ns, spirit_pid, intent, capability_token, payload_redacted \
+                     FROM transparency_log WHERE intent LIKE 'cap.issue%' ORDER BY rowid",
+                )
+                .into_iter()
+                .find(|(_, pid, _, _, payload)| {
+                    *pid == worker_pid && payload.get("CliSubprocessSpawn").is_some()
+                })
+                .and_then(|(_, _, _, column, _)| column.filter(|column| column.len() >= 16))
+                .map(|column| hex::encode(&column[..16]));
+                token.is_some()
+            },
+        );
+        token.expect("the Worker's spawn grant is journaled at its pid")
     }
 
     /// Waits for a heartbeat journaled after the call; returns the newest
@@ -499,41 +516,73 @@ fn twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds() {
     wait_container_gone(&container, TEARDOWN_BUDGET);
 }
 
-/// One revoke run: boot, revoke the spawn grant, measure POST → terminal.
-fn revoke_once(tag: &str) -> Duration {
-    let mut root = WorkerRoot::boot(tag);
-    let container = root.container_id();
-    let worker_pid = root.heartbeats()[0].2;
-    let token = root.spawn_token_hex(worker_pid);
-
-    let posted = Instant::now();
-    let body = root.ctl_json(&["revoke-token", &token]);
-    assert_eq!(body["revoked"], true, "{tag}: {body}");
-    assert_eq!(
-        body["worker_stopped"], "worker",
-        "{tag}: the binding was stopped: {body}"
+/// Isolate HOME/workspaces and pid allocation without mutating process-wide
+/// environment in the five lanes. The child composes real kernel adapters and
+/// the real door, not a second production-binary policy convention.
+fn revoke_once(tag: &str, deadline: Instant) -> Duration {
+    let home = tempfile::tempdir().expect("revoke child home");
+    t3_substrate::isolated_runtime_home(home.path());
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    assert!(!remaining.is_zero(), "{tag}: revoke lanes exceeded 55 s");
+    let output = base(Path::new("timeout"), home.path())
+        .arg(format!("{}s", remaining.as_secs_f64()))
+        .arg(std::env::current_exe().expect("test executable"))
+        .args([
+            "--exact",
+            "twenty_spawn_token_revokes_stop_the_worker_within_the_teardown_budget",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(REVOKE_CHILD, tag)
+        .output()
+        .expect("run token-bearing revoke child");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "{tag}: revoke child failed (55 s lane deadline): {}; stdout:\n{stdout}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
     );
-    let remaining = TEARDOWN_BUDGET.saturating_sub(posted.elapsed());
-    wait_container_gone(&container, remaining);
-    let latency = posted.elapsed();
-    let _ = root.wait_exit();
-    latency
+    assert!(
+        stdout.contains("test result: ok. 1 passed;"),
+        "{tag}: {stdout}"
+    );
+    let samples: Vec<_> = stdout
+        .lines()
+        .filter_map(|line| line.strip_prefix(REVOKE_SAMPLE))
+        .collect();
+    assert_eq!(
+        samples.len(),
+        1,
+        "{tag}: exactly one measured revoke: {stdout}"
+    );
+    Duration::from_nanos(samples[0].parse().expect("revoke sample nanoseconds"))
 }
 
-// AC8 leg 3 — revoking a Worker's spawn token stops it within the teardown
-// budget, 20 times (AC8.3). Expected wall ≈ 30–50 s: `LANES` lanes of 4
-// sequential runs of ≈ 7–12 s (init + boot + first heartbeat, revoke,
-// container gone, root exit).
+#[test]
+fn a_prepared_spawn_grant_is_journaled_at_the_bound_worker_pid() {
+    worker_revoke_root::assert_mint_journal();
+}
+
+// AC8 leg 3 — 20 real spawn grants, real door revokes and T3 terminal facts.
+// Five lanes of four isolated, in-process roots; all share a 55 s wall bound.
 #[test]
 fn twenty_spawn_token_revokes_stop_the_worker_within_the_teardown_budget() {
     if !t3_substrate::require_t3("19-2 Worker revoke-stop") {
         return;
     }
+    if let Ok(tag) = std::env::var(REVOKE_CHILD) {
+        let home = PathBuf::from(std::env::var_os("MAOS_HOME").expect("isolated child home"));
+        let latency = worker_revoke_root::revoke_once(home, &tag);
+        println!("{REVOKE_SAMPLE}{}", latency.as_nanos());
+        return;
+    }
+    let deadline = Instant::now() + Duration::from_secs(55);
     let lanes: Vec<_> = (0..LANES)
         .map(|lane| {
             std::thread::spawn(move || {
                 (0..REVOKES / LANES)
-                    .map(|run| revoke_once(&format!("revoke-{lane}-{run}")))
+                    .map(|run| revoke_once(&format!("revoke-{lane}-{run}"), deadline))
                     .collect::<Vec<_>>()
             })
         })

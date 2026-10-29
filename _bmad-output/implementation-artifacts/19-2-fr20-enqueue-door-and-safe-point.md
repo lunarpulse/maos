@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. ◆ FLAG-Winston
 
 # Story 19.2: FR20 enqueue door and safe-point dequeue, and FR51(a)(d) bounded pause and revoke — `maosctl orchestrator queue|recall`, `maosctl spirit pick`, `maosctl pause|resume|revoke-token` ◆ FLAG-Winston
 
-Status: in-progress (RULED 2026-10-28; dev candidate 75e1e493 + review corrections 2026-10-29)
+Status: in-progress (RULED 2026-10-28; candidate 9fea84c0 (earlier: 75e1e493) + review corrections 2026-10-29)
 
 <!-- Created 2026-10-28 at d9bd59c4 by bmad-create-story (lighter creation contract, wave 2 beside 19-3 and 19-6); AMENDED 2026-10-28 at 9ce0e47a (crate source identical to d9bd59c4: `git diff --stat d9bd59c4 9ce0e47a -- crates spirits xtask/src` empty) after the operator's rulings (Lunarpulse): D-19-2-01 **B** (ask `w2_19_2_d01`: FR51(a)(d) absorbed here), D-19-2-02 B and 03…11 A (ask `w2_19_2`), D-19-2-12 superseded by the E19 kloc raise (ask `w2_kloc`). The amendment adds AC7–AC9 and D-19-2-13…20 (PROPOSED — the operator rules). Status stays ready-for-dev PENDING D-13…20 and, per E16-A7 (`sprint-status.yaml:503`), the measured kernel figure (Measurements owed #8) and the CI freeze spike (#15) before dev starts. No cargo was run by this creator (another cargo process held the host) and no crate source was touched: every kernel option is a throwaway prototype diff in `creation/` (`git apply --check` exit 0, never applied), priced on patched file copies (wc -l + tokei 14.0.0). Every epic/tracker/inventory edit is in `creation/records-owed.md`, none applied. Original creation inputs: `creation/cites-d9bd59c4.md`, `tokei-d9bd59c4.json`. -->
 
@@ -149,6 +149,8 @@ Not-recommended deltas: D-02 C maos-domain +3–5 (exact pin, no E19 envelope �
 | maos-shell | 613 | 626 | 13 | 0 | 13 | ≈ −7 | yes (re-pin lower) |
 | kernel (tokei) | 20619 | 20628 (D-19-1-01 A) → **≤ 20686** (D-19-2-20 B) | — | 9 (19-3 K2) | ≤ 58 granted | +46 (replicated) | yes, inside the cap |
 | aggregate | 189877 / 189878 | **191248** (was 191061) | 1370 | 826 (19-3 241 + 19-4 260 + 19-5 195 + 19-6 130) + kernel 9 | **535** | 315–415 (incl. kernel +46) | yes (120 spare at the upper bound) — no aggregate raise needed for the kernel grant |
+
+**Round 2 (2026-10-29, @`9fea84c0`, ask `w4_kloc`):** the maos-bin and aggregate endpoints were raised once more for the round-2 tree — maos-bin 31710 → **32086** (+376), aggregate 191669 → **192045** (+376) (`epics/epic-19-founder-loop-w4.md:40,48`); measured maos-bin **31728**, aggregate **191405** (`xtask/kloc.toml:517,718`) — the full cross-story table is in the Dev Agent Record's round-2 entry.
 
 ## Decisions — ALL RULED 2026-10-28 (Lunarpulse): D-01 B, D-02 B, D-03…11 A, D-12 superseded by the E19 kloc raise, D-13…19 A (D-14 with the C fallback), D-20 B
 
@@ -388,10 +390,32 @@ anthropic/claude-opus-5-5 (creation). Implementation: recorded by the dev pass.
 ### Debug Log References
 
 - Creation evidence: `19-2-fr20-enqueue-door-and-safe-point-evidence/creation/` (`cites-d9bd59c4.md`, `tokei-d9bd59c4.json`, `measurements-owed.md`, `records-owed.md`, ten prototype diffs).
+- Round-2 plants (written, NOT yet compiled or run): `19-2-…-evidence/plants.md` with `ac1-drain-in-flight-`, `ac3-recall-skips-drain-`, `ac4-pick-canned-200-`, `ac7-fence-unset-`, `ac7-worker-freeze-noop-`, `ac8-inference-recheck-removed-plant.diff`; hosted-verify workflow `19-2-…-evidence/ci/ci-w2-verify.yml` (shared with 19-3/19-6).
 
 ### Completion Notes List
 
 - Creation + amendment only. All D-rows RULED 2026-10-28 (asks `w2_19_2_d01`, `w2_19_2`, `w2_kloc`, `w2_19_2_fr51`, `w2_19_2_d20`); status ready-for-dev (RULED 2026-10-28). The kernel figure is measured at landing under the capped grant (#8–#14 folded in); the hosted podman pause spike (#15) is a dev-time T0 item.
+- **Review correction round 2 (2026-10-29, tree @`9fea84c0`; candidate `9fea84c0`, earlier `75e1e493`).** Cites re-read at `9fea84c0`:
+- Enqueue is log-before-act: a failed Approval-Decision row enqueues nothing; a refused enqueue after it writes a `queue-refused` row naming the id (`operator_door.rs:1351-1352,1394-1398`).
+- `BinPrivateOps::is_live_butler` picks by admitted Butler class (`main.rs:9838-9842`): a non-Butler ⇒ 404 `butler_not_found` (`operator_door.rs:1469-1473`); a principal-less Butler ⇒ 409 `principal_unbound` before any row (`operator_door.rs:1476-1481`); `MAOS_BUTLER_PRINCIPAL` is validated at boot — non-UTF-8, malformed or scene-mismatched values refuse the boot (`main.rs:3990-4020`; `env_contract.rs:212-213`).
+- The drained director instruction is folded only after the section's frame is built and the Orchestrator is re-checked not Paused (`main.rs:5035-5055`; `fold_at_safe_point` `orchestrator_root.rs:320`, `reclaim_goal` `:348`, `orchestrator_paused` `:404`), and is carried across a 19-6 re-dispatch with a second safe-point row.
+- `LONG_ROUTE_BUDGET` (30 s) covers RevokeToken/Pause/Resume server-side (`maos-control/src/lib.rs:477-481`) and in maosctl (`maos-cli/src/door_client.rs:38-39`); `BindingCore::set_frozen`'s failed-freeze undo runs under a fresh `TEARDOWN_BUDGET` (`supervision.rs:811-835`).
+- AC9 doc truth: `hook_pump.rs:23-25`, `ctx.rs:173-176`, generated ABI `docs-site/abi/v1/ctx.md:138-141` (+ko `i18n/ko/docusaurus-plugin-content-docs-abi/current/ctx.md:140-143`).
+- **Measured kloc @`9fea84c0` (after `cargo fmt --all`; `xtask/kloc.toml` pins) — cross-story table, referenced by 19-3/19-6:**
+
+| Crate | Measured | Envelope / STOP | Cite |
+|---|---:|---:|---|
+| maos-bin | 31728 | 32086 (ask `w4_kloc`; was 31710) | `kloc.toml:517` (31573 → 31728, +155) |
+| maos-control | 1494 | 1539 | `:484` (1491 → 1494, +3) |
+| xtask | 47474 | 47688 | `:339` (19-3: 47473 → 47474, +1) |
+| maos-cli | 6378 | STOP 6382 | `:489` |
+| maos-shell | 602 | 626 | `:691` |
+| maos-bench | 2451 | 2490 | `:520` |
+| aggregate | 191405 (pin 191406) | 192045 (= 191669 + 376, `w4_kloc`) | `:718` |
+| kernel | 20674 / 26463 | pinned, unchanged — inside the D-19-2-20 B cap | `:264`; `kernel-core-baseline.toml:505` |
+
+- Local evidence (this host, heavily loaded): build rc=0; full-workspace nextest 763 passed / 9 failed / 3 timeouts at 120 s — 2 deterministic `post_surface` budget tests + 1 pick-order test, all fixed and re-run green; the rest load flakes that passed serially (`one_daemon_one_door_16_1`, `butler_8_14b`, `butler_scene_18_4`, `maos_uninstall_16_4`, `butler::hallucination`). Gates rc=0: kloc, env-contract, serde-error-handling, composition-root-completeness, service-boundary, kernel-baseline (26463 = pinned), test-cost, j1-loopback-delegation, error-catalog, dev-record-completeness, epic-close-coherence, glossary-lock, ko-coverage, anchor-ids, gen-abi-docs.
+- Open: the 12 round-2 plant diffs, the three `plants.md` and `ci/ci-w2-verify.yml` exist but are NOT yet compiled or run; the hosted proof is pending — Status stays in-progress and the final kloc/kernel re-pin follows it.
 
 ### File List
 
@@ -418,3 +442,4 @@ anthropic/claude-opus-5-5 (creation). Implementation: recorded by the dev pass.
 - 2026-10-28: AMENDED at `9ce0e47a` for FR51(a)(d): AC7 (pause fence, Worker freeze, dispatch hold; P99 ≤ 2 s measured), AC8 (revoke: post-call re-check, Worker stop by recorded token), AC9 (rule-11 relabels incl. `nfr_perf_4_pause_resume_latency.rs`); D-19-2-13…20 PROPOSED; ◆ FLAG-Winston kernel request **+74 physical / +46 tokei** (p345; E19 kernel endpoint 26390/20628 → 26464/20674); kloc forecast maos-bin +196–279 inside 31353, aggregate +315–415 inside 191248; Measurements owed #8–#15 and records owed E12–E16, T2/T3, R1, A1 added. Title, frontmatter, Closes and Does-NOT-close updated; tasks T8–T10.
 - 2026-10-28: Operator rulings recorded (Lunarpulse): D-19-2-13…19 **A** (ask `w2_19_2_fr51`; D-14 A with the C fallback if hosted check #15 fails, never B); D-19-2-20 **B** (ask `w2_19_2_d20`): capped FLAG-Winston grant up to **+93 physical / +58 tokei** (E19 kernel endpoint for 19-2 ≤ 26483 / ≤ 20686), measured figure re-pinned at landing, STOP above the cap. Status → ready-for-dev (RULED 2026-10-28). Measurements #8–#14 folded into the landing measurement; #15 moved to T0. Records owed T1/T2, E12–E16, R1, A1/A1′ applied by this creator (parent-authorized).
 - 2026-10-29: Review corrections recorded as an amendment block under the ACs: `drain_at_safe_point` became `fold_at_safe_point` (drains only after the frame is built and the Orchestrator is re-checked not Paused; a drained instruction is carried across a 19-6 re-dispatch and recorded twice); enqueue is now log-before-act; the AC9 doc sites (`hook_pump.rs`, `ctx.rs` + generated ABI pages, `hook_pump_17_4.rs`) are fixed. Tasks not marked done.
+- 2026-10-29: Review correction round 2 at candidate `9fea84c0` (earlier: `75e1e493`): enqueue log-before-act with a `queue-refused` row; `is_live_butler` 404 `butler_not_found` / 409 `principal_unbound` discrimination with `MAOS_BUTLER_PRINCIPAL` validated at boot; the drained instruction folds only after the frame is built and a pause re-check (`fold_at_safe_point`/`reclaim_goal`/`orchestrator_paused`) and is carried across a 19-6 re-dispatch with a second safe-point row; `LONG_ROUTE_BUDGET` for revoke/pause/resume (server + maosctl); `set_frozen` undo under a fresh `TEARDOWN_BUDGET`; AC9 doc truth (`hook_pump.rs`, `ctx.rs`, ABI `ctx.md` +ko). E19 envelope raised by ask `w4_kloc`: maos-bin 31710 → 32086, aggregate 191669 → 192045; measured maos-bin 31728, aggregate 191405 (hardfail pin 191406), kernel 20674/26463 unchanged — Dev Agent Record round-2 entry. Plants + `ci/ci-w2-verify.yml` not yet run; hosted proof pending; tasks not marked done; status stays in-progress.

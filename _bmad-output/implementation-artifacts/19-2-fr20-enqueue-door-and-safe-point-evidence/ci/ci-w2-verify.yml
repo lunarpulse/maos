@@ -12,8 +12,8 @@
 # Order: spike #15, then per T3 target an unplanted control (green, no SKIP,
 # every named vector ran and none was ignored) followed by that target's plants.
 # Each plant: sha256 check → apply → run ONE test `--exact` (tee'd) → require
-# rc != 0, `running 1 test`, the test FAILED, the panic at the recorded site and
-# the oracle text → `git checkout -- <files>` → `git diff --exit-code`.
+# rc != 0, `running 1 test`, a 0-passed/1-failed summary, the named failure
+# header, the panic at the recorded site and the oracle text → restore + diff.
 # A plant runs only if its target's control passed (the Worker-freeze plant also
 # needs the spike). Plant table and expected reds: each story's plants.md.
 #   19-2 AC1   ac1-drain-in-flight-plant.diff          orchestrator_queue_19_2
@@ -154,8 +154,11 @@ jobs:
               || { echo "::error title=${label}::planted tree stayed GREEN (rc=0)"; verdict=bad; }
             grep -q '^running 1 test$' "$log" \
               || { echo "::error title=${label}::--exact did not select exactly one test"; verdict=bad; }
-            grep -q "^test ${name} \.\.\. FAILED\$" "$log" \
-              || { echo "::error title=${label}::${name} did not FAIL"; verdict=bad; }
+            # Child stderr can split libtest's `test … FAILED` progress line.
+            grep -Eq '^test result: FAILED\. 0 passed; 1 failed;' "$log" \
+              || { echo "::error title=${label}::no single-test FAILED summary"; verdict=bad; }
+            grep -qFx -- "---- ${name} stdout ----" "$log" \
+              || { echo "::error title=${label}::${name} has no failure header"; verdict=bad; }
             grep -qF "panicked at ${site}:" "$log" \
               || { echo "::error title=${label}::red did not panic at ${site}"; verdict=bad; }
             for oracle in "$@"; do
@@ -271,7 +274,7 @@ jobs:
             bdeaf0363b6aa0647ff23f19b713afc78abc35657210e5cdf7d57fe540fbd751 \
             worker_freeze_19_2 \
             twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds \
-            crates/maos-bin/tests/worker_freeze_19_2.rs:454 \
+            crates/maos-bin/tests/worker_freeze_19_2.rs:471 \
             crates/maos-bin/src/supervision.rs \
             'cycle 0: ' \
             'journaled after the freeze was acknowledged'

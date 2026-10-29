@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 19.6: Crash delivery to the task originator and declared disposition
 
-Status: in-progress (RULED 2026-10-28; dev candidate c535e434 + review corrections 2026-10-29)
+Status: in-progress (RULED 2026-10-28; candidate 9fea84c0 (earlier: c535e434) + review corrections 2026-10-29)
 
 <!-- Created 2026-10-28 at d9bd59c4 (19-1 and 19-7 in-progress on local HEAD; origin/main b35c9284) by bmad-create-story under the lighter creation contract (no party-mode preflight), in parallel with 19-2 and 19-3 (wave 2; each depends only on 19-1, whose loop is in the tree). D-19-6-01…11 are PROPOSED, not ruled — the operator rules; Status reads ready-for-dev by the parent's instruction, pending those rulings. The tracker row `sprint-status.yaml:292`, the epic and the routing audit are NOT edited here: every correction and addition is filed in `19-6-…-evidence/creation/records-owed.md`. No cargo ran (the host's cargo slot was held): per-crate kloc by the kloc-check instrument replicated read-only (tokei 14.0.0, argv `xtask/src/kloc_check.rs:294-318`; `creation/tokei-d9bd59c4.json`), kernel options by throwaway prototypes in `/tmp` (`creation/measurements.md`, three `.diff` files); the gate runs are owed to the parent (Measurements owed 1–7). The epic has no `### 19-6` section; the ACs below are derived from the tracker row, the routing audit (`routing-audit-2026-10-22.md:21,176-177,186`) and the PRD (FR12 `prd/functional-requirements.md:41`, FR50 `:44`, NFR-Rel-1 `prd/non-functional-requirements.md:20`). -->
 
@@ -111,6 +111,8 @@ Not-recommended deltas: D-01 B −30–48 maos-bin, + kernel +27/+24; D-01 C −
 | kernel | 20619 / 26378 | 20628 / 26390 (19-3's grant) | 9 / 12 | 19-3 | 0 (A) · +24/+27 (01 B) | 01 B breaches the endpoint → needs its own FLAG-Winston grant |
 | maos-domain · maos-iac | 9975 · 8270 (exact) | no E19 envelope | 0 | — | 0 (A) · +11–17 (05 C) | 05 C needs a grant |
 | Cumulative consumed at creation (E19, after the 2026-10-28 raise) | | | | | | maos-bin +14 (19-7 correction, `kloc.toml:517`); 19-2…19-6: 0 |
+
+**Round 2 (2026-10-29, @`9fea84c0`, ask `w4_kloc`):** the E19 endpoints move to maos-bin **32086** / aggregate **192045** (`epics/epic-19-founder-loop-w4.md:40,48`); measured aggregate **191405** (`xtask/kloc.toml:718`). Cross-story table: 19-2's Dev Agent Record round-2 entry.
 
 ## Decisions — RULED 2026-10-28 (D-19-6-01…11; ask ids in the Status column)
 
@@ -298,8 +300,14 @@ anthropic/claude-opus-5-5 (creation).
 ### Debug Log References
 
 - `19-6-crash-originator-delivery-and-disposition-evidence/creation/cites-d9bd59c4.md`, `tokei-d9bd59c4.json`, `measurements.md`, `records-owed.md`, `k1-kernel-delivery-prototype.diff`, `k2-replica-pid-prototype.diff`, `k3-trait-reshape-prototype.diff`.
+- Round-2 plants (written, NOT yet compiled or run): `19-6-…-evidence/plants.md` with `ac1-delivery-removed-`, `ac3-resolver-none-`, `ac5-corpus-seam-uninstalled-plant.diff`; hosted run via `19-2-…-evidence/ci/ci-w2-verify.yml` (shared with 19-2/19-3).
 
 ### Completion Notes List
+- **Review correction round 2 (2026-10-29, tree @`9fea84c0`; candidate `9fea84c0`, earlier `c535e434`).** Cites re-read at `9fea84c0`:
+- A section-1 crash with no prior distillate under a declared `reassign-to-replica` escalates honestly: `dispose_orphan` carries `"reason":"no_prior_distillate"` and the stop line names that reason (`crates/maos-bin/src/orchestrator_root.rs:599-600,635-636`; ruling `r19_6_d04`; the FR21-exemption fix is the deferred-work row owned by `21-5-orchestrator-port-and-move`).
+- 19-2's drained director instruction is carried across this story's re-dispatch with a second safe-point row (cites on 19-2's round-2 entry).
+- Measured kloc: aggregate 191405 (`xtask/kloc.toml:718`) inside the `w4_kloc` envelope 192045. Cross-story table and local gate evidence: 19-2's Dev Agent Record round-2 entry.
+- Open: the round-2 plants and `ci/ci-w2-verify.yml` are NOT yet compiled or run; the hosted proof is pending — Status stays in-progress.
 
 ### File List
 
@@ -309,3 +317,4 @@ anthropic/claude-opus-5-5 (creation).
 - 2026-10-28: Operator rulings recorded (ask `w2_19_6`): D-19-6-01…11 RULED **A**; D-19-6-10's "absorb inside 31166" outcome superseded by the E19 kloc ruling (ask `w2_kloc`, "Raise maos-bin now"): maos-bin envelope 31166 → **31353** (+187, = 19-6's upper forecast × 1.3 coverage), aggregate hardfail 191061 → **191248**; Status → ready-for-dev (RULED 2026-10-28).
 - 2026-10-28: Acceptance-review corrections S1–S4 (`agent://Accept19x6`, code at `c535e434`) recorded as an amendment block under the ACs (`:172-179`): AC1.1's command is `--maos-fixture-mode=exit-nonzero` (T3 payload is PID 1, `sigkill-self` ignored) and AC1.2's cause `fault.non-zero-exit`, AC1.3 folded into AC1; AC3.2's debug-only `MAOS_TEST_ONLY_CRASH_SECTION_ONCE` plant and `delay-then-complete` fixture mode recorded; D-19-6-04 A's k = 1 premise corrected (resolver armed only when a prior distillate exists — section 1 escalates); AC6's stale-record list extended with `4-kernel-design.md:631` and `maos-domain/src/supervision.rs:182`. Tasks not marked done.
 - 2026-10-29: RULED (ask `r19_6_d04`): the S3 narrowing accepted — a crashed section with no prior distillate (section 1, or a loopback delegation without `--epic`) that declared `reassign-to-replica` escalates honestly; the stop line names the reason; the FR21-exemption fix (keyed on the reassigned task_id, maos-iac) filed as a deferred-work row owned by `21-5-orchestrator-port-and-move` (`deferred-work.md` § "Deferred from: 19-6 review"). Tasks not marked done.
+- 2026-10-29: Review correction round 2 at candidate `9fea84c0` (earlier: `c535e434`): a section-1 crash with no prior distillate under a declared `reassign-to-replica` escalates with reason `no_prior_distillate` and a stop line naming it (`orchestrator_root.rs:599-600,635-636`; ruling `r19_6_d04`, deferred row owned by `21-5-orchestrator-port-and-move`); 19-2's drained instruction is carried across this story's re-dispatch with a second safe-point row. Aggregate measured 191405 (`xtask/kloc.toml:718`) inside the `w4_kloc` envelope 192045 — cross-story table in 19-2's round-2 entry. Plants + `ci/ci-w2-verify.yml` not yet run; hosted proof pending; tasks not marked done; status stays in-progress.
