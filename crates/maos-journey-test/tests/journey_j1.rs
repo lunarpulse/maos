@@ -621,12 +621,21 @@ fn j1_clear_judgement_twin_completes_without_halt_or_resume() {
     );
     let digests = named(&events, "morning_digest");
     assert_eq!(digests.len(), 1, "{events:?}");
-    for field in ["open_halts", "resolved_halts"] {
-        assert!(
-            digests[0]["digest"][field]
-                .as_array()
-                .is_some_and(Vec::is_empty),
-            "clear twin has no halt citations in {field}: {digests:?}"
-        );
-    }
+    // The only halt-kind rows a clear run may cite are the planned-unload
+    // teardown markers every Worker/Spirit unload writes (hosted run
+    // 40980181567: three of them, intent `planned_unload`); a judgement halt
+    // (`dispatch_ambiguity`) or any resolution would be a real halt.
+    assert!(
+        digests[0]["digest"]["resolved_halts"]
+            .as_array()
+            .is_some_and(Vec::is_empty),
+        "clear twin resolves no halt: {digests:?}"
+    );
+    let open = digests[0]["digest"]["open_halts"]
+        .as_array()
+        .unwrap_or_else(|| panic!("open_halts is an array: {digests:?}"));
+    assert!(
+        open.iter().all(|h| h["intent"] == "planned_unload"),
+        "clear twin cites only planned-unload teardown markers as open halts: {digests:?}"
+    );
 }
