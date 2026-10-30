@@ -119,7 +119,7 @@ Not-recommended deltas: D-01 B kernel 0 instead of −53, maos-bin +16 (the smok
 | kernel tokei | 20619 | 20628 | 20686 | 58 (19-2's cap) | 19-2 +46 (≤ 58) | −43 | yes (frees 43) |
 | aggregate hardfail | 189878 | 190356 | **191669** (was 191248) | 1313 | — | ≈ +140…+155 | yes |
 
-**Landing envelope ruling 2026-10-29 (Lunarpulse, ask `w6_kloc`, "Raise to measured + ~100"):** maos-bin 32860 (`w5_kloc`) → **33010** (+150; +924 over 32086), aggregate hardfail ~192685 → **~192935**; measured 19-4/19-5 review corrections rounds 4-5 maos-bin **32937**, xtask **47682** ≤ 47688, maos-cli **6371** ≤ 6382, maos-control **1496** ≤ 1539, aggregate **192761** (strict pin **192762** = measured + 1); kernel LOWER re-pin **26463 → 26409 physical / 20674 → 20618 tokei**, inside the <=26483/20686 grant.
+**Landing envelope ruling 2026-10-29 (Lunarpulse, ask `w6_kloc`, "Raise to measured + ~100"):** maos-bin 32860 (`w5_kloc`) → **33010** (+150; +924 over 32086), aggregate hardfail ~192685 → **~192935**; measured 19-4/19-5 merge with wave-2 hosted-run corrections maos-bin **32939**, xtask **47682** ≤ 47688, maos-cli **6371** ≤ 6382, maos-control **1496** ≤ 1539, aggregate **192778** (strict pin **192779** = measured + 1); **w7_audit** (Lunarpulse, "Raise STOP to 7660", 2026-10-29): maos-audit pin **7645 → 7660** (+15), STOP **7658 → 7660**, exact measured **7660**, ZERO HEADROOM — 19-5 cold_swap WRITER_SHAPES row (FR4 census); kernel LOWER re-pin **26463 → 26409 physical / 20674 → 20618 tokei**, inside the <=26483/20686 grant.
 
 ## Decisions — RULED 2026-10-28 (Lunarpulse; asks `w3_19_5`, `w3_19_5_d10`, `w3_kloc`)
 

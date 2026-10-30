@@ -119,8 +119,23 @@ impl BinPrivateOps for RevokeOnlyOps {
         &self,
         _: &str,
         _: &Path,
+        _: &Path,
         _: maos_kernel_core::lifecycle::UpgradePolicy,
-    ) -> Result<serde_json::Value, String> {
+        _: Option<&str>,
+        _: Option<&str>,
+    ) -> Result<serde_json::Value, maos_bin::operator_door::UpgradeFailure> {
+        unreachable!("revoke-token does not upgrade")
+    }
+
+    fn admitted_manifest(&self, _: &str) -> Option<Arc<String>> {
+        unreachable!("revoke-token does not upgrade")
+    }
+
+    fn record_upgraded_manifest(&self, _: &str, _: &str) {
+        unreachable!("revoke-token does not upgrade")
+    }
+
+    fn migration_plan_pending(&self, _: &str) -> bool {
         unreachable!("revoke-token does not upgrade")
     }
 

@@ -427,6 +427,22 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
+        // Measured cold-swap TL payload; the completion body's pid fields are not journaled.
+        site: ("operator_door.rs", "cold_swap", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("spirit.upgrade"),
+        shape: Some(&[
+            ("spirit_id", PayloadType::Str),
+            ("predecessor_version", PayloadType::Str),
+            ("successor_version", PayloadType::Str),
+            ("policy", PayloadType::StrEq("cold-swap")),
+            ("outcome", PayloadType::Str),
+            ("latency_ns", PayloadType::Num),
+            ("halt_receipts_produced", PayloadType::Num),
+        ]),
+    },
+    WriterShapeEntry {
         // `cli_wrapper/runtime.rs` — `insert_frame_event_with_sender`,
         // token `None`.
         site: ("runtime.rs", "wait_and_finalize", 0),

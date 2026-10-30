@@ -301,6 +301,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "capability.invocation",
             None,
+            "spirit.upgrade",
+            r#"{"spirit_id":"butler","predecessor_version":"0.3.0","successor_version":"0.3.1","policy":"cold-swap","outcome":"completed","latency_ns":5,"halt_receipts_produced":0}"#,
+            1,
+            "operator door cold_swap",
+        ),
+        (
+            "capability.invocation",
+            None,
             "cli.subprocess.exit",
             r#"{"event":"cli_subprocess_exit","cli_child_pid":4242,"exit_cause":"exit","is_crash":false}"#,
             1,
