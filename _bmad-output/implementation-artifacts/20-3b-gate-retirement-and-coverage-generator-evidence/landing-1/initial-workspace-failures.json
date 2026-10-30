@@ -1,0 +1,193 @@
+{
+  "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --color never --no-fail-fast",
+  "exit_code": 100,
+  "summary": {
+    "run": 5373,
+    "passed": 5343,
+    "failed": 30,
+    "skipped": 137
+  },
+  "failures": [
+    {
+      "binary": "maos-escape-detector::detection_quality",
+      "test": "detection_quality_meets_floor_and_ceiling_on_real_seccomp",
+      "message": "thread 'detection_quality_meets_floor_and_ceiling_on_real_seccomp' (284203) panicked at crates/maos-escape-detector/tests/common/../../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'detection_quality_meets_floor_and_ceiling_on_real_seccomp' (284203) panicked at crates/maos-escape-detector/tests/common/../../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `escape-forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'detection_quality_meets_floor_and_ceiling_on_real_seccomp' (284203) panicked at crates/maos-escape-detector/tests/common/../../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `escape-forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-escape-detector::producer_wired_e2e",
+      "test": "real_seccomp_kill_produces_real_tl_row_and_detector_anomaly",
+      "message": "thread 'real_seccomp_kill_produces_real_tl_row_and_detector_anomaly' (284214) panicked at crates/maos-escape-detector/tests/common/../../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'real_seccomp_kill_produces_real_tl_row_and_detector_anomaly' (284214) panicked at crates/maos-escape-detector/tests/common/../../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `escape-forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'real_seccomp_kill_produces_real_tl_row_and_detector_anomaly' (284214) panicked at crates/maos-escape-detector/tests/common/../../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `escape-forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-exec-deps::resolver_17_6",
+      "test": "dynamic_probe_resolves_canonical_loader_and_libc_closure",
+      "message": "thread 'dynamic_probe_resolves_canonical_loader_and_libc_closure' (284571) panicked at crates/maos-exec-deps/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'dynamic_probe_resolves_canonical_loader_and_libc_closure' (284571) panicked at crates/maos-exec-deps/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'dynamic_probe_resolves_canonical_loader_and_libc_closure' (284571) panicked at crates/maos-exec-deps/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-kernel-core::bridge_t2_route_17_6",
+      "test": "t1_and_t4_are_refused_typed_before_any_spawn",
+      "message": "thread 't1_and_t4_are_refused_typed_before_any_spawn' (287296) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 't1_and_t4_are_refused_typed_before_any_spawn' (287296) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 't1_and_t4_are_refused_typed_before_any_spawn' (287296) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-kernel-core::bridge_t2_route_17_6",
+      "test": "t0_probe_runs_bare_and_ptrace_returns",
+      "message": "thread 't0_probe_runs_bare_and_ptrace_returns' (287298) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 't0_probe_runs_bare_and_ptrace_returns' (287298) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 't0_probe_runs_bare_and_ptrace_returns' (287298) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-kernel-core::bridge_t2_route_17_6",
+      "test": "t2_probe_dies_of_sigsys_at_the_launch_primitive",
+      "message": "thread 't2_probe_dies_of_sigsys_at_the_launch_primitive' (287297) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 't2_probe_dies_of_sigsys_at_the_launch_primitive' (287297) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 't2_probe_dies_of_sigsys_at_the_launch_primitive' (287297) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-kernel-core::bridge_t2_route_17_6",
+      "test": "t2_sigsys_block_is_audited_or_journaled_never_dropped",
+      "message": "thread 't2_sigsys_block_is_audited_or_journaled_never_dropped' (287302) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 't2_sigsys_block_is_audited_or_journaled_never_dropped' (287302) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 't2_sigsys_block_is_audited_or_journaled_never_dropped' (287302) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-kernel-core::bridge_t2_route_17_6",
+      "test": "t3_without_verified_launch_is_refused_before_spawn",
+      "message": "thread 't3_without_verified_launch_is_refused_before_spawn' (287311) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 't3_without_verified_launch_is_refused_before_spawn' (287311) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 't3_without_verified_launch_is_refused_before_spawn' (287311) panicked at crates/maos-kernel-core/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::equiv_harness",
+      "test": "cosmetic_only_stays_green",
+      "message": "thread 'cosmetic_only_stays_green' (291689) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'cosmetic_only_stays_green' (291689) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'cosmetic_only_stays_green' (291689) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::equiv_harness",
+      "test": "divergent_spirit_causes_invariant_red",
+      "message": "thread 'divergent_spirit_causes_invariant_red' (291692) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'divergent_spirit_causes_invariant_red' (291692) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'divergent_spirit_causes_invariant_red' (291692) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::equiv_harness",
+      "test": "forged_consent_survives_both_forms_and_claim_mutation_is_red",
+      "message": "thread 'forged_consent_survives_both_forms_and_claim_mutation_is_red' (291703) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'forged_consent_survives_both_forms_and_claim_mutation_is_red' (291703) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'forged_consent_survives_both_forms_and_claim_mutation_is_red' (291703) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::equiv_harness",
+      "test": "identity_spirit_both_forms_100pct_invariant",
+      "message": "thread 'identity_spirit_both_forms_100pct_invariant' (291709) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'identity_spirit_both_forms_100pct_invariant' (291709) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'identity_spirit_both_forms_100pct_invariant' (291709) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `equiv-native-twin` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit",
+      "message": "thread 'legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit' (292008) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit' (292008) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `compat_echo_2_0.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit' (292008) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `compat_echo_2_0.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "legacy_2_1_export_schema_echoes_byte_identically",
+      "message": "thread 'legacy_2_1_export_schema_echoes_byte_identically' (292010) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'legacy_2_1_export_schema_echoes_byte_identically' (292010) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `compat_echo_2_0.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'legacy_2_1_export_schema_echoes_byte_identically' (292010) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `compat_echo_2_0.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically",
+      "message": "thread 'frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically' (292007) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically' (292007) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `compat_echo_2_0.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically' (292007) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `compat_echo_2_0.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "eof_outstanding_closes_client_but_finishes_export_and_exits_zero",
+      "message": "thread 'eof_outstanding_closes_client_but_finishes_export_and_exits_zero' (292006) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'eof_outstanding_closes_client_but_finishes_export_and_exits_zero' (292006) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'eof_outstanding_closes_client_but_finishes_export_and_exits_zero' (292006) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "oversized_reply_latches_broken_after_export",
+      "message": "thread 'oversized_reply_latches_broken_after_export' (292009) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'oversized_reply_latches_broken_after_export' (292009) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'oversized_reply_latches_broken_after_export' (292009) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "context_report_returns_typed_status_and_context_frames_reach_handle_frame",
+      "message": "thread 'context_report_returns_typed_status_and_context_frames_reach_handle_frame' (292005) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'context_report_returns_typed_status_and_context_frames_reach_handle_frame' (292005) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'context_report_returns_typed_status_and_context_frames_reach_handle_frame' (292005) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "context_report_not_admitted_is_typed_and_next_call_recovers",
+      "message": "thread 'context_report_not_admitted_is_typed_and_next_call_recovers' (292004) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'context_report_not_admitted_is_typed_and_next_call_recovers' (292004) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'context_report_not_admitted_is_typed_and_next_call_recovers' (292004) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "partial_reply_header_latches_broken_after_export",
+      "message": "thread 'partial_reply_header_latches_broken_after_export' (292019) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'partial_reply_header_latches_broken_after_export' (292019) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'partial_reply_header_latches_broken_after_export' (292019) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "reply_too_large_is_typed_and_does_not_break_following_call",
+      "message": "thread 'reply_too_large_is_typed_and_does_not_break_following_call' (292031) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'reply_too_large_is_typed_and_does_not_break_following_call' (292031) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'reply_too_large_is_typed_and_does_not_break_following_call' (292031) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "undecodable_reply_latches_broken_after_export",
+      "message": "thread 'undecodable_reply_latches_broken_after_export' (292033) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'undecodable_reply_latches_broken_after_export' (292033) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'undecodable_reply_latches_broken_after_export' (292033) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "recall_outside_handle_frame_is_unavailable_without_records",
+      "message": "thread 'recall_outside_handle_frame_is_unavailable_without_records' (292028) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'recall_outside_handle_frame_is_unavailable_without_records' (292028) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'recall_outside_handle_frame_is_unavailable_without_records' (292028) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "unknown_tag_reply_latches_broken_after_export",
+      "message": "thread 'unknown_tag_reply_latches_broken_after_export' (292034) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'unknown_tag_reply_latches_broken_after_export' (292034) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'unknown_tag_reply_latches_broken_after_export' (292034) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "recall_probe_maps_filter_page_fetch_and_open_labels",
+      "message": "thread 'recall_probe_maps_filter_page_fetch_and_open_labels' (292032) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'recall_probe_maps_filter_page_fetch_and_open_labels' (292032) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'recall_probe_maps_filter_page_fetch_and_open_labels' (292032) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "untagged_reply_latches_broken_after_export",
+      "message": "thread 'untagged_reply_latches_broken_after_export' (292035) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'untagged_reply_latches_broken_after_export' (292035) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'untagged_reply_latches_broken_after_export' (292035) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::recall_runner_17_3d",
+      "test": "wrong_reply_variant_is_protocol_desync",
+      "message": "thread 'wrong_reply_variant_is_protocol_desync' (292040) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'wrong_reply_variant_is_protocol_desync' (292040) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'wrong_reply_variant_is_protocol_desync' (292040) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `recall_probe.wasm` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::t2_sandbox_kill",
+      "test": "pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2",
+      "message": "thread 'pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2' (292057) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2' (292057) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'pr_get_auxv_is_allowed_other_prctl_options_are_denied_by_t2' (292057) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::t2_sandbox_kill",
+      "test": "benign_rust_probe_survives_t2_under_same_spec",
+      "message": "thread 'benign_rust_probe_survives_t2_under_same_spec' (292046) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'benign_rust_probe_survives_t2_under_same_spec' (292046) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'benign_rust_probe_survives_t2_under_same_spec' (292046) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    },
+    {
+      "binary": "maos-wasm-host::t2_sandbox_kill",
+      "test": "forbidden_syscall_killed_by_t2_with_sigsys",
+      "message": "thread 'forbidden_syscall_killed_by_t2_with_sigsys' (292053) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5",
+      "diagnostic": "thread 'forbidden_syscall_killed_by_t2_with_sigsys' (292053) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`\nthread 'forbidden_syscall_killed_by_t2_with_sigsys' (292053) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:57:5:\ntest fixture missing \u2014 no `forbidden-syscall-probe` entry in /mnt/build/cargo-maos/maos-fixtures/manifest.json (or no manifest); build fixtures first: `cargo run -p xtask -- build-test-fixtures`"
+    }
+  ],
+  "disposition": "Build the official fixtures with cargo run -q -p xtask -- build-test-fixtures, then rerun the unchanged full suite. These are missing prerequisites, not flakes."
+}

@@ -5,16 +5,16 @@ created: 2026-10-30
 context_commit: 23f58da4
 baseline_commit: 23f58da4
 security_sensitive: true
-kernel_grant: "◆ FLAG-Winston REQUESTED, PROPOSED (D03 + D-20-3b-05) — NOT granted. Gate deletion and generation are kernel-Δ 0 by construction (xtask, workflows, registry, YAML, docs). The received FR31 repair is the only kernel-touching scope, priced by throwaway prototype on a `git archive 23f58da4` copy under `/tmp/proto203b` (never the tree; `creation/*.diff`), measured with the prebuilt `check-kernel-baseline --json` / `kloc-check --json` run from the copy root: K1 durability **+1/+1**; K2a identity-keyed spill dirs **+41/+33**; K2b K2a + principal-index owner column **+90/+79** and maos-domain **+1**; recommended R′ = K1 + K2b **+91 physical / +80 tokei** (26409 → 26500; 20618 → 20698), alternative R = K1 + K2a **+42/+34**. ADR-069 (`docs/adr/ADR-069-kernel-core-envelope-through-v1.md:35-46`): 20698 is 1302 under the 22000 alarm — the envelope is not headroom; the grant is the operator's."
-kloc_grant: "PROPOSED (D02 A as ruled 2026-10-30: per-story measured envelope + explicit review-correction allowance; no E20-wide numeric grant) — D-20-3b-15. Measured at creation: retirement gross **xtask −5409** (GO; −5316 NO-GO), maos-bin −2, aggregate −5411 (prototype `creation/x1-*`); FR31 maos-bin **+9** (`creation/b1-*`); adds NOT prototyped, forecast xtask +321…+914 [INFERENCE, measured analogues]. Allowance ×3 on unmeasured adds and ×2 on measured adds (E19 landed at 2–3× forecast: `_bmad-output/implementation-artifacts/epic-19-retro-2026-10-30.md:40-44`). Inherited room at creation (live pins exact, zero headroom): maos-bin 71 (E19 STOP 33010 − 32939), xtask 6 (47688 − 47682), maos-cli 11 (6382 − 6371), maos-audit 0, aggregate 0 (hardfail 192779 vs measured 192778). Operator raises still needed: kernel FLAG-Winston (D03/D-05), maos-domain +1 (D-05 B), any aggregate growth landed before or apart from the deletion, and the maos-bin share of the 71 (contended by 20-1/20-4)."
+kernel_grant: "◆ FLAG-Winston GRANTED 2026-10-30 (D03 A, D-20-3b-05 B; ask d03/rest): FR31 K1 + K2b measured +91 physical / +80 tokei; maos-domain +1, maos-bin +9. Kernel ceiling +182 physical / +160 tokei: 26409/20618 → at most 26591/20778; STOP above. Deletion and generation are kernel-Δ 0; land exact pins."
+kloc_grant: "RULED 2026-10-30 (D02 A, D-20-3b-15 A; ask env15): ×3 allowance on unmeasured adds, ×2 on measured adds; maos-domain +2 and maos-bin +16 ceilings. Pins lowered exactly after landing 1, no reservations; landing 2 requires an aggregate grant requested at creation of its dev plan. Operator splits the inherited 71 maos-bin lines at 20-1/20-4 creation."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-70`): a kernel FLAG-Winston grant (D03) and a security-critical cross-Spirit isolation AC (FR31), plus the deletion of ten live or registered controls where one mistake removes protection (epic split rationale, E20@HEAD:103). Blind and Edge on opus-5.5, Acceptance on opus-5.5, Security reading on AC4, Test Infrastructure on glm-5.3 (standing policy `proof-contract.md:64-72`; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
 # Story 20.3b: Gate retirement and the generated coverage matrix
 
-Status: ready-for-dev
+Status: in-progress
 
-<!-- Created 2026-10-30 at 23f58da4 (= 3fd7f8b4 + the E20 preflight report) by bmad-create-story under the lighter measured creation contract, after the operator's 2026-10-30 rulings D01 A (ratify the preflight scope and amend the epic), D02 A (per-story measured envelopes, review-correction allowance, savings recognized only after deletion) and D11 A. D03, D04, D08 (preflight §5) and D-20-3b-01…16 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. The epic is owned by EpicAmend this session: its corrections are filed in `20-3b-…-evidence/creation/records-owed.md` (E-rows), not applied here. No cargo ran (parent rule): cites re-read at HEAD; kloc and kernel by the prebuilt gate binary run on /tmp copies of HEAD with each prototype applied (`creation/measurements.md`); nothing in the tree was modified except records (this file, its evidence dir, the tracker row, four deferred-work annotations). -->
+<!-- Created 2026-10-30 at 23f58da4 under the measured creation contract; operator rulings 2026-10-30 supersede creation-time proposals. Creation evidence remains historical. -->
 
 > **The capability:** *the gate set is what CI actually runs, and nothing else: ten dead, duplicated or unscheduled gates are gone with every enrolment, every behaviour that still protected something moved — not lost — into a live gate or a test; the coverage matrix is generated from one requirements-keyed source and blocks; and a Spirit admitted at a recycled pid in a later boot can neither read nor plant another Spirit's principal memory.*
 
@@ -53,7 +53,7 @@ Full OLD → NEW table: `creation/cites-23f58da4.md` (C1–C18, F1–F10, T1–T
 | `check_dev_model_used_populated.rs` is deletable | **Two live gates import four of its helpers** (`check_dev_model_tier.rs:19-21`, `check_dev_record_completeness.rs:476-478`): `load_sibling_sprint_status`, `is_pre_development_status`, `agent_model_section_model`, `looks_like_model` (+ `PRE_DEVELOPMENT_STATUSES`, `KNOWN_MODELS`; module `:17-108,301-367`). They move; the prototype moved them into `check_dev_record_completeness.rs`. |
 | "`check-cross-form-equiv` never scheduled" | False: job `discipline.yml:4059-4077`. But `docs/cross-form/results/cross-form-results.json` is absent (only the schema), so the job always takes its `::warning::` branch and the module never runs; registry row advisory/advisory (`gate-registry.toml:270-272`); binding equivalence is `check-wasm-form-equiv` (`check_wasm_form_equiv.rs:7`, ADR-031 `:75`). → D-20-3b-04. |
 | Arithmetic: 6406 retired, net −4.5k…−5.2k | 6402 physical / **5499 tokei**; **measured gross −5409 xtask** with enrolment edits (GO), −5316 (NO-GO), maos-bin −2, aggregate −5411. Adds unmeasured. |
-| AC5: generated YAML at `mode: error`; `coverage_matrix.rs:93-120` unchanged | Parser accepts `warning`/`hard` only (`coverage_matrix.rs:110-117`); `hard` enforces (`:65`). → **D08** (PROPOSED). `delivered_phase: v0.1-alpha` (`tests/coverage-matrix.yaml:2`) defers every row above v0.1-alpha — `hard` today would enforce only unknown names/phases, not coverage of v1.0 rows (the completeness gate does that for v1.0 NFRs). Spike question S7. |
+| AC5: generated YAML at `mode: error`; `coverage_matrix.rs:93-120` unchanged | Parser accepts `warning`/`hard` only (`coverage_matrix.rs:110-117`); `hard` enforces (`:65`). **D08 A RULED:** use `mode: hard`. `delivered_phase: v0.1-alpha` (`tests/coverage-matrix.yaml:2`) defers rows above v0.1-alpha; spike question S7 addresses enforcement scope. |
 | "absorbs 15-3's 33 violations" | **33 reproduced by replica** (`creation/coverage-matrix-replica.py`; the gate was not run here): 27 unknown-gate refs in 21 rows (`approval_log_is_distinct_table`, `audit_spine_integration`, `cap_registry_integration`, `cap_token_verify_assertion`, `check-kernel-baseline`, `coverage-matrix-nfr-test-3`, `fr4_1000_call_fixture`, `iac_transparency_log_tests`, `journal_append_p99_measurement`, `journal_survives_cold_restart`, `journey-hermetic-tier-1`, `nfr-rel-3-hsis-95pct`, `smoke-skill-7-4`), 3 unknown corpora (`hsis-corpus-v0`, `quarterly-audit-v0`, `crates/maos-kernel-core/tests/fixtures/manifest`), 3 phases outside `phase_order` (`NFR-Rel-7`/`NFR-Scale-2` `v2.2`, `NFR-Test-8` `v2.0`). → AC2.4, D-20-3b-03. |
 | `check-deprecations-declared` "in no workflow" | True, but `prepush.rs:42` runs it and `proof-contract.md:159,167` names it a **CR-2 exception** — both retire with it; `stability-matrix --check` is already the prepush/CI leg (`prepush.rs:15`). |
 | `check-adr040-accepted` retirement is free | ADR-068 `:6` says ADR-040's `Status:` line "is read by `check-adr-040-accepted`"; ADR-040 `:5` names the gate. Docs amended with the retirement. |
@@ -69,7 +69,7 @@ Full OLD → NEW table: `creation/cites-23f58da4.md` (C1–C18, F1–F10, T1–T
 
 **Instrument:** prebuilt `/tmp/xtask-maos-w3` (`check-kernel-baseline --json`, `kloc-check --json`, tokei 14.0.0) run from a `git archive 23f58da4` copy root per prototype; the untouched copy reproduces the tree exactly (26409 / 95 files / set hash `66dc2e24…`; aggregate 192778). Detail and diffs: `creation/measurements.md`, `creation/tokei-23f58da4-and-prototypes.json`.
 
-**Kernel (◆ FLAG-Winston row — PROPOSED, D03 + D-20-3b-05):**
+**Kernel (◆ FLAG-Winston GRANTED 2026-10-30, D03 A + D-20-3b-05 B; ask d03/rest):** K1 + K2b is authorized up to **+182 physical / +160 tokei**, from **26,409 / 20,618** to at most **26,591 / 20,778**. STOP above either ceiling; land exact pins. Measured +91 / +80, maos-domain +1, maos-bin +9; respective domain and bin ceilings +2 and +16.
 
 | Shape | Kernel physical | Kernel tokei | Other | Diff |
 |---|---:|---:|---|---|
@@ -98,37 +98,39 @@ Both pins move with any grant (`xtask/kernel-core-baseline.toml:27-28` + EOF blo
 | maos-cli, maos-control, maos-shell, spirits, tests | 0 | not touched |
 | **aggregate** | ≈ −5411 + adds; worst case with allowance ≈ **−2485** | sum |
 
-**Envelope (D-20-3b-15, PROPOSED; D02 A — allowance ×3 on unmeasured adds, ×2 on measured adds):** xtask landing ≤ **45015** (GO: 42273 measured after deletion + forecast adds ×3 upper 2742; NO-GO ≤ 43608); maos-bin ≤ **+16** (+9 ×2 − 2) drawn from the inherited 71 (E19 STOP `epics/epic-19-founder-loop-w4.md:40`; 20-1's +60…+120 and 20-4's +40…+80 contend for the same 71, preflight §1.3); maos-domain ≤ **+2** (+1 ×2; raise from live 0); kernel ≤ **+182 physical / +160 tokei** (R′ ×2) under the FLAG-Winston row; maos-audit / maos-cli **0**. Aggregate: L1 (deletion + xtask adds) only lowers it; under D-20-3b-01 A, L2's adds (≤ +178 tokei with allowance: kernel 160, bin 16, domain 2) need an exact aggregate grant against L1's lowered pin (D-20-3b-16 A); under D-20-3b-01 B they net against the deletion in one landing. Inherited and untouched by this story: maos-cli 11 (`epic-19…:45`), xtask STOP 6 (`:41`) — irrelevant once the deletion lands — maos-audit 0 (`:48`), aggregate 0 (`kloc.toml:718`). Exact formatted pins land with the driver (`kloc.toml:60-89`); lowering is unconditional.
+**Envelope (D-20-3b-15 A RULED 2026-10-30; ask env15):** D02 A applies ×3 on unmeasured adds and ×2 on measured adds. L1 xtask ceiling **43608**; maos-bin ≤ **+16**, maos-domain ≤ **+2**, kernel ≤ **+182 physical / +160 tokei**, maos-audit / maos-cli **0**. Ceilings are not reservations. L1 is retirement and the three row-09 folds; lower pins exactly afterward (`kloc.toml:86-89`, aggregate measured +1). L2 includes generator and FR31: request its aggregate grant at creation of its own dev plan against the lowered pin. The operator splits the inherited 71 maos-bin lines at 20-1/20-4 creation.
 
-## Decisions — PROPOSED (the operator rules; none is decided here)
+## Decisions — RULED 2026-10-30
 
-Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10-30.md:287-292`); their 20-3b consequence is added.
+Operator rulings via ask `d03`, `d04`, `d08`, `d01_shape`, `env15`, `rest`:
 
-| ID | Question | Options | Recommendation and evidence | Status |
-|---|---|---|---|---|
-| **D03** (preflight) | FR31 two-boot confidentiality/integrity | **A** include stable-identity + principal durability production repair with a measured FLAG row and the 3b witness · **B** separate named security prerequisite story before witness/rc · **C** label the invariant "asserted" | **A.** Measured now, not inferred: R′ +91/+80 (R +42/+34) — small and confined to `memory/`; not inseparable from a larger migration (the preflight's B trigger), so A holds. C leaves a known read and restore-poisoning path (`deferred-work.md:1198-1199`) behind a label. | PROPOSED |
-| **D04** (preflight) | FR13 quarantine vs drain-and-marker (20-1) | **A** measure real isolation, grant necessary kernel change · **B** sufficient existing non-kernel isolation API with a hostile-effect witness · **C** ship drain+marker as quarantine | **A unless prototype proves B** (preflight). 20-3b consequence: AC5's ledger lists FR13 quarantine **asserted, owner 20-1** until 20-1 lands; under C the row must read "not isolated". Kernel seam: D03 A and D04 A both touch `maos-kernel-core` — serialize the pin updates (one integration owner), shared ADR-069 room 1382 tokei to alarm. | PROPOSED |
-| **D08** (preflight) | Coverage enforcement token | **A** existing `mode: hard` as strict and correct the epic literal · **B** migrate parser/source/contracts to `error`, delete `hard` · **C** keep `warning` | **A.** `coverage_matrix.rs:65,110-117` already enforce `hard`; keeps the epic's "parser unchanged" (E20@HEAD:130) true; B costs a parser + fixture change for a spelling; C fails NFR-Meta-3 ("blocks"). | PROPOSED |
-| **D-20-3b-01** | Landing shape for the ratified (D01 A) scope | **A** one key, two landings: L1 = deletion + generator + gate dispositions (AC1–AC3, AC6, AC7); L2 = FR31 repair + witnesses + ledger (AC4, AC5); `done` only after L2 · **B** one landing for all · **C** split AC4/AC5 to a new key | **A.** L1 frees ≈ 5.4k xtask the next E20 stories need (preflight §2 priority 1) without waiting on a FLAG-Winston grant and a DIFFICULT security review; E19's joint wave needed 4 review rounds / 13 agents (`19-4-…md:287-322`). C re-opens D01 A's ratified scope. Under A, L2's adds need an aggregate grant against L1's lowered pin (D-16 A). | PROPOSED |
-| **D-20-3b-02** | Generator design the spike tests (AC1) | **A** epic's design: requirements-keyed `tests/coverage-source.toml` (phase/valid_until/notes/corpora per requirement) + `covers = [...]` per gate in `gate-registry.toml`; generator `gen-coverage-matrix [--check]` emits the YAML byte-identically · **B** `covers` in the registry only; YAML stays hand-kept for phase/notes, generator only checks the gate half · **C** NO-GO now: keep the hand-kept YAML, fix the 33 at origin, `mode: hard`, keep completeness | **A, decided by the spike's oracle.** NFR-Meta-3 wants a *generated* report (`routing-audit:133`); a per-gate `covers` cannot carry phase/notes (E20@HEAD:130 (1)–(2)). C is the measured NO-GO fallback (xtask −5316 vs −5409). `gen-abi-docs --check` (`prepush.rs:17`) is the existing generate/check precedent. | PROPOSED |
-| **D-20-3b-03** | Phases outside `phase_order` (`NFR-Rel-7`, `NFR-Scale-2` = `v2.2`; `NFR-Test-8` = `v2.0`) | **A** add `v2.2` (and normalise `v2.0` → `v2.0+`) in both `tests/coverage-matrix.yaml` and `phase-config.toml` · **B** relabel the three rows `v2.0+`, keep the PRD phase in `notes` | **B.** `phase_order` must equal `phase-config.toml`'s (`coverage_matrix.rs:119-121`); A changes the phase vocabulary every phase consumer reads for three rows; `v2.0+` already orders after `v1.5`. A is right only if the operator wants v2.2 as a planning phase. | PROPOSED |
-| **D-20-3b-04** | `check-cross-form-equiv` | **A** retire module, job, registry + ship rows, `EXPECTED_GATES`, YAML; amend ADR-031 `:75` to name `check-wasm-form-equiv` as the only equivalence gate · **B** keep it advisory (no retirement; −312 tokei less) · **C** retire the gate, keep the Mann-Whitney statistics as a test | **A.** The module never runs in CI (artifact absent, C8); D10 relabeled it non-binding; the equivalence-binding row is `check-wasm-form-equiv` (`gate-registry.toml:283-284`, advisory at v1.0/v1.5, blocking at v2.0). The ADR edit is the "preserve/ratify equivalence obligation" the preflight requires (§3.2). | PROPOSED |
-| **D-20-3b-05** | FR31 kernel shape (if D03 A) | **A** R = K1 + K2a (+42/+34): identity spill dirs, durable principals; the principal index stays pid-keyed (cross-boot subject-access export reads the current boot's owner of that pid) · **B** R′ = K1 + K2b (+91/+80, domain +1): index records the owner; export reads by recorded owner | **B.** A fixes read/poison but leaves GDPR Art.15 export of earlier boots' rows resolving through a recycled pid (`mod.rs:921`) — incomplete or mis-attributed export, a record asserting something false (rule 11). B is +49/+46 more kernel and needs a maos-domain +1 raise. | PROPOSED |
-| **D-20-3b-06** | Storage identity source (maos-bin) | **A** the admitted `spirit_id` (manifest class name) bound after `on_loaded(pid)` (`admission.rs:859`) and on the shell path (`main.rs:4363-4368`), +9 measured · **B** `spirit_id` + publisher-key fingerprint — needs 20-1's signer binding (no signer at admission today: `grep signer\|publisher admission.rs` = 0) · **C** operator-assigned install id persisted in the store | **A, with the same-name residual labelled to 20-1.** Closes the pid-reuse read/plant between differently named Spirits now; a later Spirit *named* `butler` still lands in Butler's tree — the trust boundary is admission (20-1 AC2 binds the publisher key). C adds an id registry for no closed attack today. Migration: pre-fix spills under `<pid>/` stay forgettable and purgeable but are no longer read by bound Spirits (Butler's acceptance ledger restarts empty once — disclosed in AC4.6). | PROPOSED |
-| **D-20-3b-07** | Registered-but-unscheduled gates: `check-adr040-accepted`, `check-literal-reappearance`, `check-governance-categories`, `check-deprecations-declared` | **A** retire all four; keep only behaviour with an owner (governance round-trip → test, D-08; deprecations → existing `stability-matrix --check`); amend ADR-040 `:5`, ADR-045 `:60`, ADR-068 `:6`, `proof-contract.md:156-169` · **B** schedule them in CI instead (re-enrol; −429 tokei less) | **A.** None runs in CI (`.github` grep empty, C9–C12); the literal guard's literals exist in no production source (C10); ADR-040 is `accepted` and superseded by ADR-031 (`ADR-040…md:2-3`); B adds CI cost to re-assert closed facts. | PROPOSED |
-| **D-20-3b-08** | Governance round-trip placement | **A** `crates/maos-audit/tests/governance_categories_round_trip.rs` (kloc-free) · **B** inline `#[cfg(test)]` beside `kind_category_to_kinds` (`maos-audit/src/lib.rs:832`), ≈ +20 maos-audit (live room 0 → raise) | **A.** Same assertion, no raise against a crate at 0 (`kloc.toml:409`). | PROPOSED |
-| **D-20-3b-09** | The three migrations of the Epic-6 beacon | **A** fold: bare-placeholder check → `check-review-findings-resolved`; dev-model presence → `check-dev-record-completeness`; `if: false` scan → `check-epic-close-coherence`; preserve each negative witness · **B** retire without fold, relying on the successors' existing coverage | **A.** B has no measured proof the successors already catch all three; the d19 governance vector (`d19_story_file_governance.rs:351-386`) and ADR-043's successor map (`:14-29`) treat them as live controls. Forecast +115…+344. | PROPOSED |
-| **D-20-3b-10** | `smoke-discipline-7-1-5` (job `discipline.yml:3715-3720`, arm `main.rs:13836-13887`) | **A** shrink to the two surviving gates (maos-bin −2) · **B** delete job + arm (≈ −46 maos-bin): both gates already run in their own aggregate-enrolled jobs | **A.** Story 7.1.5 AC5's smoke is a contract this story did not set out to retire; B is a cheap follow-on if the operator wants the bytes. | PROPOSED |
-| **D-20-3b-11** | Clippy (`deferred-work.md:902-903`) | **A** blocking `cargo clippy --workspace --all-targets --locked -- -D warnings` job in `aggregate.needs`, with T0 count first (STOP and re-ask if > 0) · **B** advisory job labelled with owner + reason (rule 11(b)) · **C** close by record: clippy is not a v1.0 gate; drop `clippy` from `components` (`:81`) | **A with the T0 STOP.** Installed-but-never-run is rule 11's exact case; the warning count is unmeasured (no cargo here, measurement 4), so the STOP keeps a large lint sweep from riding in unpriced. | PROPOSED |
-| **D-20-3b-12** | prepush mirror (`deferred-work.md:1223`) | **A** derive `GATES` from the registry Blocking set + workflow literals · **B** add the literal `check-epic-close-coherence` leg + an `xtask/tests` pin asserting every Blocking aggregate gate with a local form appears in `GATES` · **C** leave | **B.** Same protection, +1…+5 production lines; A must reconstruct CLI arguments the registry does not carry. Both fix the runtime `CARGO_MANIFEST_DIR` read for copied binaries (cwd-ancestor fallback, the `check_kernel_baseline.rs:462-466` pattern). | PROPOSED |
-| **D-20-3b-13** | `pub use` group hash | **A** hash each leaf from its own path tokens; regenerate the surface baseline once · **B** keep group hash, report one alarm per `Item::Use` · **C** leave filed | **A.** Fixes the attribution at origin (rule 10(a)); one-time baseline regen with the FR31 surface change is a single re-pin. | PROPOSED |
-| **D-20-3b-14** | I1–I14 ledger mechanism | **A** a `claim: guaranteed \| asserted` frontmatter key per `docs/invariants/I*.md` with the property test / adversarial corpus named, read by the existing `invariant-lock` (`invariant_lock.rs`) · **B** a new xtask gate `check-invariant-ledger` (+60…+150) | **A.** One instrument (the lock already owns `I*.md`, `docs/invariants/README.md:7-12`); PRD `success-criteria.md:38` sanctions the downgrade. | PROPOSED |
-| **D-20-3b-15** | Per-crate envelope (D02 A applied) | **A** the envelope above (allowance ×3 unmeasured / ×2 measured) · **B** exact measured grants only, every review correction re-asks · **C** allowance ×1.3 (rule 6) | **A.** E19 landed at 2–3× forecast with material review corrections (`epic-19-retro-2026-10-30.md:40-44`); ×1.3 is not demonstrated adequate (preflight §1.3). A is a ceiling, never a reservation — pins land exact. | PROPOSED |
-| **D-20-3b-16** | Freed room | **A** lower xtask and aggregate pins to measured (+1 aggregate) at each landing; later adds — including L2 — ask exact measured grants · **B** hold 20-3b's L2 forecast under the old pins until done · **C** re-grant freed lines as an E20 envelope for 20-2/20-5/20-7 | **A.** B and C are reservations, forbidden (`kloc.toml:86-89`); D02 A recognizes savings only after deletion. | PROPOSED |
+| ID | Status and decision |
+|---|---|
+| D03 | **RULED A** (`d03`): FR31 production repair and witness; K1 + K2b grant above. |
+| D04 | **RULED A** (`d04`): real FR13 isolation in 20-1; ledger marks FR13 **asserted, owner 20-1**. |
+| D08 | **RULED A** (`d08`): `mode: hard`. |
+| D-20-3b-01 | **RULED A** (`d01_shape`): one story, two landings: L1 retirement + three row-09 folds; L2 generator, FR31 and remaining dispositions; request aggregate grant at L2 dev-plan creation. |
+| D-20-3b-02 | **RULED A** (`rest`): requirements-keyed source + registry covers, subject to spike GO/NO-GO oracle. |
+| D-20-3b-03 | **RULED B** (`rest`): relabel three phases `v2.0+`, retain PRD phase in notes. |
+| D-20-3b-04 | **RULED A** (`rest`): retire cross-form gate and amend ADR-031. |
+| D-20-3b-05 | **RULED B** (`rest`): K1 + K2b, principal-index owner and export. |
+| D-20-3b-06 | **RULED A** (`rest`): admitted `spirit_id` storage binding; same-name residual owned by 20-1. |
+| D-20-3b-07 | **RULED A** (`rest`): retire four registered-but-unscheduled gates, preserving owned behavior. |
+| D-20-3b-08 | **RULED A** (`rest`): governance round-trip in uncounted `maos-audit/tests`. |
+| D-20-3b-09 | **RULED A** (`rest`): fold three Epic-6 controls into successors with negative witnesses. |
+| D-20-3b-10 | **RULED A** (`rest`): shrink smoke job to two surviving gates. |
+| D-20-3b-11 | **RULED A** (`rest`): T0 clippy warning count, STOP if >0; otherwise blocking job. |
+| D-20-3b-12 | **RULED B** (`rest`): literal prepush leg plus Blocking-set pin test. |
+| D-20-3b-13 | **RULED A** (`rest`): hash each `pub use` path independently. |
+| D-20-3b-14 | **RULED A** (`rest`): invariant claim frontmatter read by existing invariant-lock. |
+| D-20-3b-15 | **RULED A** (`env15`): measured/unmeasured allowances and ceilings above. |
+| D-20-3b-16 | **RULED A** (`env15`): lower pins exactly after L1, no reservations; L2 requests aggregate grant. |
+
+**Orchestrator correction of ruling-summary wording, 2026-10-30; no ruling changed:** the three row-09 folds land with retirement in L1 so their controls are not lost between landings. L1 retires nine gates while coverage-completeness stays until the spike's GO; L2 carries generator, FR31, clippy job, prepush literal/pin, pub-use hash, I1–I14 ledger and governance round-trip test.
 
 ## Acceptance Criteria
 
-*(Epic §20-3b as amended 2026-10-30; clauses marked (D-…) follow the recommended row.)*
+*(Epic §20-3b as amended 2026-10-30; clauses marked (D-…) follow the ruled row.)*
 
 ### AC1 — the spike (≤ 2 days, rule 5): a written GO/NO-GO before any generator code
 
@@ -147,7 +149,7 @@ Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10
 
 ### AC3 — ten retirements, deletion first, closure proven
 
-1. Order: `check_epic_6_bridge.rs` first (load-bearing, E20@HEAD:133); the deletion lands in the same landing as every xtask add (D-20-3b-16).
+1. Order: `check_epic_6_bridge.rs` first (load-bearing, E20@HEAD:133); L1 retires nine gates and lands the three folds with negative witnesses, retaining coverage-completeness until spike GO; lower pins exactly before L2 (D-20-3b-01 A, D-20-3b-16 A).
 2. Each of the ten is removed from **every** site in `creation/cites-23f58da4.md` C6 (modules; `mod`/command/dispatch; `EXPECTED_GATES`; registry `gates` + `[[ship_gate]]`; YAML; workflow jobs, `aggregate.needs`, ship-gate needs and summaries, the aggregate script outputs; `smoke-discipline-7-1-5` + maos-bin arm per D-20-3b-10; prepush; xtask tests; ADR/doc text) — `check_coverage_matrix_completeness.rs` only on GO.
 3. Retained behaviour (nothing protective is lost): cross-form per D-20-3b-04 (ADR-031 `:75` amended); deprecations → `stability-matrix --check`, CR-2 exception text deleted (`proof-contract.md:159,167`); governance round-trip → `crates/maos-audit/tests/` (D-20-3b-08); the three folds per D-20-3b-09 with negative witnesses: a bare `_No review findings._` placeholder reds `check-review-findings-resolved`; a declared-active story with no file / no model reds `check-dev-record-completeness` (the d19 vector `:351-386` keeps its surviving walkers); a job-level `if: false` reds `check-epic-close-coherence`; the dev-model helpers move with the two gates that import them; ADR-040 `:5`, ADR-043 `:3`, ADR-045 `:60`, ADR-068 `:6` amended.
 4. **Closure check (the AC's command):** `git grep -nE '<ten CLI names>|<ten module names>'` over `crates xtask .github docs tests` returns only an explicit provenance allowlist (ADR history lines, the `discipline.yml:2890-2898` retirement comment) recorded in the Dev Agent Record; `cargo run -q -p xtask -- check-epic-close-green` exits 2 (clap unknown subcommand) for each retired name.
@@ -186,11 +188,11 @@ Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10
 
 - [ ] **T0 — Preflight.** Operator rulings on D03, D04, D08, D-20-3b-01…16 recorded; tracker → `in-progress`. Run `creation/measurements.md` items 1, 2, 4; re-measure every cite this story touches (rule 9). If any measured figure exceeds the ruled envelope, STOP and return a D-row.
 - [ ] **T1 — Spike (AC1).** Two days max; GO/NO-GO file; byte-identical oracle.
-- [ ] **T2 — Retirement (AC3).** `check_epic_6_bridge.rs` first, then the other nine with the closure table; helpers moved; folds with negative witnesses; docs/ADRs.
+- [ ] **T2 — Retirement (AC3).** `check_epic_6_bridge.rs` first, then retirement with the closure table; move helpers, land the three folds with negative witnesses, and update docs/ADRs in L1. Coverage-completeness remains until spike GO; governance round-trip test lands in L2.
 - [ ] **T3 — Generator (AC2)** on GO; invariant-lock re-point; 33 violations at origin; `mode: hard`.
 - [ ] **T4 — Dispositions (AC6, AC7).** Clippy (after T0 count), group hash, prepush pin, root resolution.
-- [ ] **T5 — L1 landing (D-20-3b-01 A).** `cargo fmt --all`; `kloc-check --json`; exact lower re-pins (xtask, maos-bin, aggregate); prepush; records.
-- [ ] **T6 — FR31 (AC4)** after the FLAG-Winston ruling: kernel bundle, maos-bin binding, five witnesses, one plant; pins.
+- [ ] **T5 — L1 landing (D-20-3b-01 A).** Land retirement and folds; measure fold adds, xtask ≤ 43608; exact lower re-pins (xtask, maos-bin, aggregate); records.
+- [ ] **T6 — L2 dev plan and implementation.** Request aggregate grant at dev-plan creation; then generator, FR31 kernel bundle, maos-bin binding, governance round-trip test, clippy, prepush literal/pin, pub-use hash and ledger; pins within ruled ceilings.
 - [ ] **T7 — Witnesses and ledger (AC5).**
 - [ ] **T8 — Plants** (one per AC, `proof-contract.md:24-31`): AC2 drift, AC3 `if: false`, AC4 pid-keyed owner; AC1/AC5/AC6/AC7 are falsified by their in-tree vectors.
 - [ ] **T9 — L2 landing.** Exact pins inside the ruled envelope; FLAG-Winston HISTORY rows; `check-kernel-baseline`, `check-service-boundary`, `check-pub-field-constructors`, `check-ship-gate-completeness`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; records owed at landing. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
@@ -229,7 +231,7 @@ Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10
 - Delete only with the closure table in hand; a retired name still referenced outside the provenance allowlist is a red, not a follow-up.
 - No kernel line without the ruled FLAG-Winston row; any `crates/maos-kernel-core/src` change outside AC4's bundle is STOP.
 - Never weaken a witness to pass; never baseline a coverage violation away.
-- One cargo process; `env -u CI -u GITHUB_ACTIONS`; `CARGO_TARGET_DIR=/mnt/build/cargo`; gates via `cargo run -q --locked -p xtask -- <gate>`; plants byte-restored.
+- One cargo process per checkout; `env -u CI -u GITHUB_ACTIONS`; inherit the target directory, never override it or clean it; plants byte-restored.
 
 ### Proven-red controls (rule 11; proof contract)
 
@@ -242,7 +244,7 @@ Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10
 ### Tests and commands
 
 ```bash
-# local; one cargo process; CARGO_TARGET_DIR=/mnt/build/cargo
+# local; one cargo process per checkout; inherit the target directory
 env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p xtask
 env -u CI -u GITHUB_ACTIONS cargo test --locked -p xtask --test d19_story_file_governance --test story_10_2_proven_red
 env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --lib memory && env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-kernel-core -p maos-bin -p maos-audit
@@ -289,7 +291,7 @@ Created 2026-10-30 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter me
 
 **Measurements owed:** `creation/measurements.md` items 1–6.
 
-**Records owed:** `creation/records-owed.md` (E-rows to the epic owner; tracker and deferred-work rows applied here; landing rows).
+**Records:** `creation/records-owed.md` records the creation-time obligations; E1–E3, tracker and deferred-work creation rows have been applied. Landing rows remain owed.
 
 **Revert:** nothing to revert — no crate source was modified (prototypes only under `/tmp/proto203b`); no test ran, so `intent-lineage-coverage-report.md` is untouched.
 
@@ -298,6 +300,24 @@ Created 2026-10-30 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter me
 ### Agent Model Used
 
 anthropic/claude-opus-5-5 (creation).
+
+### DEV start — 2026-10-30
+
+Operator ruled D03 A, D04 A, D08 A, D-20-3b-01 A, 02 A, 03 B, 04 A, 05 B, 06–11 A, 12 B, 13–16 A (asks `d03`, `d04`, `d08`, `d01_shape`, `env15`, `rest`). FLAG-Winston grant and two-landing funding rules are above; T0 measurements and clippy count remain dev work.
+
+**L1 formatted final measurement** (reported by Dev203b1 before final checks): xtask 47682 -> 42400 (−5282); maos-bin 32939 -> 32937 (−2); aggregate 192778 -> 187494 (−5284), hardfail 192779 -> 187495 (measured +1). Kernel unchanged 26409 physical / 20618 tokei.
+
+**L1 fold pricing** (Dev203b1, formatted): versus helper-only cutover, dev-record +6, review-findings −9, epic-close-coherence +60 (including its 22-line `cfg(test)` witness), net +57; separate removal of unused migrated `KNOWN_MODELS` −15. Retirement-only derived xtask 42343 (−5339), with folds 42400 (−5282).
+
+**L1 retirement closure provenance allowlist:** the nine retired CLI/module names and `check-adr-040-accepted` alias remain only in `.github/workflows/discipline.yml:2890` (historical retirement comment), `crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs:28` (historical relaxed-predicate citation; kernel untouched), `docs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md:7,12,14,25,29,37` (historical decision and rationale), and `xtask/kloc.toml:350` (historical deletion measurement). Observed closure and nine unknown-command exit-2 results: `20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/retirement-closure.json`. Coverage-completeness remains live pending spike GO.
+
+**L1 local proof** (reported by Dev203b1, 2026-10-30; evidence in `20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/`):
+- Formatting and `build --locked --workspace --all-targets` exit 0. Focused nextest (`xtask`, `maos-bin`, `maos-audit`) 2149 passed / 27 skipped after four stale expectations were corrected.
+- Workspace nextest: 5373 passed / 137 skipped; one serial full rerun also 5373 / 137. Initial run 5343 passed / 30 failed / 137 skipped: all failures were missing fixture manifest entries; the official fixture producer built 14 artifacts before rerun (`initial-workspace-failures.json`).
+- Final `check-test-budget` exit 0: 567 binaries, sum 579.725s, no findings. Initial parallel budget findings and prepush timing findings were saved; the advisory timing cleared on serial rerun (`initial-test-budget-failure.json`, `gates.json`, `prepush.json`). The 12 required/static gates and final budget gate exited 0. Local smoke exited 0 with exactly two surviving gates.
+- Local `if: false` plant: clean 0 → planted 1 (`disabled-workflow-job`) → restored 0; before/after SHA-256 `e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d` (`plants/if-false-results.json`). Nine retired CLI commands exit 2 (`retirement-closure.json`).
+- Prepush with authorized `CARGO_MANIFEST_DIR` environment exited 0: 61 passed, 0 red, 1 advisory, 8 skipped; tracked-tree PASS (`prepush.json`). The lineage report was byte-identical to HEAD.
+- Hosted evidence workflow is wired but **not run or pushed**. Story remains `in-progress` for L2; local results do not claim hosted proof.
 
 ### Debug Log References
 

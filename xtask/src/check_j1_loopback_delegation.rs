@@ -98,9 +98,8 @@ const BIN_LIB_RS: &str = "crates/maos-bin/src/lib.rs";
 ///
 /// Without this the gate had no eyes on the file its own enrollment lives in, so
 /// deleting a `--test` line left the gate green and AC1.9's falsifier was a
-/// falsifier standing in for a falsifier. Two in-repo idioms already read this
-/// file from a gate (`check_loom_substrate_drift`'s `WORKFLOW` const and
-/// `check_epic_6_bridge`'s `discipline_yml_has_step`); this is the third.
+/// falsifier standing in for a falsifier. This follows the existing in-repo
+/// workflow-reading idiom (`check_loom_substrate_drift`'s `WORKFLOW` const).
 const WORKFLOW: &str = ".github/workflows/discipline.yml";
 
 /// The workspace directory whose `<crate>/tests/` directories the enrolled

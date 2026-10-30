@@ -1,5 +1,5 @@
 //! Story 10.2 — proven-red tests for third-party trial gate (AC1),
-//! cross-form equivalence gate (AC2), adversarial red-team gate (AC3),
+//! adversarial red-team gate (AC3),
 //! and ship-gate-completeness update (AC4).
 //!
 //! Per Epic 9 §A1: proven-red as dev-pass gate.
@@ -46,13 +46,6 @@ fn write_file(root: &std::path::Path, rel: &str, content: &str) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let mut f = std::fs::File::create(path).unwrap();
     f.write_all(content.as_bytes()).unwrap();
-}
-
-/// #11: the cross-form gate reads ADR-040 frontmatter at runtime to determine scope.
-/// Tests that exercise the cross-form gate must supply a valid ADR-040 fixture.
-fn write_adr_040_fixture(root: &std::path::Path) {
-    write_file(root, "docs/adr/ADR-040-rust-inproc-measurement-gate-v05-decision.md",
-        "---\nStatus: accepted\n---\n\n# ADR-040: Rust In-Proc Measurement Gate v0.5 Decision\n\nAccepted.\n");
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -746,120 +739,6 @@ fn trial_gate_fails_on_malformed_toml() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Task 2.4: Cross-Form Equivalence Gate — 3 proven-red vectors
-// ═══════════════════════════════════════════════════════════════════
-
-fn make_cross_form(p_value: f64) -> String {
-    // Per-run hashes are MANDATORY (§A7 derive-and-reconcile; review finding
-    // #6 default-deny): 30+30 interleaved values — cli={0,2,..58},
-    // sub={1,3,..59} → U1=465 (see `cross_form_recompute_path_with_hashes`).
-    // The reported u_statistic matches the recomputed value.
-    let hashes_cli: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2)).collect();
-    let hashes_sub: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2 + 1)).collect();
-    format!(
-        r#"{{
-  "test_metadata": {{
-    "spirit_name": "hello",
-    "spirit_version": "0.1.0",
-    "run_date": "2026-06-01",
-    "environment": "ubuntu-24.04-x86_64",
-    "cli_wrapper_runs": 30,
-    "subprocess_runs": 30
-  }},
-  "results": {{
-    "u_statistic": 465.0,
-    "p_value": {p_value},
-    "sample_size_cli": 30,
-    "sample_size_sub": 30,
-    "per_run_hashes_cli": {hashes_cli:?},
-    "per_run_hashes_sub": {hashes_sub:?}
-  }}
-}}"#
-    )
-}
-
-/// Vector (a): p_value = 0.03 (below 0.05) → advisory warns (gate still passes).
-#[test]
-fn cross_form_gate_warns_on_low_p_value() {
-    let out = run_in_tempdir("check-cross-form-equiv", |root| {
-        write_adr_040_fixture(root);
-        write_file(
-            root,
-            "docs/cross-form/results/cross-form-results.json",
-            &make_cross_form(0.03),
-        );
-    });
-    // Gate always passes (advisory), but should log warning
-    assert!(out.status.success(), "advisory gate should always pass");
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("warning") || stderr.contains("WARNING") || stderr.contains("p_value"),
-        "should log a warning for low p-value: {stderr}"
-    );
-}
-
-/// Vector (b): valid results with p > 0.05 → advisory passes clean.
-#[test]
-fn cross_form_gate_passes_clean() {
-    let out = run_in_tempdir("check-cross-form-equiv", |root| {
-        write_adr_040_fixture(root);
-        write_file(
-            root,
-            "docs/cross-form/results/cross-form-results.json",
-            &make_cross_form(0.95),
-        );
-    });
-    assert!(out.status.success(), "gate should pass with valid results");
-}
-
-/// Vector (c): absent → advisory pass with "cross-form results pending".
-#[test]
-fn cross_form_gate_passes_advisory_when_absent() {
-    let out = run_in_tempdir("check-cross-form-equiv", |root| {
-        write_adr_040_fixture(root);
-    });
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(json["advisory"], true, "should be advisory");
-}
-
-/// Review finding #6 / D15b default-deny: a PRESENT artifact WITHOUT per-run
-/// hashes is an unrecognized measurement — it cannot be derive-and-reconciled,
-/// and a deterministic fixture routed here must not slip through the advisory
-/// path. Must hard-ERROR (never advisory-green).
-#[test]
-fn cross_form_gate_errors_when_hashes_absent() {
-    let artifact = r#"{
-  "test_metadata": {
-    "spirit_name": "hello", "spirit_version": "0.1.0",
-    "run_date": "2026-06-01", "environment": "test",
-    "cli_wrapper_runs": 30, "subprocess_runs": 30
-  },
-  "results": {
-    "u_statistic": 450.0, "p_value": 0.95,
-    "sample_size_cli": 30, "sample_size_sub": 30
-  }
-}"#;
-    let out = run_in_tempdir("check-cross-form-equiv", |root| {
-        write_adr_040_fixture(root);
-        write_file(
-            root,
-            "docs/cross-form/results/cross-form-results.json",
-            artifact,
-        );
-    });
-    assert!(
-        !out.status.success(),
-        "a present hashless artifact must default-deny ERROR, not advisory-pass"
-    );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("per-run hashes") || stderr.contains("default-deny"),
-        "error should cite the missing per-run hashes / default-deny: {stderr}"
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════
 // Task 3.5: Red-Team Gate — 5 proven-red vectors
 // ═══════════════════════════════════════════════════════════════════
 
@@ -1072,7 +951,6 @@ jobs:
       - check-breaking-md
       - check-pentest-gate
       - check-third-party-trial
-      - check-cross-form-equiv
     if: always()
     steps:
       - name: Check
@@ -1094,59 +972,6 @@ jobs:
 // ═══════════════════════════════════════════════════════════════════
 // Story 10.2 re-review: additional proven-red vectors for new enforcement
 // ═══════════════════════════════════════════════════════════════════
-
-/// #9: cross-form U-test recomputation path — supply 30+30 hashes, verify consistency_ok.
-#[test]
-fn cross_form_recompute_path_with_hashes() {
-    // Interleaved hash pattern: cli gets even-indexed, sub gets odd-indexed.
-    // This produces a mid-range U (not 0 or n1*n2) so the recompute exercises
-    // real ranking, and U ≈ 450 for n=30 with near-balanced interleaving.
-    let hashes_cli: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2)).collect();
-    let hashes_sub: Vec<String> = (0..30).map(|i| format!("{:064x}", i * 2 + 1)).collect();
-    // With fully interleaved values (0,2,4..58 vs 1,3,5..59), every cli value
-    // ranks just below its sub neighbor. R1 ≈ sum of cli ranks. For n=30:
-    // cli ranks at positions 1,3,5..59 → R1 = sum of odd numbers 1..59 = 900.
-    // U1 = 30*30 + 30*31/2 - 900 = 900 + 465 - 900 = 465.
-    let expected_u = 465.0_f64;
-    let artifact = format!(
-        r#"{{
-  "test_metadata": {{
-    "spirit_name": "hello", "spirit_version": "0.1.0",
-    "run_date": "2026-06-01", "environment": "test",
-    "cli_wrapper_runs": 30, "subprocess_runs": 30
-  }},
-  "results": {{
-    "u_statistic": {expected_u}, "p_value": 0.95,
-    "sample_size_cli": 30, "sample_size_sub": 30,
-    "per_run_hashes_cli": {hashes_cli:?},
-    "per_run_hashes_sub": {hashes_sub:?}
-  }}
-}}"#
-    );
-    let out = run_in_tempdir("check-cross-form-equiv", |root| {
-        write_adr_040_fixture(root);
-        write_file(
-            root,
-            "docs/cross-form/results/cross-form-results.json",
-            &artifact,
-        );
-    });
-    assert!(
-        out.status.success(),
-        "gate should pass with consistent hashes: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert!(
-        json["u_statistic_recomputed"].is_number(),
-        "recompute should produce a U value"
-    );
-    assert_eq!(
-        json["consistency_ok"], true,
-        "recomputed U should match reported within tolerance"
-    );
-}
 
 /// #19: corpus_sha256 mismatch → hard-fail (provenance enforcement).
 #[test]
@@ -1180,20 +1005,6 @@ methodology_version = "1.0"
         !out.status.success(),
         "gate should hard-fail on corpus SHA mismatch"
     );
-}
-
-/// #22: malformed JSON → hard-fail (cross-form).
-#[test]
-fn cross_form_gate_fails_on_malformed_json() {
-    let out = run_in_tempdir("check-cross-form-equiv", |root| {
-        write_adr_040_fixture(root);
-        write_file(
-            root,
-            "docs/cross-form/results/cross-form-results.json",
-            "{{{not valid JSON",
-        );
-    });
-    assert!(!out.status.success(), "gate should fail on malformed JSON");
 }
 
 /// #22: malformed TOML → hard-fail (red-team).

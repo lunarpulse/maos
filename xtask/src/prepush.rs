@@ -39,7 +39,6 @@ const GATES: &[(&str, &str)] = &[
         "check-dependency-closure",
         "Cargo.lock / dependency closure",
     ),
-    ("check-deprecations-declared", "deprecation declarations"),
     ("coverage-matrix", "xtask/coverage-matrix.toml"),
     ("check-corpus", "corpus manifest"),
     ("build-test-fixtures", "target/maos-fixtures/manifest.json"),

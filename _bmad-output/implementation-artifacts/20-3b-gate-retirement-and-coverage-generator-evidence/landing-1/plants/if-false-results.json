@@ -1,0 +1,21 @@
+{
+  "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+  "fixture_root": "/tmp/203b-local-plant-ozvxrkb0",
+  "clean": {
+    "exit_code": 0,
+    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 1,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": []\n}\n",
+    "stderr": ""
+  },
+  "planted": {
+    "exit_code": 1,
+    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": false,\n  \"epics-checked\": 1,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": [\n    {\n      \"kind\": \"disabled-workflow-job\",\n      \"epic\": 0,\n      \"detail\": \".github/workflows/20-3b-scratch.yml:5: `if: false` parks a gate; repair or retire it\"\n    }\n  ]\n}\n",
+    "stderr": "epic close-out sources disagree\n"
+  },
+  "restored": {
+    "exit_code": 0,
+    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 1,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": []\n}\n",
+    "stderr": ""
+  },
+  "before_sha256": "e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d",
+  "after_sha256": "e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d"
+}

@@ -14,10 +14,9 @@
 //!    have at least one path in its Resolution column that also appears in the
 //!    story's File List section. The pattern catches "closure-by-scope-reduction"
 //!    where the dev marked a finding closed but did not edit code.
-//! 3. **Empty findings table requires marker**: `_No review findings._` is permitted
-//!    only if the story file's frontmatter or first body block contains the marker
-//!    `<!-- code-review-deferred: <reason> -->` OR the story key is in the
-//!    bootstrap-allowlist (Epic 0 / Epic 1a substrate-bootstrap stories).
+//! 3. **No bare findings placeholders**: every governed story's findings section
+//!    must replace `_No review findings._` with its actual review disposition,
+//!    regardless of completion state (20-3b).
 //!
 //! v0.5-α implementation: line-based parsing of markdown tables. Catches the
 //! dominant pattern; pathological table formatting (escaped pipes, multi-line
@@ -29,9 +28,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const TERMINAL_STATUSES: &[&str] = &["done"];
-const BOOTSTRAP_ALLOWLIST: &[&str] = &[
-    "0-1-", "0-2-", "0-3-", "0-4-", "0-5-", "1a-1-", "1a-2-", "1a-3-", "1a-4-", "1a-5-",
-];
 
 #[derive(Debug, Clone)]
 struct StoryReview {
@@ -44,7 +40,6 @@ struct StoryReview {
     deferred_count: usize,
     closed_without_file_ref: Vec<String>,
     table_empty: bool,
-    code_review_deferred_marker: bool,
     file_list_entries: HashSet<String>,
 }
 
@@ -75,7 +70,6 @@ fn parse_story(keys: &BTreeSet<String>, path: &Path) -> Option<StoryReview> {
         deferred_count: 0,
         closed_without_file_ref: Vec::new(),
         table_empty: false,
-        code_review_deferred_marker: content.contains("<!-- code-review-deferred:"),
         file_list_entries: HashSet::new(),
     };
 
@@ -122,7 +116,10 @@ fn parse_story(keys: &BTreeSet<String>, path: &Path) -> Option<StoryReview> {
         }
         if in_findings {
             // Detect "_No review findings._" marker.
-            if trimmed.contains("_No review findings._") {
+            if trimmed.contains("_No review findings.")
+                && !review.story_key.contains("template")
+                && !review.story_key.contains("example")
+            {
                 review.table_empty = true;
             }
             if trimmed.starts_with('|') && !trimmed.starts_with("|---") {
@@ -185,10 +182,6 @@ fn parse_story(keys: &BTreeSet<String>, path: &Path) -> Option<StoryReview> {
     Some(review)
 }
 
-fn is_bootstrap_story(story_key: &str) -> bool {
-    BOOTSTRAP_ALLOWLIST.iter().any(|p| story_key.starts_with(p))
-}
-
 pub fn run(stories_dir: &str, sprint_status_path: &str, json: bool) -> Result<(), String> {
     let sprint_status = crate::sprint_status::load_sprint_status(sprint_status_path);
     let dir = Path::new(stories_dir);
@@ -230,14 +223,10 @@ pub fn run(stories_dir: &str, sprint_status_path: &str, json: bool) -> Result<()
                 r.closed_without_file_ref.join(", "),
             ));
         }
-        // Rule 3 — _No review findings._ requires explicit deferral marker or bootstrap allow.
-        if r.table_empty
-            && is_done
-            && !r.code_review_deferred_marker
-            && !is_bootstrap_story(&r.story_key)
-        {
+        // Rule 3 — the retired placeholder gate covered active stories too.
+        if r.table_empty {
             violations.push(format!(
-                "{}: status=`done` with `_No review findings._` AND no `<!-- code-review-deferred: ... -->` marker — formal review required OR add the deferral marker with a reason",
+                "{}: bare `_No review findings._` placeholder — record the actual review disposition",
                 r.story_key,
             ));
         }
@@ -367,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn permits_no_findings_with_deferral_marker() {
+    fn bare_placeholder_still_reds_with_deferral_marker() {
         let dir = tempfile::tempdir().unwrap();
         write_story(
             dir.path(),
@@ -381,11 +370,11 @@ mod tests {
             sprint.to_str().unwrap(),
             false,
         )
-        .is_ok());
+        .is_err());
     }
 
     #[test]
-    fn permits_no_findings_for_bootstrap_stories() {
+    fn bare_placeholder_still_reds_for_bootstrap_stories() {
         let dir = tempfile::tempdir().unwrap();
         write_story(
             dir.path(),
@@ -399,6 +388,6 @@ mod tests {
             sprint.to_str().unwrap(),
             false,
         )
-        .is_ok());
+        .is_err());
     }
 }

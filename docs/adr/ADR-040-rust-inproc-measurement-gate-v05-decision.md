@@ -2,7 +2,7 @@
 Status: accepted
 Superseded-by: ADR-031 (defer lifted; in-process embedding remains FORBIDDEN; §13.1 measurement gate stays untripped)
 Phase: binding-v0.5
-Gate: v0.5 release-block (xtask check-adr-040-accepted); ADR-031 status-resolution
+Gate: historical v0.5 release-block, retired by Story 20-3b; superseding ADR-031 equivalence via `check-wasm-form-equiv`
 Decided: 2025-05-25 (real-mode measurement completed)
 Revisits: ADR-002, ADR-031, §13.1
 ---

@@ -3,7 +3,7 @@ Status: ACCEPTED — ratified 2026-09-25 by the operator under Story 17-3a follo
 Gate: none yet — `20-7-stable-runner-perf-gates` lands `check-perf-verdict` and `check-perf-runner-policy`; this file's index row is held by `cargo test -p xtask --test decision_adrs_and_provisioning`
 Decided: 2026-09-25
 Accepted-in-PR: pending — operator ratification 2026-09-25 (Story 17-3a follow-up D7)
-Revisits: ADR-040 only for where its §13.1 budgets are enforced — its `Status:` line is read by `check-adr-040-accepted` and does not change; ADR-030's 5 µs hot-path figure gains a machine it can be measured on
+Revisits: ADR-040 only for where its §13.1 budgets are enforced — its `Status:` line does not change (the historical status gate retired in Story 20-3b); ADR-030's 5 µs hot-path figure gains a machine it can be measured on
 Supersedes: no ADR — replaces the per-job "ADVISORY … wall-clock-sensitive on shared GH runners" posture at `.github/workflows/discipline.yml:1696,1748,1766`
 ---
 

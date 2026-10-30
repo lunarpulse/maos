@@ -1,0 +1,10 @@
+--- a/.github/workflows/20-3b-scratch.yml
++++ b/.github/workflows/20-3b-scratch.yml
+@@ -2,6 +2,7 @@
+ on: workflow_dispatch
+ jobs:
+   control:
++    if: false
+     runs-on: ubuntu-latest
+     steps:
+       - run: exit 0

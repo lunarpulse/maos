@@ -1,0 +1,24 @@
+{
+  "story": "20-3b-gate-retirement-and-coverage-generator",
+  "landing": 1,
+  "coverage_completeness": "kept pending landing-2 generator spike; no GO/NO-GO decision claimed",
+  "instrument": "kloc-check --json, tokei 14.0.0, after cargo fmt --all",
+  "baseline": {"xtask": 47682, "maos-bin": 32939, "maos-kernel-core": 20618, "aggregate": 192778},
+  "final": {"xtask": 42400, "maos-bin": 32937, "maos-kernel-core": 20618, "aggregate": 187494},
+  "delta": {"xtask": -5282, "maos-bin": -2, "maos-kernel-core": 0, "aggregate": -5284},
+  "exact_pins": {"xtask": 42400, "maos-bin": 32937, "maos-kernel-core": 20618, "_aggregate_hardfail": 187495},
+  "xtask_ruled_ceiling": 43608,
+  "fold_measurement": {
+    "method": "tokei --types Rust --output json over three successor files before removal of the unused migrated model allowlist versus rustfmt-formatted helper-only cutover snapshots reconstructed from HEAD; temporary snapshots removed after measurement",
+    "check_dev_record_completeness.rs": {"before": 1183, "after": 1189, "delta": 6},
+    "check_review_findings_resolved.rs": {"before": 340, "after": 331, "delta": -9},
+    "check_epic_close_coherence.rs": {"before": 468, "after": 528, "delta": 60},
+    "sum_delta": 57,
+    "unused_moved_allowlist_removed_after_fold_measurement": -15,
+    "retirement_only_xtask_derived": 42343,
+    "retirement_only_deletion_derived": -5339,
+    "note": "Fold counts include the in-source workflow-plant unit test. Integration tests under xtask/tests remain uncharged. Retirement-only figures are arithmetic from the measured final count minus the measured fold delta, not a separately built intermediate tree. Creation prototype predicted 42366; current recut avoids unused moved types, and then removes the unused migrated advisory model allowlist (-15). The per-file before/after fields above are the observed earlier fold measurement; final dev-record count is 1174 after that removal."
+  },
+  "kernel": {"physical": 26409, "files": 95, "set_hash": "66dc2e2464dd42dedc57ced2a364d201dedbb1e74b4c9477990f58d1a9e4e524", "changed": [], "added": [], "removed": [], "baseline_file_edited": false},
+  "recovery_lane_ceiling_rule": "intentionally unchanged: its only numeric zero-headroom pin is the untouched kernel ceiling 20618"
+}

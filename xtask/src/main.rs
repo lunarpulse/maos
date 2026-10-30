@@ -8,9 +8,7 @@ mod calibrate;
 mod cassette_age_gate;
 mod check_a2a_sender_completeness;
 mod check_abi_ratification;
-mod check_adr_040_accepted;
 mod check_air_gap;
-mod check_bare_review_findings;
 mod gate_common;
 // Story 13.6e — the evidence ledger (judge machinery for the four
 // journey-relevant gates). Depends on gate_common's projection.
@@ -28,7 +26,6 @@ mod check_breaking_md;
 mod check_composition_root_completeness;
 mod check_corpus;
 mod check_coverage_matrix_completeness;
-mod check_cross_form_equiv;
 // Story 14-2a (AC6) — the production peer-certificate rotation trigger's gate.
 // Its CONTROL is a runtime leg (a live daemon rotating on a signed reissue); the
 // method-aware AST probe is the cheap second opinion, never the proof.
@@ -64,23 +61,17 @@ mod check_escape_detector;
 // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
 mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
-mod check_deprecations_declared;
 mod check_dev_model_tier;
-mod check_dev_model_used_populated;
 mod check_dev_record_completeness;
 mod check_empty_kernel;
 mod check_env_contract;
-mod check_epic_6_bridge;
 mod check_epic_close_coherence;
-mod check_epic_close_green;
 mod check_equiv_fixture_provenance;
 mod check_error_catalog;
 mod check_exit_commands;
 mod check_fr47;
-mod check_governance_categories;
 mod check_judge_config;
 mod check_kernel_baseline;
-mod check_literal_reappearance;
 mod check_loom;
 mod check_manifest_schema_version;
 mod check_migration_merkle;
@@ -415,14 +406,6 @@ enum Commands {
         #[arg(long)]
         emit_pin: bool,
     },
-    /// Story 8.16 §A5 — epic-close green gate. Fails if ANY workflow job is
-    /// disabled with a job-level `if: false` (the Epic-8 fake-green mode). Makes
-    /// "mark an epic retrospective done while gates are parked red" impossible.
-    #[command(name = "check-epic-close-green")]
-    CheckEpicCloseGreen {
-        #[arg(long)]
-        json: bool,
-    },
     /// Epic-13 retro C1 — re-derive every epic's roll-up. REDs when an epic is
     /// closed over an open story, when a key never advanced, when planning prose
     /// disagrees, or when an OPEN epic cites a kernel pin that is not the baseline.
@@ -536,11 +519,6 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 5.5e — v0.5 release-block: ADR-040 must be committed with status `accepted`.
-    CheckAdr040Accepted {
-        #[arg(long)]
-        json: bool,
-    },
     /// Epic 5 retro §A3 (closes Epic 4 retro §A6) — flag `.unwrap_or_default()` / `.unwrap()` / `.expect(...)` after serde calls.
     CheckSerdeErrorHandling {
         #[arg(long, default_value = "crates")]
@@ -561,30 +539,6 @@ enum Commands {
         sprint_status: String,
         #[arg(long)]
         json: bool,
-    },
-    /// Story 6.1 AC1 — Epic 6 bridge precondition gate (9 mechanical checks).
-    /// Story 6.2 AC1 — extended with `--story 6.2` flag adding 6.2-specific rows
-    /// (D-2.10 retract-corpus, D-4.* iac-routing-budget, D-3.7/3.8 DRR fairness,
-    /// D-5.1/5.2 smoke-iac-bus-6, §A4-Debt-2c hook-count drift).
-    /// Story 6.3 AC1 — extended with `--story 6.3` flag adding 10 6.3-specific
-    /// row classifications (§A3/§A5/§A6 gate-exists, 6.2 smoke-arm, iac-routing
-    /// budget, retract-corpus, DRR carry-forward, cli_wrapper bench carry-forward,
-    /// §A2 backfill carry-forward, 6.2 RF count, smoke-iac-bus chain, maos-a2a
-    /// baseline). When `--story 6.X` is set, blocking_6_X rows must clear before
-    /// the command exits 0.
-    /// Story 6.4 AC1 — extended with `--story 6.4` flag adding 10 6.4-specific
-    /// row classifications (§A3/§A5/§A6 gate-exists, 6.3 smoke-arm, 6.3-P4 CI
-    /// test-target verification, 6.3 RF count, DRR carry-forward, cli_wrapper
-    /// bench carry-forward, §A2 backfill carry-forward, maos-providers baseline,
-    /// FrameKind baseline, ScheduleWatchdog baseline).
-    #[command(name = "check-epic-6-bridge")]
-    CheckEpic6Bridge {
-        #[arg(long)]
-        json: bool,
-        /// Story scope — "6.2" / "6.3" / "6.4" extends with the story-specific
-        /// rows. Unset = Story 6.1 legacy 9-check semantics.
-        #[arg(long)]
-        story: Option<String>,
     },
     /// Epic 5 retro §A6 (closes Epic 4 retro §A7) — `done` stories MUST have non-TBD model + non-empty dev record + File List files in `git diff`.
     CheckDevRecordCompleteness {
@@ -608,28 +562,10 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 7.1 — assert ZERO deprecation annotations at v0.5 HEAD.
-    #[command(name = "check-deprecations-declared")]
-    CheckDeprecationsDeclared {
-        #[arg(long)]
-        json: bool,
-    },
-    /// Story 7.1.5 — assert ZERO bare `_No review findings._` placeholders remain.
-    #[command(name = "check-bare-review-findings")]
-    CheckBareReviewFindings {
-        #[arg(long)]
-        json: bool,
-    },
     /// Story 7.4 — assert the maos.skill.v1 schema posture: valid round-trip +
     /// deny_unknown_fields (UnknownField, not a silent default) + semver validation.
     #[command(name = "check-skill-schema")]
     CheckSkillSchema {
-        #[arg(long)]
-        json: bool,
-    },
-    /// Story 7.1.5 — assert every story file has a populated `dev_model_used:` frontmatter field.
-    #[command(name = "check-dev-model-used-populated")]
-    CheckDevModelUsedPopulated {
         #[arg(long)]
         json: bool,
     },
@@ -755,14 +691,6 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 9.6 AC-5 — smoke-arm literal reappearance guard.
-    #[command(name = "check-literal-reappearance")]
-    CheckLiteralReappearance {
-        #[arg(long, default_value = "crates")]
-        path: String,
-        #[arg(long)]
-        json: bool,
-    },
     /// Story 9.3 FR63 — typed error catalog CI gate: bijection check between
     /// `xtask/error-catalog.toml` and AST-discovered E*-prefixed error variants.
     #[command(name = "error-catalog-check")]
@@ -797,12 +725,6 @@ enum Commands {
         /// strict TL-ancestor of the delta.
         #[arg(long, default_value = "/var/lib/maos/audit/transparency.sqlite")]
         transparency_log: String,
-        #[arg(long)]
-        json: bool,
-    },
-    /// Story 9.3b FR62 — governance category completeness cross-check (R9).
-    #[command(name = "check-governance-categories")]
-    CheckGovernanceCategories {
         #[arg(long)]
         json: bool,
     },
@@ -931,14 +853,6 @@ enum Commands {
     /// Story 11.7 — v2.0 third-party trial attestation producer gate.
     #[command(name = "check-trial-attestation")]
     CheckTrialAttestation {
-        #[arg(long)]
-        json: bool,
-    },
-    /// Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate
-    /// (ADVISORY per ADR-040 rust-inproc deferral). Validates pre-committed
-    /// Mann-Whitney U-test artifact.
-    #[command(name = "check-cross-form-equiv")]
-    CheckCrossFormEquiv {
         #[arg(long)]
         json: bool,
     },
@@ -1350,7 +1264,6 @@ fn main() {
             }
             Ok(())
         }
-        Commands::CheckAdr040Accepted { json } => check_adr_040_accepted::run(json),
         Commands::CheckSerdeErrorHandling {
             path,
             allowlist,
@@ -1361,9 +1274,6 @@ fn main() {
             sprint_status,
             json,
         } => check_review_findings_resolved::run(&stories_dir, &sprint_status, json),
-        Commands::CheckEpic6Bridge { json, story } => {
-            check_epic_6_bridge::run_with_story(json, story.as_deref())
-        }
         Commands::CheckDevRecordCompleteness {
             stories_dir,
             sprint_status,
@@ -1371,10 +1281,7 @@ fn main() {
             json,
         } => check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json),
         Commands::CheckManifestSchemaVersion { json } => check_manifest_schema_version::run(json),
-        Commands::CheckDeprecationsDeclared { json } => check_deprecations_declared::run(json),
-        Commands::CheckBareReviewFindings { json } => check_bare_review_findings::run(json),
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
-        Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
         Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
         Commands::CheckDecisionRegister { json } => check_decision_register::run(json),
         Commands::CheckJ1LoopbackDelegation { json } => check_j1_loopback_delegation::run(json),
@@ -1400,7 +1307,6 @@ fn main() {
             evidence_output.as_deref(),
             json,
         ),
-        Commands::CheckEpicCloseGreen { json } => check_epic_close_green::run(json),
         Commands::CheckEpicCloseCoherence { json } => check_epic_close_coherence::run(json),
         Commands::CheckExitCommands { json } => check_exit_commands::run(json),
         Commands::CheckModelCurrency { json } => check_model_currency::run(json),
@@ -1431,9 +1337,6 @@ fn main() {
         Commands::CheckEnvContract { maos_bin_dir, json } => {
             check_env_contract::run(&maos_bin_dir, json)
         }
-        Commands::CheckLiteralReappearance { path, json } => {
-            check_literal_reappearance::run(&path, json)
-        }
         Commands::ErrorCatalogCheck { catalog, json } => check_error_catalog::run(&catalog, json),
         Commands::ErrorCatalogGenerate { catalog, output } => {
             check_error_catalog::run_generate(&catalog, &output)
@@ -1444,7 +1347,6 @@ fn main() {
             transparency_log,
             json,
         } => check_abi_ratification::run(&manifest, &baseline, &transparency_log, json),
-        Commands::CheckGovernanceCategories { json } => check_governance_categories::run(json),
         Commands::BypassScan { json } => bypass_scan::run(json),
         Commands::ReleaseVerify {
             sign,
@@ -1491,7 +1393,6 @@ fn main() {
         Commands::CheckThirdPartyTrial { json, ship_phase } => {
             check_third_party_trial::run(json, &ship_phase)
         }
-        Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
         Commands::CheckWasmFormEquiv { json } => check_wasm_form_equiv::run(json),
         Commands::CheckEquivFixtureProvenance { json } => check_equiv_fixture_provenance::run(json),
         Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),

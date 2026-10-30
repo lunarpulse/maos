@@ -1,0 +1,64 @@
+{
+  "unknown_commands": [
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-epic-6-bridge",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-epic-6-bridge'\n\n  tip: some similar subcommands exist: 'check-dev-model-tier', 'check-enterprise-pdp', 'check-rotation-real-timing', 'check-corpus', 'check-judge-config', 'check-red-team-gate', 'check-rto-gate', 'check-ff-j6', 'check-escape-detector', 'check-service-boundary', 'check-security-md', 'check-decision-register', 'check-epic-close-coherence', 'check-cert-rotation-trigger', 'check-breaking-md', 'check-j1-loopback-delegation', 'check-air-gap', 'check-test-budget'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-cross-form-equiv",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-cross-form-equiv'\n\n  tip: some similar subcommands exist: 'check-review-findings-resolved', 'check-model-currency', 'check-decision-register', 'check-skill-conformance', 'check-unsafe', 'check-rto-gate', 'check-security-md', 'check-multi-provider-drift', 'check-fkcs', 'check-corpus', 'check-cross-region-consensus', 'check-loom', 'check-host-surface', 'check-cohort-mesh', 'check-loom-substrate-drift', 'check-wasm-form-equiv'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-adr040-accepted",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-adr040-accepted'\n\n  tip: some similar subcommands exist: 'check-scale-churn', 'check-workspace-count', 'check-rto-gate', 'check-escape-detector', 'check-fr47', 'check-red-team-gate', 'check-model-currency', 'check-air-gap'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-literal-reappearance",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-literal-reappearance'\n\n  tip: some similar subcommands exist: 'check-equiv-fixture-provenance', 'check-export-control', 'check-red-team-gate', 'check-coverage-matrix-completeness', 'check-empty-kernel', 'check-enterprise-identity', 'check-release-precondition', 'check-escape-detector', 'check-ship-gate-completeness', 'check-enterprise-pdp', 'check-kernel-baseline', 'check-air-gap'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-governance-categories",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-governance-categories'\n\n  tip: some similar subcommands exist: 'check-workspace-count', 'check-cross-region-consensus', 'check-model-currency', 'check-dev-model-tier', 'check-export-control', 'check-review-findings-resolved', 'check-enterprise-identity', 'check-enterprise-pdp', 'check-cert-rotation-trigger', 'check-equiv-fixture-provenance', 'check-red-team-gate', 'check-escape-detector', 'check-vetting-attestation', 'check-air-gap', 'check-migration-merkle', 'check-rotation-real-timing', 'check-rto-gate', 'check-a2a-sender-completeness', 'check-dependency-closure', 'check-decision-register', 'check-kernel-baseline', 'check-env-contract', 'check-mock-not-in-release', 'check-release-precondition', 'check-dev-record-completeness', 'check-coverage-matrix-completeness'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-deprecations-declared",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-deprecations-declared'\n\n  tip: some similar subcommands exist: 'check-equiv-fixture-provenance', 'check-air-gap', 'check-reza-production-path', 'check-pentest-gate', 'check-judge-config', 'check-security-md', 'check-skill-conformance', 'check-corpus', 'check-workspace-count', 'check-mock-not-in-release', 'check-review-findings-resolved', 'check-migration-merkle', 'check-exit-commands', 'check-model-currency', 'check-env-contract', 'check-enterprise-identity', 'check-pub-field-constructors', 'check-ship-gate-completeness', 'check-export-control', 'check-a2a-sender-completeness', 'check-coverage-matrix-completeness', 'check-dev-model-tier', 'check-empty-kernel', 'check-epic-close-coherence', 'check-serde-error-handling', 'check-kernel-baseline', 'check-enterprise-pdp', 'check-release-precondition', 'check-service-boundary', 'check-decision-register', 'check-escape-detector', 'check-dev-record-completeness', 'check-dependency-closure'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-bare-review-findings",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-bare-review-findings'\n\n  tip: some similar subcommands exist: 'check-release-precondition', 'check-cert-rotation-trigger', 'check-exit-commands', 'check-enterprise-pdp', 'check-service-boundary', 'check-equiv-fixture-provenance', 'check-rotation-real-timing', 'check-enterprise-identity', 'check-breaking-md', 'check-decision-register', 'check-manifest-schema-version', 'check-kernel-baseline', 'check-serde-error-handling', 'check-review-findings-resolved'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-dev-model-used-populated",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-dev-model-used-populated'\n\n  tip: some similar subcommands exist: 'check-mock-not-in-release', 'check-ship-gate-completeness', 'check-dependency-closure', 'check-loom', 'check-dev-record-completeness', 'check-dev-model-tier'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-green",
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "error: unrecognized subcommand 'check-epic-close-green'\n\n  tip: some similar subcommands exist: 'check-equiv-fixture-provenance', 'check-j1-loopback-delegation', 'check-exit-commands', 'check-enterprise-pdp', 'check-export-control', 'check-cross-region-consensus', 'check-serde-error-handling', 'check-test-cost', 'check-env-contract', 'check-pentest-gate', 'check-loom', 'check-fkcs', 'check-migration-merkle', 'check-model-currency', 'check-dev-model-tier', 'check-skill-conformance', 'check-red-team-gate', 'check-enterprise-identity', 'check-composition-root-completeness', 'check-review-findings-resolved', 'check-workspace-count', 'check-a2a-sender-completeness', 'check-multi-region-slo', 'check-release-precondition', 'check-corpus', 'check-pub-field-constructors', 'check-kernel-baseline', 'check-coverage-matrix-completeness', 'check-air-gap', 'check-empty-kernel', 'check-decision-register', 'check-mock-not-in-release', 'check-scale-churn', 'check-ship-gate-completeness', 'check-escape-detector', 'check-dev-record-completeness', 'check-dependency-closure', 'check-epic-close-coherence'\n\nUsage: xtask <COMMAND>\n\nFor more information, try '--help'.\n"
+    }
+  ],
+  "closure": {
+    "command": "git grep -nE 'check\\\\-epic\\\\-6\\\\-bridge|check\\\\-cross\\\\-form\\\\-equiv|check\\\\-adr040\\\\-accepted|check\\\\-literal\\\\-reappearance|check\\\\-governance\\\\-categories|check\\\\-deprecations\\\\-declared|check\\\\-bare\\\\-review\\\\-findings|check\\\\-dev\\\\-model\\\\-used\\\\-populated|check\\\\-epic\\\\-close\\\\-green|check_epic_6_bridge|check_cross_form_equiv|check_adr_040_accepted|check_literal_reappearance|check_governance_categories|check_deprecations_declared|check_bare_review_findings|check_dev_model_used_populated|check_epic_close_green|check\\\\-adr\\\\-040\\\\-accepted' -- crates xtask .github docs tests",
+    "exit_code": 0,
+    "stdout": ".github/workflows/discipline.yml:2890:  # RETIRED 2026-06-12 by Story 8.16 per ADR-043 \u2014 `check-epic-6-bridge` was a\ncrates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs:28://!    introduced by `check-epic-6-bridge --story 6.2` row `6.2-A4-Debt-2c-relaxed`\ndocs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md:7:Supersedes: the `check-epic-6-bridge` debt-beacon job and the `smoke-spirit-author-7-1` advisory smoke (both DISABLED `if: false` 2026-06-12, round 6 of the Epic-8 CI remediation)\ndocs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md:12:**Context.** At Epic-8 close the only way the integrated CI run (`27388044071`) reached green was to DISABLE two advisory gates with `if: false` (round 6, commit `0707f21`): `smoke-spirit-author-7-1` and `check-epic-6-bridge`. The Epic-8 retrospective (`epic-8-retro-2026-06-12.md`, actions \u00a7A1) ruled that `if: false` is not an acceptable terminal state \u2014 each gate must be either **repaired and re-enabled** or **formally retired with a ratified ADR proving its enforcement is carried elsewhere or is obsolete**. This ADR ratifies the **retire** path for both, executed by Story 8.16. Neither retirement removes live coverage; each is justified item-by-item below.\ndocs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md:14:## Decision 1 \u2014 Retire `check-epic-6-bridge`\ndocs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md:25:| \u00a7A5/\u00a7A6 \u2014 gate-existence | migrated to the above hard-fail gates in Story 7.1.5 (per the beacon's own header comment, `check_epic_6_bridge.rs:36`: \"\u00a7A2/A5/A6 rows REMOVED in Story 7.1.5 \u2014 now enforced as hard-fail gates\") | superseded |\ndocs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md:29:The beacon's last remaining red (`A4-Debt-1`) is a **stale check, not real debt**: `check_a4_debt_1()` (`check_epic_6_bridge.rs:716-723`) counts lines in `xtask/i9-whitelist.toml` that contain the substring `rationale` and requires `>= 5` (the OLD array-of-tables-with-per-entry-rationale schema). The current file uses a `paths = [...]` array (3 sanctioned holder paths, no `rationale` lines) and `docs/invariants/i9-exemptions.md` exists \u2014 both present; only the beacon's entry-counting predicate is outdated against the file's current shape. The underlying I9 invariant is enforced live by `check-empty-kernel` and `check-service-boundary` (both in the aggregate `needs:`). Additionally, the beacon's `--story 6.2/6.3/6.4` sub-invocations have been CLI-broken (exit 2, arg-parse) since the job was disabled. Retiring removes a 4504-line legacy module that duplicates live enforcement and carries a stale predicate; **no Epic-6 \u00a7-item goes dark.**\ndocs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md:37:1. **`if: false` is the worst form of the decay pattern** (`[[feedback_mechanical_gates_compound_promises_decay]]`): a red gate disabled to fake green reads as \"covered\" while enforcing nothing. The Epic-8 retro named this; the four-epic `check-epic-6-bridge` beacon is its canonical instance. Retiring (with proof of live successors) or repairing are the only honest terminal states.\nxtask/kloc.toml:350:#      clean build proving each: `check_epic_6_bridge::check_a2` / `check_a5` /\n",
+    "stderr": ""
+  }
+}

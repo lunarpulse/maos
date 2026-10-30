@@ -1,0 +1,206 @@
+{
+  "tracked_changes": [
+    {
+      "status": "M",
+      "path": ".github/workflows/discipline.yml",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator.md",
+      "owner": "Records203b"
+    },
+    {
+      "status": "M",
+      "path": "_bmad-output/implementation-artifacts/sprint-status.yaml",
+      "owner": "Records203b"
+    },
+    {
+      "status": "M",
+      "path": "_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md",
+      "owner": "Records203b"
+    },
+    {
+      "status": "M",
+      "path": "crates/maos-bin/src/main.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "docs/adr/ADR-031-wasm-component-model-spirit-form.md",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "docs/adr/ADR-040-rust-inproc-measurement-gate-v05-decision.md",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "docs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "docs/adr/ADR-045-governance-audit-artifacts.md",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "docs/adr/ADR-068-stable-performance-runner.md",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "docs/adr/index.md",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "docs/testing/proof-contract.md",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "tests/coverage-matrix.yaml",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/gate-registry.toml",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/kloc.toml",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_adr_040_accepted.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_bare_review_findings.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_cross_form_equiv.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_deprecations_declared.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/check_dev_model_tier.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_dev_model_used_populated.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/check_dev_record_completeness.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_epic_6_bridge.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/check_epic_close_coherence.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_epic_close_green.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_governance_categories.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/check_j1_loopback_delegation.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "D",
+      "path": "xtask/src/check_literal_reappearance.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/check_review_findings_resolved.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/check_ship_gate_completeness.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/check_wasm_form_equiv.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/main.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/src/prepush.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/tests/d11_xtask_ceiling_ratchet.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/tests/d19_story_file_governance.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/tests/ship_gate_binding_20_3a.rs",
+      "owner": "Dev203b1"
+    },
+    {
+      "status": "M",
+      "path": "xtask/tests/story_10_2_proven_red.rs",
+      "owner": "Dev203b1"
+    }
+  ],
+  "new_evidence": [
+    "ci/ci-20-3b-verify.yml",
+    "landing-1/gates.json",
+    "landing-1/initial-workspace-failures.json",
+    "landing-1/initial-test-budget-failure.json",
+    "landing-1/measurements.json",
+    "landing-1/plants/if-false.diff",
+    "landing-1/plants/if-false-results.json",
+    "landing-1/retirement-closure.json",
+    "landing-1/prepush.json",
+    "landing-1/files-changed.json",
+    "landing-1/verification.json"
+  ],
+  "operator_file": ".devcontainer/Dockerfile was observed modified before this assignment and never edited by this agent",
+  "kernel_baseline": "untouched",
+  "committed": false,
+  "pushed": false
+}

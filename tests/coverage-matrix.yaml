@@ -2000,17 +2000,16 @@ coverage:
   # distributional leg and the v2.0+ blocking any-rust↔wasm-component binding
   # leg are distinct rows, not one conflated entry hiding the binding in prose.
   NFR-Test-7:
-    gates:
-    - check-cross-form-equiv
+    gates: []
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
     notes: |
       CLI-wrapper distributional leg (Story 10.2, advisory per ADR-040).
-      Mann-Whitney U-test over 30+30 per-run hashes (derive-and-reconcile);
-      advisory at v1.0/v1.5. NOT the equivalence-binding gate — the binding
-      leg is NFR-Test-7-binding (check-wasm-form-equiv).
+      Story 20-3b retires its unsatisfied statistical gate: no committed
+      measurement artifact existed, so this row makes no coverage claim.
+      Equivalence binding remains NFR-Test-7-binding (check-wasm-form-equiv).
   NFR-Test-7-binding:
     gates:
     - check-wasm-form-equiv

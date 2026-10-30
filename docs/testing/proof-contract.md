@@ -156,7 +156,7 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   `check-skill-schema`, `check-coverage-matrix-completeness`, `check-test-cost`, `check-env-contract`,
   `check-unsafe`, `check-service-boundary`, `check-kernel-baseline`, `kloc-check`, `check-breaking-md`,
   `check-composition-root-completeness`, `check-pub-field-constructors`, `check-dependency-closure`,
-  `check-deprecations-declared`, `coverage-matrix`, and `check-corpus`; it also runs `cargo fmt --all -- --check`.
+  `coverage-matrix`, and `check-corpus`; it also runs `cargo fmt --all -- --check`.
   Build-free docs checks include route-manifest parity, glossary, anchors and ko coverage
   (`KO_COVERAGE_MIN=100`). The CI pin reader compares test-bound count pins against `cargo nextest list`, marker
   specs against emission-site counts, and checks color settings on parsed cargo/nextest output; it covers recognised
@@ -164,9 +164,8 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   (20-16 D-02 operator addendum 2026-10-27, C): a statically determinate marker is compared exactly; a marker
   emitted only dynamically is a named indeterminate SKIP; a marker with no emission site is RED. Actual marker
   values, including dynamic counts, remain CI-only, and CI's runtime marker pins are not weakened.
-  `check-deprecations-declared` is a **named CR-2 exception** (operator 2026-10-27): it has no CI step and no test
-  authority, so prepush runs it as an extra local drift check rather than a mirror of CI; the landing run does not
-  authorise it.
+  Deprecation policy is enforced by the existing `stability-matrix --check` leg; the obsolete empty-channel
+  check and its CR-2 exception retired in Story 20-3b.
 - Determine changes from `git merge-base origin/main HEAD` through HEAD, plus the working tree and untracked files;
   never fetch, and print the base SHA and its age. Run the release build, strip and 33,554,432-byte size check when
   `Cargo.toml`, `Cargo.lock`, `crates/maos-bin/**`, or a maos-bin dependency changes; run a fresh Docusaurus build

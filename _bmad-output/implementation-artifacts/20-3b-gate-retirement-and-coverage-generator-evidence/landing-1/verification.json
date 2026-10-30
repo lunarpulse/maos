@@ -1,0 +1,132 @@
+{
+  "scope": "Landing 1 only; nine gate retirements with three protective folds; coverage-completeness stays until the landing-2 spike decides its disposition.",
+  "commands": [
+    {
+      "command": "cargo fmt --all",
+      "exit_code": 0
+    },
+    {
+      "command": "env -u CI -u GITHUB_ACTIONS cargo build --locked --workspace --all-targets",
+      "exit_code": 0,
+      "note": "Executed initially and again after final source corrections. Build completed with existing workspace warnings."
+    },
+    {
+      "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p xtask -p maos-bin -p maos-audit --color never --no-fail-fast",
+      "exit_code": 0,
+      "passed": 2149,
+      "failed": 0,
+      "skipped": 27,
+      "earlier_run": {
+        "exit_code": 100,
+        "passed": 2145,
+        "failed": 4,
+        "repairs": [
+          "d11 current HISTORY includes a date token: assert the first citation is the story key, not that every numeric-looking token is a story",
+          "ship_gate_binding_20_3a real-tree expected_count 46 -> 45",
+          "check_ship_gate_completeness unit set length pins 46 -> 45",
+          "active dev-record fixture now supplies a model while retaining empty completion fields; missing-model negative remains covered by d19"
+        ]
+      }
+    },
+    {
+      "command": "env -u CI -u GITHUB_ACTIONS cargo run -q -p xtask -- build-test-fixtures",
+      "exit_code": 0,
+      "artifacts": 14,
+      "note": "Official producer fixed the 30 missing-fixture failures. No target environment override was supplied by this agent; the existing producer emits its own guest --target-dir arguments."
+    },
+    {
+      "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --color never --no-fail-fast",
+      "exit_code": 0,
+      "passed": 5373,
+      "failed": 0,
+      "skipped": 137,
+      "wall_seconds": 43.738,
+      "earlier_failure_evidence": "initial-workspace-failures.json"
+    },
+    {
+      "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /mnt/build/cargo-maos/debug/xtask prepush --json",
+      "exit_code": 0,
+      "records": {
+        "pass": 61,
+        "red": 0,
+        "advisory": 1,
+        "skip": 8
+      },
+      "wall_ms": 625007,
+      "evidence": "prepush.json",
+      "note": "Runtime CARGO_MANIFEST_DIR was explicitly authorized by Main; cwd fallback remains landing 2. Timing budget was advisory in this parallel run and passed after the one serial rerun. Nested workspace nextest, kernel-core libtest and workspace doctests all exited 0; tracked-tree preservation passed."
+    },
+    {
+      "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --color never --no-fail-fast --test-threads 1",
+      "exit_code": 0,
+      "passed": 5373,
+      "failed": 0,
+      "skipped": 137,
+      "wall_seconds": 579.87,
+      "note": "Single serial rerun for timing noise; no budget exceptions or scope reductions."
+    },
+    {
+      "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-test-budget --junit /home/lunarpulse/dev_ws/target/nextest/default/junit.xml --json",
+      "exit_code": 0,
+      "binaries": 567,
+      "total_sum_seconds": 579.725,
+      "findings": []
+    },
+    {
+      "command": "env -u CI -u GITHUB_ACTIONS MAOS_ONE_SHOT=smoke-discipline-7-1-5 /mnt/build/cargo-maos/debug/maos",
+      "exit_code": 0,
+      "output": {
+        "smoke": "7-1-5",
+        "status": "ok",
+        "gates": [
+          "check-review-findings-resolved",
+          "check-dev-record-completeness"
+        ]
+      }
+    }
+  ],
+  "direct_gate_results": {
+    "check-env-contract": 0,
+    "check-serde-error-handling": 0,
+    "check-composition-root-completeness": 0,
+    "check-j1-loopback-delegation": 0,
+    "check-dev-record-completeness": 0,
+    "check-epic-close-coherence": 0,
+    "check-ship-gate-completeness": 0,
+    "kloc-check": 0,
+    "check-kernel-baseline": 0,
+    "check-service-boundary": 0,
+    "check-test-cost": 0,
+    "check-coverage-matrix-completeness": 0,
+    "check-test-budget": 0
+  },
+  "proven_red": {
+    "evidence": "plants/if-false-results.json",
+    "diff": "plants/if-false.diff",
+    "clean_exit": 0,
+    "planted_exit": 1,
+    "restored_exit": 0,
+    "failure_kind": "disabled-workflow-job",
+    "byte_identical_restore": true,
+    "sha256": "e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d",
+    "in_tree_witnesses": "d19_story_file_governance and disabled_workflow_plant_reds_both_literal_forms_and_restores_green passed in the suites"
+  },
+  "retired_commands": {
+    "count": 9,
+    "all_exit_code": 2,
+    "evidence": "retirement-closure.json"
+  },
+  "not_exercised": [
+    "Hosted branch-only ci/ci-20-3b-verify.yml was not run because nothing was pushed.",
+    "137 default-suite skips remain; signed T3 substrate, strace and Python cryptography were not provisioned. Runtime skip diagnostics are preserved in prepush.json.",
+    "Prepush skipped docs build/routes (no applicable changes), cargo-deny (no Cargo.lock/deny.toml change), and five dynamic CI marker cardinalities.",
+    "Clippy, generator spike, FR31, new ledger, governance integration-test migration, pub-use hash and AC7 fallback/literal+pin remain landing 2."
+  ],
+  "preservation": {
+    "kernel_src_and_baseline_unchanged": true,
+    "lineage_report_byte_identical_to_HEAD_snapshot": true,
+    "operator_dockerfile_untouched": true,
+    "committed": false,
+    "pushed": false
+  }
+}

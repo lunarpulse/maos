@@ -154,8 +154,6 @@ impl Fixture {
 fn a_complete_fixture_is_green_on_every_converted_gate() {
     let fx = Fixture::new(&[J1_KEY, NUMERIC_KEY]);
     for gate in [
-        "check-bare-review-findings",
-        "check-dev-model-used-populated",
         "check-dev-record-completeness",
         "check-review-findings-resolved",
     ] {
@@ -172,8 +170,6 @@ fn an_ungoverned_md_file_reds_nothing() {
     // The fixture already wrote `some-design-note.md` with a bare RF placeholder
     // and no dev record at all.
     for gate in [
-        "check-bare-review-findings",
-        "check-dev-model-used-populated",
         "check-dev-record-completeness",
         "check-review-findings-resolved",
     ] {
@@ -183,7 +179,7 @@ fn an_ungoverned_md_file_reds_nothing() {
             "{gate} must ignore a `.md` that is not a sprint-status key:\n{out}"
         );
     }
-    let (_, out) = fx.gate("check-bare-review-findings", &[]);
+    let (_, out) = fx.gate("check-review-findings-resolved", &[]);
     assert!(
         !out.contains(UNGOVERNED),
         "an ungoverned file must not even be named: {out}"
@@ -238,7 +234,7 @@ fn the_same_defect_reds_under_a_numeric_key_too() {
 }
 
 /// A `j1-*` story with a bare review-findings placeholder reds
-/// `check-bare-review-findings`.
+/// `check-review-findings-resolved`.
 #[test]
 fn a_j1_story_with_a_bare_review_findings_placeholder_reds() {
     let fx = Fixture::new(&[J1_KEY]);
@@ -248,7 +244,7 @@ fn a_j1_story_with_a_bare_review_findings_placeholder_reds() {
     );
     write_file(fx.path(), &fx.story(J1_KEY), &bare);
 
-    let (ok, out) = fx.gate("check-bare-review-findings", &[]);
+    let (ok, out) = fx.gate("check-review-findings-resolved", &[]);
     assert!(
         !ok,
         "a bare RF placeholder in a `j1-*` story must red:\n{out}"
@@ -256,7 +252,7 @@ fn a_j1_story_with_a_bare_review_findings_placeholder_reds() {
     assert!(out.contains(J1_KEY), "{out}");
 }
 
-/// A `j1-*` story with no recorded model reds `check-dev-model-used-populated`.
+/// A `j1-*` story with no recorded model reds `check-dev-record-completeness`.
 #[test]
 fn a_j1_story_with_no_recorded_model_reds() {
     let fx = Fixture::new(&[J1_KEY]);
@@ -271,7 +267,7 @@ fn a_j1_story_with_no_recorded_model_reds() {
         );
     write_file(fx.path(), &fx.story(J1_KEY), &no_model);
 
-    let (ok, out) = fx.gate("check-dev-model-used-populated", &[]);
+    let (ok, out) = fx.gate("check-dev-record-completeness", &[]);
     assert!(
         !ok,
         "a `j1-*` story with no model provenance must red:\n{out}"
@@ -308,8 +304,6 @@ fn a_missing_sprint_status_reds_rather_than_governing_nothing() {
     )
     .unwrap();
     for gate in [
-        "check-bare-review-findings",
-        "check-dev-model-used-populated",
         "check-dev-record-completeness",
         "check-review-findings-resolved",
     ] {
@@ -347,18 +341,14 @@ fn an_empty_development_status_block_reds_too() {
 /// DECLARED in sprint-status whose story file is missing shrank the governed
 /// set silently — `rm <story>.md` and the story escapes every walker. An
 /// ACTIVE key (review/in-progress/ready-for-dev) with no file must RED every
-/// converted gate — this vector exercises all seven walk sites end-to-end,
-/// including the two (`check-dev-model-tier`, `check-epic-6-bridge`) the
-/// per-defect vectors above never reach.
+/// surviving gate — this vector exercises all four walkers end-to-end,
+/// including `check-dev-model-tier` (not reached by the per-defect vectors).
 #[test]
 fn an_active_declared_story_with_no_file_reds_every_walker() {
     const GATES: &[&str] = &[
-        "check-bare-review-findings",
-        "check-dev-model-used-populated",
         "check-dev-record-completeness",
         "check-review-findings-resolved",
         "check-dev-model-tier",
-        "check-epic-6-bridge",
     ];
     for gate in GATES {
         let fx = Fixture::new(&[J1_KEY, NUMERIC_KEY]);
@@ -375,16 +365,10 @@ fn an_active_declared_story_with_no_file_reds_every_walker() {
             !ok,
             "`{gate}` must RED when an ACTIVE declared story has no file\n{out}"
         );
-        // `check-epic-6-bridge` consumes the same helper but its own fixture
-        // substrate (story 5.5d, serde-error allowlists…) fails first in a
-        // minimal fixture, so its red is not guaranteed to carry the
-        // missing-file message — the walk site is still exercised.
-        if *gate != "check-epic-6-bridge" {
-            assert!(
-                out.contains("no story file"),
-                "`{gate}` must name the missing file for the ghost story\n{out}"
-            );
-        }
+        assert!(
+            out.contains("no story file"),
+            "`{gate}` must name the missing file for the ghost story\n{out}"
+        );
     }
 }
 

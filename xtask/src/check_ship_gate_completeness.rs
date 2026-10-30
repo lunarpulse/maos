@@ -21,7 +21,6 @@ const EXPECTED_GATES: &[&str] = &[
     "check-breaking-md",
     "check-pentest-gate",
     "check-third-party-trial",
-    "check-cross-form-equiv",
     // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
     "check-wasm-form-equiv",
     "check-red-team-gate",
@@ -554,7 +553,7 @@ jobs:
     /// Real-tree reconciliation includes the formerly exempt infrastructure
     /// gates and the previously registry-only fuzz gates, with no legacy list.
     #[test]
-    fn expected_gates_and_registry_are_one_set_of_46() {
+    fn expected_gates_and_registry_are_one_set_of_45() {
         // Unit tests run with CWD = the crate root, not the workspace root.
         let registry_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml");
         let registry: crate::corpus_types::ShipGateRegistry =
@@ -565,9 +564,9 @@ jobs:
             .map(|e| e.name.as_str())
             .collect();
         let expected: std::collections::HashSet<&str> = EXPECTED_GATES.iter().copied().collect();
-        assert_eq!(EXPECTED_GATES.len(), 46);
-        assert_eq!(expected.len(), 46, "duplicate expected gate");
-        assert_eq!(registry.ship_gates.len(), 46, "duplicate registry gate");
+        assert_eq!(EXPECTED_GATES.len(), 45);
+        assert_eq!(expected.len(), 45, "duplicate expected gate");
+        assert_eq!(registry.ship_gates.len(), 45, "duplicate registry gate");
         assert_eq!(names, expected);
     }
 }

@@ -1,6 +1,6 @@
 ---
 Status: ACCEPTED — Winston (System Architect) ratified 2026-06-12 (ACCEPTED-WITH-CONDITIONS; the 2 truthfulness corrections are applied below). Story 8.16 — Epic 8→9 readiness bridge.
-Gate: removal verified by `xtask check-epic-close-green` (zero `if: false` jobs in discipline.yml) + the live successor gates enumerated below
+Gate: removal verified by `xtask check-epic-close-coherence` (zero `if: false` jobs in discipline.yml) + the live successor gates enumerated below
 Decided: 2026-06-12
 Accepted-in-PR: <PR_NUMBER>
 Revisits: Epic 6 retro §A2/§A3/§A5/§A6; Epic 7 §A1 (7.1.5/7.1.6 gate migration); Story 7.1 spirit-authoring template
@@ -13,14 +13,14 @@ Supersedes: the `check-epic-6-bridge` debt-beacon job and the `smoke-spirit-auth
 
 ## Decision 1 — Retire `check-epic-6-bridge`
 
-**Retire the job** (delete from `discipline.yml`, remove from the aggregate `needs:` list and `report-aggregate`, leave the `xtask/src/check_epic_6_bridge.rs` module in tree as archived history). The Epic-6 debt-beacon's responsibilities are all carried by live, permanent hard-fail gates at HEAD:
+**Retire the job** (delete from `discipline.yml`, remove from the aggregate `needs:` list and `report-aggregate`, archive the module at that landing; Story 20-3b subsequently deletes it). The Epic-6 debt-beacon's responsibilities are all carried by live, permanent hard-fail gates at HEAD:
 
 | Beacon concern | Live successor gate (hard-fail at HEAD) | Status |
 |---|---|---|
 | §A2 — review-findings resolved | `check-review-findings-resolved` (no `continue-on-error`, discipline.yml:1660 post-8.16) | green at HEAD |
 | §A2 — dev-record completeness | `check-dev-record-completeness` (discipline.yml:1674 post-8.16) | green at HEAD |
-| §A2 — dev_model_used populated | `check-dev-model-used-populated` | green at HEAD |
-| §A2 — no bare review-findings | `check-bare-review-findings` | green at HEAD |
+| §A2 — dev_model_used populated | `check-dev-record-completeness` (20-3b fold) | green at HEAD |
+| §A2 — no bare review-findings | `check-review-findings-resolved` (20-3b fold) | green at HEAD |
 | §A3 — serde error handling | `check-serde-error-handling` (the beacon's own A3 check confirmed it "exists and wired") | live |
 | §A5/§A6 — gate-existence | migrated to the above hard-fail gates in Story 7.1.5 (per the beacon's own header comment, `check_epic_6_bridge.rs:36`: "§A2/A5/A6 rows REMOVED in Story 7.1.5 — now enforced as hard-fail gates") | superseded |
 | §A4-Debt-2b/2c — exemptions/hook-count | already PASS in the beacon | n/a |
@@ -35,8 +35,8 @@ The beacon's last remaining red (`A4-Debt-1`) is a **stale check, not real debt*
 ## Rationale
 
 1. **`if: false` is the worst form of the decay pattern** (`[[feedback_mechanical_gates_compound_promises_decay]]`): a red gate disabled to fake green reads as "covered" while enforcing nothing. The Epic-8 retro named this; the four-epic `check-epic-6-bridge` beacon is its canonical instance. Retiring (with proof of live successors) or repairing are the only honest terminal states.
-2. **Retire ≠ hide debt.** Each retired concern maps to a live hard-fail gate or is a proven-stale predicate. The `check-epic-close-green` gate (Story 8.16) makes re-introducing `if: false` mechanically impossible going forward.
-3. **Modules stay in tree** (archived), so the history and any future re-enable are a documented revert, not a reconstruction.
+2. **Retire ≠ hide debt.** Each retired concern maps to a live hard-fail gate or is a proven-stale predicate. The `check-epic-close-coherence` gate (20-3b fold of the Story 8.16 control) makes re-introducing `if: false` mechanically impossible going forward.
+3. **Historical disposition:** modules stayed archived at Story 8.16. Story 20-3b deletes the dead modules after folding the remaining live controls; git history retains the original implementation.
 
 ## Consequences
 

@@ -12,7 +12,7 @@
 //! §7.4 of that retrospective: *a status field nobody re-derives is not a status
 //! field*. This gate is the re-derivation.
 //!
-//! Five mechanical checks, each unambiguous:
+//! Six mechanical checks, each unambiguous:
 //!
 //! 1. **`epic-over-stories`** — an epic marked `done` while a story beneath it is
 //!    not terminal. This is the dangerous direction: a closed epic hiding open
@@ -31,6 +31,9 @@
 //!    authoritative value was `23679`. Both the number and its correction were
 //!    stale, which is why C1 requires docs to RESOLVE to the baseline file
 //!    rather than restate it.
+//!
+//! 6. **`disabled-workflow-job`** — no workflow may park a gate with literal
+//!    `if: false` (20-3b; preserves the retired Epic-8 control).
 //!
 //! **Why closed epics are exempt from check 5.** A `done` epic's ZERO-Δ
 //! assertion is a historical record that was true against the baseline of its
@@ -83,6 +86,7 @@ pub fn run(json: bool) -> Result<(), String> {
         Path::new(EPICS_INDEX),
         Path::new(EPICS_DIR),
         Path::new(KERNEL_BASELINE),
+        Path::new(".github/workflows"),
     )
     .inspect_err(|error| {
         // Both check's input failure and read_pinned's I/O/parse failure must
@@ -131,6 +135,7 @@ fn check(
     index_path: &Path,
     epics_dir: &Path,
     baseline_path: &Path,
+    workflows_dir: &Path,
 ) -> Result<Report, String> {
     let statuses = load_sprint_status(&sprint_path.to_string_lossy());
     if statuses.is_empty() {
@@ -142,7 +147,7 @@ fn check(
     let claims = index_claims(&index);
     let stories = stories_by_epic(&statuses);
     let epics = epic_numbers(&statuses);
-    let mut violations = Vec::new();
+    let mut violations = disabled_workflow_jobs(workflows_dir)?;
 
     for epic in &epics {
         let epic_status = statuses
@@ -224,6 +229,44 @@ fn check(
         authoritative_src_lines: pin,
         violations,
     })
+}
+
+// Preserve the retired scanner's literal-false check, including expression form.
+fn disabled_workflow_jobs(dir: &Path) -> Result<Vec<Violation>, String> {
+    let entries = fs::read_dir(dir).map_err(|e| format!("read dir {}: {e}", dir.display()))?;
+    let mut files = Vec::new();
+    for entry in entries {
+        let path = entry.map_err(|e| format!("workflow entry: {e}"))?.path();
+        if path.is_file()
+            && matches!(
+                path.extension().and_then(|e| e.to_str()),
+                Some("yml" | "yaml")
+            )
+        {
+            files.push(path);
+        }
+    }
+    files.sort();
+    let mut violations = Vec::new();
+    for file in files {
+        let text =
+            fs::read_to_string(&file).map_err(|e| format!("read {}: {e}", file.display()))?;
+        for (index, line) in text.lines().enumerate() {
+            let normalized = line.split_whitespace().collect::<Vec<_>>().join(" ");
+            if normalized == "if: false" || normalized == "if: ${{ false }}" {
+                violations.push(Violation {
+                    kind: "disabled-workflow-job",
+                    epic: 0,
+                    detail: format!(
+                        "{}:{}: `if: false` parks a gate; repair or retire it",
+                        file.display(),
+                        index + 1
+                    ),
+                });
+            }
+        }
+    }
+    Ok(violations)
 }
 
 /// `13-6-reza-…` → 13, `5-5a-sandbox-…` → 5. Non-numeric heads (`epic-13`,
@@ -445,7 +488,7 @@ mod tests {
         )
         .unwrap();
         let baseline = baseline_file(dir.path(), 23679);
-        let report = check(&sprint, &index, dir.path(), &baseline).unwrap();
+        let report = check(&sprint, &index, dir.path(), &baseline, dir.path()).unwrap();
         assert!(report.passed, "{:?}", report.violations);
         assert_eq!(report.authoritative_src_lines, 23679);
     }
@@ -462,7 +505,7 @@ mod tests {
         let index = dir.path().join("index.md");
         fs::write(&index, "  - [Epic 5: X](./epic-5.md) — 2 stories, `done`\n").unwrap();
         let baseline = baseline_file(dir.path(), 23679);
-        let report = check(&sprint, &index, dir.path(), &baseline).unwrap();
+        let report = check(&sprint, &index, dir.path(), &baseline, dir.path()).unwrap();
         assert!(!report.passed);
         assert_eq!(report.violations[0].kind, "epic-over-stories");
         assert!(report.violations[0].detail.contains("5-2-b"));
@@ -482,7 +525,7 @@ mod tests {
         )
         .unwrap();
         let baseline = baseline_file(dir.path(), 23679);
-        let report = check(&sprint, &index, dir.path(), &baseline).unwrap();
+        let report = check(&sprint, &index, dir.path(), &baseline, dir.path()).unwrap();
         assert!(!report.passed);
         assert_eq!(report.violations[0].kind, "stale-epic-key");
     }
@@ -498,7 +541,7 @@ mod tests {
         )
         .unwrap();
         let baseline = baseline_file(dir.path(), 23679);
-        let report = check(&sprint, &index, dir.path(), &baseline).unwrap();
+        let report = check(&sprint, &index, dir.path(), &baseline, dir.path()).unwrap();
         assert!(!report.passed);
         assert_eq!(report.violations[0].kind, "prose-status-mismatch");
     }
@@ -510,7 +553,7 @@ mod tests {
         let index = dir.path().join("index.md");
         fs::write(&index, "  - [Epic 9: X](./epic-9.md) — 1 stories, `done`\n").unwrap();
         let baseline = baseline_file(dir.path(), 23679);
-        let report = check(&sprint, &index, dir.path(), &baseline).unwrap();
+        let report = check(&sprint, &index, dir.path(), &baseline, dir.path()).unwrap();
         assert!(!report.passed);
         assert_eq!(report.violations[0].kind, "story-count-mismatch");
     }
@@ -531,7 +574,7 @@ mod tests {
         )
         .unwrap();
         let baseline = baseline_file(dir.path(), 23679);
-        let report = check(&sprint, &index, dir.path(), &baseline).unwrap();
+        let report = check(&sprint, &index, dir.path(), &baseline, dir.path()).unwrap();
         assert!(!report.passed);
         assert_eq!(report.violations[0].kind, "stale-kernel-pin");
         assert!(report.violations[0].detail.contains("23141"));
@@ -553,7 +596,7 @@ mod tests {
         )
         .unwrap();
         let baseline = baseline_file(dir.path(), 23679);
-        let report = check(&sprint, &index, dir.path(), &baseline).unwrap();
+        let report = check(&sprint, &index, dir.path(), &baseline, dir.path()).unwrap();
         assert!(
             report.passed,
             "a closed epic's historical pin must not be rewritten: {:?}",
@@ -565,5 +608,27 @@ mod tests {
     fn draft_ready_for_preflight_agrees_with_backlog() {
         assert!(status_agrees("draft-ready-for-preflight", "backlog"));
         assert!(!status_agrees("done", "backlog"));
+    }
+    #[test]
+    fn disabled_workflow_plant_reds_both_literal_forms_and_restores_green() {
+        let dir = tempfile::tempdir().unwrap();
+        let workflow = dir.path().join("discipline.yml");
+        let clean = "jobs:\n  control:\n    if: github.event_name == 'push'\n    steps:\n      - run: echo live\n";
+        fs::write(&workflow, clean).unwrap();
+        assert!(disabled_workflow_jobs(dir.path()).unwrap().is_empty());
+        for condition in ["false", "${{ false }}"] {
+            fs::write(
+                &workflow,
+                clean.replace("github.event_name == 'push'", condition),
+            )
+            .unwrap();
+            let red = disabled_workflow_jobs(dir.path()).unwrap();
+            assert_eq!(red.len(), 1);
+            assert_eq!(red[0].kind, "disabled-workflow-job");
+            assert!(red[0].detail.contains("discipline.yml:3"));
+        }
+        fs::write(&workflow, clean).unwrap();
+        assert!(disabled_workflow_jobs(dir.path()).unwrap().is_empty());
+        assert_eq!(fs::read_to_string(workflow).unwrap(), clean);
     }
 }

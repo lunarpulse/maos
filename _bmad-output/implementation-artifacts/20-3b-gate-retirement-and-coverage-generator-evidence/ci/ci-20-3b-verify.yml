@@ -1,0 +1,46 @@
+name: 20-3b landing-1 branch verification
+
+# Evidence only: copy to .github/workflows on a disposable non-main branch.
+# Never enroll this plant workflow in the production aggregate.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retirement-hosted-proof:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the real gates and smoke binary
+        run: cargo build --locked -p xtask -p maos-bin --features network
+      - name: Preserve governed-story and workflow controls
+        run: |
+          cargo test --locked -p xtask --test d19_story_file_governance --test story_10_2_proven_red
+          cargo test --locked -p xtask disabled_workflow_plant_reds_both_literal_forms_and_restores_green
+          cargo run --locked -q -p xtask -- check-ship-gate-completeness --json
+      - name: Hosted smoke still exercises the two surviving gates
+        env:
+          MAOS_ONE_SHOT: smoke-discipline-7-1-5
+        run: cargo run --locked -q -p maos-bin --features network
+      - name: Prove workflow parking red then restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch=.github/workflows/20-3b-disabled-plant.yml
+          test ! -e "$scratch"
+          before=$(sha256sum .github/workflows/discipline.yml)
+          trap 'rm -f "$scratch"' EXIT
+          printf 'name: disabled-plant\non: workflow_dispatch\njobs:\n  planted:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 0\n' > "$scratch"
+          if cargo run --locked -q -p xtask -- check-epic-close-coherence --json; then
+            echo 'ERROR: parked gate was accepted'
+            exit 1
+          fi
+          rm "$scratch"
+          test "$before" = "$(sha256sum .github/workflows/discipline.yml)"
+          cargo run --locked -q -p xtask -- check-epic-close-coherence --json

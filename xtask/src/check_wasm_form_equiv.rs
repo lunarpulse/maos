@@ -3,8 +3,7 @@
 //! Story 11.1b AC3 — NEW `check-wasm-form-equiv` gate.
 //!
 //! Deterministic tiered binary oracle for cross-form equivalence (binding).
-//! This is THE authoritative equivalence-binding row — NOT the distributional
-//! `check-cross-form-equiv` (which handles the CLI-wrapper statistical leg).
+//! This is the sole authoritative equivalence-binding row (ADR-031, 20-3b).
 //!
 //! # What this gate actually enforces (review finding #3)
 //!

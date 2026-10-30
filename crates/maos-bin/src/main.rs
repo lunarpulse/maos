@@ -13834,7 +13834,7 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(feature = "network")]
-/// Story 7.1.5 AC5 — `smoke-discipline-7-1-5` runs all four §A2-family gates.
+/// Story 7.1.5 AC5 — `smoke-discipline-7-1-5` runs the two surviving §A2-family gates (20-3b).
 async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
     use std::process::Command;
     use std::time::Duration;
@@ -13843,8 +13843,6 @@ async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
     let gates = [
         "check-review-findings-resolved",
         "check-dev-record-completeness",
-        "check-bare-review-findings",
-        "check-dev-model-used-populated",
     ];
 
     // Pre-build xtask once so each gate subprocess hits a warm cache. The
@@ -13881,7 +13879,7 @@ async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!(
-        r#"{{"smoke":"7-1-5","status":"ok","gates":["check-review-findings-resolved","check-dev-record-completeness","check-bare-review-findings","check-dev-model-used-populated"]}}"#
+        r#"{{"smoke":"7-1-5","status":"ok","gates":["check-review-findings-resolved","check-dev-record-completeness"]}}"#
     );
     Ok(())
 }

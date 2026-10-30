@@ -10,8 +10,8 @@
 //!    the frontmatter `dev_model_used:` field, OR the `### Agent Model Used`
 //!    body, OR a `**Model:**` preamble line (Epics 11–13 relocated the model out
 //!    of frontmatter). Empty / `TBD` / `TBD (recommend ...)` in ALL locations
-//!    fails. Shares model resolution with the sibling gate
-//!    `check-dev-model-used-populated` (Epic 12 retro B3).
+//!    fails. Model presence applies to every developed story (20-3b); the other
+//!    record requirements apply only to completed stories.
 //! 2. **Completion Notes non-empty**: the `### Completion Notes List` (or
 //!    `### Completion Notes`) section must contain at least one bullet/paragraph.
 //! 3. **File List non-empty**: the `### File List` (or `## File List`) section
@@ -28,7 +28,7 @@
 //! v0.5-α implementation: line-based parsing of YAML frontmatter + markdown
 //! sections. Same simplicity as `check_review_findings_resolved`.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -453,8 +453,7 @@ fn parse_dev_record(keys: &BTreeSet<String>, path: &Path) -> Option<DevRecord> {
     let content = fs::read_to_string(path).ok()?;
     let lines: Vec<&str> = content.lines().collect();
 
-    // Model resolution mirrors the sibling gate `check-dev-model-used-populated`
-    // (Epic 12 retro B3): frontmatter `dev_model_used:` first, then the
+    // Shared model resolution (Epic 12 retro B3): frontmatter first, then the
     // `### Agent Model Used` body / `**Model:**` preamble that Epics 11–13 use
     // instead of the frontmatter field. Without this fallback, every Epic 11–13
     // `done` story (which dropped the frontmatter field) read as "model empty".
@@ -473,9 +472,8 @@ fn parse_dev_record(keys: &BTreeSet<String>, path: &Path) -> Option<DevRecord> {
         // returns the section's first word regardless of shape, which would
         // let `<!-- TBD -->` or prose stand in for a real attribution — a null
         // control. `looks_like_model` closes that.
-        if let Some(m) = crate::check_dev_model_used_populated::agent_model_section_model(&content)
-        {
-            if crate::check_dev_model_used_populated::looks_like_model(&m) {
+        if let Some(m) = agent_model_section_model(&content) {
+            if looks_like_model(&m) {
                 dev_model_used = m;
             }
         }
@@ -561,10 +559,9 @@ pub fn run(
     let mut done_count = 0;
     for r in &records {
         let status = sprint_status.get(&r.story_key).cloned().unwrap_or_default();
-        if !TERMINAL_STATUSES.contains(&status.as_str()) {
+        if is_pre_development_status(Some(&status)) {
             continue;
         }
-        done_count += 1;
 
         // Model attribution (checks #1 + #2 merged). `dev_model_used` is already
         // resolved from frontmatter → `### Agent Model Used` body → `**Model:**`
@@ -576,12 +573,20 @@ pub fn run(
         // (a convention-drift false positive, not a missing record). A story
         // with no concrete model in ANY location still fails here.
         let dm_lc = r.dev_model_used.to_ascii_lowercase();
-        if r.dev_model_used.is_empty() || dm_lc.starts_with("tbd") {
+        if r.dev_model_used.is_empty()
+            || dm_lc.starts_with("tbd")
+            || r.dev_model_used == "<set by dev at story start>"
+        {
             violations.push(format!(
                 "{}: no concrete dev model recorded — needs `dev_model_used:` in frontmatter, a `### Agent Model Used` body, or a `**Model:**` line (found `{}`)",
                 r.story_key, r.dev_model_used,
             ));
         }
+
+        if !TERMINAL_STATUSES.contains(&status.as_str()) {
+            continue;
+        }
+        done_count += 1;
 
         if body_is_empty(&r.completion_notes_body) {
             violations.push(format!(
@@ -752,6 +757,134 @@ pub fn run(
     ))
 }
 
+/// The authoritative statuses that prove a story has not yet been developed.
+///
+/// This list is deliberately narrow: unknown, missing, or later lifecycle
+/// statuses stay in scope so provenance gates fail closed.
+pub const PRE_DEVELOPMENT_STATUSES: &[&str] = &["backlog", "drafted", "ready-for-dev", "blocked"];
+
+/// Loads the authoritative development state from the sibling sprint record.
+///
+/// Story filenames and `development_status` keys use the same full slug. A
+/// missing or unreadable status file produces no exemptions, preserving the
+/// fail-closed default in both dev-model gates.
+pub fn load_sibling_sprint_status(stories_dir: &str) -> HashMap<String, String> {
+    let path = Path::new(stories_dir).join("sprint-status.yaml");
+    let Ok(content) = fs::read_to_string(path) else {
+        return HashMap::new();
+    };
+
+    let mut statuses = HashMap::new();
+    let mut in_development_status = false;
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("development_status:") {
+            in_development_status = true;
+            continue;
+        }
+        if !in_development_status {
+            continue;
+        }
+        if !line.starts_with(' ') && !line.starts_with('\t') && !line.is_empty() {
+            if !trimmed.starts_with('#') {
+                break;
+            }
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once(':') {
+            let value = value
+                .split('#')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_matches(|c| c == '\'' || c == '"');
+            if !key.trim().is_empty() && !value.is_empty() {
+                statuses.insert(key.trim().to_string(), value.to_string());
+            }
+        }
+    }
+    statuses
+}
+
+/// True only for an explicit authoritative pre-development status.
+pub fn is_pre_development_status(status: Option<&str>) -> bool {
+    status.is_some_and(|value| PRE_DEVELOPMENT_STATUSES.contains(&value))
+}
+
+/// Model recorded outside YAML frontmatter — the story template varies:
+///   1. a `### Agent Model Used` body section (Epic 12 template), or
+///   2. a `**Model:** <model>` / `Model: <model>` preamble line (Epic 11).
+/// The boilerplate reminder line "(frontier-class allowlist {…})" is stripped so
+/// the models it *lists* are not mistaken for the model *used* (a vacuous-match
+/// trap). Returns the first model-shaped token (vendor/family). Shared with
+/// `check-dev-model-tier` (Epic 12 retro B3).
+pub fn agent_model_section_model(content: &str) -> Option<String> {
+    let is_boilerplate = |t: &str| t.contains("allowlist {");
+    let tokenize = |t: &str| -> Vec<String> {
+        t.split(|c: char| c.is_whitespace() || matches!(c, '(' | ')' | ',' | '`' | ';'))
+            .map(|w| {
+                w.trim_matches(|c: char| c == '.' || c == '*' || c == ':')
+                    .to_string()
+            })
+            .filter(|w| !w.is_empty())
+            .collect()
+    };
+
+    // Source 1: the `### Agent Model Used` section.
+    let mut in_section = false;
+    let mut section_words: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let t = line.trim();
+        if !in_section {
+            if t == "### Agent Model Used" {
+                in_section = true;
+            }
+            continue;
+        }
+        if t.starts_with("## ") || t.starts_with("### ") {
+            break;
+        }
+        if is_boilerplate(t) {
+            continue;
+        }
+        section_words.extend(tokenize(t));
+    }
+    if let Some(m) = section_words.iter().find(|w| looks_like_model(w)) {
+        return Some(m.clone());
+    }
+
+    // Source 2: a `**Model:**` / `Model:` preamble line anywhere in the doc.
+    for line in content.lines() {
+        let t = line.trim().trim_start_matches('*').trim();
+        if (t.starts_with("Model:") || t.starts_with("Model ")) && !is_boilerplate(t) {
+            if let Some(m) = tokenize(t).iter().find(|w| looks_like_model(w)) {
+                return Some(m.clone());
+            }
+        }
+    }
+
+    // Presence fallback: the first meaningful word of the section (if any).
+    section_words.into_iter().next()
+}
+
+/// A token shaped like a concrete model id (vendor/family or bare family).
+pub fn looks_like_model(tok: &str) -> bool {
+    let t = tok.to_ascii_lowercase();
+    (t.contains('/')
+        && (t.contains("gpt-")
+            || t.contains("opus")
+            || t.contains("glm")
+            || t.contains("claude")
+            || t.contains("kimi")
+            || t.contains("deepseek")))
+        || t.starts_with("claude-opus-")
+        || t.starts_with("opus-4-")
+        || t.starts_with("gpt-5")
+        || t.starts_with("glm-5")
+        || t.starts_with("deepseek-")
+        || t.starts_with("k2p")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -864,12 +997,12 @@ mod tests {
     }
 
     #[test]
-    fn skips_non_done_stories() {
+    fn skips_completion_fields_for_active_stories_with_model() {
         let dir = tempfile::tempdir().unwrap();
         write(
             dir.path(),
             "5-5-wip.md",
-            "---\ndev_model_used: TBD\n---\n### Agent Model Used\n\n### Completion Notes List\n\n### File List\n\n",
+            "---\ndev_model_used: claude-opus-4-7\n---\n### Agent Model Used\n\n### Completion Notes List\n\n### File List\n\n",
         );
         let sprint = sprint_with("5-5-wip", "in-progress");
         assert!(run(

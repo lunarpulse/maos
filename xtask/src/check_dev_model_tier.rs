@@ -16,7 +16,7 @@
 //! committed story files), so a violation reds CI at HEAD regardless of
 //! `CURRENT_PHASE`.
 
-use crate::check_dev_model_used_populated::{
+use crate::check_dev_record_completeness::{
     agent_model_section_model, is_pre_development_status, load_sibling_sprint_status,
 };
 use crate::gate_common::{dev_enforced_red_blocks, BindingClass};
@@ -26,7 +26,7 @@ const DEFAULT_STORIES_DIR: &str = "_bmad-output/implementation-artifacts";
 /// Stories at or after this epic are dev'd under the frontier-allowlist policy
 /// (ratified at the Epic 11 retro, 2026-07-08). Earlier epics predate it and are
 /// out of scope (their model presence is enforced by
-/// `check-dev-model-used-populated`).
+/// `check-dev-record-completeness`).
 const ENFORCE_FROM_EPIC: u32 = 12;
 /// Frontier-class family tokens — E11 retro A1 allowlist {opus-4-8, gpt-5.5,
 /// glm-5.2, equiv} plus the frontier successors actually used in v2.2 dev.
@@ -76,7 +76,7 @@ const REVIEW_MARKERS: &[&str] = &[
 ];
 
 /// The authoritative pre-development policy is shared with
-/// `check-dev-model-used-populated`, so the two provenance gates cannot exempt
+/// `check-dev-record-completeness`, so the two provenance gates cannot exempt
 /// different stories. The sibling sprint record, not a story's stale body
 /// status, determines whether a model/review record is required.
 
