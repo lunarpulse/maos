@@ -60,6 +60,36 @@
       "tier": "T2",
       "timestamp": "2026-10-29T13:40:57Z",
       "workers": 4
+    },
+    {
+      "commit": "43ce3ea72a75071d5c08034284c5f2049344fefa",
+      "corpus_size": 443277,
+      "cpu_seconds": 57608,
+      "run_id": "41035769831-nightly",
+      "target": "frame_deser",
+      "tier": "T2",
+      "timestamp": "2026-10-30T13:47:36Z",
+      "workers": 4
+    },
+    {
+      "commit": "43ce3ea72a75071d5c08034284c5f2049344fefa",
+      "corpus_size": 5332,
+      "cpu_seconds": 57604,
+      "run_id": "41035769831-nightly",
+      "target": "fuzz_exec_deps_parse_elf",
+      "tier": "T2",
+      "timestamp": "2026-10-30T13:46:35Z",
+      "workers": 4
+    },
+    {
+      "commit": "43ce3ea72a75071d5c08034284c5f2049344fefa",
+      "corpus_size": 48099,
+      "cpu_seconds": 57604,
+      "run_id": "41035769831-nightly",
+      "target": "manifest_parser",
+      "tier": "T2",
+      "timestamp": "2026-10-30T13:47:12Z",
+      "workers": 4
     }
   ]
 }
