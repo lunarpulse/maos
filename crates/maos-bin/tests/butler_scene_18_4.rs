@@ -21,8 +21,8 @@
 //!   only its own pid's record — a second authorised pid's record is
 //!   unreachable; an unauthorised pid is refused. Review EC-1/AA-1: a forget
 //!   through the door's own call between two decisions resurrects nothing.
-//!   Review ruling D-18-4-R3: a door `unload` + `load` mid-scene binds the
-//!   new pid and it restores 0 records.
+//!   Review ruling D-18-4-R3, repaired by 20-3b: a door `unload` + `load`
+//!   mid-scene binds the new pid to the same identity and restores its record.
 //! - CR-2 / D-18-4-06 A: every scene refusal and a malformed
 //!   `MAOS_UTC_OFFSET` are typed, non-zero exits.
 
@@ -748,13 +748,11 @@ fn maosctl(home: &Path, args: &[&str]) -> Output {
     cmd.args(args).output().expect("run maosctl")
 }
 
-/// Review ruling D-18-4-R3 (AA-3, CR-4) at process level — a door `unload`
-/// + `load` of Butler mid-scene: the door-loaded Butler is bound (a second
-/// `butler inference seam wired`), the scene's next day runs on it, and at
-/// its new pid it restores 0 records (the pid-keyed restore, routed to
-/// 20-3b) — so the conflict proxy halts that day.
+/// D-18-4-R3 / 20-3b: a door reload binds the new pid to the same stable
+/// identity. Its eight existing records survive, so the resumed scene
+/// reaches the same day-14 acceptance-window halt as an uninterrupted run.
 #[test]
-fn a_door_reload_mid_scene_binds_the_new_pid_with_zero_records() {
+fn a_door_reload_mid_scene_binds_the_new_pid_and_restores_the_same_identity() {
     let home = tempfile::tempdir().unwrap();
     let init = maos(home.path()).arg("init").output().expect("maos init");
     assert!(init.status.success(), "{}", stderr(&init));
@@ -820,13 +818,13 @@ fn a_door_reload_mid_scene_binds_the_new_pid_with_zero_records() {
         "the door-loaded Butler has a new pid"
     );
     assert_eq!(
-        restores[1]["records"], 0,
-        "the new pid restores 0 records: {stdout}"
+        restores[1]["records"], 8,
+        "seven seed days and day 1 survive the new pid: {stdout}"
     );
     let halts = named(&events, "halt");
     assert_eq!(halts.len(), 1, "{stdout}");
-    assert_eq!(halts[0]["day"], 2);
-    assert_eq!(halts[0]["derived_from"], "conflict_proxy");
+    assert_eq!(halts[0]["day"], 14);
+    assert_eq!(halts[0]["derived_from"], "acceptance_window");
 }
 
 fn refused(output: &Output, says: &str) {
@@ -965,4 +963,58 @@ fn scene_refusals_are_typed() {
         ]),
         "malformed clock",
     );
+}
+
+/// FR31 / 20-3b AC4(b): an authorised non-Butler plants valid all-accept
+/// Markdown at pid 1, then a fresh boot binds Butler to that recycled pid.
+/// Planting pid-based `owner_dirname` must restore seven records, not zero.
+#[test]
+fn recycled_pid_cannot_poison_butlers_acceptance_restore() -> Result<(), Box<dyn std::error::Error>>
+{
+    let dir = tempfile::tempdir()?;
+    let fx = history();
+    let mut forged = butler::AcceptanceLedger::default();
+    for day in -6..=0 {
+        forged.insert(butler::AcceptanceRecord {
+            local_day: fx.local_day(day),
+            sim_ns: fx.day_ns(day),
+            work_mode: "deep".into(),
+            response: "pick:1".into(),
+            action: "linear_note".into(),
+            accepted: true,
+        });
+    }
+    let markdown = forged.to_markdown()?;
+    assert_eq!(butler::AcceptanceLedger::from_markdown(&markdown)?.len(), 7);
+    {
+        let (memory, _tl) = root_memory(dir.path());
+        memory.bind_storage_identity(1, "non-butler")?;
+        memory.authorize_principal_writes(1);
+        let attacker =
+            maos_bin::butler_root::PidBoundPrincipalPort::new(Arc::downgrade(&memory), 1);
+        attacker.write(PRINCIPAL, "butler.acceptance/v1", "ledger", &markdown)?;
+    }
+    let (memory, tl) = root_memory(dir.path());
+    memory.bind_storage_identity(1, "butler")?;
+    memory.authorize_principal_writes(1);
+    let clock = Arc::new(maos_spirit_sdk::clock::ScenarioClock::new(fx.day_ns(1), 0));
+    let butler =
+        root_seam(&memory, &tl, &clock).attach(conflicted(), || None, Arc::new(|| Some(1)))?;
+    // No seed history: this exercises Butler's real restore path without
+    // masking an inherited record by replacing its local days.
+    let empty_history = AcceptanceFixture::parse(
+        "{\"principal\":\"director-ada\",\"start\":\"2026-03-02\",\"utc_offset\":\"+00:00\"}\n{\"day\":1,\"work_mode\":\"deep\",\"response\":\"pick:1\"}",
+    )?;
+    butler.seed_acceptance_history(&empty_history)?;
+    assert_eq!(
+        butler.acceptance_window().offers,
+        0,
+        "Butler must restore zero attacker records"
+    );
+    let own = maos_bin::butler_root::PidBoundPrincipalPort::new(Arc::downgrade(&memory), 1);
+    let restored = own
+        .read(PRINCIPAL, "butler.acceptance/v1", "ledger")?
+        .ok_or("Butler persisted its empty ledger")?;
+    assert_eq!(butler::AcceptanceLedger::from_markdown(&restored)?.len(), 0);
+    Ok(())
 }

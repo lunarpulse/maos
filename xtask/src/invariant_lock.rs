@@ -6,6 +6,7 @@ use std::process::Command;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LockReport {
     pub passed: bool,
+    pub claims: BTreeMap<String, InvariantClaim>,
     pub touched_invariants: Vec<String>,
     pub missing_corpus_delta: bool,
     pub missing_phase_commitment: bool,
@@ -27,6 +28,88 @@ pub struct RevertReference {
     /// SHA being reverted, parsed from "This reverts commit <sha>." if present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ClaimState {
+    Guaranteed,
+    Asserted,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InvariantClaim {
+    pub id: String,
+    pub claim: ClaimState,
+    pub owner: Option<String>,
+    pub property_test: Option<String>,
+    pub adversarial_corpus: Option<String>,
+    pub ci_job: Option<String>,
+    #[serde(default)]
+    pub requirement_claims: BTreeMap<String, String>,
+}
+
+pub fn validate_claim(root: &std::path::Path, src: &str) -> Result<InvariantClaim, String> {
+    let front = src
+        .strip_prefix("---\n")
+        .and_then(|s| s.split_once("\n---"))
+        .ok_or("invariant requires YAML frontmatter")?
+        .0;
+    let claim: InvariantClaim = serde_yaml::from_str(front).map_err(|e| e.to_string())?;
+    match claim.claim {
+        ClaimState::Asserted => {
+            if claim.owner.as_deref().is_none_or(|o| o.trim().is_empty()) {
+                return Err(format!("{} asserted without owner", claim.id));
+            }
+        }
+        ClaimState::Guaranteed => {
+            let test = claim
+                .property_test
+                .as_deref()
+                .and_then(|s| s.split_once('#'))
+                .ok_or("guaranteed requires property_test path#test_name")?;
+            let corpus = claim
+                .adversarial_corpus
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .ok_or("guaranteed requires adversarial_corpus")?;
+            let job = claim
+                .ci_job
+                .as_deref()
+                .ok_or("guaranteed requires ci_job")?;
+            let test_src = fs::read_to_string(root.join(test.0)).map_err(|e| e.to_string())?;
+            let workflow: serde_yaml::Value = serde_yaml::from_str(
+                &fs::read_to_string(root.join(".github/workflows/discipline.yml"))
+                    .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+            if test.1.is_empty()
+                || !test_src.contains(&format!("fn {}(", test.1))
+                || !root.join(corpus).is_file()
+                || !workflow["jobs"][job].is_mapping()
+            {
+                return Err(format!("{} guaranteed evidence is missing", claim.id));
+            }
+        }
+    }
+    Ok(claim)
+}
+
+pub fn read_claims(root: &std::path::Path) -> Result<BTreeMap<String, InvariantClaim>, String> {
+    let mut claims = BTreeMap::new();
+    for n in 1..=14 {
+        let id = format!("I{n}");
+        let path = root.join(format!("docs/invariants/{id}.md"));
+        let claim = validate_claim(
+            root,
+            &fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?,
+        )?;
+        if claim.id != id {
+            return Err(format!("{} declares {}", path.display(), claim.id));
+        }
+        claims.insert(id, claim);
+    }
+    Ok(claims)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -103,6 +186,7 @@ fn invariant_lock(
     pr_body_path: Option<&str>,
 ) -> Result<LockReport, String> {
     let root = workspace_root();
+    let claims = read_claims(&root)?;
     let lock_path = root.join("xtask/invariants/lock.toml");
     let lock: BTreeMap<String, String> = toml::from_str(
         &fs::read_to_string(&lock_path)
@@ -140,6 +224,7 @@ fn invariant_lock(
     if touched_invariants.is_empty() {
         return Ok(LockReport {
             passed: true,
+            claims,
             touched_invariants: vec![],
             missing_corpus_delta: false,
             missing_phase_commitment: false,
@@ -158,7 +243,7 @@ fn invariant_lock(
     // Requirement (c): phase-commitment update.
     let mut missing_phase_commitment = true;
     for inv_id in &touched_invariants {
-        if inv_id.starts_with("I") && inv_id.len() == 2 {
+        if claims.contains_key(inv_id) {
             let path = root.join(format!("docs/invariants/{inv_id}.md"));
             let rel_path = format!("docs/invariants/{inv_id}.md");
             if changed.contains(&rel_path) {
@@ -175,7 +260,7 @@ fn invariant_lock(
     // Regression check: forward-only progression.
     let mut regression_detected = Vec::new();
     for inv_id in &touched_invariants {
-        if inv_id.starts_with("I") && inv_id.len() == 2 {
+        if claims.contains_key(inv_id) {
             let path = root.join(format!("docs/invariants/{inv_id}.md"));
             if let Some(reg) = check_regression(&path, inv_id)? {
                 regression_detected.push(reg);
@@ -198,6 +283,7 @@ fn invariant_lock(
 
     Ok(LockReport {
         passed,
+        claims,
         touched_invariants,
         missing_corpus_delta,
         missing_phase_commitment,

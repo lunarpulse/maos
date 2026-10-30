@@ -406,6 +406,11 @@ impl MemoryManagerAdapter {
         }
     }
 
+    /// Bind the admitted stable identity before any Spirit memory access (FR31).
+    pub fn bind_storage_identity(&self, pid: u32, identity: &str) -> Result<(), MemoryError> {
+        self.private.bind_storage_identity(pid, identity)
+    }
+
     /// Create a pid-fused memory view for a Spirit.  This is the I5
     /// enforcement substrate — the `spirit_pid` is fused at construction
     /// and cannot be re-supplied.
@@ -737,8 +742,14 @@ impl MemoryManagerPort for MemoryManagerAdapter {
                 } = namespace
                 {
                     let ts = Self::now_ns();
-                    self.principal_index
-                        .record_write(principal_id, spirit_pid, schema, key, ts)?;
+                    self.principal_index.record_write(
+                        principal_id,
+                        spirit_pid,
+                        &self.private.owner_dirname(spirit_pid),
+                        schema,
+                        key,
+                        ts,
+                    )?;
                 }
                 Ok(())
             }
@@ -918,7 +929,7 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         for row in &rows {
             let ns = MemoryNamespace::principal(&row.principal_id, &row.schema)
                 .map_err(|e| MemoryError::Storage(e.to_string()))?;
-            let val_opt = self.private.read(row.writer_spirit_pid, &ns, &row.key)?;
+            let val_opt = self.private.read_owner(&row.writer_owner, &ns, &row.key)?;
 
             let payload = if include_principal {
                 match val_opt {

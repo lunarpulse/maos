@@ -39,3 +39,6 @@ tests/reports/evidence-ledger-*.json
 /dist/
 
 .devcontainer/.env
+
+# Generated deterministic migration corpus (2.8 GB; regenerate per docs/testing/proof-contract.md or set MAOS_MIGRATION_CORPUS)
+/tests/corpora/migration-corpus-1e6.sqlite

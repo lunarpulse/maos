@@ -1,3 +1,62 @@
+## Deferred from: Story 20-3b landing 2 (2026-10-30)
+
+Rule 10 dispositions below distinguish implemented behavior from missing coverage enrollment. No completed story or retrospective is used as a live owner.
+
+- **Audit category domain discrepancy — ownerless and open.** `crates/maos-iac/src/adapter/transparency_log.rs:132-174` has no `FrameKind` variants for 30/31, but does have 32/33; `crates/maos-audit/src/lib.rs:864-873` classifies only 0..=29. Audit rows at 30/31 therefore are not enum-backed and 32/33 have no `kind_to_category` classification. The retired governance gate's full-u8 contiguity/classification assertion could never have passed this table. `governance_roundtrip_20_3b` intentionally proves the documented category expansions and the legacy classified domain, not global completeness. Production taxonomy repair is outside this retirement's charter; no owner is invented. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10.
+- **Clippy warning debt — ownerless and open.** T0 is 1,411 warning occurrences / 884 source-distinct diagnostics. Row 11 B authorizes an advisory job and a two-count ratchet that prevents growth, not a claim that lint debt is closed. The live landing-2 non-denying clippy run exited 0 and counted **1,409 / 881**; the real ratchet exited 0 against the unchanged **1,411 / 884** baseline. `landing-2/clippy-live.jsonl` and `clippy-ratchet-live.log` preserve the stream and counts; no baseline change was made. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10.
+- **Same-name principal-storage identity squatting — Owner: `20-1`.** Row 06 A binds admitted `spirit_id`, not a publisher key. A later boot admitting the same name can reuse its identity directory; 20-1's publisher-key binding owns that residual. FR31's recycled-pid isolation does not claim publisher authentication.
+- **Legacy principal-spill restart residual — ownerless and open (explicit cutover disposition).** Bound Spirits no longer read pre-fix numeric pid spill directories. In particular, Butler's pre-fix acceptance ledger restarts empty once instead of importing an unauthenticated prior pid's records. Legacy index rows retain their recorded numeric owner for subject-access/export; forget still removes legacy directories. Automatic ownership reassignment would reintroduce the isolation defect, so no migration or recovery guarantee is claimed. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10.
+
+### Forty-three advisory empty v1.0 coverage rows
+
+The generator spike is NO-GO: AC2 is cut, the existing completeness gate remains, and the hand-maintained YAML is hard mode at delivered phase v0.1-alpha. These 43 rows remain honestly `gates: []` / `advisory-until-engagement`; hard mode is not a v1.0 coverage-completion claim. The table dispositions concern **missing coverage enrollment**, not an assertion that every underlying feature is absent. Known open charter owners are routed; the rest remain without a live owner rather than being dumped into 20-3b or a done story. Sources: `tests/coverage-matrix.yaml`, routing audit 2026-10-22 §2 / Appendix A–C, and landing-2 `spike.md`.
+
+| Requirement | Coverage disposition / owner |
+|---|---|
+| FR42 | Ownerless and open; existing subject-access witness is not a registered gate claim. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR43 | Ownerless and open; existing posture-delta behavior is not enrolled here. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR44 | Ownerless and open; signed-bundle behavior is not enrolled here. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR45 | Ownerless and open; 18-6's historical implementation/corpora are not a live owner. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR46 | Ownerless and open; existing trajectory export is not enrolled here. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR49 | Ownerless and open; 19-5's completed policy work is not a live coverage owner. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR51 | Ownerless and open; 19-2's completed interruption work is not a live coverage owner. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR59 | Owner: `20-1`; yank-sync and vetter-origin propagation charter. |
+| FR62 | Owner: `20-3c`; ABI proposal/ratification transparency-log receipt charter. |
+| FR63 | Ownerless and open; landing-2 catalog witness does not enroll this v1.0 row. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| FR64 | Owner: `20-14`; per-task/session-principal token attribution charter. |
+| FR65 | Owner: `20-11`; erasure inventory closure and proof charter. |
+| NFR-Aud-1 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Aud-10 | Ownerless and open; historical 18-6 corpora remain cited, not relabelled as gates. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Aud-12 | Owner: `20-11`; proof covers the complete erasure inventory. |
+| NFR-Aud-13 | Ownerless and open; existing logical-tick SLA test is not enrolled as a gate. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Aud-2 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Aud-3 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Aud-6 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Comp-2 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Comp-5 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Cost-1 | Ownerless and open; no cost-efficiency gate is inferred from attribution. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Doc-2 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Doc-3 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Doc-4 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Doc-5 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Doc-7 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Maint-4 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Maint-5 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Maint-6 | Owner: `20-5`; LTS policy/release evidence charter, not a fabricated local test. |
+| NFR-Maint-7 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Maint-9 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Meta-1 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Obs-1 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Ops-12 | Owner: `20-2`; air-gapped substrate and journaling witness charter. |
+| NFR-Ops-2 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Ops-3 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Rel-4 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Rel-5 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Rel-6 | Owner: `21-3`; restart TOFU invalidation/re-pin charter. |
+| NFR-Sec-15 | Ownerless and open for the v1.5 FIPS validation obligation (operator split 2026-10-23); 20-13's v1.0 selection mechanism is not certification. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Sec-8 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+| NFR-Test-14 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
+
 ## Deferred from: Story 18-5 review patch (2026-10-26)
 
 - **EC5 — RateLimited no-runtime/prewrite fallback.** Normal-runtime spawned delivery is delivered by 18-5 AC6; synchronous no-runtime/prewrite fallback remains outside that proof. **Owner: `20-3c-audit-truth-and-halt-receipt-residuals`**, Status:open.

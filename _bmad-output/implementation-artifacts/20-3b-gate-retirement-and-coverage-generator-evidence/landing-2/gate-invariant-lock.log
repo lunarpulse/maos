@@ -1,0 +1,155 @@
+{
+  "passed": true,
+  "claims": {
+    "I1": {
+      "id": "I1",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I10": {
+      "id": "I10",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I11": {
+      "id": "I11",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I12": {
+      "id": "I12",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I13": {
+      "id": "I13",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I14": {
+      "id": "I14",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I2": {
+      "id": "I2",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I3": {
+      "id": "I3",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I4": {
+      "id": "I4",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I5": {
+      "id": "I5",
+      "claim": "asserted",
+      "owner": "20-1",
+      "property_test": "crates/maos-kernel-core/tests/principal_identity_20_3b.rs#recycled_pid_cannot_disclose_another_spirits_principal_spill",
+      "adversarial_corpus": "crates/maos-kernel-core/tests/principal_identity_20_3b.rs",
+      "ci_job": "workspace-test-suite",
+      "requirement_claims": {
+        "FR13": "asserted, owner 20-1",
+        "FR31": "proven by 20-3b"
+      }
+    },
+    "I6": {
+      "id": "I6",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I7": {
+      "id": "I7",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I8": {
+      "id": "I8",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    },
+    "I9": {
+      "id": "I9",
+      "claim": "asserted",
+      "owner": "20-3b",
+      "property_test": null,
+      "adversarial_corpus": null,
+      "ci_job": null,
+      "requirement_claims": {}
+    }
+  },
+  "touched_invariants": [
+    "I1",
+    "I10",
+    "I11",
+    "I12",
+    "I13",
+    "I14",
+    "I2",
+    "I3",
+    "I4",
+    "I5",
+    "I6",
+    "I7",
+    "I8",
+    "I9"
+  ],
+  "missing_corpus_delta": false,
+  "missing_phase_commitment": false,
+  "insufficient_reviews": false,
+  "regression_detected": [],
+  "review_count": 0
+}

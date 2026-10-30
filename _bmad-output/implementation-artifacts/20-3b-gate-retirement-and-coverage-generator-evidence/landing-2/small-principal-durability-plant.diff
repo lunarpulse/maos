@@ -1,0 +1,12 @@
+--- a/crates/maos-kernel-core/src/memory/private.rs
++++ b/crates/maos-kernel-core/src/memory/private.rs
+@@ -683,8 +683,7 @@
+             .io_lock
+             .lock()
+             .expect("PrivateMemoryStore I/O lock poisoned");
+-        let needs_spill = matches!(namespace, MemoryNamespace::Principal { .. })
+-            || Self::should_spill_to_disk(&value, self.inline_threshold)?;
++        let needs_spill = Self::should_spill_to_disk(&value, self.inline_threshold)?;
+ 
+         #[cfg(unix)]
+         {

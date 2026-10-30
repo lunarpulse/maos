@@ -1,0 +1,436 @@
+
+[[coverage_gate]]
+name = "abi-diff"
+covers = [
+    { requirement = "FR8", position = 0 },
+]
+
+[[coverage_gate]]
+name = "approval_log_is_distinct_table"
+covers = [
+    { requirement = "I4", position = 0 },
+    { requirement = "NFR-Obs-5", position = 0 },
+]
+
+[[coverage_gate]]
+name = "audit_spine_integration"
+covers = [
+    { requirement = "I2", position = 0 },
+    { requirement = "I4", position = 1 },
+    { requirement = "I10", position = 1 },
+    { requirement = "FR4", position = 0 },
+    { requirement = "FR9", position = 1 },
+    { requirement = "NFR-Obs-4", position = 0 },
+]
+
+[[coverage_gate]]
+name = "calibrate"
+covers = [
+    { requirement = "NFR-Aud-8", position = 0 },
+]
+
+[[coverage_gate]]
+name = "cap_registry_integration"
+covers = [
+    { requirement = "I1", position = 0 },
+    { requirement = "FR4", position = 3 },
+    { requirement = "NFR-Maint-8", position = 0 },
+]
+
+[[coverage_gate]]
+name = "cap_token_verify_assertion"
+covers = [
+    { requirement = "NFR-Perf-3", position = 0 },
+]
+
+[[coverage_gate]]
+name = "ccac-ship-gate"
+covers = [
+    { requirement = "NFR-Aud-9", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-cert-rotation-trigger"
+covers = [
+    { requirement = "FR23b", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-cohort-mesh"
+covers = [
+    { requirement = "FR21", position = 0 },
+    { requirement = "FR23b", position = 0 },
+    { requirement = "FR52", position = 0 },
+    { requirement = "FR53", position = 0 },
+    { requirement = "FR54", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-corpus"
+covers = [
+    { requirement = "NFR-Test-1", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-cross-region-consensus"
+covers = [
+    { requirement = "NFR-Comp-4", position = 0 },
+    { requirement = "NFR-Scale-1", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-dependency-closure"
+covers = [
+    { requirement = "ADR-050", position = 1 },
+    { requirement = "ADR-051", position = 1 },
+    { requirement = "ADR-055", position = 2 },
+    { requirement = "ADR-024", position = 1 },
+    { requirement = "NFR-Sec-19", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-empty-kernel"
+covers = [
+    { requirement = "I9", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-enterprise-identity"
+covers = [
+    { requirement = "ADR-051", position = 0 },
+    { requirement = "NFR-Aud-11", position = 0 },
+    { requirement = "NFR-Sec-18", position = 0 },
+    { requirement = "NFR-Sec-19", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-enterprise-pdp"
+covers = [
+    { requirement = "ADR-050", position = 0 },
+    { requirement = "NFR-Sec-17", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-escape-detector"
+covers = [
+    { requirement = "ADR-024", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-export-control"
+covers = [
+    { requirement = "NFR-Comp-1", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-fkcs"
+covers = [
+    { requirement = "NFR-Test-5", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-fuzz-floor"
+covers = [
+    { requirement = "NFR-Sec-5", position = 1 },
+    { requirement = "NFR-Sec-6", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-fuzz-targets"
+covers = [
+    { requirement = "NFR-Sec-5", position = 0 },
+    { requirement = "NFR-Sec-6", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-j1-loopback-delegation"
+covers = [
+    { requirement = "FR23a", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-j4-latency"
+covers = [
+    { requirement = "NFR-Perf-1", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-judge-config"
+covers = [
+    { requirement = "NFR-Test-1", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-kernel-baseline"
+covers = [
+    { requirement = "ADR-050", position = 2 },
+    { requirement = "ADR-051", position = 2 },
+    { requirement = "ADR-055", position = 3 },
+    { requirement = "ADR-024", position = 2 },
+    { requirement = "NFR-Test-5", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-ko-coverage"
+covers = [
+    { requirement = "NFR-Doc-6", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-live-bilateral-consent"
+covers = [
+    { requirement = "NFR-Sec-13", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-loom"
+covers = [
+    { requirement = "NFR-Test-9", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-migration-merkle"
+covers = [
+    { requirement = "NFR-Ops-10", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-multi-region-slo"
+covers = [
+    { requirement = "NFR-Scale-1", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-multi-tenant-loom"
+covers = [
+    { requirement = "ADR-055", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-pentest-gate"
+covers = [
+    { requirement = "NFR-Sec-7", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-red-team-gate"
+covers = [
+    { requirement = "NFR-Sec-10", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-reza-production-path"
+covers = [
+    { requirement = "ADR-055", position = 1 },
+    { requirement = "NFR-Ops-11", position = 0 },
+    { requirement = "NFR-Ops-9", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-rotation-real-timing"
+covers = [
+    { requirement = "NFR-Sec-12", position = 0 },
+    { requirement = "NFR-Sec-13", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-scale-churn"
+covers = [
+    { requirement = "NFR-Rel-7", position = 0 },
+    { requirement = "NFR-Scale-2", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-security-md"
+covers = [
+    { requirement = "FR61", position = 0 },
+    { requirement = "NFR-Ops-4", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-service-boundary"
+covers = [
+    { requirement = "ADR-010", position = 0 },
+    { requirement = "NFR-Test-2", position = 0 },
+    { requirement = "FR17", position = 0 },
+    { requirement = "FR48", position = 0 },
+    { requirement = "FR55", position = 0 },
+    { requirement = "FR58", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-skill-conformance"
+covers = [
+    { requirement = "NFR-Test-10", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-skill-schema"
+covers = [
+    { requirement = "FR39", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-third-party-trial"
+covers = [
+    { requirement = "NFR-Test-8", position = 0 },
+]
+
+[[coverage_gate]]
+name = "check-trial-attestation"
+covers = [
+    { requirement = "NFR-Test-8", position = 1 },
+]
+
+[[coverage_gate]]
+name = "check-wasm-form-equiv"
+covers = [
+    { requirement = "NFR-Test-7-binding", position = 0 },
+]
+
+[[coverage_gate]]
+name = "corpus-staleness"
+covers = [
+    { requirement = "NFR-Meta-2", position = 0 },
+]
+
+[[coverage_gate]]
+name = "coverage-matrix"
+covers = [
+    { requirement = "NFR-Meta-3", position = 0 },
+]
+
+[[coverage_gate]]
+name = "coverage-matrix-nfr-test-3"
+covers = [
+    { requirement = "NFR-Test-3", position = 0 },
+]
+
+[[coverage_gate]]
+name = "eval-halt"
+covers = [
+    { requirement = "NFR-Test-4", position = 0 },
+]
+
+[[coverage_gate]]
+name = "example-spirit-drift"
+covers = [
+    { requirement = "FR33", position = 1 },
+    { requirement = "NFR-Onb-1", position = 1 },
+]
+
+[[coverage_gate]]
+name = "example-spirit-tests"
+covers = [
+    { requirement = "FR33", position = 0 },
+    { requirement = "FR34", position = 0 },
+    { requirement = "NFR-Onb-1", position = 0 },
+]
+
+[[coverage_gate]]
+name = "fr4_1000_call_fixture"
+covers = [
+    { requirement = "FR4", position = 2 },
+]
+
+[[coverage_gate]]
+name = "iac_transparency_log_tests"
+covers = [
+    { requirement = "FR4", position = 1 },
+]
+
+[[coverage_gate]]
+name = "isolation-framework-tests"
+covers = [
+    { requirement = "FR34", position = 3 },
+    { requirement = "NFR-Sec-14", position = 0 },
+]
+
+[[coverage_gate]]
+name = "journal_append_p99_measurement"
+covers = [
+    { requirement = "NFR-Rel-8", position = 0 },
+]
+
+[[coverage_gate]]
+name = "journal_survives_cold_restart"
+covers = [
+    { requirement = "I10", position = 0 },
+    { requirement = "FR9", position = 0 },
+]
+
+[[coverage_gate]]
+name = "journey-hermetic-tier-1"
+covers = [
+    { requirement = "FR39", position = 1 },
+    { requirement = "FR57", position = 0 },
+]
+
+[[coverage_gate]]
+name = "kloc-check"
+covers = [
+    { requirement = "ADR-011", position = 1 },
+]
+
+[[coverage_gate]]
+name = "lcas-corpus-tests"
+covers = [
+    { requirement = "FR34", position = 2 },
+    { requirement = "NFR-Test-6", position = 0 },
+]
+
+[[coverage_gate]]
+name = "manifest-field-coverage"
+covers = [
+    { requirement = "NFR-Test-13", position = 0 },
+]
+
+[[coverage_gate]]
+name = "nfr-aud-7-distillate-five-metrics-floor"
+covers = [
+    { requirement = "NFR-Aud-7", position = 0 },
+]
+
+[[coverage_gate]]
+name = "nfr-onb-1-gate"
+covers = [
+    { requirement = "NFR-Onb-1", position = 2 },
+]
+
+[[coverage_gate]]
+name = "nfr-perf-6-hook-dispatch-envelope"
+covers = [
+    { requirement = "NFR-Perf-6", position = 0 },
+]
+
+[[coverage_gate]]
+name = "nfr-rel-3-hsis-95pct"
+covers = [
+    { requirement = "NFR-Rel-3", position = 0 },
+]
+
+[[coverage_gate]]
+name = "rebaseline-check"
+covers = [
+    { requirement = "NFR-Test-1", position = 2 },
+]
+
+[[coverage_gate]]
+name = "reproducible-build"
+covers = [
+    { requirement = "ADR-011", position = 0 },
+    { requirement = "FR1", position = 0 },
+    { requirement = "FR48", position = 1 },
+]
+
+[[coverage_gate]]
+name = "smoke-skill-7-4"
+covers = [
+    { requirement = "FR40", position = 0 },
+]
+
+[[coverage_gate]]
+name = "spirit-test-tests"
+covers = [
+    { requirement = "FR34", position = 1 },
+]

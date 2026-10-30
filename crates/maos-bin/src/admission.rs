@@ -858,6 +858,14 @@ pub async fn load_admit_start(
 
     on_loaded(pid);
 
+    // FR31: bind before admission/start; a rejected binding rolls the load back.
+    if let Err(error) = deps.memory.bind_storage_identity(pid, &spirit_id) {
+        rollback(deps, pid, &spirit_id).await;
+        return Err(AdmissionRefusal::Load {
+            detail: error.to_string(),
+        });
+    }
+
     // Admission runs at the SCHEDULER-ASSIGNED pid: capability mediation is
     // keyed by pid, so admitting a placeholder would fail every live port
     // closed.

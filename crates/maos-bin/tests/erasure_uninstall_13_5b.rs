@@ -689,7 +689,7 @@ fn unknown_spirit_on_populated_log_with_shared_residue_writes_partial_proof() {
 }
 
 /// Story 16-2 / D-16-2-F — branch 3: an unknown Spirit name on a populated
-/// Transparency Log with NO shared residue keeps the failed outcome the
+/// Transparency Log with NO shared or private residue keeps the failed outcome the
 /// cascade has always given an unknown name — `failed`/exit 5, NO proof —
 /// and must never become a new `not_found`.
 ///
@@ -702,7 +702,34 @@ fn unknown_spirit_on_populated_log_with_shared_residue_writes_partial_proof() {
 #[test]
 fn unknown_spirit_on_populated_log_without_residue_fails_without_proof() {
     let fixture = Fixture::new();
-    fixture.seed_unheld_principal();
+    // Start with an empty TL, then write only the unrelated admission identity.
+    // A principal write is no longer residue-free: even a small Text is durable.
+    std::fs::create_dir_all(fixture.audit_db().parent().expect("audit parent")).unwrap();
+    drop(SharedMemoryStore::open(&fixture.audit_db()).unwrap());
+    let tl = TransparencyLogAdapter::open_with_global_legal_holds(
+        &fixture.audit_db(),
+        &fixture.audit_db(),
+        1,
+    )
+    .unwrap();
+    assert!(tl.all_frame_ids().unwrap().is_empty());
+    tl.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::SpiritAdmitted,
+        0,
+        None,
+        "hello-spirit",
+        br#"{"spirit_id":"hello-spirit","source":"one-shot"}"#,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    drop(tl);
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+        0
+    );
+    assert_eq!(
+        maos_audit::shared_tier_principal_row_count(&fixture.audit_db()).unwrap(),
+        0
+    );
 
     let mut command = fixture.command();
     command.env("MAOS_SPIRIT_ID", "ghost-spirit");
@@ -719,6 +746,58 @@ fn unknown_spirit_on_populated_log_without_residue_fails_without_proof() {
         regular_files(&fixture.proof_dir()),
         0,
         "the resolution failure precedes proof building: no artifact may exist"
+    );
+}
+
+#[test]
+fn unknown_spirit_with_small_durable_principal_residue_writes_partial_proof() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+        1
+    );
+    let output = fixture
+        .command()
+        .env("MAOS_SPIRIT_ID", "ghost-spirit")
+        .output()
+        .expect("run unknown-name uninstall");
+    assert_eq!(output.status.code(), Some(5));
+    let result = terminal(&output);
+    assert_eq!(result["outcome"], "failed");
+    assert!(result["error"].as_str().unwrap().contains("private tier"));
+    assert_eq!(regular_files(&fixture.proof_dir()), 1);
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+        1,
+        "an unknown identity must not erase another identity's durable value"
+    );
+}
+
+#[test]
+fn held_principal_does_not_hide_unindexed_private_residue() {
+    let fixture = Fixture::new();
+    fixture.seed_held_principal();
+    let ns = MemoryNamespace::principal("unindexed-principal", "profile").unwrap();
+    let directory = fixture
+        .memory_root
+        .join("42")
+        .join(hex::encode(serde_json::to_vec(&ns).unwrap()));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(directory.join("orphan.txt"), "unindexed private value").unwrap();
+    let output = fixture.run_uninstall(None);
+    assert_eq!(output.status.code(), Some(5));
+    let result = terminal(&output);
+    assert_eq!(result["outcome"], "failed");
+    assert_eq!(regular_files(&fixture.proof_dir()), 1);
+    assert!(result["error"]
+        .as_str()
+        .unwrap()
+        .contains("1 under legal hold"));
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+        2,
+        "both the legal hold and unrelated orphan must survive"
     );
 }
 

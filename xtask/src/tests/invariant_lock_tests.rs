@@ -30,6 +30,7 @@ fn parse_cadence_handles_tabs() {
 fn json_output_round_trip() {
     let report = LockReport {
         passed: false,
+        claims: BTreeMap::new(),
         touched_invariants: vec!["I1".into(), "I9".into()],
         missing_corpus_delta: true,
         missing_phase_commitment: false,

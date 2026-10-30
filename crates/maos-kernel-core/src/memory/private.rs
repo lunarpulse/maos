@@ -3,9 +3,9 @@
 //! Private-tier memory store — per-Spirit `Arc<RwLock<HashMap>>` +
 //! per-Spirit-namespaced filesystem area (Story 4.3).
 //!
-//! In-memory map holds small values inline; `Markdown` values and values
-//! exceeding `inline_threshold` spill to the per-Spirit filesystem area
-//! under `<fs_root>/<spirit_pid>/<ns_encoded>/<key>.<ext>`.
+//! Principal values, `Markdown` values and values exceeding `inline_threshold`
+//! spill under `<fs_root>/id-<hex(identity)>/<ns_encoded>/<key>.<ext>` once bound.
+//! Unbound callers retain legacy pid directories; bound Spirits never read those.
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -58,6 +58,7 @@ struct SpillBackup {
 )]
 pub struct PrivateMemoryStore {
     in_mem: RwLock<HashMap<(u32, MemoryNamespace, String), MemoryValue>>,
+    owners: RwLock<HashMap<u32, String>>,
     fs_root: PathBuf,
     inline_threshold: usize,
     io_lock: Mutex<()>,
@@ -67,10 +68,50 @@ impl PrivateMemoryStore {
     pub fn new(fs_root: PathBuf, inline_threshold: usize) -> Self {
         Self {
             in_mem: RwLock::new(HashMap::new()),
+            owners: RwLock::new(HashMap::new()),
             fs_root,
             inline_threshold,
             io_lock: Mutex::new(()),
         }
+    }
+
+    /// Bind an admitted pid before memory access; a binding cannot be changed.
+    pub fn bind_storage_identity(
+        &self,
+        spirit_pid: u32,
+        identity: &str,
+    ) -> Result<(), MemoryError> {
+        Self::sanitize_key(identity)?;
+        if identity.is_empty() {
+            return Err(MemoryError::InvalidKey {
+                key: identity.into(),
+            });
+        }
+        let owner = format!("id-{}", hex::encode(identity.as_bytes()));
+        let _io = self
+            .io_lock
+            .lock()
+            .expect("PrivateMemoryStore I/O lock poisoned");
+        let mut owners = self
+            .owners
+            .write()
+            .expect("PrivateMemoryStore owners lock poisoned");
+        if owners.get(&spirit_pid).is_some_and(|bound| bound != &owner) {
+            return Err(MemoryError::Storage(
+                "storage identity already bound".into(),
+            ));
+        }
+        owners.insert(spirit_pid, owner);
+        Ok(())
+    }
+
+    pub(in crate::memory) fn owner_dirname(&self, spirit_pid: u32) -> String {
+        self.owners
+            .read()
+            .expect("PrivateMemoryStore owners lock poisoned")
+            .get(&spirit_pid)
+            .cloned()
+            .unwrap_or_else(|| spirit_pid.to_string())
     }
 
     // ------------------------------------------------------------------
@@ -270,7 +311,8 @@ impl PrivateMemoryStore {
         let Some(root) = self.open_root(create)? else {
             return Ok(None);
         };
-        let Some(pid_dir) = Self::open_dir_component(&root, &spirit_pid.to_string(), create)?
+        let Some(pid_dir) =
+            Self::open_dir_component(&root, &self.owner_dirname(spirit_pid), create)?
         else {
             return Ok(None);
         };
@@ -641,7 +683,8 @@ impl PrivateMemoryStore {
             .io_lock
             .lock()
             .expect("PrivateMemoryStore I/O lock poisoned");
-        let needs_spill = Self::should_spill_to_disk(&value, self.inline_threshold)?;
+        let needs_spill = matches!(namespace, MemoryNamespace::Principal { .. })
+            || Self::should_spill_to_disk(&value, self.inline_threshold)?;
 
         #[cfg(unix)]
         {
@@ -723,6 +766,47 @@ impl PrivateMemoryStore {
             }
         }
         Ok(disk_value)
+    }
+
+    /// Read the recorded disk owner, independent of this boot's pid bindings.
+    #[cfg(unix)]
+    pub(in crate::memory) fn read_owner(
+        &self,
+        owner_dir: &str,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<MemoryValue>, MemoryError> {
+        Self::sanitize_key(owner_dir)?;
+        Self::sanitize_key(key)?;
+        let _io = self
+            .io_lock
+            .lock()
+            .expect("PrivateMemoryStore I/O lock poisoned");
+        let Some(root) = self.open_root(false)? else {
+            return Ok(None);
+        };
+        let Some(owner) = Self::open_dir_component(&root, owner_dir, false)? else {
+            return Ok(None);
+        };
+        match Self::open_dir_component(&owner, &Self::namespace_to_dirname(namespace)?, false)? {
+            Some(directory) => {
+                Ok(Self::select_disk_value(&directory, key)?.map(|(value, _)| value))
+            }
+            None => Ok(None),
+        }
+    }
+
+    #[cfg(not(unix))]
+    pub(in crate::memory) fn read_owner(
+        &self,
+        _owner_dir: &str,
+        _namespace: &MemoryNamespace,
+        _key: &str,
+    ) -> Result<Option<MemoryValue>, MemoryError> {
+        Err(MemoryError::Io(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "durable private spill requires Unix no-follow directory handles",
+        )))
     }
 
     /// Scan entries matching a key prefix within the given namespace,
@@ -846,7 +930,7 @@ impl PrivateMemoryStore {
 
         if let Some(root) = self.open_root(false)? {
             for pid_name in Self::list_names(&root)? {
-                if pid_name.parse::<u32>().is_err() {
+                if pid_name.parse::<u32>().is_err() && !pid_name.starts_with("id-") {
                     continue;
                 }
                 let pid_stat =
@@ -914,7 +998,11 @@ impl PrivateMemoryStore {
         for (pid, namespace, key) in to_remove {
             if map.remove(&(pid, namespace.clone(), key.clone())).is_some() {
                 erased.insert((
-                    format!("{pid}/{}", Self::namespace_to_dirname(&namespace)?),
+                    format!(
+                        "{}/{}",
+                        self.owner_dirname(pid),
+                        Self::namespace_to_dirname(&namespace)?
+                    ),
                     key,
                 ));
             }

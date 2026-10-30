@@ -641,20 +641,38 @@ pub fn run_generate(catalog_path: &str, output_path: &str) -> Result<(), String>
     Ok(())
 }
 
-/// Resolve the workspace root from `CARGO_MANIFEST_DIR` so the check is
-/// independent of the current working directory.
+/// Cargo invocation supplies its manifest directory. Copied binaries instead
+/// locate the nearest real workspace ancestor of cwd, never the build tree.
 fn workspace_root_from_cargo_manifest_dir() -> Result<PathBuf, String> {
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-        .map_err(|e| format!("CARGO_MANIFEST_DIR not set: {}", e))?;
-    Path::new(&manifest_dir)
-        .parent()
-        .map(|p| p.to_path_buf())
-        .ok_or_else(|| {
-            format!(
-                "CARGO_MANIFEST_DIR `{}` has no parent; cannot resolve workspace root",
-                manifest_dir
-            )
-        })
+    match std::env::var_os("CARGO_MANIFEST_DIR") {
+        Some(manifest_dir) => Path::new(&manifest_dir)
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| "CARGO_MANIFEST_DIR has no parent".into()),
+        None => workspace_root_from_cwd(
+            &std::env::current_dir().map_err(|e| format!("cannot read cwd: {e}"))?,
+        ),
+    }
+}
+
+pub fn workspace_root_from_cwd(cwd: &Path) -> Result<PathBuf, String> {
+    for ancestor in cwd.ancestors() {
+        if !ancestor.join("xtask").is_dir() {
+            continue;
+        }
+        let Ok(manifest) = std::fs::read_to_string(ancestor.join("Cargo.toml")) else {
+            continue;
+        };
+        let parsed: toml::Value = toml::from_str(&manifest)
+            .map_err(|e| format!("{}: {e}", ancestor.join("Cargo.toml").display()))?;
+        if parsed.get("workspace").is_some_and(toml::Value::is_table) {
+            return Ok(ancestor.to_path_buf());
+        }
+    }
+    Err(format!(
+        "no workspace Cargo.toml + xtask/ ancestor of {}",
+        cwd.display()
+    ))
 }
 
 // -----------------------------------------------------------------------

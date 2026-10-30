@@ -1,4 +1,10 @@
 pub mod abi_diff;
+pub mod check_empty_kernel;
+pub mod check_error_catalog;
+pub mod check_service_boundary;
+pub mod clippy_ratchet;
+mod fs_walk;
+pub mod invariant_lock;
 // Story 14-0 AC1 — the Epic-14 decision register's reader. Exposed so
 // `xtask/tests/` can drive the REAL audit over planted registers; a proven-red
 // vector that exercises a parallel copy of the logic proves nothing about the

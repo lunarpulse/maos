@@ -4360,6 +4360,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!(
                 "maos: hello-spirit admitted via canonical path (shell mode, pid {hello_pid})"
             );
+            memory
+                .bind_storage_identity(hello_pid, "hello-spirit")
+                .map_err(|e| format!("shell: storage identity: {e}"))?;
             // 3. Start — the `lifecycle.start` row and `on_start` hook.
             scheduler
                 .start(hello_pid)
@@ -10328,6 +10331,7 @@ async fn run_uninstall_cascade_inner(
     use maos_audit::erasure::proof::{
         build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
     };
+    use maos_domain::ports::MemoryManagerPort as _;
 
     // Capture pre-erasure tree leaves.
     let pre_frame_ids = transparency_log
@@ -10456,7 +10460,23 @@ async fn run_uninstall_cascade_inner(
         total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid);
     }
 
-    if all_principal_ids.is_empty() && shared_principal_rows == 0 && private_principal_rows == 0 {
+    held_principal_ids.sort();
+    held_principal_ids.dedup();
+    // Count only actual recorded-owner disk values, not possibly stale index rows.
+    let held_private_rows = held_principal_ids.iter().try_fold(0_u64, |count, id| {
+        memory.export_redactable(id, true).map(|rows| {
+            count
+                + rows
+                    .iter()
+                    .filter(|row| matches!(row.payload, maos_domain::memory::ExportPayload::Raw(_)))
+                    .count() as u64
+        })
+    })?;
+
+    if all_principal_ids.is_empty()
+        && shared_principal_rows == 0
+        && private_principal_rows == held_private_rows
+    {
         if held_principal_ids.is_empty() {
             return Ok(UninstallCascadeTerminal::NotFound {
                 spirit_id: spirit_id.to_string(),
@@ -10502,10 +10522,17 @@ async fn run_uninstall_cascade_inner(
             .map_err(|e| format!("failed to verify post-erasure private tier: {e}"))?;
     let (private_status, private_failure) = if remaining_private_principal_rows == 0 {
         (CategoryStatus::VerifiedEmpty, None)
+    } else if remaining_private_principal_rows == held_private_rows {
+        (
+            CategoryStatus::CoverageGap {
+                reason: "private principal values retained under durable legal hold".into(),
+            },
+            None,
+        )
     } else {
         let reason = format!(
-            "private tier still holds {remaining_private_principal_rows} principal value(s); \
-             they were not reachable through the principal index and are NOT erased"
+            "private tier still holds {remaining_private_principal_rows} principal value(s), \
+             {held_private_rows} under legal hold; other values are not indexed for this uninstall"
         );
         (
             CategoryStatus::CoverageGap {

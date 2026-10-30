@@ -153,10 +153,26 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   Substrate-dependent local skips are counted and printed, not treated as CI coverage.
 - The aggregate self-executes the gates with their CI arguments: `stability-matrix --check`, `error-catalog-check`,
   `gen-abi-docs --check`, `check-serde-error-handling`, `check-workspace-count`, `check-manifest-schema-version`,
-  `check-skill-schema`, `check-coverage-matrix-completeness`, `check-test-cost`, `check-env-contract`,
+  `check-skill-schema`, `check-epic-close-coherence`, `check-coverage-matrix-completeness`, `check-test-cost`, `check-env-contract`,
   `check-unsafe`, `check-service-boundary`, `check-kernel-baseline`, `kloc-check`, `check-breaking-md`,
   `check-composition-root-completeness`, `check-pub-field-constructors`, `check-dependency-closure`,
   `coverage-matrix`, and `check-corpus`; it also runs `cargo fmt --all -- --check`.
+  Story 20-3b also pins standalone Blocking aggregate invocations: `abi-diff --base abi-baseline/v1-pre-bump.txt`,
+  `check-empty-kernel`, `check-loom`, `check-fr47`, `check-a2a-sender-completeness`, `check-judge-config`,
+  `check-security-md`, `templates-regen --check`, `corpus-staleness`,
+  `calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95`, `check-review-findings-resolved`,
+  `check-dev-record-completeness`, `check-dev-model-tier`, `check-ship-gate-completeness`,
+  `check-pentest-gate`, `check-third-party-trial`, `check-trial-attestation`, `check-red-team-gate`,
+  `check-migration-merkle`, `nfr-onb-1-gate --check`, and `cassette-age-gate`.
+  The migration leg needs the same deterministic million-row corpus that CI generates before invoking it.
+  On a fresh local checkout, provision it once with
+  `env -u CI -u GITHUB_ACTIONS cargo run --locked --release -p maos-loom-lite --example generate_migration_corpus -- --out "$PWD/tests/corpora/migration-corpus-1e6.sqlite"`
+  from the workspace root, or generate it elsewhere and set `MAOS_MIGRATION_CORPUS` to that absolute path.
+  This is the real pinned corpus, not a reduced substitute; absence or oracle drift remains RED.
+  The pin reads aggregate dependencies and executable xtask invocations, not summary-table echo strings.
+  Explicit no-standalone-form exclusions: invariant-lock's PR/reviewer/journal context, the CI release-binary
+  mock scan, the Epic-19 scene/twin reconciliation, target-matrix/signing release dry-runs, and the junit
+  budget gate (already conditionally mirrored over fresh local junit). None is downgraded to advisory in CI.
   Build-free docs checks include route-manifest parity, glossary, anchors and ko coverage
   (`KO_COVERAGE_MIN=100`). The CI pin reader compares test-bound count pins against `cargo nextest list`, marker
   specs against emission-site counts, and checks color settings on parsed cargo/nextest output; it covers recognised
@@ -166,6 +182,14 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   values, including dynamic counts, remain CI-only, and CI's runtime marker pins are not weakened.
   Deprecation policy is enforced by the existing `stability-matrix --check` leg; the obsolete empty-channel
   check and its CR-2 exception retired in Story 20-3b.
+  The 20-3b coverage spike selected NO-GO, so the hand-kept matrix and its completeness leg remain live.
+  `clippy-advisory` is deliberately outside this Blocking mirror and `aggregate.needs`: its non-denying
+  `cargo clippy --workspace --all-targets --locked --message-format=json` output is checked by
+  `clippy-ratchet --input <jsonl>` against `xtask/clippy-baseline.toml` (T0: 1411 warning occurrences,
+  884 source-distinct). Both count ceilings ratchet; repeated library/lib-test emissions count separately.
+  Source-distinct keys are package, level, code, message and primary source start/end ranges; target and
+  secondary spans are excluded. Lower the pins when debt is intentionally reduced; do not increase them
+  to hide newly introduced warnings. A failed/malformed/truncated clippy run cannot count as zero debt.
 - Determine changes from `git merge-base origin/main HEAD` through HEAD, plus the working tree and untracked files;
   never fetch, and print the base SHA and its age. Run the release build, strip and 33,554,432-byte size check when
   `Cargo.toml`, `Cargo.lock`, `crates/maos-bin/**`, or a maos-bin dependency changes; run a fresh Docusaurus build

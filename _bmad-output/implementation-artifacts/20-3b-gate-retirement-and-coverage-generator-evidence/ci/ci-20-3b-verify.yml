@@ -1,4 +1,4 @@
-name: 20-3b landing-1 branch verification
+name: 20-3b landing-1 and landing-2 branch verification
 
 # Evidence only: copy to .github/workflows on a disposable non-main branch.
 # Never enroll this plant workflow in the production aggregate.
@@ -49,3 +49,76 @@ jobs:
           rm "$scratch"
           test "$before" = "$(sha256sum .github/workflows/discipline.yml)"
           cargo run --locked -q -p xtask -- check-epic-close-coherence --json
+
+  landing-2-proof:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and run FR31 and landing-2 controls
+        run: |
+          env -u CI -u GITHUB_ACTIONS cargo build --locked -p xtask
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --test principal_identity_20_3b
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-bin --test hook_pump_17_4 --test butler_scene_18_4
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-audit --test governance_roundtrip_20_3b
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p xtask --test coverage_matrix_20_3b --test invariant_claims_20_3b --test clippy_ratchet_20_3b --test surface_and_root_20_3b --test prepush_blocking_20_3b
+          env -u CI -u GITHUB_ACTIONS cargo run --locked -p xtask -- coverage-matrix --json
+          env -u CI -u GITHUB_ACTIONS cargo run --locked -p xtask -- check-coverage-matrix-completeness --json
+      - name: Verify and exercise the exact FR31 mutation cuts
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2"
+          cd "$evidence"
+          sha256sum --check plant-cuts.sha256
+          cd "$GITHUB_WORKSPACE"
+          backup=$(mktemp -d)
+          files=(crates/maos-kernel-core/src/memory/private.rs crates/maos-kernel-core/src/memory/principal.rs crates/maos-kernel-core/src/memory/mod.rs)
+          for file in "${files[@]}"; do cp "$file" "$backup/$(basename "$file")"; done
+          restore() {
+            for file in "${files[@]}"; do
+              cp "$backup/$(basename "$file")" "$file"
+              cmp "$backup/$(basename "$file")" "$file"
+              touch "$file"
+            done
+          }
+          trap 'restore; rm -rf "$backup"' EXIT
+          for plant in disclosure-owner-pid principal-index-export-pid small-principal-durability butler-restore-poisoning; do
+            restore
+            git apply "$evidence/$plant-plant.diff"
+            case "$plant" in
+              disclosure-owner-pid) package=maos-kernel-core; binary=principal_identity_20_3b; vector=recycled_pid_cannot_disclose_another_spirits_principal_spill ;;
+              principal-index-export-pid) package=maos-kernel-core; binary=principal_identity_20_3b; vector=subject_access_export_preserves_both_owners_when_pid_and_key_are_reused ;;
+              small-principal-durability) package=maos-kernel-core; binary=principal_identity_20_3b; vector=small_non_markdown_principal_values_survive_restart_and_pid_change ;;
+              butler-restore-poisoning) package=maos-bin; binary=butler_scene_18_4; vector=recycled_pid_cannot_poison_butlers_acceptance_restore ;;
+            esac
+            set +e
+            env -u CI -u GITHUB_ACTIONS cargo test --locked -p "$package" --test "$binary" "$vector" -- --exact --nocapture > "$evidence/hosted-$plant.log" 2>&1
+            result=$?
+            set -e
+            test "$result" -eq 101
+            python3 - "$evidence/hosted-$plant.log" "$vector" <<'PY'
+          import pathlib, sys
+          text = pathlib.Path(sys.argv[1]).read_text()
+          assert sys.argv[2] in text and 'assertion' in text and 'FAILED' in text, text
+          PY
+          done
+          restore
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --test principal_identity_20_3b
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-bin --test butler_scene_18_4 recycled_pid_cannot_poison_butlers_acceptance_restore -- --exact
+      - name: Reproduce the production advisory clippy stream and count ratchet
+        run: |
+          env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json > clippy.jsonl
+          env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- clippy-ratchet --input clippy.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: landing-2-hosted-proof
+          path: |
+            clippy.jsonl
+            _bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/hosted-*.log

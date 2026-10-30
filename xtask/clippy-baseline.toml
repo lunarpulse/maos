@@ -1,0 +1,8 @@
+# 20-3b row 11 B: advisory only; never add to aggregate.needs/prepush Blocking set.
+# T0: landing-1/review-fixes/t0-clippy-summary.json, summary.count_method.
+# cargo clippy --workspace --all-targets --locked --message-format=json
+# lib and lib-test diagnostic repetitions count separately. Source-distinct keys:
+# package, level, lint code, message, primary file/line/column start and end.
+# Lower both pins to the observed counts when warning debt is intentionally reduced.
+occurrences = 1411
+source_distinct = 884

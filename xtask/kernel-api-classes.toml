@@ -711,3 +711,8 @@
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::bridge_container" = "supervision" # Story 17-7 review: shared framing/finalization for an admitted owned T3 child
 "maos_kernel_core::security::sandbox::t3::spawn::read_receipt_after_hold" = "supervision" # Story 17-7 review: deterministic held-inode replacement boundary
 "maos_kernel_core::lifecycle::cli_wrapper::crate::security::sandbox::t3::child::ContainerLaunchCustody" = "supervision" # re-export of root-owned launch custody
+
+# 20-3b landing 2, FLAG-Winston d03 A: admitted principal-storage identity.
+# Method metadata is explicit even though the surface walker tracks top-level items.
+"maos_kernel_core::memory::private::PrivateMemoryStore::bind_storage_identity" = "data-movement" # immutable stable-owner storage binding
+"maos_kernel_core::memory::MemoryManagerAdapter::bind_storage_identity" = "data-movement" # delegates the admitted storage binding

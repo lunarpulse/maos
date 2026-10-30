@@ -1,0 +1,22 @@
+--- a/crates/maos-kernel-core/src/memory/principal.rs
++++ b/crates/maos-kernel-core/src/memory/principal.rs
+@@ -21,7 +21,7 @@
+     key TEXT NOT NULL,
+     timestamp_ns INTEGER NOT NULL,
+     writer_owner TEXT NOT NULL,
+-    PRIMARY KEY (principal_id, writer_owner, schema, key)
++    PRIMARY KEY (principal_id, writer_spirit_pid, schema, key)
+ );
+ CREATE INDEX IF NOT EXISTS principal_index_id_idx ON principal_index(principal_id);
+ ";
+--- a/crates/maos-kernel-core/src/memory/mod.rs
++++ b/crates/maos-kernel-core/src/memory/mod.rs
+@@ -929,7 +929,7 @@
+         for row in &rows {
+             let ns = MemoryNamespace::principal(&row.principal_id, &row.schema)
+                 .map_err(|e| MemoryError::Storage(e.to_string()))?;
+-            let val_opt = self.private.read_owner(&row.writer_owner, &ns, &row.key)?;
++            let val_opt = self.private.read(row.writer_spirit_pid, &ns, &row.key)?;
+ 
+             let payload = if include_principal {
+                 match val_opt {

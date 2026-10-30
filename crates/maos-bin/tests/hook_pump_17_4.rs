@@ -1986,3 +1986,115 @@ async fn a_late_hook_result_appends_its_eventual_redistilled_receipt() {
     .expect("late result must be journaled, not dropped");
     world.pump.shutdown().await;
 }
+
+/// 20-3b AC4: both canonical admission policies bind the stable identity.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn admission_binds_storage_identity_before_start_or_leave_loaded() {
+    use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
+    use maos_domain::ports::MemoryManagerPort;
+    struct ChecksOwnerOnStart {
+        memory: Arc<MemoryManagerAdapter>,
+        lookup: Arc<RwLock<BTreeMap<String, u32>>>,
+    }
+    impl Spirit for ChecksOwnerOnStart {
+        fn on_start(&self, _ctx: &mut Ctx) {
+            let pid = *self
+                .lookup
+                .read()
+                .expect("lookup lock")
+                .get("observer")
+                .expect("admission precedes on_start");
+            let ns = MemoryNamespace::principal("start-owner-20-3b", "admission/v1")
+                .expect("valid principal namespace");
+            self.memory
+                .write(
+                    pid,
+                    MemoryTier::Private,
+                    &ns,
+                    "start",
+                    MemoryValue::Text("owned".into()),
+                )
+                .expect("on_start principal write");
+            let rows = self
+                .memory
+                .subject_access("start-owner-20-3b")
+                .expect("indexed start write");
+            assert_eq!(rows.len(), 1);
+            assert_eq!(
+                rows[0].writer_owner,
+                format!("id-{}", hex::encode("observer"))
+            );
+        }
+    }
+    for policy in [StartPolicy::StartNow, StartPolicy::LeaveLoaded] {
+        let world = World::new();
+        let pid = world
+            .admit(
+                OBSERVER_MANIFEST,
+                make_spirit_obj(ChecksOwnerOnStart {
+                    memory: Arc::clone(&world.memory),
+                    lookup: Arc::clone(&world.lookup),
+                }),
+                policy,
+            )
+            .await
+            .expect("admit the real Observer manifest");
+        let ns = MemoryNamespace::principal("storage-owner-20-3b", "admission/v1")
+            .expect("valid principal namespace");
+        world
+            .memory
+            .write(
+                pid,
+                MemoryTier::Private,
+                &ns,
+                "proof",
+                MemoryValue::Text("owned".into()),
+            )
+            .expect("write through admitted pid");
+        let rows = world
+            .memory
+            .subject_access("storage-owner-20-3b")
+            .expect("indexed write");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].writer_owner,
+            format!("id-{}", hex::encode("observer"))
+        );
+        world.pump.shutdown().await;
+    }
+}
+
+/// Binding refusal happens after `on_loaded`, before admission, and rolls back.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn admission_storage_binding_refusal_is_typed_and_unloads_the_spirit() {
+    let world = World::new();
+    let gated = gate_manifest(OBSERVER_MANIFEST, &|name| KNOWN_CLASS_NAMES.contains(&name))
+        .expect("real Observer manifest");
+    let refused = load_admit_start(
+        &AdmissionDeps {
+            scheduler: &world.scheduler,
+            security: &world.security,
+            transparency_log: &world.tl,
+            journal: &world.journal,
+            memory: &world.memory,
+            pid_by_spirit_id: &world.lookup,
+            hooks: Some(&world.pump),
+        },
+        &gated,
+        make_spirit_obj(Observer::default()),
+        NONCE,
+        StartPolicy::StartNow,
+        &mut |pid| {
+            world
+                .memory
+                .bind_storage_identity(pid, "conflicting-owner")
+                .expect("on_loaded precedes canonical identity binding");
+        },
+    )
+    .await;
+    assert!(matches!(refused, Err(AdmissionRefusal::Load { .. })));
+    assert!(world.scheduler.resolve_pid(&gated.spirit_id).is_none());
+    assert!(world.lookup.read().expect("lookup lock").is_empty());
+    assert!(world.subscription_rows().is_empty());
+    world.pump.shutdown().await;
+}

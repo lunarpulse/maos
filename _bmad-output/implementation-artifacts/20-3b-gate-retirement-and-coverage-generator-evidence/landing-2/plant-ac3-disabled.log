@@ -1,0 +1,14 @@
+{
+  "gate": "check-epic-close-coherence",
+  "passed": false,
+  "epics-checked": 21,
+  "authoritative-src-lines": 26548,
+  "violations": [
+    {
+      "kind": "disabled-workflow-job",
+      "epic": 0,
+      "detail": ".github/workflows/zz-plant-203b.yml:5: `if: false` parks a gate; repair or retire it"
+    }
+  ]
+}
+epic close-out sources disagree

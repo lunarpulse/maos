@@ -5,7 +5,7 @@
 //!
 //! The index makes subject-access query O(log N) on `principal_id`
 //! without scanning the private store.  Carries NO content — only the
-//! addressing tuple `(principal_id, writer_spirit_pid, schema, key)`.
+//! addressing tuple `(principal_id, writer_owner, schema, key)` plus the audit pid.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS principal_index (
     schema TEXT NOT NULL,
     key TEXT NOT NULL,
     timestamp_ns INTEGER NOT NULL,
-    PRIMARY KEY (principal_id, writer_spirit_pid, schema, key)
+    writer_owner TEXT NOT NULL,
+    PRIMARY KEY (principal_id, writer_owner, schema, key)
 );
 CREATE INDEX IF NOT EXISTS principal_index_id_idx ON principal_index(principal_id);
 ";
@@ -43,6 +44,42 @@ impl PrincipalNamespaceIndex {
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         conn.execute_batch(CREATE_TABLE_SQL)
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        // Existing databases first gain an owner column, then replace the pid key.
+        let has_owner: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('principal_index') WHERE name='writer_owner')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        if !has_owner {
+            conn.execute_batch(
+                "ALTER TABLE principal_index ADD COLUMN writer_owner TEXT NOT NULL DEFAULT ''",
+            )
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        }
+        let pid_key: bool = conn
+            .query_row(
+                "SELECT pk != 0 FROM pragma_table_info('principal_index') WHERE name='writer_spirit_pid'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        if pid_key {
+            conn.execute_batch(&format!(
+                "BEGIN IMMEDIATE;
+                 ALTER TABLE principal_index RENAME TO principal_index_legacy;
+                 DROP INDEX principal_index_id_idx;
+                 {CREATE_TABLE_SQL}
+                 INSERT INTO principal_index
+                 SELECT principal_id, writer_spirit_pid, schema, key, timestamp_ns,
+                        CASE WHEN writer_owner = '' THEN CAST(writer_spirit_pid AS TEXT) ELSE writer_owner END
+                 FROM principal_index_legacy;
+                 DROP TABLE principal_index_legacy;
+                 COMMIT;"
+            ))
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        }
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -66,6 +103,7 @@ impl PrincipalNamespaceIndex {
         &self,
         principal_id: &str,
         writer_spirit_pid: u32,
+        writer_owner: &str,
         schema: &str,
         key: &str,
         timestamp_ns: u64,
@@ -76,23 +114,24 @@ impl PrincipalNamespaceIndex {
             .expect("PrincipalNamespaceIndex lock poisoned");
         conn.execute(
             "INSERT OR REPLACE INTO principal_index
-                (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+                (principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 principal_id,
                 writer_spirit_pid as i64,
                 schema,
                 key,
                 timestamp_ns as i64,
+                writer_owner,
             ],
         )
         .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(())
     }
 
-    /// Subject-access query — returns every `(writer_spirit_pid, schema,
-    /// key, timestamp_ns)` indexed for the given `principal_id` across
-    /// ALL Spirits on this Host.  Sorted by `(writer_spirit_pid, schema, key)`.
+    /// Subject-access query — stable owner addresses plus boot-local audit pids
+    /// for the given `principal_id` across ALL Spirits on this Host.
+    /// Sorted by `(writer_spirit_pid, writer_owner, schema, key)`.
     pub(in crate::memory) fn lookup(
         &self,
         principal_id: &str,
@@ -104,10 +143,10 @@ impl PrincipalNamespaceIndex {
 
         let mut stmt = conn
             .prepare(
-                "SELECT principal_id, writer_spirit_pid, schema, key, timestamp_ns
+                "SELECT principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner
                  FROM principal_index
                  WHERE principal_id = ?1
-                 ORDER BY writer_spirit_pid, schema, key",
+                 ORDER BY writer_spirit_pid, writer_owner, schema, key",
             )
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
 
@@ -131,6 +170,7 @@ impl PrincipalNamespaceIndex {
                     schema,
                     key,
                     timestamp_ns: ts as u64,
+                    writer_owner: row.get(5)?,
                 })
             })
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
@@ -176,11 +216,11 @@ mod tests {
         let (idx, _tmp) = make_index();
         let ts = PrincipalNamespaceIndex::now_ns();
 
-        idx.record_write("alice@example.org", 10, "calendar", "event-001", ts)
+        idx.record_write("alice@example.org", 10, "10", "calendar", "event-001", ts)
             .unwrap();
-        idx.record_write("alice@example.org", 10, "calendar", "event-002", ts)
+        idx.record_write("alice@example.org", 10, "10", "calendar", "event-002", ts)
             .unwrap();
-        idx.record_write("alice@example.org", 20, "tasks", "task-001", ts)
+        idx.record_write("alice@example.org", 20, "20", "tasks", "task-001", ts)
             .unwrap();
 
         let rows = idx.lookup("alice@example.org").unwrap();
@@ -203,11 +243,11 @@ mod tests {
         let (idx, _tmp) = make_index();
         let ts = PrincipalNamespaceIndex::now_ns();
 
-        idx.record_write("alice@example.org", 10, "calendar", "e1", ts)
+        idx.record_write("alice@example.org", 10, "10", "calendar", "e1", ts)
             .unwrap();
-        idx.record_write("alice@example.org", 10, "calendar", "e2", ts)
+        idx.record_write("alice@example.org", 10, "10", "calendar", "e2", ts)
             .unwrap();
-        idx.record_write("alice@example.org", 20, "tasks", "t1", ts)
+        idx.record_write("alice@example.org", 20, "20", "tasks", "t1", ts)
             .unwrap();
 
         let deleted = idx.forget("alice@example.org").unwrap();
@@ -222,7 +262,7 @@ mod tests {
         let (idx, _tmp) = make_index();
         let ts = PrincipalNamespaceIndex::now_ns();
 
-        idx.record_write("alice@example.org", 10, "calendar", "e1", ts)
+        idx.record_write("alice@example.org", 10, "10", "calendar", "e1", ts)
             .unwrap();
         let d1 = idx.forget("alice@example.org").unwrap();
         assert_eq!(d1, 1);

@@ -133,6 +133,8 @@ fn ceiling_raise_after_every_numbered_epic_is_done_reds() {
 /// Story 20-3b landing 1 lowers the ratchet exactly after retirement. A later
 /// raise must not borrow the pre-retirement ceiling as unrecorded headroom.
 const RETIREMENT_CEILING: u64 = 42_400;
+/// Landing-1's reviewed exact pin is the starting point for the authorized L2 raise.
+const LANDING_1_CEILING: u64 = 42_405;
 
 /// Read ONLY the current assignment's own inline grant, before its PRIOR ledger.
 /// Accepted landing shape: `xtask = N # Story 20-3a-gate-honesty EXACT MEASURED
@@ -179,7 +181,7 @@ fn authorize_row(kloc: &str, status: &str, stories: &Path) -> Result<(), Refusal
         .iter()
         .find(|key| statuses.contains_key(Value::from(key.as_str())));
     match authorize_xtask_raise(
-        RETIREMENT_CEILING,
+        LANDING_1_CEILING,
         ceiling,
         citation.map(String::as_str),
         status,
@@ -225,7 +227,7 @@ fn real_statuses() -> std::collections::HashMap<String, String> {
     statuses
 }
 
-/// Only a raise beyond the last retirement ceiling needs a live story or an exact historical grant.
+/// Only a raise beyond the reviewed landing-1 ceiling needs a live story or an exact historical grant.
 #[test]
 fn the_live_xtask_ceiling_cites_a_real_sprint_story() {
     let root = workspace_root();
@@ -253,7 +255,7 @@ fn planted_current_row_raises_cannot_borrow_historical_or_done_grants() {
         })
         .unwrap();
     let (ceiling, _, _) = xtask_row(&kloc);
-    let raised = ceiling.max(RETIREMENT_CEILING) + 7919;
+    let raised = ceiling.max(LANDING_1_CEILING) + 7919;
     let story = |done: bool| {
         statuses
             .iter()

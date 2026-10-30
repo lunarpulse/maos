@@ -309,7 +309,7 @@ fn check_service_boundary(
     })
 }
 
-fn snapshot_kernel_surface(crate_path: &Path) -> Result<KernelSurface, String> {
+pub fn snapshot_kernel_surface(crate_path: &Path) -> Result<KernelSurface, String> {
     let mut items = Vec::new();
     let src_dir = crate_path.join("src");
     let lib_rs = src_dir.join("lib.rs");
@@ -528,7 +528,17 @@ fn is_test_cfg_mod(item: &syn::ItemMod) -> bool {
 }
 
 fn surface_item(kind: &str, path: &str, item: &syn::Item) -> SurfaceItem {
-    let sig = canonicalize_signature(item);
+    let sig = if let syn::Item::Use(i) = item {
+        // One leaf owns one hash; adding a sibling is not a removal of every
+        // prior leaf. Preserve cfg/other attributes and absolute-path semantics.
+        let (attrs, vis, colon) = (&i.attrs, &i.vis, &i.leading_colon);
+        format!(
+            "{} {path}",
+            strip_doc_attrs(&quote::quote!(#(#attrs)* #vis #colon).to_string())
+        )
+    } else {
+        canonicalize_signature(item)
+    };
     SurfaceItem {
         kind: kind.into(),
         path: path.into(),
@@ -548,9 +558,9 @@ fn surface_item(kind: &str, path: &str, item: &syn::Item) -> SurfaceItem {
 ///   edit read as "removed public kernel symbol" + "new unclassified symbol".
 ///   Epic 13's first CI run reported exactly that for `spawn_and_bridge` after
 ///   the J1 stdin-deadlock fix (`0a03468f`), which changed no signature and
-///   removed nothing. For every OTHER item kind the whole item is the surface —
-///   struct fields, enum variants and const values are all ABI — so those are
-///   still hashed in full.
+///   removed nothing. Except for per-leaf `pub use` hashes in `surface_item`,
+///   other item kinds retain the whole item: struct fields, enum variants and
+///   const values are ABI and are still hashed in full.
 /// - **Doc attributes.** The previous filter dropped lines starting with `///`,
 ///   but `quote!` renders doc comments as `#[doc = "..."]` attributes on a
 ///   single line, so it never matched anything — a null control that let a

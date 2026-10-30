@@ -3,6 +3,26 @@
 # renaming a gate is a breaking change that requires invariant-lock review.
 
 gates = [
+    # 20-3b: existing controls previously referenced but not enrolled here.
+    "check-kernel-baseline",
+    # workspace-test-suite: maos-kernel-core integration binaries.
+    "audit_spine_integration",
+    "cap_registry_integration",
+    "fr4_1000_call_fixture",
+    "cap_token_verify_assertion",
+    # workspace-test-suite: maos-iac transparency_log unit-test module.
+    "approval_log_is_distinct_table",
+    "iac_transparency_log_tests",
+    # workspace-test-suite: journal unit test and journal_fsync_assertion binary.
+    "journal_survives_cold_restart",
+    "journal_append_p99_measurement",
+    # Existing scheduled discipline jobs (not new ship gates).
+    "journey-hermetic-tier-1",
+    "smoke-skill-7-4",
+    "nfr-rel-3-hsis-95pct",
+    "coverage-matrix-nfr-test-3",
+    # Advisory only: absent from aggregate.needs and local Blocking prepush set.
+    "clippy-ratchet",
     "reproducible-build",
     "check-unsafe",
     "kloc-check",

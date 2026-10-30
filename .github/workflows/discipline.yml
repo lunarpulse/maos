@@ -188,6 +188,32 @@ jobs:
       - name: cargo deny check
         run: cargo deny check --disable-fetch
 
+  # 20-3b row 11 B: advisory debt lane, deliberately NOT in aggregate.needs.
+  # Count both repeated warning occurrences and source-distinct diagnostics.
+  clippy-advisory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # ADVISORY — owner: 20-3b; reason: T0 has 1411/884 warnings; ratchet prevents growth without claiming debt closure.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy-advisory-${{ hashFiles('**/Cargo.lock') }}
+      - name: Collect warnings without deny-warnings
+        run: env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json > clippy.jsonl
+      - name: Refuse warning-count growth against T0
+        run: cargo run -q --locked -p xtask -- clippy-ratchet --input clippy.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clippy-advisory-diagnostics
+          path: clippy.jsonl
+
   check-unsafe:
     runs-on: ubuntu-latest
     timeout-minutes: 30

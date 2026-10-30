@@ -1,0 +1,768 @@
+{
+  "passed": true,
+  "mode": "hard",
+  "violations": [],
+  "out_of_scope_deferred": [
+    {
+      "id": "ADR-024",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "ADR-050",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "ADR-051",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "ADR-055",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "FR1",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR10",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR11",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR12",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR13",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR14",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR15",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR16",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR17",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR18",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR19",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR2",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR20",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR21",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR22",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR23",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR23a",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR23b",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR24",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR25",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR26",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR27",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR28",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR29",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR3",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR30",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR31",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR32",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR33",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR34",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR35",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR36",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR37",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "FR38",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR39",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR4",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR40",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR41",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR42",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR43",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR44",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR45",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR46",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR47",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR49",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR5",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR50",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR51",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR52",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR53",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR54",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR55",
+      "phase": "v0.3"
+    },
+    {
+      "id": "FR56",
+      "phase": "v0.8"
+    },
+    {
+      "id": "FR57",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR58",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR59",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR6",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR60",
+      "phase": "v1.5"
+    },
+    {
+      "id": "FR61",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR62",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR63",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR64",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR65",
+      "phase": "v1.0"
+    },
+    {
+      "id": "FR7",
+      "phase": "v0.5"
+    },
+    {
+      "id": "FR8",
+      "phase": "v0.1"
+    },
+    {
+      "id": "FR9",
+      "phase": "v0.1"
+    },
+    {
+      "id": "I1",
+      "phase": "v0.1"
+    },
+    {
+      "id": "I10",
+      "phase": "v0.1"
+    },
+    {
+      "id": "I2",
+      "phase": "v0.1"
+    },
+    {
+      "id": "I4",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Aud-1",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Aud-10",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Aud-11",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Aud-12",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Aud-13",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Aud-14",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Aud-2",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Aud-3",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Aud-4",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Aud-5",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Aud-6",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Aud-7",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Aud-8",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Aud-9",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Comp-1",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Comp-2",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Comp-3",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Comp-4",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Comp-5",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Cost-1",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Doc-1",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Doc-2",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Doc-3",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Doc-4",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Doc-5",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Doc-6",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Doc-7",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Maint-1",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Maint-2",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Maint-3",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Maint-4",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Maint-5",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Maint-6",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Maint-7",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Maint-8",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Maint-9",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Meta-1",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Obs-1",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Obs-2",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Obs-3",
+      "phase": "v0.3"
+    },
+    {
+      "id": "NFR-Obs-4",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Obs-5",
+      "phase": "v0.3"
+    },
+    {
+      "id": "NFR-Onb-1",
+      "phase": "v0.3"
+    },
+    {
+      "id": "NFR-Onb-2",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Onb-3",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Onb-4",
+      "phase": "v0.3"
+    },
+    {
+      "id": "NFR-Ops-1",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Ops-10",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Ops-11",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Ops-12",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Ops-2",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Ops-3",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Ops-4",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Ops-5",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Ops-6",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Ops-7",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Ops-8",
+      "phase": "v0.3"
+    },
+    {
+      "id": "NFR-Ops-9",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Perf-1",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Perf-2",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Perf-3",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Perf-4",
+      "phase": "v0.3"
+    },
+    {
+      "id": "NFR-Perf-5",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Perf-6",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Perf-7",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Perf-8",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Rel-1",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Rel-10",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Rel-11",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Rel-2",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Rel-3",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Rel-4",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Rel-5",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Rel-6",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Rel-7",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Rel-8",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Rel-9",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Saf-1",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Scale-1",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Scale-2",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Scale-3",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Scale-4",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Scale-5",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Sec-1",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Sec-10",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Sec-11",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Sec-12",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Sec-13",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Sec-14",
+      "phase": "v0.8"
+    },
+    {
+      "id": "NFR-Sec-15",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Sec-16",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Sec-17",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Sec-18",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Sec-19",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Sec-2",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Sec-3",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Sec-4",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Sec-5",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Sec-6",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Sec-7",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Sec-8",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Sec-9",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Tenancy-1",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Test-10",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Test-11",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Test-12",
+      "phase": "v0.3"
+    },
+    {
+      "id": "NFR-Test-13",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Test-14",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Test-2",
+      "phase": "v0.1"
+    },
+    {
+      "id": "NFR-Test-3",
+      "phase": "v1.0"
+    },
+    {
+      "id": "NFR-Test-4",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Test-5",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Test-6",
+      "phase": "v0.5"
+    },
+    {
+      "id": "NFR-Test-7",
+      "phase": "v1.5"
+    },
+    {
+      "id": "NFR-Test-7-binding",
+      "phase": "v2.0+"
+    },
+    {
+      "id": "NFR-Test-8",
+      "phase": "v2.0+"
+    }
+  ],
+  "checked": 198
+}

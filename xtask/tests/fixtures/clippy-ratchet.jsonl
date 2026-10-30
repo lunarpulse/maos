@@ -1,0 +1,6 @@
+{"reason":"compiler-artifact","package_id":"pkg"}
+{"reason":"compiler-message","package_id":"pkg","target":{"kind":["lib"]},"message":{"level":"warning","code":{"code":"clippy::sample"},"message":"sample warning","spans":[{"is_primary":true,"file_name":"src/lib.rs","line_start":1,"column_start":2,"line_end":3,"column_end":4}]}}
+{"reason":"compiler-message","package_id":"pkg","target":{"kind":["test"]},"message":{"level":"warning","code":{"code":"clippy::sample"},"message":"sample warning","spans":[{"is_primary":true,"file_name":"src/lib.rs","line_start":1,"column_start":2,"line_end":3,"column_end":4},{"is_primary":false,"file_name":"src/other.rs","line_start":9,"column_start":1,"line_end":9,"column_end":4}]}}
+{"reason":"compiler-message","package_id":"pkg","message":{"level":"warning","code":null,"message":"rustc warning","spans":[]}}
+{"reason":"compiler-message","package_id":"pkg","message":{"level":"note","message":"not a warning"}}
+{"reason":"build-finished","success":true}

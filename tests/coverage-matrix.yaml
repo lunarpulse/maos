@@ -1,6 +1,6 @@
 schema_version: 1
 delivered_phase: v0.1-alpha
-mode: warning
+mode: hard
 phase_order:
 - v0.1-alpha
 - v0.1-alpha-surface-diff-stub
@@ -322,13 +322,12 @@ coverage:
     corpora: []
     phase: v0.1-alpha
     valid_until: '2027-05-11'
-    notes: warning-only at v0.1 per Story 0.4 AC6; hard at v0.3
+    notes: hard mode per Story 20-3b D08 A; delivered scope follows phase-config.toml
   NFR-Aud-8:
     gates:
     - calibrate
     corpora:
     - calibration-seed-v0.1
-    - quarterly-audit-v0
     phase: v0.5
     valid_until: '2027-05-11'
     notes: per-commit calibration N=100 lands with corpus in Story 0.4; quarterly
@@ -337,6 +336,8 @@ coverage:
       flipping test_distillate_corpus_quarterly_audit_shape from ignored to
       enforced. SHA-pinned by maos-eval distillate_corpus_quarterly_pin.rs
       (PIN 225184b3-a7d41); regenerate via quarterly-audit-v0/generate.py.
+      This directory corpus is not registered in MANIFEST.toml; its shape/pin
+      tests, not the manifest corpus gate, carry that separate claim.
   FR1:
     gates:
     - reproducible-build
@@ -367,6 +368,7 @@ coverage:
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: asserted, owner 20-1; FR13 quarantine isolation is not proven by the FR31 principal-memory witness.
   FR14:
     gates: []
     corpora: []
@@ -572,10 +574,16 @@ coverage:
     phase: v0.8
     valid_until: '2027-05-12'
   FR31:
-    gates: []
+    gates: [workspace-test-suite]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: |
+      Proven by 20-3b: principal_identity_20_3b.rs tests cross-boot recycled-pid
+      confidentiality, durable same-identity values, owner-correct export and
+      identity/legacy forget; butler_scene_18_4.rs tests restore-poison refusal.
+      The inline malicious-writer vectors are test corpora, not MANIFEST.toml
+      corpus claims. Same-name identity squatting remains owned by 20-1.
   FR32:
     gates: []
     corpora: []
@@ -1441,12 +1449,12 @@ coverage:
   NFR-Rel-3:
     gates:
       - nfr-rel-3-hsis-95pct
-    corpora:
-      - hsis-corpus-v0
+    corpora: []
     phase: v1.0
     phase_delivered: v1.0
     phase_enforced: v1.0
     valid_until: '2027-05-12'
+    notes: HSIS directory corpus is SHA-pinned by hsis_runner tests and the named job, not registered as a MANIFEST.toml JSONL corpus.
   NFR-Rel-4:
     gates: []
     enforcement: advisory-until-engagement
@@ -1468,9 +1476,10 @@ coverage:
   NFR-Rel-7:
     gates: [check-scale-churn]
     corpora: []
-    phase: v2.2
+    phase: v2.0+
     valid_until: '2027-05-12'
     notes: |
+      PRD delivery phase remains v2.2; canonical matrix phase bucket v2.0+ (20-3b row 03 B).
       Story 11.3 — PRIMARY row (D10 traceability: this NFR's literal
       detection ≤1h / blast ≤5 / recovery ≤24h floors). The `check-scale-churn`
       gate (`xtask/src/check_scale_churn.rs`) derives these from real host mTLS
@@ -1548,9 +1557,10 @@ coverage:
   NFR-Scale-2:
     gates: [check-scale-churn]
     corpora: []
-    phase: v2.2
+    phase: v2.0+
     valid_until: '2027-05-12'
     notes: |
+      PRD delivery phase remains v2.2; canonical matrix phase bucket v2.0+ (20-3b row 03 B).
       Story 11.3 — scale/phase ANCHOR row (D10 traceability: 25-host @v2.0
       compressed scope; the 100-host target below). `check-scale-churn` runs
       the real drill at N=30 (floor ≥25 distinct-identity-reconciled hosts)
@@ -1787,9 +1797,10 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Test-13:
     gates: [manifest-field-coverage]
-    corpora: [crates/maos-kernel-core/tests/fixtures/manifest]
+    corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
+    notes: Fixture directory crates/maos-kernel-core/tests/fixtures/manifest is exercised by manifest-field-coverage, not a registered MANIFEST.toml corpus.
   NFR-Test-14:
     gates: []
     enforcement: advisory-until-engagement
@@ -2031,7 +2042,7 @@ coverage:
     - check-trial-attestation
     enforcement: blocking-when-present
     corpora: []
-    phase: v2.0
+    phase: v2.0+
     valid_until: '2027-05-12'
     trial_split:
       v2_0_infrastructure_delivered: true
@@ -2041,6 +2052,7 @@ coverage:
       v2_0_sbom_emit: deferred-v2_5
       v2_5_external_n12_owner: Epic-14
     notes: |
+      PRD delivery phase remains v2.0; canonical matrix phase bucket v2.0+ (20-3b row 03 B).
       Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
       + per-participant conjunction BLOCKING when results are present
       (derive-from-detail, with successes and strata reconciled against

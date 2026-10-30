@@ -6,6 +6,7 @@ mod abi_diff;
 mod bypass_scan;
 mod calibrate;
 mod cassette_age_gate;
+use xtask::clippy_ratchet;
 mod check_a2a_sender_completeness;
 mod check_abi_ratification;
 mod check_air_gap;
@@ -63,11 +64,11 @@ mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
 mod check_dev_model_tier;
 mod check_dev_record_completeness;
-mod check_empty_kernel;
+use xtask::check_empty_kernel;
 mod check_env_contract;
 mod check_epic_close_coherence;
 mod check_equiv_fixture_provenance;
-mod check_error_catalog;
+use xtask::check_error_catalog;
 mod check_exit_commands;
 mod check_fr47;
 mod check_judge_config;
@@ -100,7 +101,7 @@ mod check_fuzz_targets;
 // Story 10.4c AC5 (D8) — FF-J6 guard: J6 latency harness revival trigger.
 mod check_ff_j6;
 mod check_serde_error_handling;
-mod check_service_boundary;
+use xtask::check_service_boundary;
 mod check_skill_schema;
 // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
 mod check_skill_conformance;
@@ -131,7 +132,7 @@ mod fs_walk;
 mod gen_abi_docs;
 mod gen_isolation_corpus;
 mod gen_termination_corpus;
-mod invariant_lock;
+use xtask::invariant_lock;
 mod kloc_check;
 mod nfr_onb_1_gate;
 mod prepush;
@@ -288,6 +289,13 @@ enum Commands {
         identifiers: String,
         #[arg(long)]
         json: bool,
+    },
+    /// Advisory warning-debt ratchet over a successful cargo-clippy JSON stream.
+    ClippyRatchet {
+        #[arg(long)]
+        input: String,
+        #[arg(long, default_value = "xtask/clippy-baseline.toml")]
+        baseline: String,
     },
     /// AC4 — Coverage-matrix delivered-phase enforcement (NFR-Meta-3).
     CoverageMatrix {
@@ -1151,6 +1159,7 @@ fn main() {
             identifiers,
             json,
         } => check_judge_config::run(&config, &identifiers, json),
+        Commands::ClippyRatchet { input, baseline } => clippy_ratchet::run(&input, &baseline),
         Commands::CoverageMatrix {
             config,
             phase_config,

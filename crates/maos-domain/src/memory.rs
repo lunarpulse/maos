@@ -312,8 +312,8 @@ pub enum MemoryError {
 // ---------------------------------------------------------------------------
 
 /// Return shape for `subject_access` — one row per `(principal_id,
-/// writer_spirit_pid, schema, key)` quartet.  Carries NO content (kernel
-/// does NOT interpret per §4.0.7).
+/// writer_owner, schema, key)` quartet; pid is audit attribution only.
+/// Carries NO content (kernel does NOT interpret per §4.0.7).
 #[doc = "Construct via [`PrincipalIndexRow::new`] to enforce validation; struct literals bypass non-empty checks."]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrincipalIndexRow {
@@ -322,6 +322,7 @@ pub struct PrincipalIndexRow {
     pub schema: String,
     pub key: String,
     pub timestamp_ns: u64,
+    pub writer_owner: String,
 }
 
 impl PrincipalIndexRow {
@@ -350,6 +351,7 @@ impl PrincipalIndexRow {
             schema,
             key,
             timestamp_ns,
+            writer_owner: writer_spirit_pid.to_string(),
         })
     }
 }
