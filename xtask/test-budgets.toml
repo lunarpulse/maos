@@ -66,9 +66,15 @@ owner = "18-0-green-main-ci-baseline"
 
 [[exception]]
 binary = "maos-bin::worker_freeze_19_2"
-seconds = 66
-reason = "19-2 AC7 Worker pause and spawn-token revoke latency vectors: 20 door pauses and 20 real-operator-door revokes on a real T3 chatty Worker; CI Σ 52.978 s on hosted run 40955589411 @ cf78d16e; budget = observed + 25 %"
+seconds = 84
+reason = "19-2 AC7 Worker pause and spawn-token revoke latency vectors: 20 door pauses on a real T3 chatty Worker and 20 real-operator-door revokes through a token-bearing in-process root; CI Σ 66.943 s on hosted validation run 40965829411 @ 39fe0060 (52.978 s before the revoke vector was rebuilt); budget = observed + 25 %"
 owner = "19-2-fr20-enqueue-door-and-safe-point"
+
+[[exception]]
+binary = "maos-bin::epic_dispatch_19_1"
+seconds = 52
+reason = "19-1/19-6 epic dispatch and crash-disposition vectors (12 tests; the T3 Worker crash/redispatch vectors boot real containers); CI Σ 40.870 s on hosted validation run 40965829411 @ 39fe0060; budget = observed + 25 %"
+owner = "19-6-crash-originator-delivery-and-disposition"
 
 # --- Expensive tests (ignored in the default run) ---------------------------
 
