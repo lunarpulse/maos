@@ -1,0 +1,231 @@
+{
+ "instrument": "/tmp/xtask-maos-w3 kloc-check --json (tokei 14.0.0), cwd = git-archive copy of 23f58da4 + prototype; kernel physical by check-kernel-baseline --json",
+ "runs": {
+  "head": {
+   "passed": true,
+   "aggregate": 192778,
+   "over_budget": [],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32939,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20618,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26409
+  },
+  "base_copy": {
+   "passed": true,
+   "aggregate": 192778,
+   "over_budget": [],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32939,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20618,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26409
+  },
+  "k1": {
+   "passed": false,
+   "aggregate": 192779,
+   "over_budget": [
+    "aggregate 192779 >= 192779",
+    "maos-kernel-core 20619 > 20618"
+   ],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32939,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20619,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26410
+  },
+  "k2a": {
+   "passed": false,
+   "aggregate": 192811,
+   "over_budget": [
+    "aggregate 192811 >= 192779",
+    "maos-kernel-core 20651 > 20618"
+   ],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32939,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20651,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26450
+  },
+  "k2b": {
+   "passed": false,
+   "aggregate": 192858,
+   "over_budget": [
+    "aggregate 192858 >= 192779",
+    "maos-domain 9976 > 9975",
+    "maos-kernel-core 20697 > 20618"
+   ],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32939,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20697,
+    "maos-domain": 9976,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26499
+  },
+  "krec": {
+   "passed": false,
+   "aggregate": 192812,
+   "over_budget": [
+    "aggregate 192812 >= 192779",
+    "maos-kernel-core 20652 > 20618"
+   ],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32939,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20652,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26451
+  },
+  "kfull": {
+   "passed": false,
+   "aggregate": 192859,
+   "over_budget": [
+    "aggregate 192859 >= 192779",
+    "maos-domain 9976 > 9975",
+    "maos-kernel-core 20698 > 20618"
+   ],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32939,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20698,
+    "maos-domain": 9976,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26500
+  },
+  "brec": {
+   "passed": false,
+   "aggregate": 192821,
+   "over_budget": [
+    "aggregate 192821 >= 192779",
+    "maos-bin 32948 > 32939",
+    "maos-kernel-core 20652 > 20618"
+   ],
+   "per_crate": {
+    "xtask": 47682,
+    "maos-bin": 32948,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20652,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26451
+  },
+  "x1": {
+   "passed": true,
+   "aggregate": 187367,
+   "over_budget": [],
+   "per_crate": {
+    "xtask": 42273,
+    "maos-bin": 32937,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20618,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26409
+  },
+  "x1n": {
+   "passed": true,
+   "aggregate": 187460,
+   "over_budget": [],
+   "per_crate": {
+    "xtask": 42366,
+    "maos-bin": 32937,
+    "maos-cli": 6371,
+    "maos-audit": 7660,
+    "maos-kernel-core": 20618,
+    "maos-domain": 9975,
+    "maos-control": 1496
+   },
+   "kernel_physical": 26409
+  }
+ },
+ "head_per_crate_all": {
+  "(unknown:spikes)": 144,
+  "(unknown:templates)": 11,
+  "maos-a2a": 304,
+  "maos-a2a-core": 5037,
+  "maos-a2a-tcp": 1442,
+  "maos-acp": 642,
+  "maos-attrs": 11,
+  "maos-audit": 7660,
+  "maos-bench": 2451,
+  "maos-bin": 32939,
+  "maos-cap-registry": 0,
+  "maos-capability": 1432,
+  "maos-cli": 6371,
+  "maos-cohort": 5873,
+  "maos-compliance": 2032,
+  "maos-control": 1496,
+  "maos-corpus-gen": 2341,
+  "maos-director-surface": 784,
+  "maos-domain": 9975,
+  "maos-egress": 1769,
+  "maos-escape-detector": 347,
+  "maos-eval": 4675,
+  "maos-exec-deps": 358,
+  "maos-fkcs": 482,
+  "maos-frame-codec": 249,
+  "maos-host": 37,
+  "maos-iac": 8270,
+  "maos-journal": 0,
+  "maos-journey-test": 946,
+  "maos-kernel-core": 20618,
+  "maos-loom-lite": 5277,
+  "maos-manifest": 4604,
+  "maos-mcp": 1174,
+  "maos-notify-push": 248,
+  "maos-orchestrator-buffer": 0,
+  "maos-pdp": 438,
+  "maos-persistence": 1,
+  "maos-providers": 1425,
+  "maos-registry": 3452,
+  "maos-secrets": 536,
+  "maos-shell": 602,
+  "maos-siem": 447,
+  "maos-skill": 1234,
+  "maos-spirit-abi": 1042,
+  "maos-spirit-cli": 753,
+  "maos-spirit-derive": 350,
+  "maos-spirit-hello": 382,
+  "maos-spirit-sdk": 1085,
+  "maos-sso": 391,
+  "maos-telemetry": 547,
+  "maos-wasm-host": 2412,
+  "maos-wire": 0,
+  "xtask": 47682
+ }
+}

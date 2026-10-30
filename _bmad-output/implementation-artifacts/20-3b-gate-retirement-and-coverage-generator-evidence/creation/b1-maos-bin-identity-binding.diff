@@ -1,0 +1,29 @@
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -858,6 +858,14 @@
+ 
+     on_loaded(pid);
+ 
++    // FR31: storage is keyed by the admitted identity, never the boot-local pid.
++    if let Err(error) = deps.memory.bind_storage_identity(pid, &spirit_id) {
++        rollback(deps, pid, &spirit_id).await;
++        return Err(AdmissionRefusal::Load {
++            detail: error.to_string(),
++        });
++    }
++
+     // Admission runs at the SCHEDULER-ASSIGNED pid: capability mediation is
+     // keyed by pid, so admitting a placeholder would fail every live port
+     // closed.
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -4360,6 +4360,9 @@
+             eprintln!(
+                 "maos: hello-spirit admitted via canonical path (shell mode, pid {hello_pid})"
+             );
++            memory
++                .bind_storage_identity(hello_pid, "hello-spirit")
++                .map_err(|e| format!("shell: storage identity: {e}"))?;
+             // 3. Start — the `lifecycle.start` row and `on_start` hook.
+             scheduler
+                 .start(hello_pid)

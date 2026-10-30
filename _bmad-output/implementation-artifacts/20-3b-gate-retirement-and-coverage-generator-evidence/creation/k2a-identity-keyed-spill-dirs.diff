@@ -1,0 +1,99 @@
+--- a/crates/maos-kernel-core/src/memory/private.rs
++++ b/crates/maos-kernel-core/src/memory/private.rs
+@@ -58,6 +58,9 @@
+ )]
+ pub struct PrivateMemoryStore {
+     in_mem: RwLock<HashMap<(u32, MemoryNamespace, String), MemoryValue>>,
++    /// Stable storage identity per boot-local pid; a bound pid spills under
++    /// `id-<hex(identity)>`, never under the reusable pid.
++    owners: RwLock<HashMap<u32, String>>,
+     fs_root: PathBuf,
+     inline_threshold: usize,
+     io_lock: Mutex<()>,
+@@ -67,12 +70,39 @@
+     pub fn new(fs_root: PathBuf, inline_threshold: usize) -> Self {
+         Self {
+             in_mem: RwLock::new(HashMap::new()),
++            owners: RwLock::new(HashMap::new()),
+             fs_root,
+             inline_threshold,
+             io_lock: Mutex::new(()),
+         }
+     }
+ 
++    /// Bind `spirit_pid` to a stable storage identity before its first write.
++    pub fn bind_storage_identity(
++        &self,
++        spirit_pid: u32,
++        identity: &str,
++    ) -> Result<(), MemoryError> {
++        Self::sanitize_key(identity)?;
++        self.owners
++            .write()
++            .expect("PrivateMemoryStore owners lock poisoned")
++            .insert(spirit_pid, identity.to_string());
++        Ok(())
++    }
++
++    fn owner_dirname(&self, spirit_pid: u32) -> String {
++        match self
++            .owners
++            .read()
++            .expect("PrivateMemoryStore owners lock poisoned")
++            .get(&spirit_pid)
++        {
++            Some(identity) => format!("id-{}", hex::encode(identity.as_bytes())),
++            None => spirit_pid.to_string(),
++        }
++    }
++
+     // ------------------------------------------------------------------
+     // key sanitization
+     // ------------------------------------------------------------------
+@@ -270,7 +300,8 @@
+         let Some(root) = self.open_root(create)? else {
+             return Ok(None);
+         };
+-        let Some(pid_dir) = Self::open_dir_component(&root, &spirit_pid.to_string(), create)?
++        let Some(pid_dir) =
++            Self::open_dir_component(&root, &self.owner_dirname(spirit_pid), create)?
+         else {
+             return Ok(None);
+         };
+@@ -846,7 +877,7 @@
+ 
+         if let Some(root) = self.open_root(false)? {
+             for pid_name in Self::list_names(&root)? {
+-                if pid_name.parse::<u32>().is_err() {
++                if pid_name.parse::<u32>().is_err() && !pid_name.starts_with("id-") {
+                     continue;
+                 }
+                 let pid_stat =
+@@ -914,7 +945,11 @@
+         for (pid, namespace, key) in to_remove {
+             if map.remove(&(pid, namespace.clone(), key.clone())).is_some() {
+                 erased.insert((
+-                    format!("{pid}/{}", Self::namespace_to_dirname(&namespace)?),
++                    format!(
++                        "{}/{}",
++                        self.owner_dirname(pid),
++                        Self::namespace_to_dirname(&namespace)?
++                    ),
+                     key,
+                 ));
+             }
+--- a/crates/maos-kernel-core/src/memory/mod.rs
++++ b/crates/maos-kernel-core/src/memory/mod.rs
+@@ -406,6 +406,12 @@
+         }
+     }
+ 
++    /// FR31: bind an admitted pid to its stable storage identity (before any
++    /// write) so a later boot's Spirit at the same pid cannot reach its spills.
++    pub fn bind_storage_identity(&self, pid: u32, identity: &str) -> Result<(), MemoryError> {
++        self.private.bind_storage_identity(pid, identity)
++    }
++
+     /// Create a pid-fused memory view for a Spirit.  This is the I5
+     /// enforcement substrate — the `spirit_pid` is fused at construction
+     /// and cannot be re-supplied.

@@ -1,0 +1,287 @@
+--- a/crates/maos-domain/src/memory.rs
++++ b/crates/maos-domain/src/memory.rs
+@@ -322,6 +322,8 @@
+     pub schema: String,
+     pub key: String,
+     pub timestamp_ns: u64,
++    /// FR31 stable owner directory; empty for legacy pid-keyed rows.
++    pub writer_owner: String,
+ }
+ 
+ impl PrincipalIndexRow {
+--- a/crates/maos-kernel-core/src/memory/mod.rs
++++ b/crates/maos-kernel-core/src/memory/mod.rs
+@@ -406,6 +406,12 @@
+         }
+     }
+ 
++    /// FR31: bind an admitted pid to its stable storage identity (before any
++    /// write) so a later boot's Spirit at the same pid cannot reach its spills.
++    pub fn bind_storage_identity(&self, pid: u32, identity: &str) -> Result<(), MemoryError> {
++        self.private.bind_storage_identity(pid, identity)
++    }
++
+     /// Create a pid-fused memory view for a Spirit.  This is the I5
+     /// enforcement substrate — the `spirit_pid` is fused at construction
+     /// and cannot be re-supplied.
+@@ -737,8 +743,14 @@
+                 } = namespace
+                 {
+                     let ts = Self::now_ns();
+-                    self.principal_index
+-                        .record_write(principal_id, spirit_pid, schema, key, ts)?;
++                    self.principal_index.record_write(
++                        principal_id,
++                        spirit_pid,
++                        &self.private.owner_dirname(spirit_pid),
++                        schema,
++                        key,
++                        ts,
++                    )?;
+                 }
+                 Ok(())
+             }
+@@ -918,7 +930,11 @@
+         for row in &rows {
+             let ns = MemoryNamespace::principal(&row.principal_id, &row.schema)
+                 .map_err(|e| MemoryError::Storage(e.to_string()))?;
+-            let val_opt = self.private.read(row.writer_spirit_pid, &ns, &row.key)?;
++            let val_opt = if row.writer_owner.is_empty() {
++                self.private.read(row.writer_spirit_pid, &ns, &row.key)?
++            } else {
++                self.private.read_owner(&row.writer_owner, &ns, &row.key)?
++            };
+ 
+             let payload = if include_principal {
+                 match val_opt {
+--- a/crates/maos-kernel-core/src/memory/principal.rs
++++ b/crates/maos-kernel-core/src/memory/principal.rs
+@@ -20,6 +20,7 @@
+     schema TEXT NOT NULL,
+     key TEXT NOT NULL,
+     timestamp_ns INTEGER NOT NULL,
++    writer_owner TEXT NOT NULL DEFAULT '',
+     PRIMARY KEY (principal_id, writer_spirit_pid, schema, key)
+ );
+ CREATE INDEX IF NOT EXISTS principal_index_id_idx ON principal_index(principal_id);
+@@ -43,6 +44,14 @@
+             .map_err(|e| MemoryError::Storage(e.to_string()))?;
+         conn.execute_batch(CREATE_TABLE_SQL)
+             .map_err(|e| MemoryError::Storage(e.to_string()))?;
++        // FR31: pre-identity databases gain the stable owner column ('' = legacy pid row).
++        match conn.execute_batch(
++            "ALTER TABLE principal_index ADD COLUMN writer_owner TEXT NOT NULL DEFAULT ''",
++        ) {
++            Ok(()) => {}
++            Err(e) if e.to_string().contains("duplicate column") => {}
++            Err(e) => return Err(MemoryError::Storage(e.to_string())),
++        }
+         Ok(Self {
+             conn: Mutex::new(conn),
+         })
+@@ -66,6 +75,7 @@
+         &self,
+         principal_id: &str,
+         writer_spirit_pid: u32,
++        writer_owner: &str,
+         schema: &str,
+         key: &str,
+         timestamp_ns: u64,
+@@ -76,14 +86,15 @@
+             .expect("PrincipalNamespaceIndex lock poisoned");
+         conn.execute(
+             "INSERT OR REPLACE INTO principal_index
+-                (principal_id, writer_spirit_pid, schema, key, timestamp_ns)
+-             VALUES (?1, ?2, ?3, ?4, ?5)",
++                (principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner)
++             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+             params![
+                 principal_id,
+                 writer_spirit_pid as i64,
+                 schema,
+                 key,
+                 timestamp_ns as i64,
++                writer_owner,
+             ],
+         )
+         .map_err(|e| MemoryError::Storage(e.to_string()))?;
+@@ -104,7 +115,7 @@
+ 
+         let mut stmt = conn
+             .prepare(
+-                "SELECT principal_id, writer_spirit_pid, schema, key, timestamp_ns
++                "SELECT principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner
+                  FROM principal_index
+                  WHERE principal_id = ?1
+                  ORDER BY writer_spirit_pid, schema, key",
+@@ -125,12 +136,14 @@
+                 let schema: String = row.get(2)?;
+                 let key: String = row.get(3)?;
+                 let ts: i64 = row.get(4)?;
++                let writer_owner: String = row.get(5)?;
+                 Ok(PrincipalIndexRow {
+                     principal_id: pid,
+                     writer_spirit_pid: wsp_u32,
+                     schema,
+                     key,
+                     timestamp_ns: ts as u64,
++                    writer_owner,
+                 })
+             })
+             .map_err(|e| MemoryError::Storage(e.to_string()))?;
+@@ -176,11 +189,11 @@
+         let (idx, _tmp) = make_index();
+         let ts = PrincipalNamespaceIndex::now_ns();
+ 
+-        idx.record_write("alice@example.org", 10, "calendar", "event-001", ts)
++        idx.record_write("alice@example.org", 10, "", "calendar", "event-001", ts)
+             .unwrap();
+-        idx.record_write("alice@example.org", 10, "calendar", "event-002", ts)
++        idx.record_write("alice@example.org", 10, "", "calendar", "event-002", ts)
+             .unwrap();
+-        idx.record_write("alice@example.org", 20, "tasks", "task-001", ts)
++        idx.record_write("alice@example.org", 20, "", "tasks", "task-001", ts)
+             .unwrap();
+ 
+         let rows = idx.lookup("alice@example.org").unwrap();
+@@ -203,11 +216,11 @@
+         let (idx, _tmp) = make_index();
+         let ts = PrincipalNamespaceIndex::now_ns();
+ 
+-        idx.record_write("alice@example.org", 10, "calendar", "e1", ts)
++        idx.record_write("alice@example.org", 10, "", "calendar", "e1", ts)
+             .unwrap();
+-        idx.record_write("alice@example.org", 10, "calendar", "e2", ts)
++        idx.record_write("alice@example.org", 10, "", "calendar", "e2", ts)
+             .unwrap();
+-        idx.record_write("alice@example.org", 20, "tasks", "t1", ts)
++        idx.record_write("alice@example.org", 20, "", "tasks", "t1", ts)
+             .unwrap();
+ 
+         let deleted = idx.forget("alice@example.org").unwrap();
+@@ -222,7 +235,7 @@
+         let (idx, _tmp) = make_index();
+         let ts = PrincipalNamespaceIndex::now_ns();
+ 
+-        idx.record_write("alice@example.org", 10, "calendar", "e1", ts)
++        idx.record_write("alice@example.org", 10, "", "calendar", "e1", ts)
+             .unwrap();
+         let d1 = idx.forget("alice@example.org").unwrap();
+         assert_eq!(d1, 1);
+--- a/crates/maos-kernel-core/src/memory/private.rs
++++ b/crates/maos-kernel-core/src/memory/private.rs
+@@ -58,6 +58,9 @@
+ )]
+ pub struct PrivateMemoryStore {
+     in_mem: RwLock<HashMap<(u32, MemoryNamespace, String), MemoryValue>>,
++    /// Stable storage identity per boot-local pid; a bound pid spills under
++    /// `id-<hex(identity)>`, never under the reusable pid.
++    owners: RwLock<HashMap<u32, String>>,
+     fs_root: PathBuf,
+     inline_threshold: usize,
+     io_lock: Mutex<()>,
+@@ -67,12 +70,39 @@
+     pub fn new(fs_root: PathBuf, inline_threshold: usize) -> Self {
+         Self {
+             in_mem: RwLock::new(HashMap::new()),
++            owners: RwLock::new(HashMap::new()),
+             fs_root,
+             inline_threshold,
+             io_lock: Mutex::new(()),
+         }
+     }
+ 
++    /// Bind `spirit_pid` to a stable storage identity before its first write.
++    pub fn bind_storage_identity(
++        &self,
++        spirit_pid: u32,
++        identity: &str,
++    ) -> Result<(), MemoryError> {
++        Self::sanitize_key(identity)?;
++        self.owners
++            .write()
++            .expect("PrivateMemoryStore owners lock poisoned")
++            .insert(spirit_pid, identity.to_string());
++        Ok(())
++    }
++
++    pub(in crate::memory) fn owner_dirname(&self, spirit_pid: u32) -> String {
++        match self
++            .owners
++            .read()
++            .expect("PrivateMemoryStore owners lock poisoned")
++            .get(&spirit_pid)
++        {
++            Some(identity) => format!("id-{}", hex::encode(identity.as_bytes())),
++            None => spirit_pid.to_string(),
++        }
++    }
++
+     // ------------------------------------------------------------------
+     // key sanitization
+     // ------------------------------------------------------------------
+@@ -270,7 +300,8 @@
+         let Some(root) = self.open_root(create)? else {
+             return Ok(None);
+         };
+-        let Some(pid_dir) = Self::open_dir_component(&root, &spirit_pid.to_string(), create)?
++        let Some(pid_dir) =
++            Self::open_dir_component(&root, &self.owner_dirname(spirit_pid), create)?
+         else {
+             return Ok(None);
+         };
+@@ -725,6 +756,32 @@
+         Ok(disk_value)
+     }
+ 
++    /// Disk-only read under a recorded owner directory (cross-boot export).
++    #[cfg(unix)]
++    pub(in crate::memory) fn read_owner(
++        &self,
++        owner_dir: &str,
++        namespace: &MemoryNamespace,
++        key: &str,
++    ) -> Result<Option<MemoryValue>, MemoryError> {
++        Self::sanitize_key(key)?;
++        let _io_guard = self
++            .io_lock
++            .lock()
++            .expect("PrivateMemoryStore I/O lock poisoned");
++        let Some(root) = self.open_root(false)? else {
++            return Ok(None);
++        };
++        let Some(owner) = Self::open_dir_component(&root, owner_dir, false)? else {
++            return Ok(None);
++        };
++        let dirname = Self::namespace_to_dirname(namespace)?;
++        match Self::open_dir_component(&owner, &dirname, false)? {
++            Some(directory) => Ok(Self::select_disk_value(&directory, key)?.map(|(v, _)| v)),
++            None => Ok(None),
++        }
++    }
++
+     /// Scan entries matching a key prefix within the given namespace,
+     /// up to `limit` entries.  Order is NOT deterministic (HashMap
+     /// iteration).
+@@ -846,7 +903,7 @@
+ 
+         if let Some(root) = self.open_root(false)? {
+             for pid_name in Self::list_names(&root)? {
+-                if pid_name.parse::<u32>().is_err() {
++                if pid_name.parse::<u32>().is_err() && !pid_name.starts_with("id-") {
+                     continue;
+                 }
+                 let pid_stat =
+@@ -914,7 +971,11 @@
+         for (pid, namespace, key) in to_remove {
+             if map.remove(&(pid, namespace.clone(), key.clone())).is_some() {
+                 erased.insert((
+-                    format!("{pid}/{}", Self::namespace_to_dirname(&namespace)?),
++                    format!(
++                        "{}/{}",
++                        self.owner_dirname(pid),
++                        Self::namespace_to_dirname(&namespace)?
++                    ),
+                     key,
+                 ));
+             }
