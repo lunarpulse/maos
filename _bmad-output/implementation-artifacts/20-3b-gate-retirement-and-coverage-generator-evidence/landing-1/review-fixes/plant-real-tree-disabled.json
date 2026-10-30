@@ -1,0 +1,9 @@
+{
+  "label": "plant-real-tree-disabled",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 1,
+  "wall_seconds": 0.019,
+  "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": false,\n  \"epics-checked\": 21,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": [\n    {\n      \"kind\": \"disabled-workflow-job\",\n      \"epic\": 0,\n      \"detail\": \".github/workflows/zz-plant-203b.yml:5: `if: false` parks a gate; repair or retire it\"\n    }\n  ]\n}\n",
+  "stderr": "epic close-out sources disagree\n"
+}

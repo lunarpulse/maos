@@ -100,6 +100,19 @@ fn parse_story(keys: &BTreeSet<String>, path: &Path) -> Option<StoryReview> {
         }
     }
 
+    // The retired placeholder control spans nested headings, unlike table parsing.
+    review.table_empty = !review.story_key.contains("template")
+        && !review.story_key.contains("example")
+        && lines
+            .iter()
+            .skip_while(|line| {
+                let line = line.trim_start();
+                !line.starts_with("### Review Findings") && !line.starts_with("## Review Findings")
+            })
+            .skip(1)
+            .take_while(|line| !line.trim_start().starts_with("## "))
+            .any(|line| line.contains("_No review findings."));
+
     // Parse Review Findings section.
     let mut in_findings = false;
     let mut findings_rows: Vec<&str> = Vec::new();
@@ -115,13 +128,6 @@ fn parse_story(keys: &BTreeSet<String>, path: &Path) -> Option<StoryReview> {
             continue;
         }
         if in_findings {
-            // Detect "_No review findings._" marker.
-            if trimmed.contains("_No review findings.")
-                && !review.story_key.contains("template")
-                && !review.story_key.contains("example")
-            {
-                review.table_empty = true;
-            }
             if trimmed.starts_with('|') && !trimmed.starts_with("|---") {
                 findings_rows.push(trimmed);
             }

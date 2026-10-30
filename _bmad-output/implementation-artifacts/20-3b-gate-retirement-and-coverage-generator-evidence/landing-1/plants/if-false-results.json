@@ -1,21 +1,75 @@
 {
-  "command": "/home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
-  "fixture_root": "/tmp/203b-local-plant-ozvxrkb0",
+  "evidence_scope": "AC3.5 / T8: scratch workflow in real checkout, not a /tmp fixture",
+  "workspace_root": "/home/lunarpulse/dev_ws",
+  "scratch_workflow": "/home/lunarpulse/dev_ws/.github/workflows/zz-plant-203b.yml",
+  "plant_contents": "name: 20-3b disabled workflow plant\non: workflow_dispatch\njobs:\n  planted:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 0\n",
   "clean": {
+    "label": "plant-real-tree-clean",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
     "exit_code": 0,
-    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 1,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": []\n}\n",
+    "wall_seconds": 0.019,
+    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 21,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": []\n}\n",
     "stderr": ""
   },
   "planted": {
+    "label": "plant-real-tree-disabled",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
     "exit_code": 1,
-    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": false,\n  \"epics-checked\": 1,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": [\n    {\n      \"kind\": \"disabled-workflow-job\",\n      \"epic\": 0,\n      \"detail\": \".github/workflows/20-3b-scratch.yml:5: `if: false` parks a gate; repair or retire it\"\n    }\n  ]\n}\n",
+    "wall_seconds": 0.019,
+    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": false,\n  \"epics-checked\": 21,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": [\n    {\n      \"kind\": \"disabled-workflow-job\",\n      \"epic\": 0,\n      \"detail\": \".github/workflows/zz-plant-203b.yml:5: `if: false` parks a gate; repair or retire it\"\n    }\n  ]\n}\n",
     "stderr": "epic close-out sources disagree\n"
   },
   "restored": {
+    "label": "plant-real-tree-restored",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
     "exit_code": 0,
-    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 1,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": []\n}\n",
+    "wall_seconds": 0.019,
+    "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 21,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": []\n}\n",
     "stderr": ""
   },
-  "before_sha256": "e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d",
-  "after_sha256": "e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d"
+  "scratch_status_after_removal": {
+    "label": "plant-restoration-status",
+    "command": "env -u CI -u GITHUB_ACTIONS git status --short --untracked-files=all -- /home/lunarpulse/dev_ws/.github/workflows/zz-plant-203b.yml",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.006,
+    "stdout": "",
+    "stderr": ""
+  },
+  "before_sha256_by_workflow": {
+    "container.yml": "b05e84e7723fc9f3ab10c4b85d1de51145bf7b5b05260bbc1e9866ffa7bb5fe4",
+    "corpus-rebaseline.yml": "6107efa66b2bac9886ebe0032153046c12af67f65bde09587378c513f47f757a",
+    "discipline.yml": "698ec1db1eac63740665f016ac04bb71e3e0f0fb78a0a9e8aa081c927f8c34d8",
+    "docs-site.yml": "894f77c4484127ea33916d8881f94dcc9e74660036d4dbd207da2b0080d2e300",
+    "fuzz-cadence.yml": "feaefe9f572424db81095ff325a6d39cd24febc2eeaf965ac2b13137d15ad33a",
+    "fuzz-prerelease.yml": "6ffaef98633d9cf23841e7c9df5f59204e4b5b2d4d1b8d92d2b63f30219a6a79",
+    "journal-aggregate.yml": "78bca622b9f3c9077f273e7ed7b07ec754dc535b0c3fe6a34d4f185a1be0fa73",
+    "journal-append.yml": "32a2754102ced5f3f53d39527829ebf790e3a70ebf44c309b7e0b01d86ec6e67",
+    "journey-nightly.yml": "933a30020bd4c001a65903ef3b6124162c748c58170956bbd7c211153360562e",
+    "multi-provider.yml": "a26fc2fcd45aaadcc368fd722832edd6b8e5f6629415efdf6d0bfef3f617aa06",
+    "release.yml": "52b09a86ade07e75267f03f5c8ae06a826ef4df04e63338cb133abbd11774731",
+    "rpo-rto-cadence.yml": "89b2fc214c9d7acccbd707d10fb787994be858d7d325c9b40d64f600a6eff820"
+  },
+  "restored_sha256_by_workflow": {
+    "container.yml": "b05e84e7723fc9f3ab10c4b85d1de51145bf7b5b05260bbc1e9866ffa7bb5fe4",
+    "corpus-rebaseline.yml": "6107efa66b2bac9886ebe0032153046c12af67f65bde09587378c513f47f757a",
+    "discipline.yml": "698ec1db1eac63740665f016ac04bb71e3e0f0fb78a0a9e8aa081c927f8c34d8",
+    "docs-site.yml": "894f77c4484127ea33916d8881f94dcc9e74660036d4dbd207da2b0080d2e300",
+    "fuzz-cadence.yml": "feaefe9f572424db81095ff325a6d39cd24febc2eeaf965ac2b13137d15ad33a",
+    "fuzz-prerelease.yml": "6ffaef98633d9cf23841e7c9df5f59204e4b5b2d4d1b8d92d2b63f30219a6a79",
+    "journal-aggregate.yml": "78bca622b9f3c9077f273e7ed7b07ec754dc535b0c3fe6a34d4f185a1be0fa73",
+    "journal-append.yml": "32a2754102ced5f3f53d39527829ebf790e3a70ebf44c309b7e0b01d86ec6e67",
+    "journey-nightly.yml": "933a30020bd4c001a65903ef3b6124162c748c58170956bbd7c211153360562e",
+    "multi-provider.yml": "a26fc2fcd45aaadcc368fd722832edd6b8e5f6629415efdf6d0bfef3f617aa06",
+    "release.yml": "52b09a86ade07e75267f03f5c8ae06a826ef4df04e63338cb133abbd11774731",
+    "rpo-rto-cadence.yml": "89b2fc214c9d7acccbd707d10fb787994be858d7d325c9b40d64f600a6eff820"
+  },
+  "restored_state_sha256": "39a6d498c9d5434d847c94853b4cd5c05acee546f623a56ac379152ad923382b",
+  "restore_byte_identical": true,
+  "scratch_absent": true,
+  "creation": "functions.write scratch workflow with contents above; functions.edit REM removed it",
+  "historical_fixture_evidence": "if-false-fixture-results.json"
 }

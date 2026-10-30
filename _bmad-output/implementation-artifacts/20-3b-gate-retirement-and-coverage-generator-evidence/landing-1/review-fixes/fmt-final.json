@@ -1,0 +1,9 @@
+{
+  "label": "fmt-final",
+  "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 2.48,
+  "stdout": "",
+  "stderr": ""
+}

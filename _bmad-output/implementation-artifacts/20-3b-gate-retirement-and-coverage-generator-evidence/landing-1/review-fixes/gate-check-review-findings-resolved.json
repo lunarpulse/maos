@@ -1,0 +1,9 @@
+{
+  "label": "gate-check-review-findings-resolved",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-review-findings-resolved --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 1,
+  "wall_seconds": 0.085,
+  "stdout": "{\"passed\":false,\"violation_count\":1,\"violations\":[\"7-3-verify-complianceclaim-envelopes-at-admission-with-the-ccac-n-600-ship-gate: 6 closed finding(s) reference no path in File List \u2014 possible scope-reduction-closure: D4, D5, D7, D9, D10, D12\"],\"stories_checked\":196}\n",
+  "stderr": "check-review-findings-resolved failed: 1 violations\n"
+}

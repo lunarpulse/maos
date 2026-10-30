@@ -372,12 +372,25 @@ fn the_tree_bound_inputs_exist() {
 #[test]
 fn the_retirement_row_matches_its_exact_story_arrow() {
     let kloc = std::fs::read_to_string(workspace_root().join("xtask/kloc.toml")).unwrap();
-    let (ceiling, citations, grant) = xtask_row(&kloc);
     let key = "20-3b-gate-retirement-and-coverage-generator";
-    assert_eq!(ceiling, RETIREMENT_CEILING);
-    assert_eq!(citations.first().map(String::as_str), Some(key));
-    let grant = grant.expect("current HISTORY segment carries the retirement arrow");
-    assert_eq!(grant, (47_682, RETIREMENT_CEILING));
+    let grant = (47_682, RETIREMENT_CEILING);
+    let row = kloc
+        .lines()
+        .find(|line| line.starts_with("xtask ="))
+        .unwrap();
+    assert!(
+        row.split('|').any(|segment| {
+            story_keys(segment).iter().any(|citation| citation == key)
+                && arrow_grants(segment).contains(&grant)
+        }),
+        "HISTORY must retain the retirement story and its exact arrow"
+    );
+    let status = std::fs::read_to_string(stories_dir().join("sprint-status.yaml")).unwrap();
+    assert_eq!(
+        authorize_row(&kloc, &status, &stories_dir()),
+        Ok(()),
+        "a ceiling above retirement requires a later authorized grant"
+    );
     assert!(
         records_grant(&stories_dir(), key, grant),
         "story must record the exact measured xtask arrow"

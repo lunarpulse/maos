@@ -1,0 +1,9 @@
+{
+  "label": "plant-restoration-status",
+  "command": "env -u CI -u GITHUB_ACTIONS git status --short --untracked-files=all -- /home/lunarpulse/dev_ws/.github/workflows/zz-plant-203b.yml",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 0.006,
+  "stdout": "",
+  "stderr": ""
+}

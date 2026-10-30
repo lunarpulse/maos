@@ -1,0 +1,135 @@
+{
+  "assignment": "20-3b landing-1 DIFFICULT-review fixes 1-9",
+  "candidate_commit_from_assignment": "2e694cd6",
+  "verification_state": "working tree after scoped review corrections; no commit/push",
+  "workspace_nextest": {
+    "exit_code": 0,
+    "passed": 5376,
+    "skipped": 137,
+    "wall_seconds": 642.905,
+    "record": "final-workspace-nextest.json"
+  },
+  "expensive_xtask_gates": {
+    "exit_code": 0,
+    "passed": 11,
+    "skipped_outside_selection": 7,
+    "record": "final-expensive-xtask-gates.json"
+  },
+  "final_gate_exit_codes": {
+    "kloc-check": 0,
+    "check-kernel-baseline": 0,
+    "check-dev-record-completeness": 0,
+    "check-epic-close-coherence": 0,
+    "check-env-contract": 0,
+    "check-service-boundary": 0,
+    "check-j1-loopback-delegation": 0,
+    "check-test-cost": 0,
+    "check-review-findings-resolved": 0,
+    "check-ship-gate-completeness": 0,
+    "check-test-budget": 0
+  },
+  "kloc": {
+    "xtask": 42405,
+    "maos-bin": 32937,
+    "kernel": 20618,
+    "aggregate": 187499,
+    "aggregate_hardfail": 187500,
+    "xtask_l1_envelope": 43608
+  },
+  "kernel_physical": 26409,
+  "kernel_file_set_sha256": "66dc2e2464dd42dedc57ced2a364d201dedbb1e74b4c9477990f58d1a9e4e524",
+  "prepush": {
+    "exit_code": 0,
+    "statuses": {
+      "pass": 61,
+      "skip": 8,
+      "advisory": 1
+    },
+    "record": "final-prepush.json",
+    "limitation": "Its fresh default-parallel timing report is advisory-red on two existing 30s binary budgets; standalone serial final workspace budget passed. No budget exceptions or test weakening."
+  },
+  "t0": {
+    "coverage_completeness": {
+      "exit_code": 0,
+      "passed": true,
+      "v1_0_entries": 55,
+      "empty_gates": [],
+      "advisory_entries": [
+        "FR42",
+        "FR43",
+        "FR44",
+        "FR45",
+        "FR46",
+        "FR49",
+        "FR51",
+        "FR59",
+        "FR62",
+        "FR63",
+        "FR64",
+        "FR65",
+        "NFR-Aud-1",
+        "NFR-Aud-10",
+        "NFR-Aud-12",
+        "NFR-Aud-13",
+        "NFR-Aud-2",
+        "NFR-Aud-3",
+        "NFR-Aud-6",
+        "NFR-Comp-2",
+        "NFR-Comp-5",
+        "NFR-Cost-1",
+        "NFR-Doc-2",
+        "NFR-Doc-3",
+        "NFR-Doc-4",
+        "NFR-Doc-5",
+        "NFR-Doc-7",
+        "NFR-Maint-4",
+        "NFR-Maint-5",
+        "NFR-Maint-6",
+        "NFR-Maint-7",
+        "NFR-Maint-9",
+        "NFR-Meta-1",
+        "NFR-Obs-1",
+        "NFR-Ops-12",
+        "NFR-Ops-2",
+        "NFR-Ops-3",
+        "NFR-Rel-4",
+        "NFR-Rel-5",
+        "NFR-Rel-6",
+        "NFR-Sec-15",
+        "NFR-Sec-8",
+        "NFR-Test-14"
+      ]
+    },
+    "coverage_matrix": {
+      "exit_code": 0,
+      "passed": false,
+      "mode": "warning",
+      "violations": 33,
+      "checked": 198
+    },
+    "clippy": {
+      "exit_code": 0,
+      "diagnostic_count": 1411,
+      "warnings": 1411,
+      "errors": 0,
+      "decision": "STOP D-20-3b-11 A: warning count > 0; no lint repairs or blocking clippy job in this landing.",
+      "source_distinct_diagnostics": 884,
+      "count_method": "Parse cargo --message-format=json compiler-message events at warning/error level; counts include repeated diagnostics emitted for library and lib-test targets. Source-distinct deduplication uses package, level, lint code, message and primary source ranges.",
+      "clippy_lint_occurrences": 1143,
+      "rustc_warning_occurrences": 268
+    },
+    "clippy_deny_warnings_exit_code": 101
+  },
+  "real_tree_plant": {
+    "clean": 0,
+    "planted": 1,
+    "restored": 0,
+    "restored_state_sha256": "39a6d498c9d5434d847c94853b4cd5c05acee546f623a56ac379152ad923382b",
+    "evidence": "../plants/if-false-results.json",
+    "scratch_absent": true
+  },
+  "hosted": "Not run/pushed; branch proof matches release smoke and debug ship profiles but does not prove the artifact/key-backed ledger path.",
+  "ordering_deviation": "Bridge-first edit order is not separable in one atomic candidate commit; closure finds no surviving consumer.",
+  "test_prerequisites": "Existing official fixture manifest sufficed; build-test-fixtures was not necessary in this run.",
+  "initial_failures": "Preserved per-command: interim charged unit-test witness (+30) was moved to integration coverage; placeholder whole-section parsing exposed unrelated sibling tables and was scoped independently; default-parallel timing budgets failed and a final serial workspace run passed. No errors suppressed."
+}

@@ -1,5 +1,14 @@
 {
   "scope": "Landing 1 only; nine gate retirements with three protective folds; coverage-completeness stays until the landing-2 spike decides its disposition.",
+  "review_corrections": {
+    "summary": "review-fixes/summary.md",
+    "commands": "review-fixes/commands.json",
+    "final_workspace": "review-fixes/final-workspace-nextest.json",
+    "final_prepush": "review-fixes/final-prepush.json",
+    "t0_clippy": "review-fixes/t0-clippy-summary.json",
+    "real_tree_plant": "plants/if-false-results.json",
+    "note": "Original commands/results below remain historical. These review-correction records supersede them for the corrected tree; clippy warning debt triggers D-20-3b-11 A STOP, not lint repair."
+  },
   "commands": [
     {
       "command": "cargo fmt --all",
@@ -101,7 +110,8 @@
     "check-test-budget": 0
   },
   "proven_red": {
-    "evidence": "plants/if-false-results.json",
+    "evidence": "plants/if-false-fixture-results.json",
+    "scope": "Historical fixture-level evidence only; superseded for AC3.5 by plants/if-false-results.json and review-fixes/summary.md",
     "diff": "plants/if-false.diff",
     "clean_exit": 0,
     "planted_exit": 1,
@@ -120,7 +130,7 @@
     "Hosted branch-only ci/ci-20-3b-verify.yml was not run because nothing was pushed.",
     "137 default-suite skips remain; signed T3 substrate, strace and Python cryptography were not provisioned. Runtime skip diagnostics are preserved in prepush.json.",
     "Prepush skipped docs build/routes (no applicable changes), cargo-deny (no Cargo.lock/deny.toml change), and five dynamic CI marker cardinalities.",
-    "Clippy, generator spike, FR31, new ledger, governance integration-test migration, pub-use hash and AC7 fallback/literal+pin remain landing 2."
+    "Clippy T0 count is now recorded in review-fixes/t0-clippy-summary.json; warning debt triggers D-20-3b-11 A STOP. Generator spike, FR31, new ledger, governance integration-test migration, pub-use hash and AC7 fallback/literal+pin remain landing 2."
   ],
   "preservation": {
     "kernel_src_and_baseline_unchanged": true,

@@ -1,0 +1,9 @@
+{
+  "label": "final-gate-check-review-findings-resolved",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-review-findings-resolved --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 0.061,
+  "stdout": "{\"passed\":true,\"violation_count\":0,\"violations\":[],\"stories_checked\":196}\n",
+  "stderr": ""
+}

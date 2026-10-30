@@ -1,0 +1,9 @@
+{
+  "label": "gate-check-test-cost",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-cost --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 0.237,
+  "stdout": "{\"gate\":\"check-test-cost\",\"passed\":true,\"files_scanned\":581,\"cargo_call_sites\":8,\"cargo_query_sites\":4,\"expensive_tests\":{\"maos-a2a-tcp::t_11_3_scale_churn\":[\"t_11_3_blast_recovery_rto_drill\",\"t_14_1_blast_recovery_rto_n100\",\"t_11_3_mesh_identity_reconcile_30_host\",\"t_14_1_mesh_identity_reconcile_n100\",\"t_11_3_duplicate_identity_negative_control_hard_fails\",\"t_14_1_duplicate_identity_negative_control_n100\",\"t_11_3_scale_churn_30_host_drill\",\"t_14_1_scale_churn_n100_drill\",\"t_11_3_detection_latency_drill\",\"t_14_1_detection_latency_n100\"],\"maos-bin::worker_crash_corpus_16_3\":[\"hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild\"],\"maos-bin::worker_hang_corpus_16_3\":[\"sixty_workers_stall_by_silence_and_crash_by_signal\"],\"maos-kernel-core::cgroup_ceiling_smoke\":[\"native_child_is_placed_before_guest_and_resource_limits_bite\",\"same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves\",\"creation_limit_write_and_exec_failures_release_owned_leaves\",\"killed_leader_cleanup_kills_its_surviving_descendant\"],\"maos-spirit-sdk::spirit_macro_errors\":[\"spirit_macro_compile_errors\"],\"xtask::abi_diff_integration\":[\"quote_whitespace_no_false_positive\",\"pub_use_reexport_preserved\",\"pub_use_reexport_removal_detected\",\"generic_bound_reorder_deterministic\",\"inline_mod_items_visible\"],\"xtask::diagnostics_20_3a\":[\"cohort_mismatch_emits_json\",\"cohort_pin_read_error_emits_json\",\"loom_mismatch_emits_json\",\"loom_pin_read_error_emits_json\",\"epic_mismatch_emits_json\",\"epic_pin_read_error_emits_json\"]},\"findings\":[]}\n",
+  "stderr": ""
+}

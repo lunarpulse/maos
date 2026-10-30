@@ -1,0 +1,9 @@
+{
+  "label": "final-gate-check-env-contract",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-env-contract --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 0.413,
+  "stdout": "{\"passed\":true,\"registered_count\":117,\"violations\":[]}\n",
+  "stderr": "check-env-contract: PASS (117 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml \u2014 D-I)\n"
+}

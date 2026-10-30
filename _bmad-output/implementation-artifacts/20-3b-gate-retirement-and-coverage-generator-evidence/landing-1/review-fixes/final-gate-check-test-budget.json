@@ -1,0 +1,9 @@
+{
+  "label": "final-gate-check-test-budget",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-budget --junit /home/lunarpulse/dev_ws/target/nextest/default/junit.xml --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 0.017,
+  "stdout": "{\"gate\":\"check-test-budget\",\"passed\":true,\"junit\":\"/home/lunarpulse/dev_ws/target/nextest/default/junit.xml\",\"binaries\":567,\"total_span_seconds\":575.4780080318451,\"total_sum_seconds\":575.4129999999991,\"findings\":[]}\n",
+  "stderr": ""
+}

@@ -1,0 +1,386 @@
+[
+  {
+    "label": "fmt",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 2.441,
+    "output_record": "fmt.json"
+  },
+  {
+    "label": "build",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo build --locked --workspace --all-targets",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 57.224,
+    "output_record": "build.json"
+  },
+  {
+    "label": "t0-coverage-completeness",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-coverage-matrix-completeness --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.015,
+    "output_record": "t0-coverage-completeness.json"
+  },
+  {
+    "label": "t0-coverage-matrix",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask coverage-matrix --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.012,
+    "output_record": "t0-coverage-matrix.json"
+  },
+  {
+    "label": "t0-clippy",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked -- -D warnings",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 101,
+    "wall_seconds": 15.395,
+    "output_record": "t0-clippy.json"
+  },
+  {
+    "label": "t0-clippy-count",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 61.807,
+    "output_record": "t0-clippy-count.json"
+  },
+  {
+    "label": "ignored-diagnostics",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --run-ignored only -p xtask -E 'binary(diagnostics_20_3a)'",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 13.965,
+    "output_record": "ignored-diagnostics.json"
+  },
+  {
+    "label": "kloc-measurement",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask kloc-check --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 1,
+    "wall_seconds": 0.034,
+    "output_record": "kloc-measurement.json"
+  },
+  {
+    "label": "expensive-filter",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-cost --expensive-filter",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.242,
+    "output_record": "expensive-filter.json"
+  },
+  {
+    "label": "plant-real-tree-clean",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.019,
+    "output_record": "plant-real-tree-clean.json"
+  },
+  {
+    "label": "plant-real-tree-disabled",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 1,
+    "wall_seconds": 0.019,
+    "output_record": "plant-real-tree-disabled.json"
+  },
+  {
+    "label": "plant-real-tree-restored",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.019,
+    "output_record": "plant-real-tree-restored.json"
+  },
+  {
+    "label": "plant-restoration-status",
+    "command": "env -u CI -u GITHUB_ACTIONS git status --short --untracked-files=all -- /home/lunarpulse/dev_ws/.github/workflows/zz-plant-203b.yml",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.006,
+    "output_record": "plant-restoration-status.json"
+  },
+  {
+    "label": "fmt-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 2.48,
+    "output_record": "fmt-final.json"
+  },
+  {
+    "label": "build-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo build --locked --workspace --all-targets",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 3.145,
+    "output_record": "build-final.json"
+  },
+  {
+    "label": "workspace-nextest",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --color never --no-fail-fast",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 46.912,
+    "output_record": "workspace-nextest.json"
+  },
+  {
+    "label": "expensive-xtask-gates",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --profile expensive --workspace --locked --run-ignored only --no-fail-fast -E '((binary_id(xtask::abi_diff_integration) & test(/(^|::)(quote_whitespace_no_false_positive|pub_use_reexport_preserved|pub_use_reexport_removal_detected|generic_bound_reorder_deterministic|inline_mod_items_visible)$/)) | (binary_id(xtask::diagnostics_20_3a) & test(/(^|::)(cohort_mismatch_emits_json|cohort_pin_read_error_emits_json|loom_mismatch_emits_json|loom_pin_read_error_emits_json|epic_mismatch_emits_json|epic_pin_read_error_emits_json)$/)) | (binary_id(maos-spirit-sdk::spirit_macro_errors) & test(/(^|::)(spirit_macro_compile_errors)$/))) & package(xtask)'",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 4.081,
+    "output_record": "expensive-xtask-gates.json"
+  },
+  {
+    "label": "gate-kloc-check",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask kloc-check --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.03,
+    "output_record": "gate-kloc-check.json"
+  },
+  {
+    "label": "gate-check-kernel-baseline",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-kernel-baseline --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.01,
+    "output_record": "gate-check-kernel-baseline.json"
+  },
+  {
+    "label": "gate-check-dev-record-completeness",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-dev-record-completeness --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.082,
+    "output_record": "gate-check-dev-record-completeness.json"
+  },
+  {
+    "label": "gate-check-epic-close-coherence",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.018,
+    "output_record": "gate-check-epic-close-coherence.json"
+  },
+  {
+    "label": "gate-check-env-contract",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-env-contract --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.406,
+    "output_record": "gate-check-env-contract.json"
+  },
+  {
+    "label": "gate-check-service-boundary",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-service-boundary --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 1.075,
+    "output_record": "gate-check-service-boundary.json"
+  },
+  {
+    "label": "gate-check-j1-loopback-delegation",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-j1-loopback-delegation --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.037,
+    "output_record": "gate-check-j1-loopback-delegation.json"
+  },
+  {
+    "label": "gate-check-test-cost",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-cost --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.237,
+    "output_record": "gate-check-test-cost.json"
+  },
+  {
+    "label": "gate-check-test-budget",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-budget --junit /home/lunarpulse/dev_ws/target/nextest/default/junit.xml --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 1,
+    "wall_seconds": 0.017,
+    "output_record": "gate-check-test-budget.json"
+  },
+  {
+    "label": "workspace-nextest-serial",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --color never --no-fail-fast --test-threads 1",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 579.522,
+    "output_record": "workspace-nextest-serial.json"
+  },
+  {
+    "label": "gate-check-test-budget-serial",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-budget --junit /home/lunarpulse/dev_ws/target/nextest/default/junit.xml --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.017,
+    "output_record": "gate-check-test-budget-serial.json"
+  },
+  {
+    "label": "gate-check-review-findings-resolved",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-review-findings-resolved --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 1,
+    "wall_seconds": 0.085,
+    "output_record": "gate-check-review-findings-resolved.json"
+  },
+  {
+    "label": "prepush",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /home/lunarpulse/dev_ws/target/debug/xtask prepush --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 168.678,
+    "output_record": "prepush.json"
+  },
+  {
+    "label": "fmt-placeholder-scope",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 2.465,
+    "output_record": "fmt-placeholder-scope.json"
+  },
+  {
+    "label": "kloc-placeholder-scope",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask kloc-check --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 1,
+    "wall_seconds": 0.031,
+    "output_record": "kloc-placeholder-scope.json"
+  },
+  {
+    "label": "final-fmt",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 2.453,
+    "output_record": "final-fmt.json"
+  },
+  {
+    "label": "final-build",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo build --locked --workspace --all-targets",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 71.833,
+    "output_record": "final-build.json"
+  },
+  {
+    "label": "final-workspace-nextest",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --color never --no-fail-fast --test-threads 1",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 642.905,
+    "output_record": "final-workspace-nextest.json"
+  },
+  {
+    "label": "final-gate-check-test-budget",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-budget --junit /home/lunarpulse/dev_ws/target/nextest/default/junit.xml --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.017,
+    "output_record": "final-gate-check-test-budget.json"
+  },
+  {
+    "label": "final-expensive-xtask-gates",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --profile expensive --workspace --locked --run-ignored only --no-fail-fast -E '((binary_id(xtask::abi_diff_integration) & test(/(^|::)(quote_whitespace_no_false_positive|pub_use_reexport_preserved|pub_use_reexport_removal_detected|generic_bound_reorder_deterministic|inline_mod_items_visible)$/)) | (binary_id(xtask::diagnostics_20_3a) & test(/(^|::)(cohort_mismatch_emits_json|cohort_pin_read_error_emits_json|loom_mismatch_emits_json|loom_pin_read_error_emits_json|epic_mismatch_emits_json|epic_pin_read_error_emits_json)$/)) | (binary_id(maos-spirit-sdk::spirit_macro_errors) & test(/(^|::)(spirit_macro_compile_errors)$/))) & package(xtask)'",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 4.141,
+    "output_record": "final-expensive-xtask-gates.json"
+  },
+  {
+    "label": "final-gate-kloc-check",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask kloc-check --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.032,
+    "output_record": "final-gate-kloc-check.json"
+  },
+  {
+    "label": "final-gate-check-kernel-baseline",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-kernel-baseline --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.01,
+    "output_record": "final-gate-check-kernel-baseline.json"
+  },
+  {
+    "label": "final-gate-check-dev-record-completeness",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-dev-record-completeness --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.093,
+    "output_record": "final-gate-check-dev-record-completeness.json"
+  },
+  {
+    "label": "final-gate-check-epic-close-coherence",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.018,
+    "output_record": "final-gate-check-epic-close-coherence.json"
+  },
+  {
+    "label": "final-gate-check-env-contract",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-env-contract --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.413,
+    "output_record": "final-gate-check-env-contract.json"
+  },
+  {
+    "label": "final-gate-check-service-boundary",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-service-boundary --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 1.075,
+    "output_record": "final-gate-check-service-boundary.json"
+  },
+  {
+    "label": "final-gate-check-j1-loopback-delegation",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-j1-loopback-delegation --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.038,
+    "output_record": "final-gate-check-j1-loopback-delegation.json"
+  },
+  {
+    "label": "final-gate-check-test-cost",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-test-cost --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.243,
+    "output_record": "final-gate-check-test-cost.json"
+  },
+  {
+    "label": "final-gate-check-review-findings-resolved",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-review-findings-resolved --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.061,
+    "output_record": "final-gate-check-review-findings-resolved.json"
+  },
+  {
+    "label": "final-gate-check-ship-gate-completeness",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-ship-gate-completeness --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 0.03,
+    "output_record": "final-gate-check-ship-gate-completeness.json"
+  },
+  {
+    "label": "final-prepush",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /home/lunarpulse/dev_ws/target/debug/xtask prepush --json",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "exit_code": 0,
+    "wall_seconds": 171.242,
+    "output_record": "final-prepush.json"
+  }
+]

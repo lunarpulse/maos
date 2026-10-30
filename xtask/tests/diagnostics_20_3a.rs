@@ -46,6 +46,12 @@ fn isolated() -> tempfile::TempDir {
         copy_tree(&root().join(relative), &dir.path().join(relative));
     }
     fs::create_dir_all(dir.path().join("xtask")).unwrap();
+    fs::create_dir_all(dir.path().join(".github/workflows")).unwrap();
+    fs::write(
+        dir.path().join(".github/workflows/fixture.yml"),
+        "name: fixture\non: workflow_dispatch\njobs:\n  live:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+    )
+    .unwrap();
     let sprint = "_bmad-output/implementation-artifacts/sprint-status.yaml";
     fs::create_dir_all(dir.path().join(sprint).parent().unwrap()).unwrap();
     for relative in [
@@ -200,8 +206,8 @@ fn witness(tree: &Path) {
             .into()
     });
     executable(&tree.join("cargo"), &format!(
-        "#!/bin/sh\nexport RUSTUP_HOME='{}'\nexec '{}' test --offline --quiet --manifest-path '{}' --target-dir '{}' --lib\n",
-        Path::new(&rustup).display(), Path::new(&real_cargo).display(), witness.join("Cargo.toml").display(), witness.join("target").display()
+        "#!/bin/sh\nexport RUSTUP_HOME='{}'\nexec '{}' test --offline --quiet --manifest-path '{}' --lib\n",
+        Path::new(&rustup).display(), Path::new(&real_cargo).display(), witness.join("Cargo.toml").display()
     ));
 }
 
@@ -332,4 +338,39 @@ fn composite_child_spawn_error_emits_json() {
             .unwrap();
         report(&output, gate);
     }
+}
+
+#[test]
+fn workflow_plant_reaches_the_coherence_gate_and_restores_green() {
+    let _guard = SERIAL.lock();
+    let tree = isolated();
+    let run = || {
+        command(tree.path(), tree.path(), "check-epic-close-coherence")
+            .arg("--json")
+            .output()
+            .unwrap()
+    };
+    let clean = run();
+    assert!(clean.status.success(), "{:?}", clean);
+    let workflow = tree.path().join(".github/workflows/plant.yml");
+    fs::write(
+        &workflow,
+        "jobs:\n  planted:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+    )
+    .unwrap();
+    let red = run();
+    assert_eq!(red.status.code(), Some(1));
+    let value = report(&red, "check-epic-close-coherence");
+    assert_eq!(value["violations"].as_array().unwrap().len(), 1);
+    assert_eq!(value["violations"][0]["kind"], "disabled-workflow-job");
+    assert!(value["violations"][0]["detail"]
+        .as_str()
+        .unwrap()
+        .contains("plant.yml:3"));
+    fs::remove_file(workflow).unwrap();
+    let restored = run();
+    assert!(restored.status.success(), "{:?}", restored);
+    let value: Value = serde_json::from_slice(&restored.stdout).unwrap();
+    assert_eq!(value["passed"], true);
+    assert!(value["violations"].as_array().unwrap().is_empty());
 }

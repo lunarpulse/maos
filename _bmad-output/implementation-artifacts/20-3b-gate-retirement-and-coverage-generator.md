@@ -315,9 +315,17 @@ Operator ruled D03 A, D04 A, D08 A, D-20-3b-01 A, 02 A, 03 B, 04 A, 05 B, 06–1
 - Formatting and `build --locked --workspace --all-targets` exit 0. Focused nextest (`xtask`, `maos-bin`, `maos-audit`) 2149 passed / 27 skipped after four stale expectations were corrected.
 - Workspace nextest: 5373 passed / 137 skipped; one serial full rerun also 5373 / 137. Initial run 5343 passed / 30 failed / 137 skipped: all failures were missing fixture manifest entries; the official fixture producer built 14 artifacts before rerun (`initial-workspace-failures.json`).
 - Final `check-test-budget` exit 0: 567 binaries, sum 579.725s, no findings. Initial parallel budget findings and prepush timing findings were saved; the advisory timing cleared on serial rerun (`initial-test-budget-failure.json`, `gates.json`, `prepush.json`). The 12 required/static gates and final budget gate exited 0. Local smoke exited 0 with exactly two surviving gates.
-- Local `if: false` plant: clean 0 → planted 1 (`disabled-workflow-job`) → restored 0; before/after SHA-256 `e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d` (`plants/if-false-results.json`). Nine retired CLI commands exit 2 (`retirement-closure.json`).
+- Historical fixture-level `if: false` plant: clean 0 → planted 1 (`disabled-workflow-job`) → restored 0; before/after SHA-256 `e69bc4fe84d2f1d5605b4967af7dd3e21a049c9f5b002ab7e0dee4d17b25cf8d` (`plants/if-false-fixture-results.json`). This was not the required real-tree plant; the review correction below supplies that proof. Nine retired CLI commands exit 2 (`retirement-closure.json`).
 - Prepush with authorized `CARGO_MANIFEST_DIR` environment exited 0: 61 passed, 0 red, 1 advisory, 8 skipped; tracked-tree PASS (`prepush.json`). The lineage report was byte-identical to HEAD.
 - Hosted evidence workflow is wired but **not run or pushed**. Story remains `in-progress` for L2; local results do not claim hosted proof.
+
+**L1 DIFFICULT-review correction** (`openai-codex/gpt-6.1-sol`, 2026-10-30): missing workflow fixtures repaired without weakening fail-closed scans; nested review placeholders remain red through the next level-two heading without extending table parsing into sibling sections; active-model paired witnesses and a gate-entry-point workflow clean/red/restored witness added; the retirement ratchet preserves the historical 47682 -> 42400 arrow but allows later authorized grants. Exact formatted xtask correction: 42400 -> 42405 (+5), within L1's 43608 ceiling; aggregate 187494 -> 187499, strict hardfail 187495 -> 187500, all other crates unchanged. Detailed commands, results, T0 lint counts, real-tree plant hashes, and final verification are in `20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/`.
+
+**AC3.1 ordering deviation:** “bridge deleted first” is not independently observable in the single landing-1 candidate commit. The bridge and its enrolments disappear atomically with the other retirements; no surviving code consumes the bridge, as established by the closure search recorded in `landing-1/retirement-closure.json`. Thus no intermediate shipped tree loses a dependency. This is a documented ordering deviation, not a claim that the commit proves edit order.
+
+**Hosted scope:** the branch-only evidence workflow builds the smoke binary and its xtask subprocess in release, matching `discipline.yml`'s smoke job, and retains the debug xtask profile for ship-completeness. It does not provision the signed ledger artifacts/audit key: green proves enrolment, not the ledger-consuming path; only the full discipline run proves that path. No hosted run or push is claimed.
+
+**T0 clippy STOP (D-20-3b-11 A):** the deny-warnings command exits 101 after four diagnostics in `maos-spirit-abi`; the non-denying JSON count exits 0 with 1411 warning diagnostic occurrences (including repeated lib/test-target emissions). No lints are repaired and no blocking clippy job is added; warning debt requires the operator's disposition before the clippy lane proceeds. Both real coverage gates were run, not a replica; results are recorded under `review-fixes/t0-*`.
 
 ### Debug Log References
 
@@ -328,7 +336,9 @@ Operator ruled D03 A, D04 A, D08 A, D-20-3b-01 A, 02 A, 03 B, 04 A, 05 B, 06–1
 ### File List
 
 - Creation: this story file; `20-3b-…-evidence/creation/*`; `sprint-status.yaml:299`; `deferred-work.md:903,911,1200,1224` (annotations).
+- L1 review corrections: `xtask/src/check_review_findings_resolved.rs`; `xtask/tests/{diagnostics_20_3a,d19_story_file_governance,d11_xtask_ceiling_ratchet}.rs`; `xtask/kloc.toml`; this record; `20-3b-gate-retirement-and-coverage-generator-evidence/ci/ci-20-3b-verify.yml`; landing-1 review-fix and plant evidence. No kernel or operator Dockerfile edits.
 
 ### Change Log
 
 - 2026-10-30: Story created at `23f58da4` (ready-for-dev; D03, D04, D08 and D-20-3b-01…16 PROPOSED). Enrolment closure re-measured (wider than six sites; maos-bin smoke arm and two library dependents found); retirement gross measured −5409 xtask (GO) / −5316 (NO-GO); 33 coverage violations reproduced by replica; FR31 kernel repair priced R′ +91/+80 (R +42/+34), maos-bin +9, maos-domain +1; deny half of `deferred-work.md:902` and all of `:909` recorded closed by 18-0's blocking job and the landed lockfile.
+- 2026-10-30: L1 DIFFICULT-review corrections preserve fixture prerequisites and nested placeholder scope, add active-model/gate-level workflow witnesses, permit future authorized ratchet grants, record real-tree plant and T0 preflight, and document ordering/hosted-proof limitations.

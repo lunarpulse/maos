@@ -1,0 +1,9 @@
+{
+  "label": "final-gate-check-kernel-baseline",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-kernel-baseline --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 0.01,
+  "stdout": "{\n  \"passed\": true,\n  \"actual-lines\": 26409,\n  \"pinned-lines\": 26409,\n  \"baseline-file\": \"/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml\",\n  \"file-set-entries\": 95,\n  \"set-hash\": \"66dc2e2464dd42dedc57ced2a364d201dedbb1e74b4c9477990f58d1a9e4e524\",\n  \"pinned-set-hash\": \"66dc2e2464dd42dedc57ced2a364d201dedbb1e74b4c9477990f58d1a9e4e524\",\n  \"changed\": [],\n  \"added\": [],\n  \"removed\": []\n}\n",
+  "stderr": ""
+}

@@ -252,6 +252,23 @@ fn a_j1_story_with_a_bare_review_findings_placeholder_reds() {
     assert!(out.contains(J1_KEY), "{out}");
 }
 
+#[test]
+fn a_nested_review_heading_does_not_hide_a_bare_placeholder() {
+    let fx = Fixture::new(&[J1_KEY]);
+    let bare = complete_story(J1_KEY).replace(
+        "| 1 | Low | A real finding. | CLOSED (`crates/maos-cli/src/subcommands.rs`) |",
+        "### Round 2\n\n_No review findings._",
+    );
+    write_file(fx.path(), &fx.story(J1_KEY), &bare);
+    let (ok, out) = fx.gate("check-review-findings-resolved", &[]);
+    assert!(!ok, "a nested placeholder must red:\n{out}");
+    assert!(
+        out.contains("bare `_No review findings._` placeholder"),
+        "{out}"
+    );
+    assert!(out.contains(J1_KEY), "{out}");
+}
+
 /// A `j1-*` story with no recorded model reds `check-dev-record-completeness`.
 #[test]
 fn a_j1_story_with_no_recorded_model_reds() {
@@ -272,6 +289,29 @@ fn a_j1_story_with_no_recorded_model_reds() {
         !ok,
         "a `j1-*` story with no model provenance must red:\n{out}"
     );
+    assert!(out.contains(J1_KEY), "{out}");
+}
+
+#[test]
+fn an_active_story_requires_a_concrete_model() {
+    let fx = Fixture::new(&[J1_KEY]);
+    write_file(
+        fx.path(),
+        "_bmad-output/implementation-artifacts/sprint-status.yaml",
+        &sprint_status(&[J1_KEY]).replace(": done ", ": in-progress "),
+    );
+    let (ok, out) = fx.gate("check-dev-record-completeness", &[]);
+    assert!(ok, "an active story with a model must be green:\n{out}");
+    let no_model = complete_story(J1_KEY)
+        .replace("dev_model_used: anthropic/claude-opus-5\n", "")
+        .replace(
+            "### Agent Model Used\n\nanthropic/claude-opus-5 (harness: omp, 2026-08-17)\n\n",
+            "",
+        );
+    write_file(fx.path(), &fx.story(J1_KEY), &no_model);
+    let (ok, out) = fx.gate("check-dev-record-completeness", &[]);
+    assert!(!ok, "an active story without a model must red:\n{out}");
+    assert!(out.contains("no concrete dev model recorded"), "{out}");
     assert!(out.contains(J1_KEY), "{out}");
 }
 

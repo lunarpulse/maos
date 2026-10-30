@@ -1,0 +1,9 @@
+{
+  "label": "gate-check-epic-close-coherence",
+  "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /home/lunarpulse/dev_ws/target/debug/xtask check-epic-close-coherence --json",
+  "cwd": "/home/lunarpulse/dev_ws",
+  "exit_code": 0,
+  "wall_seconds": 0.018,
+  "stdout": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 21,\n  \"authoritative-src-lines\": 26409,\n  \"violations\": []\n}\n",
+  "stderr": ""
+}
