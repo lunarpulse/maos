@@ -153,6 +153,10 @@ Observed **exit 0**, **48.28 s** wall: `25 tests run: 25 passed, 0 skipped`. `li
 | `ac4-continuity-masking-removed-token-plant.diff` | `8f52dd8267745f1bce215a149f98fd3ab5b719c22831a2fa55f95b9cd4d98e2d` |
 | `ac4-continuity-masking-removed-memory-plant.diff` | `a543c17e991b805ae94ec7cf1705f8f38c319a1c293a7fd764fb86384f9f5f47` |
 
+## Hosted evidence — none required (plants are LOCAL-ONLY)
+
+Re-affirmed 2026-10-30 by the records pass: every 19-5 plant is **local-only** — the daemon witnesses run Butler in-process, the admitted-SCB witness uses a hermetic real admission in an archive-isolated libtest child, and the continuity witness an in-process kernel harness; none needs T3 or a hosted workflow, so `ci/ci-w3-verify.yml` carries no 19-5 planted step. The **six restored witnesses** (above) re-ran green on the unplanted tree — `ac1` cold successor 11.34 s, `ac2` incompatible target 1.58 s, `ac3` cross-major refusal 1.49 s, `ac4` admitted-bundle wrapper 1.14 s, `ac4` same-major daemon swap 1.27 s, `ac4` kernel continuity 3.08 s — plus the `kernel_pin_content_hash_16_0` suite 25/25 (48.28 s). Hosted coverage for 19-5's vectors rides the unplanted controls of 19-4's branch runs: `ci/w3-verify` **40980181567** (first) and **40986864882** @ `5026ceea` (all green, `one_daemon_one_door_16_1` under the provisioned substrate), with the landing-shape validation **40980187631** (6 failures: 19-4's clear-twin journey assertion + one `root_shutdown_unload_16_3` flake not reproduced) → **40986869634** @ `59ee0412` (**192/192**).
+
 ## Open items
 
 None for this plant assignment. All required controls were runnable locally and went red at the recorded oracles; all planted sources were restored byte-identically; all distinct restored witnesses and the required final kernel-pin suite passed. The story/epic kloc paragraphs and `xtask/kloc.toml` are owned by the concurrent re-pin assignment and were not edited here.

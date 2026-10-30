@@ -98,7 +98,7 @@ Pristine and restored SHA-256 values matched:
 
 After restoring both sources, `git apply --check /home/lunarpulse/wt-w3/_bmad-output/implementation-artifacts/19-4-j1-beats-and-demo-replay-evidence/<diff>` exited **0** separately for **all four** inventory diffs. AC2/AC5 were applicability-checked only, never applied or executed locally. No unrelated working-tree changes were reset.
 
-## Hosted T3 run — prepared, not yet executed
+## Hosted T3 run — workflow and order (branch `ci/w3-verify`)
 
 Workflow: `ci/ci-w3-verify.yml`. Copy only that file into `.github/workflows/` on branch **`ci/w3-verify`**; its only trigger is push to that branch. No workflow is installed in the main workflow directory by this evidence change. Provisioning is the identical `./.github/actions/provision-t3-test-substrate` action used by wave 2 on `ubuntu-24.04`; fixtures are built through `build-test-fixtures --only worker-cli-fixture --only maosctl`.
 
@@ -115,4 +115,13 @@ The hosted order is:
 
 Hosted plants run only after the unplanted controls pass. An EXIT trap restores from the pristine `/tmp` copy even if an oracle or command fails; every changed file is copied back, `cmp`-checked and touched. Restored/pristine SHA values and clean `git diff --exit-code` are logged. The workflow does not replace the user's uncommitted fixes with a checkout.
 
-**Hosted run id: NOT RUN / pending operator branch push.** Hosted wall times, real AC2 demo/journey reds, actual AC5 mutated-demo red, and hosted restore proofs are intentionally unclaimed until that run. They are not runnable locally because the signed T3 substrate is absent. No commit, push, hosted dispatch, broad test suite, formatter or kloc gate was run by this assignment.
+**Hosted execution — recorded 2026-10-30 by the records pass (observed via the GitHub API by the orchestrator; not re-run here):**
+
+| Run | Workflow / SHA | Result |
+|---|---|---|
+| **40980181567** | `ci/w3-verify` (first attempt) | Unplanted `epic_halt_resume_19_4` (17 vectors) GREEN and unplanted verbatim `demo-j1` GREEN. The `journey_j1` control exposed a too-strict clear-twin assertion — a clear run's `open_halts[]` legitimately carries the `planned_unload` teardown markers every Worker/Spirit unload writes — fixed in `101322df` (`journey_j1.rs:624-641`: `resolved_halts` empty, open rows all intent `planned_unload`). |
+| **40986864882** | `ci/w3-verify` @ `5026ceea` | **ALL GREEN**: unplanted controls (17-vector `epic_halt_resume_19_4`, verbatim `demo-j1`, whole `journey_j1` incl. the corrected twin); the AC2.6 clear-judgement cassette plant RED at its named ambiguity beat (decomposition green); the AC2.6 exit-job clear-twin command (`founder-loop.clear-twin.json`) red with the named ambiguity beat and three-frame decomposition green; the AC5.4 actual `demo-j1` resolve-step-removal plant RED (hold expires, resume beat FAIL). Restores clean per the workflow's EXIT trap. |
+| **40980187631** | `ci/w3-validate` (first landing-shape validation) | 6 failures — the clear-twin journey assertion (fixed by `101322df`) and one `root_shutdown_unload_16_3::ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan` flake **not reproduced since**. |
+| **40986869634** | `ci/w3-validate` @ `59ee0412` | **192/192 success**; `check-test-budget` passed with **no new rows** (TIA-1 disposition: the widened binaries measured inside the default on the hosted runner). |
+
+Hosted wall-clock sidecars live in the runs' `w3-proven-red` artifacts (GitHub); this file claims the verdicts and red sites above, not per-step timings. The plants themselves remain as recorded above (local in-place for AC3/AC6; hosted-only for AC2/AC5).
