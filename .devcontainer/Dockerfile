@@ -83,9 +83,13 @@ USER $USER
 # 스모크 테스트(--version)가 홈에 남기는 natives(~346MB)·캐시는 이미지에서 걷어낸다
 # (런타임 ~/.omp 는 호스트 바인드라 이미지 홈의 사본은 쓸모가 없다).
 RUN if [ "$INSTALL_AGENT_CLIS" = "true" ]; then \
-        curl -fsSL https://omp.sh/install | PI_INSTALL_DIR=$AGENT_CLI_DIR sh \
-        && curl -fsSL https://herdr.dev/install.sh | HERDR_INSTALL_DIR=$AGENT_CLI_DIR sh \
-        && omp --version && herdr --version \
+        curl -fsSL https://omp.sh/install -o /tmp/omp-install.sh \
+        && PI_INSTALL_DIR="$AGENT_CLI_DIR" sh /tmp/omp-install.sh --binary \
+        && curl -fsSL https://herdr.dev/install.sh -o /tmp/herdr-install.sh \
+        && HERDR_INSTALL_DIR="$AGENT_CLI_DIR" sh /tmp/herdr-install.sh \
+        && "$AGENT_CLI_DIR/omp" --version \
+        && "$AGENT_CLI_DIR/herdr" --version \
+        && rm -f /tmp/omp-install.sh /tmp/herdr-install.sh \
         && rm -rf "$HOME/.omp" "$HOME/.cache" "$HOME/.config"; \
     fi
 
