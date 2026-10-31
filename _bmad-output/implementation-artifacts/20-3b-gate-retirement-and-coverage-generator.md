@@ -345,6 +345,7 @@ Operator ruled D03 A, D04 A, D08 A, D-20-3b-01 A, 02 A, 03 B, 04 A, 05 B, 06–1
 ### Debug Log References
 
 - Creation evidence: `20-3b-gate-retirement-and-coverage-generator-evidence/creation/{measurements.md, cites-23f58da4.md, records-owed.md, tokei-23f58da4-and-prototypes.json, coverage-matrix-replica.py, x1-retirement-prototype.py, x1-retirement-enrolment-edits.diff, k1-principal-durability.diff, k2a-identity-keyed-spill-dirs.diff, k2b-identity-index-owner-column.diff, krec-k1-k2a-bundle.diff, kfull-k1-k2b-bundle.diff, b1-maos-bin-identity-binding.diff}`.
+- 2026-10-31: Patched locked Wasmtime/WASI/Pulley/Wiggle 48.0.7→48.0.8 and Cranelift 0.135.7→0.135.8; RUSTSEC-2026-0420/0422/0423/0424 cleared, requested build/fixtures/targeted+workspace tests/gates/fmt/prepush pass (prepush cargo-deny actually ran; one timing advisory/seven skips), all KLOC/kernel figures unchanged; exact commands/exits and limits: `20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/verification.md#wasmtime-4808-security-patch-verification`.
 
 ### Completion Notes List
 

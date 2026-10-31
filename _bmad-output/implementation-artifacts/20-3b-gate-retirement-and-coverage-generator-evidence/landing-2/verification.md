@@ -1,6 +1,6 @@
 # 20-3b landing-2 verifier/integrator — final evidence
 
-**Current authoritative result:** see “Review-correction final verification — operator ruling w8” below. Earlier measurements, runs and the envelope STOP are retained as history. The current local build/tests/gates/prepush pass, but the explicitly executed `cargo deny check` is **RED** on four advisories; this report does not claim an all-green ship verdict.
+**Current authoritative result:** see “Wasmtime 48.0.8 security patch verification” below. Earlier measurements, runs, the envelope STOP and the four-advisory deny failure are retained as history. The patched local build/tests/gates/prepush and all four cargo-deny checks pass; the recorded advisory, skipped scenarios and hosted-proof limitations remain explicit.
 
 Tasks 1–7 completed locally, including the operator-authorized held-durable-value correction. Hosted execution remains deliberately unclaimed. Exact commands, working directories, exit codes and durations are in `commands.jsonl`; failed attempts are retained, not overwritten.
 
@@ -378,3 +378,141 @@ labelled ignored FR34/FR53 witnesses. The initial prepush endpoint collision is
 retained as a failed observation, despite the unchanged rerun being green.
 No commit/push, cargo clean, alternate-worktree access or Dockerfile edit was
 performed. The ignored real migration corpus remains on disk, untracked.
+
+## Wasmtime 48.0.8 security patch verification
+
+This section supersedes only the historical cargo-deny vulnerability verdict
+and refreshes the requested local verification after the lockfile patch.
+The [crates.io release listing](https://crates.io/api/v1/crates/wasmtime)
+identified **48.0.8** as the latest published 48.0.x patch (published
+2026-10-29). No major/minor upgrade was taken.
+
+### Smallest dependency change
+
+Only the root `Cargo.lock` changed dependency resolution: **32 coupled packages**,
+with no package additions/removals or unrelated upgrades in Cargo's update report.
+The existing `wasmtime = "48.0.7"` and `wasmtime-wasi = "48.0.7"`
+requirements permit this patch and remain unchanged. No `Cargo.toml`,
+`deny.toml`, advisory ignore, feature setting, source file or ceiling was changed.
+
+| Locked family | Before | After | Packages |
+|---|---|---|---:|
+| Wasmtime/WASI/internal crates |48.0.7|48.0.8|14|
+| Pulley interpreter/macros |48.0.7|48.0.8|2|
+| Wiggle/runtime/generator/macros |48.0.7|48.0.8|3|
+| Cranelift assembler/codegen/support crates |0.135.7|0.135.8|13|
+
+The Wasmtime rows comprise `wasmtime`, `wasmtime-environ`,
+`wasmtime-internal-{component-macro,component-util,core,cranelift,fiber,jit-debug,jit-icache-coherence,unwinder,versioned-export-macros,wit-bindgen}`,
+`wasmtime-wasi` and `wasmtime-wasi-io`. Pulley is
+`pulley-{interpreter,macros}`; Wiggle is `wiggle`, `wiggle-generate`,
+`wiggle-macro`; Cranelift is
+`cranelift-{assembler-x64,assembler-x64-meta,bforest,bitset,codegen,codegen-meta,codegen-shared,control,entity,frontend,isle,native,srcgen}`.
+
+The first Wasmtime-only dry run correctly refused the locked WASI/Wiggle
+`=48.0.7` coupling. Dry-running the exact WASI companion update resolved the
+entire family without widening the upgrade. The real WASI update was then
+followed by the explicitly requested precise Wasmtime update (already satisfied).
+**RUSTSEC-2026-0420, RUSTSEC-2026-0422, RUSTSEC-2026-0423 and
+RUSTSEC-2026-0424 are cleared:** actual `cargo deny check` reports
+**advisories ok, bans ok, licenses ok, sources ok**, exit 0.
+Its existing unmatched-license/unnecessary-skip warnings remain visible;
+no policy was weakened to silence them.
+
+### Exact command and exit-code ledger
+
+Working directory for every command below: `/home/lunarpulse/dev_ws`.
+Every Cargo row below was executed with the exact prefix
+`env -u CI -u GITHUB_ACTIONS`; the prefix is omitted from table cells solely
+for readability. All builds used the inherited `CARGO_TARGET_DIR`; no override
+or `cargo clean` was issued. The official fixture producer retains its existing
+internal target-directory arguments, unchanged.
+
+| Command (in execution order) | Exit | Observed result |
+|---|---:|---|
+| `cargo update --dry-run -p wasmtime --precise 48.0.8` |101| Refused locked Wiggle/WASI `wasmtime-environ =48.0.7`; no lock write |
+| `cargo update --dry-run -p wasmtime-wasi --precise 48.0.8` |0| Previewed exactly the 32 coupled patch updates above; no lock write |
+| `cargo update -p wasmtime-wasi --precise 48.0.8` |0| Applied those 32 updates |
+| `cargo update -p wasmtime --precise 48.0.8` |0| Exact patch already satisfied; no further updates |
+| `cargo tree --locked -i wasmtime` |101| Root is virtual with empty default-members; requires explicit workspace scope |
+| `cargo tree --locked --workspace -i wasmtime` |0| Default workspace consumer: `maos-wasm-host` |
+| `cargo tree --locked --workspace --all-features -i wasmtime` |0| Also identified `maos-bin`, `maos-journey-test` and `xtask` through optional/dev edges |
+| `cargo deny check` |0| All four checks pass; all four reported advisories cleared |
+| `cargo build --locked --workspace --all-targets` |0| All targets built, 185.41 s |
+| `cargo run -p xtask -- build-test-fixtures` |0| Official WASM/T2 refresh: 14 artifacts, 125.49 s |
+| `cargo nextest run --locked --color never --no-fail-fast -p maos-wasm-host -p maos-bin -p maos-eval -p maos-journey-test -p xtask` |0| **2,222 passed, 31 skipped**; 27.527 s runner /121.55 s command |
+| `cargo nextest run --workspace --locked --color never --no-fail-fast` |0| **5,433 passed, 139 skipped**; 42.160 s runner /181.30 s command; one standalone full-workspace run |
+| `cargo run -q -p xtask -- check-dev-record-completeness` |0| 195 done-status stories checked, 0.362 s |
+| `cargo run -q -p xtask -- check-env-contract` |0| Passed, 0.597 s |
+| `cargo run -q -p xtask -- kloc-check` |0| Aggregate 188,119 LOC, 0.220 s |
+| `cargo run -q -p xtask -- check-kernel-baseline` |0| 26,620 physical lines /95 files, 0.195 s |
+| `cargo run -q -p xtask -- check-service-boundary` |0| Zero violations, 1.284 s |
+| `cargo fmt --all -- --check` |0| No formatting changes required, 2.501 s |
+| Prescribed prepush command below |0| **84 pass, zero red, one advisory, seven skips**; 412.50 s command /412.477 s report |
+| `cargo run -q -p xtask -- kloc-check --json` |0| Recorded all per-crate figures unchanged, 14.500 s |
+| `cargo run -q -p xtask -- check-kernel-baseline --json` |0| Exact source/file-set/hash match, 0.205 s |
+
+The two update commands, and separately the two workspace-scoped tree commands,
+were each issued as a left-to-right `&&` pair; both components exited 0.
+Workflow setup also ran
+`python3 /home/lunarpulse/dev_ws/_bmad/scripts/resolve_customization.py --skill /home/lunarpulse/dev_ws/.claude/skills/bmad-quick-dev --key workflow`,
+exit 0. Read-only evidence parsing initially used the nonexistent `checks`
+JSON key and raised `KeyError`; correcting the lookup to the actual `records`
+key produced the counts below without rerunning prepush. This was not a
+failed Cargo command or gate.
+
+### Prescribed prepush: deny actually ran
+
+```sh
+env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated $CARGO_TARGET_DIR/debug/xtask prepush --json
+```
+
+**Exit 0.** The report includes `Cargo.lock` in `changed_paths`; its
+`cargo-deny` record is **pass, detail `exit 0`, 683 ms**, not a conditional
+skip. Workspace nextest, full kernel-core library tests, workspace doctests,
+fixture refresh, release/size and tracked-tree gates also passed.
+
+The one advisory remains `test-budget`: its inner check exited 1 with three
+timing findings on the default-thread JUnit. This does not turn the prepush
+exit into a failure, and is not claimed as a green timing-budget proof.
+No budget/exception/pin was changed. The seven explicit skips are docs build,
+docs routes and five dynamic CI-marker cardinality checks. The report retains
+81 runtime diagnostics, including missing signed T3 substrate, Python
+Ed25519 backend and strace scenarios; these are not claimed as exercised.
+
+### No KLOC or kernel movement
+
+Compared the JSON `per_crate` map and aggregate with
+`review-corrections/gate-kloc-check.log`: **every per-crate figure and the
+aggregate are identical**, not merely below their ceilings.
+
+| Surface | Before | After |
+|---|---:|---:|
+| Kernel physical |26,620|26,620|
+| Kernel tokei |20,834|20,834|
+| xtask |42,757|42,757|
+| maos-bin |32,979|32,979|
+| maos-domain |9,977|9,977|
+| maos-audit |7,668|7,668|
+| Aggregate |188,119|188,119|
+
+Kernel baseline still has 95 files and set hash
+`ca8eb931958207cbe5bd76b599764aeeb75b9142374e10ff4cbff157598616d2`;
+its `changed`, `added` and `removed` arrays are empty. No source figure or
+baseline moved.
+
+### Remaining limits
+
+The standalone default suites preserve their 31 targeted /139 workspace
+skips. Hosted discipline/evidence execution, signed-ledger artifacts/keys,
+dynamic hosted marker cardinalities, non-Unix compilation, signed T3 runtime
+scenarios, Python Ed25519/strace scenarios and live PostgreSQL cross-check
+remain unverified. The deliberately ignored FR34/FR53 reds documented above
+were not rerun or fixed by this dependency-only change. No extra all-features
+test run is claimed: `--all-features` was used only to discover reverse
+dependency consumers. Final Markdown evidence/Debug Log edits were made
+after verification and were not followed by another prepush run.
+
+Changed deliverables are exactly the root `Cargo.lock`, this verification
+record and the story's one-line Debug Log note. No commit/push,
+alternate-worktree access or Dockerfile edit occurred.
