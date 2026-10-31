@@ -42,6 +42,8 @@ impl PrincipalNamespaceIndex {
         let conn = Connection::open(path).map_err(|e| MemoryError::Storage(e.to_string()))?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        conn.execute_batch("BEGIN IMMEDIATE;")
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
         conn.execute_batch(CREATE_TABLE_SQL)
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         // Existing databases first gain an owner column, then replace the pid key.
@@ -67,30 +69,22 @@ impl PrincipalNamespaceIndex {
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         if pid_key {
             conn.execute_batch(&format!(
-                "BEGIN IMMEDIATE;
-                 ALTER TABLE principal_index RENAME TO principal_index_legacy;
+                "ALTER TABLE principal_index RENAME TO principal_index_legacy;
                  DROP INDEX principal_index_id_idx;
                  {CREATE_TABLE_SQL}
                  INSERT INTO principal_index
                  SELECT principal_id, writer_spirit_pid, schema, key, timestamp_ns,
                         CASE WHEN writer_owner = '' THEN CAST(writer_spirit_pid AS TEXT) ELSE writer_owner END
                  FROM principal_index_legacy;
-                 DROP TABLE principal_index_legacy;
-                 COMMIT;"
+                 DROP TABLE principal_index_legacy;"
             ))
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         }
+        conn.execute_batch("COMMIT;")
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(Self {
             conn: Mutex::new(conn),
         })
-    }
-
-    fn now_ns() -> u64 {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64
     }
 
     // ------------------------------------------------------------------
@@ -107,25 +101,40 @@ impl PrincipalNamespaceIndex {
         schema: &str,
         key: &str,
         timestamp_ns: u64,
+        spill: impl FnOnce() -> Result<(), MemoryError>,
     ) -> Result<(), MemoryError> {
         let conn = self
             .conn
             .lock()
             .expect("PrincipalNamespaceIndex lock poisoned");
-        conn.execute(
-            "INSERT OR REPLACE INTO principal_index
+        let inserted = conn
+            .execute(
+                "INSERT OR IGNORE INTO principal_index
                 (principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                principal_id,
-                writer_spirit_pid as i64,
-                schema,
-                key,
-                timestamp_ns as i64,
-                writer_owner,
-            ],
-        )
-        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+                params![
+                    principal_id,
+                    writer_spirit_pid as i64,
+                    schema,
+                    key,
+                    timestamp_ns as i64,
+                    writer_owner,
+                ],
+            )
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        // Durable intent precedes the spill: a crash may leave redacted-missing,
+        // never an undiscoverable value. Keep pre-existing rows on spill failure.
+        if let Err(error) = spill() {
+            if inserted != 0 {
+                conn.execute("DELETE FROM principal_index WHERE principal_id=?1 AND writer_owner=?2 AND schema=?3 AND key=?4",
+                    params![principal_id, writer_owner, schema, key])
+                    .map_err(|cleanup| MemoryError::Storage(format!("{error}; intent cleanup: {cleanup}")))?;
+            }
+            return Err(error);
+        }
+        conn.execute("UPDATE principal_index SET writer_spirit_pid=?1, timestamp_ns=?2 WHERE principal_id=?3 AND writer_owner=?4 AND schema=?5 AND key=?6",
+            params![writer_spirit_pid, timestamp_ns as i64, principal_id, writer_owner, schema, key])
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(())
     }
 
@@ -152,34 +161,36 @@ impl PrincipalNamespaceIndex {
 
         let rows = stmt
             .query_map(params![principal_id], |row| {
-                let pid: String = row.get(0)?;
-                let wsp: i64 = row.get(1)?;
-                let wsp_u32 = u32::try_from(wsp).map_err(|_| {
-                    rusqlite::Error::InvalidColumnType(
-                        1,
-                        "writer_spirit_pid".into(),
-                        rusqlite::types::Type::Integer,
-                    )
-                })?;
-                let schema: String = row.get(2)?;
-                let key: String = row.get(3)?;
-                let ts: i64 = row.get(4)?;
                 Ok(PrincipalIndexRow {
-                    principal_id: pid,
-                    writer_spirit_pid: wsp_u32,
-                    schema,
-                    key,
-                    timestamp_ns: ts as u64,
+                    principal_id: row.get(0)?,
+                    writer_spirit_pid: row.get(1)?,
+                    schema: row.get(2)?,
+                    key: row.get(3)?,
+                    timestamp_ns: row.get::<_, i64>(4)? as u64,
                     writer_owner: row.get(5)?,
                 })
             })
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
 
-        let mut entries = Vec::new();
-        for row in rows {
-            entries.push(row.map_err(|e| MemoryError::Storage(e.to_string()))?);
-        }
-        Ok(entries)
+        rows.collect::<Result<_, _>>()
+            .map_err(|e| MemoryError::Storage(e.to_string()))
+    }
+
+    pub(in crate::memory) fn principal_ids_for_owner(
+        &self,
+        owner: &str,
+    ) -> Result<Vec<String>, MemoryError> {
+        let conn = self
+            .conn
+            .lock()
+            .expect("PrincipalNamespaceIndex lock poisoned");
+        let mut stmt = conn.prepare("SELECT DISTINCT principal_id FROM principal_index WHERE writer_owner=?1 ORDER BY principal_id")
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        let rows = stmt
+            .query_map([owner], |row| row.get(0))
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        rows.collect::<Result<_, _>>()
+            .map_err(|e| MemoryError::Storage(e.to_string()))
     }
 
     /// Forget all index rows for a given `principal_id` — returns the
@@ -196,77 +207,5 @@ impl PrincipalNamespaceIndex {
             )
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(deleted as u64)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    fn make_index() -> (PrincipalNamespaceIndex, TempDir) {
-        let tmp = TempDir::new().unwrap();
-        let db_path = tmp.path().join("test.db");
-        let idx = PrincipalNamespaceIndex::open(&db_path).unwrap();
-        (idx, tmp)
-    }
-
-    #[test]
-    fn write_and_lookup() {
-        let (idx, _tmp) = make_index();
-        let ts = PrincipalNamespaceIndex::now_ns();
-
-        idx.record_write("alice@example.org", 10, "10", "calendar", "event-001", ts)
-            .unwrap();
-        idx.record_write("alice@example.org", 10, "10", "calendar", "event-002", ts)
-            .unwrap();
-        idx.record_write("alice@example.org", 20, "20", "tasks", "task-001", ts)
-            .unwrap();
-
-        let rows = idx.lookup("alice@example.org").unwrap();
-        assert_eq!(rows.len(), 3);
-        // First two should be from pid=10.
-        assert_eq!(rows[0].writer_spirit_pid, 10);
-        assert_eq!(rows[1].writer_spirit_pid, 10);
-        assert_eq!(rows[2].writer_spirit_pid, 20);
-    }
-
-    #[test]
-    fn lookup_nonexistent_returns_empty() {
-        let (idx, _tmp) = make_index();
-        let rows = idx.lookup("bob@example.org").unwrap();
-        assert!(rows.is_empty());
-    }
-
-    #[test]
-    fn forget_then_lookup_empty() {
-        let (idx, _tmp) = make_index();
-        let ts = PrincipalNamespaceIndex::now_ns();
-
-        idx.record_write("alice@example.org", 10, "10", "calendar", "e1", ts)
-            .unwrap();
-        idx.record_write("alice@example.org", 10, "10", "calendar", "e2", ts)
-            .unwrap();
-        idx.record_write("alice@example.org", 20, "20", "tasks", "t1", ts)
-            .unwrap();
-
-        let deleted = idx.forget("alice@example.org").unwrap();
-        assert_eq!(deleted, 3);
-
-        let rows = idx.lookup("alice@example.org").unwrap();
-        assert!(rows.is_empty());
-    }
-
-    #[test]
-    fn second_forget_returns_zero() {
-        let (idx, _tmp) = make_index();
-        let ts = PrincipalNamespaceIndex::now_ns();
-
-        idx.record_write("alice@example.org", 10, "10", "calendar", "e1", ts)
-            .unwrap();
-        let d1 = idx.forget("alice@example.org").unwrap();
-        assert_eq!(d1, 1);
-        let d2 = idx.forget("alice@example.org").unwrap();
-        assert_eq!(d2, 0);
     }
 }

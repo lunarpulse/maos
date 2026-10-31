@@ -382,10 +382,10 @@ fn forget_counts_a_pre_existing_superseded_spill_once() {
             .find(|p| p.is_dir())
             .expect("namespace dir")
     };
-    std::fs::write(ns_dir.join("k.bin"), vec![b'B'; 8 * 1024]).expect("plant legacy residue");
+    std::fs::write(ns_dir.join("6b.bin"), vec![b'B'; 8 * 1024]).expect("plant legacy residue");
     assert_eq!(
         spill_names(&ns_dir),
-        vec!["k.bin".to_string(), "k.json".to_string()],
+        vec!["6b.bin".to_string(), "6b.json".to_string()],
         "precondition: two files for one logical key"
     );
 

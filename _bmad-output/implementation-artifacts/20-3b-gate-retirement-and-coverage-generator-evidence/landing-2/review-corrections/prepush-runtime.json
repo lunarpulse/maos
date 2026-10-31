@@ -1,0 +1,167 @@
+{
+  "final_total_seconds": 118.5,
+  "final_report_wall_ms": 118490,
+  "final_statuses": {
+    "pass": 83,
+    "skip": 8,
+    "advisory": 1
+  },
+  "added_standalone_leg_count": 22,
+  "added_standalone_seconds": 19.35,
+  "added_records": [
+    {
+      "check": "check-epic-close-coherence",
+      "artifact": "epic closure / discipline workflow",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 17
+    },
+    {
+      "check": "abi-diff",
+      "artifact": "ABI surface",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 836
+    },
+    {
+      "check": "check-empty-kernel",
+      "artifact": "kernel invariant I9",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 252
+    },
+    {
+      "check": "check-loom",
+      "artifact": "loom substrate",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 245
+    },
+    {
+      "check": "check-fr47",
+      "artifact": "FR47 bindings",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14
+    },
+    {
+      "check": "check-a2a-sender-completeness",
+      "artifact": "A2A sender boundary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 25
+    },
+    {
+      "check": "check-judge-config",
+      "artifact": "pinned judge configuration",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1555
+    },
+    {
+      "check": "check-security-md",
+      "artifact": "SECURITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "templates-regen",
+      "artifact": "example Spirit templates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "corpus-staleness",
+      "artifact": "corpus validity dates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "calibrate",
+      "artifact": "calibration seed",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-review-findings-resolved",
+      "artifact": "review closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 92
+    },
+    {
+      "check": "check-dev-record-completeness",
+      "artifact": "story records",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 58
+    },
+    {
+      "check": "check-dev-model-tier",
+      "artifact": "story model tiers",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14
+    },
+    {
+      "check": "check-ship-gate-completeness",
+      "artifact": "ship registry",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 29
+    },
+    {
+      "check": "check-pentest-gate",
+      "artifact": "pen-test evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 6
+    },
+    {
+      "check": "check-third-party-trial",
+      "artifact": "trial evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-trial-attestation",
+      "artifact": "trial attestation",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 169
+    },
+    {
+      "check": "check-red-team-gate",
+      "artifact": "red-team evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-migration-merkle",
+      "artifact": "migration evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 15993
+    },
+    {
+      "check": "nfr-onb-1-gate",
+      "artifact": "onboarding evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "cassette-age-gate",
+      "artifact": "cassette age policy",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    }
+  ]
+}

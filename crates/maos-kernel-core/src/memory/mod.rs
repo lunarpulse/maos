@@ -137,6 +137,12 @@ impl MemoryManagerAdapter {
         }
     }
 
+    /// Discover durable rows by stable admitted identity, not a recycled audit pid.
+    pub fn principal_ids_for_spirit(&self, identity: &str) -> Result<Vec<String>, MemoryError> {
+        self.principal_index
+            .principal_ids_for_owner(&format!("id-{}", hex::encode(identity)))
+    }
+
     /// Story 9.4b AC-5 — pin this memory manager to a home jurisdiction.  Set at
     /// the composition root from `RegionSection::resolve_from_env_and_disk`.
     /// When unset (default), region pinning is disabled.
@@ -733,25 +739,23 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         Self::reject_principal_outside_private(tier, namespace)?;
         match tier {
             MemoryTier::Private => {
-                self.private
-                    .write(spirit_pid, namespace, key, value.clone())?;
-                // If this is a principal-tagged write, record in the index.
+                // Commit discoverable intent before the durable spill.
                 if let MemoryNamespace::Principal {
                     principal_id,
                     schema,
                 } = namespace
                 {
-                    let ts = Self::now_ns();
-                    self.principal_index.record_write(
+                    return self.principal_index.record_write(
                         principal_id,
                         spirit_pid,
                         &self.private.owner_dirname(spirit_pid),
                         schema,
                         key,
-                        ts,
-                    )?;
+                        Self::now_ns(),
+                        || self.private.write(spirit_pid, namespace, key, value),
+                    );
                 }
-                Ok(())
+                self.private.write(spirit_pid, namespace, key, value)
             }
             MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
             MemoryTier::Collective => {

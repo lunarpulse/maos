@@ -793,7 +793,7 @@ fn held_principal_does_not_hide_unindexed_private_residue() {
     assert!(result["error"]
         .as_str()
         .unwrap()
-        .contains("1 under legal hold"));
+        .contains("Some(1) under legal hold"));
     assert_eq!(
         maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
         2,
@@ -1143,4 +1143,164 @@ fn redistillation_failure_after_erasure_does_not_skip_the_signed_uninstall_proof
         &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
     )
     .expect("completion failure cannot prevent signing the real erasure");
+}
+
+#[test]
+fn unreadable_held_value_still_writes_signed_partial_proof_after_other_erasure() {
+    const ERASED: &str = "a-erased-before-held@example.org";
+    let fixture = Fixture::new();
+    fixture.seed_held_principal();
+    fixture.seed_named_markdown_principal(ERASED);
+    let namespace = MemoryNamespace::principal(PRINCIPAL, "profile").unwrap();
+    let spill = fixture
+        .memory_root
+        .join("0")
+        .join(hex::encode(serde_json::to_vec(&namespace).unwrap()))
+        .join(format!("{}.txt", hex::encode("record")));
+    std::fs::write(&spill, [0xff]).expect("make only the held value unreadable");
+    let output = fixture.run_uninstall(None);
+    let result = terminal(&output);
+    assert_eq!(result["outcome"], "held", "{result}");
+    assert_eq!(result["deleted_entries"], 1);
+    let path = result["proof_path"]
+        .as_str()
+        .expect("post-erasure proof is mandatory");
+    let proof: maos_audit::erasure::proof::ErasureProof =
+        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    maos_audit::erasure::proof::verify_erasure_proof(
+        &proof,
+        &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
+    )
+    .expect("coverage gap must be signed");
+    let private = proof
+        .categories
+        .iter()
+        .find(|category| category.name == "private")
+        .unwrap();
+    assert!(
+        matches!(&private.status, maos_audit::erasure::proof::CategoryStatus::CoverageGap { reason } if reason.contains("retained-under-hold/unreadable"))
+    );
+    assert!(
+        maos_audit::subject_access_query(&fixture.audit_db(), ERASED)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        !maos_audit::subject_access_query(&fixture.audit_db(), PRINCIPAL)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(std::fs::read(spill).unwrap(), [0xff]);
+}
+
+#[test]
+fn uninstall_discovers_stable_owner_after_readmission_at_a_new_pid() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    let owner = format!("id-{}", hex::encode("hello-spirit"));
+    std::fs::rename(
+        fixture.memory_root.join("0"),
+        fixture.memory_root.join(&owner),
+    )
+    .expect("record previous boot's stable owner");
+    let conn = rusqlite::Connection::open(fixture.audit_db()).unwrap();
+    conn.execute("UPDATE principal_index SET writer_owner=?1", [&owner])
+        .unwrap();
+    drop(conn);
+    let log = TransparencyLogAdapter::open_with_global_legal_holds(
+        &fixture.audit_db(),
+        &fixture.audit_db(),
+        2,
+    )
+    .unwrap();
+    log.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::SpiritAdmitted,
+        2,
+        None,
+        "hello-spirit",
+        br#"{"spirit_id":"hello-spirit","source":"one-shot"}"#,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    drop(log);
+    let output = fixture.run_uninstall(None);
+    let result = terminal(&output);
+    assert_eq!(output.status.code(), Some(0), "{result}");
+    assert_eq!(result["erased_principals"], 1, "{result}");
+    assert!(
+        maos_audit::subject_access_query(&fixture.audit_db(), PRINCIPAL)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(!fixture.memory_root.join(owner).exists());
+    let path = result["proof_path"]
+        .as_str()
+        .expect("owner erasure requires proof");
+    let proof: maos_audit::erasure::proof::ErasureProof =
+        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    assert!(
+        proof.categories.iter().any(|category| {
+            category.name == "memory_namespace"
+                && matches!(
+                    category.status,
+                    maos_audit::erasure::proof::CategoryStatus::Removed { count: 1 }
+                )
+        }),
+        "the signed proof must count the old owner's single durable value"
+    );
+    assert_eq!(proof.spirit_pid, 2);
+    maos_audit::erasure::proof::verify_erasure_proof(
+        &proof,
+        &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
+    )
+    .unwrap();
+}
+
+#[test]
+fn audit_counts_hashed_namespaces_but_not_identity_or_key_sidecars() {
+    let fixture = Fixture::new();
+    let db = fixture.audit_db();
+    std::fs::create_dir_all(db.parent().unwrap()).unwrap();
+    let memory = MemoryManagerAdapter::new(
+        Arc::new(PrivateMemoryStore::new(fixture.memory_root.clone(), 4096)),
+        Arc::new(SharedMemoryStore::open(&db).unwrap()),
+        Arc::new(PrincipalNamespaceIndex::open(&db).unwrap()),
+        Arc::new(TransparencyLogAdapter::open_in_memory(1)),
+    );
+    memory.bind_storage_identity(1, &"a".repeat(128)).unwrap();
+    let namespace = MemoryNamespace::principal(PRINCIPAL, "s".repeat(200)).unwrap();
+    memory
+        .write(
+            1,
+            MemoryTier::Private,
+            &namespace,
+            &"k".repeat(1024),
+            MemoryValue::Text("value".into()),
+        )
+        .unwrap();
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+        1
+    );
+    let owner = std::fs::read_dir(&fixture.memory_root)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let ns = std::fs::read_dir(owner)
+        .unwrap()
+        .map(Result::unwrap)
+        .find(|entry| entry.file_type().unwrap().is_dir())
+        .unwrap()
+        .path();
+    let metadata = ns.join(".identity");
+    let original = std::fs::read(&metadata).unwrap();
+    std::fs::write(&metadata, "wrong namespace").unwrap();
+    assert!(maos_audit::private_tier_principal_row_count(&fixture.memory_root).is_err());
+    std::fs::write(&metadata, original).unwrap();
+    assert_eq!(memory.forget(PRINCIPAL).unwrap().deleted_entries, 1);
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+        0
+    );
 }

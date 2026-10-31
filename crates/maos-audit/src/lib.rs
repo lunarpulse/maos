@@ -1953,11 +1953,12 @@ pub fn shared_tier_principal_row_count(memory_db_path: &Path) -> Result<u64, Aud
 
 /// Count persisted Private-tier values stored under a `Principal` namespace.
 ///
-/// The Private store lays values out as
-/// `<memory_root>/<spirit_pid>/<hex-encoded-namespace>/<key>.<kind>`. Missing
-/// roots and non-store files are zero; unreadable directories fail closed so
-/// an emptiness proof cannot be minted from a partial scan.
+/// Long owner/namespace components use guarded SHA-256 names; `.identity`
+/// records the full encoded namespace. Identity/key metadata are not values.
+/// Missing roots and non-store files are zero; unreadable or mismatched hashed
+/// namespaces fail closed rather than minting emptiness from a partial scan.
 pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, AuditError> {
+    use sha2::{Digest, Sha256};
     if !memory_root.exists() {
         return Ok(0);
     }
@@ -1973,13 +1974,22 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
             if !namespace_dir.file_type()?.is_dir() {
                 continue;
             }
-            let Ok(namespace_bytes) =
-                hex::decode(namespace_dir.file_name().to_string_lossy().as_bytes())
-            else {
-                continue;
+            let name = namespace_dir.file_name().to_string_lossy().into_owned();
+            let identity = if name.starts_with("h-") {
+                let identity = std::fs::read_to_string(namespace_dir.path().join(".identity"))?;
+                if format!("h-{}", hex::encode(Sha256::digest(&identity))) != name {
+                    return Err(AuditError::Row(
+                        "private namespace identity mismatch".into(),
+                    ));
+                }
+                identity
+            } else {
+                name
             };
-            let Ok(maos_domain::memory::MemoryNamespace::Principal { .. }) =
-                serde_json::from_slice::<maos_domain::memory::MemoryNamespace>(&namespace_bytes)
+            let Ok(maos_domain::memory::MemoryNamespace::Principal { .. }) = hex::decode(identity)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                .ok_or(())
             else {
                 continue;
             };
@@ -1988,12 +1998,10 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
                 if !value.file_type()?.is_file() {
                     continue;
                 }
-                let name = value.file_name();
-                let name = name.to_string_lossy();
-                if [".json", ".md", ".bin", ".txt"]
-                    .iter()
-                    .any(|extension| name.ends_with(extension))
-                {
+                if matches!(
+                    value.path().extension().and_then(|ext| ext.to_str()),
+                    Some("json" | "md" | "bin" | "txt")
+                ) {
                     count = count.checked_add(1).ok_or_else(|| {
                         AuditError::Row("private-tier principal row count overflow".to_string())
                     })?;

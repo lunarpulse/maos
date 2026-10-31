@@ -5,8 +5,8 @@ created: 2026-10-30
 context_commit: 23f58da4
 baseline_commit: 23f58da4
 security_sensitive: true
-kernel_grant: "◆ FLAG-Winston GRANTED 2026-10-30 (D03 A, D-20-3b-05 B; ask d03/rest): FR31 K1 + K2b measured +91 physical / +80 tokei; maos-domain +1, maos-bin +9. Kernel ceiling +182 physical / +160 tokei: 26409/20618 → at most 26591/20778; STOP above. Deletion and generation are kernel-Δ 0; land exact pins."
-kloc_grant: "RULED 2026-10-30 (D02 A, D-20-3b-15 A; ask env15): ×3 allowance on unmeasured adds, ×2 on measured adds; maos-domain +2 and maos-bin +16 ceilings. Pins lowered exactly after landing 1, no reservations; landing 2 requires an aggregate grant requested at creation of its dev plan. Operator splits the inherited 71 maos-bin lines at 20-1/20-4 creation."
+kernel_grant: "◆ FLAG-Winston extended by operator ruling w8, 2026-10-31, Raise to measured exactly: kernel <= 26620 physical / 20834 tokei, zero headroom; extends d03 ceilings 26591/20778 by +29/+56. Final formatted pins must equal measured; STOP above either ceiling. Prior d03/rest grant and creation measurements remain historical below."
+kloc_grant: "Operator ruling w8, 2026-10-31, Raise to measured exactly: maos-bin <= 32979, maos-audit <= 7668, xtask <= 42775 unchanged, maos-domain 9977 unchanged; aggregate hardfail = measured + 1 (188120 for measured188119). Exact final formatted pins, zero headroom; any fix above a ceiling is STOP. Supersedes initial env15/bin40 limits for these review corrections, without authorizing unrelated growth."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-70`): a kernel FLAG-Winston grant (D03) and a security-critical cross-Spirit isolation AC (FR31), plus the deletion of ten live or registered controls where one mistake removes protection (epic split rationale, E20@HEAD:103). Blind and Edge on opus-5.5, Acceptance on opus-5.5, Security reading on AC4, Test Infrastructure on glm-5.3 (standing policy `proof-contract.md:64-72`; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -69,7 +69,7 @@ Full OLD → NEW table: `creation/cites-23f58da4.md` (C1–C18, F1–F10, T1–T
 
 **Instrument:** prebuilt `/tmp/xtask-maos-w3` (`check-kernel-baseline --json`, `kloc-check --json`, tokei 14.0.0) run from a `git archive 23f58da4` copy root per prototype; the untouched copy reproduces the tree exactly (26409 / 95 files / set hash `66dc2e24…`; aggregate 192778). Detail and diffs: `creation/measurements.md`, `creation/tokei-23f58da4-and-prototypes.json`.
 
-**Kernel (◆ FLAG-Winston GRANTED 2026-10-30, D03 A + D-20-3b-05 B; ask d03/rest):** K1 + K2b is authorized up to **+182 physical / +160 tokei**, from **26,409 / 20,618** to at most **26,591 / 20,778**. STOP above either ceiling; land exact pins. Measured +91 / +80, maos-domain +1, maos-bin +9; respective domain and bin ceilings +2 and +16.
+**Kernel (◆ FLAG-Winston, operator ruling w8, 2026-10-31 — “Raise to measured exactly”):** review corrections are authorized at most **26,620 physical / 20,834 tokei**, extending d03's **26,591 / 20,778** by **+29 / +56**. The formatted review measurement is **26,620 / 20,834** (initial landing-2 exact pin26,548/20,748); STOP above either ceiling and pin exactly at the final measurement with zero headroom. The original creation prototype +91/+80 and d03 +182/+160 grant remain historical, not current ceilings.
 
 | Shape | Kernel physical | Kernel tokei | Other | Diff |
 |---|---:|---:|---|---|
@@ -97,6 +97,21 @@ Both pins move with any grant (`xtask/kernel-core-baseline.toml:27-28` + EOF blo
 | maos-audit · governance round-trip as `crates/maos-audit/tests/*` (D-08 A) | 0 (tests uncharged, `kloc_check.rs:303,311`) | — |
 | maos-cli, maos-control, maos-shell, spirits, tests | 0 | not touched |
 | **aggregate** | ≈ −5411 + adds; worst case with allowance ≈ **−2485** | sum |
+
+**Review-correction measured table — operator ruling w8, 2026-10-31 (“Raise to measured exactly”):**
+
+| Surface | Formatted measured | Authorized maximum / exact pin rule |
+|---|---:|---|
+| Kernel physical / tokei | 26,620 / 20,834 | 26,620 / 20,834; FLAG-Winston w8; zero headroom |
+| xtask | 42,757 | Ceiling42,775 unchanged; pin measured exactly |
+| maos-bin | 32,979 | 32,979; supersedes bin40 |
+| maos-audit | 7,668 | 7,668; supersedes STOP7,660 |
+| maos-domain | 9,977 | 9,977 unchanged |
+| Aggregate | 188,119 | Strict hardfail188,120 = measured+1 |
+
+These values are the formatted measured review corrections, not reservations. A compile fix above any authorized maximum must STOP; a lower final measurement lowers its pin exactly. HISTORY cites `20-3b landing 2 review corrections, operator ruling w8`. The generator is NO-GO (AC2 cut), so hard mode remains on the hand-kept YAML and coverage-completeness remains live.
+
+**Historical creation envelope below — superseded for landing-2 review corrections by operator ruling w8 above.**
 
 **Envelope (D-20-3b-15 A RULED 2026-10-30; ask env15):** D02 A applies ×3 on unmeasured adds and ×2 on measured adds. L1 xtask ceiling **43608**; maos-bin ≤ **+16**, maos-domain ≤ **+2**, kernel ≤ **+182 physical / +160 tokei**, maos-audit / maos-cli **0**. Ceilings are not reservations. L1 is retirement and the three row-09 folds; lower pins exactly afterward (`kloc.toml:86-89`, aggregate measured +1). L2 includes generator and FR31: request its aggregate grant at creation of its own dev plan against the lowered pin. The operator splits the inherited 71 maos-bin lines at 20-1/20-4 creation.
 

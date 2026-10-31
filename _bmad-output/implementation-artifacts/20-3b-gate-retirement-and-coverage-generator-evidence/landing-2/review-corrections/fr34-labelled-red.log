@@ -1,0 +1,29 @@
+warning: unused import: `Spirit`
+  --> crates/maos-spirit-sdk/tests/routed_sdk_20_3b.rs:11:69
+   |
+11 |     spirit, ConsolidatePayload, Ctx, FramePayload, SchedulePayload, Spirit, SwapInPayload,
+   |                                                                     ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-sdk` (test "routed_sdk_20_3b") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running tests/routed_sdk_20_3b.rs (target/debug/deps/routed_sdk_20_3b-5e46d67608b0c337)
+
+running 1 test
+
+thread 'sdk_harness_records_iac_frame_io_in_its_capture_report' (2129690) panicked at crates/maos-spirit-sdk/tests/routed_sdk_20_3b.rs:191:5:
+assertion `left == right` failed: FR34 SDK frame I/O must be observable in the harness report; empty capture is not coverage
+  left: []
+ right: [[105, 97, 99, 45, 102, 114, 97, 109, 101]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test sdk_harness_records_iac_frame_io_in_its_capture_report ... FAILED
+
+failures:
+
+failures:
+    sdk_harness_records_iac_frame_io_in_its_capture_report
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p maos-spirit-sdk --test routed_sdk_20_3b`

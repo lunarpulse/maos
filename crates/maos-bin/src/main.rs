@@ -10388,94 +10388,92 @@ async fn run_uninstall_cascade_inner(
     let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
     let mut held_principal_ids: Vec<String> = Vec::new();
 
-    for (_boot_nonce, spirit_pid) in &incarnations {
-        let spirit_pid = *spirit_pid;
-        // Forget every principal that this spirit wrote to.  forget_with_reason
-        // consults the durable legal-hold store (P29), so a held principal is
-        // suspended here rather than erased — the Suspended arm is live.
-        let principal_ids = transparency_log
-            .principal_ids_for_spirit_pid(spirit_pid)
-            .map_err(|e| format!("failed to list principals for pid {spirit_pid}: {e}"))?;
-        // NOTE (13.5b review): do NOT `continue` on an empty principal list.
-        // Token revocation below is unconditional per incarnation, and skipping
-        // it left an uninstalled identity holding live capability tokens. The
-        // inner loop over an empty vec is already a no-op.
-        for principal_id in &principal_ids {
-            let forgotten = memory.forget_with_reason(principal_id, None);
-            if let Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) = &forgotten {
-                let report =
-                    maos_bin::hook_pump::HookPump::finish_forget(transparency_log, outcome, pump)
-                        .await;
-                if let Some(rows) = report["redistill_outcomes"].as_array() {
-                    redistillation.extend(rows.iter().cloned());
-                }
-            }
-            match forgotten {
-                Ok(maos_domain::memory::ForgetOutcome::Erased {
-                    receipt,
-                    redacted_distillate_frame_ids,
-                    redacted_principal_frame_ids,
-                    redistill,
-                }) => {
-                    drop(redistill); // Already dispatched above, before proof construction.
-                    total_deleted_entries += receipt.deleted_entries;
-                    total_deleted_index_rows += receipt.deleted_index_rows;
-                    all_principal_ids.push(principal_id.clone());
-                    // Collect the scrubbed distillate frames for the proof.
-                    for hex_id in redacted_distillate_frame_ids {
-                        if let Ok(bytes) = hex::decode(&hex_id) {
-                            if bytes.len() == 16 {
-                                let mut arr = [0u8; 16];
-                                arr.copy_from_slice(&bytes);
-                                erased_distillate_frame_ids.push(arr);
-                            }
-                        }
-                    }
-                    // Collect the scrubbed principal frames for audit
-                    // (Story 9.3b patch 3 — do not discard with `..`).
-                    for hex_id in redacted_principal_frame_ids {
-                        if let Ok(bytes) = hex::decode(&hex_id) {
-                            if bytes.len() == 16 {
-                                let mut arr = [0u8; 16];
-                                arr.copy_from_slice(&bytes);
-                                erased_principal_frame_ids.push(arr);
-                            }
-                        }
-                    }
-                }
-                Ok(maos_domain::memory::ForgetOutcome::Suspended { hold }) => {
-                    eprintln!(
-                        "maos: uninstall blocked by legal hold for principal {}: {:?}",
-                        principal_id, hold
-                    );
-                    held_principal_ids.push(principal_id.clone());
-                }
-                Err(e) => {
-                    return Err(format!("forget failed for principal {principal_id}: {e}").into());
-                }
+    let mut principal_ids = memory.principal_ids_for_spirit(spirit_id)?;
+    for (_, pid) in &incarnations {
+        principal_ids.extend(transparency_log.principal_ids_for_spirit_pid(*pid)?);
+    }
+    principal_ids.sort();
+    principal_ids.dedup();
+    // Count before any erasure; unreadable held owners become signed coverage gaps.
+    let private_counts: std::collections::HashMap<_, _> = principal_ids
+        .iter()
+        .map(|id| {
+            let count = memory.export_redactable(id, true).ok().map(|rows| {
+                rows.iter()
+                    .filter(|row| matches!(row.payload, maos_domain::memory::ExportPayload::Raw(_)))
+                    .count() as u64
+            });
+            (id.clone(), count)
+        })
+        .collect();
+    for principal_id in &principal_ids {
+        let forgotten = memory.forget_with_reason(principal_id, None);
+        if let Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) = &forgotten {
+            let report =
+                maos_bin::hook_pump::HookPump::finish_forget(transparency_log, outcome, pump).await;
+            if let Some(rows) = report["redistill_outcomes"].as_array() {
+                redistillation.extend(rows.iter().cloned());
             }
         }
-
-        // Revoke all capability tokens for the spirit.
-        total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid);
+        match forgotten {
+            Ok(maos_domain::memory::ForgetOutcome::Erased {
+                receipt,
+                redacted_distillate_frame_ids,
+                redacted_principal_frame_ids,
+                redistill,
+            }) => {
+                drop(redistill); // Already dispatched above, before proof construction.
+                total_deleted_entries += receipt.deleted_entries;
+                total_deleted_index_rows += receipt.deleted_index_rows;
+                all_principal_ids.push(principal_id.clone());
+                // Collect scrubbed distillate and principal frames for the proof.
+                for (frames, target) in [
+                    (
+                        redacted_distillate_frame_ids,
+                        &mut erased_distillate_frame_ids,
+                    ),
+                    (
+                        redacted_principal_frame_ids,
+                        &mut erased_principal_frame_ids,
+                    ),
+                ] {
+                    for hex_id in frames {
+                        if let Ok(bytes) = hex::decode(&hex_id) {
+                            if bytes.len() == 16 {
+                                let mut arr = [0u8; 16];
+                                arr.copy_from_slice(&bytes);
+                                target.push(arr);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(maos_domain::memory::ForgetOutcome::Suspended { hold }) => {
+                eprintln!(
+                    "maos: uninstall blocked by legal hold for principal {}: {:?}",
+                    principal_id, hold
+                );
+                held_principal_ids.push(principal_id.clone());
+            }
+            Err(e) => {
+                return Err(format!("forget failed for principal {principal_id}: {e}").into());
+            }
+        }
     }
+    total_revoked_tokens += incarnations
+        .iter()
+        .map(|(_, pid)| capability.revoke_all_for_pid(*pid))
+        .sum::<usize>();
 
     held_principal_ids.sort();
     held_principal_ids.dedup();
-    // Count only actual recorded-owner disk values, not possibly stale index rows.
     let held_private_rows = held_principal_ids.iter().try_fold(0_u64, |count, id| {
-        memory.export_redactable(id, true).map(|rows| {
-            count
-                + rows
-                    .iter()
-                    .filter(|row| matches!(row.payload, maos_domain::memory::ExportPayload::Raw(_)))
-                    .count() as u64
-        })
-    })?;
+        private_counts[id].map(|rows| count + rows)
+    });
 
     if all_principal_ids.is_empty()
         && shared_principal_rows == 0
-        && private_principal_rows == held_private_rows
+        && Some(private_principal_rows) == held_private_rows
     {
         if held_principal_ids.is_empty() {
             return Ok(UninstallCascadeTerminal::NotFound {
@@ -10520,9 +10518,11 @@ async fn run_uninstall_cascade_inner(
     let remaining_private_principal_rows =
         maos_audit::private_tier_principal_row_count(&memory_root)
             .map_err(|e| format!("failed to verify post-erasure private tier: {e}"))?;
-    let (private_status, private_failure) = if remaining_private_principal_rows == 0 {
+    let (private_status, private_failure) = if held_private_rows.is_none() {
+        (CategoryStatus::CoverageGap { reason: "private principal values retained-under-hold/unreadable; held coverage could not be counted".into() }, None)
+    } else if remaining_private_principal_rows == 0 {
         (CategoryStatus::VerifiedEmpty, None)
-    } else if remaining_private_principal_rows == held_private_rows {
+    } else if Some(remaining_private_principal_rows) == held_private_rows {
         (
             CategoryStatus::CoverageGap {
                 reason: "private principal values retained under durable legal hold".into(),
@@ -10532,7 +10532,7 @@ async fn run_uninstall_cascade_inner(
     } else {
         let reason = format!(
             "private tier still holds {remaining_private_principal_rows} principal value(s), \
-             {held_private_rows} under legal hold; other values are not indexed for this uninstall"
+             {held_private_rows:?} under legal hold; other values are not indexed for this uninstall"
         );
         (
             CategoryStatus::CoverageGap {

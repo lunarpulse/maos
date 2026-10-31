@@ -502,7 +502,12 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26548
+src_lines = 26620
+# HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31:
+# FLAG-Winston exact formatted26548 -> 26620 (+72 physical), tokei20748 -> 20834 (+86);
+# 95 files unchanged, ZERO HEADROOM. Bounded spill identities/keys, serialized owner
+# migration, index-first intent and stable-owner discovery; production --emit-pin.
+# | PRIOR: earlier authorized pin history follows.
 # HISTORY: 20-3b landing 2, 2026-10-30, FLAG-Winston grant (d03 A):
 # exact formatted26409 -> 26548 (+139 physical), tokei20618 -> 20748 (+130),
 # 95 files unchanged, ZERO HEADROOM; within26591/20778. FR31 durable identity spills,
@@ -897,7 +902,7 @@ src_lines = 26548
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "e644d26eb74592103d606398df0653dce0828e375833b57c242b941e30d6d01c"
+set_hash = "ca8eb931958207cbe5bd76b599764aeeb75b9142374e10ff4cbff157598616d2"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -939,9 +944,9 @@ set_hash = "e644d26eb74592103d606398df0653dce0828e375833b57c242b941e30d6d01c"
 "lifecycle/upgrade.rs" = "9c315e76975a2b92b2305afad058b895c184bd641fb78d7621691104b08862f9"
 "mcp/mod.rs" = "12604548a8daa78a2786b820733f4639f06759f893856745027c8083c8a42bfd"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
-"memory/mod.rs" = "3ee1303b9cfe83067313f6361dff26dc3155f4900f84a8481aa932582ffac330"
-"memory/principal.rs" = "5ff14ccfa5d046c909c9f6ebe598e405d1067e99d07ebcd843a9c04ee5864a78"
-"memory/private.rs" = "8e639072c1a384214f4ebebee26cc382e3d5625f2e3987f300b5e3e70b610450"
+"memory/mod.rs" = "779cf99f4fcc57c1243d33375508a92285a8e2533965701f58df3c8639226d4c"
+"memory/principal.rs" = "98c013b51ba865ca76cd36533c168cf6766320806ae84ecbadd7cd2533240774"
+"memory/private.rs" = "eb4eee9d549ef2d57a367bfb4d9ed91510f4fd688f4adea388e9f2c33a08a5c3"
 "memory/read_entry_point.rs" = "0528ce87453ef4a10b4bbe4a360f557769be412fc091df4734495482d551dda1"
 "memory/self_telemetry.rs" = "c562094354fe64784e49de7e37754badce6637802f12c17ce3e6d2873e2adcef"
 "memory/shared.rs" = "1df5abe33a685cfb940bc191fe96bc8e0ac6f5c38893ac8792d944504df99d84"

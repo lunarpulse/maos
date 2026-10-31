@@ -83,16 +83,123 @@ pub fn validate_claim(root: &std::path::Path, src: &str) -> Result<InvariantClai
                     .map_err(|e| e.to_string())?,
             )
             .map_err(|e| e.to_string())?;
-            if test.1.is_empty()
-                || !test_src.contains(&format!("fn {}(", test.1))
-                || !root.join(corpus).is_file()
-                || !workflow["jobs"][job].is_mapping()
+            if !executing_witness(
+                root,
+                &test_src,
+                test.1,
+                corpus,
+                &workflow["jobs"][job],
+                test.0,
+            )? || !root.join(corpus).is_file()
             {
                 return Err(format!("{} guaranteed evidence is missing", claim.id));
             }
         }
     }
     Ok(claim)
+}
+
+// Fail closed on conditional/ignored Rust witnesses and shell shapes whose execution
+// cannot be established here. Guaranteed claims use a direct cargo test invocation.
+fn executing_witness(
+    root: &std::path::Path,
+    src: &str,
+    name: &str,
+    corpus: &str,
+    job: &serde_yaml::Value,
+    path: &str,
+) -> Result<bool, String> {
+    use syn::visit::Visit;
+    struct CorpusUse {
+        directory: std::path::PathBuf,
+        corpus: std::path::PathBuf,
+        found: bool,
+    }
+    impl<'ast> Visit<'ast> for CorpusUse {
+        fn visit_macro(&mut self, node: &'ast syn::Macro) {
+            if node.path.is_ident("include_str") || node.path.is_ident("include_bytes") {
+                if let Ok(literal) = syn::parse2::<syn::LitStr>(node.tokens.clone()) {
+                    let path = self.directory.join(literal.value());
+                    self.found |= path.canonicalize().is_ok_and(|p| p == self.corpus);
+                }
+            }
+        }
+    }
+    let file = syn::parse_file(src).map_err(|e| e.to_string())?;
+    let mut usage = CorpusUse {
+        directory: root
+            .join(path)
+            .parent()
+            .ok_or("test directory missing")?
+            .to_path_buf(),
+        corpus: root
+            .join(corpus)
+            .canonicalize()
+            .map_err(|e| e.to_string())?,
+        found: false,
+    };
+    let witness = !file
+        .attrs
+        .iter()
+        .any(|a| a.path().is_ident("cfg") || a.path().is_ident("cfg_attr"))
+        && file.items.iter().any(|item| match item {
+            syn::Item::Fn(f)
+                if f.sig.ident == name
+                    && f.attrs.iter().any(|a| a.path().is_ident("test"))
+                    && f.attrs.iter().all(|a| a.path().is_ident("test")) =>
+            {
+                usage.visit_block(&f.block);
+                usage.found
+            }
+            _ => false,
+        });
+    let crate_dir = usage.directory.parent().ok_or("test crate missing")?;
+    let cargo = fs::read_to_string(crate_dir.join("Cargo.toml")).map_err(|e| e.to_string())?;
+    let manifest: toml::Value = toml::from_str(&cargo).map_err(|e| e.to_string())?;
+    let package = manifest.get("package").ok_or("test package missing")?;
+    let package_name = package
+        .get("name")
+        .and_then(toml::Value::as_str)
+        .ok_or("test package name missing")?;
+    if usage.directory.file_name().is_none_or(|n| n != "tests")
+        || package.get("autotests").and_then(toml::Value::as_bool) == Some(false)
+        || manifest.get("test").is_some()
+    {
+        return Ok(false);
+    }
+    let enabled = |v: &serde_yaml::Value| {
+        (v["if"].is_null() || v["if"].as_bool() == Some(true))
+            && v["continue-on-error"].as_bool() != Some(true)
+    };
+    let binary = std::path::Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    if !witness || !job.is_mapping() || !enabled(job) {
+        return Ok(false);
+    }
+    let command = regex::Regex::new(&format!(
+        r"^cargo test(?: --(?:locked|release|all-features))* (?:-p|--package) {}(?: --(?:locked|release|all-features)| --features [A-Za-z0-9_.,/-]+)* --test {}(?: {})?(?: --(?: --(?:exact|nocapture))*)?$",
+        regex::escape(package_name), regex::escape(binary), regex::escape(name),
+    ).replace(' ', r"\s+")).map_err(|e| e.to_string())?;
+    Ok(job["steps"]
+        .as_sequence()
+        .into_iter()
+        .flatten()
+        .any(|step| {
+            if !enabled(step) {
+                return false;
+            }
+            let env_corpus = [&job["env"], &step["env"]]
+                .iter()
+                .filter_map(|env| env.as_mapping())
+                .any(|m| m.values().any(|v| v.as_str() == Some(corpus)));
+            env_corpus
+                && step["run"].as_str().is_some_and(|run| {
+                    let run = run.replace("\\\n", " ");
+                    !run.trim().contains('\n') && command.is_match(run.trim())
+                })
+        }))
 }
 
 pub fn read_claims(root: &std::path::Path) -> Result<BTreeMap<String, InvariantClaim>, String> {

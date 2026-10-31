@@ -1,0 +1,10 @@
+   Compiling maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running tests/routed_sdk_20_3b.rs (target/debug/deps/routed_sdk_20_3b-5e46d67608b0c337)
+
+running 2 tests
+test sdk_harness_records_iac_frame_io_in_its_capture_report ... ignored, red witness: SDK LocalRunner never populates mock_bus_frames (local_runner.rs:43-69,179); ownerless and open, dispositioned by 20-3b AC5.4, trigger-owned by the first story touching the SDK LocalRunner
+test sdk_harness_covers_lifecycle_input_halt_manifest_and_class ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

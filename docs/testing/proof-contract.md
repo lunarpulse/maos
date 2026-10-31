@@ -170,6 +170,13 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   from the workspace root, or generate it elsewhere and set `MAOS_MIGRATION_CORPUS` to that absolute path.
   This is the real pinned corpus, not a reduced substitute; absence or oracle drift remains RED.
   The pin reads aggregate dependencies and executable xtask invocations, not summary-table echo strings.
+  Assignment-prefixed and `env` commands and backslash continuations are parsed;
+  other executable xtask shell shapes fail closed. Gate arguments are compared
+  after whitespace/`--json` normalization: `--check` and baseline/calibration
+  values remain binding. Explicit auxiliary exceptions are the NFR-Test-3
+  `--dry-run` soft-floor measurement and expensive-suite selector discovery;
+  fixture producer `--only`/`--release` setup is covered by the full local build,
+  not treated as an alternative invocation of a Blocking gate.
   Explicit no-standalone-form exclusions: invariant-lock's PR/reviewer/journal context, the CI release-binary
   mock scan, the Epic-19 scene/twin reconciliation, target-matrix/signing release dry-runs, and the junit
   budget gate (already conditionally mirrored over fresh local junit). None is downgraded to advisory in CI.
@@ -183,6 +190,12 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   Deprecation policy is enforced by the existing `stability-matrix --check` leg; the obsolete empty-channel
   check and its CR-2 exception retired in Story 20-3b.
   The 20-3b coverage spike selected NO-GO, so the hand-kept matrix and its completeness leg remain live.
+  The error-catalog copied-binary fallback selects the nearest cwd ancestor
+  containing a workspace manifest and `xtask/`. This is a **cwd trust
+  assumption**, not authentication of the repository root: invoke it inside
+  the intended trusted checkout. A hostile cwd tree can supply those markers
+  and select a counterfeit workspace; the fallback does not authenticate a
+  checkout, publisher or ownership boundary.
   `clippy-advisory` is deliberately outside this Blocking mirror and `aggregate.needs`: its non-denying
   `cargo clippy --workspace --all-targets --locked --message-format=json` output is checked by
   `clippy-ratchet --input <jsonl>` against `xtask/clippy-baseline.toml` (T0: 1411 warning occurrences,

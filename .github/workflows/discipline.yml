@@ -208,6 +208,8 @@ jobs:
         run: env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json > clippy.jsonl
       - name: Refuse warning-count growth against T0
         run: cargo run -q --locked -p xtask -- clippy-ratchet --input clippy.jsonl
+      - name: Preserve malformed-stream refusal and downward baseline ratchets
+        run: cargo test --locked -p xtask --test clippy_ratchet_20_3b
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -703,6 +705,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Bind guaranteed claims to executing tests and corpus evidence
+        run: cargo test --locked -p xtask --test invariant_claims_20_3b
       - name: Detect changed files
         run: git diff --name-only HEAD~1 > /tmp/changed-files.txt
       - name: Run invariant-lock (validate-only; journal persistence is in journal-append.yml)

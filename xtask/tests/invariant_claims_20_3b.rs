@@ -12,8 +12,13 @@ fn guaranteed_requires_property_corpus_and_ci_job_together() -> Result<(), Strin
     fs::create_dir_all(dir.path().join("tests")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.path().join(".github/workflows")).map_err(|e| e.to_string())?;
     fs::write(
+        dir.path().join("Cargo.toml"),
+        "[package]\nname = 'fixture'\nversion = '0.0.0'\n",
+    )
+    .map_err(|e| e.to_string())?;
+    fs::write(
         dir.path().join("tests/property.rs"),
-        "#[test] fn preserves_property() {}\n",
+        "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); assert!(corpus.contains(\"malicious\")); }\n",
     )
     .map_err(|e| e.to_string())?;
     fs::write(
@@ -23,7 +28,7 @@ fn guaranteed_requires_property_corpus_and_ci_job_together() -> Result<(), Strin
     .map_err(|e| e.to_string())?;
     fs::write(
         dir.path().join(".github/workflows/discipline.yml"),
-        "jobs:\n  fixture:\n    steps:\n    - run: cargo test --test property\n",
+        "jobs:\n  fixture:\n    steps:\n    - env:\n        CORPUS: tests/adversary.jsonl\n      run: cargo test -p fixture --test property preserves_property -- --exact\n",
     )
     .map_err(|e| e.to_string())?;
     assert!(matches!(
@@ -43,6 +48,50 @@ fn guaranteed_requires_property_corpus_and_ci_job_together() -> Result<(), Strin
             validate_claim(dir.path(), &guaranteed().replace(old, new)).is_err(),
             "{old}"
         );
+    }
+    Ok(())
+}
+
+#[test]
+fn guaranteed_refuses_nonexecuting_or_unbound_witnesses() -> Result<(), String> {
+    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(dir.path().join("tests")).map_err(|e| e.to_string())?;
+    fs::create_dir_all(dir.path().join(".github/workflows")).map_err(|e| e.to_string())?;
+    fs::write(
+        dir.path().join("Cargo.toml"),
+        "[package]\nname = 'fixture'\nversion = '0.0.0'\n",
+    )
+    .map_err(|e| e.to_string())?;
+    let source = "#[test]\nfn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); assert!(corpus.contains(\"malicious\")); }\n";
+    let workflow = "jobs:\n  fixture:\n    steps:\n    - env:\n        CORPUS: tests/adversary.jsonl\n      run: cargo test -p fixture --test property preserves_property -- --exact\n";
+    fs::write(
+        dir.path().join("tests/adversary.jsonl"),
+        "{\"malicious\":true}\n",
+    )
+    .map_err(|e| e.to_string())?;
+    for (label, test, job) in [
+        ("commented test", format!("/* {source} */"), workflow.to_owned()),
+        ("ignored test", format!("#[ignore]\n{source}"), workflow.to_owned()),
+        ("not a test", source.replace("#[test]", ""), workflow.to_owned()),
+        ("cfg-disabled test", format!("#[cfg(any())]\n{source}"), workflow.to_owned()),
+        ("cfg-disabled file", format!("#![cfg(any())]\n{source}"), workflow.to_owned()),
+        ("corpus in comment only", source.replace("include_str!(\"adversary.jsonl\")", "\"unrelated\" /* adversary.jsonl */"), workflow.to_owned()),
+        ("wrong package", source.to_owned(), workflow.replace("-p fixture", "-p unrelated")),
+        ("unrelated job", source.to_owned(), workflow.replace("--test property", "--test unrelated")),
+        ("wrong selector", source.to_owned(), workflow.replace("property preserves_property", "property another")),
+        ("disabled job", source.to_owned(), workflow.replace("  fixture:\n", "  fixture:\n    if: false\n")),
+        ("disabled step", source.to_owned(), workflow.replace("    - env:", "    - if: false\n      env:")),
+        ("corpus not in job", source.to_owned(), workflow.replace("tests/adversary.jsonl", "tests/unrelated.jsonl")),
+        ("corpus not in test", source.replace("adversary.jsonl", "unrelated.jsonl"), workflow.to_owned()),
+        ("build only", source.to_owned(), workflow.replace("cargo test", "cargo test --no-run")),
+        ("ignored only", source.to_owned(), workflow.replace("-- --exact", "-- --ignored")),
+        ("echoed invocation", source.to_owned(), workflow.replace("run: cargo", "run: echo cargo")),
+        ("conditional shell", source.to_owned(), workflow.replace("run: cargo test -p fixture --test property preserves_property -- --exact", "run: |\n        if false; then\n          cargo test -p fixture --test property preserves_property -- --exact\n        fi")),
+    ] {
+        fs::write(dir.path().join("tests/property.rs"), test).map_err(|e| e.to_string())?;
+        fs::write(dir.path().join(".github/workflows/discipline.yml"), job)
+            .map_err(|e| e.to_string())?;
+        assert!(validate_claim(dir.path(), guaranteed()).is_err(), "{label}");
     }
     Ok(())
 }
@@ -105,5 +154,72 @@ fn forged_id_or_missing_register_cannot_shrink_the_ledger() -> Result<(), String
     assert!(read_claims(dir.path()).is_err());
     fs::remove_file(dir.path().join("docs/invariants/I14.md")).map_err(|e| e.to_string())?;
     assert!(read_claims(dir.path()).is_err());
+    Ok(())
+}
+
+#[test]
+fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(), String> {
+    let workflow: serde_yaml::Value = serde_yaml::from_str(include_str!(
+        "../../_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/ci/ci-20-3b-verify.yml"
+    )).map_err(|e| e.to_string())?;
+    let steps = workflow["jobs"]["landing-2-proof"]["steps"]
+        .as_sequence()
+        .ok_or("hosted steps")?;
+    let runs = steps
+        .iter()
+        .filter_map(|s| s["run"].as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    for command in [
+        "-p maos-spirit-sdk --features spirit_test --test routed_sdk_20_3b",
+        "-p maos-kernel-core --test routed_halt_swap_20_3b",
+        "--test routed_catalog_20_3b",
+        "sdk_harness_records_iac_frame_io_in_its_capture_report",
+        "active_halt_keeps_identity_and_replay_context_across_hot_swap",
+        "-- --ignored --exact --nocapture",
+    ] {
+        assert!(runs.contains(command), "{command}");
+    }
+    for (source, test, reason) in [
+        (
+            include_str!("../../crates/maos-spirit-sdk/tests/routed_sdk_20_3b.rs"),
+            "sdk_harness_records_iac_frame_io_in_its_capture_report",
+            "ownerless and open",
+        ),
+        (
+            include_str!("../../crates/maos-kernel-core/tests/routed_halt_swap_20_3b.rs"),
+            "active_halt_keeps_identity_and_replay_context_across_hot_swap",
+            "owned by 20-3c",
+        ),
+    ] {
+        let source = syn::parse_file(source).map_err(|e| e.to_string())?;
+        let witness = source
+            .items
+            .iter()
+            .find_map(|item| match item {
+                syn::Item::Fn(f) if f.sig.ident == test => Some(f),
+                _ => None,
+            })
+            .ok_or("routed red test missing")?;
+        assert!(
+            witness.attrs.iter().any(|attr| match &attr.meta {
+                syn::Meta::NameValue(value) if value.path.is_ident("ignore") =>
+                    matches!(&value.value, syn::Expr::Lit(lit)
+                    if matches!(&lit.lit, syn::Lit::Str(text) if text.value().contains(reason))),
+                _ => false,
+            }),
+            "{test}: missing explicit red owner/disposition"
+        );
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .ok_or("workspace")?;
+    let claims = read_claims(root)?;
+    let continuity = claims.get("I14").ok_or("I14")?;
+    assert!(matches!(continuity.claim, ClaimState::Asserted));
+    assert_eq!(continuity.owner.as_deref(), Some("20-3c"));
+    assert!(continuity.requirement_claims["FR53"].contains("asserted, owner 20-3c"));
+    let ledger = include_str!("../../docs/invariants/README.md");
+    assert!(ledger.contains("FR34 | asserted; owner: none (trigger-owned; see deferred-work)"));
     Ok(())
 }

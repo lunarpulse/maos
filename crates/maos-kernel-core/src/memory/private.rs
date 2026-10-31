@@ -3,8 +3,9 @@
 //! Private-tier memory store — per-Spirit `Arc<RwLock<HashMap>>` +
 //! per-Spirit-namespaced filesystem area (Story 4.3).
 //!
-//! Principal values, `Markdown` values and values exceeding `inline_threshold`
-//! spill under `<fs_root>/id-<hex(identity)>/<ns_encoded>/<key>.<ext>` once bound.
+//! Principal values, `Markdown` and large values spill under stable owner/namespace
+//! components. Long components use SHA-256 with verified full-identity metadata;
+//! principal keys use lowercase hex (or guarded hashes), including on case-folding filesystems.
 //! Unbound callers retain legacy pid directories; bound Spirits never read those.
 
 use std::collections::{BTreeSet, HashMap};
@@ -33,6 +34,7 @@ use rustix::fs::{
 use rustix::io::Errno;
 
 use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue, ValueKind};
+use sha2::{Digest, Sha256};
 
 const MAX_KEY_LEN: usize = 1024;
 
@@ -150,12 +152,7 @@ impl PrivateMemoryStore {
     fn namespace_to_dirname(ns: &MemoryNamespace) -> Result<String, MemoryError> {
         let json = serde_json::to_string(ns)
             .map_err(|e| MemoryError::Storage(format!("namespace serialize: {e}")))?;
-        // Hex-encode for filesystem-safe directory names (I5-safe).
-        let mut hex = String::with_capacity(json.len() * 2);
-        for byte in json.as_bytes() {
-            hex.push_str(&format!("{byte:02x}"));
-        }
-        Ok(hex)
+        Ok(hex::encode(json))
     }
 
     fn file_ext_for_kind(kind: ValueKind) -> &'static str {
@@ -177,16 +174,7 @@ impl PrivateMemoryStore {
         ValueKind::Text,
     ];
 
-    /// Reverse of the file-name half of `fs_path_for`: strip a recognized
-    /// value-kind extension to recover the logical key **verbatim** (the key
-    /// is deliberately not mangled on the way out, `:100-102`) together with
-    /// the kind that produced it.  `None` means the name is not a spill this
-    /// store could have written, so it is not a readable entry and must never
-    /// be attested or returned as one.  Stripping the extension rather than
-    /// taking `file_stem()` is what makes the empty key round-trip (`.md` stems
-    /// to `".md"`, but strips to `""`) and what keeps a dotted key like
-    /// `report.2026` intact.  The four extensions are mutually non-suffixing,
-    /// so the match is unambiguous whatever the order.
+    /// Strip a recognized value-kind extension; other names are metadata, not values.
     fn spill_name_parts(name: &str) -> Option<(&str, ValueKind)> {
         Self::ALL_KINDS
             .into_iter()
@@ -301,6 +289,103 @@ impl PrivateMemoryStore {
         }
     }
 
+    fn bounded_component(name: &str) -> String {
+        if name.len() <= 200 {
+            name.into()
+        } else {
+            format!("h-{}", hex::encode(Sha256::digest(name)))
+        }
+    }
+
+    #[cfg(unix)]
+    fn verify_identity(
+        directory: &OwnedFd,
+        name: &str,
+        identity: &str,
+        create: bool,
+    ) -> Result<(), MemoryError> {
+        if create {
+            match openat(
+                directory,
+                name,
+                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+                Mode::RUSR | Mode::WUSR,
+            ) {
+                Ok(fd) => {
+                    let mut file = File::from(fd);
+                    file.write_all(identity.as_bytes())
+                        .and_then(|_| file.sync_all())
+                        .map_err(MemoryError::Io)?;
+                    fsync(directory).map_err(Self::errno)?;
+                }
+                Err(Errno::EXIST) => {}
+                Err(error) => return Err(Self::errno(error)),
+            }
+        }
+        match Self::open_candidate(directory, name, ValueKind::Text)? {
+            Some(DiskCandidate {
+                value: MemoryValue::Text(found),
+                ..
+            }) if found == identity => Ok(()),
+            _ => Err(MemoryError::Storage(
+                "spill identity mismatch or missing metadata".into(),
+            )),
+        }
+    }
+
+    #[cfg(unix)]
+    fn open_identity_dir(
+        parent: &OwnedFd,
+        identity: &str,
+        create: bool,
+    ) -> Result<Option<OwnedFd>, MemoryError> {
+        let name = Self::bounded_component(identity);
+        let directory = Self::open_dir_component(parent, &name, create)?;
+        if let Some(directory) = &directory {
+            if name != identity {
+                Self::verify_identity(directory, ".identity", identity, create)?;
+            }
+        }
+        Ok(directory)
+    }
+
+    #[cfg(unix)]
+    fn principal_key(directory: &OwnedFd, key: &str, create: bool) -> Result<String, MemoryError> {
+        let hex = hex::encode(key);
+        let name = Self::bounded_component(&hex);
+        if name != hex {
+            let metadata = format!(".key-{name}");
+            if !create
+                && Self::open_candidate(directory, &metadata, ValueKind::Text)?.is_none()
+                && Self::select_disk_value(directory, &name)?.is_none()
+            {
+                return Ok(name);
+            }
+            Self::verify_identity(directory, &metadata, key, create)?;
+        }
+        Ok(name)
+    }
+
+    #[cfg(unix)]
+    fn decode_principal_key(directory: &OwnedFd, name: &str) -> Result<String, MemoryError> {
+        if name.starts_with("h-") {
+            if let Some(DiskCandidate {
+                value: MemoryValue::Text(key),
+                ..
+            }) = Self::open_candidate(directory, &format!(".key-{name}"), ValueKind::Text)?
+            {
+                if Self::principal_key(directory, &key, false)? == name {
+                    return Ok(key);
+                }
+            }
+            return Err(MemoryError::Storage(
+                "missing or mismatched principal key metadata".into(),
+            ));
+        }
+        String::from_utf8(hex::decode(name).map_err(|e| MemoryError::Storage(e.to_string()))?)
+            .map_err(|e| MemoryError::Storage(e.to_string()))
+    }
+
     #[cfg(unix)]
     fn open_namespace_dir(
         &self,
@@ -312,11 +397,11 @@ impl PrivateMemoryStore {
             return Ok(None);
         };
         let Some(pid_dir) =
-            Self::open_dir_component(&root, &self.owner_dirname(spirit_pid), create)?
+            Self::open_identity_dir(&root, &self.owner_dirname(spirit_pid), create)?
         else {
             return Ok(None);
         };
-        Self::open_dir_component(&pid_dir, &Self::namespace_to_dirname(namespace)?, create)
+        Self::open_identity_dir(&pid_dir, &Self::namespace_to_dirname(namespace)?, create)
     }
 
     #[cfg(unix)]
@@ -657,16 +742,6 @@ impl PrivateMemoryStore {
         Ok(())
     }
 
-    fn should_spill_to_disk(
-        value: &MemoryValue,
-        inline_threshold: usize,
-    ) -> Result<bool, MemoryError> {
-        Ok(
-            matches!(value, MemoryValue::Markdown(_))
-                || value.approximate_len()? > inline_threshold,
-        )
-    }
-
     // ------------------------------------------------------------------
     // public API
     // ------------------------------------------------------------------
@@ -684,7 +759,8 @@ impl PrivateMemoryStore {
             .lock()
             .expect("PrivateMemoryStore I/O lock poisoned");
         let needs_spill = matches!(namespace, MemoryNamespace::Principal { .. })
-            || Self::should_spill_to_disk(&value, self.inline_threshold)?;
+            || matches!(value, MemoryValue::Markdown(_))
+            || value.approximate_len()? > self.inline_threshold;
 
         #[cfg(unix)]
         {
@@ -692,7 +768,12 @@ impl PrivateMemoryStore {
                 let directory = self
                     .open_namespace_dir(spirit_pid, namespace, true)?
                     .expect("create=true must return a namespace directory");
-                Self::replace_spills(&directory, key, Some(&value))?;
+                let key = if matches!(namespace, MemoryNamespace::Principal { .. }) {
+                    Self::principal_key(&directory, key, true)?
+                } else {
+                    key.into()
+                };
+                Self::replace_spills(&directory, &key, Some(&value))?;
             } else if let Some(directory) = self.open_namespace_dir(spirit_pid, namespace, false)? {
                 Self::replace_spills(&directory, key, None)?;
             }
@@ -743,7 +824,14 @@ impl PrivateMemoryStore {
 
         #[cfg(unix)]
         let disk_value = match self.open_namespace_dir(spirit_pid, namespace, false)? {
-            Some(directory) => Self::select_disk_value(&directory, key)?.map(|(value, _)| value),
+            Some(directory) => {
+                let key = if matches!(namespace, MemoryNamespace::Principal { .. }) {
+                    Self::principal_key(&directory, key, false)?
+                } else {
+                    key.into()
+                };
+                Self::select_disk_value(&directory, &key)?.map(|(value, _)| value)
+            }
             None => None,
         };
 
@@ -785,12 +873,13 @@ impl PrivateMemoryStore {
         let Some(root) = self.open_root(false)? else {
             return Ok(None);
         };
-        let Some(owner) = Self::open_dir_component(&root, owner_dir, false)? else {
+        let Some(owner) = Self::open_identity_dir(&root, owner_dir, false)? else {
             return Ok(None);
         };
-        match Self::open_dir_component(&owner, &Self::namespace_to_dirname(namespace)?, false)? {
+        match Self::open_identity_dir(&owner, &Self::namespace_to_dirname(namespace)?, false)? {
             Some(directory) => {
-                Ok(Self::select_disk_value(&directory, key)?.map(|(value, _)| value))
+                let key = Self::principal_key(&directory, key, false)?;
+                Ok(Self::select_disk_value(&directory, &key)?.map(|(value, _)| value))
             }
             None => Ok(None),
         }
@@ -863,11 +952,17 @@ impl PrivateMemoryStore {
                 .filter_map(|name| Self::spill_name_parts(&name).map(|(key, _)| key.to_string()))
                 .collect();
             for key in keys {
+                let disk_key = key.clone();
+                let key = if matches!(namespace, MemoryNamespace::Principal { .. }) {
+                    Self::decode_principal_key(&directory, &key)?
+                } else {
+                    key
+                };
                 if !key.starts_with(prefix) || cached.contains(&key) || entries.len() >= limit {
                     continue;
                 }
                 Self::sanitize_key(&key)?;
-                let selected = Self::select_disk_value(&directory, &key)?;
+                let selected = Self::select_disk_value(&directory, &disk_key)?;
                 if let Some((value, _)) = selected {
                     entries.push(MemoryEntry {
                         namespace: namespace.clone(),
@@ -930,7 +1025,10 @@ impl PrivateMemoryStore {
 
         if let Some(root) = self.open_root(false)? {
             for pid_name in Self::list_names(&root)? {
-                if pid_name.parse::<u32>().is_err() && !pid_name.starts_with("id-") {
+                if pid_name.parse::<u32>().is_err()
+                    && !pid_name.starts_with("id-")
+                    && !pid_name.starts_with("h-")
+                {
                     continue;
                 }
                 let pid_stat =
@@ -946,7 +1044,26 @@ impl PrivateMemoryStore {
                     })?;
                 let mut cleaned = false;
                 for namespace_name in Self::list_names(&pid_dir)? {
-                    let decoded = hex::decode(&namespace_name)
+                    let identity = if namespace_name.starts_with("h-") {
+                        let Some(dir) = Self::open_dir_component(&pid_dir, &namespace_name, false)?
+                        else {
+                            continue;
+                        };
+                        match Self::open_candidate(&dir, ".identity", ValueKind::Text)? {
+                            Some(DiskCandidate {
+                                value: MemoryValue::Text(identity),
+                                ..
+                            }) if Self::bounded_component(&identity) == namespace_name => identity,
+                            _ => {
+                                return Err(MemoryError::Storage(
+                                    "namespace identity mismatch".into(),
+                                ))
+                            }
+                        }
+                    } else {
+                        namespace_name.clone()
+                    };
+                    let decoded = hex::decode(&identity)
                         .ok()
                         .and_then(|bytes| serde_json::from_slice::<MemoryNamespace>(&bytes).ok());
                     if !matches!(
@@ -958,12 +1075,6 @@ impl PrivateMemoryStore {
                     ) {
                         continue;
                     }
-                    let namespace_stat =
-                        statat(&pid_dir, &namespace_name, AtFlags::SYMLINK_NOFOLLOW)
-                            .map_err(Self::errno)?;
-                    if !FileType::from_raw_mode(namespace_stat.st_mode).is_dir() {
-                        return Err(Self::errno(Errno::NOTDIR));
-                    }
                     let namespace_dir = Self::open_dir_component(&pid_dir, &namespace_name, false)?
                         .ok_or_else(|| {
                             MemoryError::Io(std::io::Error::from(std::io::ErrorKind::NotFound))
@@ -974,17 +1085,35 @@ impl PrivateMemoryStore {
                             .map_err(Self::errno)?;
                         if FileType::from_raw_mode(stat.st_mode).is_file() {
                             if let Some(key) = Self::key_from_spill_name(&file_name) {
-                                erased.insert((logical_dir.clone(), key.to_string()));
+                                erased.insert((
+                                    logical_dir.clone(),
+                                    Self::decode_principal_key(&namespace_dir, key)?,
+                                ));
                             }
                         }
-                        Self::remove_tree(&namespace_dir, &file_name)?;
+                        if !file_name.starts_with(".key-") && file_name != ".identity" {
+                            Self::remove_tree(&namespace_dir, &file_name)?;
+                        }
+                    }
+                    for metadata in Self::list_names(&namespace_dir)? {
+                        Self::remove_tree(&namespace_dir, &metadata)?;
                     }
                     fsync(&namespace_dir).map_err(Self::errno)?;
                     unlinkat(&pid_dir, &namespace_name, AtFlags::REMOVEDIR).map_err(Self::errno)?;
                     fsync(&pid_dir).map_err(Self::errno)?;
                     cleaned = true;
                 }
-                if cleaned && Self::list_names(&pid_dir)?.is_empty() {
+                if cleaned
+                    && Self::list_names(&pid_dir)?
+                        .iter()
+                        .all(|name| name == ".identity")
+                {
+                    if Self::list_names(&pid_dir)?
+                        .iter()
+                        .any(|name| name == ".identity")
+                    {
+                        unlinkat(&pid_dir, ".identity", AtFlags::empty()).map_err(Self::errno)?;
+                    }
                     unlinkat(&root, &pid_name, AtFlags::REMOVEDIR).map_err(Self::errno)?;
                     fsync(&root).map_err(Self::errno)?;
                 }
@@ -1000,8 +1129,8 @@ impl PrivateMemoryStore {
                 erased.insert((
                     format!(
                         "{}/{}",
-                        self.owner_dirname(pid),
-                        Self::namespace_to_dirname(&namespace)?
+                        Self::bounded_component(&self.owner_dirname(pid)),
+                        Self::bounded_component(&Self::namespace_to_dirname(&namespace)?)
                     ),
                     key,
                 ));

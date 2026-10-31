@@ -1,5 +1,7 @@
 # 20-3b landing-2 verifier/integrator — final evidence
 
+**Current authoritative result:** see “Review-correction final verification — operator ruling w8” below. Earlier measurements, runs and the envelope STOP are retained as history. The current local build/tests/gates/prepush pass, but the explicitly executed `cargo deny check` is **RED** on four advisories; this report does not claim an all-green ship verdict.
+
 Tasks 1–7 completed locally, including the operator-authorized held-durable-value correction. Hosted execution remains deliberately unclaimed. Exact commands, working directories, exit codes and durations are in `commands.jsonl`; failed attempts are retained, not overwritten.
 
 ## Final formatted measurements and exact pins
@@ -96,4 +98,283 @@ New deferred-work section records the FrameKind30/31 non-enum rows and32/33 uncl
 
 Hosted workflow/full discipline and signed-ledger artifact/key paths were not run. The137 nextest skips and81 named prepush runtime diagnostics remain visible: signed rootless T3 substrate, Python Ed25519 backend and strace were not provisioned locally. Dynamic CI marker cardinalities remain CI-only. Docs build/routes and cargo-deny were conditionally skipped because their trigger paths did not change; no claim of a current advisory-DB deny recheck is made. Non-Unix compilation and live PostgreSQL cross-check were not exercised. These limitations do not replace the green local commands.
 
+**AC6 cargo-deny recheck remains required:** the verifier must run `cargo deny check`
+against its then-current advisory database and record the command, exit status
+and result. The editing/review-fix pass did not run it and claims no deny result;
+the prior conditional prepush skip does not satisfy this landing recheck.
+
 No commit,push,cargo clean,alternate-worktree access or Dockerfile edit occurred. All mutation scaffolds were restored/removed. The real generated migration corpus remains as the documented local prerequisite. The operator's uncommitted Dockerfile edit was left alone. Prepush's tracked-tree check passed.
+
+## DIFFICULT kernel/bin repairs — editing evidence, not a verification run
+
+The post-review editing pass adds bounded owner/namespace components and lowercase
+hex principal-key filenames. Components exceeding 200 bytes use SHA-256 names,
+with full-identity sidecars checked before reads/writes; mismatches refuse rather
+than sharing a digest address. The index retains full stable owner addresses.
+This is a clean filename-format cutover: pre-landing raw-key principal spill files
+are unreadable; there is no installed base pre-v1.0. A versioned layout and
+migration is a prerequisite if an installed base appears. No ambiguous raw-key
+fallback was added. The same-line rule-10 disposition is in `deferred-work.md`.
+
+Principal writes commit an index intent before spilling. A spill failure removes
+only a newly inserted intent, preserving pre-existing discoverability; cleanup
+errors are surfaced. A crash after the intent but before the value may leave an
+index row without a value, which export represents as redacted-missing. Uninstall
+unions recorded stable-owner principals with current incarnation audit principals,
+counts values before destructive operations, and signs a retained-under-hold/
+unreadable coverage gap when a held value cannot be counted. The legacy schema
+check, owner-column ALTER and primary-key migration share one immediate transaction.
+Private-tier audit counting recognizes verified hashed namespaces and ignores
+identity/key sidecars.
+
+Budget offset is explicit: four original `principal.rs` unit tests were relocated
+without weakening their assertions into `principal_identity_20_3b.rs`:
+`write_and_lookup`, `lookup_nonexistent_returns_empty`,
+`forget_then_lookup_empty`, and `second_forget_returns_zero`. The old unit module
+occupied 71 physical / 59 Rust-code lines; kernel library test count decreases by
+four and the integration target gains those four tests. New deterministic witnesses
+cover long identity/namespace/key round trips, case-fold-distinct key filenames,
+identity mismatches, intent-before-spill ordering, injected spill and index
+failures, missing-value export, stable-owner discovery/forget, concurrent legacy
+opens, unreadable held-value signed proofs, and hashed-namespace audit counting.
+
+No cargo command, test, gate or formatter was run by this editing pass. Earlier
+green results above precede these repairs and do not verify them. The orchestrator
+must compile and run the changed kernel/bin integration targets and kernel memory
+library tests, then refresh the granted pins/surfaces and run the required gates.
+
+Observed source-only measurements (`tokei --files` and `wc -l` on the five
+changed production files, each exit 0; no build/test/gate):
+
+| Source | Physical before → after | Rust code before → after |
+|---|---:|---:|
+| kernel `memory/private.rs` | 1,037 → 1,122 | 910 → 1,000 |
+| kernel `memory/principal.rs` | 272 → 201 | 223 → 161 |
+| kernel `memory/mod.rs` | 1,170 → 1,173 | 924 → 925 |
+| bin `main.rs` | 16,506 → 16,493 | 13,308 → 13,306 |
+| audit `lib.rs` | 3,476 → 3,476 | 2,614 → 2,614 |
+
+Net kernel delta is **+17 physical / +29 Rust code** including the disclosed
+71/59 test relocation; without that offset production changes are +88/+88.
+Applied arithmetically to the supplied pins, kernel becomes **26,565 / 20,777**
+(ceilings 26,591 / 20,778), bin becomes **32,966** (ceiling 32,977), and audit
+remains **7,660** (ceiling 7,660). These are source-count deltas, not a claim that
+the verifier has re-pinned or run kloc/surface checks. `git show HEAD:crates/maos-kernel-core/src/memory/principal.rs`
+also exited 0 for the original 71-line unit-module measurement.
+
+## Review-correction verifier STOP — formatted envelope breach
+
+This result supersedes the source-only forecast above. Earlier green verification
+does **not** verify the current review-correction tree.
+
+- `env -u CI -u GITHUB_ACTIONS cargo fmt --all` — **exit 0**, 2.76 seconds.
+- `env -u CI -u GITHUB_ACTIONS /home/lunarpulse/dev_ws/target/debug/xtask kloc-check --json`
+  — **exit 1**, 0.055 seconds; authoritative formatted counts below.
+- Physical kernel lines were counted over every `crates/maos-kernel-core/src/**/*.rs`
+  file, matching the existing kernel-baseline counting scope.
+
+| Surface | Formatted measured | Current authorized maximum | Disposition |
+|---|---:|---:|---|
+| Kernel physical | **26,620** | **26,591** | **STOP: +29 above grant** |
+| Kernel tokei | **20,834** | **20,778** | **STOP: +56 above grant** |
+| maos-bin | **32,979** | **32,977** | **STOP: +2 above grant** |
+| maos-audit | **7,668** | **7,660** | **STOP: +8 above grant** |
+| xtask | 42,757 | 42,775 | Inside grant |
+| maos-domain | 9,977 | 9,977 | Unchanged |
+| Aggregate | **188,119** | Exact measured + 1 required | Would require hardfail **188,120** |
+
+No baseline or ceiling was re-pinned past its grant. No build, test, plant,
+`cargo deny`, clippy or prepush command was run for this review-correction tree.
+Main received the exact figures and the request for revised operator authority
+or edit-only corrections inside the existing grant. Raw gate output and the
+command ledger are under `landing-2/review-corrections/`.
+
+## Review-correction final verification — operator ruling w8
+
+The operator subsequently authorized **“A: Raise to measured exactly”** on
+2026-10-31. This resumes and supersedes the historical envelope STOP above;
+no pin was raised before that authority. HISTORY uses
+`20-3b landing 2 review corrections, operator ruling w8`, prepending the old
+text under `| PRIOR:`. The following results verify the adopted
+`L2FixKernel`/`L2FixXtask` corrections, not their earlier source-only forecasts.
+
+### Final formatted measurements, pins and metadata
+
+| Surface | Measured | Exact enforced pin |
+|---|---:|---:|
+| Kernel physical | **26,620** | **26,620**, `src_lines` remains line505 |
+| Kernel tokei | **20,834** | **20,834** |
+| xtask | **42,757** | **42,757**; inside the42,775 provisional grant |
+| maos-bin | **32,979** | **32,979** |
+| maos-domain | **9,977** | **9,977**, unchanged |
+| maos-audit | **7,668** | **7,668** |
+| Aggregate | **188,119** | strict hardfail **188,120** |
+
+Kernel/bin/audit are exactly at their w8 grants, with no reserved headroom.
+The production `check-kernel-baseline --emit-pin` returned95 file hashes and
+set hash `ca8eb931958207cbe5bd76b599764aeeb75b9142374e10ff4cbff157598616d2`.
+The95-file set is unchanged; the three memory implementation hashes changed.
+The production surface writer regenerated a byte-identical current snapshot;
+the earlier one-time per-path `pub use` leaf-hash migration remains intact,
+not reclassified as removals. Added the data-movement classification for
+`MemoryManagerAdapter::principal_ids_for_spirit`.
+
+Updated `kernel-core-baseline.toml`, `kloc.toml`, kernel pin-content literals,
+`RATIFIED_AT_EASING = 20_834`, API-class metadata, and both story/epic grant
+tables. The xtask HISTORY first segment retains the full
+`20-3b-gate-retirement-and-coverage-generator` key and42,648→42,757 arrow.
+Kernel-pin/recovery/d11 regression binaries and the real-tree gates passed.
+The final post-test-fix kloc check also exited0; test lint fixes did not change
+any production measurement.
+
+### Commands, regressions and all integration fixes
+
+Exact argument vectors, absolute working directories, exit codes and elapsed
+seconds are in [`review-corrections/commands.jsonl`](review-corrections/commands.jsonl).
+Corresponding stdout/stderr logs, JUnits, clippy streams and both prepush
+reports are retained in that directory. Every cargo command used
+`env -u CI -u GITHUB_ACTIONS`; no target-directory override or clean was used.
+
+| Command or requested regression set | Final exit | Observed result |
+|---|---:|---|
+| `cargo fmt --all` |0| Final test-diagnostic formatting2.451s |
+| `cargo build --locked --workspace --all-targets` |0| Initial134.36s; refreshed final build90.299s |
+| `cargo run -p xtask -- build-test-fixtures` |0| Official refresh14.769s |
+| Kernel `--lib memory` |0|7.087s |
+| Kernel principal identity / forget-restart / spill-supersession / routed halt binaries |0|19+10+18 supported tests pass; routed ignored red explicitly exercised below |
+| Bin erasure/uninstall and uninstall/purge binaries |0|24+23 tests pass,7.253s |
+| Audit private-tier-count and governance-roundtrip binaries |0|3.776s |
+| New xtask coverage/invariant/clippy/surface-root/prepush/routed-catalog binaries |0| Final direct command0.830s; negative vectors included |
+| SDK routed binary with `--features spirit_test` |0| Final import-only regression0.646s; ignored red explicitly exercised below |
+| Bin hook-pump and Butler binaries |0| Final direct command21.248s |
+| Registered expensive-filter xtask set, ignored-only, serial |0|11/11 pass across ABI/diagnostics, including all six `diagnostics_20_3a` vectors;31.647s command/5.602s runner |
+| Full workspace serial nextest |0| **5,433 passed /139 skipped**,588.73s command/585.624s runner |
+| Full workspace default-thread nextest |0| **5,433 passed /139 skipped**,41.96s command/40.665s runner |
+
+Initial targeted kernel/bin commands exited101 on three obsolete fixture
+assumptions. The complete verifier integration fixes were:
+
+1. `private_spill_supersession_13_5j.rs`: plant the principal sibling as
+   `6b.bin`, alongside `6b.json`, matching the adopted lowercase-hex key
+   encoding; the logical forgotten count remains exactly one.
+2. `erasure_uninstall_13_5b.rs`: assert the new typed held-count message
+   `Some(1) under legal hold`. The stable-owner uninstall witness now checks
+   the actual terminal's `erased_principals == 1` and the signed proof's
+   `memory_namespace = Removed { count: 1 }`, instead of a nonexistent
+   `deleted_entries` terminal field. Owner-directory/index removal, pid2 and
+   proof-signature assertions remain.
+3. `routed_sdk_20_3b.rs`: remove an unused `Spirit` import.
+4. `principal_identity_20_3b.rs`: remove two redundant borrows of freshly
+   repeated schema strings; `erasure_uninstall_13_5b.rs`: remove the analogous
+   redundant borrow in its long-schema witness.
+5. `prepush_blocking_20_3b.rs`: compile the direct-xtask regex once outside the
+   workflow loops, rather than on every visited command.
+
+No production logic was changed by this review-correction integration pass.
+The adopted production changes are the edit-only units' changes. No assertion,
+gate or warning policy was weakened. Byte-neutral touches of both already-read
+bin/cli entrypoints, followed by the all-target build and official fixture
+producer, refreshed normal workspace-feature artifacts; source bytes were
+asserted unchanged. Earlier full serial/default runs were also green before
+the final lint-only test edits; the final runs above cover those edits.
+
+### Explicit labelled reds and recut FR31 mutation evidence
+
+Both ignored routed witnesses were run with `--ignored --exact --nocapture`,
+not counted as default-suite coverage:
+
+- FR34 SDK capture command — **exit101**,0.119s, at the intended assertion:
+  **“FR34 SDK frame I/O must be observable in the harness report; empty capture
+  is not coverage”**; observed `[]` versus the bytes of `iac-frame`.
+- FR53 hot-swap command — **exit101**,0.172s, at the intended assertion:
+  **“FR53 preserves the ORIGINAL active halt id, source-frame/policy replay
+  payload, owner and fire time; re-firing is not continuity”**; observed
+  `([], [])` versus the original halt id and full metadata. This remains
+  explicitly owned20-3c, not presented as passing continuity.
+
+[`plants.md`](plants.md) now begins with the recut current-tree FR31 proof.
+All four mutations reached their intended assertions and exited101:
+pid spill disclosure2.149s, pid index/export2.101s, lost small-value durability
+1.833s, Butler restore poisoning6.042s. Every copy-back/cmp/touch command
+exited0 and restored exact bytes. Restored principal tests passed19/19 and
+the Butler witness passed. Cut SHA-256 verification exited0.
+Backups remain at `/tmp/20-3b-review-plants-yweae8gs`; no cleanup was run.
+Current root `*-plant.diff` files and `plant-cuts.sha256` replace the earlier
+cuts and remain wired into the unpushed hosted evidence workflow.
+
+AC2 remains the ruled NO-GO closure, AC3's prior real-tree if:false proof is
+retained, and the in-tree invariant-ledger/clippy negative vectors pass.
+No extra hosted-only cut or nonexistent generated-YAML drift proof was added.
+
+### Actual cargo-deny and live clippy verdicts
+
+`env -u CI -u GITHUB_ACTIONS cargo deny check` — **exit1**,1.145s.
+The actual current database reports **four vulnerabilities**:
+**RUSTSEC-2026-0420**, **RUSTSEC-2026-0422**, **RUSTSEC-2026-0423** and
+**RUSTSEC-2026-0424**, affecting wasmtime/wasmtime-wasi48.0.7 and recommending
+48.0.8 or newer. Summary: **advisories FAILED; bans/licenses/sources ok**.
+`deny.toml`, dependencies and lockfile were not changed. This is an unresolved
+ship-gate result, not replaced by prepush's conditional cargo-deny skip.
+
+The first actual non-denying clippy JSON stream exited0 but the unchanged
+ratchet correctly exited1 at **1,415 occurrences /886 source-distinct**.
+Only the avoidable new test diagnostics listed above were corrected.
+Final `cargo clippy --workspace --all-targets --locked --message-format=json`
+exited0 in1.757s; the built `clippy-ratchet --input <absolute
+review-corrections/clippy-fixed.jsonl>` exited0 in0.165s at
+**1,410 occurrences /881 source-distinct**. Baseline remains **1,411/884**;
+no suppression, baseline raise or unrelated production refactor was made.
+
+### Standalone gates, saved serial budget and final prepush
+
+Every requested standalone gate exited0: kloc-check; check-kernel-baseline;
+check-service-boundary; check-env-contract; check-serde-error-handling;
+check-composition-root-completeness; check-j1-loopback-delegation;
+check-dev-record-completeness; check-epic-close-coherence;
+check-review-findings-resolved; check-test-cost; coverage-matrix
+(hard mode,zero violations); check-coverage-matrix-completeness; invariant-lock.
+
+`check-test-budget --junit <absolute
+review-corrections/workspace-serial-final.junit.xml> --json` — **exit0**,
+0.017s:576 binaries, **Σ585.489s**,span585.603s,zero findings.
+That exact serial report is saved independently of later default/prepush runs.
+
+```sh
+env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /home/lunarpulse/dev_ws/target/debug/xtask prepush --json
+```
+
+The first reviewed-tree prepush exited1 in421.50s:82 pass,one red,one advisory,
+eight skips. Its sole red was `journey_forget_18_6` Butler startup:
+`EndpointInUse` at127.0.0.1:46645, child exit78. The complete failure/JUnit is
+retained. Both standalone full suites had passed that test. The exact same
+prepush command was rerun **without a source or configuration change**:
+**exit0**,118.50s (report118.490s), **83 pass,zero red,one advisory,eight skips**.
+Workspace nextest, full kernel lib tests, doctests, release/size and
+tracked-tree checks passed. The22 added standalone mirror legs consumed
+**19.350s** in that run; per-leg records are in
+`review-corrections/prepush-runtime.json`.
+
+The prepush timing judgment remains advisory with three findings; it does not
+supersede the requested saved serial budget's green verdict. No timing ceiling
+was raised. Its eight explicit skips are docs build/routes, unchanged
+lockfile/deny-trigger cargo-deny, and five dynamic CI marker cardinalities.
+Runtime substrate diagnostics remain visible in the JSON: signed T3 substrate,
+Python Ed25519 backend and strace are unavailable locally.
+
+### Dispositions and remaining limits
+
+The task7 deferred-work section and43 individually dispositioned advisory
+coverage rows remain recorded; the hard-mode and disposition gates pass.
+Same-name squatting remains owned20-1. The review units additionally recorded
+their precise remaining ownerless legacy-spill restart scope and the labelled
+FR34/FR53 boundaries rather than claiming those are solved.
+
+**Not verified:** hosted evidence/discipline execution and signed-ledger
+artifacts/keys, dynamic hosted marker counts, non-Unix compilation, signed T3
+runtime scenarios, Python Ed25519/strace scenarios and a live PostgreSQL
+cross-check. No hosted run id is claimed.
+**Known reds:** actual cargo-deny's four advisories and the deliberately
+labelled ignored FR34/FR53 witnesses. The initial prepush endpoint collision is
+retained as a failed observation, despite the unchanged rerun being green.
+No commit/push, cargo clean, alternate-worktree access or Dockerfile edit was
+performed. The ignored real migration corpus remains on disk, untracked.

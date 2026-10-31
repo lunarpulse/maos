@@ -267,7 +267,7 @@ fn forget_does_not_follow_pid_directory_symlink() {
         let outside = fixture._dir.path().join("outside");
         let namespace_dir = outside.join(namespace_dirname(&principal_namespace(PRINCIPAL)));
         std::fs::create_dir_all(&namespace_dir).expect("create outside namespace");
-        let outside_file = namespace_dir.join("dossier.md");
+        let outside_file = namespace_dir.join(format!("{}.md", hex::encode("dossier")));
         std::fs::write(&outside_file, MARKDOWN_CANARY).expect("plant outside canary");
         symlink(&outside, fixture.fs_root.join("7")).expect("plant pid symlink");
 
@@ -294,8 +294,11 @@ fn forget_fails_closed_when_pid_directory_is_unreadable() {
         let pid_dir = fixture.fs_root.join("7");
         let namespace_dir = pid_dir.join(namespace_dirname(&principal_namespace(PRINCIPAL)));
         std::fs::create_dir_all(&namespace_dir).expect("create principal namespace");
-        std::fs::write(namespace_dir.join("dossier.md"), MARKDOWN_CANARY)
-            .expect("plant principal spill");
+        std::fs::write(
+            namespace_dir.join(format!("{}.md", hex::encode("dossier"))),
+            MARKDOWN_CANARY,
+        )
+        .expect("plant principal spill");
         std::fs::set_permissions(&pid_dir, std::fs::Permissions::from_mode(0o000))
             .expect("make pid directory unreadable");
         if std::fs::read_dir(&pid_dir).is_ok() {
@@ -374,7 +377,7 @@ fn forget_does_not_follow_namespace_directory_symlink() {
         let fixture = Fixture::new();
         let outside = fixture._dir.path().join("outside");
         std::fs::create_dir_all(&outside).expect("create outside namespace");
-        let outside_file = outside.join("dossier.md");
+        let outside_file = outside.join(format!("{}.md", hex::encode("dossier")));
         std::fs::write(&outside_file, MARKDOWN_CANARY).expect("plant outside canary");
 
         let pid_dir = fixture.fs_root.join("7");

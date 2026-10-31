@@ -11,7 +11,7 @@
  ";
 --- a/crates/maos-kernel-core/src/memory/mod.rs
 +++ b/crates/maos-kernel-core/src/memory/mod.rs
-@@ -929,7 +929,7 @@
+@@ -933,7 +933,7 @@
          for row in &rows {
              let ns = MemoryNamespace::principal(&row.principal_id, &row.schema)
                  .map_err(|e| MemoryError::Storage(e.to_string()))?;

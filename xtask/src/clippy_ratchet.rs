@@ -27,6 +27,11 @@ pub fn count(reader: impl BufRead) -> Result<Counts, String> {
             }
             finished = true;
         }
+        if event["reason"] == "compiler-message"
+            && (!event["message"].is_object() || !event["message"]["level"].is_string())
+        {
+            return Err("compiler-message lacks message object or level".into());
+        }
         if event["reason"] != "compiler-message" || event["message"]["level"] != "warning" {
             continue;
         }

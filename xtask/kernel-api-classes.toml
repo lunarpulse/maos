@@ -716,3 +716,5 @@
 # Method metadata is explicit even though the surface walker tracks top-level items.
 "maos_kernel_core::memory::private::PrivateMemoryStore::bind_storage_identity" = "data-movement" # immutable stable-owner storage binding
 "maos_kernel_core::memory::MemoryManagerAdapter::bind_storage_identity" = "data-movement" # delegates the admitted storage binding
+# 20-3b landing 2 review corrections, operator ruling w8: stable-owner discovery.
+"maos_kernel_core::memory::MemoryManagerAdapter::principal_ids_for_spirit" = "data-movement" # durable index discovery by full admitted identity

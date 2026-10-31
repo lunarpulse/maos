@@ -46,30 +46,30 @@ fn every_t0_identity_component_affects_source_distinct() -> Result<(), String> {
 #[test]
 fn ratchet_fails_if_either_count_grows_and_accepts_equal_or_lower() {
     let baseline = Counts {
-        occurrences: 1411,
-        source_distinct: 884,
+        occurrences: 3,
+        source_distinct: 2,
     };
     assert!(compare(&baseline, &baseline).is_ok());
     assert!(compare(
         &Counts {
-            occurrences: 1410,
-            source_distinct: 883
+            occurrences: 2,
+            source_distinct: 1
         },
         &baseline
     )
     .is_ok());
     assert!(compare(
         &Counts {
-            occurrences: 1412,
-            source_distinct: 884
+            occurrences: 4,
+            source_distinct: 2
         },
         &baseline
     )
     .is_err());
     assert!(compare(
         &Counts {
-            occurrences: 1411,
-            source_distinct: 885
+            occurrences: 3,
+            source_distinct: 3
         },
         &baseline
     )
@@ -83,6 +83,9 @@ fn malformed_truncated_or_failed_clippy_stream_is_not_zero_debt() {
         "not json\n",
         "{\"reason\":\"build-finished\",\"success\":false}\n",
         "{\"reason\":\"compiler-artifact\"}\n",
+        "{\"reason\":\"compiler-message\"}\n{\"reason\":\"build-finished\",\"success\":true}\n",
+        "{\"reason\":\"compiler-message\",\"message\":{}}\n{\"reason\":\"build-finished\",\"success\":true}\n",
+        "{\"reason\":\"compiler-message\",\"message\":{\"level\":null}}\n{\"reason\":\"build-finished\",\"success\":true}\n",
     ] {
         assert!(count(bad.as_bytes()).is_err());
     }
@@ -110,12 +113,35 @@ fn advisory_lane_is_enrolled_but_not_in_blocking_fanin() -> Result<(), String> {
     assert!(!runs.contains("-D warnings"));
     let baseline: Counts =
         toml::from_str(include_str!("../clippy-baseline.toml")).map_err(|e| e.to_string())?;
-    assert_eq!(
-        baseline,
-        Counts {
+    compare(
+        &baseline,
+        &Counts {
             occurrences: 1411,
-            source_distinct: 884
-        }
-    );
+            source_distinct: 884,
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
+fn fixture_baseline_ratchets_down_without_pinning_live_debt() -> Result<(), String> {
+    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let input = dir.path().join("clippy.jsonl");
+    let baseline = dir.path().join("baseline.toml");
+    std::fs::write(&input, FIXTURE).map_err(|e| e.to_string())?;
+    for (pin, passes) in [
+        ("occurrences = 4\nsource_distinct = 3\n", true),
+        ("occurrences = 3\nsource_distinct = 2\n", true),
+        ("occurrences = 2\nsource_distinct = 2\n", false),
+        ("occurrences = 3\nsource_distinct = 1\n", false),
+        ("occurrences = 'invalid'\nsource_distinct = 2\n", false),
+    ] {
+        std::fs::write(&baseline, pin).map_err(|e| e.to_string())?;
+        let result = xtask::clippy_ratchet::run(
+            input.to_str().ok_or("input path")?,
+            baseline.to_str().ok_or("baseline path")?,
+        );
+        assert_eq!(result.is_ok(), passes, "{pin}: {result:?}");
+    }
     Ok(())
 }

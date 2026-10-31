@@ -1,6 +1,6 @@
 --- a/crates/maos-kernel-core/src/memory/private.rs
 +++ b/crates/maos-kernel-core/src/memory/private.rs
-@@ -106,12 +106,7 @@
+@@ -108,12 +108,7 @@
      }
  
      pub(in crate::memory) fn owner_dirname(&self, spirit_pid: u32) -> String {

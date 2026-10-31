@@ -66,9 +66,39 @@ jobs:
           env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --test principal_identity_20_3b
           env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-bin --test hook_pump_17_4 --test butler_scene_18_4
           env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-audit --test governance_roundtrip_20_3b
-          env -u CI -u GITHUB_ACTIONS cargo test --locked -p xtask --test coverage_matrix_20_3b --test invariant_claims_20_3b --test clippy_ratchet_20_3b --test surface_and_root_20_3b --test prepush_blocking_20_3b
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-spirit-sdk --features spirit_test --test routed_sdk_20_3b
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --test routed_halt_swap_20_3b
+          env -u CI -u GITHUB_ACTIONS cargo test --locked -p xtask --test coverage_matrix_20_3b --test invariant_claims_20_3b --test clippy_ratchet_20_3b --test surface_and_root_20_3b --test prepush_blocking_20_3b --test routed_catalog_20_3b
           env -u CI -u GITHUB_ACTIONS cargo run --locked -p xtask -- coverage-matrix --json
           env -u CI -u GITHUB_ACTIONS cargo run --locked -p xtask -- check-coverage-matrix-completeness --json
+      - name: Exercise the labelled AC5 red witnesses without treating them as guarantees
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2"
+          for witness in sdk halt; do
+            if [ "$witness" = sdk ]; then
+              package=maos-spirit-sdk; binary=routed_sdk_20_3b
+              vector=sdk_harness_records_iac_frame_io_in_its_capture_report
+              assertion='FR34 SDK frame I/O must be observable'
+              features=(--features spirit_test)
+            else
+              package=maos-kernel-core; binary=routed_halt_swap_20_3b
+              vector=active_halt_keeps_identity_and_replay_context_across_hot_swap
+              assertion='FR53 preserves the ORIGINAL active halt id'
+              features=()
+            fi
+            set +e
+            env -u CI -u GITHUB_ACTIONS cargo test --locked -p "$package" "${features[@]}" --test "$binary" "$vector" -- --ignored --exact --nocapture > "$evidence/hosted-ac5-$witness.log" 2>&1
+            result=$?
+            set -e
+            test "$result" -eq 101
+            python3 - "$evidence/hosted-ac5-$witness.log" "$vector" "$assertion" <<'PY'
+          import pathlib, sys
+          text = pathlib.Path(sys.argv[1]).read_text()
+          assert sys.argv[2] in text and sys.argv[3] in text and 'FAILED' in text, text
+          PY
+          done
       - name: Verify and exercise the exact FR31 mutation cuts
         shell: bash
         run: |
