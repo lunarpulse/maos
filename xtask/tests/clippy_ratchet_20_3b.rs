@@ -113,11 +113,13 @@ fn advisory_lane_is_enrolled_but_not_in_blocking_fanin() -> Result<(), String> {
     assert!(!runs.contains("-D warnings"));
     let baseline: Counts =
         toml::from_str(include_str!("../clippy-baseline.toml")).map_err(|e| e.to_string())?;
+    // Hosted T0 (run 41233186774, job clippy-advisory): the live baseline may
+    // be lowered below it as debt is reduced but must never exceed it.
     compare(
         &baseline,
         &Counts {
-            occurrences: 1411,
-            source_distinct: 884,
+            occurrences: 1456,
+            source_distinct: 904,
         },
     )?;
     Ok(())

@@ -195,9 +195,18 @@ impl Root {
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
         .expect("open the Transparency Log read-only");
-        let mut statement = conn
-            .prepare("SELECT spirit_pid, intent FROM transparency_log ORDER BY rowid")
-            .expect("prepare TL read");
+        let mut statement =
+            match conn.prepare("SELECT spirit_pid, intent FROM transparency_log ORDER BY rowid") {
+                Ok(statement) => statement,
+                // The daemon creates the table after the file: an early read sees
+                // no table, which is no rows yet, not a harness failure.
+                Err(rusqlite::Error::SqliteFailure(_, Some(message)))
+                    if message.contains("no such table") =>
+                {
+                    return Vec::new();
+                }
+                Err(error) => panic!("prepare TL read: {error}"),
+            };
         let rows = statement
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("query the TL");

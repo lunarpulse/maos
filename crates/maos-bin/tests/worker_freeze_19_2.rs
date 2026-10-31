@@ -87,6 +87,47 @@ const EXIT_BOUND: Duration = Duration::from_secs(40);
 /// `(timestamp_ns, spirit_pid, intent, capability_token column, payload)`.
 type Row = (i64, i64, String, Option<Vec<u8>>, serde_json::Value);
 
+/// Rows of a read-only TL query at `db`. The root creates the database file
+/// and then its `transparency_log` table, so a poll can land on a missing
+/// file, an empty file, or a file without the table: all three are "no rows
+/// yet" (the caller's bounded wait retries), never a harness failure. Any
+/// other SQLite error still fails loudly.
+fn tl_rows_at(db: &Path, sql: &str) -> Vec<Row> {
+    if !db.exists() {
+        return Vec::new();
+    }
+    let connection = rusqlite::Connection::open_with_flags(
+        db,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .expect("open the transparency log read-only");
+    let mut statement = match connection.prepare(sql) {
+        Ok(statement) => statement,
+        Err(rusqlite::Error::SqliteFailure(_, Some(message)))
+            if message.contains("no such table") =>
+        {
+            return Vec::new();
+        }
+        Err(error) => panic!("prepare TL read: {error}"),
+    };
+    statement
+        .query_map([], |row| {
+            let payload: Option<Vec<u8>> = row.get(4)?;
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                payload
+                    .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                    .unwrap_or(serde_json::Value::Null),
+            ))
+        })
+        .expect("query TL rows")
+        .collect::<Result<_, _>>()
+        .expect("read TL rows")
+}
+
 fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
 }
@@ -262,32 +303,7 @@ impl WorkerRoot {
     }
 
     fn rows(&self, sql: &str) -> Vec<Row> {
-        let db = self.home.join("audit").join("transparency.sqlite");
-        if !db.exists() {
-            return Vec::new();
-        }
-        let connection = rusqlite::Connection::open_with_flags(
-            db,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .expect("open the transparency log read-only");
-        let mut statement = connection.prepare(sql).expect("prepare TL read");
-        statement
-            .query_map([], |row| {
-                let payload: Option<Vec<u8>> = row.get(4)?;
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    payload
-                        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-                        .unwrap_or(serde_json::Value::Null),
-                ))
-            })
-            .expect("query TL rows")
-            .collect::<Result<_, _>>()
-            .expect("read TL rows")
+        tl_rows_at(&self.home.join("audit").join("transparency.sqlite"), sql)
     }
 
     /// `(timestamp_ns, child_pid, spirit_pid)` of every journaled heartbeat.
@@ -598,4 +614,67 @@ fn twenty_spawn_token_revokes_stop_the_worker_within_the_teardown_budget() {
         max <= TEARDOWN_BUDGET,
         "all {REVOKES} ≤ 25 s (P99 at n={REVOKES} = max): the slowest revoke stop took {max:?}"
     );
+}
+
+const HEARTBEAT_SQL: &str = "SELECT timestamp_ns, spirit_pid, intent, capability_token, \
+     payload_redacted FROM transparency_log ORDER BY rowid";
+
+/// The hosted race (run 41233186774): the harness read the root's TL before
+/// the root created its table. A missing file, a zero-byte file, and a file
+/// that only carries other tables each read as no rows.
+#[test]
+fn a_tl_read_before_the_table_exists_yields_no_rows() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    let missing = dir.path().join("missing.sqlite");
+    assert!(tl_rows_at(&missing, HEARTBEAT_SQL).is_empty());
+
+    let empty = dir.path().join("empty.sqlite");
+    std::fs::File::create(&empty).expect("create empty db file");
+    assert!(tl_rows_at(&empty, HEARTBEAT_SQL).is_empty());
+
+    let other_tables = dir.path().join("other.sqlite");
+    rusqlite::Connection::open(&other_tables)
+        .expect("create db")
+        .execute_batch("CREATE TABLE unrelated (id INTEGER PRIMARY KEY);")
+        .expect("create unrelated table");
+    assert!(tl_rows_at(&other_tables, HEARTBEAT_SQL).is_empty());
+}
+
+/// Once the table exists the same helper returns its rows with the payload
+/// decoded, so the tolerance above cannot hide written frames.
+#[test]
+fn a_tl_read_after_the_table_exists_returns_its_rows() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = dir.path().join("transparency.sqlite");
+    let connection = rusqlite::Connection::open(&db).expect("create db");
+    connection
+        .execute_batch(
+            "CREATE TABLE transparency_log (timestamp_ns INTEGER, spirit_pid INTEGER, \
+             intent TEXT, capability_token BLOB, payload_redacted BLOB);
+             INSERT INTO transparency_log VALUES \
+             (7, 42, 'cli.subprocess.output', NULL, X'7B226C696E65223A2268227D');",
+        )
+        .expect("seed one row");
+    let rows = tl_rows_at(&db, HEARTBEAT_SQL);
+    assert_eq!(rows.len(), 1);
+    let (timestamp, pid, intent, token, payload) = &rows[0];
+    assert_eq!((*timestamp, *pid), (7, 42));
+    assert_eq!(intent, "cli.subprocess.output");
+    assert!(token.is_none());
+    assert_eq!(payload["line"], "h");
+}
+
+/// Only the missing-table case is tolerated: any other SQLite failure still
+/// fails the harness loudly.
+#[test]
+#[should_panic(expected = "prepare TL read")]
+fn a_tl_read_with_a_broken_query_still_fails_loudly() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = dir.path().join("transparency.sqlite");
+    rusqlite::Connection::open(&db)
+        .expect("create db")
+        .execute_batch("CREATE TABLE transparency_log (timestamp_ns INTEGER);")
+        .expect("create table without the queried columns");
+    tl_rows_at(&db, HEARTBEAT_SQL);
 }

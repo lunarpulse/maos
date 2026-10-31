@@ -1134,3 +1134,35 @@ runtime substrates remain unverified. FR34/FR53's labelled ignored reds are
 unchanged. No commit, push, `.devcontainer/*` edit/stage, alternate-worktree,
 target override, clean or migration-corpus tracking occurred. Final evidence
 edits follow verification; no post-evidence prepush run is claimed.
+
+## Hosted landing run 41233186774 follow-up
+
+Run 41233186774 (discipline @ `1293f427`) was 184/189. Reds and fixes:
+
+| Red | Cause | Fix |
+|---|---|---|
+| `workspace-test-suite`: `maos-bin::worker_freeze_19_2::twenty_door_pauses_freeze_a_chatty_worker_each_within_two_seconds` panicked at `worker_freeze_19_2.rs:274:53` (`prepare TL read: SqliteFailure … "no such table: transparency_log"`) | Harness race: the test read the root's TL read-only after the file existed but before the root created its table | The query is now the free `tl_rows_at` helper: a missing file, an empty file, or a file without `transparency_log` (SqliteFailure message contains `no such table`) is "no rows yet", so the existing bounded `wait_for` retries; every other SQLite error still panics. All assertions and bounds are untouched. |
+| `clippy-advisory` (non-blocking) 1,456 occurrences / 904 source-distinct vs baseline 1,411/884 | The baseline was measured with the local toolchain (local 1,410/881); the hosted `stable` toolchain is newer and counts higher | `xtask/clippy-baseline.toml` = 1456/904, naming run 41233186774 job `clippy-advisory` as the authority (local toolchains may count lower); `xtask/tests/clippy_ratchet_20_3b.rs` bounds the live baseline by the hosted T0 1456/904 (invariant: it never exceeds it); `docs/testing/proof-contract.md` and the `discipline.yml` advisory comment state the hosted figures. Ratchet logic unchanged: the job still fails only on growth. |
+| ship-gates reds | Dependents of the `workspace-test-suite` red | None needed. |
+
+Same read-before-table race fixed the same way (a `no such table` prepare is no rows; other errors still panic) in the other live-polled TL readers:
+`butler_daemon_18_1.rs::tl_rows`, `maosctl_load_16_6.rs::Root::tl_rows`, `orchestrator_queue_19_2.rs::Root::tl`, `epic_dispatch_19_1.rs::journal_rows`, `epic_halt_resume_19_4.rs::tl_rows`, `f4_pairing.rs::repin_requested_rows` (all `maos-bin/tests`). `one_daemon_one_door_16_1.rs`, `researcher_inference_18_3.rs` and `root_shutdown_unload_16_3.rs` already tolerated it. The remaining TL readers (`drain_once_audit_writer`, `smoke_cli_wrapper_8_12`, `worker_workspace_19_3`, `epic_args_19_1`, `context_budget_18_5`, `butler_8_14b`, `cohort_daemon_smoke_13_5c`, `shell_host_16_2`, `j_researcher_survey_18_3`, `escape_anomaly_tail_17_10`) read only after the root exited or after the producing event was observed, so they cannot race table creation; `maos-control` and `maos-cli` tests have no such reader. No production line changed (kloc-check aggregate 188451, unchanged).
+
+Deterministic regressions (run locally; no T3 substrate needed):
+`worker_freeze_19_2::a_tl_read_before_the_table_exists_yields_no_rows`, `::a_tl_read_after_the_table_exists_returns_its_rows`, `::a_tl_read_with_a_broken_query_still_fails_loudly`, and `butler_daemon_18_1::a_tl_read_before_the_table_exists_yields_no_rows`.
+
+Verification (inherited `CARGO_TARGET_DIR=/mnt/build/cargo-maos`, which was absent at start and was recreated with `mkdir -p`; `env -u CI -u GITHUB_ACTIONS`):
+
+| Command | Exit |
+|---|---|
+| `cargo fmt --all` | 0 |
+| `cargo build --locked --workspace --all-targets`, then `cargo run --locked -p xtask -- build-test-fixtures` | 0, 0 |
+| `cargo nextest run -p maos-bin --test worker_freeze_19_2 --test butler_daemon_18_1 --test maosctl_load_16_6 --test orchestrator_queue_19_2 --test epic_dispatch_19_1 --test epic_halt_resume_19_4 --test f4_pairing` | 0 (59/59; the three T3 worker_freeze vectors skip locally) |
+| `cargo nextest run -p xtask --test clippy_ratchet_20_3b` | 0 (6/6) |
+| `cargo nextest run -p xtask` | 0 (1190 passed, 12 skipped) |
+| `cargo nextest run --workspace --locked --no-fail-fast` | 0 (5450 passed, 139 skipped) |
+| `xtask kloc-check` / `check-dev-record-completeness` / `check-epic-close-coherence` / `check-test-cost` | 0 / 0 / 0 / 0 |
+| `xtask prepush --json`, first run | 1: `workspace-nextest` red on `maos-cli::pause_resume_test::resume_maps_typed_responses_to_d16_1_p_exits` and `maos-cli::orchestrator_recall_pick_19_2::recall_and_pick_discovery_failures_map_to_typed_exits` (load flakes; both pass alone and in the full workspace rerun above) |
+| `xtask prepush --json`, rerun | 0: 83 pass, 8 skip, 1 advisory (`test-budget`: independent default-thread timing judgment, unchanged contract) |
+
+Not verified: the hosted rerun of the discipline workflow.

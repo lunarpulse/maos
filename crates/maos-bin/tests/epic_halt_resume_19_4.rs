@@ -330,12 +330,20 @@ fn tl_rows(home: &Path, kind: i64) -> Vec<(String, i64, String, serde_json::Valu
     let Some(connection) = open_tl(home) else {
         return Vec::new();
     };
-    let mut statement = connection
-        .prepare(
-            "SELECT frame_id, spirit_pid, intent, payload_redacted FROM transparency_log \
-             WHERE kind = ?1 ORDER BY timestamp_ns, rowid",
-        )
-        .expect("prepare TL query");
+    let mut statement = match connection.prepare(
+        "SELECT frame_id, spirit_pid, intent, payload_redacted FROM transparency_log \
+         WHERE kind = ?1 ORDER BY timestamp_ns, rowid",
+    ) {
+        Ok(statement) => statement,
+        // A run that stopped after creating the file but before the table has
+        // no rows, not a harness failure.
+        Err(rusqlite::Error::SqliteFailure(_, Some(message)))
+            if message.contains("no such table") =>
+        {
+            return Vec::new();
+        }
+        Err(error) => panic!("prepare TL query: {error}"),
+    };
     statement
         .query_map([kind], |row| {
             let frame_id: Vec<u8> = row.get(0)?;

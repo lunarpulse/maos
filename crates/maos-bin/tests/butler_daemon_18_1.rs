@@ -87,9 +87,19 @@ fn tl_rows(scratch: &Path) -> Vec<(i64, String, u64, Vec<u8>)> {
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .expect("open the TL read-only");
-    let mut statement = conn
-        .prepare("SELECT kind, intent, timestamp_ns, payload_redacted FROM transparency_log ORDER BY rowid")
-        .expect("prepare TL read");
+    let mut statement = match conn.prepare(
+        "SELECT kind, intent, timestamp_ns, payload_redacted FROM transparency_log ORDER BY rowid",
+    ) {
+        Ok(statement) => statement,
+        // The daemon creates the table after the file: an early read sees no
+        // table, which is no rows yet, not a harness failure.
+        Err(rusqlite::Error::SqliteFailure(_, Some(message)))
+            if message.contains("no such table") =>
+        {
+            return Vec::new();
+        }
+        Err(error) => panic!("prepare TL read: {error}"),
+    };
     let rows = statement
         .query_map([], |row| {
             Ok((
@@ -282,4 +292,26 @@ fn the_serving_root_renders_at_start_mints_per_pass_and_survives_a_refused_pass(
         !err.contains("drain timed out"),
         "no audit-drain stall at shutdown:\n{err}"
     );
+}
+
+/// The daemon creates the TL file before its table: a read in that window
+/// (zero-byte file, or a file with only other tables) is no rows, not a
+/// harness panic.
+#[test]
+fn a_tl_read_before_the_table_exists_yields_no_rows() {
+    let scratch = tempfile::tempdir().expect("tempdir");
+    let audit = scratch.path().join("home").join("audit");
+    std::fs::create_dir_all(&audit).expect("audit dir");
+    let db = audit.join("transparency.sqlite");
+
+    assert!(tl_rows(scratch.path()).is_empty(), "no file yet");
+
+    std::fs::File::create(&db).expect("create empty db file");
+    assert!(tl_rows(scratch.path()).is_empty(), "empty file");
+
+    rusqlite::Connection::open(&db)
+        .expect("open db")
+        .execute_batch("CREATE TABLE unrelated (id INTEGER PRIMARY KEY);")
+        .expect("create unrelated table");
+    assert!(tl_rows(scratch.path()).is_empty(), "other tables only");
 }

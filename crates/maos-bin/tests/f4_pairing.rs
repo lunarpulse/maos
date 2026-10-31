@@ -1110,12 +1110,20 @@ fn maosctl_on_door(door: &str, args: &[&str]) -> std::process::Output {
 /// `(rowid, payload)` of every `a2a:repin-requested` row, oldest first.
 fn repin_requested_rows(db: &Path) -> Vec<(i64, String)> {
     let connection = rusqlite::Connection::open(db).expect("open transparency log");
-    let mut statement = connection
-        .prepare(
-            "SELECT rowid, CAST(payload_redacted AS TEXT) FROM transparency_log \
-             WHERE intent = 'a2a:repin-requested' ORDER BY rowid",
-        )
-        .expect("prepare detection-row query");
+    let mut statement = match connection.prepare(
+        "SELECT rowid, CAST(payload_redacted AS TEXT) FROM transparency_log \
+         WHERE intent = 'a2a:repin-requested' ORDER BY rowid",
+    ) {
+        Ok(statement) => statement,
+        // The caller polls a live host's log: before its table exists there
+        // is no detection row yet, not a harness failure.
+        Err(rusqlite::Error::SqliteFailure(_, Some(message)))
+            if message.contains("no such table") =>
+        {
+            return Vec::new();
+        }
+        Err(error) => panic!("prepare detection-row query: {error}"),
+    };
     statement
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
         .expect("query detection rows")

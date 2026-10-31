@@ -327,12 +327,20 @@ impl Root {
         let Some(connection) = self.connection() else {
             return Vec::new();
         };
-        let mut statement = connection
-            .prepare(
-                "SELECT frame_id, timestamp_ns, spirit_pid, kind, intent, payload_redacted \
-                 FROM transparency_log ORDER BY rowid",
-            )
-            .expect("prepare TL read");
+        let mut statement = match connection.prepare(
+            "SELECT frame_id, timestamp_ns, spirit_pid, kind, intent, payload_redacted \
+             FROM transparency_log ORDER BY rowid",
+        ) {
+            Ok(statement) => statement,
+            // The root creates the table after the file: an early read sees
+            // no table, which is no rows yet, not a harness failure.
+            Err(rusqlite::Error::SqliteFailure(_, Some(message)))
+                if message.contains("no such table") =>
+            {
+                return Vec::new();
+            }
+            Err(error) => panic!("prepare TL read: {error}"),
+        };
         statement
             .query_map([], |row| {
                 let frame_id: Vec<u8> = row.get(0)?;

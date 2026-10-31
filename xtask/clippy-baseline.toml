@@ -3,6 +3,11 @@
 # cargo clippy --workspace --all-targets --locked --message-format=json
 # lib and lib-test diagnostic repetitions count separately. Source-distinct keys:
 # package, level, lint code, message, primary file/line/column start and end.
-# Lower both pins to the observed counts when warning debt is intentionally reduced.
-occurrences = 1411
-source_distinct = 884
+# Measurement authority: hosted run 41233186774, job `clippy-advisory` (stable
+# toolchain on ubuntu-latest), 1456 occurrences / 904 source-distinct. Hosted CI
+# is the authority; a local toolchain may count lower (local: 1410/881) because
+# the hosted toolchain is newer and emits more lints. The job fails only on
+# growth from these hosted figures.
+# Lower both pins to the observed hosted counts when warning debt is intentionally reduced.
+occurrences = 1456
+source_distinct = 904
