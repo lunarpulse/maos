@@ -5,8 +5,8 @@ created: 2026-10-30
 context_commit: 23f58da4
 baseline_commit: 23f58da4
 security_sensitive: true
-kernel_grant: "◆ FLAG-Winston extended by operator ruling w9, 2026-10-31, Raise to measured exactly: kernel <= 26680 physical / 20889 tokei, zero headroom; extends w8 26620/20834 by +60/+55. Final formatted pins must equal measured; STOP above either ceiling. Prior w8/d03 grants and creation measurements remain historical below."
-kloc_grant: "Operator ruling w9, 2026-10-31, Raise to measured exactly: maos-bin <= 33021 (epic envelope33010 -> 33021), maos-audit 7668 unchanged, xtask cap42775 -> 42780, maos-domain 9977 unchanged; aggregate hardfail = measured + 1 (188240 for measured188239). Exact final formatted pins, zero headroom; any fix above a ceiling is STOP. Supersedes w8 for the round-2 corrections only."
+kernel_grant: "◆ FLAG-Winston extended by operator ruling w10, 2026-10-31, Raise to measured exactly: kernel <= 26793 physical / 20992 tokei, zero headroom; extends w9 26680/20889 by +113/+103. Final formatted pins must equal measured; STOP above either ceiling. Prior w9/w8/d03 grants and creation measurements remain historical below."
+kloc_grant: "Operator ruling w10, 2026-10-31, Raise to measured exactly: maos-bin <= 33030 (epic envelope33021 -> 33030), maos-audit STOP7668 -> 7707, xtask42780 -> 42841, maos-domain 9977 unchanged; aggregate hardfail = measured + 1 (188452 for measured188451). Exact final formatted pins, zero headroom; any fix above a ceiling is STOP. Supersedes w9 for the round-3 corrections only."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-70`): a kernel FLAG-Winston grant (D03) and a security-critical cross-Spirit isolation AC (FR31), plus the deletion of ten live or registered controls where one mistake removes protection (epic split rationale, E20@HEAD:103). Blind and Edge on opus-5.5, Acceptance on opus-5.5, Security reading on AC4, Test Infrastructure on glm-5.3 (standing policy `proof-contract.md:64-72`; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -69,7 +69,7 @@ Full OLD → NEW table: `creation/cites-23f58da4.md` (C1–C18, F1–F10, T1–T
 
 **Instrument:** prebuilt `/tmp/xtask-maos-w3` (`check-kernel-baseline --json`, `kloc-check --json`, tokei 14.0.0) run from a `git archive 23f58da4` copy root per prototype; the untouched copy reproduces the tree exactly (26409 / 95 files / set hash `66dc2e24…`; aggregate 192778). Detail and diffs: `creation/measurements.md`, `creation/tokei-23f58da4-and-prototypes.json`.
 
-**Kernel (◆ FLAG-Winston, operator ruling w9, 2026-10-31 — “Raise to measured exactly”):** round-2 corrections are authorized at most **26,680 physical / 20,889 tokei**, extending w8's **26,620 / 20,834** by **+60 / +55**. The formatted round-2 measurement is **26,680 / 20,889**; STOP above either ceiling and pin exactly at the final measurement with zero headroom. Prior w8/d03/creation grants remain historical, not current ceilings.
+**Kernel (◆ FLAG-Winston, operator ruling w10, 2026-10-31 — “Raise to measured exactly”):** round-3 corrections are authorized at most **26,793 physical / 20,992 tokei**, extending w9's **26,680 / 20,889** by **+113 / +103**. The formatted round-3 measurement is **26,793 / 20,992**; STOP above either ceiling and pin exactly at the final measurement with zero headroom. Prior w9/w8/d03/creation grants remain historical, not current ceilings.
 
 | Shape | Kernel physical | Kernel tokei | Other | Diff |
 |---|---:|---:|---|---|
@@ -98,20 +98,20 @@ Both pins move with any grant (`xtask/kernel-core-baseline.toml:27-28` + EOF blo
 | maos-cli, maos-control, maos-shell, spirits, tests | 0 | not touched |
 | **aggregate** | ≈ −5411 + adds; worst case with allowance ≈ **−2485** | sum |
 
-**Round-2 measured table — operator ruling w9, 2026-10-31 (“Raise to measured exactly”):**
+**Round-3 measured table — operator ruling w10, 2026-10-31 (“Raise to measured exactly”):**
 
 | Surface | Formatted measured | Authorized maximum / exact pin rule |
 |---|---:|---|
-| Kernel physical / tokei | 26,680 / 20,889 | 26,680 / 20,889; FLAG-Winston w9; zero headroom |
-| xtask | 42,780 | xtask42757 -> 42780; cap42,775 -> 42,780; exact formatted pin |
-| maos-bin | 33,021 | 33,021; epic envelope33,010 -> 33,021; zero headroom |
-| maos-audit | 7,668 | 7,668 unchanged; empty-key fix has zero production growth |
+| Kernel physical / tokei | 26,793 / 20,992 | 26,793 / 20,992; FLAG-Winston w10; zero headroom |
+| xtask | 42,841 | xtask42780 -> 42841; exact formatted pin |
+| maos-bin | 33,030 | 33,030; epic envelope33,021 -> 33,030; zero headroom |
+| maos-audit | 7,707 | STOP7,668 -> 7,707; exact formatted pin |
 | maos-domain | 9,977 | 9,977 unchanged |
-| Aggregate | 188,239 | Strict hardfail188,240 = measured+1 |
+| Aggregate | 188,451 | Strict hardfail188,452 = measured+1 |
 
-These values are the formatted measured round-2 corrections, not reservations. A compile fix above any authorized maximum must STOP; a lower final measurement lowers its pin exactly. HISTORY cites `20-3b landing 2 round-2 corrections, operator ruling w9`; the xtask row retains the full story key and 42757 -> 42780 arrow in its first segment. The generator is NO-GO (AC2 cut), so hard mode remains on the hand-kept YAML and coverage-completeness remains live.
+These values are the formatted measured round-3 corrections, not reservations. A compile fix above any authorized maximum must STOP; a lower final measurement lowers its pin exactly. HISTORY cites `20-3b landing 2 round-3 corrections, operator ruling w10`; the xtask row retains the full story key and 42780 -> 42841 arrow in its first segment. The generator is NO-GO (AC2 cut), so hard mode remains on the hand-kept YAML and coverage-completeness remains live.
 
-**Historical creation envelope below — superseded for landing-2 round-2 corrections by operator ruling w9 above.** Prior w8 measured grants were kernel26,620/20,834, bin32,979, audit7,668, xtask42,757 within42,775, aggregate188,119/hardfail188,120; w9 adopts only the subsequently measured +60/+55 kernel, +42 bin and +23 xtask corrections.
+**Historical creation envelope below — superseded for landing-2 round-3 corrections by operator ruling w10 above.** Prior w9 grants were kernel26,680/20,889, bin33,021, audit7,668, xtask42,780, aggregate188,239/hardfail188,240; w10 adopts only the subsequently measured +113/+103 kernel, +9 bin, +39 audit and +61 xtask corrections. Prior w8 measured grants were kernel26,620/20,834, bin32,979, audit7,668, xtask42,757 within42,775, aggregate188,119/hardfail188,120.
 
 **Envelope (D-20-3b-15 A RULED 2026-10-30; ask env15):** D02 A applies ×3 on unmeasured adds and ×2 on measured adds. L1 xtask ceiling **43608**; maos-bin ≤ **+16**, maos-domain ≤ **+2**, kernel ≤ **+182 physical / +160 tokei**, maos-audit / maos-cli **0**. Ceilings are not reservations. L1 is retirement and the three row-09 folds; lower pins exactly afterward (`kloc.toml:86-89`, aggregate measured +1). L2 includes generator and FR31: request its aggregate grant at creation of its own dev plan against the lowered pin. The operator splits the inherited 71 maos-bin lines at 20-1/20-4 creation.
 
@@ -347,6 +347,7 @@ Operator ruled D03 A, D04 A, D08 A, D-20-3b-01 A, 02 A, 03 B, 04 A, 05 B, 06–1
 - Creation evidence: `20-3b-gate-retirement-and-coverage-generator-evidence/creation/{measurements.md, cites-23f58da4.md, records-owed.md, tokei-23f58da4-and-prototypes.json, coverage-matrix-replica.py, x1-retirement-prototype.py, x1-retirement-enrolment-edits.diff, k1-principal-durability.diff, k2a-identity-keyed-spill-dirs.diff, k2b-identity-index-owner-column.diff, krec-k1-k2a-bundle.diff, kfull-k1-k2b-bundle.diff, b1-maos-bin-identity-binding.diff}`.
 - 2026-10-31: Patched locked Wasmtime/WASI/Pulley/Wiggle 48.0.7→48.0.8 and Cranelift 0.135.7→0.135.8; RUSTSEC-2026-0420/0422/0423/0424 cleared, requested build/fixtures/targeted+workspace tests/gates/fmt/prepush pass (prepush cargo-deny actually ran; one timing advisory/seven skips), all KLOC/kernel figures unchanged; exact commands/exits and limits: `20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/verification.md#wasmtime-4808-security-patch-verification`.
 - 2026-10-31: Round-2 fixes 1–6 adopted under operator ruling w9 at exact kernel26,680/20,889, bin33,021, audit7,668, xtask42,780 and aggregate188,239/hardfail188,240; both full nextest runs green (5,438 passed/139 skipped), all 11 pin-dependent failures cleared; four FR31 plants red at intended assertions/restored green; clippy1,410/881 and cargo-deny pass; prepush83 pass/0 red/1 advisory/8 skip. Serial participant-recall Σ37.355s timing finding is explicitly advisory by Main/operator disposition, no exception; hosted JUnit decides. Exact evidence: `20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/` and `landing-2/verification.md`.
+- 2026-10-31: Round-3 fixes 1–4 adopted under operator ruling w10 at exact kernel26,793/20,992, bin33,030, audit7,707, xtask42,841 and aggregate188,451/hardfail188,452. Both serial workspace runs and the default run pass5,446/139 skipped; all11 pin-dependent failures cleared. Both fresh serial timing judgments pass with zero findings; all eight prior findings individually reassessed without exceptions. All gates, clippy1,410/881 and deny pass; four FR31 plants reach intended assertions/restored green; prescribed prepush83 pass/0 red/1 advisory/8 skip. Exact commands, individual timing dispositions and limits: `20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-3/w10/` and `landing-2/verification.md`.
 
 ### Completion Notes List
 

@@ -1,0 +1,33 @@
+{
+  "implementation_complete": true,
+  "pins_changed": false,
+  "tests_relocated": [],
+  "measured": {
+    "kernel_physical": {"actual": 26793, "pin": 26680, "delta": 113},
+    "kernel_tokei": {"actual": 20992, "pin": 20889, "delta": 103},
+    "maos_bin": {"actual": 33030, "pin": 33021, "delta": 9},
+    "maos_audit": {"actual": 7707, "pin": 7668, "delta": 39},
+    "xtask": {"actual": 42841, "pin": 42780, "delta": 61},
+    "maos_domain": {"actual": 9977, "pin": 9977, "delta": 0},
+    "aggregate": {"actual": 188451, "prior_actual": 188239, "hardfail": 188240, "required_exact_hardfail": 188452}
+  },
+  "focused": {
+    "kernel_memory": {"exit": 0, "passed": 37},
+    "principal_identity_20_3b": {"exit": 0, "passed": 27},
+    "private_forget_restart_13_5i": {"exit": 0, "passed": 10},
+    "private_spill_supersession_13_5j": {"exit": 0, "passed": 18},
+    "erasure_uninstall_13_5b": {"exit": 0, "passed": 26},
+    "maos_uninstall_16_4": {"exit": 0, "passed": 23},
+    "private_tier_count_16_5": {"exit": 0, "passed": 3},
+    "governance_roundtrip_20_3b": {"exit": 0, "passed": 4},
+    "invariant_claims_20_3b": {"exit": 0, "passed": 7}
+  },
+  "workspace_serial_final": {"exit": 100, "passed": 5435, "failed": 11, "skipped": 139, "runner_seconds": 1190.406, "command_seconds": 2052.750},
+  "workspace_default_explicit": {"exit": 100, "passed": 5434, "failed": 11, "skipped": 139, "runner_seconds": 42.583, "command_seconds": 44.008, "note": "Before the path-specific legacy-empty/NFS diagnostic and its additional passing test; final-source default run also exercised by prescribed prepush."},
+  "clippy": {"exit": 0, "ratchet_exit": 0, "occurrences": 1410, "source_distinct": 881, "occurrence_pin": 1411, "source_distinct_pin": 884},
+  "cargo_deny": {"exit": 0},
+  "fr31_plants": {"disclosure": 101, "butler": 101, "index": 101, "durability": 101, "source_restoration_sha256_exit": 0, "cut_checksums_exit": 0, "restored_kernel_exit": 0, "restored_butler_exit": 0},
+  "prepush": {"exit": 1, "pass": 79, "red": 4, "advisory": 1, "skip": 8, "command_seconds": 578.148, "red_checks": ["check-kernel-baseline", "kloc-check", "check-trial-attestation", "workspace-nextest"], "runtime_diagnostics": 81},
+  "serial_test_budget": {"exit": 1, "findings": 8, "sum_seconds": 1188.152, "span_seconds": 1190.203010559082},
+  "limitations": ["Operator authority for pin increases remains outstanding; no repinning performed.", "Legacy empty-sidecar recovery refuses with a path-bearing typed storage error when NFS returns EBADF for the required exclusive directory lock; fresh creation and reads pass simulated EBADF tests.", "No live NFS filesystem, non-Unix build, hosted workflow, signed T3 substrate, Python Ed25519, strace or live PostgreSQL verification is claimed."]
+}

@@ -875,3 +875,179 @@ fn empty_legacy_sidecars_recover_only_without_ambiguous_values() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn missing_identity_debris_does_not_block_unrelated_forget_but_values_do() -> TestResult {
+    for target in ["owner", "namespace"] {
+        for occupied in [false, true] {
+            let dir = tempfile::tempdir()?;
+            let identity = "o".repeat(128);
+            let ns = MemoryNamespace::principal(PRINCIPAL, "s".repeat(200))?;
+            let metadata = sidecar_path(dir.path(), &identity, &ns, "key", target)?;
+            let debris = metadata.parent().unwrap();
+            std::fs::create_dir_all(debris)?;
+            if target == "namespace" {
+                let owner = sidecar_path(dir.path(), &identity, &ns, "key", "owner")?;
+                std::fs::write(owner, format!("id-{}", hex::encode(&identity)))?;
+            }
+            std::fs::write(debris.join(".identity-tmp.1.0"), &identity)?;
+            if occupied {
+                std::fs::write(debris.join("6b.txt"), "unattributed")?;
+            }
+            let store = PrivateMemoryStore::new(dir.path().join("private"), 4096);
+            let result = store.forget_principal("unrelated");
+            if occupied {
+                assert!(result
+                    .unwrap_err()
+                    .to_string()
+                    .contains(debris.file_name().unwrap().to_str().unwrap()));
+                assert!(debris.join("6b.txt").exists());
+            } else {
+                assert_eq!(result?, 0);
+                assert!(!debris.exists());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn stale_identity_temps_are_cleaned_on_creation_and_forget() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let identity = "o".repeat(128);
+    let ns = MemoryNamespace::principal(PRINCIPAL, "s".repeat(200))?;
+    let metadata = sidecar_path(dir.path(), &identity, &ns, "key", "owner")?;
+    let owner = metadata.parent().unwrap();
+    std::fs::create_dir_all(owner)?;
+    let stale = owner.join(format!(".identity-tmp.{}.0", std::process::id()));
+    std::fs::write(&stale, "partial")?;
+    let store = boot(dir.path())?;
+    store.bind_storage_identity(1, &identity)?;
+    store.write(
+        1,
+        MemoryTier::Private,
+        &ns,
+        "key",
+        MemoryValue::Text("value".into()),
+    )?;
+    assert!(!stale.exists());
+    // A crash after linkat but before temp unlink leaves two links.
+    std::fs::hard_link(&metadata, &stale)?;
+    assert_eq!(
+        PrivateMemoryStore::new(dir.path().join("private"), 4096).forget_principal(PRINCIPAL)?,
+        1
+    );
+    assert!(!owner.exists());
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn identity_publication_accepts_matching_eexist_and_refuses_mismatch() -> TestResult {
+    use maos_kernel_core::memory::spill_test_faults::{arm_pause, disarm, PausePoint};
+    use std::sync::mpsc;
+    for matching in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let ns = MemoryNamespace::principal(PRINCIPAL, "s".repeat(200))?;
+        let encoded = hex::encode(serde_json::to_vec(&ns)?);
+        let metadata = sidecar_path(dir.path(), "owner", &ns, "key", "namespace")?;
+        let store = boot(dir.path())?;
+        store.bind_storage_identity(1, "owner")?;
+        let (arrived_tx, arrived_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            arm_pause(PausePoint::BeforeIdentityPublish, arrived_tx, release_rx);
+            let result = store.write(
+                1,
+                MemoryTier::Private,
+                &ns,
+                "key",
+                MemoryValue::Text("value".into()),
+            );
+            disarm();
+            result
+        });
+        arrived_rx.recv_timeout(std::time::Duration::from_secs(10))?;
+        std::fs::write(&metadata, if matching { &encoded } else { "wrong" })?;
+        release_tx.send(())?;
+        assert_eq!(worker.join().unwrap().is_ok(), matching);
+        assert_eq!(
+            std::fs::read_to_string(&metadata)?,
+            if matching { &encoded } else { "wrong" }
+        );
+        assert!(
+            std::fs::read_dir(metadata.parent().unwrap())?.all(|entry| !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".identity-tmp."))
+        );
+    }
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn identity_creation_and_reads_work_when_nfs_exclusive_directory_lock_returns_ebadf() -> TestResult
+{
+    use maos_kernel_core::memory::spill_test_faults::{arm_failure, disarm, FailurePoint};
+    let dir = tempfile::tempdir()?;
+    let store = boot(dir.path())?;
+    let ns = MemoryNamespace::principal(PRINCIPAL, "s".repeat(200))?;
+    store.bind_storage_identity(1, "owner")?;
+    arm_failure(FailurePoint::IdentityLockBadFd);
+    let written = store.write(
+        1,
+        MemoryTier::Private,
+        &ns,
+        "key",
+        MemoryValue::Text("value".into()),
+    );
+    disarm();
+    written?;
+    arm_failure(FailurePoint::IdentityLockBadFd);
+    let read = store.read(1, MemoryTier::Private, &ns, "key");
+    disarm();
+    assert_eq!(read?, Some(MemoryValue::Text("value".into())));
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn legacy_empty_identity_on_nfs_refuses_without_lock_and_reports_path() -> TestResult {
+    use maos_kernel_core::memory::spill_test_faults::{arm_failure, disarm, FailurePoint};
+    let dir = tempfile::tempdir()?;
+    let ns = MemoryNamespace::principal(PRINCIPAL, "s".repeat(200))?;
+    let metadata = sidecar_path(dir.path(), "owner", &ns, "key", "namespace")?;
+    std::fs::create_dir_all(metadata.parent().unwrap())?;
+    std::fs::write(&metadata, "")?;
+    let store = boot(dir.path())?;
+    store.bind_storage_identity(1, "owner")?;
+    arm_failure(FailurePoint::IdentityLockBadFd);
+    let result = store.write(
+        1,
+        MemoryTier::Private,
+        &ns,
+        "key",
+        MemoryValue::Text("value".into()),
+    );
+    disarm();
+    let error = result.unwrap_err();
+    assert!(matches!(
+        &error,
+        maos_domain::memory::MemoryError::Storage(_)
+    ));
+    assert!(error.to_string().contains("legacy empty identity"));
+    assert!(error.to_string().contains(
+        metadata
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+    ));
+    assert!(error.to_string().contains(".identity"));
+    assert_eq!(std::fs::read_to_string(metadata)?, "");
+    Ok(())
+}

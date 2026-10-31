@@ -1,6 +1,26 @@
-# Round-2 final-code FR31 revalidation — 2026-10-31
+# Round-3 final-code FR31 revalidation — operator ruling w10
 
-The current authoritative w9 run is recorded in `verification.md` under “Round-2 corrections — w9 adopted final verification” and `round-2/w9/commands.jsonl`. Each mutation compiled and exited **101** at its intended assertion: disclosure `Some(Markdown("A only"))` versus `None` (**108.031s**); Butler seven attacker records versus zero (**174.361s**); index one owner row versus two (**90.506s**); durability `None` versus `Some(Text("small"))` (**50.921s**). Complete current outputs are `round-2/w9/plant-*.log`; earlier `round-2/` outputs remain historical.
+Current authoritative runs are `round-3/w10/plant-*.log` and
+`round-3/w10/commands.jsonl`. All four compiled and exited **101** at the
+intended assertions: disclosure `Some(Markdown("A only"))` versus `None`
+(**3.910s**), Butler seven attacker records versus zero (**9.569s**),
+index one row versus two (**3.225s**), durability `None` versus
+`Some(Text("small"))` (**3.187s**). No setup/build failure counted as red.
+
+Reverse surgical edits restored all three source files byte-identically;
+`round-3/w10/plant-source-originals.sha256` and the four unchanged root-cut
+checksums each passed (**exit 0**). Restored identity/forget/spill targets
+(27/10/18), bin uninstall targets (26/23), exact Butler witness and normal
+workspace all-targets build each exited **0**. No temporary mutation script
+or backup remains. Both serial full suites, default suite and all blocking
+gates pass at the exact w10 pins; prescribed prepush exits **0** with the
+disclosed default-thread timing advisory. See `verification.md`'s w10 section.
+
+---
+
+# Historical Round-2 final-code FR31 revalidation — 2026-10-31
+
+The historical w9 run is recorded in `verification.md` under “Round-2 corrections — w9 adopted final verification” and `round-2/w9/commands.jsonl`. Each mutation compiled and exited **101** at its intended assertion: disclosure `Some(Markdown("A only"))` versus `None` (**108.031s**); Butler seven attacker records versus zero (**174.361s**); index one owner row versus two (**90.506s**); durability `None` versus `Some(Text("small"))` (**50.921s**). Complete historical outputs are `round-2/w9/plant-*.log`.
 
 The index cut changes the SQL conflict target along with the primary key/export path, preventing a setup-only failure. All four root cuts match the w9-adopted source exactly, so no further recut is needed. Current root-cut SHA-256 values, checked successfully from this directory (**exit 0**):
 

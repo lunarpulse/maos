@@ -114,6 +114,12 @@ fn executing_witness(
         let direct =
             |expr: &syn::Expr| matches!(expr, syn::Expr::Path(p) if p.path.is_ident(binding));
         match expr {
+            syn::Expr::Path(p) => p.path.is_ident(binding),
+            syn::Expr::Try(e) => call_uses(&e.expr, binding),
+            syn::Expr::Reference(e) => call_uses(&e.expr, binding),
+            syn::Expr::Paren(e) => call_uses(&e.expr, binding),
+            syn::Expr::Binary(e) => call_uses(&e.left, binding) || call_uses(&e.right, binding),
+            syn::Expr::Unary(e) => call_uses(&e.expr, binding),
             syn::Expr::Call(call) if call.attrs.is_empty() => {
                 call.args.iter().any(|e| direct(e) || call_uses(e, binding))
             }
@@ -135,6 +141,20 @@ fn executing_witness(
             _ => false,
         }
     }
+    fn assertion(mac: &syn::Macro) -> bool {
+        ["assert", "assert_eq", "assert_ne"]
+            .iter()
+            .any(|name| mac.path.is_ident(name))
+    }
+    fn exits(expr: &syn::Expr) -> bool {
+        match expr {
+            syn::Expr::Call(call) => matches!(&*call.func, syn::Expr::Path(p)
+                if p.path.segments.last().is_some_and(|s| s.ident == "exit")),
+            syn::Expr::Try(e) => exits(&e.expr),
+            syn::Expr::Paren(e) => exits(&e.expr),
+            _ => false,
+        }
+    }
     let file = syn::parse_file(src).map_err(|e| e.to_string())?;
     let directory = root
         .join(path)
@@ -149,30 +169,54 @@ fn executing_witness(
         .attrs
         .iter()
         .any(|a| a.path().is_ident("cfg") || a.path().is_ident("cfg_attr"))
+        && !file.items.iter().any(|item| matches!(item, syn::Item::Macro(m)
+            if m.ident.as_ref().is_some_and(|i| ["assert", "assert_eq", "assert_ne"].iter().any(|name| i == name))))
         && file.items.iter().any(|item| match item {
             syn::Item::Fn(f)
                 if f.sig.ident == name
                     && f.attrs.iter().any(|a| a.path().is_ident("test"))
                     && f.attrs.iter().all(|a| a.path().is_ident("test")) =>
             {
-                let mut bindings = Vec::new();
-                f.block.stmts.iter().take_while(|s| matches!(s, syn::Stmt::Local(_) | syn::Stmt::Macro(_) | syn::Stmt::Expr(syn::Expr::Call(_) | syn::Expr::MethodCall(_) | syn::Expr::Macro(_), _))).any(|stmt| match stmt {
-                    syn::Stmt::Local(local) if local.attrs.is_empty() => {
-                        if let (syn::Pat::Ident(binding), Some(init)) = (&local.pat, &local.init) {
-                            bindings.retain(|known| known != &binding.ident);
-                            if bindings.iter().any(|binding| call_uses(&init.expr, binding)) { return true; }
-                            if let syn::Expr::Macro(m) = &*init.expr {
-                                if m.attrs.is_empty() && (m.mac.path.is_ident("include_str") || m.mac.path.is_ident("include_bytes")) && syn::parse2::<syn::LitStr>(m.mac.tokens.clone()).is_ok_and(|lit| directory.join(lit.value()).canonicalize().is_ok_and(|p| p == corpus_path)) {
-                                    bindings.push(binding.ident.clone());
-                                }
-                            }
-                        }
-                        false
-                    }
-                    syn::Stmt::Expr(expr, _) => bindings.iter().any(|binding| call_uses(expr, binding)),
-                    syn::Stmt::Macro(m) if m.attrs.is_empty() && ["assert", "assert_eq", "assert_ne"].iter().any(|name| m.mac.path.is_ident(name)) => syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated.parse2(m.mac.tokens.clone()).is_ok_and(|args| args.iter().any(|expr| bindings.iter().any(|binding| call_uses(expr, binding)))),
+                if f.block.stmts.iter().any(|stmt| match stmt {
+                    syn::Stmt::Item(syn::Item::Macro(m)) => m.ident.as_ref().is_some_and(|i|
+                        ["assert", "assert_eq", "assert_ne"].iter().any(|name| i == name)),
+                    syn::Stmt::Expr(e, _) => exits(e),
+                    syn::Stmt::Local(l) => l.init.as_ref().is_some_and(|i| exits(&i.expr)),
                     _ => false,
-                })
+                }) { return false; }
+                let returns_result = matches!(&f.sig.output, syn::ReturnType::Type(_, ty)
+                    if matches!(&**ty, syn::Type::Path(p) if p.path.segments.last().is_some_and(|s| s.ident.to_string().ends_with("Result"))));
+                let mut bindings = Vec::new();
+                let mut checked = false;
+                for stmt in &f.block.stmts {
+                    let expression = match stmt {
+                        syn::Stmt::Local(local) if local.attrs.is_empty() => {
+                            let (syn::Pat::Ident(binding), Some(init)) = (&local.pat, &local.init) else { break; };
+                            let uses = bindings.iter().any(|b| call_uses(&init.expr, b));
+                            checked |= uses && returns_result && matches!(&*init.expr, syn::Expr::Try(_));
+                            let included = matches!(&*init.expr, syn::Expr::Macro(m)
+                                if m.attrs.is_empty() && (m.mac.path.is_ident("include_str") || m.mac.path.is_ident("include_bytes"))
+                                && syn::parse2::<syn::LitStr>(m.mac.tokens.clone()).is_ok_and(|lit|
+                                    directory.join(lit.value()).canonicalize().is_ok_and(|p| p == corpus_path)));
+                            bindings.retain(|known| known != &binding.ident);
+                            if uses || included { bindings.push(binding.ident.clone()); }
+                            continue;
+                        }
+                        syn::Stmt::Expr(e, _) => e,
+                        syn::Stmt::Macro(m) if m.attrs.is_empty() && assertion(&m.mac) => {
+                            checked |= syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
+                                .parse2(m.mac.tokens.clone()).is_ok_and(|args|
+                                    args.iter().any(|e| bindings.iter().any(|b| call_uses(e, b))));
+                            continue;
+                        }
+                        _ => break,
+                    };
+                    if !matches!(expression, syn::Expr::Call(_) | syn::Expr::MethodCall(_) | syn::Expr::Macro(_) | syn::Expr::Try(_)) { break; }
+                    checked |= (matches!(expression, syn::Expr::Macro(m) if assertion(&m.mac))
+                        || returns_result && matches!(expression, syn::Expr::Try(_)))
+                        && bindings.iter().any(|b| call_uses(expression, b));
+                }
+                checked
             }
             _ => false,
         });
@@ -205,12 +249,29 @@ fn executing_witness(
         r"^cargo test(?: --(?:locked|release|all-features))* (?:-p|--package) {}(?: --(?:locked|release|all-features)| --features [A-Za-z0-9_.,/-]+)* --test {}(?: {})?(?: --(?: --(?:exact|nocapture))*)?$",
         regex::escape(package_name), regex::escape(binary), regex::escape(name),
     ).replace(' ', r"\s+")).map_err(|e| e.to_string())?;
+    let defaults = |v: &serde_yaml::Value| {
+        v["shell"].is_null()
+            && v["working-directory"].is_null()
+            && v["defaults"]["run"]["shell"].is_null()
+            && v["defaults"]["run"]["working-directory"].is_null()
+            && v["env"].as_mapping().is_none_or(|env| {
+                env.keys().all(|key| {
+                    key.as_str().is_some_and(|key| {
+                        let key = key.to_ascii_uppercase();
+                        !key.ends_with("_RUNNER") && !key.ends_with("_WRAPPER")
+                    })
+                })
+            })
+    };
+    if !defaults(job) {
+        return Ok(false);
+    }
     Ok(job["steps"]
         .as_sequence()
         .into_iter()
         .flatten()
         .any(|step| {
-            if !enabled(step) {
+            if !enabled(step) || !defaults(step) {
                 return false;
             }
             let env_corpus = [&job["env"], &step["env"]]

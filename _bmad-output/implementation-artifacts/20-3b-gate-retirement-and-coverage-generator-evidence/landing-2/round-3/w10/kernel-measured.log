@@ -1,0 +1,16 @@
+{
+  "passed": false,
+  "actual-lines": 26793,
+  "pinned-lines": 26680,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 95,
+  "set-hash": "a7719696a749180a3fa6b7b8d62de4f25e75ea2c14497297e7b6ada17a0e2cc2",
+  "pinned-set-hash": "f18147a4742e99aec0f7fd38a8205d440613c836cf9740438a5e147dec5118cf",
+  "changed": [
+    "memory/private.rs",
+    "memory/spill_test_faults.rs"
+  ],
+  "added": [],
+  "removed": []
+}
+kernel-core drifted from the pinned baseline

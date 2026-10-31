@@ -27,8 +27,8 @@ use std::time::SystemTime;
 use super::spill_test_faults::{self, FailurePoint, PausePoint};
 #[cfg(unix)]
 use rustix::fs::{
-    flock, fstat, fsync, linkat, mkdirat, open, openat, renameat, renameat_with, statat, unlinkat,
-    AtFlags, Dir, FileType, FlockOperation, Mode, OFlags, RenameFlags,
+    flock, fstat, fsync, linkat, mkdirat, open, openat, renameat, statat, unlinkat, AtFlags, Dir,
+    FileType, FlockOperation, Mode, OFlags,
 };
 #[cfg(unix)]
 use rustix::io::Errno;
@@ -304,9 +304,13 @@ impl PrivateMemoryStore {
         identity: &str,
         create: bool,
     ) -> Result<(), MemoryError> {
-        // Serialize legacy-empty recovery and publication across store instances.
-        flock(directory, FlockOperation::LockExclusive).map_err(Self::errno)?;
+        // Readers need no exclusive lock. NFS rejects LOCK_EX on read-only
+        // directory handles (EBADF); O_EXCL + linkat still serialize publication.
+        let locked = create && Self::lock_identity_directory(directory)?;
         let result = (|| {
+            if create && locked {
+                Self::clean_identity_temps(directory)?;
+            }
             let existing = Self::open_candidate(directory, name, ValueKind::Text)?;
             if matches!(&existing, Some(DiskCandidate { value: MemoryValue::Text(found), .. }) if found == identity)
             {
@@ -332,18 +336,27 @@ impl PrivateMemoryStore {
                     ));
                 }
             }
-            let temp = format!(
-                ".identity-tmp.{}.{}",
-                std::process::id(),
-                TEMP_FILE_NONCE.fetch_add(1, Ordering::Relaxed)
-            );
-            let fd = openat(
-                directory,
-                &temp,
-                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-                Mode::RUSR | Mode::WUSR,
-            )
-            .map_err(Self::errno)?;
+            let (temp, fd) = loop {
+                let temp = format!(
+                    ".identity-tmp.{}.{}",
+                    std::process::id(),
+                    TEMP_FILE_NONCE.fetch_add(1, Ordering::Relaxed)
+                );
+                match openat(
+                    directory,
+                    &temp,
+                    OFlags::WRONLY
+                        | OFlags::CREATE
+                        | OFlags::EXCL
+                        | OFlags::NOFOLLOW
+                        | OFlags::CLOEXEC,
+                    Mode::RUSR | Mode::WUSR,
+                ) {
+                    Ok(fd) => break (temp, fd),
+                    Err(Errno::EXIST) => continue,
+                    Err(error) => return Err(Self::errno(error)),
+                }
+            };
             let publish = (|| {
                 let mut file = File::from(fd);
                 #[cfg(any(test, debug_assertions))]
@@ -352,13 +365,24 @@ impl PrivateMemoryStore {
                     .and_then(|_| file.sync_all())
                     .map_err(MemoryError::Io)?;
                 #[cfg(any(test, debug_assertions))]
+                spill_test_faults::pause(PausePoint::BeforeIdentityPublish);
+                #[cfg(any(test, debug_assertions))]
                 spill_test_faults::fail_if_armed(FailurePoint::IdentityPublish)?;
                 if existing.is_some() {
+                    // Recheck under the lock before recovering legacy empty metadata.
+                    if !locked {
+                        return Err(MemoryError::Storage(format!(
+                            "legacy empty identity recovery needs a directory lock: {}/{name}",
+                            Self::bounded_component(identity)
+                        )));
+                    }
                     unlinkat(directory, name, AtFlags::empty()).map_err(Self::errno)?;
                 }
-                // Atomic no-replace publication never exposes a partial final file.
-                renameat_with(directory, &temp, directory, name, RenameFlags::NOREPLACE)
-                    .map_err(Self::errno)
+                // POSIX atomic no-replace; remove the extra link before reading.
+                match linkat(directory, &temp, directory, name, AtFlags::empty()) {
+                    Ok(()) | Err(Errno::EXIST) => Ok(()),
+                    Err(error) => Err(Self::errno(error)),
+                }
             })();
             let cleanup = Self::cleanup_transaction_files(directory, Some(&temp), &[]);
             match publish {
@@ -371,10 +395,21 @@ impl PrivateMemoryStore {
                     ))
                 }
             }
-            fsync(directory).map_err(Self::errno)
+            fsync(directory).map_err(Self::errno)?;
+            match Self::open_candidate(directory, name, ValueKind::Text)? {
+                Some(DiskCandidate {
+                    value: MemoryValue::Text(found),
+                    ..
+                }) if found == identity => Ok(()),
+                _ => Err(MemoryError::Storage("spill identity mismatch".into())),
+            }
         })();
-        let unlock = flock(directory, FlockOperation::Unlock).map_err(Self::errno);
-        result.and(unlock)
+        if locked {
+            let unlock = flock(directory, FlockOperation::Unlock).map_err(Self::errno);
+            result.and(unlock)
+        } else {
+            result
+        }
     }
 
     #[cfg(unix)]
@@ -462,6 +497,68 @@ impl PrivateMemoryStore {
             }
         }
         Ok(names)
+    }
+
+    #[cfg(unix)]
+    fn clean_identity_temps(directory: &OwnedFd) -> Result<(), MemoryError> {
+        for name in Self::list_names(directory)? {
+            if name.starts_with(".identity-tmp.") {
+                unlinkat(directory, &name, AtFlags::empty()).map_err(Self::errno)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn lock_identity_directory(directory: &OwnedFd) -> Result<bool, MemoryError> {
+        #[cfg(any(test, debug_assertions))]
+        if spill_test_faults::fail_if_armed(FailurePoint::IdentityLockBadFd).is_err() {
+            return Ok(false);
+        }
+        match flock(directory, FlockOperation::LockExclusive) {
+            Ok(()) => Ok(true),
+            Err(Errno::BADF) => Ok(false),
+            Err(error) => Err(Self::errno(error)),
+        }
+    }
+
+    #[cfg(unix)]
+    fn clean_identity_temps_locked(directory: &OwnedFd) -> Result<(), MemoryError> {
+        if Self::lock_identity_directory(directory)? {
+            let cleanup = Self::clean_identity_temps(directory);
+            let unlock = flock(directory, FlockOperation::Unlock).map_err(Self::errno);
+            cleanup.and(unlock)
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(unix)]
+    fn identity_debris(directory: &OwnedFd, path: &str) -> Result<bool, MemoryError> {
+        if Self::open_candidate(directory, ".identity", ValueKind::Text)?.is_some() {
+            return Ok(false);
+        }
+        Self::require_value_free(directory, path)?;
+        Ok(true)
+    }
+
+    #[cfg(unix)]
+    fn require_value_free(directory: &OwnedFd, path: &str) -> Result<bool, MemoryError> {
+        for name in Self::list_names(directory)? {
+            let stat = statat(directory, &name, AtFlags::SYMLINK_NOFOLLOW).map_err(Self::errno)?;
+            if FileType::from_raw_mode(stat.st_mode).is_dir() {
+                let child =
+                    Self::open_dir_component(directory, &name, false)?.ok_or_else(|| {
+                        MemoryError::Storage(format!("missing directory: {path}/{name}"))
+                    })?;
+                Self::require_value_free(&child, path)?;
+            } else if Self::key_from_spill_name(&name).is_some() {
+                return Err(MemoryError::Storage(format!(
+                    "missing private identity: {path}"
+                )));
+            }
+        }
+        Ok(true)
     }
 
     #[cfg(unix)]
@@ -1086,6 +1183,12 @@ impl PrivateMemoryStore {
                     Self::open_dir_component(&root, &pid_name, false)?.ok_or_else(|| {
                         MemoryError::Io(std::io::Error::from(std::io::ErrorKind::NotFound))
                     })?;
+                Self::clean_identity_temps_locked(&pid_dir)?;
+                if pid_name.starts_with("h-") && Self::identity_debris(&pid_dir, &pid_name)? {
+                    Self::remove_tree(&root, &pid_name)?;
+                    fsync(&root).map_err(Self::errno)?;
+                    continue;
+                }
                 let mut cleaned = false;
                 for namespace_name in Self::list_names(&pid_dir)? {
                     let identity = if namespace_name.starts_with("h-") {
@@ -1093,15 +1196,22 @@ impl PrivateMemoryStore {
                         else {
                             continue;
                         };
+                        Self::clean_identity_temps_locked(&dir)?;
+                        if Self::identity_debris(&dir, &format!("{pid_name}/{namespace_name}"))? {
+                            Self::remove_tree(&pid_dir, &namespace_name)?;
+                            fsync(&pid_dir).map_err(Self::errno)?;
+                            cleaned = true;
+                            continue;
+                        }
                         match Self::open_candidate(&dir, ".identity", ValueKind::Text)? {
                             Some(DiskCandidate {
                                 value: MemoryValue::Text(identity),
                                 ..
                             }) if Self::bounded_component(&identity) == namespace_name => identity,
                             _ => {
-                                return Err(MemoryError::Storage(
-                                    "namespace identity mismatch".into(),
-                                ))
+                                return Err(MemoryError::Storage(format!(
+                                    "namespace identity mismatch: {pid_name}/{namespace_name}"
+                                )))
                             }
                         }
                     } else {

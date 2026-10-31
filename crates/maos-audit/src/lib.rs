@@ -1951,6 +1951,47 @@ pub fn shared_tier_principal_row_count(memory_db_path: &Path) -> Result<u64, Aud
     Ok(u64::try_from(count).unwrap_or(0))
 }
 
+/// Resolve guarded directory metadata; missing metadata is harmless only for
+/// interrupted, value-free directory creation. Ambiguous data fails with its path.
+pub fn private_directory_identity(path: &Path) -> Result<Option<String>, AuditError> {
+    fn require_value_free(path: &Path) -> Result<(), AuditError> {
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                require_value_free(&entry.path())?;
+            } else if [".json", ".md", ".bin", ".txt"]
+                .iter()
+                .any(|suffix| entry.file_name().to_string_lossy().ends_with(suffix))
+            {
+                return Err(AuditError::Row(format!(
+                    "missing private identity: {}",
+                    path.display()
+                )));
+            }
+        }
+        Ok(())
+    }
+    use sha2::{Digest, Sha256};
+    match std::fs::read_to_string(path.join(".identity")) {
+        Ok(identity)
+            if path.file_name().is_some_and(|name| {
+                name == format!("h-{}", hex::encode(Sha256::digest(&identity))).as_str()
+            }) =>
+        {
+            Ok(Some(identity))
+        }
+        Ok(_) => Err(AuditError::Row(format!(
+            "private identity mismatch: {}",
+            path.display()
+        ))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            require_value_free(path)?;
+            Ok(None)
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
 /// Count persisted Private-tier values stored under a `Principal` namespace.
 ///
 /// Long owner/namespace components use guarded SHA-256 names; `.identity`
@@ -1958,7 +1999,7 @@ pub fn shared_tier_principal_row_count(memory_db_path: &Path) -> Result<u64, Aud
 /// Missing roots and non-store files are zero; unreadable or mismatched hashed
 /// namespaces fail closed rather than minting emptiness from a partial scan.
 pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, AuditError> {
-    use sha2::{Digest, Sha256};
+    // Guarded owners and namespaces share the interrupted-creation rule.
     if !memory_root.exists() {
         return Ok(0);
     }
@@ -1969,6 +2010,11 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
         if !spirit_dir.file_type()?.is_dir() {
             continue;
         }
+        if spirit_dir.file_name().to_string_lossy().starts_with("h-")
+            && private_directory_identity(&spirit_dir.path())?.is_none()
+        {
+            continue;
+        }
         for namespace_dir in std::fs::read_dir(spirit_dir.path())? {
             let namespace_dir = namespace_dir?;
             if !namespace_dir.file_type()?.is_dir() {
@@ -1976,12 +2022,9 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
             }
             let name = namespace_dir.file_name().to_string_lossy().into_owned();
             let identity = if name.starts_with("h-") {
-                let identity = std::fs::read_to_string(namespace_dir.path().join(".identity"))?;
-                if format!("h-{}", hex::encode(Sha256::digest(&identity))) != name {
-                    return Err(AuditError::Row(
-                        "private namespace identity mismatch".into(),
-                    ));
-                }
+                let Some(identity) = private_directory_identity(&namespace_dir.path())? else {
+                    continue;
+                };
                 identity
             } else {
                 name

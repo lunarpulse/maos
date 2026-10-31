@@ -1369,3 +1369,40 @@ fn unreadable_held_value_cannot_cover_an_unrelated_unindexed_private_value() {
         );
     }
 }
+
+#[test]
+fn interrupted_identity_debris_does_not_block_uninstall_or_held_attribution() {
+    for held in [false, true] {
+        let fixture = Fixture::new();
+        fixture.seed_principal(held);
+        let debris = fixture
+            .memory_root
+            .join("0")
+            .join(format!("h-{}", "a".repeat(64)));
+        std::fs::create_dir_all(&debris).unwrap();
+        std::fs::write(debris.join(".identity-tmp.1.0"), "interrupted").unwrap();
+        if held {
+            let ns = MemoryNamespace::principal(PRINCIPAL, "profile").unwrap();
+            let value = fixture
+                .memory_root
+                .join("0")
+                .join(hex::encode(serde_json::to_vec(&ns).unwrap()))
+                .join(format!("{}.txt", hex::encode("record")));
+            std::fs::write(value, [0xff]).unwrap();
+        }
+        let output = fixture.run_uninstall(None);
+        let result = terminal(&output);
+        assert_eq!(
+            result["outcome"],
+            if held { "held" } else { "erased" },
+            "{result}"
+        );
+        assert_eq!(
+            maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+            u64::from(held)
+        );
+        if !held {
+            assert!(!debris.exists());
+        }
+    }
+}

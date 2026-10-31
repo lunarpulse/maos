@@ -1,6 +1,6 @@
 # 20-3b landing-2 verifier/integrator — final evidence
 
-**Current authoritative result:** see “Round-2 corrections — w9 adopted final verification” below. Operator ruling w9 authorized the exact measured pins; all 11 baseline-dependent failures cleared, both full workspace suites and prescribed prepush pass. The serial test-budget command has one explicitly dispositioned timing-only advisory; no exception/budget change or hosted proof is claimed. Earlier STOP/red runs remain historical.
+**Current authoritative result:** see “Round-3 corrections — w10 adopted final verification” below. Operator ruling w10 authorized the exact measured pins. All 11 pin-dependent failures cleared: both serial workspace runs and the explicit default-thread run pass 5,446 tests, both serial timing judgments pass with zero findings, and prescribed prepush passes with one explicitly disclosed default-thread timing advisory. Earlier STOP/red runs remain historical.
 
 Tasks 1–7 completed locally, including the operator-authorized held-durable-value correction. Hosted execution remains deliberately unclaimed. Exact commands, working directories, exit codes and durations are in `commands.jsonl`; failed attempts are retained, not overwritten.
 
@@ -717,3 +717,420 @@ The one prepush advisory is its independent default-thread test-budget judgment 
 Hosted discipline/evidence execution, signed-ledger artifacts/keys, hosted timing judgment/marker cardinalities, non-Unix compilation, live PostgreSQL and the disclosed unavailable signed-T3/Python-Ed25519/strace scenarios remain unverified. FR34/FR53's labelled ignored reds are unchanged. No extra all-features test run is claimed.
 
 This w9 continuation changes only exact pin/HISTORY/test-literal metadata, the story and two affected epic grant records, and final evidence records. The prior six implementation corrections are unchanged. Surface/class files and test budgets are intentionally unchanged. No commit, push, `.devcontainer/*` edit, alternate-worktree access, target override, `cargo clean`, or tracking of `tests/corpora/migration-corpus-1e6.sqlite` occurred. Final Markdown/summary evidence updates follow verification; no post-evidence prepush run is claimed.
+
+## Round-3 corrections — initial measured STOP (historical)
+
+The four R3Blind/R3Sec corrections are implemented. Exact verification commands,
+absolute working directories, exit codes and durations are in
+[`round-3/commands.jsonl`](round-3/commands.jsonl); logs, separate JUnits,
+restoration checksums, real clippy streams and
+[`round-3/summary.json`](round-3/summary.json) are alongside it.
+No pin, ceiling, test budget, warning baseline or assertion was weakened.
+
+### Fixes, locations and passing witnesses
+
+1. **Interrupted hashed-directory creation is removable debris only without
+   value files.** `crates/maos-kernel-core/src/memory/private.rs:537`
+   (`identity_debris`), `:546` (recursive value-free check), and `:1147`
+   (forget) remove unlabelled owner/namespace debris during unrelated forget;
+   unlabelled values fail closed with the affected guarded path.
+   `crates/maos-audit/src/lib.rs:1956` supplies the shared guarded-directory
+   resolver; audit `:2001` counts debris as zero and refuses unlabelled values.
+   Uninstall attribution uses the same resolver at
+   `crates/maos-bin/src/main.rs:10496`, including guarded owners.
+   This is the smaller reader-side recovery design rather than staging and
+   renaming the entire directory hierarchy; same-identity creation still heals
+   an interrupted empty directory.
+   Passing tests:
+   - `principal_identity_20_3b.rs:880`:
+     `missing_identity_debris_does_not_block_unrelated_forget_but_values_do`
+     exercises both owner and namespace debris and path-bearing refusal.
+   - `private_tier_count_16_5.rs:52`:
+     `missing_identity_counts_debris_as_zero_and_refuses_unattributed_values`.
+   - `erasure_uninstall_13_5b.rs:1374`:
+     `interrupted_identity_debris_does_not_block_uninstall_or_held_attribution`
+     covers ordinary erasure and the unreadable-held attribution scan.
+   All three tests passed in their focused commands and workspace runs.
+
+2. **Portable atomic sidecar publication.** `private.rs:301`
+   (`verify_identity`) now uses POSIX `linkat` atomic no-replace, removes the
+   temp before reopening the sidecar (the normal no-hardlinks check remains),
+   and on `EEXIST` accepts only a reread matching identity. Obsolete
+   `renameat_with`/`RenameFlags` imports were removed. Reads no longer acquire
+   an exclusive directory lock. `private.rs:513` treats exclusive-lock `EBADF`
+   as unavailable, allowing fresh `O_EXCL`/`linkat` publication.
+   Passing tests:
+   - `principal_identity_20_3b.rs:946`:
+     `identity_publication_accepts_matching_eexist_and_refuses_mismatch`.
+   - `principal_identity_20_3b.rs:991`:
+     `identity_creation_and_reads_work_when_nfs_exclusive_directory_lock_returns_ebadf`.
+   - `principal_identity_20_3b.rs:1017`:
+     `legacy_empty_identity_on_nfs_refuses_without_lock_and_reports_path`.
+   These are deterministic publication/lock fault witnesses, not a claim of
+   execution on a live NFS mount.
+
+   **Accepted filesystem limitation:** Main explicitly accepted safe refusal
+   for the combination of a legacy **empty** final sidecar and an unavailable
+   real exclusive lock. Its typed `MemoryError::Storage` includes the guarded
+   directory/sidecar path. Fresh creation and reads still work on the EBADF
+   fallback. Unlinking an empty final without a real lock could delete a
+   concurrent publisher's final metadata. The creation lock also protects
+   stale-temp cleanup from deleting another creator's live temp; it is not
+   needed for no-replace publication or reads. No alternative lock protocol
+   was invented. This limitation is documented in
+   `docs/testing/proof-contract.md:199`.
+
+3. **Identity temp recovery.** `private.rs:301` retries the next nonce on
+   temp `EEXIST`; `:503` and `:526` remove stale identity temps under the
+   directory lock during creation and forget. Forget cleans owner and hashed
+   namespace temps before reading their sidecars, including an interrupted
+   link publication's second hardlink. On EBADF, unsafe unlocked temp cleanup
+   is skipped. `memory/spill_test_faults.rs` adds only deterministic
+   publication/EBADF test hooks.
+   `principal_identity_20_3b.rs:915`:
+   `stale_identity_temps_are_cleaned_on_creation_and_forget` passed. The test
+   first plants a stale PID/nonce temp, then plants a hardlink of the completed
+   owner sidecar to model a crash between link and temp unlink; forget removes
+   the owner completely. Existing interrupted-publication, legacy-empty
+   recovery and long-identity tests also pass.
+
+4. **Nonvacuous invariant witnesses and constrained CI execution.**
+   `xtask/src/invariant_lock.rs:104` supports `Try`, `Reference` and `Paren`,
+   permits preceding `?` statements, and evaluates an initializer's dataflow
+   before removing its shadowed binding. Corpus-derived bindings must reach
+   an assertion, an asserted call result, or a checked `?` in a Result-returning
+   test. Top-level `exit` calls and shadowing assertion macros are refused.
+   Runner/wrapper environment overrides and nondefault shell/working-directory
+   settings are refused. `xtask/tests/invariant_claims_20_3b.rs:56` adds
+   adversarial vectors for discarded results, both exit forms, local/file
+   assertion-macro shadowing, target/build runners, rustc wrappers, custom
+   shell/directory and job shell defaults. `:126`,
+   `guaranteed_accepts_asserted_dataflow_and_question_mark_tests`, covers
+   references/parentheses, parsed-result assertions, same-name trimming and
+   preceding/consuming `?` statements. The integration binary passes **7/7**.
+
+### Exact formatted measurements versus unchanged pins
+
+Measurements are from the final restored, formatted production tree, including
+the path-bearing NFS refusal and all test hooks:
+
+| Surface | Final measured | Unchanged pin | Delta |
+|---|---:|---:|---:|
+| Kernel physical | **26,793** | **26,680** | **+113** |
+| Kernel tokei | **20,992** | **20,889** | **+103** |
+| maos-bin | **33,030** | **33,021** | **+9** |
+| maos-audit | **7,707** | **7,668** | **+39** |
+| xtask | **42,841** | **42,780** | **+61** |
+| maos-domain | **9,977** | **9,977** | **0** |
+| Aggregate | **188,451** | prior measured **188,239**; hardfail **188,240** | **+212** |
+
+The exact measured-plus-one hardfail would be **188,452**; it was **not**
+adopted. Kernel content drift is confined to `memory/private.rs` and
+`memory/spill_test_faults.rs`; the 95-file set is unchanged. Final actual set
+hash is `a7719696a749180a3fa6b7b8d62de4f25e75ea2c14497297e7b6ada17a0e2cc2`,
+versus unchanged pinned
+`f18147a4742e99aec0f7fd38a8205d440613c836cf9740438a5e147dec5118cf`.
+
+Per-fix budget attribution: fix 1 accounts for the audit **+39** and bin **+9**
+surfaces; fix 4 accounts for xtask **+61**. Fixes 1–3 share the single kernel
+implementation and its cleanup/publication helpers, measured together at
+**+113 physical / +103 tokei**; these are shared totals, not three independent
+additive measurements. No charged in-source test was moved to integration
+tests and no existing test was removed to offset growth. Operator authority
+for the exact figures remains outstanding; no repinning was performed.
+
+### Verification commands and observed exit codes
+
+Every Cargo build/test/clippy/deny invocation used `env -u CI -u GITHUB_ACTIONS`
+and the Bash-inherited target `/mnt/build/cargo-maos`, unchanged in subprocesses;
+no alternate target or clean was used. The initial formatter does not build
+artifacts; subsequent invocations carried the inherited target explicitly
+through the command runner's environment, not a caller-selected target override.
+
+| Command / target, with the environment prefix above | Exit | Observed result |
+|---|---:|---|
+| `cargo fmt --all` | **0** | Final formatting before plants; all formatter attempts exited 0 |
+| `cargo build --locked --workspace --all-targets` | **0** | Final restored build; earlier initial test-only compile failure retained |
+| `cargo test --locked -p maos-kernel-core --lib memory` | **0** | **37 passed** |
+| Kernel `principal_identity_20_3b`, `private_forget_restart_13_5i`, `private_spill_supersession_13_5j` | **0** | Final restored **27 + 10 + 18 passed** |
+| Bin `erasure_uninstall_13_5b`, `maos_uninstall_16_4` | **0** | **26 + 23 passed** |
+| Audit `private_tier_count_16_5`, `governance_roundtrip_20_3b` | **0** | **3 + 4 passed** |
+| xtask `invariant_claims_20_3b` | **0** | **7 passed** |
+| `cargo nextest run --workspace --locked --color never --no-fail-fast --test-threads 1` | **100** | Final source: **5,435 passed, 11 failed, 139 skipped**; runner **1,190.406s**, command **2,052.750s** |
+| `cargo nextest run --workspace --locked --color never --no-fail-fast` | **100** | One explicitly requested default-thread run: **5,434 passed, 11 failed, 139 skipped**, runner **42.583s**, command **44.008s** |
+| `cargo clippy --workspace --all-targets --locked --message-format=json` | **0** | Real final stream, **191.354s** |
+| `clippy-ratchet --input <absolute round-3/clippy-final.jsonl>` | **0** | **1,410 occurrences / 881 source-distinct**, within **1,411 / 884** |
+| `cargo deny check` | **0** | Advisories, bans, licenses and sources pass |
+
+The explicit default-thread run preceded only the final path-specific
+legacy-empty/NFS diagnostic, its additional passing test, and removal of
+obsolete rename imports. The prescribed prepush also ran default-thread
+nextest on the final source, including that 27th identity test. The final
+serial command above ran after those changes and after all plant restores.
+Both serial attempts and the explicit default run remain in the ledger.
+
+The **11 failures are baseline-dependent**, not suppressed or excluded:
+`t12b_kernel_core_byte_identical_line_count`; FKCS's independent current-kernel
+baseline assertion; `escape_substrate_refusal_never_passes`; six
+`kernel_pin_content_hash_16_0` assertions; the trial-attestation evidence
+assertion; and `kloc_check_runs_on_workspace`. Escape/trial evidence is red
+because its kernel-ABI leg sees the deliberately unadopted kernel pin.
+
+Standalone gate exits, each with `--json`:
+- **1:** `kloc-check`, `check-kernel-baseline`, including final restored measurements.
+- **0:** `check-service-boundary`, `check-dev-record-completeness`,
+  `check-epic-close-coherence`, `check-env-contract`, `invariant-lock`,
+  `coverage-matrix`, `check-coverage-matrix-completeness`,
+  `check-review-findings-resolved`, `check-test-cost`.
+
+Initial diagnostics were fixed, not hidden: the first workspace build exited
+**101** because the new integration test attempted the private store's private
+`write` method; it was corrected to use the public memory-manager port. The
+first real clippy ratchet exited **1**, **1,412 / 882**, because the replaced
+publication left obsolete rename imports. Removing those imports restored
+the unchanged **1,410 / 881** final counts. All failed attempts and their
+exact commands remain in `round-3/commands.jsonl`.
+
+### Four FR31 plants and restoration proof
+
+All four final-code mutations compiled and reached their intended behavioral
+assertions, not setup failures:
+
+| Exact test selector | Exit | Intended assertion | Command seconds |
+|---|---:|---|---:|
+| `recycled_pid_cannot_disclose_another_spirits_principal_spill` | **101** | `Some(Markdown("A only"))` versus `None`, test line **47** | **3.445** |
+| `recycled_pid_cannot_poison_butlers_acceptance_restore` | **101** | seven attacker records versus zero, test line **1009** | **8.554** |
+| `subject_access_export_preserves_both_owners_when_pid_and_key_are_reused` | **101** | one row versus two, test line **111** | **3.093** |
+| `small_non_markdown_principal_values_survive_restart_and_pid_change` | **101** | `None` versus `Some(Text("small"))`, test line **76** | **2.753** |
+
+The source originals stayed in memory; reverse surgical edits restored all
+three files byte-identically. `sha256sum --check <absolute
+round-3/plant-source-originals.sha256>` exited **0**; all four unchanged
+root-cut checksums also exited **0** from `landing-2`. Restored kernel focused
+targets, the exact Butler poisoning witness, and the normal workspace
+all-targets build each exited **0**. No mutation script or backup remains.
+
+### Prescribed prepush and timing results
+
+```sh
+env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /mnt/build/cargo-maos/debug/xtask prepush --json
+```
+
+**Exit 1**, **578.148s**: **79 pass, 4 red, 1 advisory, 8 skip**. The four
+red records are `check-kernel-baseline`, `kloc-check`,
+`check-trial-attestation` and `workspace-nextest`, consistent with the
+unchanged-pin results above. Kernel lib tests, workspace doctests, release/size,
+tracked-tree and the other blocking legs passed. Its timing advisory has
+two findings; its 81 named runtime diagnostics remain visible. No skipped
+runtime scenario is claimed exercised. Conditional deny was skipped there;
+the independently required standalone `cargo deny check` passed.
+
+The final saved serial JUnit's separate `check-test-budget --junit <absolute
+round-3/workspace-serial-final.junit.xml> --json` exited **1**:
+576 binaries, sum **1,188.152s**, span **1,190.203s**, **8 findings**.
+They are Butler **37.826s**, forget floors **40.980s**, hook pump **30.258s**,
+observer activity corpus **113.868s**, one-daemon/one-door **84.290s**,
+participant recall **38.646s**, xtask binary **35.949s**, and suite total
+**1,188.152s > 1,100s**. These timing failures are reported as observed,
+not rerun away; no timing exception or budget was changed. The prepush
+default-thread timing judgment is separately advisory under the existing
+contract. Separate serial/default/prepush JUnits are preserved.
+
+### Remaining authority and unverified items
+
+The implementation and requested verification commands are complete, but this
+is **not** a green full-workspace/prepush claim. Raising the exact measured
+pins remains an operator decision; no authority was assumed. Final evidence
+edits follow verification; no post-evidence prepush run is claimed.
+
+Live NFS, non-Unix compilation, hosted discipline/evidence execution,
+signed-ledger artifacts/keys, hosted timing/marker judgments, live PostgreSQL,
+signed-T3 runtime substrates, Python Ed25519 and strace scenarios remain
+unverified/skipped. The accepted legacy-empty/NFS lock limitation above is
+intentional and has a passing refusal witness. FR34/FR53's labelled ignored
+reds remain unchanged. No commit, push, `.devcontainer/*` edit/stage,
+alternate-worktree access, target override, `cargo clean`, or tracking of
+`tests/corpora/migration-corpus-1e6.sqlite` occurred.
+
+## Round-3 corrections — w10 adopted final verification
+
+**Operator ruling w10, 2026-10-31: “A: Raise to measured exactly.”**
+This authorizes the previously measured **+113 physical / +103 tokei** kernel
+extension over w9, bin **+9**, audit STOP **7,668 → 7,707**, xtask **+61**
+and aggregate measured-plus-one. Authority was received before any pin moved.
+The four implementation fixes documented above are unchanged; this continuation
+adopts their exact pins and reruns the requested verification.
+
+Exact absolute commands, exit codes and durations are in
+[`round-3/w10/commands.jsonl`](round-3/w10/commands.jsonl). Full logs, distinct
+serial/repeat/default/prepush JUnits, the production-emitted pin block,
+restoration checksums, real clippy stream, unchanged API snapshot and
+[`round-3/w10/summary.json`](round-3/w10/summary.json) are alongside it.
+The earlier `round-3/` root records remain the historical unadopted-pin runs.
+
+### Exact pins and grant records
+
+| Surface | Final formatted measured | Adopted exact pin / ceiling |
+|---|---:|---:|
+| Kernel physical | **26,793** | **26,793**, `src_lines` still line **505** |
+| Kernel tokei | **20,992** | **20,992** |
+| maos-bin | **33,030** | **33,030**, epic envelope **33,021 → 33,030** |
+| maos-audit | **7,707** | **7,707**, STOP **7,668 → 7,707** |
+| xtask | **42,841** | **42,841** |
+| maos-domain | **9,977** | **9,977**, unchanged |
+| Aggregate | **188,451** | strict hardfail **188,452** |
+
+`cargo fmt --all` and final restored `kloc-check --json` /
+`check-kernel-baseline --json` each exited **0**. No measurement exceeds w10.
+Production `check-kernel-baseline --emit-pin` exited **0**; its two changed
+file digests and set hash were adopted exactly. The 95-file set is unchanged,
+and the final report has empty `changed`/`added`/`removed` arrays, with equal
+actual/pinned set hash:
+
+```text
+a7719696a749180a3fa6b7b8d62de4f25e75ea2c14497297e7b6ada17a0e2cc2
+```
+
+Updated kernel-baseline HISTORY and KLOC kernel/bin/audit/xtask/aggregate rows
+cite **`20-3b landing 2 round-3 corrections, operator ruling w10`**, retaining
+prior grants under `PRIOR`. The xtask row's first grant segment retains the
+complete open story key and **42780 -> 42841** arrow; D11's real-tree and
+negative vectors pass. Updated all four kernel-pin reader literals,
+`RATIFIED_AT_EASING = 20_992`, story frontmatter/grant table, Epic-20 grant
+rows and Epic-19's bin-envelope extension. The current public kernel surface
+has **401 items**, exactly equal to the existing baseline; the surface/class
+metadata files are intentionally unchanged. No tests were relocated for offsets.
+
+### Build, focused tests, both full suites and gates
+
+All Cargo commands used `env -u CI -u GITHUB_ACTIONS`, with the unchanged
+Bash-inherited **`CARGO_TARGET_DIR=/mnt/build/cargo-maos`** carried into
+subprocesses. No target override or clean was used.
+
+| Command / requested target set | Exit | Observed result |
+|---|---:|---|
+| `cargo fmt --all` | **0** | Before adoption and final restored measurement |
+| `cargo build --locked --workspace --all-targets` | **0** | Initial adopted-pin and final restored builds |
+| xtask D11 / kernel-pin / recovery-rule / invariant-claims integration targets | **0** | **9 + 25 + 12 + 7 passed** |
+| Kernel `--lib memory` | **0** | **37 passed** |
+| Kernel identity / forget-restart / spill-supersession targets | **0** | **27 + 10 + 18 passed**, also after plant restores |
+| Bin erasure/uninstall and uninstall/purge targets | **0** | **26 + 23 passed**, also after plant restores |
+| Audit private-tier-count / governance-roundtrip targets | **0** | **3 + 4 passed** |
+| `cargo nextest run --workspace --locked --color never --no-fail-fast --test-threads 1` | **0** | **5,446 passed / 139 skipped**, runner **597.432s**, command **601.188s** |
+| Same full serial command, one requested timing repeat | **0** | **5,446 passed / 139 skipped**, runner **597.320s**, command **599.083s** |
+| `cargo nextest run --workspace --locked --color never --no-fail-fast` | **0** | **5,446 passed / 139 skipped**, runner **42.711s**, command **45.004s** |
+
+**All 11 pin-dependent failures cleared.** No failing test was filtered out
+or weakened. Both requested modes use the existing workspace filter and retain
+the 139 named skips; kernel lib tests are also exercised by prepush.
+
+Each standalone gate below ran with `--json` and exited **0**:
+`kloc-check`, `check-kernel-baseline`, `check-service-boundary`,
+`check-dev-record-completeness`, `check-epic-close-coherence`,
+`check-env-contract`, `invariant-lock`, `coverage-matrix`,
+`check-coverage-matrix-completeness`, `check-review-findings-resolved`,
+`check-test-cost`, `check-serde-error-handling`,
+`check-composition-root-completeness`, `check-j1-loopback-delegation`
+and `check-trial-attestation`.
+
+### All eight prior serial timing findings, individually reassessed
+
+The requested fresh serial timing judgment and one additional fresh
+serial-suite/timing repeat both exited **0**, **zero findings**. The tests,
+production implementation and budgets did not change between these two runs.
+Both saved JUnits contain 576 binaries; first sum/span **597.216s/597.406s**,
+repeat **597.146s/597.304s**. The previous eight findings are retained below
+rather than erased from history:
+
+| Prior finding | Prior seconds | w10 serial | Fresh serial repeat | Limit | Repeated? |
+|---|---:|---:|---:|---:|---|
+| `maos-bin::butler_scene_18_4` | 37.826 | **8.652** | **8.840** | 30 | No |
+| `maos-bin::forget_floors_18_6` | 40.980 | **12.495** | **12.483** | 30 | No |
+| `maos-bin::hook_pump_17_4` | 30.258 | **21.004** | **21.602** | 30 | No |
+| `maos-bin::observer_activity_corpus_17_4` | 113.868 | **6.445** | **6.026** | 30 | No |
+| `maos-bin::one_daemon_one_door_16_1` | 84.290 | **25.694** | **25.699** | 30 | No |
+| `maos-iac::participant_recall_17_8` | 38.646 | **25.182** | **25.931** | 30 | No |
+| `xtask::bin/xtask` | 35.949 | **15.980** | **16.184** | 30 | No |
+| Suite sum | 1,188.152 | **597.216** | **597.146** | 1,100 | No |
+
+**Attribution for each row:** [INFERENCE] host/runtime timing variance, not a
+new production-code regression. The Round-3 production implementation is
+unchanged since the historical high-time run; only authorized pin/HISTORY/
+test-literal and grant records changed. In particular none of these seven
+binaries received a code or budget repair to clear its timing. Two independent
+fresh serial runs are now below every limit. No host-load trace was collected,
+so a specific CPU/I/O scheduler cause is not claimed. **No exception rows or
+budget changes were added.**
+
+### Real clippy and dependency policy
+
+`cargo clippy --workspace --all-targets --locked --message-format=json`
+exited **0**, **239.125s**. The real built `clippy-ratchet --input <absolute
+round-3/w10/clippy-live.jsonl>` exited **0**, **0.197s**, counting
+**1,410 occurrences / 881 source-distinct** within unchanged **1,411 / 884**.
+No warning suppression or baseline increase was made.
+
+`cargo deny check` exited **0**, **0.940s**: advisories, bans, licenses and
+sources all **ok**. Existing unnecessary-skip configuration warnings remain
+visible; no deny configuration was changed. The standalone recheck, not
+prepush's conditional deny skip, supplies the required dependency-policy proof.
+
+### Four w10 FR31 plants and restored-green proof
+
+Each mutation compiled in the real checkout and failed at the intended
+behavioral assertion, **exit 101**:
+
+| Test selector | Assertion | Command seconds |
+|---|---|---:|
+| `recycled_pid_cannot_disclose_another_spirits_principal_spill` | `Some(Markdown("A only"))` versus `None`, line **47** | **3.910** |
+| `recycled_pid_cannot_poison_butlers_acceptance_restore` | seven attacker records versus zero, line **1009** | **9.569** |
+| `subject_access_export_preserves_both_owners_when_pid_and_key_are_reused` | one row versus two, line **111** | **3.225** |
+| `small_non_markdown_principal_values_survive_restart_and_pid_change` | `None` versus `Some(Text("small"))`, line **76** | **3.187** |
+
+Original bytes stayed in memory; reverse surgical edits restored all three
+source files. `sha256sum --check <absolute
+round-3/w10/plant-source-originals.sha256>` exited **0**, as did all four
+unchanged root-cut checksums from `landing-2`. Restored kernel focused targets,
+both bin uninstall targets, the exact Butler poisoning witness and the final
+normal workspace all-targets build each exited **0**. The final formatter and
+KLOC/kernel measurements also exited **0** at the exact w10 figures. No
+temporary mutation script or backup remains.
+
+### Prescribed final prepush
+
+```sh
+env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /mnt/build/cargo-maos/debug/xtask prepush --json
+```
+
+**Exit 0**, **765.908s**: **83 pass, 0 red, 1 advisory, 8 skip**.
+Kernel lib tests, workspace doctests, workspace nextest, release/size,
+tracked-tree and all blocking legs pass. Its JUnit is saved separately from
+both serial and the explicit default run.
+
+The one advisory is prepush's independent default-thread timing judgment
+(**exit 1**). A separate read of its saved JUnit with `check-test-budget`
+preserves all eight findings: forget floors **35.997s**, hook pump **32.021s**,
+one-daemon/one-door **37.595s**, participant recall **52.329s**, xtask binary
+**56.918s**, ledger collectors **44.291s**, macOS compile guard **52.934s**
+(each versus 30s), plus sum **1,286.601s > 1,100s**. This remains advisory
+under the existing local prepush contract; it does not replace the two
+independently green serial budget checks. No exception or timing budget changed.
+
+Eight skips remain: docs build/routes, conditional deny and five hosted-marker
+cardinality checks. Prepush's **81 named runtime diagnostics** remain disclosed.
+No unavailable signed-T3, Python-Ed25519 or strace scenario is claimed run.
+
+### Completion and limits
+
+The w10 pin authority is fully adopted and all requested blocking verification
+is green. The four implementation fixes and their file/test anchors remain
+documented in the historical Round-3 implementation section above. Accepted
+legacy-empty/NFS `EBADF` refusal remains intentional, path-bearing and covered
+by its passing test; fresh creation and reads pass simulated EBADF tests.
+
+Live NFS, non-Unix compilation, hosted discipline/evidence and signed-ledger
+artifacts, hosted timing/marker judgments, live PostgreSQL and the unavailable
+runtime substrates remain unverified. FR34/FR53's labelled ignored reds are
+unchanged. No commit, push, `.devcontainer/*` edit/stage, alternate-worktree,
+target override, clean or migration-corpus tracking occurred. Final evidence
+edits follow verification; no post-evidence prepush run is claimed.

@@ -502,7 +502,12 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26680
+src_lines = 26793
+# HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31:
+# FLAG-Winston exact formatted26680 -> 26793 (+113 physical), tokei20889 -> 20992 (+103);
+# 95 files unchanged, ZERO HEADROOM. Missing-identity debris, POSIX sidecar
+# publication and stale-temp recovery; production --emit-pin hashes adopted exactly.
+# | PRIOR: earlier authorized pin history follows.
 # HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31:
 # FLAG-Winston exact formatted26620 -> 26680 (+60 physical), tokei20834 -> 20889 (+55);
 # 95 files unchanged, ZERO HEADROOM. Shared-intent cleanup and atomic identity/key
@@ -907,7 +912,7 @@ src_lines = 26680
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "f18147a4742e99aec0f7fd38a8205d440613c836cf9740438a5e147dec5118cf"
+set_hash = "a7719696a749180a3fa6b7b8d62de4f25e75ea2c14497297e7b6ada17a0e2cc2"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -951,11 +956,11 @@ set_hash = "f18147a4742e99aec0f7fd38a8205d440613c836cf9740438a5e147dec5118cf"
 "memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
 "memory/mod.rs" = "779cf99f4fcc57c1243d33375508a92285a8e2533965701f58df3c8639226d4c"
 "memory/principal.rs" = "0e7c8a03073a33f8dccd8acb41d873ffeec96f34d94b88fd6a4ee509fb269f3f"
-"memory/private.rs" = "76074d720d335655eef8cabd15a495b22a27ac15d57cf01593435e8395a3bae1"
+"memory/private.rs" = "588d4b577aa50ef0d9c8e03bf4ffaa2b3aa85c8a55858ed02ece508cce93bc9d"
 "memory/read_entry_point.rs" = "0528ce87453ef4a10b4bbe4a360f557769be412fc091df4734495482d551dda1"
 "memory/self_telemetry.rs" = "c562094354fe64784e49de7e37754badce6637802f12c17ce3e6d2873e2adcef"
 "memory/shared.rs" = "1df5abe33a685cfb940bc191fe96bc8e0ac6f5c38893ac8792d944504df99d84"
-"memory/spill_test_faults.rs" = "207d3ea6ccd272433603f6938e10516a338331ae00b2a4b2bd9c190471c15b44"
+"memory/spill_test_faults.rs" = "362db050c60d58246eb3795ca5ca3647ea13d6fb8a1a1e0ed04a567c8162b74b"
 "memory/write_entry_point.rs" = "e43e8c2957d0042a13b75e4972c7417b72388316b1c56091f6b417f06509f224"
 "orchestrator/buffer.rs" = "8f3f73b3ce363ca6678774dc83acdb83c9910a04a13487df8d0220ea66ce8f4d"
 "orchestrator/echo_gateway.rs" = "7c5195d3df9e20909d52bf5e04d829377433313667842964de51c1625083ae92"

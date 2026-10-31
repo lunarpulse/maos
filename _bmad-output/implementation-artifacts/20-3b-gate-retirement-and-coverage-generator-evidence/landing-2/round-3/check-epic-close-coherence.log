@@ -1,0 +1,7 @@
+{
+  "gate": "check-epic-close-coherence",
+  "passed": true,
+  "epics-checked": 21,
+  "authoritative-src-lines": 26680,
+  "violations": []
+}

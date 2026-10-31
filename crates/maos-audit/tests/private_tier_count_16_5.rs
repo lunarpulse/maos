@@ -47,3 +47,24 @@ fn empty_logical_keys_are_values_not_metadata() {
         4
     );
 }
+
+#[test]
+fn missing_identity_counts_debris_as_zero_and_refuses_unattributed_values() {
+    for owner in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let path = if owner {
+            root.path().join(format!("h-{}", "a".repeat(64)))
+        } else {
+            root.path().join("42").join(format!("h-{}", "b".repeat(64)))
+        };
+        fs::create_dir_all(&path).unwrap();
+        fs::write(path.join(".identity-tmp.1.0"), "partial").unwrap();
+        assert_eq!(
+            maos_audit::private_tier_principal_row_count(root.path()).unwrap(),
+            0
+        );
+        fs::write(path.join("6b.txt"), "unattributed").unwrap();
+        let error = maos_audit::private_tier_principal_row_count(root.path()).unwrap_err();
+        assert!(error.to_string().contains(path.to_str().unwrap()));
+    }
+}

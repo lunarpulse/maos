@@ -10482,6 +10482,11 @@ async fn run_uninstall_cascade_inner(
             if !owner.file_type()?.is_dir() {
                 continue;
             }
+            if owner.file_name().to_string_lossy().starts_with("h-")
+                && maos_audit::private_directory_identity(&owner.path())?.is_none()
+            {
+                continue;
+            }
             for namespace in std::fs::read_dir(owner.path())? {
                 let namespace = namespace?;
                 if !namespace.file_type()?.is_dir() {
@@ -10489,7 +10494,11 @@ async fn run_uninstall_cascade_inner(
                 }
                 let name = namespace.file_name().to_string_lossy().into_owned();
                 let encoded = if name.starts_with("h-") {
-                    std::fs::read_to_string(namespace.path().join(".identity"))?
+                    let Some(identity) = maos_audit::private_directory_identity(&namespace.path())?
+                    else {
+                        continue;
+                    };
+                    identity
                 } else {
                     name
                 };

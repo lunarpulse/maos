@@ -102,11 +102,47 @@ fn guaranteed_refuses_nonexecuting_or_unbound_witnesses() -> Result<(), String> 
         ("shadowed corpus binding", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); let corpus = \"unrelated\"; check(corpus); }".into(), workflow.to_owned()),
         ("cfg-excluded call", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); #[cfg(any())] check(corpus); }".into(), workflow.to_owned()),
         ("cfg-excluded assert", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); #[cfg(any())] assert!(corpus.contains(\"malicious\")); }".into(), workflow.to_owned()),
+        ("discarded call result", source.replace("assert!(corpus.contains(\"malicious\"))", "corpus.len()"), workflow.to_owned()),
+        ("exit before use", source.replace("let corpus", "std::process::exit(0); let corpus"), workflow.to_owned()),
+        ("imported exit", source.replace("let corpus", "exit(0); let corpus"), workflow.to_owned()),
+        ("shadow assert in test", source.replace("let corpus", "macro_rules! assert { ($($t:tt)*) => {}; } let corpus"), workflow.to_owned()),
+        ("shadow assert in file", format!("macro_rules! assert {{ ($($t:tt)*) => {{}}; }} {source}"), workflow.to_owned()),
+        ("runner override", source.to_owned(), workflow.replace("CORPUS:", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: 'true'\n        CORPUS:")),
+        ("build runner override", source.to_owned(), workflow.replace("CORPUS:", "CARGO_BUILD_RUNNER: 'true'\n        CORPUS:")),
+        ("rustc wrapper override", source.to_owned(), workflow.replace("CORPUS:", "RUSTC_WRAPPER: 'true'\n        CORPUS:")),
+        ("custom shell", source.to_owned(), workflow.replace("    - env:", "    - shell: 'true {0}'\n      env:")),
+        ("custom directory", source.to_owned(), workflow.replace("    - env:", "    - working-directory: elsewhere\n      env:")),
+        ("job shell default", source.to_owned(), workflow.replace("    steps:", "    defaults:\n      run:\n        shell: 'true {0}'\n    steps:")),
     ] {
         fs::write(dir.path().join("tests/property.rs"), test).map_err(|e| e.to_string())?;
         fs::write(dir.path().join(".github/workflows/discipline.yml"), job)
             .map_err(|e| e.to_string())?;
         assert!(validate_claim(dir.path(), guaranteed()).is_err(), "{label}");
+    }
+    Ok(())
+}
+
+#[test]
+fn guaranteed_accepts_asserted_dataflow_and_question_mark_tests(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    fs::create_dir_all(dir.path().join("tests"))?;
+    fs::create_dir_all(dir.path().join(".github/workflows"))?;
+    fs::write(
+        dir.path().join("Cargo.toml"),
+        "[package]\nname = 'fixture'\nversion = '0.0.0'\n",
+    )?;
+    fs::write(dir.path().join("tests/adversary.jsonl"), "malicious")?;
+    fs::write(dir.path().join(".github/workflows/discipline.yml"), "jobs:\n  fixture:\n    steps:\n    - env:\n        CORPUS: tests/adversary.jsonl\n      run: cargo test -p fixture --test property preserves_property -- --exact\n")?;
+    for body in [
+        "let corpus = corpus.trim(); assert!(corpus.contains(\"malicious\"));",
+        "let cases = parse((&corpus))?; assert_eq!(cases.len(), 1);",
+        "prepare()?; check(&corpus)?;",
+        "let result = check(&corpus); assert_eq!(result, true);",
+    ] {
+        fs::write(dir.path().join("tests/property.rs"), format!(
+            "#[test] fn preserves_property() -> Result<(), Error> {{ let corpus = include_str!(\"adversary.jsonl\"); {body} Ok(()) }}"))?;
+        validate_claim(dir.path(), guaranteed())?;
     }
     Ok(())
 }

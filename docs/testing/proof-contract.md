@@ -196,6 +196,15 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   the intended trusted checkout. A hostile cwd tree can supply those markers
   and select a counterfeit workspace; the fallback does not authenticate a
   checkout, publisher or ownership boundary.
+  Private spill identity publication uses POSIX `linkat` no-replace, not
+  filesystem-specific `renameat2` flags. Fresh creation and reads work when
+  NFS returns `EBADF` for an exclusive lock on a read-only directory handle.
+  Legacy **empty** identity-sidecar recovery still requires a real exclusive
+  lock: without one it refuses with a typed storage error naming the guarded
+  directory/sidecar path, rather than unlinking a concurrent publisher's metadata.
+  Creation and forget clean stale identity temps only under that lock; missing
+  sidecars with no value files are removable debris, while unlabelled values
+  fail closed with their path.
   `clippy-advisory` is deliberately outside this Blocking mirror and `aggregate.needs`: its non-denying
   `cargo clippy --workspace --all-targets --locked --message-format=json` output is checked by
   `clippy-ratchet --input <jsonl>` against `xtask/clippy-baseline.toml` (T0: 1411 warning occurrences,

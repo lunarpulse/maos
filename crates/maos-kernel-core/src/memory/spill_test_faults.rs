@@ -26,11 +26,13 @@ pub enum FailurePoint {
     CommitDirectorySync,
     IdentityTempSync,
     IdentityPublish,
+    IdentityLockBadFd,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum PausePoint {
     BeforeRename,
+    BeforeIdentityPublish,
     BeforeCandidateOpen,
     BeforeDirectoryOpen(String),
 }
@@ -50,6 +52,7 @@ thread_local! {
 fn pause_kind(p: &PausePoint) -> u8 {
     match p {
         PausePoint::BeforeRename => 0,
+        PausePoint::BeforeIdentityPublish => 3,
         PausePoint::BeforeCandidateOpen => 1,
         PausePoint::BeforeDirectoryOpen(_) => 2,
     }
