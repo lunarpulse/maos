@@ -1,0 +1,79 @@
+    Checking ring v0.17.14
+    Checking maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit)
+   Compiling maos-corpus-gen v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-corpus-gen)
+   Compiling pulley-macros v48.0.8
+   Compiling wasmtime-internal-versioned-export-macros v48.0.8
+   Compiling cranelift-codegen-shared v0.135.8
+    Checking cranelift-control v0.135.8
+    Checking wasmtime-internal-component-util v48.0.8
+   Compiling wasmtime-internal-core v48.0.8
+    Checking cranelift-assembler-x64 v0.135.8
+   Compiling wasmtime-internal-wit-bindgen v48.0.8
+   Compiling wasmtime-internal-jit-debug v48.0.8
+   Compiling wasmtime-internal-fiber v48.0.8
+   Compiling wasmtime v48.0.8
+   Compiling cranelift-bitset v0.135.8
+    Checking wasmtime-internal-jit-icache-coherence v48.0.8
+    Checking maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+    Checking maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite)
+    Checking butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler)
+    Checking maos-siem v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-siem)
+    Checking maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+    Checking rustls-webpki v0.103.16
+    Checking maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+    Checking rcgen v0.13.2
+    Checking jsonwebtoken v9.3.1
+    Checking maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+   Compiling wasmtime-internal-component-macro v48.0.8
+   Compiling pulley-interpreter v48.0.8
+   Compiling cranelift-entity v0.135.8
+    Checking maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+    Checking maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+    Checking maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+    Checking rustls v0.23.46
+    Checking maos-sso v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-sso)
+   Compiling cranelift-bforest v0.135.8
+   Compiling cranelift-codegen-meta v0.135.8
+    Checking maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+    Checking maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+    Checking maos-fkcs v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-fkcs)
+    Checking maos-telemetry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-telemetry)
+   Compiling wasmtime-environ v48.0.8
+    Checking ureq v2.12.1
+    Checking maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+    Checking tokio-rustls v0.26.4
+    Checking maos-egress v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-egress)
+   Compiling cranelift-codegen v0.135.8
+    Checking maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+    Checking maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+    Checking maos-a2a v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a)
+    Checking maos-notify-push v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-notify-push)
+    Checking maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp)
+    Checking worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+   Compiling wiggle-generate v48.0.8
+    Checking maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+    Checking maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+    Checking maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+    Checking maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+   Compiling wiggle-macro v48.0.8
+    Checking maos-journey-test v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-journey-test)
+    Checking maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+    Checking maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    Checking cranelift-native v0.135.8
+    Checking wasmtime-internal-unwinder v48.0.8
+    Checking cranelift-frontend v0.135.8
+    Checking mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira)
+    Checking xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+    Checking wasmtime-internal-cranelift v48.0.8
+    Checking wasmtime-wasi-io v48.0.8
+    Checking wiggle v48.0.8
+    Checking wasmtime-wasi v48.0.8
+    Checking maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+    Checking researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+    Checking maos-pdp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-pdp)
+    Checking orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator)
+    Checking maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello)
+    Checking observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer)
+    Checking architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect)
+    Checking maos-escape-detector v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-escape-detector)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 58s

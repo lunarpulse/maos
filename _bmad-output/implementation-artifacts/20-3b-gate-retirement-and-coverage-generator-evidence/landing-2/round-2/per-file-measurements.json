@@ -1,0 +1,44 @@
+[
+  {
+    "file": "crates/maos-kernel-core/src/memory/principal.rs",
+    "physical_before": 211,
+    "physical_after": 225,
+    "code_before": 173,
+    "code_after": 187
+  },
+  {
+    "file": "crates/maos-kernel-core/src/memory/private.rs",
+    "physical_before": 1166,
+    "physical_after": 1210,
+    "code_before": 1044,
+    "code_after": 1085
+  },
+  {
+    "file": "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+    "physical_before": 107,
+    "physical_after": 109,
+    "code_before": 72,
+    "code_after": 74
+  },
+  {
+    "file": "crates/maos-bin/src/main.rs",
+    "physical_before": 16506,
+    "physical_after": 16550,
+    "code_before": 13319,
+    "code_after": 13361
+  },
+  {
+    "file": "crates/maos-audit/src/lib.rs",
+    "physical_before": 3484,
+    "physical_after": 3484,
+    "code_before": 2622,
+    "code_after": 2622
+  },
+  {
+    "file": "xtask/src/invariant_lock.rs",
+    "physical_before": 654,
+    "physical_after": 677,
+    "code_before": 563,
+    "code_after": 586
+  }
+]

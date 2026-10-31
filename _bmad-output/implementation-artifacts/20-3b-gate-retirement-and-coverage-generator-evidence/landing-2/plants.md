@@ -1,6 +1,23 @@
-# Review-correction revalidation — operator ruling w8, 2026-10-31
+# Round-2 final-code FR31 revalidation — 2026-10-31
 
-This is the current bounded-owner/namespace/key layout. The root `*-plant.diff` cuts and `plant-cuts.sha256` now target this tree; the earlier section below is historical. All four witnesses still go red at their intended assertions. No compilation/setup failure was accepted as red.
+The current authoritative w9 run is recorded in `verification.md` under “Round-2 corrections — w9 adopted final verification” and `round-2/w9/commands.jsonl`. Each mutation compiled and exited **101** at its intended assertion: disclosure `Some(Markdown("A only"))` versus `None` (**108.031s**); Butler seven attacker records versus zero (**174.361s**); index one owner row versus two (**90.506s**); durability `None` versus `Some(Text("small"))` (**50.921s**). Complete current outputs are `round-2/w9/plant-*.log`; earlier `round-2/` outputs remain historical.
+
+The index cut changes the SQL conflict target along with the primary key/export path, preventing a setup-only failure. All four root cuts match the w9-adopted source exactly, so no further recut is needed. Current root-cut SHA-256 values, checked successfully from this directory (**exit 0**):
+
+```text
+6bdf6cf69fdc3de36322b36ac4460d1fd02e5eabff73ccdc1cbecc5289b0976d  disclosure-owner-pid-plant.diff
+a5ec173fea6834747c47b888690ff91fbed7270ba06c6e16e2390e3d6e233b23  principal-index-export-pid-plant.diff
+904f25a4acc06c60261e43ccd7bff789264882a3c44bd239da51f1f85b7a8b51  small-principal-durability-plant.diff
+6bdf6cf69fdc3de36322b36ac4460d1fd02e5eabff73ccdc1cbecc5289b0976d  butler-restore-poisoning-plant.diff
+```
+
+All three touched source files were restored byte-identically using reverse surgical edits and independently checked with `round-2/w9/plant-source-originals.sha256` (**exit 0**). Restored principal identity target (22 tests), Butler poisoning witness, and final normal workspace all-targets build each exited **0**. No temporary mutation script or backup file remains. Operator ruling w9 authorized the exact measured pins; the kernel/KLOC gates, both full workspace suites and prescribed prepush now pass. The separately dispositioned serial timing advisory remains explicit in the verification record.
+
+---
+
+# Historical review-correction revalidation — operator ruling w8, 2026-10-31
+
+At this historical stage the bounded-owner/namespace/key cuts targeted the then-current tree; the hashes and runs below are retained as history, superseded by the Round-2 section above. All four witnesses went red at their intended assertions. No compilation/setup failure was accepted as red.
 
 ## plant-disclosure-owner-pid
 

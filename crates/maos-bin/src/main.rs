@@ -10470,6 +10470,49 @@ async fn run_uninstall_cascade_inner(
     let held_private_rows = held_principal_ids.iter().try_fold(0_u64, |count, id| {
         private_counts[id].map(|rows| count + rows)
     });
+    let mut held_attributable: u64 = held_principal_ids
+        .iter()
+        .filter_map(|id| private_counts[id])
+        .sum();
+    // Attribute unreadable residue by its namespace, never by the mere presence
+    // of an unreadable held principal. Other directories remain uninstall failures.
+    if held_private_rows.is_none() {
+        for owner in std::fs::read_dir(&memory_root)? {
+            let owner = owner?;
+            if !owner.file_type()?.is_dir() {
+                continue;
+            }
+            for namespace in std::fs::read_dir(owner.path())? {
+                let namespace = namespace?;
+                if !namespace.file_type()?.is_dir() {
+                    continue;
+                }
+                let name = namespace.file_name().to_string_lossy().into_owned();
+                let encoded = if name.starts_with("h-") {
+                    std::fs::read_to_string(namespace.path().join(".identity"))?
+                } else {
+                    name
+                };
+                let principal = hex::decode(encoded).ok().and_then(|bytes| {
+                    serde_json::from_slice::<maos_domain::memory::MemoryNamespace>(&bytes).ok()
+                });
+                if !matches!(principal, Some(maos_domain::memory::MemoryNamespace::Principal { principal_id, .. }) if held_principal_ids.contains(&principal_id) && private_counts[&principal_id].is_none())
+                {
+                    continue;
+                }
+                for value in std::fs::read_dir(namespace.path())? {
+                    let value = value?;
+                    if value.file_type()?.is_file()
+                        && [".json", ".md", ".bin", ".txt"]
+                            .iter()
+                            .any(|suffix| value.file_name().to_string_lossy().ends_with(suffix))
+                    {
+                        held_attributable += 1;
+                    }
+                }
+            }
+        }
+    }
 
     if all_principal_ids.is_empty()
         && shared_principal_rows == 0
@@ -10518,27 +10561,28 @@ async fn run_uninstall_cascade_inner(
     let remaining_private_principal_rows =
         maos_audit::private_tier_principal_row_count(&memory_root)
             .map_err(|e| format!("failed to verify post-erasure private tier: {e}"))?;
-    let (private_status, private_failure) = if held_private_rows.is_none() {
-        (CategoryStatus::CoverageGap { reason: "private principal values retained-under-hold/unreadable; held coverage could not be counted".into() }, None)
-    } else if remaining_private_principal_rows == 0 {
-        (CategoryStatus::VerifiedEmpty, None)
-    } else if Some(remaining_private_principal_rows) == held_private_rows {
-        (
-            CategoryStatus::CoverageGap {
-                reason: "private principal values retained under durable legal hold".into(),
-            },
-            None,
-        )
-    } else {
+    let unheld_orphans = remaining_private_principal_rows.saturating_sub(held_attributable);
+    let (private_status, private_failure) = if unheld_orphans > 0 {
         let reason = format!(
             "private tier still holds {remaining_private_principal_rows} principal value(s), \
-             {held_private_rows:?} under legal hold; other values are not indexed for this uninstall"
+             {held_private_rows:?} under legal hold; {unheld_orphans} other value(s) are not indexed for this uninstall"
         );
         (
             CategoryStatus::CoverageGap {
                 reason: reason.clone(),
             },
             Some(reason),
+        )
+    } else if held_private_rows.is_none() {
+        (CategoryStatus::CoverageGap { reason: "private principal values retained-under-hold/unreadable; held coverage could not be counted".into() }, None)
+    } else if remaining_private_principal_rows == 0 {
+        (CategoryStatus::VerifiedEmpty, None)
+    } else {
+        (
+            CategoryStatus::CoverageGap {
+                reason: "private principal values retained under durable legal hold".into(),
+            },
+            None,
         )
     };
 

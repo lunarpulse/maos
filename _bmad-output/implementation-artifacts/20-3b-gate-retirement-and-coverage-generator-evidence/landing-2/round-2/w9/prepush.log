@@ -1,0 +1,1169 @@
+{
+  "base": "61321573117b063935135466c3c8fc34b7328cf1",
+  "base_age_seconds": 13169,
+  "changed_paths": [
+    ".devcontainer/Dockerfile",
+    ".devcontainer/docker-compose.yml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-cuts.sha256",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plants.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/principal-index-export-pid-plant.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/audit-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/bin-regressions-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/bin-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/build-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/build.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-dev-record-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-epic-close-coherence.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-plant-cuts-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-plant-cuts.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-service-boundary.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/clippy-live.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/clippy-ratchet-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/clippy-ratchet.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/clippy-stderr.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/commands.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/coverage-matrix.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/deny.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/fmt-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/fmt.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/invariant-lock.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kernel-baseline.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kernel-memory.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kernel-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kloc.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/per-file-measurements.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/plant-butler-restore-poisoning.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/plant-disclosure-owner-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/plant-principal-index-export-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/plant-restored-butler.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/plant-restored-kernel.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/plant-small-principal-durability.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/prepush.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/trial-attestation-detail.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/audit-focused.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/bin-focused-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/build-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/build-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/butler-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/clippy-live.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/clippy-ratchet.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/clippy-stderr.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/commands.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/deny.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/emit-kernel-pin.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/fmt-before-pin.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/fmt-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-composition-root-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-coverage-matrix-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-dev-record-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-env-contract.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-epic-close-coherence.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-j1-loopback-delegation.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-review-findings-resolved.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-serde-error-handling.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-test-cost.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-check-trial-attestation.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-coverage-matrix.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/gate-invariant-lock.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/kernel-baseline-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/kernel-baseline-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/kernel-focused-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/kernel-memory.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/kernel-surface-current.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/kloc-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/kloc-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/measured-kloc-before-pin.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/pin-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-butler-restore-poisoning.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-cuts-sha256.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-disclosure-owner-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-principal-index-export-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-restoration-sha256.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-small-principal-durability.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-source-originals.sha256",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/prepush.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/serial-test-budget.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/service-boundary-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/workspace-default.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/workspace-default.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/workspace-serial.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/workspace-serial.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/workspace-default.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/workspace-serial.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/xtask-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/small-principal-durability-plant.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/verification.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator.md",
+    "_bmad-output/implementation-artifacts/deferred-work.md",
+    "_bmad-output/planning-artifacts/epics/epic-19-founder-loop-w4.md",
+    "_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md",
+    "crates/maos-audit/src/lib.rs",
+    "crates/maos-audit/tests/private_tier_count_16_5.rs",
+    "crates/maos-bin/src/main.rs",
+    "crates/maos-bin/tests/erasure_uninstall_13_5b.rs",
+    "crates/maos-kernel-core/src/memory/principal.rs",
+    "crates/maos-kernel-core/src/memory/private.rs",
+    "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+    "crates/maos-kernel-core/tests/principal_identity_20_3b.rs",
+    "xtask/kernel-core-baseline.toml",
+    "xtask/kloc.toml",
+    "xtask/src/invariant_lock.rs",
+    "xtask/tests/invariant_claims_20_3b.rs",
+    "xtask/tests/kernel_pin_content_hash_16_0.rs",
+    "xtask/tests/recovery_lane_ceiling_rule.rs"
+  ],
+  "records": [
+    {
+      "check": "changed-paths",
+      "artifact": "merge-base..HEAD / HEAD..working tree / untracked",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "stability-matrix",
+      "artifact": "STABILITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 144
+    },
+    {
+      "check": "error-catalog-check",
+      "artifact": "docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 471
+    },
+    {
+      "check": "gen-abi-docs",
+      "artifact": "docs-site/abi/v1",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1358
+    },
+    {
+      "check": "check-serde-error-handling",
+      "artifact": "crates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 223
+    },
+    {
+      "check": "check-workspace-count",
+      "artifact": "Cargo.toml / docs/kernel-design.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 8
+    },
+    {
+      "check": "check-manifest-schema-version",
+      "artifact": "manifest schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-skill-schema",
+      "artifact": "skill schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "check-epic-close-coherence",
+      "artifact": "epic closure / discipline workflow",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 19
+    },
+    {
+      "check": "check-coverage-matrix-completeness",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 10
+    },
+    {
+      "check": "check-test-cost",
+      "artifact": "xtask/test-budgets.toml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 250
+    },
+    {
+      "check": "check-env-contract",
+      "artifact": "environment contract",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 412
+    },
+    {
+      "check": "check-unsafe",
+      "artifact": "capability validation sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "check-service-boundary",
+      "artifact": "service boundary sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1106
+    },
+    {
+      "check": "check-kernel-baseline",
+      "artifact": "kernel baseline",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "kloc-check",
+      "artifact": "xtask/kloc.toml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 30
+    },
+    {
+      "check": "check-breaking-md",
+      "artifact": "BREAKING.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "check-composition-root-completeness",
+      "artifact": "composition roots",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 43
+    },
+    {
+      "check": "check-pub-field-constructors",
+      "artifact": "public field constructors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 246
+    },
+    {
+      "check": "check-dependency-closure",
+      "artifact": "Cargo.lock / dependency closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 349
+    },
+    {
+      "check": "coverage-matrix",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 16
+    },
+    {
+      "check": "check-corpus",
+      "artifact": "corpus manifest",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 100
+    },
+    {
+      "check": "abi-diff",
+      "artifact": "ABI surface",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1051
+    },
+    {
+      "check": "check-empty-kernel",
+      "artifact": "kernel invariant I9",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 258
+    },
+    {
+      "check": "check-loom",
+      "artifact": "loom substrate",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 256
+    },
+    {
+      "check": "check-fr47",
+      "artifact": "FR47 bindings",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14
+    },
+    {
+      "check": "check-a2a-sender-completeness",
+      "artifact": "A2A sender boundary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 30
+    },
+    {
+      "check": "check-judge-config",
+      "artifact": "pinned judge configuration",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1574
+    },
+    {
+      "check": "check-security-md",
+      "artifact": "SECURITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "templates-regen",
+      "artifact": "example Spirit templates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "corpus-staleness",
+      "artifact": "corpus validity dates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "calibrate",
+      "artifact": "calibration seed",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-review-findings-resolved",
+      "artifact": "review closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 98
+    },
+    {
+      "check": "check-dev-record-completeness",
+      "artifact": "story records",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 57
+    },
+    {
+      "check": "check-dev-model-tier",
+      "artifact": "story model tiers",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 13
+    },
+    {
+      "check": "check-ship-gate-completeness",
+      "artifact": "ship registry",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 28
+    },
+    {
+      "check": "check-pentest-gate",
+      "artifact": "pen-test evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-third-party-trial",
+      "artifact": "trial evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-trial-attestation",
+      "artifact": "trial attestation",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 170
+    },
+    {
+      "check": "check-red-team-gate",
+      "artifact": "red-team evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-migration-merkle",
+      "artifact": "migration evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14416
+    },
+    {
+      "check": "nfr-onb-1-gate",
+      "artifact": "onboarding evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "cassette-age-gate",
+      "artifact": "cassette age policy",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "build-test-fixtures",
+      "artifact": "target/maos-fixtures/manifest.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 11862
+    },
+    {
+      "check": "binary-size:trigger",
+      "artifact": "cargo metadata / change set",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "binary-size:build",
+      "artifact": "release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 61477
+    },
+    {
+      "check": "binary-size",
+      "artifact": "tests/integration/onb_nfr2_timing.sh: stripped release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "fmt",
+      "artifact": "workspace Rust sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2612
+    },
+    {
+      "check": "docs:troubleshoot-bidi",
+      "artifact": "docs-site/route-manifest.json / docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 107
+    },
+    {
+      "check": "docs:glossary-lock",
+      "artifact": "docs-site/i18n/ko / glossary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 77
+    },
+    {
+      "check": "docs:anchor-ids",
+      "artifact": "docs-site anchors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 66
+    },
+    {
+      "check": "docs:ko-coverage",
+      "artifact": "docs-site/i18n/ko (KO_COVERAGE_MIN=100)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 70
+    },
+    {
+      "check": "docs:build",
+      "artifact": "docs-site/build",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "docs:routes",
+      "artifact": "docs-site/build / route-manifest.json",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "cargo-deny",
+      "artifact": "Cargo.lock / deny.toml (required cargo-deny)",
+      "status": "skip",
+      "detail": "neither Cargo.lock nor deny.toml changed",
+      "wall_ms": 0
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1014240
+    },
+    {
+      "check": "kernel-core-lib",
+      "artifact": "maos-kernel-core lib tests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 5313
+    },
+    {
+      "check": "workspace-doc",
+      "artifact": "workspace doctests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 59453
+    },
+    {
+      "check": "test-budget",
+      "artifact": "/mnt/build/cargo-maos/nextest/default/junit.xml",
+      "status": "advisory",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; {\"gate\":\"check-test-budget\",\"passed\":false,\"junit\":\"/mnt/build/cargo-maos/nextest/default/junit.xml\",\"binaries\":576,\"total_span_seconds\":363.9720046520233,\"total_sum_seconds\":835.0150000000004,\"findings\":[\"maos-bin::one_daemon_one_door_16_1 took 35.437 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml\",\"ma ::error::check-test-budget: FAIL — 2 finding(s): - maos-bin::one_daemon_one_door_16_1 took 35.437 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 40.094 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml check-test-budget: FAIL — 2 finding(s): - maos-bin::one_daemon_one_door_16_1 took 35.437 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 40.094 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "wall_ms": 21
+    },
+    {
+      "check": "ci-pins",
+      "artifact": ".github/workflows/discipline.yml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-1-crash-detection-2s/Run crash corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-2-hang-detection-60s/Run hang corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 4 — retained T3 terminal facts (Story 17-7)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 5 — Observer live scene + activity corpus (Story 17-4)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:journey-hermetic-tier-1/Live skill port security witnesses (18-7, ten tests)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Native cgroup-v2 smoke — four real cases",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Real admitted session suite — 23 cases, serial",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Rootless T3 Worker resource enforcement (x64)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-undelegated/Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"SCOPED-VERDICT \": 1 static emission sites; pin 8 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"GOVERNED-ATOMIC \": 1 static emission sites; pin 10 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING-CONTROL \": 1 static emission sites; pin 1 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"RUNNER-SIGSYS \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"REPEATED-MAILBOX \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-PROVENANCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-REFUSALS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-FLOODS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-DIAGNOSTICS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-EXITS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-ONCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"WASM-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Live escape-anomaly consumer under real T2 (Story 17-10)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/In-band recall through the admitted session (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Participant recall and consent envelopes, both forms (Story 17-8)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:windows-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:check-reza-production-path/GDPR response-only MCP principal cannot resurrect from cache (18-6)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:macos-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "tracked-tree",
+      "artifact": "git diff HEAD / tracked status",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    }
+  ],
+  "output_diagnostics": [
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-374217/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-374217/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 absent_grant_keeps_d1_tokenless_proceed_posture: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 local_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 remote_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop audit-drain Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic crashed second Worker (nack): signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic pending-halt stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigned section crashes twice: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigning first section crashes: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic section crashed once, re-dispatched: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic escalating section: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-Worker dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic clear-judgement twin: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold resumed with provided context: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold released by accepted-halt: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic ambiguity halt resolved over the door: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold expiring at its bound: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V1 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V2 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V4 re-pin consent delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V3 recovered delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 paused Orchestrator holds dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 recall: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 safe-point drain: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root unload live Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown serving Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown one-shot Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown interrupted topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown standalone Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root startup shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated goal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 maos run cli-wrapper Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 two-host delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 replayed inbound delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 hostless completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion no-effect Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion prose-refusal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion permission-denial Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fixture credential-immunity Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 standalone completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker revoke-stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker freeze: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 Worker FD hard-limit refusal: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 live Worker resource enforcement: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled then crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root-crash: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 client-first: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fallback: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 ownership: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S1 immediate exit: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S2 exit-137: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S3 external SIGKILL: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S4 memory.max OOM: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload over-budget: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload panic: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 configured workspaces root claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 host-probe marker claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect codex Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-workspace dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: Python Ed25519 backend for tools/verify-audit-bundle/verify.py (pip install cryptography)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: Python Ed25519 backend for tools/verify-audit-bundle/verify.py (pip install cryptography)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 every executable escape-corpus-v1 scenario: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 t3 egress socket custody: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 clear-twin topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 founder-loop journey delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 resume-continuity topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 sandbox_t3_spawn_linux: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_no_endpoint_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_proven_red_network_canary_detected): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace -V failed:"
+    }
+  ],
+  "wall_ms": 1298172
+}

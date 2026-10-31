@@ -9,6 +9,15 @@
  );
  CREATE INDEX IF NOT EXISTS principal_index_id_idx ON principal_index(principal_id);
  ";
+@@ -121,7 +121,7 @@
+                 "INSERT INTO principal_index
+                 (principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner, written)
+              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)
+-             ON CONFLICT(principal_id, writer_owner, schema, key) DO UPDATE SET written=1
++             ON CONFLICT(principal_id, writer_spirit_pid, schema, key) DO UPDATE SET written=1
+              RETURNING rowid",
+                 params![
+                     principal_id,
 --- a/crates/maos-kernel-core/src/memory/mod.rs
 +++ b/crates/maos-kernel-core/src/memory/mod.rs
 @@ -933,7 +933,7 @@

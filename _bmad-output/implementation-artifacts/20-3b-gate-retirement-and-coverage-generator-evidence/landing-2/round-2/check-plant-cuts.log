@@ -1,0 +1,9 @@
+sha256sum: disclosure-owner-pid-plant.diff: No such file or directory
+disclosure-owner-pid-plant.diff: FAILED open or read
+sha256sum: principal-index-export-pid-plant.diff: No such file or directory
+principal-index-export-pid-plant.diff: FAILED open or read
+sha256sum: small-principal-durability-plant.diff: No such file or directory
+small-principal-durability-plant.diff: FAILED open or read
+sha256sum: butler-restore-poisoning-plant.diff: No such file or directory
+butler-restore-poisoning-plant.diff: FAILED open or read
+sha256sum: WARNING: 4 listed files could not be read

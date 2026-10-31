@@ -80,6 +80,15 @@ impl PrincipalNamespaceIndex {
             ))
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         }
+        let has_written: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('principal_index') WHERE name='written')", [], |row| row.get(0),
+        ).map_err(|e| MemoryError::Storage(e.to_string()))?;
+        if !has_written {
+            conn.execute_batch(
+                "ALTER TABLE principal_index ADD COLUMN written INTEGER NOT NULL DEFAULT 1",
+            )
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        }
         conn.execute_batch("COMMIT;")
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(Self {
@@ -107,11 +116,13 @@ impl PrincipalNamespaceIndex {
             .conn
             .lock()
             .expect("PrincipalNamespaceIndex lock poisoned");
-        let inserted = conn
-            .execute(
-                "INSERT OR IGNORE INTO principal_index
-                (principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        let intent: i64 = conn
+            .query_row(
+                "INSERT INTO principal_index
+                (principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner, written)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)
+             ON CONFLICT(principal_id, writer_owner, schema, key) DO UPDATE SET written=1
+             RETURNING rowid",
                 params![
                     principal_id,
                     writer_spirit_pid as i64,
@@ -120,19 +131,22 @@ impl PrincipalNamespaceIndex {
                     timestamp_ns as i64,
                     writer_owner,
                 ],
+                |row| row.get(0),
             )
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
-        // Durable intent precedes the spill: a crash may leave redacted-missing,
-        // never an undiscoverable value. Keep pre-existing rows on spill failure.
+        // A second writer marks the intent shared before spilling, so even an
+        // in-flight spill cannot lose discovery when the inserting writer fails.
         if let Err(error) = spill() {
-            if inserted != 0 {
-                conn.execute("DELETE FROM principal_index WHERE principal_id=?1 AND writer_owner=?2 AND schema=?3 AND key=?4",
-                    params![principal_id, writer_owner, schema, key])
-                    .map_err(|cleanup| MemoryError::Storage(format!("{error}; intent cleanup: {cleanup}")))?;
-            }
+            conn.execute(
+                "DELETE FROM principal_index WHERE rowid=?1 AND written=0",
+                [intent],
+            )
+            .map_err(|cleanup| {
+                MemoryError::Storage(format!("{error}; intent cleanup: {cleanup}"))
+            })?;
             return Err(error);
         }
-        conn.execute("UPDATE principal_index SET writer_spirit_pid=?1, timestamp_ns=?2 WHERE principal_id=?3 AND writer_owner=?4 AND schema=?5 AND key=?6",
+        conn.execute("UPDATE principal_index SET written=1, writer_spirit_pid=?1, timestamp_ns=?2 WHERE principal_id=?3 AND writer_owner=?4 AND schema=?5 AND key=?6",
             params![writer_spirit_pid, timestamp_ns as i64, principal_id, writer_owner, schema, key])
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(())

@@ -21,3 +21,29 @@ fn private_tier_count_finds_principal_data_when_shared_tier_is_empty() {
         1
     );
 }
+
+#[test]
+fn empty_logical_keys_are_values_not_metadata() {
+    let root = tempfile::tempdir().unwrap();
+    let ns = maos_domain::memory::MemoryNamespace::principal("empty-key", "profile").unwrap();
+    let directory = root
+        .path()
+        .join("42")
+        .join(hex::encode(serde_json::to_vec(&ns).unwrap()));
+    fs::create_dir_all(&directory).unwrap();
+    for name in [
+        ".md",
+        ".json",
+        ".bin",
+        ".txt",
+        ".identity",
+        ".key-h-metadata",
+        ".spill.tmp",
+    ] {
+        fs::write(directory.join(name), b"data").unwrap();
+    }
+    assert_eq!(
+        maos_audit::private_tier_principal_row_count(root.path()).unwrap(),
+        4
+    );
+}

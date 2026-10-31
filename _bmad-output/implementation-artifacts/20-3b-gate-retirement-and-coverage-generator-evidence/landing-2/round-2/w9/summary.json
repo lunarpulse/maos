@@ -1,0 +1,785 @@
+{
+  "pins": {
+    "kernel_physical": 26680,
+    "kernel_tokei": 20889,
+    "maos-bin": 33021,
+    "maos-audit": 7668,
+    "xtask": 42780,
+    "maos-domain": 9977,
+    "aggregate": 188239,
+    "aggregate_hardfail": 188240
+  },
+  "kernel_set_hash": "f18147a4742e99aec0f7fd38a8205d440613c836cf9740438a5e147dec5118cf",
+  "surface_items": 401,
+  "surface_unchanged": true,
+  "prepush": {
+    "pass": 83,
+    "skip": 8,
+    "advisory": 1
+  },
+  "clippy": {
+    "occurrences": 1410,
+    "source_distinct": 881
+  },
+  "commands": [
+    {
+      "label": "fmt-before-pin",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0,
+      "seconds": 2.703
+    },
+    {
+      "label": "measured-kloc-before-pin",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "kloc-check",
+        "--json"
+      ],
+      "exit_code": 1,
+      "seconds": 0.062
+    },
+    {
+      "label": "emit-kernel-pin",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-kernel-baseline",
+        "--emit-pin"
+      ],
+      "exit_code": 0,
+      "seconds": 0.005
+    },
+    {
+      "label": "fmt-final",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0,
+      "seconds": 2.422
+    },
+    {
+      "label": "build-final",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "build",
+        "--locked",
+        "--workspace",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "seconds": 2.81
+    },
+    {
+      "label": "kloc-final",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "kloc-check",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.032
+    },
+    {
+      "label": "kernel-baseline-final",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-kernel-baseline",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.01
+    },
+    {
+      "label": "service-boundary-final",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-service-boundary",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 1.105
+    },
+    {
+      "label": "pin-regressions",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "d11_xtask_ceiling_ratchet",
+        "--test",
+        "kernel_pin_content_hash_16_0",
+        "--test",
+        "recovery_lane_ceiling_rule",
+        "--test",
+        "invariant_claims_20_3b"
+      ],
+      "exit_code": 0,
+      "seconds": 17.227
+    },
+    {
+      "label": "kernel-memory",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-kernel-core",
+        "--lib",
+        "memory"
+      ],
+      "exit_code": 0,
+      "seconds": 2.526
+    },
+    {
+      "label": "workspace-serial",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "nextest",
+        "run",
+        "--workspace",
+        "--locked",
+        "--color",
+        "never",
+        "--no-fail-fast",
+        "--test-threads",
+        "1"
+      ],
+      "exit_code": 0,
+      "seconds": 882.212
+    },
+    {
+      "label": "serial-test-budget",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-test-budget",
+        "--junit",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/workspace-serial.junit.xml",
+        "--json"
+      ],
+      "exit_code": 1,
+      "seconds": 0.019
+    },
+    {
+      "label": "workspace-default",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "nextest",
+        "run",
+        "--workspace",
+        "--locked",
+        "--color",
+        "never",
+        "--no-fail-fast"
+      ],
+      "exit_code": 0,
+      "seconds": 86.689
+    },
+    {
+      "label": "gate-check-dev-record-completeness",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-dev-record-completeness",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.1
+    },
+    {
+      "label": "gate-check-epic-close-coherence",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-epic-close-coherence",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.019
+    },
+    {
+      "label": "gate-invariant-lock",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "invariant-lock",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.019
+    },
+    {
+      "label": "gate-coverage-matrix",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "coverage-matrix",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.013
+    },
+    {
+      "label": "gate-check-coverage-matrix-completeness",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-coverage-matrix-completeness",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.011
+    },
+    {
+      "label": "gate-check-env-contract",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-env-contract",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.423
+    },
+    {
+      "label": "gate-check-serde-error-handling",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-serde-error-handling",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.232
+    },
+    {
+      "label": "gate-check-composition-root-completeness",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-composition-root-completeness",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.041
+    },
+    {
+      "label": "gate-check-j1-loopback-delegation",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-j1-loopback-delegation",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.039
+    },
+    {
+      "label": "gate-check-review-findings-resolved",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-review-findings-resolved",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.062
+    },
+    {
+      "label": "gate-check-test-cost",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-test-cost",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.244
+    },
+    {
+      "label": "gate-check-trial-attestation",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-trial-attestation",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.181
+    },
+    {
+      "label": "clippy",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "seconds": 233.557
+    },
+    {
+      "label": "clippy-ratchet",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "clippy-ratchet",
+        "--input",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/clippy-live.jsonl"
+      ],
+      "exit_code": 0,
+      "seconds": 0.209
+    },
+    {
+      "label": "deny",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "deny",
+        "check"
+      ],
+      "exit_code": 0,
+      "seconds": 10.284
+    },
+    {
+      "label": "plant-disclosure-owner-pid",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-kernel-core",
+        "--test",
+        "principal_identity_20_3b",
+        "recycled_pid_cannot_disclose_another_spirits_principal_spill",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 108.031
+    },
+    {
+      "label": "plant-butler-restore-poisoning",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-bin",
+        "--test",
+        "butler_scene_18_4",
+        "recycled_pid_cannot_poison_butlers_acceptance_restore",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 174.361
+    },
+    {
+      "label": "plant-principal-index-export-pid",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-kernel-core",
+        "--test",
+        "principal_identity_20_3b",
+        "subject_access_export_preserves_both_owners_when_pid_and_key_are_reused",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 90.506
+    },
+    {
+      "label": "plant-small-principal-durability",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-kernel-core",
+        "--test",
+        "principal_identity_20_3b",
+        "small_non_markdown_principal_values_survive_restart_and_pid_change",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 50.921
+    },
+    {
+      "label": "plant-restoration-sha256",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "sha256sum",
+        "--check",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/plant-source-originals.sha256"
+      ],
+      "exit_code": 0,
+      "seconds": 0.006
+    },
+    {
+      "label": "plant-cuts-sha256",
+      "cwd": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2",
+      "command": [
+        "sha256sum",
+        "--check",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-cuts.sha256"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "label": "kernel-focused-restored",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-kernel-core",
+        "--test",
+        "principal_identity_20_3b",
+        "--test",
+        "private_forget_restart_13_5i",
+        "--test",
+        "private_spill_supersession_13_5j"
+      ],
+      "exit_code": 0,
+      "seconds": 5.784
+    },
+    {
+      "label": "bin-focused-restored",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-bin",
+        "--test",
+        "erasure_uninstall_13_5b",
+        "--test",
+        "maos_uninstall_16_4"
+      ],
+      "exit_code": 0,
+      "seconds": 14.854
+    },
+    {
+      "label": "butler-restored",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-bin",
+        "--test",
+        "butler_scene_18_4",
+        "recycled_pid_cannot_poison_butlers_acceptance_restore",
+        "--",
+        "--exact"
+      ],
+      "exit_code": 0,
+      "seconds": 1.976
+    },
+    {
+      "label": "audit-focused",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "maos-audit",
+        "--test",
+        "private_tier_count_16_5",
+        "--test",
+        "governance_roundtrip_20_3b"
+      ],
+      "exit_code": 0,
+      "seconds": 5.498
+    },
+    {
+      "label": "build-restored",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "cargo",
+        "build",
+        "--locked",
+        "--workspace",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "seconds": 164.444
+    },
+    {
+      "label": "kloc-restored",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "kloc-check",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.077
+    },
+    {
+      "label": "kernel-baseline-restored",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "check-kernel-baseline",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.011
+    },
+    {
+      "label": "prepush",
+      "cwd": "/home/lunarpulse/dev_ws",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "MAOS_17_2_CGROUP_MODE=undelegated",
+        "/mnt/build/cargo-maos/debug/xtask",
+        "prepush",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 1298.18
+    }
+  ]
+}

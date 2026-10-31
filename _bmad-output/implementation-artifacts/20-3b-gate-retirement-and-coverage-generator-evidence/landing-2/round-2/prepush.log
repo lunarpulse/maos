@@ -1,0 +1,1468 @@
+{
+  "base": "43ce3ea72a75071d5c08034284c5f2049344fefa",
+  "base_age_seconds": 76837,
+  "changed_paths": [
+    ".devcontainer/Dockerfile",
+    ".devcontainer/docker-compose.yml",
+    ".github/workflows/discipline.yml",
+    ".gitignore",
+    "Cargo.lock",
+    "_bmad-output/implementation-artifacts/19-4-j1-beats-and-demo-replay.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/ci/ci-20-3b-verify.yml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/b1-maos-bin-identity-binding.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/cites-23f58da4.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/coverage-matrix-replica.py",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/k1-principal-durability.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/k2a-identity-keyed-spill-dirs.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/k2b-identity-index-owner-column.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/kfull-k1-k2b-bundle.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/krec-k1-k2a-bundle.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/measurements.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/records-owed.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/tokei-23f58da4-and-prototypes.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/x1-retirement-enrolment-edits.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/creation/x1-retirement-prototype.py",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/files-changed.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/gates.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/initial-test-budget-failure.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/initial-workspace-failures.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/measurements.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/plants/if-false-fixture-results.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/plants/if-false-results.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/plants/if-false.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/prepush.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/retirement-closure.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/build-final.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/build.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/commands.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/expensive-filter.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/expensive-xtask-gates.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-build.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-expensive-xtask-gates.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-fmt.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-dev-record-completeness.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-env-contract.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-epic-close-coherence.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-j1-loopback-delegation.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-kernel-baseline.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-review-findings-resolved.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-service-boundary.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-ship-gate-completeness.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-test-budget.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-check-test-cost.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-gate-kloc-check.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-prepush.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/final-workspace-nextest.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/fmt-final.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/fmt-placeholder-scope.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/fmt.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-dev-record-completeness.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-env-contract.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-epic-close-coherence.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-j1-loopback-delegation.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-kernel-baseline.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-review-findings-resolved.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-service-boundary.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-test-budget-serial.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-test-budget.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-check-test-cost.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/gate-kloc-check.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/ignored-diagnostics.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/kloc-measurement.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/kloc-placeholder-scope.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/plant-real-tree-clean.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/plant-real-tree-disabled.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/plant-real-tree-restored.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/plant-restoration-status.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/prepush.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/results.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/summary.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/t0-clippy-count.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/t0-clippy-summary.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/t0-clippy.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/t0-coverage-completeness.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/t0-coverage-matrix.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/workspace-nextest-serial.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/review-fixes/workspace-nextest.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-1/verification.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/backup-mod.rs.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/backup-principal.rs.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/backup-private.rs.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/bin40-uninstall-and-purge-fixed.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/bin40-uninstall-and-purge.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/build-and-fixtures-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/build-initial.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/butler-poisoning-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/butler-restore-poisoning-plant.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/clippy-final.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/clippy-final.stderr.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/clippy-live.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/clippy-live.stderr.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/clippy-ratchet-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/clippy-ratchet-live.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/commands.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/coverage-dispositions.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/disclosure-owner-pid-plant.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/expensive-filter.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-composition-root-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-coverage-matrix-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-dev-record-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-env-contract.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-epic-close-coherence.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-j1-loopback-delegation.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-kernel-baseline.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-review-findings-resolved.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-serde-error-handling.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-service-boundary.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-test-budget.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-check-test-cost.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-coverage-matrix.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-invariant-lock.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/final-kloc-check.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/fixture-refresh-after-cli-recompile.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/fixture-refresh-final-normal-artifacts.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/fmt-bin40.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/fmt-integration-correction.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/fmt-trait-scope-fix.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/formatted-tokei.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-composition-root-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-coverage-matrix-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-dev-record-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-env-contract.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-epic-close-coherence.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-j1-loopback-delegation.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-kernel-baseline.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-review-findings-resolved.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-serde-error-handling.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-service-boundary.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-check-test-cost.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-coverage-matrix.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-dev-record-dispositioned.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-invariant-lock.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/gate-kloc-check.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/governance-roundtrip-green.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/hook-butler-green.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/journey-binaries-normal-refresh.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/journey-both-entrypoints-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/journey-cli-explicit-relink.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/journey-cli-source-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/journey-refreshed-witnesses.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/journey-workspace-freshness-witnesses.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/kernel-emit-pin.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/kernel-memory-lib.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/kloc-before-gates.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/kloc-bin40.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/kloc-correction-measurement.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/kloc-final-pin.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/migration-corpus-prerequisite.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/migration-merkle-real-corpus.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-ac3-clean.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-ac3-disabled.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-ac3-remove.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-ac3-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-butler-restore-poisoning.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-cut-checksums.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-cuts.sha256",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-disclosure-owner-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-principal-index-export-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plant-small-principal-durability.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/plants.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/prepush-final.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/prepush-initial.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/prepush-runtime.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/principal-identity-green.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/principal-identity-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/principal-index-export-pid-plant.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-durability-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-durability-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-durability-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-mod.rs-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-mod.rs-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-mod.rs-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-owner-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-owner-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-owner-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-principal.rs-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-principal.rs-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/restore-principal.rs-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/audit-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/backup-mod.rs.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/backup-principal.rs.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/backup-private.rs.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/bin-regressions-fixed.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/bin-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/build-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/build-initial.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/butler-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/cargo-deny-real.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/changed-test-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/clippy-fixed.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/clippy-fixed.stderr.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/clippy-ratchet-fixed.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/clippy-ratchet.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/clippy.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/clippy.stderr.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/commands.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/fmt-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/fmt-new-test-diagnostics.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/fmt-test-fixture-corrections.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/formatted-kloc-measurement.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/fr34-labelled-red.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/fr53-labelled-red.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-composition-root-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-coverage-matrix-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-dev-record-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-env-contract.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-epic-close-coherence.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-j1-loopback-delegation.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-kernel-baseline.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-review-findings-resolved.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-serde-error-handling.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-service-boundary.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-check-test-cost.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-coverage-matrix.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-invariant-lock.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/gate-kloc-check.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/hook-and-butler-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/kernel-emit-pin-w8.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/kernel-memory-lib.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/kernel-regressions-fixed.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/kernel-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/kloc-after-test-fixes.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/kloc-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/landing2-new-xtask-binaries-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/normal-binary-source-refresh.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/official-fixture-refresh.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/plant-butler-restore-poisoning.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/plant-cut-checksums.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/plant-disclosure-owner-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/plant-principal-index-export-pid.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/plant-small-principal-durability.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/prepush-final.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/prepush-final.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/prepush-initial.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/prepush-initial.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/prepush-runtime.json",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/principal-restored.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-durability-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-durability-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-durability-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-mod.rs-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-mod.rs-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-mod.rs-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-owner-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-owner-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-owner-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-principal.rs-cmp.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-principal.rs-copy-back.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/restore-principal.rs-touch.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/sdk-import-regression.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/sdk-routed.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/serial-test-budget-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/serial-test-budget.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/surface-snapshot-w8.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-default-final.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-default-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-default.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-default.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-serial-final.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-serial-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-serial.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/workspace-serial.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/xtask-expensive-filter-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/review-corrections/xtask-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/audit-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/bin-regressions-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/bin-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/build.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-dev-record-completeness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-epic-close-coherence.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/check-service-boundary.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/clippy-live.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/clippy-ratchet.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/clippy-stderr.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/commands.jsonl",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/coverage-matrix.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/deny.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/fmt-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/fmt.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/invariant-lock.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kernel-baseline.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kernel-memory.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kernel-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/kloc.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/prepush.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/workspace-default.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/workspace-serial.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/xtask-regressions.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/service-surface-before.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/small-principal-durability-plant.diff",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/spike-covers.toml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/spike-original.yaml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/spike-reconstructed.yaml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/spike-source.yaml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/spike.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/verification.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-cli-relink-attempt.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-cli-relink-attempt.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-cli-touch-cross-staleness.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-cli-touch-cross-staleness.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-default-final.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-default-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-initial.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-initial.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-normal-artifact-refresh.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-post-bin40-stale-cli.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-post-bin40-stale-cli.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-serial-final.junit.xml",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/workspace-serial-final.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/xtask-expensive-filter.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/xtask-new-vectors.log",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator-evidence/spike-go-no-go.md",
+    "_bmad-output/implementation-artifacts/20-3b-gate-retirement-and-coverage-generator.md",
+    "_bmad-output/implementation-artifacts/deferred-work.md",
+    "_bmad-output/implementation-artifacts/sprint-status.yaml",
+    "_bmad-output/planning-artifacts/epic-20-preflight-2026-10-30.md",
+    "_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md",
+    "_bmad-output/planning-artifacts/epics/index.md",
+    "crates/maos-audit/src/lib.rs",
+    "crates/maos-audit/tests/governance_roundtrip_20_3b.rs",
+    "crates/maos-audit/tests/private_tier_count_16_5.rs",
+    "crates/maos-bin/src/admission.rs",
+    "crates/maos-bin/src/main.rs",
+    "crates/maos-bin/tests/butler_scene_18_4.rs",
+    "crates/maos-bin/tests/erasure_uninstall_13_5b.rs",
+    "crates/maos-bin/tests/hook_pump_17_4.rs",
+    "crates/maos-domain/src/memory.rs",
+    "crates/maos-kernel-core/src/memory/mod.rs",
+    "crates/maos-kernel-core/src/memory/principal.rs",
+    "crates/maos-kernel-core/src/memory/private.rs",
+    "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+    "crates/maos-kernel-core/tests/principal_identity_20_3b.rs",
+    "crates/maos-kernel-core/tests/private_forget_restart_13_5i.rs",
+    "crates/maos-kernel-core/tests/private_spill_supersession_13_5j.rs",
+    "crates/maos-kernel-core/tests/routed_halt_swap_20_3b.rs",
+    "crates/maos-spirit-sdk/tests/routed_sdk_20_3b.rs",
+    "docs/adr/ADR-031-wasm-component-model-spirit-form.md",
+    "docs/adr/ADR-040-rust-inproc-measurement-gate-v05-decision.md",
+    "docs/adr/ADR-043-retire-two-parked-discipline-gates-enforcement-carried-by-live-gates.md",
+    "docs/adr/ADR-045-governance-audit-artifacts.md",
+    "docs/adr/ADR-068-stable-performance-runner.md",
+    "docs/adr/index.md",
+    "docs/ci-baselines/kernel-surface-v0.1-beta.json",
+    "docs/invariants/I1.md",
+    "docs/invariants/I10.md",
+    "docs/invariants/I11.md",
+    "docs/invariants/I12.md",
+    "docs/invariants/I13.md",
+    "docs/invariants/I14.md",
+    "docs/invariants/I2.md",
+    "docs/invariants/I3.md",
+    "docs/invariants/I4.md",
+    "docs/invariants/I5.md",
+    "docs/invariants/I6.md",
+    "docs/invariants/I7.md",
+    "docs/invariants/I8.md",
+    "docs/invariants/I9.md",
+    "docs/invariants/README.md",
+    "docs/testing/proof-contract.md",
+    "tests/coverage-matrix.yaml",
+    "xtask/clippy-baseline.toml",
+    "xtask/gate-registry.toml",
+    "xtask/kernel-api-classes.toml",
+    "xtask/kernel-core-baseline.toml",
+    "xtask/kloc.toml",
+    "xtask/src/check_adr_040_accepted.rs",
+    "xtask/src/check_bare_review_findings.rs",
+    "xtask/src/check_cross_form_equiv.rs",
+    "xtask/src/check_deprecations_declared.rs",
+    "xtask/src/check_dev_model_tier.rs",
+    "xtask/src/check_dev_model_used_populated.rs",
+    "xtask/src/check_dev_record_completeness.rs",
+    "xtask/src/check_epic_6_bridge.rs",
+    "xtask/src/check_epic_close_coherence.rs",
+    "xtask/src/check_epic_close_green.rs",
+    "xtask/src/check_error_catalog.rs",
+    "xtask/src/check_governance_categories.rs",
+    "xtask/src/check_j1_loopback_delegation.rs",
+    "xtask/src/check_literal_reappearance.rs",
+    "xtask/src/check_review_findings_resolved.rs",
+    "xtask/src/check_service_boundary.rs",
+    "xtask/src/check_ship_gate_completeness.rs",
+    "xtask/src/check_wasm_form_equiv.rs",
+    "xtask/src/clippy_ratchet.rs",
+    "xtask/src/invariant_lock.rs",
+    "xtask/src/lib.rs",
+    "xtask/src/main.rs",
+    "xtask/src/prepush.rs",
+    "xtask/src/tests/invariant_lock_tests.rs",
+    "xtask/tests/clippy_ratchet_20_3b.rs",
+    "xtask/tests/coverage_matrix_20_3b.rs",
+    "xtask/tests/d11_xtask_ceiling_ratchet.rs",
+    "xtask/tests/d19_story_file_governance.rs",
+    "xtask/tests/diagnostics_20_3a.rs",
+    "xtask/tests/fixtures/clippy-ratchet.jsonl",
+    "xtask/tests/invariant_claims_20_3b.rs",
+    "xtask/tests/kernel_pin_content_hash_16_0.rs",
+    "xtask/tests/prepush_blocking_20_3b.rs",
+    "xtask/tests/recovery_lane_ceiling_rule.rs",
+    "xtask/tests/routed_catalog_20_3b.rs",
+    "xtask/tests/ship_gate_binding_20_3a.rs",
+    "xtask/tests/story_10_2_proven_red.rs",
+    "xtask/tests/surface_and_root_20_3b.rs"
+  ],
+  "records": [
+    {
+      "check": "changed-paths",
+      "artifact": "merge-base..HEAD / HEAD..working tree / untracked",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "stability-matrix",
+      "artifact": "STABILITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 181
+    },
+    {
+      "check": "error-catalog-check",
+      "artifact": "docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 482
+    },
+    {
+      "check": "gen-abi-docs",
+      "artifact": "docs-site/abi/v1",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1213
+    },
+    {
+      "check": "check-serde-error-handling",
+      "artifact": "crates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 234
+    },
+    {
+      "check": "check-workspace-count",
+      "artifact": "Cargo.toml / docs/kernel-design.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-manifest-schema-version",
+      "artifact": "manifest schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-skill-schema",
+      "artifact": "skill schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "check-epic-close-coherence",
+      "artifact": "epic closure / discipline workflow",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 20
+    },
+    {
+      "check": "check-coverage-matrix-completeness",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 12
+    },
+    {
+      "check": "check-test-cost",
+      "artifact": "xtask/test-budgets.toml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 255
+    },
+    {
+      "check": "check-env-contract",
+      "artifact": "environment contract",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 427
+    },
+    {
+      "check": "check-unsafe",
+      "artifact": "capability validation sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "check-service-boundary",
+      "artifact": "service boundary sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1134
+    },
+    {
+      "check": "check-kernel-baseline",
+      "artifact": "kernel baseline",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; { \"passed\": false, \"actual-lines\": 26680, \"pinned-lines\": 26620, \"baseline-file\": \"/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml\", \"file-set-entries\": 95, \"set-hash\": \"f18147a4742e99aec0f7fd38a8205d440613c836cf9740438a5e147dec5118cf\", \"pinned-set-hash\": \"ca8eb931958207cbe5bd76b599764aeeb75b9142374e10ff4cbff157598616d2\", \"changed\": [ \"memory/principal.rs\", \"memory/private.rs\", \"memory/spill_test_faults.rs\" ], \"added\": [], \"removed\": [] } kernel-core drifted from the pinned baseline",
+      "wall_ms": 10
+    },
+    {
+      "check": "kloc-check",
+      "artifact": "xtask/kloc.toml",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 1; 27 lines omitted; \"maos-exec-deps\": 358, \"maos-fkcs\": 482, \"maos-frame-codec\": 249, \"maos-host\": 37, \"maos-iac\": 8270, \"maos-journal\": 0, \"maos-journey-test\": 946, \"maos-kernel-core\": 20889, \"maos-loom-lite\": 5277, \"maos-manifest\": 4604, \"maos-mcp\": 1174, \"maos-notify-push\": 248, \"maos-orchestrator-buffer\": 0, \"maos-pdp\": 438, \"maos-persistence\": 1, \"maos-providers\": 1425, \"maos-registry\": 3452, \"maos-secrets\": 536, \"maos-shell\": 602, \"maos-siem\": 447, \"maos-skill\": 1234, \"maos-spirit-abi\": 1042, \"maos-spirit-cli\": 753, \"maos-spirit-derive\": 350, \"maos-spirit-hello\": 382, \"maos-spirit-sdk\": 1085, \"maos-sso\": 391, \"maos-telemetry\": 547, \"maos-wasm-host\": 2412, \"maos-wire\": 0, \"xtask\": 42780 }, \"over_budget\": [ \"aggregate 188239 >= 188120\", \"maos-bin 33021 > 32979\", \"maos-kernel-core 20889 > 20834\", \"xtask 42780 > 42757\" ] } kloc-check failed",
+      "wall_ms": 41
+    },
+    {
+      "check": "check-breaking-md",
+      "artifact": "BREAKING.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "check-composition-root-completeness",
+      "artifact": "composition roots",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 39
+    },
+    {
+      "check": "check-pub-field-constructors",
+      "artifact": "public field constructors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 250
+    },
+    {
+      "check": "check-dependency-closure",
+      "artifact": "Cargo.lock / dependency closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 326
+    },
+    {
+      "check": "coverage-matrix",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 16
+    },
+    {
+      "check": "check-corpus",
+      "artifact": "corpus manifest",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 103
+    },
+    {
+      "check": "abi-diff",
+      "artifact": "ABI surface",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 953
+    },
+    {
+      "check": "check-empty-kernel",
+      "artifact": "kernel invariant I9",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 264
+    },
+    {
+      "check": "check-loom",
+      "artifact": "loom substrate",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 260
+    },
+    {
+      "check": "check-fr47",
+      "artifact": "FR47 bindings",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14
+    },
+    {
+      "check": "check-a2a-sender-completeness",
+      "artifact": "A2A sender boundary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 30
+    },
+    {
+      "check": "check-judge-config",
+      "artifact": "pinned judge configuration",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1632
+    },
+    {
+      "check": "check-security-md",
+      "artifact": "SECURITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "templates-regen",
+      "artifact": "example Spirit templates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "corpus-staleness",
+      "artifact": "corpus validity dates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "calibrate",
+      "artifact": "calibration seed",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 5
+    },
+    {
+      "check": "check-review-findings-resolved",
+      "artifact": "review closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 93
+    },
+    {
+      "check": "check-dev-record-completeness",
+      "artifact": "story records",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 58
+    },
+    {
+      "check": "check-dev-model-tier",
+      "artifact": "story model tiers",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14
+    },
+    {
+      "check": "check-ship-gate-completeness",
+      "artifact": "ship registry",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 29
+    },
+    {
+      "check": "check-pentest-gate",
+      "artifact": "pen-test evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-third-party-trial",
+      "artifact": "trial evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 6
+    },
+    {
+      "check": "check-trial-attestation",
+      "artifact": "trial attestation",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; {\"gate\":\"check-trial-attestation\",\"passed\":false,\"oracle_green\":false,\"advisory\":false,\"blocking_now\":false,\"ship_phase\":\"v1_5\",\"disposition\":{\"v2_0\":\"blocking\",\"v1_0\":\"advisory\",\"v1_5\":\"advisory\"},\"provenance_stamp\":\"maos-trial-attestation-v2\",\"legs\":[{\"label\":\"reload-derives-load-and-frames\",\"passed\":1,\"failed\":0,\"ran\":true,\"attempted\":true,\"green\":true},{\"label\":\"hermetic-environment-enforced\", check-trial-attestation: BLOCKING — oracle RED",
+      "wall_ms": 196
+    },
+    {
+      "check": "check-red-team-gate",
+      "artifact": "red-team evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-migration-merkle",
+      "artifact": "migration evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14990
+    },
+    {
+      "check": "nfr-onb-1-gate",
+      "artifact": "onboarding evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "cassette-age-gate",
+      "artifact": "cassette age policy",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "build-test-fixtures",
+      "artifact": "target/maos-fixtures/manifest.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 11821
+    },
+    {
+      "check": "binary-size:trigger",
+      "artifact": "cargo metadata / change set",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "binary-size:build",
+      "artifact": "release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 57726
+    },
+    {
+      "check": "binary-size",
+      "artifact": "tests/integration/onb_nfr2_timing.sh: stripped release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "fmt",
+      "artifact": "workspace Rust sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2691
+    },
+    {
+      "check": "docs:troubleshoot-bidi",
+      "artifact": "docs-site/route-manifest.json / docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 98
+    },
+    {
+      "check": "docs:glossary-lock",
+      "artifact": "docs-site/i18n/ko / glossary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 71
+    },
+    {
+      "check": "docs:anchor-ids",
+      "artifact": "docs-site anchors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 59
+    },
+    {
+      "check": "docs:ko-coverage",
+      "artifact": "docs-site/i18n/ko (KO_COVERAGE_MIN=100)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 60
+    },
+    {
+      "check": "docs:build",
+      "artifact": "docs-site/build",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "docs:routes",
+      "artifact": "docs-site/build / route-manifest.json",
+      "status": "skip",
+      "detail": "no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes",
+      "wall_ms": 0
+    },
+    {
+      "check": "cargo-deny",
+      "artifact": "Cargo.lock / deny.toml (required cargo-deny)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 728
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 100; 30567 lines omitted; FAIL [ 0.025s] ( 281/5438) maos-a2a-tcp::t11_t12_chaos_absence t12b_kernel_core_byte_identical_line_count thread 'gate_otel_airgap_default_off_no_connects' (3456469) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_otel_airgap_default_off_no_connects' (3456485) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (3457809) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 0.041s] (4548/5438) xtask::gate_honesty_20_3a escape_substrate_refusal_never_passes FAIL [ 0.167s] (4606/5438) xtask::fkcs_oracle frozen_snapshot_and_current_kernel_baselines_are_independently_valid FAIL [ 0.013s] (4696/5438) xtask::kernel_pin_content_hash_16_0 live_tree_matches_the_committed_pin FAIL [ 0.011s] (4708/5438) xtask::kernel_pin_content_hash_16_0 the_reflow_vector_left_the_tracked_tree_untouched FAIL [ 0.098s] (4712/5438) xtask::kernel_pin_content_hash_16_0 a_reflow_moves_the_hash_and_rustfmt_restores_it FAIL [ 0.083s] (4713/5438) xtask::kernel_pin_content_hash_16_0 every_one_of_the_pinned_files_reds_a_line_neutral_mutation FAIL [ 0.098s] (4718/5438) xtask::kernel_pin_content_hash_16_0 the_real_kernel_leg_emits_a_parseable_json_stdout FAIL [ 0.150s] (4722/5438) xtask::kernel_pin_content_hash_16_0 the_hash_is_independent_of_directory_creation_order thread 'expansion_defaults_only_job_results' (3463796) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (3463796) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (3463796) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (3464811) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 0.046s] (5401/5438) xtask::bin/xtask kloc_check::tests::kloc_check_runs_on_workspace FAIL [ 0.581s] (5421/5438) xtask::trial_attestation_proven_red producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition FAIL [ 0.025s] ( 281/5438) maos-a2a-tcp::t11_t12_chaos_absence t12b_kernel_core_byte_identical_line_count thread 't12b_kernel_core_byte_identical_line_count' (3425546) panicked at crates/maos-a2a-tcp/tests/t11_t12_chaos_absence.rs:209:5: FAIL [ 0.041s] (4548/5438) xtask::gate_honesty_20_3a escape_substrate_refusal_never_passes thread 'escape_substrate_refusal_never_passes' (3459526) panicked at xtask/tests/gate_honesty_20_3a.rs:192:5: FAIL [ 0.167s] (4606/5438) xtask::fkcs_oracle frozen_snapshot_and_current_kernel_baselines_are_independently_valid thread 'frozen_snapshot_and_current_kernel_baselines_are_independently_valid' (3459488) panicked at xtask/tests/fkcs_oracle.rs:153:5: FAIL [ 0.013s] (4696/5438) xtask::kernel_pin_content_hash_16_0 live_tree_matches_the_committed_pin thread 'live_tree_matches_the_committed_pin' (3460288) panicked at xtask/tests/kernel_pin_content_hash_16_0.rs:145:5: FAIL [ 0.011s] (4708/5438) xtask::kernel_pin_content_hash_16_0 the_reflow_vector_left_the_tracked_tree_untouched thread 'the_reflow_vector_left_the_tracked_tree_untouched' (3460319) panicked at xtask/tests/kernel_pin_content_hash_16_0.rs:614:5: FAIL [ 0.098s] (4712/5438) xtask::kernel_pin_content_hash_16_0 a_reflow_moves_the_hash_and_rustfmt_restores_it thread 'a_reflow_moves_the_hash_and_rustfmt_restores_it' (3460250) panicked at xtask/tests/kernel_pin_content_hash_16_0.rs:522:5: FAIL [ 0.083s] (4713/5438) xtask::kernel_pin_content_hash_16_0 every_one_of_the_pinned_files_reds_a_line_neutral_mutation thread 'every_one_of_the_pinned_files_reds_a_line_neutral_mutation' (3460280) panicked at xtask/tests/kernel_pin_content_hash_16_0.rs:417:5: FAIL [ 0.098s] (4718/5438) xtask::kernel_pin_content_hash_16_0 the_real_kernel_leg_emits_a_parseable_json_stdout thread 'the_real_kernel_leg_emits_a_parseable_json_stdout' (3460311) panicked at xtask/tests/kernel_pin_content_hash_16_0.rs:1024:5: FAIL [ 0.150s] (4722/5438) xtask::kernel_pin_content_hash_16_0 the_hash_is_independent_of_directory_creation_order thread 'the_hash_is_independent_of_directory_creation_order' (3460307) panicked at xtask/tests/kernel_pin_content_hash_16_0.rs:652:5: FAIL [ 0.046s] (5401/5438) xtask::bin/xtask kloc_check::tests::kloc_check_runs_on_workspace thread 'kloc_check::tests::kloc_check_runs_on_workspace' (3464938) panicked at xtask/src/tests/kloc_check_tests.rs:40:5: FAIL [ 0.581s] (5421/5438) xtask::trial_attestation_proven_red producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition thread 'producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition' (3463725) panicked at xtask/tests/trial_attestation_proven_red.rs:187:5:",
+      "wall_ms": 243142
+    },
+    {
+      "check": "kernel-core-lib",
+      "artifact": "maos-kernel-core lib tests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 5129
+    },
+    {
+      "check": "workspace-doc",
+      "artifact": "workspace doctests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 55383
+    },
+    {
+      "check": "test-budget",
+      "artifact": "/home/lunarpulse/dev_ws/target/nextest/default/junit.xml",
+      "status": "advisory",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; {\"gate\":\"check-test-budget\",\"passed\":false,\"junit\":\"/home/lunarpulse/dev_ws/target/nextest/default/junit.xml\",\"binaries\":576,\"total_span_seconds\":372.1700072288513,\"total_sum_seconds\":849.9710000000006,\"findings\":[\"maos-bin::one_daemon_one_door_16_1 took 35.329 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets. ::error::check-test-budget: FAIL — 2 finding(s): - maos-bin::one_daemon_one_door_16_1 took 35.329 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 43.880 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml check-test-budget: FAIL — 2 finding(s): - maos-bin::one_daemon_one_door_16_1 took 35.329 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 43.880 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "wall_ms": 43
+    },
+    {
+      "check": "ci-pins",
+      "artifact": ".github/workflows/discipline.yml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-1-crash-detection-2s/Run crash corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-2-hang-detection-60s/Run hang corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 4 — retained T3 terminal facts (Story 17-7)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 5 — Observer live scene + activity corpus (Story 17-4)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:journey-hermetic-tier-1/Live skill port security witnesses (18-7, ten tests)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Native cgroup-v2 smoke — four real cases",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Real admitted session suite — 23 cases, serial",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Rootless T3 Worker resource enforcement (x64)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-undelegated/Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"SCOPED-VERDICT \": 1 static emission sites; pin 8 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"GOVERNED-ATOMIC \": 1 static emission sites; pin 10 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING-CONTROL \": 1 static emission sites; pin 1 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"RUNNER-SIGSYS \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"REPEATED-MAILBOX \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-PROVENANCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-REFUSALS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-FLOODS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-DIAGNOSTICS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-EXITS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-ONCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"WASM-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Live escape-anomaly consumer under real T2 (Story 17-10)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/In-band recall through the admitted session (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Participant recall and consent envelopes, both forms (Story 17-8)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:windows-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:check-reza-production-path/GDPR response-only MCP principal cannot resurrect from cache (18-6)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:macos-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "tracked-tree",
+      "artifact": "git diff HEAD / tracked status",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    }
+  ],
+  "output_diagnostics": [
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-3425531/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-3425531/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 absent_grant_keeps_d1_tokenless_proceed_posture: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 local_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 remote_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop audit-drain Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic crashed second Worker (nack): signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic pending-halt stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigned section crashes twice: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigning first section crashes: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic section crashed once, re-dispatched: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic escalating section: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-Worker dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic clear-judgement twin: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold resumed with provided context: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold released by accepted-halt: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic ambiguity halt resolved over the door: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold expiring at its bound: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V1 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V2 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V4 re-pin consent delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V3 recovered delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 paused Orchestrator holds dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 recall: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 safe-point drain: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root unload live Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown serving Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown one-shot Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown interrupted topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown standalone Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root startup shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated goal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 maos run cli-wrapper Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 two-host delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 replayed inbound delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 hostless completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion permission-denial Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion prose-refusal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fixture credential-immunity Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion no-effect Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 standalone completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker freeze: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker revoke-stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 Worker FD hard-limit refusal: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 live Worker resource enforcement: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled then crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root-crash: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 client-first: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fallback: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 ownership: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S1 immediate exit: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S2 exit-137: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S3 external SIGKILL: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S4 memory.max OOM: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload over-budget: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload panic: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 configured workspaces root claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 host-probe marker claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-workspace dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect codex Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: Python Ed25519 backend for tools/verify-audit-bundle/verify.py (pip install cryptography)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: Python Ed25519 backend for tools/verify-audit-bundle/verify.py (pip install cryptography)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 every executable escape-corpus-v1 scenario: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 t3 egress socket custody: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 clear-twin topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 founder-loop journey delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 resume-continuity topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 sandbox_t3_spawn_linux: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_no_endpoint_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_proven_red_network_canary_detected): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace -V failed:"
+    }
+  ],
+  "wall_ms": 520857
+}

@@ -109,35 +109,42 @@ fn executing_witness(
     job: &serde_yaml::Value,
     path: &str,
 ) -> Result<bool, String> {
-    use syn::visit::Visit;
-    struct CorpusUse {
-        directory: std::path::PathBuf,
-        corpus: std::path::PathBuf,
-        found: bool,
-    }
-    impl<'ast> Visit<'ast> for CorpusUse {
-        fn visit_macro(&mut self, node: &'ast syn::Macro) {
-            if node.path.is_ident("include_str") || node.path.is_ident("include_bytes") {
-                if let Ok(literal) = syn::parse2::<syn::LitStr>(node.tokens.clone()) {
-                    let path = self.directory.join(literal.value());
-                    self.found |= path.canonicalize().is_ok_and(|p| p == self.corpus);
-                }
+    use syn::parse::Parser;
+    fn call_uses(expr: &syn::Expr, binding: &syn::Ident) -> bool {
+        let direct =
+            |expr: &syn::Expr| matches!(expr, syn::Expr::Path(p) if p.path.is_ident(binding));
+        match expr {
+            syn::Expr::Call(call) if call.attrs.is_empty() => {
+                call.args.iter().any(|e| direct(e) || call_uses(e, binding))
             }
+            syn::Expr::MethodCall(call) if call.attrs.is_empty() => {
+                direct(&call.receiver)
+                    || call_uses(&call.receiver, binding)
+                    || call.args.iter().any(|e| direct(e) || call_uses(e, binding))
+            }
+            syn::Expr::Macro(m)
+                if m.attrs.is_empty()
+                    && ["assert", "assert_eq", "assert_ne"]
+                        .iter()
+                        .any(|name| m.mac.path.is_ident(name)) =>
+            {
+                syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
+                    .parse2(m.mac.tokens.clone())
+                    .is_ok_and(|args| args.iter().any(|e| call_uses(e, binding)))
+            }
+            _ => false,
         }
     }
     let file = syn::parse_file(src).map_err(|e| e.to_string())?;
-    let mut usage = CorpusUse {
-        directory: root
-            .join(path)
-            .parent()
-            .ok_or("test directory missing")?
-            .to_path_buf(),
-        corpus: root
-            .join(corpus)
-            .canonicalize()
-            .map_err(|e| e.to_string())?,
-        found: false,
-    };
+    let directory = root
+        .join(path)
+        .parent()
+        .ok_or("test directory missing")?
+        .to_path_buf();
+    let corpus_path = root
+        .join(corpus)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
     let witness = !file
         .attrs
         .iter()
@@ -148,12 +155,28 @@ fn executing_witness(
                     && f.attrs.iter().any(|a| a.path().is_ident("test"))
                     && f.attrs.iter().all(|a| a.path().is_ident("test")) =>
             {
-                usage.visit_block(&f.block);
-                usage.found
+                let mut bindings = Vec::new();
+                f.block.stmts.iter().take_while(|s| matches!(s, syn::Stmt::Local(_) | syn::Stmt::Macro(_) | syn::Stmt::Expr(syn::Expr::Call(_) | syn::Expr::MethodCall(_) | syn::Expr::Macro(_), _))).any(|stmt| match stmt {
+                    syn::Stmt::Local(local) if local.attrs.is_empty() => {
+                        if let (syn::Pat::Ident(binding), Some(init)) = (&local.pat, &local.init) {
+                            bindings.retain(|known| known != &binding.ident);
+                            if bindings.iter().any(|binding| call_uses(&init.expr, binding)) { return true; }
+                            if let syn::Expr::Macro(m) = &*init.expr {
+                                if m.attrs.is_empty() && (m.mac.path.is_ident("include_str") || m.mac.path.is_ident("include_bytes")) && syn::parse2::<syn::LitStr>(m.mac.tokens.clone()).is_ok_and(|lit| directory.join(lit.value()).canonicalize().is_ok_and(|p| p == corpus_path)) {
+                                    bindings.push(binding.ident.clone());
+                                }
+                            }
+                        }
+                        false
+                    }
+                    syn::Stmt::Expr(expr, _) => bindings.iter().any(|binding| call_uses(expr, binding)),
+                    syn::Stmt::Macro(m) if m.attrs.is_empty() && ["assert", "assert_eq", "assert_ne"].iter().any(|name| m.mac.path.is_ident(name)) => syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated.parse2(m.mac.tokens.clone()).is_ok_and(|args| args.iter().any(|expr| bindings.iter().any(|binding| call_uses(expr, binding)))),
+                    _ => false,
+                })
             }
             _ => false,
         });
-    let crate_dir = usage.directory.parent().ok_or("test crate missing")?;
+    let crate_dir = directory.parent().ok_or("test crate missing")?;
     let cargo = fs::read_to_string(crate_dir.join("Cargo.toml")).map_err(|e| e.to_string())?;
     let manifest: toml::Value = toml::from_str(&cargo).map_err(|e| e.to_string())?;
     let package = manifest.get("package").ok_or("test package missing")?;
@@ -161,7 +184,7 @@ fn executing_witness(
         .get("name")
         .and_then(toml::Value::as_str)
         .ok_or("test package name missing")?;
-    if usage.directory.file_name().is_none_or(|n| n != "tests")
+    if directory.file_name().is_none_or(|n| n != "tests")
         || package.get("autotests").and_then(toml::Value::as_bool) == Some(false)
         || manifest.get("test").is_some()
     {
@@ -169,7 +192,7 @@ fn executing_witness(
     }
     let enabled = |v: &serde_yaml::Value| {
         (v["if"].is_null() || v["if"].as_bool() == Some(true))
-            && v["continue-on-error"].as_bool() != Some(true)
+            && (v["continue-on-error"].is_null() || v["continue-on-error"].as_bool() == Some(false))
     };
     let binary = std::path::Path::new(path)
         .file_stem()

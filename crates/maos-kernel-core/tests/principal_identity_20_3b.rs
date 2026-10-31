@@ -578,7 +578,7 @@ fn committed_index_intent_precedes_spill_and_missing_value_exports_redacted() ->
     worker.join().unwrap()?;
     assert_eq!(count, 1, "intent must already be independently committed");
     conn.execute(
-        "INSERT INTO principal_index VALUES ('missing', 1, 'intent', 'absent', 1, '1')",
+        "INSERT INTO principal_index (principal_id, writer_spirit_pid, schema, key, timestamp_ns, writer_owner) VALUES ('missing', 1, 'intent', 'absent', 1, '1')",
         [],
     )?;
     let exported = boot(dir.path())?.export_redactable("missing", true)?;
@@ -667,5 +667,211 @@ fn absent_long_key_is_absent_not_an_identity_error() -> TestResult {
         memory.read(1, MemoryTier::Private, &namespace, &"k".repeat(1024))?,
         None
     );
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn failed_inserting_writer_preserves_a_second_index_instances_completed_spill() -> TestResult {
+    use maos_kernel_core::memory::spill_test_faults::{arm_pause, disarm, PausePoint};
+    use std::sync::mpsc;
+    let dir = tempfile::tempdir()?;
+    let first = boot(dir.path())?;
+    let second = boot(dir.path())?;
+    first.bind_storage_identity(1, "shared-owner")?;
+    second.bind_storage_identity(1, "shared-owner")?;
+    let ns = MemoryNamespace::principal(PRINCIPAL, "two-indexes")?;
+    let worker_ns = ns.clone();
+    let (arrived_tx, arrived_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        arm_pause(PausePoint::BeforeRename, arrived_tx, release_rx);
+        let result = first.write(
+            1,
+            MemoryTier::Private,
+            &worker_ns,
+            "key",
+            MemoryValue::Text("first".into()),
+        );
+        disarm();
+        result
+    });
+    arrived_rx.recv_timeout(std::time::Duration::from_secs(10))?;
+    second.write(
+        1,
+        MemoryTier::Private,
+        &ns,
+        "key",
+        MemoryValue::Text("second".into()),
+    )?;
+    let namespace = dir
+        .path()
+        .join(format!("private/id-{}", hex::encode("shared-owner")))
+        .join(hex::encode(serde_json::to_vec(&ns)?));
+    let temp = std::fs::read_dir(namespace)?
+        .filter_map(Result::ok)
+        .find(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
+        .unwrap();
+    std::fs::remove_file(temp.path())?;
+    release_tx.send(())?;
+    assert!(worker.join().unwrap().is_err());
+    let restarted = boot(dir.path())?;
+    assert_eq!(restarted.subject_access(PRINCIPAL)?.len(), 1);
+    assert_eq!(
+        restarted.principal_ids_for_spirit("shared-owner")?,
+        vec![PRINCIPAL]
+    );
+    assert!(
+        matches!(&restarted.export_redactable(PRINCIPAL, true)?[0].payload, ExportPayload::Raw(MemoryValue::Text(value)) if value == "second")
+    );
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+#[test]
+fn interrupted_identity_publication_never_leaves_a_partial_final_sidecar() -> TestResult {
+    use maos_kernel_core::memory::spill_test_faults::{arm_failure, disarm, FailurePoint};
+    for target in ["owner", "namespace", "key"] {
+        for fault in [
+            FailurePoint::IdentityTempSync,
+            FailurePoint::IdentityPublish,
+        ] {
+            let dir = tempfile::tempdir()?;
+            let identity = if target == "owner" {
+                "o".repeat(128)
+            } else {
+                "owner".into()
+            };
+            let ns = MemoryNamespace::principal(
+                PRINCIPAL,
+                if target == "namespace" {
+                    "s".repeat(200)
+                } else {
+                    "profile".into()
+                },
+            )?;
+            let key = if target == "key" {
+                "k".repeat(200)
+            } else {
+                "key".into()
+            };
+            let memory = boot(dir.path())?;
+            memory.bind_storage_identity(1, &identity)?;
+            arm_failure(fault);
+            let result = memory.write(
+                1,
+                MemoryTier::Private,
+                &ns,
+                &key,
+                MemoryValue::Text("value".into()),
+            );
+            disarm();
+            assert!(result.is_err(), "{target} {fault:?}");
+            let metadata = sidecar_path(dir.path(), &identity, &ns, &key, target)?;
+            assert!(!metadata.exists(), "{target} {fault:?}");
+            drop(memory);
+            let restarted = boot(dir.path())?;
+            restarted.bind_storage_identity(2, &identity)?;
+            restarted.write(
+                2,
+                MemoryTier::Private,
+                &ns,
+                &key,
+                MemoryValue::Text("value".into()),
+            )?;
+            assert!(!std::fs::read(metadata)?.is_empty());
+            assert_eq!(
+                restarted.read(2, MemoryTier::Private, &ns, &key)?,
+                Some(MemoryValue::Text("value".into()))
+            );
+        }
+    }
+    Ok(())
+}
+
+fn sidecar_path(
+    root: &Path,
+    identity: &str,
+    ns: &MemoryNamespace,
+    key: &str,
+    target: &str,
+) -> Result<std::path::PathBuf, Box<dyn Error>> {
+    use sha2::{Digest, Sha256};
+    let component = |name: String| {
+        if name.len() <= 200 {
+            name
+        } else {
+            format!("h-{}", hex::encode(Sha256::digest(name)))
+        }
+    };
+    let owner = root
+        .join("private")
+        .join(component(format!("id-{}", hex::encode(identity))));
+    let namespace = owner.join(component(hex::encode(serde_json::to_vec(ns)?)));
+    Ok(match target {
+        "owner" => owner.join(".identity"),
+        "namespace" => namespace.join(".identity"),
+        _ => namespace.join(format!(".key-{}", component(hex::encode(key)))),
+    })
+}
+
+#[test]
+fn empty_legacy_sidecars_recover_only_without_ambiguous_values() -> TestResult {
+    for target in ["owner", "namespace", "key"] {
+        for occupied in [false, true] {
+            let dir = tempfile::tempdir()?;
+            let identity = "o".repeat(128);
+            let ns = MemoryNamespace::principal(PRINCIPAL, "s".repeat(200))?;
+            let key = "k".repeat(200);
+            let metadata = sidecar_path(dir.path(), &identity, &ns, &key, target)?;
+            std::fs::create_dir_all(metadata.parent().unwrap())?;
+            // Complete ancestor identities first; only the target is incomplete.
+            for ancestor in ["owner", "namespace"] {
+                let path = sidecar_path(dir.path(), &identity, &ns, &key, ancestor)?;
+                if path != metadata && metadata.starts_with(path.parent().unwrap()) {
+                    let text = if ancestor == "owner" {
+                        format!("id-{}", hex::encode(&identity))
+                    } else {
+                        hex::encode(serde_json::to_vec(&ns)?)
+                    };
+                    std::fs::write(path, text)?;
+                }
+            }
+            std::fs::write(&metadata, "")?;
+            let residue = if target == "key" {
+                metadata.with_file_name(format!(
+                    "{}.txt",
+                    metadata
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .strip_prefix(".key-")
+                        .unwrap()
+                ))
+            } else {
+                metadata.with_file_name("other.txt")
+            };
+            if occupied {
+                std::fs::write(&residue, "unattributed value")?;
+            }
+            let memory = boot(dir.path())?;
+            memory.bind_storage_identity(1, &identity)?;
+            let result = memory.write(
+                1,
+                MemoryTier::Private,
+                &ns,
+                &key,
+                MemoryValue::Text("value".into()),
+            );
+            assert_eq!(result.is_err(), occupied, "{target}");
+            if occupied {
+                assert_eq!(std::fs::read_to_string(metadata)?, "");
+                assert_eq!(std::fs::read_to_string(residue)?, "unattributed value");
+            } else {
+                assert!(!std::fs::read(metadata)?.is_empty());
+            }
+        }
+    }
     Ok(())
 }

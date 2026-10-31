@@ -1304,3 +1304,68 @@ fn audit_counts_hashed_namespaces_but_not_identity_or_key_sidecars() {
         0
     );
 }
+
+#[test]
+fn unreadable_held_value_cannot_cover_an_unrelated_unindexed_private_value() {
+    for orphan in [false, true] {
+        let fixture = Fixture::new();
+        fixture.seed_held_principal();
+        let held_ns = MemoryNamespace::principal(PRINCIPAL, "profile").unwrap();
+        let held = fixture
+            .memory_root
+            .join("0")
+            .join(hex::encode(serde_json::to_vec(&held_ns).unwrap()))
+            .join(format!("{}.txt", hex::encode("record")));
+        std::fs::write(&held, [0xff]).unwrap();
+        if orphan {
+            let ns = MemoryNamespace::principal("unindexed-other", "profile").unwrap();
+            let directory = fixture
+                .memory_root
+                .join("42")
+                .join(hex::encode(serde_json::to_vec(&ns).unwrap()));
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(directory.join(".md"), "unrelated empty-key value").unwrap();
+        }
+        let output = fixture.run_uninstall(None);
+        let result = terminal(&output);
+        assert_eq!(
+            result["outcome"],
+            if orphan { "failed" } else { "held" },
+            "{result}"
+        );
+        if orphan {
+            assert_eq!(output.status.code(), Some(5));
+            assert!(result["error"]
+                .as_str()
+                .unwrap()
+                .contains("1 other value(s)"));
+        }
+        assert_eq!(regular_files(&fixture.proof_dir()), 1);
+        let proof_path = std::fs::read_dir(fixture.proof_dir())
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let proof: maos_audit::erasure::proof::ErasureProof =
+            serde_json::from_slice(&std::fs::read(proof_path).unwrap()).unwrap();
+        maos_audit::erasure::proof::verify_erasure_proof(
+            &proof,
+            &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
+        )
+        .unwrap();
+        let private = proof
+            .categories
+            .iter()
+            .find(|category| category.name == "private")
+            .unwrap();
+        assert!(
+            matches!(&private.status, maos_audit::erasure::proof::CategoryStatus::CoverageGap { reason } if reason.contains(if orphan { "1 other value(s)" } else { "retained-under-hold/unreadable" }))
+        );
+        assert_eq!(std::fs::read(&held).unwrap(), [0xff]);
+        assert_eq!(
+            maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
+            if orphan { 2 } else { 1 }
+        );
+    }
+}

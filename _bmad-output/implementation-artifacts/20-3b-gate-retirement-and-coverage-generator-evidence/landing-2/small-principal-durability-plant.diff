@@ -1,6 +1,6 @@
 --- a/crates/maos-kernel-core/src/memory/private.rs
 +++ b/crates/maos-kernel-core/src/memory/private.rs
-@@ -758,8 +758,7 @@
+@@ -802,8 +802,7 @@
              .io_lock
              .lock()
              .expect("PrivateMemoryStore I/O lock poisoned");

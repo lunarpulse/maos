@@ -27,8 +27,8 @@ use std::time::SystemTime;
 use super::spill_test_faults::{self, FailurePoint, PausePoint};
 #[cfg(unix)]
 use rustix::fs::{
-    fstat, fsync, linkat, mkdirat, open, openat, renameat, statat, unlinkat, AtFlags, Dir,
-    FileType, Mode, OFlags,
+    flock, fstat, fsync, linkat, mkdirat, open, openat, renameat, renameat_with, statat, unlinkat,
+    AtFlags, Dir, FileType, FlockOperation, Mode, OFlags, RenameFlags,
 };
 #[cfg(unix)]
 use rustix::io::Errno;
@@ -304,33 +304,77 @@ impl PrivateMemoryStore {
         identity: &str,
         create: bool,
     ) -> Result<(), MemoryError> {
-        if create {
-            match openat(
+        // Serialize legacy-empty recovery and publication across store instances.
+        flock(directory, FlockOperation::LockExclusive).map_err(Self::errno)?;
+        let result = (|| {
+            let existing = Self::open_candidate(directory, name, ValueKind::Text)?;
+            if matches!(&existing, Some(DiskCandidate { value: MemoryValue::Text(found), .. }) if found == identity)
+            {
+                return Ok(());
+            }
+            if !create
+                || matches!(&existing, Some(DiskCandidate { value: MemoryValue::Text(found), .. }) if !found.is_empty())
+            {
+                return Err(MemoryError::Storage(
+                    "spill identity mismatch or missing metadata".into(),
+                ));
+            }
+            // An unlabelled directory with data cannot be safely adopted.
+            for entry in Self::list_names(directory)? {
+                let occupied = if name == ".identity" {
+                    entry != name && !entry.starts_with(".identity-tmp.")
+                } else {
+                    Self::key_from_spill_name(&entry) == name.strip_prefix(".key-")
+                };
+                if occupied {
+                    return Err(MemoryError::Storage(
+                        "incomplete spill identity has existing data".into(),
+                    ));
+                }
+            }
+            let temp = format!(
+                ".identity-tmp.{}.{}",
+                std::process::id(),
+                TEMP_FILE_NONCE.fetch_add(1, Ordering::Relaxed)
+            );
+            let fd = openat(
                 directory,
-                name,
+                &temp,
                 OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
                 Mode::RUSR | Mode::WUSR,
-            ) {
-                Ok(fd) => {
-                    let mut file = File::from(fd);
-                    file.write_all(identity.as_bytes())
-                        .and_then(|_| file.sync_all())
-                        .map_err(MemoryError::Io)?;
-                    fsync(directory).map_err(Self::errno)?;
+            )
+            .map_err(Self::errno)?;
+            let publish = (|| {
+                let mut file = File::from(fd);
+                #[cfg(any(test, debug_assertions))]
+                spill_test_faults::fail_if_armed(FailurePoint::IdentityTempSync)?;
+                file.write_all(identity.as_bytes())
+                    .and_then(|_| file.sync_all())
+                    .map_err(MemoryError::Io)?;
+                #[cfg(any(test, debug_assertions))]
+                spill_test_faults::fail_if_armed(FailurePoint::IdentityPublish)?;
+                if existing.is_some() {
+                    unlinkat(directory, name, AtFlags::empty()).map_err(Self::errno)?;
                 }
-                Err(Errno::EXIST) => {}
-                Err(error) => return Err(Self::errno(error)),
+                // Atomic no-replace publication never exposes a partial final file.
+                renameat_with(directory, &temp, directory, name, RenameFlags::NOREPLACE)
+                    .map_err(Self::errno)
+            })();
+            let cleanup = Self::cleanup_transaction_files(directory, Some(&temp), &[]);
+            match publish {
+                Ok(()) => cleanup?,
+                Err(error) => {
+                    return Err(Self::combined_error(
+                        error,
+                        cleanup,
+                        "identity temp cleanup",
+                    ))
+                }
             }
-        }
-        match Self::open_candidate(directory, name, ValueKind::Text)? {
-            Some(DiskCandidate {
-                value: MemoryValue::Text(found),
-                ..
-            }) if found == identity => Ok(()),
-            _ => Err(MemoryError::Storage(
-                "spill identity mismatch or missing metadata".into(),
-            )),
-        }
+            fsync(directory).map_err(Self::errno)
+        })();
+        let unlock = flock(directory, FlockOperation::Unlock).map_err(Self::errno);
+        result.and(unlock)
     }
 
     #[cfg(unix)]

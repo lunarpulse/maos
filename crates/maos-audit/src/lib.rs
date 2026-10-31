@@ -1998,10 +1998,10 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
                 if !value.file_type()?.is_file() {
                     continue;
                 }
-                if matches!(
-                    value.path().extension().and_then(|ext| ext.to_str()),
-                    Some("json" | "md" | "bin" | "txt")
-                ) {
+                if [".json", ".md", ".bin", ".txt"]
+                    .iter()
+                    .any(|suffix| value.file_name().to_string_lossy().ends_with(suffix))
+                {
                     count = count.checked_add(1).ok_or_else(|| {
                         AuditError::Row("private-tier principal row count overflow".to_string())
                     })?;

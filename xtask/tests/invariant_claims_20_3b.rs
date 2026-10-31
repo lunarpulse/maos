@@ -87,6 +87,21 @@ fn guaranteed_refuses_nonexecuting_or_unbound_witnesses() -> Result<(), String> 
         ("ignored only", source.to_owned(), workflow.replace("-- --exact", "-- --ignored")),
         ("echoed invocation", source.to_owned(), workflow.replace("run: cargo", "run: echo cargo")),
         ("conditional shell", source.to_owned(), workflow.replace("run: cargo test -p fixture --test property preserves_property -- --exact", "run: |\n        if false; then\n          cargo test -p fixture --test property preserves_property -- --exact\n        fi")),
+        ("nonblocking step boolean", source.to_owned(), workflow.replace("    - env:", "    - continue-on-error: true\n      env:")),
+        ("nonblocking step expression", source.to_owned(), workflow.replace("    - env:", "    - continue-on-error: ${{ true }}\n      env:")),
+        ("nonblocking job expression", source.to_owned(), workflow.replace("  fixture:\n", "  fixture:\n    continue-on-error: ${{ true }}\n")),
+        ("nonblocking string", source.to_owned(), workflow.replace("    - env:", "    - continue-on-error: 'false'\n      env:")),
+        ("unreachable if corpus", "#[test] fn preserves_property() { if false { let corpus = include_str!(\"adversary.jsonl\"); assert!(corpus.contains(\"malicious\")); } }".into(), workflow.to_owned()),
+        ("match-nested corpus", "#[test] fn preserves_property() { match false { true => { let corpus = include_str!(\"adversary.jsonl\"); assert!(corpus.contains(\"malicious\")); }, _ => {} } }".into(), workflow.to_owned()),
+        ("uncalled closure corpus", "#[test] fn preserves_property() { let unused = || { let corpus = include_bytes!(\"adversary.jsonl\"); check(corpus); }; }".into(), workflow.to_owned()),
+        ("cfg-excluded corpus", "#[test] fn preserves_property() { #[cfg(any())] { let corpus = include_str!(\"adversary.jsonl\"); check(corpus); } }".into(), workflow.to_owned()),
+        ("cfg-excluded binding", "#[test] fn preserves_property() { #[cfg(any())] let corpus = include_str!(\"adversary.jsonl\"); check(corpus); }".into(), workflow.to_owned()),
+        ("discarded corpus", "#[test] fn preserves_property() { let _ = include_bytes!(\"adversary.jsonl\"); check(\"unrelated\"); }".into(), workflow.to_owned()),
+        ("unused corpus binding", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); check(\"unrelated\"); }".into(), workflow.to_owned()),
+        ("return before corpus", "#[test] fn preserves_property() { return; let corpus = include_str!(\"adversary.jsonl\"); check(corpus); }".into(), workflow.to_owned()),
+        ("shadowed corpus binding", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); let corpus = \"unrelated\"; check(corpus); }".into(), workflow.to_owned()),
+        ("cfg-excluded call", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); #[cfg(any())] check(corpus); }".into(), workflow.to_owned()),
+        ("cfg-excluded assert", "#[test] fn preserves_property() { let corpus = include_str!(\"adversary.jsonl\"); #[cfg(any())] assert!(corpus.contains(\"malicious\")); }".into(), workflow.to_owned()),
     ] {
         fs::write(dir.path().join("tests/property.rs"), test).map_err(|e| e.to_string())?;
         fs::write(dir.path().join(".github/workflows/discipline.yml"), job)

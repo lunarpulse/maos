@@ -24,6 +24,8 @@ pub enum FailurePoint {
     TempFileSync,
     Rename,
     CommitDirectorySync,
+    IdentityTempSync,
+    IdentityPublish,
 }
 
 #[derive(Debug, PartialEq, Eq)]
