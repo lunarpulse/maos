@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 20.3b: Gate retirement and the generated coverage matrix
 
-Status: in-progress
+Status: done
 
 <!-- Created 2026-10-30 at 23f58da4 under the measured creation contract; operator rulings 2026-10-30 supersede creation-time proposals. Creation evidence remains historical. -->
 
@@ -201,16 +201,16 @@ Operator rulings via ask `d03`, `d04`, `d08`, `d01_shape`, `env15`, `rest`:
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Preflight.** Operator rulings on D03, D04, D08, D-20-3b-01…16 recorded; tracker → `in-progress`. Run `creation/measurements.md` items 1, 2, 4; re-measure every cite this story touches (rule 9). If any measured figure exceeds the ruled envelope, STOP and return a D-row.
-- [ ] **T1 — Spike (AC1).** Two days max; GO/NO-GO file; byte-identical oracle.
-- [ ] **T2 — Retirement (AC3).** `check_epic_6_bridge.rs` first, then retirement with the closure table; move helpers, land the three folds with negative witnesses, and update docs/ADRs in L1. Coverage-completeness remains until spike GO; governance round-trip test lands in L2.
-- [ ] **T3 — Generator (AC2)** on GO; invariant-lock re-point; 33 violations at origin; `mode: hard`.
-- [ ] **T4 — Dispositions (AC6, AC7).** Clippy (after T0 count), group hash, prepush pin, root resolution.
-- [ ] **T5 — L1 landing (D-20-3b-01 A).** Land retirement and folds; measure fold adds, xtask ≤ 43608; exact lower re-pins (xtask, maos-bin, aggregate); records.
-- [ ] **T6 — L2 dev plan and implementation.** Request aggregate grant at dev-plan creation; then generator, FR31 kernel bundle, maos-bin binding, governance round-trip test, clippy, prepush literal/pin, pub-use hash and ledger; pins within ruled ceilings.
-- [ ] **T7 — Witnesses and ledger (AC5).**
-- [ ] **T8 — Plants** (one per AC, `proof-contract.md:24-31`): AC2 drift, AC3 `if: false`, AC4 pid-keyed owner; AC1/AC5/AC6/AC7 are falsified by their in-tree vectors.
-- [ ] **T9 — L2 landing.** Exact pins inside the ruled envelope; FLAG-Winston HISTORY rows; `check-kernel-baseline`, `check-service-boundary`, `check-pub-field-constructors`, `check-ship-gate-completeness`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; records owed at landing. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+- [x] **T0 — Preflight.** Operator rulings on D03, D04, D08, D-20-3b-01…16 recorded; tracker → `in-progress`. Run `creation/measurements.md` items 1, 2, 4; re-measure every cite this story touches (rule 9). If any measured figure exceeds the ruled envelope, STOP and return a D-row. **Done 2026-10-30:** rulings recorded in the DEV start entry; T0 clippy count 1,411 / 884 (`landing-1/`); hosted re-baseline 1,456 / 904 in `714a1428`.
+- [x] **T1 — Spike (AC1).** Two days max; GO/NO-GO file; byte-identical oracle. **Done:** `spike-go-no-go.md` in the evidence directory; the ruled closure is recorded in `landing-2/plants.md`.
+- [x] **T2 — Retirement (AC3).** `check_epic_6_bridge.rs` first, then retirement with the closure table; move helpers, land the three folds with negative witnesses, and update docs/ADRs in L1. Coverage-completeness remains until spike GO; governance round-trip test lands in L2. **Done (L1):** `landing-1/retirement-closure.json` (nine retired names exit 2); fixture-level `if: false` plant 0→1→0, then the real-tree plant in the L1 review correction.
+- [x] **T3 — Generator (AC2)** on GO; invariant-lock re-point; 33 violations at origin; `mode: hard`. **Not executed under the ruled NO-GO closure:** no generated matrix was built; coverage-completeness is retained (`landing-2/plants.md`, "Other required negative vectors").
+- [x] **T4 — Dispositions (AC6, AC7).** Clippy (after T0 count), group hash, prepush pin, root resolution. **Done (L2):** clippy re-baselined to 1,456 / 904 hosted (`714a1428`); clippy row 11 re-ruled B; prepush 83 pass / 0 red / 1 advisory / 8 skip (`landing-2/verification.md`).
+- [x] **T5 — L1 landing (D-20-3b-01 A).** Land retirement and folds; measure fold adds, xtask ≤ 43608; exact lower re-pins (xtask, maos-bin, aggregate); records. **Done (L1):** xtask 47682 → 42400, then 42405 after the L1 review correction (`landing-1/`).
+- [x] **T6 — L2 dev plan and implementation.** Request aggregate grant at dev-plan creation; then generator, FR31 kernel bundle, maos-bin binding, governance round-trip test, clippy, prepush literal/pin, pub-use hash and ledger; pins within ruled ceilings. **Done (L2):** final kernel 26,793 / 20,992, maos-bin 33,030, maos-audit 7,707, xtask 42,841, aggregate 188,451 under ruling w10, within the ruled ceilings.
+- [x] **T7 — Witnesses and ledger (AC5).** **Done:** invariant-ledger witnesses (`guaranteed_requires_property_corpus_and_ci_job_together`, `asserted_claim_without_owner_is_not_an_honest_ledger_entry`, `forged_id_or_missing_register_cannot_shrink_the_ledger`) passed in the in-tree integration binary (`landing-2/plants.md`).
+- [x] **T8 — Plants** (one per AC, `proof-contract.md:24-31`): AC2 drift, AC3 `if: false`, AC4 pid-keyed owner; AC1/AC5/AC6/AC7 are falsified by their in-tree vectors. **Done locally:** four FR31 red/restore plants and the AC3 real-tree `if: false` 0→1→0 (`landing-2/plants.md`). No AC2 drift plant exists under the NO-GO closure. Hosted-only plant legs were not run; `ci-20-3b-verify.yml` was never pushed.
+- [x] **T9 — L2 landing.** Exact pins inside the ruled envelope; FLAG-Winston HISTORY rows; `check-kernel-baseline`, `check-service-boundary`, `check-pub-field-constructors`, `check-ship-gate-completeness`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; records owed at landing. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator. **Done (2026-10-30):** L2 landed at `714a1428`; hosted run `41243340929` is 184/189, not fully green (see Completion Notes List).
 
 ## Dev Notes
 
@@ -349,14 +349,39 @@ Operator ruled D03 A, D04 A, D08 A, D-20-3b-01 A, 02 A, 03 B, 04 A, 05 B, 06–1
 - 2026-10-31: Round-2 fixes 1–6 adopted under operator ruling w9 at exact kernel26,680/20,889, bin33,021, audit7,668, xtask42,780 and aggregate188,239/hardfail188,240; both full nextest runs green (5,438 passed/139 skipped), all 11 pin-dependent failures cleared; four FR31 plants red at intended assertions/restored green; clippy1,410/881 and cargo-deny pass; prepush83 pass/0 red/1 advisory/8 skip. Serial participant-recall Σ37.355s timing finding is explicitly advisory by Main/operator disposition, no exception; hosted JUnit decides. Exact evidence: `20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-2/w9/` and `landing-2/verification.md`.
 - 2026-10-31: Round-3 fixes 1–4 adopted under operator ruling w10 at exact kernel26,793/20,992, bin33,030, audit7,707, xtask42,841 and aggregate188,451/hardfail188,452. Both serial workspace runs and the default run pass5,446/139 skipped; all11 pin-dependent failures cleared. Both fresh serial timing judgments pass with zero findings; all eight prior findings individually reassessed without exceptions. All gates, clippy1,410/881 and deny pass; four FR31 plants reach intended assertions/restored green; prescribed prepush83 pass/0 red/1 advisory/8 skip. Exact commands, individual timing dispositions and limits: `20-3b-gate-retirement-and-coverage-generator-evidence/landing-2/round-3/w10/` and `landing-2/verification.md`.
 
+### Code review record (DIFFICULT tier; landing 1 and landing 2)
+
+Three review rounds: landing 1 (4 layers), then landing 2 (5 layers in round 1, Blind and Security in rounds 2 and 3). Reviewers per the header `review:` field; the landing-1 correction ran on `openai-codex/gpt-6.1-sol`. Findings and dispositions:
+
+| Round | Layer | Finding | Disposition |
+|---|---|---|---|
+| Landing 1 | 4 layers | Missing workflow fixtures; nested placeholder scope; missing active-model and gate-level workflow witnesses; ratchet blocked later authorized grants; the `if: false` plant was fixture-level, not real-tree | Fixed (`landing-1/review-fixes/`); real-tree plant added; xtask 42400 → 42405, aggregate 187494 → 187499 (hardfail 187495 → 187500) |
+| Landing 2, round 1 | 5 layers | Fixes 1–6 (see `landing-2/round-2/w9/`) | Fixed under ruling w9 at kernel 26,680 / 20,889; serial participant-recall timing (Σ37.355s) advisory by Main/operator disposition |
+| Landing 2, round 2 | Blind + Security | Findings recorded in `landing-2/round-2/w9/` | Fixed; four FR31 plants red at intended assertions, restored green |
+| Landing 2, round 3 | Blind + Security | Fixes 1–4 (see `landing-2/round-3/w10/`); all eight prior findings reassessed | Fixed under ruling w10 at kernel 26,793 / 20,992; both timing judgments zero findings |
+| Recorded | — | Raw-key spills: clean cutover | Accepted |
+| Recorded | — | FR34 SDK capture gap | Ownerless until the first SDK LocalRunner-touching story |
+| Recorded | — | FR53 ignored assertion | Owner `20-3c` |
+| Recorded | — | FrameKind 30..33 classification | Debt |
+| Recorded | — | Clippy debt | Hosted baseline 1,456 / 904 (`714a1428`); row 11 re-ruled B |
+
 ### Completion Notes List
+
+**Done — landing record (2026-10-30):** closed at the final landing `714a1428`, which is **not fully green**. Hosted discipline runs (`ci/run-<id>/{run.json,jobs.jsonl,totals.txt}`): `41175764312` @ `61321573` (landing 1 + landing-2 round 1 + Wasmtime 48.0.8): success, 188/189, only the non-blocking `clippy-advisory` red at 1456/904 vs the then-baseline 1411/884. `41233186774` @ `1293f427` (landing-2 rounds 2–3): 184/189; reds `workspace-test-suite` (harness race: `worker_freeze_19_2` read the TL table before creation; fixed in `714a1428` across seven helpers), `clippy-advisory` (baseline re-set to hosted 1456/904 in `714a1428`), and ship-gate dependents. `41243340929` @ `714a1428` (final landing, attempt 1): 184/189; `clippy-advisory` green; reds `check-multi-tenant-loom` (job `124661589790`, `worker_terminal_facts_17_7::s3_external_sigkill_requires_pidfd_fact`, `worker_terminal_facts_17_7.rs:426`, known flake owned by 20-7) and `workspace-test-suite` (job `124661589929`, `maos-kernel-core::cap_token_verify_assertion::cap_token_verify_p99_under_5us_hot_path`, `cap_token_verify_assertion.rs:85`, known flake), plus `v1-0-ship-gate`, `v1-5-ship-gate` and `aggregate` as dependents. Recurrences are recorded in the flake rows of `deferred-work.md`.
+  - Landing totals: `41175764312` **11.08 job-h / 55.0 min wall**; `41233186774` **11.1 job-h / 47.5 min wall**; `41243340929` **10.97 job-h / 46.2 min wall** (each from its `totals.txt`).
+  - Final figures: kernel **26,793 / 20,992** (from 26,409 / 20,618); maos-bin **33,030**; maos-audit **7,707**; xtask **42,841** (from 47,682); aggregate **188,451** (hardfail 188,452).
+  - Operator rulings: d03, d04, d08, d01_shape, env15, rest, bin40, w8, w9, w10; clippy row 11 re-ruled B.
+  - Hosted proof boundary: the branch-only `ci-20-3b-verify.yml` was never pushed. The local plants (four FR31 red/restore, AC3 real-tree `if: false` 0→1→0, invariant and clippy negative vectors) are the plant proof; the three discipline runs are the hosted control proof. Hosted-only plant legs were not run.
+  - AC2: the spike resolved to the NO-GO closure; no generated coverage matrix was built, and coverage-completeness is retained (`landing-2/plants.md`).
 
 ### File List
 
 - Creation: this story file; `20-3b-…-evidence/creation/*`; `sprint-status.yaml:299`; `deferred-work.md:903,911,1200,1224` (annotations).
 - L1 review corrections: `xtask/src/check_review_findings_resolved.rs`; `xtask/tests/{diagnostics_20_3a,d19_story_file_governance,d11_xtask_ceiling_ratchet}.rs`; `xtask/kloc.toml`; this record; `20-3b-gate-retirement-and-coverage-generator-evidence/ci/ci-20-3b-verify.yml`; landing-1 review-fix and plant evidence. No kernel or operator Dockerfile edits.
+- **Landing evidence:** `20-3b-…-evidence/ci/run-41175764312/`, `run-41233186774/`, `run-41243340929/`, each `{run.json,jobs.jsonl,totals.txt}`; hosted status in `landing-2/plants.md`.
 
 ### Change Log
 
 - 2026-10-30: Story created at `23f58da4` (ready-for-dev; D03, D04, D08 and D-20-3b-01…16 PROPOSED). Enrolment closure re-measured (wider than six sites; maos-bin smoke arm and two library dependents found); retirement gross measured −5409 xtask (GO) / −5316 (NO-GO); 33 coverage violations reproduced by replica; FR31 kernel repair priced R′ +91/+80 (R +42/+34), maos-bin +9, maos-domain +1; deny half of `deferred-work.md:902` and all of `:909` recorded closed by 18-0's blocking job and the landed lockfile.
 - 2026-10-30: L1 DIFFICULT-review corrections preserve fixture prerequisites and nested placeholder scope, add active-model/gate-level workflow witnesses, permit future authorized ratchet grants, record real-tree plant and T0 preflight, and document ordering/hosted-proof limitations.
+- 2026-10-30: Done at final landing `714a1428` (not fully green). Hosted discipline runs `41175764312` @ `61321573` (188/189, only `clippy-advisory` red), `41233186774` @ `1293f427` (184/189), `41243340929` @ `714a1428` (184/189; `check-multi-tenant-loom` and `workspace-test-suite` known flakes, plus ship-gate dependents). Kernel 26,793/20,992; maos-bin 33,030; maos-audit 7,707; xtask 42,841; aggregate 188,451. Review record added; hosted verify workflow never pushed.

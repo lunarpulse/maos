@@ -249,3 +249,13 @@ Exact combined negative-vector command (exit 0) and time are recorded under `xta
 ## Hosted status
 
 `../ci/ci-20-3b-verify.yml` now wires the FR31 green vectors, all four checksum-pinned mutations with copy-back/cmp/touch, restored-green witnesses, coverage NO-GO/hard-mode witnesses, and the real non-denying clippy stream/ratchet. It is evidence-only, branch-only, and has **not been pushed or run**. No additional hosted-only cut was requested (Main ruling, 2026-10-30). No hosted run id or ledger-consuming proof is claimed.
+
+## Hosted discipline runs (control proof, 2026-10-30)
+
+The three discipline runs carry the hosted control proof; records are `../ci/run-<id>/{run.json,jobs.jsonl,totals.txt}`:
+
+- `41175764312` @ `61321573` (landing 1 + landing-2 round 1 + Wasmtime 48.0.8): success, 188/189. Only `clippy-advisory` (job `124462881223`, non-blocking) is red, at 1456/904 against the then-baseline 1411/884.
+- `41233186774` @ `1293f427` (landing-2 rounds 2–3): 184/189. Reds: `workspace-test-suite` (job `124631445292`; harness race, fixed in `714a1428`), `clippy-advisory` (job `124631439227`; baseline re-set to hosted 1456/904 in `714a1428`), `v1-0-ship-gate` (`124642348371`), `v1-5-ship-gate` (`124642366658`), `aggregate` (`124642366699`).
+- `41243340929` @ `714a1428` (final landing, attempt 1): 184/189. `clippy-advisory` is green. Reds: `check-multi-tenant-loom` (job `124661589790`; `worker_terminal_facts_17_7.rs:426`; known flake, owner 20-7), `workspace-test-suite` (job `124661589929`; `cap_token_verify_assertion.rs:85`; known flake), and the dependents `v1-0-ship-gate` (`124672007364`), `aggregate` (`124672027543`), `v1-5-ship-gate` (`124672027578`).
+
+The landing is **not fully green**. The local plants above remain the plant proof. Hosted-only plant legs were not run, and `ci-20-3b-verify.yml` was never pushed, so no hosted plant run is claimed.
