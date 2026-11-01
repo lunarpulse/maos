@@ -27,7 +27,7 @@ use std::time::Duration;
 
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{ConsentRuptureSink, HandshakeRetryPolicy};
-use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
+use maos_a2a_tcp::TcpA2ATransport;
 use maos_domain::frame::{FramePayload, IacFrame, RuptureReason};
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::{FrameKind, HostId};
@@ -90,7 +90,6 @@ async fn t_2c_listen_side_pin_mismatch_lands_in_the_servers_journal() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -114,7 +113,6 @@ async fn t_2c_listen_side_pin_mismatch_lands_in_the_servers_journal() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -197,7 +195,6 @@ async fn t_2c_dial_side_pin_mismatch_also_lands_in_the_dialers_journal() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -216,7 +213,6 @@ async fn t_2c_dial_side_pin_mismatch_also_lands_in_the_dialers_journal() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -283,7 +279,6 @@ async fn t_2c_a_healthy_handshake_journals_no_identity_refusal() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -304,7 +299,6 @@ async fn t_2c_a_healthy_handshake_journals_no_identity_refusal() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -348,7 +342,6 @@ async fn t_2c_journaling_without_a_sink_is_an_error_not_a_silent_success() {
         vec![],
         vec![],
         &clock,
-        TcpTimeouts::test_profile(),
         HandshakeRetryPolicy::default(),
     )
     .await;

@@ -60,7 +60,6 @@ async fn h2_pinned_clock_governs_validity() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -79,7 +78,6 @@ async fn h2_pinned_clock_governs_validity() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -116,17 +114,7 @@ async fn h3_ephemeral_port_readback() {
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-good");
     let leaf = valid_leaf(&ca, &clock);
-    let ep = bind_endpoint(
-        &leaf,
-        Some(&ca),
-        1,
-        vec![],
-        vec![],
-        &clock,
-        TcpTimeouts::test_profile(),
-        no_retry(),
-    )
-    .await;
+    let ep = bind_endpoint(&leaf, Some(&ca), 1, vec![], vec![], &clock, no_retry()).await;
     let addr = ep.local_addr().expect("H3: local_addr readback");
     assert!(
         addr.port() != 0,
@@ -142,17 +130,7 @@ async fn h4_readiness_no_sleep() {
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-good");
     let leaf = valid_leaf(&ca, &clock);
-    let ep = bind_endpoint(
-        &leaf,
-        Some(&ca),
-        1,
-        vec![],
-        vec![],
-        &clock,
-        TcpTimeouts::test_profile(),
-        no_retry(),
-    )
-    .await;
+    let ep = bind_endpoint(&leaf, Some(&ca), 1, vec![], vec![], &clock, no_retry()).await;
     assert!(
         ep.local_addr().is_some(),
         "H4: addr available right after bind, no sleep"
@@ -177,17 +155,7 @@ async fn h6_teardown_frees_port() {
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-good");
     let leaf = valid_leaf(&ca, &clock);
-    let ep = bind_endpoint(
-        &leaf,
-        Some(&ca),
-        1,
-        vec![],
-        vec![],
-        &clock,
-        TcpTimeouts::test_profile(),
-        no_retry(),
-    )
-    .await;
+    let ep = bind_endpoint(&leaf, Some(&ca), 1, vec![], vec![], &clock, no_retry()).await;
     let addr: SocketAddr = ep.local_addr().unwrap();
     drop(ep);
 

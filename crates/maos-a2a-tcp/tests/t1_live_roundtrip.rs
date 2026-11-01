@@ -12,7 +12,6 @@ mod support;
 
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{HandshakeRetryPolicy, PeerId, TofuPinStore};
-use maos_a2a_tcp::TcpTimeouts;
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
 use support::*;
@@ -42,7 +41,6 @@ async fn t1_live_mtls_roundtrip_happy_path() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         HandshakeRetryPolicy::default(),
     )
     .await;
@@ -62,7 +60,6 @@ async fn t1_live_mtls_roundtrip_happy_path() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         HandshakeRetryPolicy::default(),
     )
     .await;

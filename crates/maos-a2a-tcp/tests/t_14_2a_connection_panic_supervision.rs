@@ -28,7 +28,6 @@ use std::time::Duration;
 
 use maos_a2a_core::{A2APeerRouter, A2ATransport, ConsentRuptureSink};
 use maos_a2a_tcp::transport::{ConnectionPanic, ConnectionPanicPolicy};
-use maos_a2a_tcp::TcpTimeouts;
 use maos_domain::frame::IacFrame;
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
@@ -83,7 +82,6 @@ async fn t_14_2a_a_panicking_audit_write_is_caught_by_the_supervised_boundary() 
             ),
         ],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -129,7 +127,6 @@ async fn t_14_2a_a_panicking_audit_write_is_caught_by_the_supervised_boundary() 
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -186,7 +183,6 @@ async fn t_14_2a_a_panicking_audit_write_is_caught_by_the_supervised_boundary() 
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -236,7 +232,6 @@ async fn t_14_2a_a_healthy_session_trips_no_supervised_boundary() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -260,7 +255,6 @@ async fn t_14_2a_a_healthy_session_trips_no_supervised_boundary() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;

@@ -25,7 +25,6 @@ use std::time::Duration;
 
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::ConsentRuptureSink;
-use maos_a2a_tcp::TcpTimeouts;
 use maos_domain::frame::{FramePayload, IacFrame, RuptureReason};
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::{FrameKind, HostId};
@@ -112,7 +111,6 @@ fn t_14_2a_a_promoted_generation_makes_the_retired_leaf_a_queryable_refusal() {
                     &["readonly"],
                 )],
                 &clock,
-                TcpTimeouts::test_profile(),
                 no_retry(),
             )
             .await;
@@ -151,7 +149,6 @@ fn t_14_2a_a_promoted_generation_makes_the_retired_leaf_a_queryable_refusal() {
                     &[],
                 )],
                 &clock,
-                TcpTimeouts::test_profile(),
                 no_retry(),
             )
             .await;

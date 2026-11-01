@@ -29,7 +29,7 @@ use std::time::Duration;
 
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{A2AError, TofuPinStore};
-use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
+use maos_a2a_tcp::TcpA2ATransport;
 use maos_domain::frame::IacFrame;
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
@@ -75,7 +75,6 @@ async fn pair(
             &["readonly"],
         )],
         clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -92,7 +91,6 @@ async fn pair(
             &["readonly"],
         )],
         clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -368,7 +366,6 @@ async fn t_2c_window_c_reverse_leg_partition_is_bounded_and_typed() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -387,7 +384,6 @@ async fn t_2c_window_c_reverse_leg_partition_is_bounded_and_typed() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;

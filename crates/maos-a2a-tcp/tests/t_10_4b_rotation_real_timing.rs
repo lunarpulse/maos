@@ -85,7 +85,6 @@ use maos_a2a_core::router::A2APeerRouter;
 use maos_a2a_core::{
     compute_t_grace, A2AError, AgentRotationTimestamps, HandshakeRetryPolicy, RotationDrillReport,
 };
-use maos_a2a_tcp::TcpTimeouts;
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
 use support::*;
@@ -335,17 +334,7 @@ async fn retired_cert_probe_refused(
         &["readonly"],
         &["readonly"],
     )];
-    let ghost = bind_endpoint(
-        retired_leaf,
-        Some(ca),
-        1,
-        pins,
-        cfgs,
-        clock,
-        TcpTimeouts::test_profile(),
-        no_retry(),
-    )
-    .await;
+    let ghost = bind_endpoint(retired_leaf, Some(ca), 1, pins, cfgs, clock, no_retry()).await;
     ghost.set_peer_endpoint(
         &HostId(target.name.clone()),
         format!("tls://{}", target.addr),

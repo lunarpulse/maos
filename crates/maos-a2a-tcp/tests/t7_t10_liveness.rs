@@ -9,7 +9,7 @@ use futures_util::StreamExt;
 use maos_a2a_core::router::A2ATransport;
 use maos_a2a_core::transport::json_rpc::CODE_FRAME_TOO_LARGE;
 use maos_a2a_core::A2AJsonRpcResponse;
-use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts, MAX_FRAME_LEN};
+use maos_a2a_tcp::{TcpA2ATransport, MAX_FRAME_LEN};
 use std::time::{Duration, Instant};
 use support::*;
 use tokio::io::AsyncWriteExt;
@@ -30,7 +30,6 @@ async fn bind_nash(clock: &Clock, ca: &Ca, mira: &Leaf, nash_leaf: &Leaf) -> Tcp
             &["readonly"],
         )],
         clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await

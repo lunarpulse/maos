@@ -65,7 +65,6 @@ async fn bind_nash(
             accept,
         )],
         clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await

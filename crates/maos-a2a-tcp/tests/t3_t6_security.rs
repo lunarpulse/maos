@@ -8,7 +8,7 @@ mod support;
 
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{A2AError, HandshakeRetryPolicy, PeerId, TofuPinStore};
-use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
+use maos_a2a_tcp::TcpA2ATransport;
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
 use support::*;
@@ -44,7 +44,6 @@ async fn mira_dials_nash(
             &["readonly"],
         )],
         clock,
-        TcpTimeouts::test_profile(),
         retry.clone(),
     )
     .await;
@@ -63,7 +62,6 @@ async fn mira_dials_nash(
             &[],
         )],
         clock,
-        TcpTimeouts::test_profile(),
         retry,
     )
     .await;

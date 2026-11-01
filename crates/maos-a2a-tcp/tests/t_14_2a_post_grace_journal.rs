@@ -23,7 +23,6 @@ use std::time::Duration;
 
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::ConsentRuptureSink;
-use maos_a2a_tcp::TcpTimeouts;
 use maos_domain::frame::{FramePayload, IacFrame, RuptureReason};
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::{FrameKind, HostId};
@@ -88,7 +87,6 @@ async fn t_14_2a_a_retired_leaf_presented_after_the_grace_is_journaled() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -109,7 +107,6 @@ async fn t_14_2a_a_retired_leaf_presented_after_the_grace_is_journaled() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -188,7 +185,6 @@ async fn t_14_2a_a_current_generation_handshake_journals_no_post_grace_row() {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -209,7 +205,6 @@ async fn t_14_2a_a_current_generation_handshake_journals_no_post_grace_row() {
             &[],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;

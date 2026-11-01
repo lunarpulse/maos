@@ -55,7 +55,6 @@ use maos_a2a_core::error::HandshakeFailureClass;
 use maos_a2a_core::identity::PeerId;
 use maos_a2a_core::router::A2APeerRouter;
 use maos_a2a_core::{A2AError, HandshakeRetryPolicy};
-use maos_a2a_tcp::TcpTimeouts;
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
 use support::*;
@@ -291,7 +290,6 @@ async fn t_14_2_rotation_watchable_scene_n3() {
         ghost_pins,
         ghost_cfgs,
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;

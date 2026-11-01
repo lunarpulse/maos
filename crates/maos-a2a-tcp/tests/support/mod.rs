@@ -190,7 +190,7 @@ pub async fn raw_client_stream(
         .await
         .expect("pin nash");
     let cfg = build_client_config(
-        &[mira_leaf.der.clone()],
+        std::slice::from_ref(&mira_leaf.der),
         &mira_leaf.key_der,
         pins,
         posture(ca),
@@ -322,9 +322,10 @@ pub fn pin(peer_id: &str, fp: &PeerCertFingerprint, boot_nonce: u64) -> PinnedFi
     }
 }
 
-/// Bind one endpoint. All PEM material is read during `bind`, so the temp dir
-/// is dropped on return (H1: nothing persists). `validation_time` is pinned to
-/// `clock` (H2). `ca = Some` ⇒ chain mode; `None` ⇒ pin-only.
+/// Bind one endpoint with the fast [`TcpTimeouts::test_profile`]. All PEM
+/// material is read during `bind`, so the temp dir is dropped on return (H1:
+/// nothing persists). `validation_time` is pinned to `clock` (H2). `ca = Some`
+/// ⇒ chain mode; `None` ⇒ pin-only.
 pub async fn bind_endpoint(
     own_leaf: &Leaf,
     ca: Option<&Ca>,
@@ -332,7 +333,6 @@ pub async fn bind_endpoint(
     peer_pins: Vec<PinnedFingerprint>,
     peer_configs: Vec<A2APeerConfig>,
     clock: &Clock,
-    timeouts: TcpTimeouts,
     retry: HandshakeRetryPolicy,
 ) -> TcpA2ATransport {
     let pems = write_pem(own_leaf, ca);
@@ -341,7 +341,7 @@ pub async fn bind_endpoint(
         cfg,
         peer_configs,
         own_boot_nonce,
-        timeouts,
+        TcpTimeouts::test_profile(),
         retry,
         Some(clock.unix()),
         None, // consent expiry: real wall clock unless a test pins it
@@ -867,8 +867,7 @@ pub fn assert_fd_headroom_at(required: u64, path: &std::path::Path) {
             return;
         }
     }
-    assert!(
-        false,
+    panic!(
         "EMFILE-RISK-UNREADABLE: /proc/self/limits is readable but carries no `Max open \
          files` row — the fd precondition cannot be evaluated (AC6.2.a), and unmeasured \
          must fail, not pass"

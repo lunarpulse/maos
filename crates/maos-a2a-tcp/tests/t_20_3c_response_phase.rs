@@ -16,7 +16,7 @@ use futures_util::StreamExt;
 use maos_a2a_core::identity::PeerId;
 use maos_a2a_core::router::A2APeerRouter;
 use maos_a2a_core::{A2AError, InMemoryTofuPinStore, TofuPinStore};
-use maos_a2a_tcp::{build_server_config, length_delimited_codec, TcpTimeouts};
+use maos_a2a_tcp::{build_server_config, length_delimited_codec};
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
 use support::*;
@@ -84,7 +84,6 @@ async fn a_peer_that_reads_the_request_and_never_answers_is_a_typed_response_par
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;

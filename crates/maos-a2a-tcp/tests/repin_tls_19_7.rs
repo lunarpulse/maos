@@ -18,7 +18,7 @@ use maos_a2a_core::tofu::{Invalidated, RepinVerdict};
 use maos_a2a_core::{
     map_a2a_error_to_iac_bus, A2AError, A2ATransport, PeerId, RePinDecision, TofuPinStore,
 };
-use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
+use maos_a2a_tcp::TcpA2ATransport;
 use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
@@ -68,7 +68,6 @@ async fn bind_a(
             &[],
         )],
         clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await
@@ -93,7 +92,6 @@ async fn restarted_pair() -> Pair {
             &["readonly"],
         )],
         &clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;

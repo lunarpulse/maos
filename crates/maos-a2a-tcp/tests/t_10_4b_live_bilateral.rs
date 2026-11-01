@@ -45,7 +45,6 @@ use maos_a2a_core::identity::PeerCertFingerprint;
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::transport::json_rpc::CODE_PEER_IDENTITY_MISMATCH;
 use maos_a2a_core::{A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, InMemoryTofuPinStore};
-use maos_a2a_tcp::TcpTimeouts;
 use maos_domain::frame::{FramePayload, IacFrame};
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i8::A2AIntent;
@@ -101,7 +100,6 @@ async fn bind_bilateral(
             nash_accept,
         )],
         clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
@@ -121,7 +119,6 @@ async fn bind_bilateral(
             &[],
         )],
         clock,
-        TcpTimeouts::test_profile(),
         no_retry(),
     )
     .await;
