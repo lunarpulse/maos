@@ -4,23 +4,29 @@
 //!
 //! ## Rule (per arch §13.1 per-journey latency budgets table)
 //!
-//! - J1 budget: `p95_us ≤ 25_000` (25ms).
-//! - J4 budget: `p95_us ≤ 10_000` (10ms).
+//! - J1 budget: `j1-bridge-p95` in `xtask/perf-budgets.toml` (25 ms).
+//! - J4 budget: `j4-scalar-tap-p95` in `xtask/perf-budgets.toml` (10 ms).
 //! - BOTH budgets met → `defer-rust-inproc-to-v2.0+`
 //! - EITHER budget breached → `unlock-rust-inproc-in-v0.5`
 
 use crate::report::{DecisionRecord, JourneyResult};
 
-const J1_P95_BUDGET_US: u64 = 25_000;
-const J4_P95_BUDGET_US: u64 = 10_000;
+fn j1_p95_budget_us() -> u64 {
+    crate::budgets::budget_us("j1-bridge-p95")
+}
+
+fn j4_p95_budget_us() -> u64 {
+    crate::budgets::budget_us("j4-scalar-tap-p95")
+}
 
 pub fn decide(
     j1: &JourneyResult,
     j4: &JourneyResult,
     j6: Option<&JourneyResult>,
 ) -> DecisionRecord {
-    let j1_met = j1.p95_us <= J1_P95_BUDGET_US;
-    let j4_met = j4.p95_us <= J4_P95_BUDGET_US;
+    let (j1_budget, j4_budget) = (j1_p95_budget_us(), j4_p95_budget_us());
+    let j1_met = j1.p95_us <= j1_budget;
+    let j4_met = j4.p95_us <= j4_budget;
     let j6_met = j6.map_or(true, |j| j.not_measured || j.budget_met);
     let outcome = if j1_met && j4_met {
         "defer-rust-inproc-to-v2.0+".to_string()
@@ -30,10 +36,10 @@ pub fn decide(
     let rationale = format!(
         "J1 P95 = {}us (budget {}us, met={}); J4 P95 = {}us (budget {}us, met={}); J6 met={}; all-met={} → {}",
         j1.p95_us,
-        J1_P95_BUDGET_US,
+        j1_budget,
         j1_met,
         j4.p95_us,
-        J4_P95_BUDGET_US,
+        j4_budget,
         j4_met,
         j6_met,
         j1_met && j4_met && j6_met,
@@ -56,7 +62,7 @@ mod tests {
             p95_us * 3,
             p95_us,
             p95_us / 10,
-            p95_us <= J1_P95_BUDGET_US,
+            p95_us <= j1_p95_budget_us(),
         )
     }
 
@@ -70,7 +76,7 @@ mod tests {
             p95_us * 3,
             p95_us,
             p95_us / 10,
-            p95_us <= J4_P95_BUDGET_US,
+            p95_us <= j4_p95_budget_us(),
         )
     }
 

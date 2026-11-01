@@ -16,7 +16,10 @@
 //! Run locally with:
 //!   cargo bench -p maos-kernel-core --bench hot_swap_latency
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+#[path = "../../maos-bench/src/budgets.rs"]
+mod budgets;
+
+use criterion::{criterion_group, BatchSize, Criterion};
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
@@ -248,4 +251,29 @@ criterion_group! {
         .warm_up_time(std::time::Duration::from_secs(1));
     targets = bench_state_codec_roundtrip, bench_full_swap_path
 }
-criterion_main!(benches);
+
+/// Story 20-7 AC4 — NFR-Perf-7 (P99 < 500 ms, the subprocess row) and the PRD's
+/// hot-swap rust-inproc hot-path row (P99 < 50 ms): the coordinator's full swap
+/// protocol timed over 100 fresh kernels, budgets from `xtask/perf-budgets.toml`.
+fn budget_leg() -> bool {
+    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let mut samples_ns: Vec<u64> = (0..100)
+        .map(|_| {
+            let kernel = rt.block_on(TestKernel::new());
+            let start = std::time::Instant::now();
+            rt.block_on(kernel.run_swap());
+            start.elapsed().as_nanos() as u64
+        })
+        .collect();
+    samples_ns.sort_unstable();
+    let p99_us = samples_ns[samples_ns.len() * 99 / 100 - 1] as f64 / 1_000.0;
+    let mut within = budgets::report("hot-path-hot-swap-inproc-p99", p99_us);
+    within &= budgets::report("nfr-perf-7-hot-swap-p99", p99_us);
+    within
+}
+
+fn main() -> std::process::ExitCode {
+    benches();
+    Criterion::default().configure_from_args().final_summary();
+    budgets::finish(budget_leg())
+}

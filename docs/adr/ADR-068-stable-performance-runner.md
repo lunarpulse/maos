@@ -1,6 +1,6 @@
 ---
 Status: ACCEPTED — ratified 2026-09-25 by the operator under Story 17-3a follow-up decision D7 (approved in principle, then ratified as designed; sourcing: a rented dedicated server, §2)
-Gate: none yet — `20-7-stable-runner-perf-gates` lands `check-perf-verdict` and `check-perf-runner-policy`; this file's index row is held by `cargo test -p xtask --test decision_adrs_and_provisioning`
+Gate: `check-perf-runner-policy` (blocking, `xtask/src/check_perf_runner_policy.rs`), `check-perf-verdict` and `check-perf-counts` (xtask, landed by `20-7-stable-runner-perf-gates` landing 1; the verdict command reads the `perf-ledger` branch and prints `ABSENT` until the runner exists); this file's index row is held by `cargo test -p xtask --test decision_adrs_and_provisioning`
 Decided: 2026-09-25
 Accepted-in-PR: pending — operator ratification 2026-09-25 (Story 17-3a follow-up D7)
 Revisits: ADR-040 only for where its §13.1 budgets are enforced — its `Status:` line does not change (the historical status gate retired in Story 20-3b); ADR-030's 5 µs hot-path figure gains a machine it can be measured on

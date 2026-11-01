@@ -88,10 +88,7 @@ location = "crates/maos-audit/tests/i12_decision_audit_test.rs:159"
 location = "crates/maos-audit/tests/query_schema_test.rs:144"
 
 [[allow]]
-location = "crates/maos-bench/benches/iac_routing_budget.rs:167"
-
-[[allow]]
-location = "crates/maos-bench/benches/orchestrator_fanout_nfr_perf_8.rs:245"
+location = "crates/maos-bench/benches/orchestrator_inproc_dispatch.rs:236"
 
 [[allow]]
 location = "crates/maos-bench/src/report.rs:160"

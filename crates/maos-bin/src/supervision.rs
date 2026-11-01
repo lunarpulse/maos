@@ -244,6 +244,7 @@ pub async fn finish_serving_shutdown(
 
 #[cfg(feature = "network")]
 mod worker {
+    use std::future::Future;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use std::sync::{Arc, Mutex, Weak};
@@ -2264,6 +2265,28 @@ mod worker {
     }
 
     impl KernelBindingExecutor {
+        /// Run `future` to completion from sync code that may sit on a runtime
+        /// thread (`WorkerBinding::drop` can run mid-unwind inside an async
+        /// body, and must never panic). A multi-thread runtime thread yields its
+        /// worker; a current-thread one cannot, so a scoped thread blocks
+        /// instead. `None`: that thread panicked.
+        fn block_on_anywhere<F>(&self, future: F) -> Option<F::Output>
+        where
+            F: Future + Send,
+            F::Output: Send,
+        {
+            use tokio::runtime::{Handle, RuntimeFlavor};
+            match Handle::try_current().map(|current| current.runtime_flavor()) {
+                Err(_) => Some(self.handle.block_on(future)),
+                Ok(RuntimeFlavor::MultiThread) => {
+                    Some(tokio::task::block_in_place(|| self.handle.block_on(future)))
+                }
+                Ok(_) => std::thread::scope(|scope| {
+                    scope.spawn(|| self.handle.block_on(future)).join().ok()
+                }),
+            }
+        }
+
         fn push_record(&self, spirit_pid: u32, record: TaskAssignmentRecord) {
             let scbs = self.scheduler.scbs();
             let guard = match scbs.read() {
@@ -2430,8 +2453,8 @@ mod worker {
             // for `join_outstanding`, never aborted mid-`handle_crash` and
             // never silently dropped.
             let joined = self
-                .handle
-                .block_on(async { tokio::time::timeout(budget, &mut join).await });
+                .block_on_anywhere(async { tokio::time::timeout(budget, &mut join).await })
+                .unwrap_or(Ok(Ok(CrashOutcome::NotLoaded)));
             match joined {
                 Ok(Ok(outcome)) => Ok(outcome),
                 // A panicked or aborted handler wrote nothing, so the record
@@ -2487,8 +2510,7 @@ mod worker {
             // disposition row above is the record and the originator is
             // still told. Never on a planned stop or a clean exit.
             if crashed && replica.is_some() {
-                self.handle
-                    .block_on(deliver_orphan(&self.iac, &self.scheduler, record));
+                let _ = self.block_on_anywhere(deliver_orphan(&self.iac, &self.scheduler, record));
             }
         }
 
@@ -2501,12 +2523,16 @@ mod worker {
         }
 
         fn unload(&self, spirit_pid: u32) {
-            let result = self.handle.block_on(self.scheduler.unload(spirit_pid));
+            let result = self.block_on_anywhere(self.scheduler.unload(spirit_pid));
             if let Some(core) = self.registry.upgrade().and_then(|r| r.by_pid(spirit_pid)) {
                 core.stop_session();
             }
-            if let Err(error) = result {
-                eprintln!("maos run: worker unload failed for pid {spirit_pid}: {error}");
+            match result {
+                Some(Err(error)) => {
+                    eprintln!("maos run: worker unload failed for pid {spirit_pid}: {error}");
+                }
+                Some(Ok(_)) => {}
+                None => eprintln!("maos run: worker unload thread panicked for pid {spirit_pid}"),
             }
         }
 

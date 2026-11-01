@@ -209,6 +209,21 @@ gates = [
     # finishes under its `xtask/test-budgets.toml` budget (default 30 s; total
     # 300 s). Before: 1,871 s, 67 % of it one test that ran a whole gate.
     "check-test-budget",
+    # Story 20-7 AC2 — only `perf.yml` may target the stable runner `maos-perf`,
+    # on trusted triggers, behind the fork guard, holding `contents: read`.
+    "check-perf-runner-policy",
+    # Story 20-7 AC5 — Tier C instruction/allocation counts vs the committed baseline.
+    "check-perf-counts",
+    # Story 20-7 AC12.3 — the Tier W metric families the coverage matrix cites
+    # (rows of `xtask/perf-budgets.toml`, measured on the stable runner; shadow
+    # until ADR-068 §7.3). Not xtask subcommands: `check-perf-verdict` judges them.
+    "nfr-perf-1-iac-routing",
+    "nfr-perf-2-iac-throughput",
+    "nfr-perf-3-cap-token-verify",
+    "nfr-perf-4-posture-shift",
+    "nfr-perf-5-audit-query",
+    "nfr-perf-7-hot-swap",
+    "nfr-perf-8-real-spawn-fanout",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -448,6 +463,26 @@ binding = "blocking"
 # — four `[[exception]]` rows, `total_seconds` 800.
 [[ship_gate]]
 name = "check-test-budget"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
+
+# Story 20-7 AC2 — `check-perf-runner-policy` (ADR-068 §4). Hermetic (reads the
+# committed workflows), BLOCKING at every phase from the day it lands: it is the
+# only control between a fork pull request and code execution on the stable
+# runner host. Proven red by four plants (`xtask/tests/perf_gates_20_7.rs`).
+[[ship_gate]]
+name = "check-perf-runner-policy"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
+
+# Story 20-7 AC5 — `check-perf-counts`, Tier C (ADR-068 §1): instruction and
+# allocation counts per pull request against the baselines committed in
+# `xtask/perf-budgets.toml`. Deterministic, fork-safe. The ROW dispositions
+# live in that file (allocation rows blocking; instruction rows advisory until
+# their first hosted callgrind baseline is committed); the gate itself is
+# blocking at every phase.
+[[ship_gate]]
+name = "check-perf-counts"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 

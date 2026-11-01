@@ -102,6 +102,7 @@ mod check_fuzz_targets;
 mod check_ff_j6;
 mod check_serde_error_handling;
 use xtask::check_service_boundary;
+use xtask::{check_perf_counts, check_perf_runner_policy, check_perf_verdict, perf_ledger};
 mod check_skill_schema;
 // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
 mod check_skill_conformance;
@@ -796,6 +797,75 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 20-7 AC1 — one honest verdict per metric from the perf-ledger
+    /// (ADR-068 §5–§6): PASS, FAIL, INDETERMINATE or ABSENT; only PASS is green.
+    #[command(name = "check-perf-verdict")]
+    CheckPerfVerdict {
+        /// The commit whose verdicts to print (required unless `--stale-check`).
+        #[arg(long)]
+        sha: Option<String>,
+        /// Ledger file, or directory holding `ledger.jsonl`; default is the
+        /// `origin/perf-ledger` branch (a missing branch is a loud error).
+        #[arg(long)]
+        ledger: Option<String>,
+        /// The scheduled staleness check: newest entry older than the budget
+        /// file's `stale_hours` is red.
+        #[arg(long)]
+        stale_check: bool,
+        /// RFC 3339 time standing in for now (fixtures).
+        #[arg(long)]
+        now: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 20-7 AC2 — only `perf.yml` may target the `maos-perf` runner, on
+    /// trusted triggers, behind the fork guard, with `contents: read` (ADR-068 §4).
+    #[command(name = "check-perf-runner-policy")]
+    CheckPerfRunnerPolicy {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 20-7 AC5 — Tier C instruction/allocation counts against the
+    /// committed baselines in `xtask/perf-budgets.toml`.
+    #[command(name = "check-perf-counts")]
+    CheckPerfCounts {
+        /// Directory of `<path>.json` + `<path>.callgrind` the harness wrote.
+        #[arg(long)]
+        dir: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 20-7 — ADR-068 §5 calibration: a fixed CPU and a fixed fsync
+    /// workload, 30 timings each; prints one ledger `calibration` line.
+    #[command(name = "perf-calibrate")]
+    PerfCalibrate {
+        #[arg(long)]
+        sha: String,
+        #[arg(long)]
+        fingerprint: String,
+        /// Ledger holding the machine's recorded calibration (drift reference).
+        #[arg(long)]
+        reference: Option<String>,
+    },
+    /// Story 20-7 — ADR-068 §6 append (the GitHub-hosted follow-up job): bench
+    /// logs + calibration line → ledger lines with their verdicts.
+    #[command(name = "perf-ledger-append")]
+    PerfLedgerAppend {
+        #[arg(long)]
+        ledger: String,
+        /// Directory of bench logs carrying `MAOS-PERF {..}` lines, one file per run.
+        #[arg(long)]
+        logs: String,
+        /// File holding the `perf-calibrate` line.
+        #[arg(long)]
+        calibration: String,
+        #[arg(long)]
+        sha: String,
+        #[arg(long, default_value = "main")]
+        branch: String,
+        #[arg(long)]
+        fingerprint: String,
+    },
     /// Story 9.4 R-AG1 — air-gap no-network-symbols CI gate + dirty-fixture bite.
     #[command(name = "check-air-gap")]
     CheckAirGap {
@@ -1387,6 +1457,34 @@ fn main() {
         Commands::CheckReleasePrecondition { check_runs, json } => {
             check_release_precondition::run(check_runs.as_deref(), json)
         }
+        Commands::CheckPerfVerdict {
+            sha,
+            ledger,
+            stale_check,
+            now,
+            json,
+        } => check_perf_verdict::run(
+            sha.as_deref(),
+            ledger.as_deref(),
+            stale_check,
+            now.as_deref(),
+            json,
+        ),
+        Commands::CheckPerfRunnerPolicy { json } => check_perf_runner_policy::run(json),
+        Commands::CheckPerfCounts { dir, json } => check_perf_counts::run(&dir, json),
+        Commands::PerfCalibrate {
+            sha,
+            fingerprint,
+            reference,
+        } => perf_ledger::calibrate(&sha, &fingerprint, reference.as_deref()),
+        Commands::PerfLedgerAppend {
+            ledger,
+            logs,
+            calibration,
+            sha,
+            branch,
+            fingerprint,
+        } => perf_ledger::append(&ledger, &logs, &calibration, &sha, &branch, &fingerprint),
         Commands::CheckAirGap {
             binary,
             build_first,

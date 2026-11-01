@@ -16,13 +16,10 @@
 //! committed-baseline is the v1.5 hardening (the sibling benches share this
 //! advisory posture; per AC3 "do NOT invent a bespoke ledger format").
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use maos_bench::budgets;
 use maos_bench::harness::j4::{run_j4_measurement, J4Config};
 use maos_bench::report::{BenchReport, DecisionRecord};
-
-/// §13.1 Mira-Nash Observer colocation-latency P95 budget (10ms) — matches
-/// `harness/j4.rs::J4_P95_BUDGET_US`.
-const J4_P95_BUDGET_US: u64 = 10_000;
+use std::process::ExitCode;
 
 /// Run the real J4 measurement journey and return its `JourneyResult`.
 fn run_j4_journey() -> maos_bench::report::JourneyResult {
@@ -33,24 +30,14 @@ fn run_j4_journey() -> maos_bench::report::JourneyResult {
     run_j4_measurement(&config).expect("j4 measurement")
 }
 
-fn j4_latency_regression_bench(c: &mut Criterion) {
-    c.bench_function("j4_latency_regression", |b| {
-        b.iter(|| {
-            let journey = run_j4_journey();
-            criterion::black_box(journey)
-        });
-    });
-
+fn main() -> ExitCode {
     // Emit a single BenchReport for the §13.1 continuity / regression record.
+    // The budget (`j4-scalar-tap-p95`, 10ms) is read from `xtask/perf-budgets.toml`.
     let journey = run_j4_journey();
+    let budget_us = budgets::budget_us("j4-scalar-tap-p95");
     eprintln!(
-        "J4 regression track: P95={}µs P99={}µs max={}µs mean={}µs (budget={}µs, N={})",
-        journey.p95_us,
-        journey.p99_us,
-        journey.max_us,
-        journey.mean_us,
-        J4_P95_BUDGET_US,
-        journey.invocation_count,
+        "J4 regression track: P95={}µs P99={}µs max={}µs mean={}µs (budget={budget_us}µs, N={})",
+        journey.p95_us, journey.p99_us, journey.max_us, journey.mean_us, journey.invocation_count,
     );
     let report = BenchReport::new(
         format!("j4-latency-regression-{}", journey.invocation_count),
@@ -68,15 +55,13 @@ fn j4_latency_regression_bench(c: &mut Criterion) {
             journey.budget_met,
             true, // j6 not measured here
             format!(
-                "j4-latency-regression p95={}us budget={}us",
-                journey.p95_us, J4_P95_BUDGET_US
+                "j4-latency-regression p95={}us budget={budget_us}us",
+                journey.p95_us
             ),
             "ADR-040".into(),
         ),
     );
     let json = serde_json::to_string_pretty(&report).expect("serialize report");
     eprintln!("{json}");
+    budgets::finish(budgets::report("j4-scalar-tap-p95", journey.p95_us as f64))
 }
-
-criterion_group!(benches, j4_latency_regression_bench);
-criterion_main!(benches);

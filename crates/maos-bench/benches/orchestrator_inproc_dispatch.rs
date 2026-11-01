@@ -1,18 +1,13 @@
 #![forbid(unsafe_code)]
 
-//! Story 6.2 AC3 — NFR-Perf-8 orchestrator fan-out bench.
+//! Story 6.2 AC3, renamed by Story 20-7 AC4 — IN-PROCESS IAC dispatch under
+//! fan-out load: 50 in-process Worker task handles, 10 tasks/sec, a 15 s window.
 //!
-//! Sustained 50 concurrent Worker Spirits / 10 tasks/sec / 1h / P99 ≤500ms / 0 dropped.
-//! CI-quick mode (`MAOS_BENCH_CI_QUICK=1`) compresses 1h → 60s for per-PR gating;
-//! the full 1h runs on `schedule:` weekly.
-//!
-//! ### Soft-fail calibration at v0.5-α
-//!
-//! v0.8 is the binding milestone; today's date is 2026-05-26 (v0.5 sprint), so
-//! the bench runs in soft-fail mode for runner-tier calibration per Story 5.5e
-//! §13.1 calibration-phase precedent. The CI job carries `continue-on-error: true`;
-//! the calibration window is ≤2 weeks; flip to hard-fail in a follow-up PR before
-//! Epic 6 closes.
+//! This is NOT NFR-Perf-8. NFR-Perf-8 is 50 concurrent real T3 Workers through
+//! the real `WorkerSupervisor` for an hour; that measurement is
+//! `crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs`. What this keeps
+//! is the in-process dispatch measurement (row `iac-inproc-fanout-dispatch-p99`
+//! of `xtask/perf-budgets.toml`, which holds the budget).
 //!
 //! ### Methodology
 //!
@@ -35,6 +30,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use maos_bench::budgets;
 use maos_bench::report::{BenchReport, DecisionRecord, JourneyResult};
 use maos_domain::frame::{
     FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
@@ -51,20 +47,10 @@ use tokio::time::MissedTickBehavior;
 
 const FAN_OUT: usize = 50;
 const TASKS_PER_SEC: u64 = 10;
-const P99_BUDGET_US: u64 = 500 * 1000; // 500ms per NFR-Perf-8
-
-fn ci_quick_mode() -> bool {
-    std::env::var("MAOS_BENCH_CI_QUICK")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(true) // default to CI-quick in `cargo bench --quick`
-}
-
+/// The in-process window: a smoke measurement. NFR-Perf-8's 1 h claim is the
+/// real-spawn bench's (`nfr_perf_8_real_spawn_fanout_20_7`, weekly on Tier W).
 fn target_duration() -> Duration {
-    if ci_quick_mode() {
-        Duration::from_secs(15) // truncated bench window for PR-time CI
-    } else {
-        Duration::from_secs(3600) // full 1h on weekly schedule
-    }
+    Duration::from_secs(15)
 }
 
 fn make_task_assign(seq: u64, worker_id: usize) -> IacFrame {
@@ -195,7 +181,8 @@ fn run_fanout(rt: &Runtime) -> (JourneyResult, u64) {
         var.sqrt() as u64
     };
     let dropped_count = dropped.load(Ordering::Relaxed);
-    let budget_met = p99 <= P99_BUDGET_US && dropped_count == 0;
+    let budget_met =
+        p99 <= budgets::budget_us("iac-inproc-fanout-dispatch-p99") && dropped_count == 0;
     let journey = JourneyResult::new(
         format!("orchestrator-fanout-{FAN_OUT}c-{TASKS_PER_SEC}rps"),
         len as u64,
@@ -210,15 +197,12 @@ fn run_fanout(rt: &Runtime) -> (JourneyResult, u64) {
     (journey, dropped_count)
 }
 
-// NFR-Perf-8 is a SUSTAINED-LOAD measurement (run the fan-out for a fixed wall
-// window, then report P99 / dropped / budget), not a micro-benchmark. criterion's
-// `bench_function` samples its closure repeatedly to build a statistical
-// distribution — but a single 15s/1h fan-out yields one sample, which panics
-// criterion's univariate stats (`slice.len() > 1`). So this bench is `harness =
-// false` (Cargo.toml) with a plain `main` that runs the fan-out once and emits the
-// JourneyResult report directly. (iac_routing_budget keeps criterion: its 200 µs
-// invocations give criterion plenty of samples.)
-fn main() {
+// A SUSTAINED-LOAD measurement (run the fan-out for a fixed wall window, then
+// report P99 / dropped / budget), not a micro-benchmark: a single window yields
+// one sample, which panics criterion's univariate stats (`slice.len() > 1`). So
+// this bench is `harness = false` (Cargo.toml) with a plain `main` that runs the
+// fan-out once and emits the JourneyResult report directly.
+fn main() -> std::process::ExitCode {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(4)
@@ -226,8 +210,9 @@ fn main() {
         .expect("tokio runtime");
 
     let (journey, dropped) = run_fanout(&rt);
+    let budget_us = budgets::budget_us("iac-inproc-fanout-dispatch-p99");
     let report = BenchReport::new(
-        format!("orchestrator-fanout-{}", journey.invocation_count),
+        format!("orchestrator-inproc-dispatch-{}", journey.invocation_count),
         0,
         std::env::var("GITHUB_SHA").unwrap_or_else(|_| "untracked".into()),
         vec![journey.clone()],
@@ -242,13 +227,15 @@ fn main() {
             dropped == 0,
             true, // j6 not measured here
             format!(
-                "fanout p99={}us budget={}us dropped={}",
-                journey.p99_us, P99_BUDGET_US, dropped
+                "in-process dispatch p99={}us budget={budget_us}us dropped={dropped}",
+                journey.p99_us
             ),
-            "NFR-Perf-8".into(),
+            "ADR-068".into(),
         ),
     );
     let json = serde_json::to_string_pretty(&report).expect("serialize report");
     eprintln!("{json}");
     println!("{json}");
+    let within = budgets::report("iac-inproc-fanout-dispatch-p99", journey.p99_us as f64);
+    budgets::finish(within && dropped == 0)
 }

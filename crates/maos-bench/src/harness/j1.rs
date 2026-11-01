@@ -22,7 +22,9 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-const J1_P95_BUDGET_US: u64 = 25_000;
+fn j1_p95_budget_us() -> u64 {
+    crate::budgets::budget_us("j1-bridge-p95")
+}
 const PER_INVOCATION_TIMEOUT_MS: u64 = 1000;
 
 #[derive(Debug, thiserror::Error)]
@@ -144,7 +146,12 @@ pub fn run_j1_measurement(config: &J1Config) -> Result<JourneyResult, BenchError
         )));
     }
 
-    let result = build_journey_result("J1", config.invocation_count, &samples_us, J1_P95_BUDGET_US);
+    let result = build_journey_result(
+        "J1",
+        config.invocation_count,
+        &samples_us,
+        j1_p95_budget_us(),
+    );
     Ok(result)
 }
 
@@ -165,9 +172,12 @@ pub fn run_j1_measurement(config: &J1Config) -> Result<JourneyResult, BenchError
 // ────────────────────────────────────────────────────────────────────────────
 
 /// Generous CI ceiling (2× the §13.1 budget) — catches real regressions on a
-/// shared runner without jitter-flake. The strict `J1_P95_BUDGET_US` is the
-/// pinned-runner gate.
-pub const J1_CI_CEILING_US: u64 = 50_000;
+/// shared runner without jitter-flake. The strict `j1-bridge-p95` row is the
+/// pinned-runner gate; this is the named `j1-bridge-ci-ceiling-p95` catastrophe
+/// guard row of `xtask/perf-budgets.toml`.
+pub fn j1_ci_ceiling_us() -> u64 {
+    crate::budgets::budget_us("j1-bridge-ci-ceiling-p95")
+}
 
 pub struct J1BridgeConfig {
     pub iterations: u64,
@@ -241,7 +251,7 @@ pub fn run_j1_bridge_measurement(config: &J1BridgeConfig) -> Result<JourneyResul
         "J1-bridge",
         config.iterations,
         &samples_us,
-        J1_P95_BUDGET_US,
+        j1_p95_budget_us(),
     ))
 }
 
@@ -262,9 +272,10 @@ mod tests {
             "J1-bridge: P50={}us P95={}us P99={}us max={}us (N={})",
             result.p50_us, result.p95_us, result.p99_us, result.max_us, cfg.iterations
         );
+        let ceiling = j1_ci_ceiling_us();
         assert!(
-            p95 < J1_CI_CEILING_US,
-            "J1 bridge IPC P95={p95}us exceeded the generous CI ceiling {J1_CI_CEILING_US}us \
+            p95 < ceiling,
+            "J1 bridge IPC P95={p95}us exceeded the generous CI ceiling {ceiling}us \
              (real regression — fix our code, do NOT migrate to in-process to mask it)"
         );
     }
@@ -278,7 +289,7 @@ mod tests {
 
     #[test]
     fn j1_budget_constant() {
-        assert_eq!(J1_P95_BUDGET_US, 25_000);
+        assert_eq!(j1_p95_budget_us(), 25_000, "ADR-040 §13.1 J1 P95 budget");
     }
 
     #[test]

@@ -279,6 +279,25 @@ impl ContainerTerminal {
         succeeded
     }
 
+    /// SIGKILL the verified payload through its pidfd (pid 1 of the CID's
+    /// pid namespace, so the kernel ends every process in it).
+    #[cfg(target_os = "linux")]
+    fn kill_payload(&self) -> bool {
+        use std::os::fd::AsFd;
+        let identity = self
+            .identity
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        identity.pidfd.as_ref().is_some_and(|pidfd| {
+            rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL).is_ok()
+        })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn kill_payload(&self) -> bool {
+        false
+    }
+
     pub fn kill_succeeded(&self) -> bool {
         !self.lock().kill_failed
     }
@@ -374,6 +393,24 @@ impl ContainerTerminal {
         verdict
     }
 
+    /// Wait for an in-flight snapshot owner to publish (it is bounded by its
+    /// own deadline), so a stalled runtime cannot race removal away.
+    fn snapshot_settled(&self, by: Instant) -> bool {
+        let mut progress = self.lock();
+        while progress.snapshot_inflight {
+            let now = Instant::now();
+            if now >= by {
+                return false;
+            }
+            progress = self
+                .changed
+                .wait_timeout(progress, by - now)
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .0;
+        }
+        true
+    }
+
     fn teardown_pending(&self) -> bool {
         matches!(self.lock().teardown, Some(None))
     }
@@ -406,7 +443,10 @@ impl ContainerTerminal {
         let mut unconfirmed = None;
         if started && !self.termination_confirmed() {
             let confirm_by = overall.min(entry + KILL_BUDGET);
-            let killed = self.kill(confirm_by);
+            // The verified payload pidfd needs no runtime lock: a stalled
+            // runtime CLI cannot leave a live payload behind.
+            let signalled = self.kill_payload();
+            let killed = self.kill(confirm_by) || signalled;
             if !self.confirm(confirm_by) {
                 unconfirmed = Some(if killed {
                     R::TerminationUnconfirmed
@@ -417,7 +457,7 @@ impl ContainerTerminal {
         }
         if started {
             let facts = self.facts_by(overall, true);
-            if facts.is_none() || self.lock().snapshot_inflight {
+            if facts.is_none() || !self.snapshot_settled(overall) {
                 return Err(R::TerminationUnconfirmed);
             }
         }

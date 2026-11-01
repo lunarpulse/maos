@@ -339,15 +339,37 @@ fn wait_for_fixture_child_with(
     }
 }
 
-fn wait_pid_gone(pid: u32, start_time: &str, timeout: Duration, what: &str) {
+/// One `/proc/<pid>/status` field (`State`, `PPid`), `None` once the pid is gone.
+fn proc_status_field(pid: u32, field: &str) -> Option<String> {
+    std::fs::read_to_string(format!("/proc/{pid}/status"))
+        .ok()?
+        .lines()
+        .find_map(|line| line.strip_prefix(field)?.strip_prefix(':'))
+        .map(|value| value.trim().to_owned())
+}
+
+/// A zombie awaiting its parent's reap holds nothing and is dead (State `Z`);
+/// only a payload that can still run is "present" (20-7 AC8.4). The 5 s bound
+/// stays: a live payload after the root exited is a defect, never calibration.
+fn wait_pid_gone(
+    pid: u32,
+    start_time: &str,
+    timeout: Duration,
+    what: &str,
+    context: &dyn Fn() -> String,
+) {
     let deadline = Instant::now() + timeout;
     loop {
-        if proc_start_time(pid).as_deref() != Some(start_time) {
+        let zombie = proc_status_field(pid, "State").is_some_and(|state| state.starts_with('Z'));
+        if proc_start_time(pid).as_deref() != Some(start_time) || zombie {
             return;
         }
         assert!(
             Instant::now() < deadline,
-            "{what} (pid {pid}) is still in /proc after {timeout:?}"
+            "{what} (pid {pid}) is still in /proc after {timeout:?}; State {:?}, PPid {:?}; {}",
+            proc_status_field(pid, "State"),
+            proc_status_field(pid, "PPid"),
+            context()
         );
         std::thread::sleep(Duration::from_millis(25));
     }
@@ -374,20 +396,50 @@ fn wait_container_stopped(container_id: &str, timeout: Duration) {
     }
 }
 
-fn wait_worker_stopped(worker: &FixtureContainer, timeout: Duration, what: &str) {
+fn wait_worker_stopped(
+    worker: &FixtureContainer,
+    timeout: Duration,
+    what: &str,
+    root_stderr: &str,
+) {
+    let context = || worker_stop_context(worker, root_stderr);
     wait_pid_gone(
         worker.payload_host_pid,
         &worker.payload_start_time,
         timeout,
         what,
+        &context,
     );
     wait_pid_gone(
         worker.runtime_client_pid,
         &worker.runtime_client_start_time,
         timeout,
         "the OCI runtime client for the Worker",
+        &context,
     );
     wait_container_stopped(&worker.container_id, timeout);
+}
+
+/// Story 20-7 AC8.1/AC8.4: what a failed stop oracle always prints — the
+/// root's stderr and the CID's runtime listing (the payload's own
+/// `State`/`PPid` are appended by `wait_pid_gone`).
+fn worker_stop_context(worker: &FixtureContainer, root_stderr: &str) -> String {
+    let listing = std::env::var("MAOS_T3_RUNTIME")
+        .ok()
+        .and_then(|runtime| {
+            Command::new("timeout")
+                .arg("8s")
+                .arg(runtime)
+                .args(["ps", "-a", "--filter"])
+                .arg(format!("id={}", worker.container_id))
+                .output()
+                .ok()
+        })
+        .map_or_else(
+            || "runtime listing unavailable".to_owned(),
+            |output| String::from_utf8_lossy(&output.stdout).into_owned(),
+        );
+    format!("root stderr:\n{root_stderr}\nruntime `ps -a` for the CID:\n{listing}")
 }
 
 /// Linux `/proc/<pid>/stat` start time, used to reject reuse after CID lookup.
@@ -1368,6 +1420,7 @@ fn ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker() {
         &worker,
         Duration::from_secs(5),
         "the interrupted topology Worker",
+        &stderr,
     );
 
     let rows = root.tl();
@@ -1449,7 +1502,12 @@ fn ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan() {
     );
     // The child was SIGKILLed by the supervisor and reaped by its observer —
     // the /proc oracle (see module docs): gone means gone.
-    wait_worker_stopped(&worker, Duration::from_secs(5), "the standalone Worker");
+    wait_worker_stopped(
+        &worker,
+        Duration::from_secs(5),
+        "the standalone Worker",
+        &stderr,
+    );
 
     let rows = root.tl();
     let worker_pid = expect_load_pid(&rows, "worker");
@@ -1506,6 +1564,7 @@ fn ac3_operator_door_unload_stops_a_live_worker_once() {
         &worker,
         Duration::from_secs(5),
         "the operator-unloaded Worker",
+        &root.stderr(),
     );
 
     let rows = root.tl();
@@ -1556,6 +1615,7 @@ fn ac4_v4b_grandchild_is_stopped_with_its_worker_container() {
         &worker,
         Duration::from_secs(5),
         "the descendant-holding Worker",
+        &root.stderr(),
     );
     assert!(
         !guard.still_ours(),
@@ -2144,6 +2204,7 @@ mod cohort {
             &worker_child,
             Duration::from_secs(5),
             "host B's hang Worker",
+            &stderr,
         );
 
         let rows = tl_rows(&fixture.host_b_log);
@@ -2349,6 +2410,7 @@ mod cohort {
             &worker,
             Duration::from_secs(5),
             "host B's descendant-holding Worker",
+            &stderr,
         );
         assert!(
             !guard.still_ours(),

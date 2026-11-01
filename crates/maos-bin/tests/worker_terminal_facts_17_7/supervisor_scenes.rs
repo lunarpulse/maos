@@ -643,19 +643,59 @@ async fn unexpected_client_echild_finalizer_first_persists_one_truncated_fault()
     assert_eq!(payload["container"]["removed"], true);
     assert_eq!(payload["container"]["residue"], serde_json::Value::Null);
 }
+
+const LEASE_CHILD: &str = "MAOS_17_7_LEASE_CHILD";
+/// Story 20-7 AC9: fail the scene's barrier at once (child only).
+const FORCE_BARRIER_FAIL: &str = "MAOS_20_7_FORCE_BARRIER_FAIL";
+
+/// Re-exec this test binary on the lease scene; the scene body runs only in the child.
+fn lease_scene_child(extra_env: &[(&str, &str)]) -> std::process::Output {
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
+        .args([
+            "--exact",
+            "supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease",
+            "--nocapture",
+        ])
+        .env(LEASE_CHILD, "1");
+    for (key, value) in extra_env {
+        command.env(key, value);
+    }
+    command.output().unwrap()
+}
+
+/// Story 20-7 AC9 (D-20-7-03 A): a failing barrier assertion unwinds through
+/// the live `WorkerBinding`'s drop, which must not panic a second time ("Cannot
+/// start a runtime from within a runtime", hosted run 41013625894).
+#[test]
+fn barrier_failure_unwinds_with_exactly_one_panic_20_7() {
+    let output = lease_scene_child(&[(FORCE_BARRIER_FAIL, "1")]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "the forced barrier failure must fail the child: {stderr}"
+    );
+    assert!(
+        stderr.contains("hang guard (20 s, forced)")
+            && stderr.contains("binding phase")
+            && stderr.contains("stub calls:"),
+        "the guard message carries phase and calls log: {stderr}"
+    );
+    assert!(
+        !stderr.contains("Cannot start a runtime from within a runtime"),
+        "binding drop must not block_on inside the runtime: {stderr}"
+    );
+    assert_eq!(
+        stderr.matches("panicked at").count(),
+        1,
+        "exactly one panic (the barrier's): {stderr}"
+    );
+}
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease() {
-    const CHILD: &str = "MAOS_17_7_LEASE_CHILD";
+    const CHILD: &str = LEASE_CHILD;
     if std::env::var_os(CHILD).is_none() {
-        let output = Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease",
-                "--nocapture",
-            ])
-            .env(CHILD, "1")
-            .output()
-            .unwrap();
+        let output = lease_scene_child(&[]);
         assert!(
             output.status.success(),
             "lease child failed: {}",
@@ -745,12 +785,21 @@ async fn binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease()
     // 18-0 AC4(b): a barrier on the stub's own `argv=<kill>` record (written
     // before its `sleep 30` gate), not a deadline. The 20 s timeout is a hang
     // guard only, kept inside the stub's 30 s gate so the pending-termination
-    // assertion below still observes a gated kill.
+    // assertion below still observes a gated kill. 20-7 AC9: the guard's
+    // message carries the stub calls log, the binding phase and the stop
+    // task's state; `FORCE_BARRIER_FAIL` fails it at once so the unwind can be
+    // witnessed (`barrier_failure_unwinds_with_exactly_one_panic_20_7`).
+    let forced = std::env::var_os(FORCE_BARRIER_FAIL).is_some();
     let hang_guard = Instant::now() + Duration::from_secs(20);
-    while !super::stub_scenes::calls(dir.path()).contains("argv=<kill>") {
+    while forced || !super::stub_scenes::calls(dir.path()).contains("argv=<kill>") {
         assert!(
-            Instant::now() < hang_guard,
-            "hang guard (20 s): the stub runtime never recorded the kill call"
+            !forced && Instant::now() < hang_guard,
+            "hang guard (20 s{}): the stub runtime never recorded the kill call; \
+             binding phase {:?}; stop task finished: {}; stub calls:\n{}",
+            if forced { ", forced" } else { "" },
+            binding.core().phase(),
+            stop.is_finished(),
+            super::stub_scenes::calls(dir.path())
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
     }

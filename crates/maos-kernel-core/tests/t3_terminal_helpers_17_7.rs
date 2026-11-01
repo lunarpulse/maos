@@ -500,6 +500,74 @@ esac
     assert!(!log.lines().any(|call| call == "rm"));
 }
 
+/// Story 20-7 AC7 (D-20-7-01 A, K1w): the first `inspect` stalls to the
+/// snapshot deadline while every later one reports `exited` (the hosted S3
+/// signature). Whatever the waiter/owner interleaving at the deadline,
+/// teardown must wait for the owner to publish and then remove the container.
+fn stalled_snapshot_instance(index: usize) -> Result<(), String> {
+    let temp = tempfile::tempdir().unwrap();
+    let (runtime, calls) = stub_runtime(
+        temp.path(),
+        r#"
+case "$1" in
+  kill) exit 0 ;;
+  inspect)
+    if mkdir "$LOG.first" 2>/dev/null; then exec sleep 30; fi
+    printf '{"Status":"exited","ExitCode":137,"OOMKilled":false,"Error":"","StartedAt":"zero","FinishedAt":"zero"}\n' ;;
+  rm) exit 0 ;;
+  container) exit 1 ;;
+esac
+"#,
+    );
+    let state_dir = temp.path().join("state");
+    fs::create_dir(&state_dir).unwrap();
+    let child = SandboxedContainerChild::adopt(runtime, format!("{index:064x}"), &state_dir);
+    let terminal = Arc::clone(child.terminal());
+    let observer = {
+        let terminal = Arc::clone(&terminal);
+        std::thread::spawn(move || terminal.facts())
+    };
+    let until = Instant::now() + Duration::from_secs(5);
+    while !fs::read_to_string(&calls)
+        .unwrap_or_default()
+        .lines()
+        .any(|call| call == "inspect")
+    {
+        if Instant::now() >= until {
+            return Err(format!("instance {index}: observer never entered inspect"));
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let verdict = terminal.teardown(Instant::now() + Duration::from_secs(20));
+    observer.join().unwrap();
+    let log = fs::read_to_string(&calls).unwrap_or_default();
+    let removed = log.lines().any(|call| call == "rm");
+    if verdict != Ok(()) || !removed || state_dir.exists() {
+        return Err(format!(
+            "instance {index}: verdict {verdict:?}, rm called {removed}, state dir kept {}",
+            state_dir.exists()
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn teardown_waits_for_a_stalled_snapshot_owner_then_removes_the_container_20_7() {
+    const INSTANCES: usize = 20;
+    let workers: Vec<_> = (0..INSTANCES)
+        .map(|index| std::thread::spawn(move || stalled_snapshot_instance(index)))
+        .collect();
+    let failures: Vec<String> = workers
+        .into_iter()
+        .filter_map(|worker| worker.join().unwrap().err())
+        .collect();
+    assert!(
+        failures.is_empty(),
+        "{} of {INSTANCES} instances skipped removal: {failures:#?}",
+        failures.len()
+    );
+}
+
 #[test]
 fn pidfd_reports_non_child_exit_status_signals_and_live_absence() {
     if !require_pidfd_exit() {

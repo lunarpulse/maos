@@ -30,7 +30,7 @@ them in its JSON report, even when no invariant was changed.
   disclose that no complete property/adversarial pair has been established.
 - The ledger owner owns the claim classification; it does not silently create
   a new implementation story. All broad invariants currently remain asserted.
-  I5 separately records **FR13 asserted, owner 20-1** and **FR31 proven by
+  I5 separately records **FR13 asserted, owner 20-1b-vetting-yank-policy-and-quarantine** and **FR31 proven by
   20-3b** (cross-boot adversarial vectors in `principal_identity_20_3b.rs` and
   `butler_scene_18_4.rs`). Principal isolation does not prove quarantine isolation.
   The landing verifier must exercise these new vectors; metadata is not execution evidence.

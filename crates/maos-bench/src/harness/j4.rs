@@ -33,7 +33,10 @@ use crate::report::JourneyResult;
 
 /// §13.1 Mira-Nash Observer colocation-latency P95 budget (10ms). Its authority
 /// is the §13.1 floor, not a mirror test — so it is not re-asserted by a test.
-const J4_P95_BUDGET_US: u64 = 10_000;
+/// Read from the one budget file (`j4-scalar-tap-p95`).
+fn j4_p95_budget_us() -> u64 {
+    crate::budgets::budget_us("j4-scalar-tap-p95")
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum BenchError {
@@ -95,7 +98,7 @@ pub fn run_j4_smoke_with_count(invocation_count: u64) -> JourneyResult {
     let samples: Vec<u64> = (0..invocation_count)
         .map(|i| 1000 + (i * 20) % 5000)
         .collect();
-    build_journey_result("J4", invocation_count, &samples, J4_P95_BUDGET_US)
+    build_journey_result("J4", invocation_count, &samples, j4_p95_budget_us())
 }
 
 /// Smoketest-mode J4 measurement: 50 invocations for CI-fast verification.
@@ -264,7 +267,7 @@ fn run_j4_kernel(config: &J4Config) -> Result<JourneyResult, BenchError> {
             "J4",
             config.invocation_count,
             &latency_samples,
-            J4_P95_BUDGET_US,
+            j4_p95_budget_us(),
         ))
     })
 }

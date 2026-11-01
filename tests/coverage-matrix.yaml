@@ -368,7 +368,7 @@ coverage:
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
-    notes: asserted, owner 20-1; FR13 quarantine isolation is not proven by the FR31 principal-memory witness.
+    notes: asserted, owner 20-1b-vetting-yank-policy-and-quarantine; FR13 quarantine isolation is not proven by the FR31 principal-memory witness.
   FR14:
     gates: []
     corpora: []
@@ -1378,40 +1378,67 @@ coverage:
       manifest-team enumeration plus the RPO ≤1h / RTO ≤4h schedule remains an
       operator obligation and is not claimed by this hermetic leg.
   NFR-Perf-1:
-    gates: [check-j4-latency]
+    gates: [nfr-perf-1-iac-routing]
     corpora: []
+    bench:
+      - iac_routing_budget
     phase: v0.5
     valid_until: '2027-05-12'
     notes: >
-      Story 10.4c adds check-j4-latency — real in-kernel scalar.tap
-      colocation-latency P95 ≤ 10ms gate (§13.1). Advisory at v1.0,
-      blocking at v1.5.
+      Story 20-7 AC4/AC12.3 — its own metric rows `nfr-perf-1-iac-routing-p50` /
+      `-p99` (P50 < 5 ms, P99 < 50 ms; `iac_routing_budget` bench), no longer
+      `check-j4-latency` (J4 scalar.tap telemetry delivery, a §13.1 row). Tier W,
+      shadow until ADR-068 §7.3.
   NFR-Perf-2:
-    gates: []
+    gates: [nfr-perf-2-iac-throughput]
     corpora: []
+    bench:
+      - iac_throughput_nfr_perf_2
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: >
+      Story 20-7 AC4 — sustained frames/s bench (`xtask/perf-budgets.toml`
+      `nfr-perf-2-iac-throughput`, >= 5,000 frames/s). Tier W, shadow until ADR-068 §7.3.
   NFR-Perf-3:
     gates:
       - cap_token_verify_assertion
+      - nfr-perf-3-cap-token-verify
+      - check-perf-counts
     corpora: []
     bench:
       - cap_token_verify_p99
     phase: v0.1
     valid_until: '2027-05-12'
     notes: |
-      Story 1b.2 lands the lock-free shard-ring verify path with P99 <5us (ADR-030)
-      and the strict NFR-Perf-3 <100us assertion test.
+      Story 1b.2 lands the lock-free shard-ring verify path (ADR-030) and the NFR-Perf-3
+      <100us assertion test. Story 20-7 (D-20-7-04 A) moves ADR-030's 5us hot-path
+      claim to where it can be measured: Tier C instruction/allocation counts per
+      pull request (`check-perf-counts`, rows `cap-token-verify-*`) and a Tier W P99
+      row (`adr-030-cap-token-verify-p99`) on the stable runner. The hosted test
+      keeps NFR-Perf-3's 100us as a named catastrophe guard and times verify + audit
+      enqueue.
   NFR-Perf-4:
-    gates: []
+    gates: [nfr-perf-4-posture-shift]
     corpora: []
+    bench:
+      - posture_shift_nfr_perf_4
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: >
+      Story 20-7 AC4 — the 1000-shift posture corpus bench (FR16): P99 <= 2 s,
+      P99.9 <= 5 s from `xtask/perf-budgets.toml`. Tier W, shadow until ADR-068 §7.3.
   NFR-Perf-5:
-    gates: []
+    gates: [nfr-perf-5-audit-query]
     corpora: []
+    bench:
+      - audit_query_latency
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: >
+      Story 20-7 AC4 — a 30-day-sized audit fixture: single-Spirit P99 <= 2 s and
+      global P99 <= 10 s. NOT claimed: the production WASM `recall` route's separate
+      latency leg (R17-154/157) — owed by 20-7 landing 2 (blocker: no WASM guest
+      harness for benches); asserted only for the CLI audit-query path.
   NFR-Perf-6:
     gates: [nfr-perf-6-hook-dispatch-envelope]
     corpora: []
@@ -1425,15 +1452,29 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Perf-7:
-    gates: []
+    gates: [nfr-perf-7-hot-swap]
     corpora: []
+    bench:
+      - hot_swap_latency
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: >
+      Story 20-7 AC4/AC12.3 — `crates/maos-kernel-core/benches/hot_swap_latency.rs`
+      is wired: its `budget_leg` reports `nfr-perf-7-hot-swap-p99` (500 ms) and
+      `hot-path-hot-swap-inproc-p99` (50 ms) against `xtask/perf-budgets.toml`.
+      Tier W on the stable runner, shadow (advisory) until ADR-068 §7.3.
   NFR-Perf-8:
-    gates: []
+    gates: [nfr-perf-8-real-spawn-fanout]
     corpora: []
+    bench:
+      - nfr_perf_8_real_spawn_fanout_20_7
     phase: v0.8
     valid_until: '2027-05-12'
+    notes: >
+      Story 20-7 AC6 — 50 real T3 Workers through the real WorkerSupervisor
+      (`crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs`; hosted smoke
+      5 Workers / 60 s, weekly 1 h soak on Tier W). The in-process dispatch bench
+      `orchestrator_inproc_dispatch` is NOT this claim.
   NFR-Rel-1:
     gates: []
     corpora: []

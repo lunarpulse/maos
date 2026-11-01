@@ -122,6 +122,11 @@ const EXPECTED_GATES: &[&str] = &[
     // the same change, so this const can only red on a real absence.
     "check-test-cost",
     "check-test-budget",
+    // Story 20-7 — the stable-runner policy and Tier C counts. Enrolled LAST
+    // (15-3 reason above): the discipline jobs and both registry rows landed in
+    // the same change.
+    "check-perf-runner-policy",
+    "check-perf-counts",
 ];
 
 /// Explicit cadence enrolments: (registry name, workflow filename, job key).
@@ -553,7 +558,7 @@ jobs:
     /// Real-tree reconciliation includes the formerly exempt infrastructure
     /// gates and the previously registry-only fuzz gates, with no legacy list.
     #[test]
-    fn expected_gates_and_registry_are_one_set_of_45() {
+    fn expected_gates_and_registry_are_one_set_of_47() {
         // Unit tests run with CWD = the crate root, not the workspace root.
         let registry_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml");
         let registry: crate::corpus_types::ShipGateRegistry =
@@ -564,9 +569,9 @@ jobs:
             .map(|e| e.name.as_str())
             .collect();
         let expected: std::collections::HashSet<&str> = EXPECTED_GATES.iter().copied().collect();
-        assert_eq!(EXPECTED_GATES.len(), 45);
-        assert_eq!(expected.len(), 45, "duplicate expected gate");
-        assert_eq!(registry.ship_gates.len(), 45, "duplicate registry gate");
+        assert_eq!(EXPECTED_GATES.len(), 47);
+        assert_eq!(expected.len(), 47, "duplicate expected gate");
+        assert_eq!(registry.ship_gates.len(), 47, "duplicate registry gate");
         assert_eq!(names, expected);
     }
 }

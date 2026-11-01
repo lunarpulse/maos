@@ -2,22 +2,28 @@
 
 //! audit_query_latency — Criterion benchmark for `maos_audit::query()` read-path latency.
 //!
-//! Seeds a temp-file SQLite with 12 000 Transparency-Log rows across 5 spirits,
+//! Seeds a temp-file SQLite with 100 000 Transparency-Log rows across 5 spirits,
 //! 30 days of nanosecond timestamps, and all relevant frame kinds, then measures
-//! both single-spirit filtered queries and global (unfiltered) 30-day scans.
+//! both single-spirit filtered queries and global (unfiltered) 30-day scans, and
+//! (Story 20-7) reports NFR-Perf-5's P99 rows against `xtask/perf-budgets.toml`.
 //!
 //! Run:
 //!   cargo bench -p maos-bench --bench audit_query_latency
 //!   cargo bench -p maos-bench --bench audit_query_latency -- --test
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use maos_audit::{query, AuditFilter};
+use maos_bench::budgets;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
 // ── Fixture constants ──────────────────────────────────────────────────
 
-const ROW_COUNT: usize = 12_000;
+/// A 30-day window sized for the NFR-Perf-5 claim (an opening size: the shadow
+/// phase's real ledger volume replaces it, ADR-068 §7.2).
+const ROW_COUNT: usize = 100_000;
+const SINGLE_SAMPLES: usize = 100;
+const GLOBAL_SAMPLES: usize = 20;
 const SPIRIT_PIDS: [u32; 5] = [1001, 1002, 1003, 1004, 1005];
 const FRAME_KINDS: [i64; 5] = [7, 11, 17, 19, 22]; // CapabilityInvocation, Distillate, SpiritRevoked, SpiritAdmitted, ConsentRupture
 const INTENTS: &[&str] = &[
@@ -279,4 +285,50 @@ criterion_group!(
     bench_global_query,
     bench_kind_filtered_query,
 );
-criterion_main!(benches);
+
+/// Quantile (per-mille) of nanosecond samples, in microseconds.
+fn quantile_us(mut samples_ns: Vec<u64>, per_mille: usize) -> f64 {
+    samples_ns.sort_unstable();
+    let rank = (samples_ns.len() * per_mille)
+        .div_ceil(1000)
+        .clamp(1, samples_ns.len());
+    samples_ns[rank - 1] as f64 / 1_000.0
+}
+
+/// Story 20-7 AC4 — NFR-Perf-5's own quantiles on the 30-day-sized fixture:
+/// single-Spirit P99 <= 2 s and global P99 <= 10 s, budgets from
+/// `xtask/perf-budgets.toml`. `false` only on a breach of a binding row.
+fn budget_leg() -> bool {
+    let (_dir, db_path) = seed_fixture();
+    let time = |filter: &AuditFilter| {
+        let start = std::time::Instant::now();
+        black_box(query(&db_path, filter.clone()).expect("query"));
+        start.elapsed().as_nanos() as u64
+    };
+    let single: Vec<u64> = (0..SINGLE_SAMPLES)
+        .map(|i| {
+            time(&AuditFilter {
+                spirit_pid: Some(SPIRIT_PIDS[i % SPIRIT_PIDS.len()]),
+                ..Default::default()
+            })
+        })
+        .collect();
+    let global: Vec<u64> = (0..GLOBAL_SAMPLES)
+        .map(|_| time(&AuditFilter::default()))
+        .collect();
+    let mut within = budgets::report(
+        "nfr-perf-5-audit-query-single-p99",
+        quantile_us(single, 990),
+    );
+    within &= budgets::report(
+        "nfr-perf-5-audit-query-global-p99",
+        quantile_us(global, 990),
+    );
+    within
+}
+
+fn main() -> std::process::ExitCode {
+    benches();
+    Criterion::default().configure_from_args().final_summary();
+    budgets::finish(budget_leg())
+}

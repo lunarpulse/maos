@@ -641,6 +641,83 @@ jobs:
         if: ${{ !cancelled() }}
         run: cargo test -p xtask --test check_test_budget_proven_red
 
+  # Story 20-7 AC2 (ADR-068 §4) — the stable performance runner only ever runs
+  # trusted code. `.github/workflows/perf.yml` is the only workflow that may
+  # target the `maos-perf` label, on `push` to main / `schedule` /
+  # `workflow_dispatch` / same-repository `pull_request` only (never
+  # `pull_request_target`), behind the job-level fork guard, holding exactly
+  # `permissions: contents: read`. Hermetic (reads the committed workflows) and
+  # BLOCKING at every phase: this is the only thing between a fork pull request
+  # and code execution on the perf host. The four plants run in the same job.
+  check-perf-runner-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-perf-runner-policy
+        run: cargo run -p xtask -- check-perf-runner-policy --json
+      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
+      - name: Run the 20-7 proven-red vectors
+        if: ${{ !cancelled() }}
+        run: cargo test -p xtask --test perf_gates_20_7
+
+  # Story 20-7 AC5 (ADR-068 §1, D-20-7-07 A) — Tier C: deterministic instruction
+  # and allocation counts for the CPU-bound hot paths (capability-token verify,
+  # IAC routing, frame lowering), on every pull request, GitHub-hosted and
+  # fork-safe (no secret, no write token, no self-hosted runner). The harness
+  # `tier_c_harness` runs each path under `valgrind --tool=callgrind
+  # --toggle-collect=maos_tier_c_measured` (instructions, minus the empty path)
+  # and reports allocations from its counting allocator; `check-perf-counts`
+  # compares both with the baselines committed in `xtask/perf-budgets.toml`
+  # (allocation rows blocking; instruction rows advisory until the first hosted
+  # callgrind baseline is committed). A deliberate change re-baselines in the
+  # same commit with the measured figure and the reason. Toolchain, OS and
+  # valgrind changes are re-baseline events (ADR-068 §6).
+  check-perf-counts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: perf-counts-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install valgrind
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends valgrind
+      - name: Build the Tier C harness
+        run: cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness
+      - name: Measure instruction and allocation counts per hot path
+        run: |
+          set -euo pipefail
+          mkdir -p tier-c
+          harness="$PWD/target/debug/tier_c_harness"
+          measure() {
+            valgrind --tool=callgrind --toggle-collect=maos_tier_c_measured \
+              --callgrind-out-file="tier-c/$1.callgrind" "$harness" "$1" "$2" \
+              > "tier-c/$1.json" 2> "tier-c/$1.valgrind.log"
+          }
+          measure empty 0
+          measure cap_token_verify 10000
+          measure iac_routing 2000
+          measure frame_lowering 10000
+      - name: Compare with the committed baselines
+        run: cargo run --locked -p xtask -- check-perf-counts --dir tier-c --json
+      - name: Upload the counts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier-c-counts
+          path: tier-c
+          if-no-files-found: error
+
   # Story 20-12 AC2 — the ONE job that runs the registered expensive tests:
   # exactly the `xtask/test-budgets.toml [[expensive]]` rows whose `job` is
   # `expensive-tests`, restricted to their `#[ignore = "expensive: …"]` tests
@@ -2185,7 +2262,7 @@ jobs:
       CARGO: /bin/false
       MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
       MAOS_FIXTURE_TRANSPORT: '1'
-      EPIC17_TERMINAL_SUITE_TESTS: 32
+      EPIC17_TERMINAL_SUITE_TESTS: 33
       EPIC17_TERMINAL_REQUIRED_TESTS: |
         root_crash::root_crash_retains_stopped_container_and_purge_reports_it
         runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
@@ -3034,9 +3111,9 @@ jobs:
       - name: Run J4 latency regression bench
         run: cargo bench -p maos-bench --bench j4_latency_regression --features kernel_measurement -- --quick
 
-  # Story 6.2 AC3 — NFR-Perf-8: 50-concurrent Worker fan-out / 10 tasks/sec
-  # sustained / P99 ≤500ms / 0 dropped. CI-quick mode runs 60s; the full 1h
-  # is gated to weekly schedule.
+  # Story 6.2 AC3, renamed by 20-7 AC4 — IN-PROCESS IAC dispatch under fan-out
+  # load (15 s window). NOT NFR-Perf-8: that is the real-spawn bench
+  # (`nfr_perf_8_real_spawn_fanout_20_7`, weekly 1 h on Tier W in perf.yml).
   nfr-perf-8-orchestrator-fanout:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -3049,10 +3126,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run orchestrator-fanout NFR-Perf-8 bench (CI-quick)
-        env:
-          MAOS_BENCH_CI_QUICK: "1"
-        run: cargo bench -p maos-bench --bench orchestrator_fanout_nfr_perf_8 --features kernel_measurement -- --quick
+      - name: Run the in-process dispatch smoke (renamed from orchestrator_fanout_nfr_perf_8, 20-7 AC4; NOT an NFR-Perf-8 claim)
+        run: cargo bench -p maos-bench --bench orchestrator_inproc_dispatch --features kernel_measurement -- --quick
 
   # Story 6.2 AC4 — NFR-Aud-14: 100% intent_lineage coverage on cross-Spirit
   # IAC frames + distillate re-emission + retract continuity. The corpus is
@@ -6259,6 +6334,8 @@ jobs:
       - workspace-test-suite
       - check-test-cost
       - check-test-budget
+      - check-perf-runner-policy
+      - check-perf-counts
       - one-daemon-one-door
       - j0-scene
       - maosctl-load-over-the-door
@@ -6305,6 +6382,8 @@ jobs:
           echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo nextest run --workspace --locked --no-fail-fast --profile ci |"
           echo "| check-test-cost | ${{ needs.check-test-cost.result }} | cargo run -p xtask -- check-test-cost |"
           echo "| check-test-budget | ${{ needs.check-test-budget.result }} | cargo run -p xtask -- check-test-budget --junit <workspace junit> |"
+          echo "| check-perf-runner-policy | ${{ needs.check-perf-runner-policy.result }} | cargo run -p xtask -- check-perf-runner-policy |"
+          echo "| check-perf-counts | ${{ needs.check-perf-counts.result }} | cargo run -p xtask -- check-perf-counts --dir tier-c |"
           echo "| one-daemon-one-door | ${{ needs.one-daemon-one-door.result }} | cargo test -p maos-bin --test one_daemon_one_door_16_1 |"
           echo "| j0-scene | ${{ needs.j0-scene.result }} | cargo test -p maos-journey-test --test journey_j0 |"
           echo "| maosctl-load-over-the-door | ${{ needs.maosctl-load-over-the-door.result }} | cargo test -p maos-bin --test maosctl_load_16_6 |"
@@ -6346,6 +6425,8 @@ jobs:
           echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
           echo "  check-test-cost: ${{ needs.check-test-cost.result }}"
           echo "  check-test-budget: ${{ needs.check-test-budget.result }}"
+          echo "  check-perf-runner-policy: ${{ needs.check-perf-runner-policy.result }}"
+          echo "  check-perf-counts: ${{ needs.check-perf-counts.result }}"
           echo "  one-daemon-one-door: ${{ needs.one-daemon-one-door.result }}"
           echo "  j0-scene: ${{ needs.j0-scene.result }}"
           exit 1

@@ -1,8 +1,13 @@
 //! Criterion bench for cap-token verify hot path.
 //!
-//! ADR-030 ship gate: P99 < 5µs.
+//! ADR-030 hot-path claim (P99 < 5µs) and NFR-Perf-3 (P99 < 100µs): rows of
+//! `xtask/perf-budgets.toml`, judged on the stable runner (Tier W) and, as
+//! instruction/allocation counts, on every pull request (Tier C).
 
-use criterion::{criterion_group, criterion_main, Criterion};
+#[path = "../../maos-bench/src/budgets.rs"]
+mod budgets;
+
+use criterion::{criterion_group, Criterion};
 use std::sync::Arc;
 
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
@@ -83,4 +88,34 @@ fn bench_cap_token_verify(c: &mut Criterion) {
 }
 
 criterion_group!(benches, bench_cap_token_verify);
-criterion_main!(benches);
+
+/// Story 20-7 D-20-7-04 A: the stable runner's own P99 of `verify` carries the
+/// ADR-030 5 µs hot-path claim and NFR-Perf-3's 100 µs, both rows of
+/// `xtask/perf-budgets.toml`.
+fn budget_leg() -> bool {
+    init_monotonic_base();
+    let ring = make_test_ring();
+    let token = make_test_token(&ring);
+    let posture = [1u8; 32];
+    for _ in 0..5_000 {
+        ring.verify(&token, posture, SandboxTier(2)).unwrap();
+    }
+    let mut samples: Vec<u64> = (0..100_000)
+        .map(|_| {
+            let start = std::time::Instant::now();
+            ring.verify(&token, posture, SandboxTier(2)).unwrap();
+            start.elapsed().as_nanos() as u64
+        })
+        .collect();
+    samples.sort_unstable();
+    let p99_us = samples[samples.len() * 99 / 100 - 1] as f64 / 1_000.0;
+    let mut within = budgets::report("adr-030-cap-token-verify-p99", p99_us);
+    within &= budgets::report("nfr-perf-3-cap-token-verify-p99", p99_us);
+    within
+}
+
+fn main() -> std::process::ExitCode {
+    benches();
+    Criterion::default().configure_from_args().final_summary();
+    budgets::finish(budget_leg())
+}

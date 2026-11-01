@@ -175,7 +175,7 @@ fn committed_ledger_covers_all_fourteen_and_keeps_requirement_ownership() -> Res
     let memory = claims.get("I5").ok_or("I5 missing")?;
     assert_eq!(
         memory.requirement_claims.get("FR13").map(String::as_str),
-        Some("asserted, owner 20-1")
+        Some("asserted, owner 20-1b-vetting-yank-policy-and-quarantine")
     );
     assert_eq!(
         memory.requirement_claims.get("FR31").map(String::as_str),

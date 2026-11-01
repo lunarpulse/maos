@@ -1,0 +1,186 @@
+name: perf
+
+# Story 20-7 AC2 (ADR-068 §4–§7) — the ONLY workflow that may target the stable
+# performance runner `maos-perf` (`check-perf-runner-policy` enforces that in
+# `discipline.yml`, blocking).
+#
+# Tier W: wall-clock latency and throughput against the budgets of
+# `xtask/perf-budgets.toml`, on trusted code only. Triggers: `push` to `main`,
+# `schedule`, `workflow_dispatch` and `pull_request` — the last only behind the
+# job-level same-repository guard, so a fork's code never reaches the host
+# (never `pull_request_target`). The host job holds `permissions: contents:
+# read` and reads no secret; results leave as an artifact and the GitHub-hosted
+# `append` job (the only job with a write token) appends them to the
+# `perf-ledger` branch.
+#
+# SHADOW MODE (ADR-068 §7.2): every Tier W row is `advisory`; the run records
+# verdicts and blocks nothing. Both host jobs additionally need the repository
+# variable `MAOS_PERF_RUNNER_ENABLED=true`, set by the operator when
+# `ops-stable-perf-runner` is done (until then no job queues for a runner that
+# does not exist; the absence reads ABSENT in the ledger, never green).
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Nightly Tier W.
+    - cron: '17 3 * * *'
+    # Weekly one-hour NFR-Perf-8 real-spawn soak (Sunday).
+    - cron: '7 1 * * 0'
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-runner
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  tier-w:
+    # Same-repository guard: `maos-perf` never runs a fork's code.
+    if: ${{ vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule != '7 1 * * 0' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: [self-hosted, maos-perf]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          ref: perf-ledger
+          path: perf-ledger
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Fingerprint (ADR-068 §5)
+        id: fingerprint
+        run: |
+          {
+            grep -m1 'model name' /proc/cpuinfo
+            grep -m1 'microcode' /proc/cpuinfo
+            for f in /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor /sys/devices/system/cpu/smt/control /sys/devices/system/cpu/intel_pstate/no_turbo /sys/devices/system/cpu/cpufreq/boost /sys/kernel/mm/transparent_hugepage/enabled; do
+              state=absent
+              if [ -r "$f" ]; then state="$(cat "$f")"; fi
+              printf '%s=%s\n' "$f" "$state"
+            done
+            tr ' ' '\n' < /proc/cmdline | grep -E '^(isolcpus|nohz_full|rcu_nocbs)='
+            uname -r
+            rustc -V
+            grep -m1 MemTotal /proc/meminfo
+            for d in /sys/block/nvme*; do
+              printf '%s model=%s firmware=%s\n' "$d" "$(cat "$d"/device/model 2>/dev/null)" "$(cat "$d"/device/firmware_rev 2>/dev/null)"
+            done
+          } | tee fingerprint.txt
+          echo "hash=$(sha256sum fingerprint.txt | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Calibration — fixed CPU and fsync workloads, 30 timings each (ADR-068 §5)
+        run: |
+          mkdir -p results/logs
+          cargo run --release --locked -p xtask -- perf-calibrate \
+            --sha "$GITHUB_SHA" --fingerprint "${{ steps.fingerprint.outputs.hash }}" \
+            --reference perf-ledger/ledger.jsonl > results/calibration.json
+      - name: Each benchmark five times, as separate processes, after warm-up
+        run: |
+          set -euo pipefail
+          bench_all() {
+            local log="$1"
+            for bench in iac_routing_budget iac_throughput_nfr_perf_2 posture_shift_nfr_perf_4 audit_query_latency j1_bridge_latency j4_latency_regression orchestrator_inproc_dispatch; do
+              cargo bench --locked -p maos-bench --features kernel_measurement --bench "$bench" 2>&1 | tee -a "$log-maos-bench.log"
+            done
+            for bench in cap_token_verify_p99 hot_path_budgets hot_swap_latency; do
+              cargo bench --locked -p maos-kernel-core --bench "$bench" 2>&1 | tee -a "$log-kernel.log"
+            done
+          }
+          # Warm-up pass (page cache, CPU state): discarded, never in the ledger.
+          bench_all results/warmup
+          for run in 1 2 3 4 5; do
+            bench_all "results/logs/run-$run"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: perf-results
+          path: results
+          if-no-files-found: error
+
+  tier-w-soak:
+    # NFR-Perf-8: 50 real T3 Workers through the real WorkerSupervisor, 10
+    # tasks/s, one hour. Weekly only; needs rootless podman + the signed T3
+    # image lock on the host (operator prerequisite O4).
+    if: ${{ vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule == '7 1 * * 0' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: [self-hosted, maos-perf]
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: One-hour real-spawn fan-out
+        run: |
+          mkdir -p results/logs
+          cargo run --locked -p xtask -- build-test-fixtures
+          MAOS_20_7_FANOUT=soak cargo test --locked -p maos-bin --test nfr_perf_8_real_spawn_fanout_20_7 -- --nocapture 2>&1 | tee results/logs/run-1-soak.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: perf-soak
+          path: results
+          if-no-files-found: error
+
+  append:
+    # The only job holding a write token, and it runs on a GitHub-hosted runner:
+    # the perf host never holds one (ADR-068 §4). Never for a pull request.
+    needs: [tier-w]
+    if: ${{ github.event_name != 'pull_request' && needs.tier-w.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      # The collector fails loudly when the branch is missing (ADR-068 §6).
+      - uses: actions/checkout@v5
+        with:
+          ref: perf-ledger
+          path: perf-ledger
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/download-artifact@v4
+        with:
+          name: perf-results
+          path: results
+      - name: Append the run to the ledger
+        run: |
+          cargo run --locked -p xtask -- perf-ledger-append \
+            --ledger perf-ledger/ledger.jsonl --logs results/logs \
+            --calibration results/calibration.json \
+            --sha "$GITHUB_SHA" --branch "${GITHUB_REF_NAME}" \
+            --fingerprint "$(jq -r .fingerprint results/calibration.json)"
+          cd perf-ledger
+          git config user.name "maos-perf-ledger"
+          git config user.email "maos-perf-ledger@users.noreply.github.com"
+          git add ledger.jsonl
+          git commit -m "perf: $GITHUB_SHA"
+          git push origin HEAD:perf-ledger
+
+  ledger-staleness:
+    # ADR-068 §6: a dead machine is loud, never green — red when the newest
+    # ledger entry is older than 48 hours. Hosted; reads only.
+    if: ${{ vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          ref: perf-ledger
+          path: perf-ledger
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Newest ledger entry is at most 48 hours old
+        run: cargo run --locked -p xtask -- check-perf-verdict --stale-check --ledger perf-ledger/ledger.jsonl

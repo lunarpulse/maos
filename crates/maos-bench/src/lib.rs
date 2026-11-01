@@ -24,6 +24,7 @@
 //!
 //! Every module in this crate follows ADR-039: `#![forbid(unsafe_code)]`.
 
+pub mod budgets;
 pub mod decision;
 pub mod distill_eval;
 #[cfg(any(test, feature = "fixture_replay"))]

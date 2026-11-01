@@ -70,6 +70,12 @@ optional = true
 name = "section_13_1_run"
 path = "src/bin/section_13_1_run.rs"
 
+# Story 20-7 AC5 — the Tier C harness (instruction + allocation counts).
+[[bin]]
+name = "tier_c_harness"
+path = "src/bin/tier_c_harness.rs"
+required-features = ["kernel_measurement"]
+
 [[bench]]
 name = "section_13_1"
 harness = false
@@ -84,10 +90,29 @@ name = "iac_routing_budget"
 harness = false
 required-features = ["kernel_measurement"]
 
-# Story 6.2 AC3 — NFR-Perf-8 orchestrator fan-out bench
-# (50 concurrent Workers / 10 tasks/sec / 1h sustained / P99 ≤500ms / 0 dropped).
+# Story 6.2 AC3, renamed by Story 20-7 AC4 — IN-PROCESS IAC dispatch under
+# fan-out load (50 in-process task handles, 10 tasks/sec). NOT NFR-Perf-8: that
+# is the real-spawn bench `crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs`.
 [[bench]]
-name = "orchestrator_fanout_nfr_perf_8"
+name = "orchestrator_inproc_dispatch"
+harness = false
+required-features = ["kernel_measurement"]
+
+# Story 20-7 AC4 — NFR-Perf-2 sustained IAC frame throughput.
+[[bench]]
+name = "iac_throughput_nfr_perf_2"
+harness = false
+required-features = ["kernel_measurement"]
+
+# Story 20-7 AC3 — J1 through the real bridge: strict P95 + catastrophe guard rows.
+[[bench]]
+name = "j1_bridge_latency"
+harness = false
+required-features = ["kernel_measurement"]
+
+# Story 20-7 AC4 — NFR-Perf-4 1000-shift posture corpus (FR16).
+[[bench]]
+name = "posture_shift_nfr_perf_4"
 harness = false
 required-features = ["kernel_measurement"]
 

@@ -1,18 +1,20 @@
 ---
-story_id: '20.1'
-story_key: 20-1-registry-client-install-verb-vetter-and-yank
+story_id: '20.1a'
+story_key: 20-1a-registry-publish-install-exit-path
 created: 2026-11-01
 context_commit: a4c00897
 baseline_commit: a4c00897
 security_sensitive: true
-kernel_grant: "◆ FLAG-Winston PROPOSED, NOT GRANTED (D04 A RULED 2026-10-30: real FR13 isolation in 20-1). Recommended row R = KQ1 sticky quarantine (D-20-1-02 A) + P poller edge-trigger (D-20-1-03 A), measured by reverted prototype +78 physical / +68 tokei from 26801 / 21011 (of which +40 / +40 is the rustfmt churn any `revocation/applier.rs` edit pays, control `fmt0`). Proposed ceilings (D02 A, ×2 measured): kernel ≤ 26957 physical / 21147 tokei; STOP above; pins re-fixed exactly at landing. ADR-069 (`docs/adr/ADR-069-kernel-core-envelope-through-v1.md:35-46`): measured 21079 is 921 under the 22000 alarm; ceiling 21147 is 853 under; no ENVELOPE ALARM row. Alternatives priced: R′ = KQ2 + P +79 / +69 (+ maos-iac +24, maos-domain +2); Rmin = KQ0 + P +53 / +49; non-kernel B maos-bin +43, kernel 0 (does not make FR13 quarantine real)."
-kloc_grant: "PROPOSED, NOT RULED (D-20-1-11 A; D02 A ×2 measured / ×3 unmeasured upper). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): kernel ≤ 26957 / 21147; maos-registry ≤ 5163; maos-spirit-cli ≤ 2043; maos-cli ≤ 6666 (above its 6382 STOP; reserved pin 6856 unchanged); maos-bin ≤ 34410; maos-shell ≤ 728; maos-compliance ≤ 2122; maos-domain ≤ 10153; xtask ≤ 42920; aggregate ≤ 193768. Under D-20-1-01 B each split key asks its own part (§Kernel and kloc pricing)."
+kernel_grant: "none for 20-1a: kernel-free (AC1–AC5). The FLAG-Winston row R (D-20-1-02 A KQ1 + D-20-1-03 A P; measured +78 physical / +68 tokei from HEAD 26801 / 21011; ceilings kernel ≤ 26957 / 21147) is granted to 20-1b only, which lands last; the interaction with 20-7's row R is recorded in 20-1b's kernel_grant (cumulative tokei ≤ 21209, else STOP)."
+kloc_grant: "RULED 2026-11-01/02 (ask rows201; D-20-1-11 A; D02 A ×2 measured / ×3 unmeasured). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): maos-registry ≤ 5163; maos-spirit-cli ≤ 2043; maos-cli ≤ 6666 (above its 6382 STOP; inside the reserved 6856 pin, D-20-1-05 A); maos-bin ≤ 34410; maos-shell ≤ 728; maos-compliance ≤ 2122; maos-domain ≤ 10153; xtask ≤ 42920; aggregate ≤ 193768. The kernel ceiling 26957 / 21147 is 20-1b's (see kernel_grant)."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): a kernel FLAG-Winston grant (D-20-1-02/03), signatures and supply-chain trust (AC6, AC7, AC10), cross-Spirit isolation (AC11). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC6/AC7/AC10/AC11, Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
-# Story 20.1: Registry client, install verb, vetter and yank
+# Story 20.1a: Registry publish, install and exit path
 
 Status: ready-for-dev
+
+<!-- Split 2026-11-01/02 under operator ruling D-20-1-01 B (ask split201): Part B (AC6–AC13) and Tasks T6–T10 moved unchanged to `20-1b-vetting-yank-policy-and-quarantine.md`. 20-1 is retired; shared evidence stays in `20-1-registry-client-install-verb-vetter-and-yank-evidence/`. -->
 
 <!-- Created 2026-11-01 at a4c00897 (= 77f7276a, 20-3c's final landing, + one docs commit; `git log -1 -- crates xtask` = a4c00897) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D03 A, D04 A (2026-10-30). D09, D12 (preflight §5) and D-20-1-01…11 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran (parent rule): cites re-read at HEAD (`creation/cites-a4c00897.md`); kernel and kloc by the prebuilt gate binary run from `git archive` copies; exit lines 2, 4, 5, 7, 8, 9 and the daemon registry arm measured on the prebuilt HEAD binaries in an isolated home (`creation/runtime/`). Stale E20 §20-1 cites are corrected through `creation/records-owed.md` (E20 is a shared file; OLD→NEW in `creation/cites-a4c00897.md` C1–C33, X1–X10). -->
 
@@ -149,9 +151,17 @@ Under D-20-1-01 A, L1 and L2 (kernel-free) land first and lower nothing; L3 asks
 
 **Operator-ruling list (every draw above the inherited room; PROPOSED):** (1) FLAG-Winston kernel row R (D-20-1-02 + D-20-1-03; R′/Rmin/B priced for comparison); (2) maos-registry pin raise 4282 → ≤ 5163; (3) maos-spirit-cli pin raise 1273 → ≤ 2043; (4) maos-cli above STOP 6382 → ≤ 6666; (5) maos-bin envelope ≤ 34410; (6) maos-shell ≤ 728; (7) maos-compliance pin raise 2117 → ≤ 2122; (8) maos-domain ≤ 10153; (9) xtask ≤ 42920; (10) aggregate ≤ 193768, hardfail measured + 1; (11) the shape: one key with three landings or the split (D-20-1-01). Each figure lands exact, with a HISTORY row citing this key (or the split key).
 
-## Decisions — PROPOSED (not ruled)
+## Decisions — RULED 2026-11-01/02 (table below = creation record)
 
 Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10-30.md:287,288,293,296`); their 20-1 consequence is added.
+
+**Rulings 2026-11-01/02 (operator; asks split201 and rows201).** These supersede the Status column of the table below, which stays as filed at creation.
+
+- D-20-1-01 = **B** (split). This file is `20-1a-registry-publish-install-exit-path` (AC1–AC5, kernel-free, L1). Part B (AC6–AC13) and Tasks T6–T10 are `20-1b-vetting-yank-policy-and-quarantine` (L2 kernel-free, then L3 kernel last). 20-1 is retired (records-owed B1–B5).
+- D-20-1-02 = **A** (KQ1). D-20-1-03 = **A** (P). D-20-1-04 = **A** (offline CLI install). D-20-1-05 = **A** (`maos_registry::install`). D-20-1-06 = **A** (signed yanks). D-20-1-07 = **B** (server-assigned persistent sequence). D-20-1-08 = **A** (local CRL via `apply_crl`). D-20-1-09 = **A** (first-key pin + storage identity). D-20-1-10 = **A** (daemon re-evaluates attestation on the yank cadence). D-20-1-11 = **A** (envelope ×3 unmeasured / ×2 measured).
+- D03 = **A** (RULED 2026-10-30). D04 = **A** (RULED 2026-10-30). D09 = **A** and D12 = **A** (operator, rows201: "as already ruled"; the ruling text is not recorded in a repo file).
+- Kernel row R (FLAG-Winston, granted to 20-1b only): KQ1 + P, measured +78 physical / +68 tokei from HEAD 26801 / 21011; ceilings kernel ≤ 26957 / 21147. 20-7's row R (K1w + K2r; +40 / +31; ceilings 26881 / 21073) is also computed from HEAD 26801 / 21011. If both land, the second to land re-bases: cumulative measured tokei 21110; cumulative tokei ceilings must not exceed 21209 (= 791 under the ADR-069 22000 alarm); STOP otherwise.
+- Other ceilings (rows201): maos-registry 5163; maos-spirit-cli 2043; maos-cli 6666 (inside the reserved 6856 pin, because install logic lives in maos-registry, D-20-1-05 A); maos-bin 34410; maos-shell 728; maos-compliance 2122; maos-domain 10153; xtask 42920; aggregate 193768.
 
 | ID | Question | Options | Recommendation and evidence | Status |
 |---|---|---|---|---|
@@ -173,9 +183,9 @@ Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10
 
 ## Acceptance Criteria
 
-*(Epic §20-1 as amended 2026-10-30; clauses marked (D-…) follow the PROPOSED recommendation and are rewritten by a different ruling. Every AC names a failing-before witness and a plant; T = tier: local = hermetic on the dev host; hosted = the discipline run; T3 = the hosted capable runner.)*
+*(Epic §20-1 as amended 2026-10-30, split 2026-11-01 into 20-1a (this story) and 20-1b under D-20-1-01 B; clauses marked (D-…) carry the RULED outcome recorded in Decisions above. Every AC names a failing-before witness and a plant; T = tier: local = hermetic on the dev host; hosted = the discipline run; T3 = the hosted capable runner.)*
 
-### Part A — exit path (kernel-free; L1, or `20-1a` under D-20-1-01 B)
+### Part A — exit path (kernel-free; L1)
 
 #### AC1 — the registry runs from its own binary (exit line 5)
 
@@ -214,60 +224,6 @@ Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10
 2. `discipline.yml` gains `epic-20-exit` (ubuntu, no secrets), enrolled in the aggregate: builds the example fixture at the story SHA (componentize-js), isolates `HOME` and the registry root, readiness ≤ 5 s with an **explicit failure** after the loop (not fall-through), traps and reaps the server, asserts the exact engine-off refusal line.
 3. **Plant (one, hosted, one image):** the server is not started ⇒ the job fails at the readiness assertion (`proof-contract.md:14-17`).
 
-### Part B — trust, yank and quarantine (L2 kernel-free + L3 ◆, or `20-1b` under D-20-1-01 B)
-
-#### AC6 — the vetting attestation binds the exact artifact and publisher (D:1093); vetters can issue and revoke
-
-1. `VettingClaim` (`attestation.rs:105-129`) binds `artifact_sha256` and the publisher public key; `verify_attestation` (`mod.rs:197`) and its caller (`admission.rs:388`) check both; golden byte pin (`attestation.rs:220-224,274`) updated; ADR-056 §1 amended (`docs/adr/ADR-056-fr37-vetting-machinery.md:24,95-101`).
-2. `maos-spirit vet issue|revoke` wraps `issue_attestation` (`attestation.rs:150`) and the keyring's revocation (`keyring.rs:117,157,288,334`); the signed revocation-list **issuer** lives in maos-spirit-cli, not maos-compliance (E20:105).
-3. **Failing-before witnesses (local):** swapped artifact under a valid attestation ⇒ refused; swapped publisher key ⇒ refused — both admitted `PublicVetted` at HEAD (D:1093). `vet issue` → `maosctl spirit install … --vetting-attestation` promotes; `vet revoke` → the next admission refuses.
-4. **Plant (one, local):** `verify_attestation` ignores `artifact_sha256` ⇒ the swap vector red.
-
-#### AC7 — yanks arrive signed, labelled and restart-safe (FR59; D-20-1-06 A, D-20-1-07 B)
-
-1. `maos-spirit yank <name>@<ver>` (publisher key) and the vetter's yank (enrolled vetter key) send signed requests; the server verifies publisher yanks against the stored package's key and vetter yanks against the keyring; unsigned `registry.deprecate` is refused. `YankEntry` carries `origin` and a server sequence; the daemon re-verifies before acting and journals origin-labelled rows distinguishable from operator CRLs (intent + `RevocationOrigin` label).
-2. The yank cursor survives a server restart and a daemon restart (persisted; F2, F3).
-3. **Failing-before witnesses (local):** unsigned deprecate of another publisher's Spirit ⇒ refused (accepted at HEAD, measured); server restart between two yanks ⇒ the second is fetched (missed at HEAD); daemon restart ⇒ no replay of already-journaled yanks. Propagation ≤ 5 min is witnessed by driving `poll_once` with an injected source and by one bounded cross-process run at the 30 s clamp floor (`yank.rs:200-210`), budgeted under 20-12.
-4. **Plant (one, local):** accept unsigned deprecate ⇒ red.
-
-#### AC8 — yank policy `warn | quarantine | auto-revoke` (D-20-1-08 A)
-
-1. `maos_registry::yank::YankPolicy` read by maos-bin from `MAOS_YANK_POLICY` (registered in `env_contract.rs:13`, `UserFacing`; default `warn`), not a `RegistrySection` field (`operator_config.rs:13`). `warn` = today's rows; `quarantine` = the AC11 fence on running pids of the yanked version; `auto-revoke` = a local CRL (origin `RegistryYank`, operator-key signed, `SignedRevocationList::new`) through `apply_crl` — each Spirit executes its declared action.
-2. **Failing-before witness (local):** `crates/maos-bin/tests/yank_policy_20_1.rs` — one yank per policy against a running fixture Spirit: `warn` ⇒ rows only, still mediated; `quarantine` ⇒ next mediated call refused, still loaded; `auto-revoke` ⇒ the declared action's receipts. Red at HEAD (no policy).
-3. **Plant (one, local):** policy ignored ⇒ the `quarantine` vector red.
-
-#### AC9 — a lapsed or revoked promotion reaches operators as a vetter yank (D9; D-20-1-10 A)
-
-1. On the yank cadence the daemon re-evaluates each running `public-vetted` Spirit's attestation; expiry or revocation journals the `RunningSpiritObservation` (`terminal.rs:99-152`) with its cause label and applies the yank policy as a vetter-origin yank. `enforce_vetted_upgrade_precondition` stays the only refusal point (S:296); no crossing check.
-2. **Failing-before witness (local):** a promoted fixture whose attestation expires (injected clock) and one whose vetter key is revoked ⇒ one observation each with labels `expiry-lapse` / `vetting-revocation` and the policy effect — nothing at HEAD (F6).
-3. **Plant (one, local):** skip the re-evaluation ⇒ red.
-
-#### AC10 — a name cannot be squatted (D:37; D-20-1-09 A)
-
-1. The registry and install pin the first publisher key per `spirit_id`; a different key is refused, typed. Admission binds storage identity `spirit_id` + a truncated publisher-key fingerprint for registry-installed Spirits (`admission.rs:893`); local Spirits keep the bare `spirit_id`.
-2. **Failing-before witnesses (local):** publish `X` with key K1, then `X` with K2 ⇒ refused (overwrites at HEAD, F4); a second boot admitting `X` under K2 (forced through import) does not read K1's principal spill (extends `crates/maos-kernel-core/tests/principal_identity_20_3b.rs` at the maos-bin admission level).
-3. **Plant (one, local):** bind identity to `spirit_id` only ⇒ the spill vector red.
-
-#### AC11 — FR13 quarantine isolates and never kills (D04 A; D-20-1-02 A) ◆ FLAG-Winston
-
-1. Kernel: `kq1-sticky-quarantine.diff` shape — the CRL `Quarantine` arm (`applier.rs:160-197`) sets the quarantine fence, journals `spirit.quarantined`, and spawns no drain/terminate; `is_paused` honours quarantine at every fence site (`capability/mod.rs:203,319,345`); a director `resume` cannot lift it; `unload` ends it (`scheduler_loop.rs:572`).
-2. **Hostile-effect witness (local, kernel):** `crates/maos-kernel-core/tests/quarantine_fr13_20_1.rs` — a fixture Spirit declaring `[on_revocation] action = "quarantine"` receives a CRL; it then attempts an MCP tool call, an inference call, a memory write and a token verification ⇒ each refused (`CapError::Revoked`), nothing reaches the effect, the Spirit is still loaded and Running past the old drain deadline; pause→resume leaves it fenced; unload clears it. Red at HEAD (terminated after the deadline; mediated calls succeed until then).
-3. `docs/invariants/I5.md:11` FR13 → witnessed by this test; `tests/coverage-matrix.yaml:366-371` FR13 note updated; architecture `4-kernel-design.md:661` sentence corrected.
-4. **Plant (one, local):** restore drain-then-terminate in the arm ⇒ AC11.2 red.
-5. **Hosted T3 leg:** a T3 Worker Spirit quarantined by CRL — its next mediated action refused; whether its container keeps running activity is recorded (measurement owed 4); if it does, the record names it.
-6. Pins: both kernel pins, content hashes; HISTORY rows cite this key; FLAG-Winston decision record (precedent `20-3c-flag-winston-decision.md`).
-
-#### AC12 — the revocation poller says a failure once (D:1264; D-20-1-03 A) ◆ FLAG-Winston
-
-1. `poller.rs:44-56`: the first failure prints, repeats are counted, recovery prints the count; telemetry unchanged (`p-poller-edge-trigger.diff` shape).
-2. **Failing-before witness (local):** a fresh home (no `latest.signed.json`) with the fast cadence (`MAOS_REVOCATION_FAST`) for ~1 s ⇒ exactly one failure line — one per tick at HEAD.
-3. **Plant (one, local):** print on every failure ⇒ red.
-
-#### AC13 — the ledger stops naming this key the day it is true
-
-1. `check-dev-record-completeness` passes at the final landing with no open `deferred-work.md` row owned by `20-1` (D:37, :56, :1093, :1147, :1264 → `CLOSED <date> by 20-1 @<commit>` with witness, or rule-10 re-owned); FR35/FR36/FR59 coverage rows (`coverage-matrix.yaml:617,622,841`) name their witnesses; FR37 stays `v2.0+` with the machinery witnessed; I5 owner re-pointed or closed.
-2. **Negative control:** with one live row left naming `20-1` and S:296 flipped to `done` in a scratch copy, the gate reds.
-
 ## Tasks / Subtasks
 
 - [ ] **T0 — Preflight.** Operator rulings on D09, D12, D-20-1-01…11 recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" 1–7; re-measure every cite this story touches (rule 9). If any measured figure exceeds the ruled envelope, STOP and return a D-row.
@@ -276,11 +232,7 @@ Preflight rows that bear on this story stay as filed (`epic-20-preflight-2026-10
 - [ ] **T3 — Install (AC3)**: helper, `Remote` origin, thin verb, negatives.
 - [ ] **T4 — Boot enumeration + dispatch (AC4)**; `wasm-host` execution leg.
 - [ ] **T5 — Release set + `epic-20-exit` (AC5)**; L1 landing (exact pins inside the ruled Part-A envelope; records).
-- [ ] **T6 — Binding + vet CLI (AC6)**; ADR-056 §1; golden pin.
-- [ ] **T7 — Signed, labelled, restart-safe yanks (AC7)**; policy (AC8); vetter lapse/revocation (AC9); squatting (AC10). L2 landing.
-- [ ] **T8 — L3 kernel (AC11, AC12)** under the ruled FLAG-Winston row: apply the ruled bundle (re-cut, never applied blindly), the hostile-effect witness, I5/coverage/architecture text, both kernel pins + hashes, decision record.
-- [ ] **T9 — Plants** (one per AC, `proof-contract.md:24-31`), local except AC5 (hosted) and AC11.5 (hosted T3); wall-clock per plant in the Dev Agent Record.
-- [ ] **T10 — Close (AC13).** `check-kernel-baseline`, `check-service-boundary`, `check-pub-field-constructors`, `check-dependency-closure`, `check-env-contract`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree (known 20-7 flakes by name and run id, D13). Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+- [ ] **T6–T10 moved** to `20-1b-vetting-yank-policy-and-quarantine.md` (binding and vet CLI, signed yanks and policy, lapse and squatting, L3 kernel, plants, close) under D-20-1-01 B.
 
 ## Dev Notes
 
@@ -414,3 +366,4 @@ anthropic/claude-opus-5-5 (creation).
 ### Change Log
 
 - 2026-11-01: Story created at `a4c00897` (ready-for-dev; D09, D12 and D-20-1-01…11 PROPOSED). Inventory measured: exit lines 2/4 runnable, 5 rc 1, 7 rc 1, 8 rc 2, 9 `unknown spirit`; the daemon registry arm functional and its `registry.deprecate` unauthenticated; yank stamps process-relative and the cursor unwired; FR13 quarantine terminates. Kernel priced by prototype (R = KQ1 + P +78 / +68 incl. +40 / +40 rustfmt churn; R′ +79 / +69 + iac/domain +26; Rmin +53 / +49; non-kernel B maos-bin +43, FR13 still false); S1 maos-registry +38; total forecast +810…+1,686; envelope and operator-ruling list filed; split proposed (D-20-1-01 B).
+- 2026-11-01: Split into 20-1a/20-1b under D-20-1-01 B (ask split201); rulings 2026-11-01/02 (ask rows201) recorded in Decisions. The 20-1 sprint key is retired; kernel grant R (KQ1 + P, +78 / +68) is held by 20-1b only.

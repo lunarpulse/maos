@@ -502,7 +502,19 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26801
+src_lines = 26841
+# HISTORY: 20-7 landing 1 (stable-runner-perf-gates), FLAG-Winston R = K1w + K2r
+# (rows207; ceiling 26881 physical / 21073 tokei): exact formatted 26801 -> 26841
+# (+40 physical), tokei 21011 -> 21042 (+31), as the creation prototype measured;
+# 95 files, surface unchanged. K1w: `run_teardown` waits, bounded by its own
+# deadline, for an in-flight snapshot owner to publish and then removes the
+# container instead of returning TerminationUnconfirmed before `rm`; K2r: teardown
+# SIGKILLs the verified payload pidfd (`rustix::process::pidfd_send_signal`) before
+# the bounded runtime `kill`. Changed file: security/sandbox/t3/child.rs (content
+# hash only; `Cargo.toml` gains rustix feature "process"). RE-BASE RULE: the 20-1b
+# kernel grant was computed from the same HEAD (26801/21011); whichever kernel
+# landing is second MUST re-base (cumulative expected 21110 tokei; STOP above the
+# 21209 cumulative ceiling = 791 under the 22000 ADR-069 alarm).
 # HISTORY: 20-3c landing 2 (audit-truth-and-halt-receipt-residuals), FLAG-Winston
 # R = K1p + E3 granted 2026-11-01 (rows203c/grant203c; ceiling 26817 physical /
 # 21044 tokei): exact formatted 26793 -> 26801 (+8 physical), tokei 20992 -> 21011
@@ -920,7 +932,7 @@ src_lines = 26801
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "c023d0d7555bdd97e5511ea322cffdc83c1a7dcb69a8b8083a6d2587ee95eb41"
+set_hash = "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -1001,7 +1013,7 @@ set_hash = "c023d0d7555bdd97e5511ea322cffdc83c1a7dcb69a8b8083a6d2587ee95eb41"
 "security/sandbox/mod.rs" = "6fa0db148e19013423b8bcf67e95d657cbd48aeaf3fe6aa7f61ef34ccbf4bbd3"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
 "security/sandbox/t3/argv.rs" = "1824511ac85216b961e517e5fdfd58ce3d30656a7be8c1adcf2b317b17707139"
-"security/sandbox/t3/child.rs" = "ccf959b18afe7e78ee4efbab9e4d694d7cac99b7e0ea5d25eb6575dc6a035c55"
+"security/sandbox/t3/child.rs" = "9500670369d34939f8a82a192f581c4b6e3048c1b1a366e1a9ad231ec1c63844"
 "security/sandbox/t3/image_lock.rs" = "1ae4cc7db0290d62de482d50bf7e4cc97c672e85a32b06ffdae37823a5461b09"
 "security/sandbox/t3/image_verify.rs" = "28125115858f49ad5784c19e3baaf0088f90f5c007eeb69976836d2b1a13873b"
 "security/sandbox/t3/mod.rs" = "ec392fc9de34dcabbe3c3bb63697df32d5f373986f11b2ae79841975deaaec2d"

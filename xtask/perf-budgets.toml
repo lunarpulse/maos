@@ -1,0 +1,413 @@
+# Story 20-7 AC3 — the ONE performance budget source (ADR-068 §5; story 20-7).
+#
+# No budget constant lives anywhere else: the maos-bench harnesses and benches
+# (`crates/maos-bench/src/budgets.rs`), the kernel's NFR-Perf-3 guard test, the
+# verdict command (`check-perf-verdict`) and Tier C (`check-perf-counts`) all
+# read this file; `xtask/tests/perf_budgets_20_7.rs` scans for the literals.
+#
+# Tiers (ADR-068 §1): "C" = deterministic counts, every pull request, GitHub
+# hosted, fork-safe; "W" = wall clock, trusted code only, the stable runner
+# `maos-perf` (L2). `direction`: "max" = the value must stay at or under the
+# budget (latency), "min" = at or over it (throughput). Units: "us"
+# microseconds, "frames_per_s", "instructions" / "allocations" per iteration.
+#
+# Dispositions follow `gate-registry.toml`'s phase ladder (v1_0, v1_5, v2_0,
+# v2_2; nearest at or before `protocol.phase` wins). Every Tier W row is
+# ADVISORY (shadow, ADR-068 §7.2) until the stable runner has run >= 2 weeks and
+# >= 20 `main` runs; AC11 flips them in one commit with the measured tolerances.
+# Tolerances below are OPENING values (confidence rule 6), not measurements.
+
+[protocol]
+phase = "v1_5"                  # equals `gate_common::CURRENT_PHASE` (vector-pinned)
+calibration_cv_max_pct = 2.0    # ADR-068 §5: fixed CPU / fsync workloads, 30 timings each
+calibration_drift_max_pct = 3.0
+mad_multiplier = 3.0            # ADR-068 §5: regression must also exceed 3 x baseline MAD
+baseline_runs = 10              # ADR-068 §6: median of the last ten PASS runs on main
+stale_hours = 48                # ADR-068 §6: newest ledger entry older than this is red
+
+# ---------------------------------------------------------------- Tier W ----
+
+[[metric]]
+id = "nfr-perf-1-iac-routing-p50"
+requirement = "NFR-Perf-1"
+quantile = "p50"
+budget = 5000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/iac_routing_budget.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-1-iac-routing-p99"
+requirement = "NFR-Perf-1"
+quantile = "p99"
+budget = 50000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/iac_routing_budget.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "hot-path-iac-send-p99"
+requirement = "success-criteria hot path: iac/send (same-Host)"
+quantile = "p99"
+budget = 10
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/iac_routing_budget.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-2-iac-throughput"
+requirement = "NFR-Perf-2"
+quantile = "sustained"
+budget = 5000
+unit = "frames_per_s"
+direction = "min"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/iac_throughput_nfr_perf_2.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-3-cap-token-verify-p99"
+requirement = "NFR-Perf-3"
+quantile = "p99"
+budget = 100
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/cap_token_verify_p99.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "adr-030-cap-token-verify-p99"
+requirement = "ADR-030 hot path"
+quantile = "p99"
+budget = 5
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/cap_token_verify_p99.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "hot-path-token-issuance-p99"
+requirement = "success-criteria hot path: capability token issuance"
+quantile = "p99"
+budget = 5
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/hot_path_budgets.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "hot-path-invocation-dispatch-p99"
+requirement = "success-criteria hot path: capability invocation dispatch (excluding adapter)"
+quantile = "p99"
+budget = 5
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/hot_path_budgets.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "hot-path-memory-read-cached-p99"
+requirement = "success-criteria hot path: memory/read (cached)"
+quantile = "p99"
+budget = 50
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/hot_path_budgets.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "hot-path-memory-read-uncached-p99"
+requirement = "success-criteria hot path: memory/read (uncached, SQLite)"
+quantile = "p99"
+budget = 5000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/hot_path_budgets.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "hot-path-telemetry-broadcast-p99"
+requirement = "success-criteria hot path: telemetry broadcast (one event, 10 subscribers)"
+quantile = "p99"
+budget = 1
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/hot_path_budgets.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "hot-path-hot-swap-inproc-p99"
+requirement = "success-criteria hot path: hot-swap (rust-inproc)"
+quantile = "p99"
+budget = 50000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/hot_swap_latency.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-7-hot-swap-p99"
+requirement = "NFR-Perf-7 (and the hot-path hot-swap subprocess row)"
+quantile = "p99"
+budget = 500000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-kernel-core/benches/hot_swap_latency.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-4-posture-shift-p99"
+requirement = "NFR-Perf-4"
+quantile = "p99"
+budget = 2000000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/posture_shift_nfr_perf_4.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-4-posture-shift-p999"
+requirement = "NFR-Perf-4"
+quantile = "p99.9"
+budget = 5000000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/posture_shift_nfr_perf_4.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-5-audit-query-single-p99"
+requirement = "NFR-Perf-5 (single-Spirit, 30-day window)"
+quantile = "p99"
+budget = 2000000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/audit_query_latency.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-5-audit-query-global-p99"
+requirement = "NFR-Perf-5 (global)"
+quantile = "p99"
+budget = 10000000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/audit_query_latency.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "nfr-perf-8-fanout-dispatch-p99"
+requirement = "NFR-Perf-8 (50 real T3 Workers, 10 tasks/s, 1 h, 0 dropped)"
+quantile = "p99"
+budget = 500000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "iac-inproc-fanout-dispatch-p99"
+requirement = "NFR-Perf-8 in-process dispatch component (not the NFR-Perf-8 claim)"
+quantile = "p99"
+budget = 500000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/orchestrator_inproc_dispatch.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "j1-bridge-p95"
+requirement = "ADR-040 §13.1 J1 (strict; 25 ms)"
+quantile = "p95"
+budget = 25000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/j1_bridge_latency.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+# The 50 ms J1 catastrophe ceiling the shared hosted runner asserts
+# (`j1_bridge_overhead_within_ci_ceiling`); named so it is a row, not a literal.
+[[metric]]
+id = "j1-bridge-ci-ceiling-p95"
+requirement = "ADR-040 §13.1 J1 catastrophe guard on shared runners (2 x budget)"
+quantile = "p95"
+budget = 50000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/j1_bridge_latency.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "j4-scalar-tap-p95"
+requirement = "ADR-040 §13.1 J4 (10 ms)"
+quantile = "p95"
+budget = 10000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.10
+regression_tolerance = 0.10
+tier = "W"
+instrument = "crates/maos-bench/benches/j4_latency_regression.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+# ---------------------------------------------------------------- Tier C ----
+# Per-iteration counts of `crates/maos-bench/src/bin/tier_c_harness.rs` paths
+# under `valgrind --tool=callgrind` (instructions, minus the empty path) and its
+# counting allocator (allocations). `baseline` is the committed figure; a row
+# without one reads ABSENT. A deliberate change re-baselines here, in the same
+# commit, with the measured figure and the reason (ADR-068 §6).
+# Instruction rows are ADVISORY until their first hosted callgrind measurement
+# is committed (callgrind is not installed on the dev host); allocation rows bind.
+
+[[metric]]
+id = "cap-token-verify-instructions"
+requirement = "ADR-030 hot path (Tier C)"
+quantile = "count"
+unit = "instructions"
+direction = "max"
+noise_tolerance = 0.0
+regression_tolerance = 0.02
+tier = "C"
+path = "cap_token_verify"
+instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "cap-token-verify-allocations"
+requirement = "ADR-030 hot path (Tier C)"
+quantile = "count"
+unit = "allocations"
+direction = "max"
+noise_tolerance = 0.0
+regression_tolerance = 0.02
+tier = "C"
+path = "cap_token_verify"
+instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+# Baseline measured 2026-11-01 (20-7 L1, debug harness, 10000 iterations, 3 runs identical):
+# 10000 allocations = 1 per `CapTokensShardRing::verify` (first measurement; the
+# allocation's source was not investigated — a second allocation is a regression to explain).
+baseline = 1.0
+
+[[metric]]
+id = "iac-routing-instructions"
+requirement = "NFR-Perf-1 / iac-send hot path (Tier C)"
+quantile = "count"
+unit = "instructions"
+direction = "max"
+noise_tolerance = 0.0
+regression_tolerance = 0.02
+tier = "C"
+path = "iac_routing"
+instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "iac-routing-allocations"
+requirement = "NFR-Perf-1 / iac-send hot path (Tier C)"
+quantile = "count"
+unit = "allocations"
+direction = "max"
+noise_tolerance = 0.0
+regression_tolerance = 0.02
+tier = "C"
+path = "iac_routing"
+instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+# Baseline measured 2026-11-01 (20-7 L1, debug harness, 2000 iterations, runs 42476/42475/42476
+# allocations): 21.24 per `deliver_typed` on a current-thread runtime, in-memory transparency log.
+baseline = 21.24
+
+[[metric]]
+id = "frame-lowering-instructions"
+requirement = "frame lowering hot path (Tier C)"
+quantile = "count"
+unit = "instructions"
+direction = "max"
+noise_tolerance = 0.0
+regression_tolerance = 0.02
+tier = "C"
+path = "frame_lowering"
+instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+
+[[metric]]
+id = "frame-lowering-allocations"
+requirement = "frame lowering hot path (Tier C)"
+quantile = "count"
+unit = "allocations"
+direction = "max"
+noise_tolerance = 0.0
+regression_tolerance = 0.02
+tier = "C"
+path = "frame_lowering"
+instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+# Baseline measured 2026-11-01 (20-7 L1, debug harness, 10000 iterations, 3 runs identical):
+# 30000 allocations = 3 per `serde_json::to_vec` + `write_frame` into a reused buffer.
+baseline = 3.0

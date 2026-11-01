@@ -1,0 +1,34 @@
+# Fixture budget file for xtask/tests/perf_gates_20_7.rs (same schema as xtask/perf-budgets.toml).
+[protocol]
+phase = "v1_5"
+calibration_cv_max_pct = 2.0
+calibration_drift_max_pct = 3.0
+mad_multiplier = 3.0
+baseline_runs = 10
+stale_hours = 48
+
+[[metric]]
+id = "fixture-latency"
+requirement = "fixture"
+quantile = "p99"
+budget = 5000
+unit = "us"
+direction = "max"
+noise_tolerance = 0.4
+regression_tolerance = 0.10
+tier = "W"
+instrument = "fixture"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+[[metric]]
+id = "fixture-throughput"
+requirement = "fixture"
+quantile = "sustained"
+budget = 1000
+unit = "frames_per_s"
+direction = "min"
+noise_tolerance = 0.4
+regression_tolerance = 0.10
+tier = "W"
+instrument = "fixture"
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }

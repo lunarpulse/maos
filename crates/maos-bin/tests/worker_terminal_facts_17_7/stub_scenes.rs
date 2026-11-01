@@ -28,8 +28,8 @@ pub(super) fn podman(dir: &Path, mode: &str) -> ContainerRuntime {
     let pid = dir.join("state").join("pid");
     let script = format!(
         r#"#!/bin/sh
-printf 'argv=' >> '{log}'; for arg do printf '<%s>' "$arg" >> '{log}'; done
-printf ' env=' >> '{log}'; env | while IFS='=' read -r k v; do printf '<%s>' "$k"; done >> '{log}'; printf '\n' >> '{log}'
+# One `printf` per invocation: the record lands in a single append, never interleaved.
+rec='argv='; for arg do rec="$rec<$arg>"; done; envs=$(env | while IFS='=' read -r k v; do printf '<%s>' "$k"; done); printf '%s\n' "$rec env=$envs" >> '{log}'
 mode='{mode}'; case "$1" in
 create) cid=; for arg do case "$arg" in --cidfile=*) cid=${{arg#--cidfile=}};; esac; done; case "$mode" in
  receipt-hang) printf '%s\n' '{CID}' > "$cid"; sleep 30;; no-receipt) printf '%s\n' '{FOREIGN}';; malformed) printf 'bad\n' > "$cid"; printf '%s\n' '{FOREIGN}';; disagree) printf '%s\n' '{CID}' > "$cid"; printf '%s\n' '{FOREIGN}';; create-fails-bearer) printf '%s\n' "$WORKER_SECRET" >&1; printf '%s\n' "$WORKER_SECRET" >&2; printf '%s\n' '{CID}' > "$cid"; exit 1;; bearer-create) printf '%s\n' "$WORKER_SECRET" >&2; printf '%s\n' '{CID}' > "$cid"; printf '%s\n' '{CID}';; *) printf '%s\n' '{CID}' > "$cid"; printf '%s\n' '{CID}';; esac;;

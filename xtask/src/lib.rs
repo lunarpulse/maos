@@ -31,6 +31,13 @@ pub mod check_model_currency;
 pub mod check_test_budget;
 pub mod check_test_cost;
 pub mod check_trial_attestation;
+// Story 20-7 — the performance budget file and the verdict / policy / count
+// gates over it, exposed so `xtask/tests/` drive the REAL gates over fixtures.
+pub mod check_perf_counts;
+pub mod check_perf_runner_policy;
+pub mod check_perf_verdict;
+pub mod perf_budgets;
+pub mod perf_ledger;
 pub mod release_dry_run;
 // corpus_types + gate_common exposed so the lib-compiled gate modules
 // (check_fkcs, check_trial_attestation) can resolve `crate::gate_common`

@@ -394,57 +394,61 @@ fn s2_intentional_exit_137_is_not_a_signal() {
     }));
 }
 
+/// Story 20-7 AC7.3: what a failed S3 sample must carry — the elapsed time, the
+/// podman client's exit line, the kernel's residue line and the root's stderr.
+fn s3_diagnostics(run: &TerminalRun, elapsed: Duration, version: &str) -> String {
+    let line = |needle: &str| {
+        run.stderr
+            .lines()
+            .filter(|line| line.contains(needle))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    };
+    format!(
+        "elapsed {elapsed:?}; runtime {version}; root status {:?}; client exit [{}]; \
+         residue line [{}]; stderr: {}",
+        run.status,
+        line("exited ("),
+        line("residue "),
+        run.stderr
+    )
+}
+
 #[test]
 fn s3_external_sigkill_requires_pidfd_fact() {
     if !scene("S3 external SIGKILL") {
         return;
     }
     let (run, elapsed) = kill_payload_worker();
-    assert!(
-        !run.status.success(),
-        "external SIGKILL must fail the Worker run"
-    );
-    // FR12's 5 s holds on podman 4; podman 5.x keeps the container lock for
-    // seconds after exit, so the snapshot may use its full budget there
-    // (operator ruling 2026-10-14: SNAPSHOT_BUDGET 10 s, S3 bound 12 s).
     let version =
         maos_kernel_core::security::sandbox::t3::runtime_detect::detect_container_runtime()
             .expect("T3 runtime")
             .version;
-    // `version` is the runtime's own text, e.g. "podman version 5.7.0".
-    let bound = if version
-        .split_whitespace()
-        .last()
-        .and_then(|number| number.split('.').next())
-        .and_then(|major| major.parse::<u32>().ok())
-        >= Some(5)
-    {
-        maos_kernel_core::security::sandbox::t3::child::SNAPSHOT_BUDGET + Duration::from_secs(2)
-    } else {
-        Duration::from_secs(5)
-    };
+    let why = s3_diagnostics(&run, elapsed, &version);
     assert!(
-        elapsed <= bound,
-        "observer/orphan detection took {elapsed:?} (bound {bound:?}, runtime {version}); stderr: {}",
-        run.stderr
+        !run.status.success(),
+        "external SIGKILL must fail the Worker run: {why}"
     );
+    // Facts first, timing last (20-7 D-20-7-01 A). The pidfd and the cleanup
+    // verdict hold whether or not the runtime CLI answered its snapshot.
     let (pid, exit) = exit_row(&run);
-    assert_eq!(exit["exit_cause"], "exited(code=137)");
-    assert_eq!(exit["is_crash"], true);
-    assert_eq!(exit["container"]["runtime_exit_code"], 137);
-    assert_eq!(exit["container"]["oom_marker"], false);
-    assert_eq!(exit["container"]["payload_exit"], "signaled(sig=9)");
-    assert_eq!(exit["container"]["payload_exit_source"], "pidfd");
-    assert_eq!(exit["container"]["removed"], true);
-    assert_eq!(exit["container"]["residue"], serde_json::Value::Null);
+    assert_eq!(exit["is_crash"], true, "{why}");
+    assert_eq!(
+        exit["container"]["payload_exit"], "signaled(sig=9)",
+        "{why}"
+    );
+    assert_eq!(exit["container"]["payload_exit_source"], "pidfd", "{why}");
+    assert_eq!(exit["container"]["removed"], true, "{why}");
+    assert_eq!(
+        exit["container"]["residue"],
+        serde_json::Value::Null,
+        "{why}"
+    );
     let orphaned = run
         .rows
         .iter()
         .find(|(row_pid, intent, _)| *row_pid == pid && intent == "task.orphaned")
         .expect("S3 task.orphaned row");
-    assert_eq!(orphaned.2["cause"], "fault.signaled");
-    assert_eq!(orphaned.2["exit_signal"], 9);
-    assert_eq!(orphaned.2["exit_code"], serde_json::Value::Null);
     let crash_receipts: Vec<_> = run
         .rows
         .iter()
@@ -452,7 +456,36 @@ fn s3_external_sigkill_requires_pidfd_fact() {
             *row_pid == pid && intent == "unplanned_crash" && !payload.is_null()
         })
         .collect();
-    assert_eq!(crash_receipts.len(), 1, "{crash_receipts:?}");
+    assert_eq!(crash_receipts.len(), 1, "{crash_receipts:?}; {why}");
+    // The runtime's own facts exist only when podman answered its snapshot. A
+    // stalled runtime is the typed unavailable form (null code and marker) and
+    // classifies `fault.truncated` by the 17-7 rule that unavailable state is
+    // always truncated (`container_terminal_facts_17_7.rs`).
+    if exit["container"]["runtime_exit_code"].is_null() {
+        println!("S3: runtime snapshot unavailable (typed form); {why}");
+        assert!(exit["container"]["oom_marker"].is_null(), "{why}");
+        assert_eq!(orphaned.2["cause"], "fault.truncated", "{why}");
+    } else {
+        assert_eq!(exit["exit_cause"], "exited(code=137)", "{why}");
+        assert_eq!(exit["container"]["runtime_exit_code"], 137, "{why}");
+        assert_eq!(exit["container"]["oom_marker"], false, "{why}");
+        assert_eq!(orphaned.2["cause"], "fault.signaled", "{why}");
+        assert_eq!(orphaned.2["exit_signal"], 9, "{why}");
+        assert_eq!(orphaned.2["exit_code"], serde_json::Value::Null, "{why}");
+    }
+    // The bound times kill -> root exit: FR12 detection plus the whole T3
+    // teardown plus root shutdown. The teardown's own documented budget is the
+    // snapshot budget (podman 5.x holds the container lock ~8 s after exit; a
+    // stalled podman 4.x client ran the snapshot to its deadline on hosted
+    // runs 38807569588…41281999213) plus 2 s for the kill, the removal and the
+    // exit. FR12's 2 s / 5 s floors stay asserted by
+    // `worker_crash_corpus_16_3` (>= 99/100).
+    let bound =
+        maos_kernel_core::security::sandbox::t3::child::SNAPSHOT_BUDGET + Duration::from_secs(2);
+    assert!(
+        elapsed <= bound,
+        "orphan detection took {elapsed:?} (bound {bound:?}): {why}"
+    );
 }
 
 #[test]
