@@ -19,6 +19,13 @@
 #   P3 13237af274648421b28a8b88d64f3b09cd08c2df86fb856100c36e4086f7d9cd  post-swap monitor judges the pending set
 #   P4 0b4d10ea8380400bc9c3f38a47dc352311f37ba561c8496104949dab89145fb4  no-runtime RateLimited arm is a no-op (AC3.4)
 #   P5 174501f35eb2419df875c9894946ead3dd9c7d9c333613f11f033abcffaa72a2  spawned delivery error discarded again
+#
+# STATUS: LOCAL-ONLY PROOF. Neither `kernel-l2` nor `t3-legs` has ever been run:
+# this file is not under .github/workflows and nothing hosted has executed it.
+# The plant proof for P0-P5 is the local run recorded in `../landing-2/plants.md`
+# and `../landing-2/plant-logs/`. Each plant leg below asserts the SPECIFIC
+# witness named in plants.md is on a FAILED line (not merely "some non-zero
+# exit"); that assertion is likewise unexercised until the file is run hosted.
 # Not pushed; copied under .github/workflows only on an operator-approved branch.
 name: ci-20-3c-verify
 on:
@@ -67,28 +74,56 @@ jobs:
           --test context_budget_gate_18_5 --test audit_sink_truth_16_5
       - name: The recorded plant cuts are the ones under test
         run: cd "$EV" && sha256sum -c plant-cuts.sha256
+      - name: Define the plant helper (a plant is detected only when its NAMED witness is red)
+        run: |
+          cat > "$RUNNER_TEMP/plant.sh" <<'EOF'
+          # plant <cut> "<witness> [<witness>...]" <cargo test args...>
+          # Applies the cut, runs the suite with --no-fail-fast (so every binary
+          # runs), restores src, then requires the suite RED and every named
+          # witness on a `test <path>::<witness> ... FAILED` line. A compile error
+          # or an unrelated failure is NOT detection.
+          plant() {
+            cut="$1"; witnesses="$2"; shift 2
+            log="$RUNNER_TEMP/${cut%.diff}.log"
+            git apply "$EV/plant-cuts/$cut"
+            rc=0
+            cargo test --locked --no-fail-fast "$@" > "$log" 2>&1 || rc=$?
+            git checkout -- crates/maos-kernel-core/src
+            cat "$log"
+            [ "$rc" -ne 0 ] || { echo "plant $cut not detected: suite green"; exit 1; }
+            for w in $witnesses; do
+              grep -Eq "^test (.*::)?$w \.\.\. FAILED" "$log" \
+                || { echo "plant $cut: witness $w did not go red"; exit 1; }
+            done
+          }
+          EOF
       - name: P1 (AC2.5) — the swap gate drains again => FR53 witness and carry vectors red
         run: |
-          git apply "$EV/plant-cuts/P1-ac2-restore-drain.diff"
-          if cargo test --locked --no-fail-fast -p maos-kernel-core --test routed_halt_swap_20_3b --test halt_carry_20_3c; then echo "plant P1 not detected"; exit 1; fi
-          git checkout -- crates/maos-kernel-core/src
+          . "$RUNNER_TEMP/plant.sh"
+          plant P1-ac2-restore-drain.diff \
+            "active_halt_keeps_identity_and_replay_context_across_hot_swap an_incompatible_successor_refuses_the_swap_with_the_halt_intact swap_continuity_with_seeded_halts_carries_them_instead_of_draining chain_walk_carries_every_real_pending_halt_at_every_hop_with_zero_dropped" \
+            -p maos-kernel-core --test routed_halt_swap_20_3b --test halt_carry_20_3c --test hot_swap_halt_continuity_corpus_integration
       - name: P2 — precheck judges the global pending set => (a)/(b) red
         run: |
-          git apply "$EV/plant-cuts/P2-ac2-precheck-global-set.diff"
-          if cargo test --locked --no-fail-fast -p maos-kernel-core --test halt_carry_20_3c; then echo "plant P2 not detected"; exit 1; fi
-          git checkout -- crates/maos-kernel-core/src
+          . "$RUNNER_TEMP/plant.sh"
+          plant P2-ac2-precheck-global-set.diff \
+            "another_spirits_pending_halt_changes_neither_verdict_nor_precheck precheck_verdict_equals_swap_verdict_for_zero_one_and_two_carried_halts" \
+            -p maos-kernel-core --test halt_carry_20_3c
       - name: P3 — monitor judges the pending set => a resolved carried halt auto-reverts the swap
         run: |
-          git apply "$EV/plant-cuts/P3-ac2-monitor-pending-set.diff"
-          if cargo test --locked --no-fail-fast -p maos-kernel-core --test halt_carry_20_3c; then echo "plant P3 not detected"; exit 1; fi
-          git checkout -- crates/maos-kernel-core/src
+          . "$RUNNER_TEMP/plant.sh"
+          plant P3-ac2-monitor-pending-set.diff \
+            "resolving_the_carried_halt_inside_the_monitor_window_is_not_a_loss" \
+            -p maos-kernel-core --test halt_carry_20_3c
       - name: P4 (AC3.4) — no-runtime RateLimited arm is a no-op => the synchronous-journal vector red
         run: |
-          git apply "$EV/plant-cuts/P4-ac3-no-runtime-noop.diff"
-          if cargo test --locked --no-fail-fast -p maos-kernel-core --test context_budget_gate_18_5; then echo "plant P4 not detected"; exit 1; fi
-          git checkout -- crates/maos-kernel-core/src
+          . "$RUNNER_TEMP/plant.sh"
+          plant P4-ac3-no-runtime-noop.diff \
+            "a_429_with_no_runtime_journals_the_rate_limited_frame_synchronously" \
+            -p maos-kernel-core --test context_budget_gate_18_5
       - name: P5 — delivery error discarded => the counted-drop vector red
         run: |
-          git apply "$EV/plant-cuts/P5-ac3-discard-delivery-error.diff"
-          if cargo test --locked --no-fail-fast -p maos-kernel-core --test context_budget_gate_18_5; then echo "plant P5 not detected"; exit 1; fi
-          git checkout -- crates/maos-kernel-core/src
+          . "$RUNNER_TEMP/plant.sh"
+          plant P5-ac3-discard-delivery-error.diff \
+            "a_429_whose_spawned_delivery_fails_is_counted_as_a_rate_limited_drop" \
+            -p maos-kernel-core --test context_budget_gate_18_5

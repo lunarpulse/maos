@@ -355,6 +355,7 @@ async fn an_incompatible_successor_refuses_the_swap_with_the_halt_intact() {
 
 #[tokio::test]
 async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_metadata() {
+    let _window = monitor_window(false).await;
     let rig = rig(true);
     let before = metadata(&rig);
 
@@ -378,6 +379,7 @@ async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_
 
 #[tokio::test]
 async fn a_halt_resolved_after_the_swap_writes_exactly_one_approval_row() {
+    let _window = monitor_window(false).await;
     let rig = rig(false);
     let before = metadata(&rig);
     rig.coordinator
@@ -438,6 +440,22 @@ async fn a_halt_resolved_after_the_swap_writes_exactly_one_approval_row() {
 
 // ---- (e): the post-swap monitor watches the CARRIED set ---------------------
 
+/// `PostSwapMonitor::new` reads `MAOS_AUTO_REVERT_FAST` when a swap builds its
+/// monitor, and the environment is process-global. Every vector that completes
+/// a swap (so spawns a monitor) holds this lock for its whole body and sets the
+/// window explicitly, so a FAST window can never leak into a concurrent test.
+static MONITOR_WINDOW: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+async fn monitor_window(fast: bool) -> tokio::sync::MutexGuard<'static, ()> {
+    let guard = MONITOR_WINDOW.lock().await;
+    if fast {
+        std::env::set_var("MAOS_AUTO_REVERT_FAST", "1");
+    } else {
+        std::env::remove_var("MAOS_AUTO_REVERT_FAST");
+    }
+    guard
+}
+
 /// Count `HotSwapAborted` rows (the auto-revert receipt), waiting out the
 /// 300 ms `MAOS_AUTO_REVERT_FAST` window plus its 50 ms ticks.
 async fn auto_reverts_within(rig: &Rig, wait: std::time::Duration) -> usize {
@@ -460,7 +478,7 @@ async fn auto_reverts_within(rig: &Rig, wait: std::time::Duration) -> usize {
 
 #[tokio::test]
 async fn resolving_the_carried_halt_inside_the_monitor_window_is_not_a_loss() {
-    std::env::set_var("MAOS_AUTO_REVERT_FAST", "1");
+    let _window = monitor_window(true).await;
     let rig = rig(false);
     rig.coordinator
         .initiate_swap(SPIRIT_ID, &successor(None), probe())
@@ -478,7 +496,7 @@ async fn resolving_the_carried_halt_inside_the_monitor_window_is_not_a_loss() {
 
 #[tokio::test]
 async fn a_carried_halt_that_leaves_the_registry_inside_the_window_is_still_a_loss() {
-    std::env::set_var("MAOS_AUTO_REVERT_FAST", "1");
+    let _window = monitor_window(true).await;
     let rig = rig(false);
     rig.coordinator
         .initiate_swap(SPIRIT_ID, &successor(None), probe())

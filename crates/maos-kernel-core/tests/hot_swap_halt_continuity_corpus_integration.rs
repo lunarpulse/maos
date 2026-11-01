@@ -60,29 +60,25 @@ fn halt_signal_observation_corpus_exercises_swap_continuity_wrapper() {
             scenario.scenario_id
         ));
 
-        match expected.variant.as_str() {
-            "SafeDrained" => {
-                assert!(
-                    matches!(verdict, SwapVerdict::SafeDrained { .. }),
-                    "scenario {} expected SafeDrained, got {:?}",
-                    scenario.scenario_id,
-                    verdict
-                );
-            }
-            "SafeMigrated" | "Violation" => {
-                // The corpus carries these variants for the precheck, which
-                // seeds halts. This wrapper runs on an empty registry, so it
-                // carries nothing: the known-safe verdict, no cross-Spirit
-                // halt-state leaked.
-                assert!(
-                    matches!(verdict, SwapVerdict::SafeDrained { .. }),
-                    "scenario {}: an empty registry carries nothing; got {:?}",
-                    scenario.scenario_id,
-                    verdict
-                );
-            }
-            other => panic!("unexpected expected_swap_verdict variant: {}", other),
-        }
+        // An empty registry can only prove the empty-set verdict (SafeDrained{0});
+        // it cannot exhibit a cross-Spirit leak (`halt_carry_20_3c.rs` proves
+        // isolation with seeded halts). A fixture that expects any other variant
+        // cannot be witnessed here and MUST fail rather than pass vacuously.
+        let got = match &verdict {
+            SwapVerdict::SafeDrained { .. } => "SafeDrained",
+            SwapVerdict::SafeMigrated { .. } => "SafeMigrated",
+        };
+        assert_eq!(
+            expected.variant, got,
+            "scenario {}: expected {}, gate returned {:?}",
+            scenario.scenario_id, expected.variant, verdict
+        );
+        assert!(
+            matches!(verdict, SwapVerdict::SafeDrained { drained_count: 0 }),
+            "scenario {}: an empty registry carries nothing; got {:?}",
+            scenario.scenario_id,
+            verdict
+        );
     }
 }
 

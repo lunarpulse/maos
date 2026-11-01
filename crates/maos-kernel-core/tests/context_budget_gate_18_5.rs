@@ -318,6 +318,9 @@ impl Provider for TooManyRequests {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_provider_429_journals_and_delivers_one_rate_limited_frame() {
+    let _serial = RATE_LIMITED_HEALTH
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let registry = registry(64);
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x18_05));
     let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
@@ -376,8 +379,8 @@ async fn a_provider_429_journals_and_delivers_one_rate_limited_frame() {
 // ---- 20-3c AC3 (EC5, D-20-3c-02 A, E3): a rate-limit frame is journaled or
 // ---- counted, never lost ---------------------------------------------------
 
-/// The `RateLimited` drop counter is process-wide; the two vectors below read
-/// it, so they never overlap.
+/// The `RateLimited` drop counter is process-wide; every vector that drives a
+/// provider 429 through the inference port takes this lock, so none overlap.
 static RATE_LIMITED_HEALTH: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// An inference port whose provider answers 429, wired to an IAC bus on which

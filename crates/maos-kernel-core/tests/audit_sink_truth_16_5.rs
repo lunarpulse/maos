@@ -270,9 +270,11 @@ fn audit_sink_truth_lifecycle_healthy_then_closed() {
     assert!(after_closed.degraded);
 }
 
-/// AC1's class-wide counter wiring: every `AuditDropSite` variant increments
-/// its own per-site counter and the aggregate through `record_drop`, so a
-/// site wired to the wrong variant (or not wired at all) cannot hide.
+/// AC1's class-wide counter mapping: every `AuditDropSite` variant listed here
+/// increments its own per-site counter and the aggregate through `record_drop`.
+/// This drives `record_drop` directly, so it pins the counter mapping only; it
+/// does not prove each production call site passes its own variant (the
+/// `RateLimited` wiring is witnessed by `context_budget_gate_18_5.rs`).
 #[test]
 fn every_audit_drop_site_counts_into_its_own_counter() {
     let _serial = AUDIT_HEALTH.lock();
