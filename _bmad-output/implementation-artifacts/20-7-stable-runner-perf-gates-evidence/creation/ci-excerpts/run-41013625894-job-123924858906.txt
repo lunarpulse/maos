@@ -1,0 +1,22 @@
+# run 41013625894 job 123924858906 — excerpt (gh api repos/lunarpulse/maos/actions/jobs/123924858906/logs, fetched 2026-11-01; ANSI stripped, timestamps cut)
+  stderr ───
+
+    thread 'supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease' (72320) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs:659:9:
+    lease child failed: maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef residue KillFailed; state retained at /tmp/.tmpEY11jM/state
+    maos: Worker egress lease for pid 1 retained as termination_unconfirmed residue
+
+    thread 'supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease' (72326) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs:751:9:
+    hang guard (20 s): the stub runtime never recorded the kill call
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+    thread 'supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease' (72326) panicked at crates/maos-bin/src/supervision.rs:2460:38:
+    Cannot start a runtime from within a runtime. This happens because a function (like `block_on`) attempted to block the current thread while the thread is being used to drive asynchronous tasks.
+    stack backtrace:
+
+## nextest/libtest result lines
+        FAIL [  20.594s] (1346/5396) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+        PASS [   1.209s] (1307/5396) maos-bin::worker_terminal_facts_17_7 s3_external_sigkill_requires_pidfd_fact
+        PASS [   1.661s] (1106/5396) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+        PASS [   1.678s] (1134/5396) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+        PASS [   1.755s] (1108/5396) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+    test supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease ... FAILED

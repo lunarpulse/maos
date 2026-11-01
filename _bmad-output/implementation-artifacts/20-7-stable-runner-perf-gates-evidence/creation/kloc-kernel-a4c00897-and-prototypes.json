@@ -1,0 +1,228 @@
+{
+ "instrument": "prebuilt /mnt/build/cargo-maos/debug/xtask (check-kernel-baseline --json, kloc-check --json; tokei via kloc-check) run with env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=<copy>/xtask from git-archive copies of a4c00897 under /tmp/proto207",
+ "head_commit": "a4c00897",
+ "results": {
+  "head": {
+   "kernel_physical": 26801,
+   "kernel_physical_delta": 0,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "c023d0d7555bdd97e5511ea322cffdc83c1a7dcb69a8b8083a6d2587ee95eb41",
+   "kernel_changed": [],
+   "kernel_passed": true,
+   "kernel_tokei": 21011,
+   "kernel_tokei_delta": 0,
+   "aggregate": 188816,
+   "aggregate_delta": 0,
+   "kloc_passed": true,
+   "over_budget": [],
+   "per_crate_subset": {
+    "maos-kernel-core": 21011,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  },
+  "k1": {
+   "kernel_physical": 26805,
+   "kernel_physical_delta": 4,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "a0152478303657803f77120711b50d44b460a94b12bf7fa17f2319b463918372",
+   "kernel_changed": [
+    "security/sandbox/t3/child.rs"
+   ],
+   "kernel_passed": false,
+   "kernel_tokei": 21012,
+   "kernel_tokei_delta": 1,
+   "aggregate": 188817,
+   "aggregate_delta": 1,
+   "kloc_passed": false,
+   "over_budget": [
+    "aggregate 188817 >= 188817",
+    "maos-kernel-core 21012 > 21011"
+   ],
+   "per_crate_subset": {
+    "maos-kernel-core": 21012,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  },
+  "k2": {
+   "kernel_physical": 26845,
+   "kernel_physical_delta": 44,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "64ba85760a81e9179d6bc2235296db239283d7e6705450925489e575e4d2ef78",
+   "kernel_changed": [
+    "security/sandbox/linux.rs",
+    "security/sandbox/t3/child.rs"
+   ],
+   "kernel_passed": false,
+   "kernel_tokei": 21044,
+   "kernel_tokei_delta": 33,
+   "aggregate": 188849,
+   "aggregate_delta": 33,
+   "kloc_passed": false,
+   "over_budget": [
+    "aggregate 188849 >= 188817",
+    "maos-kernel-core 21044 > 21011"
+   ],
+   "per_crate_subset": {
+    "maos-kernel-core": 21044,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  },
+  "k2r": {
+   "kernel_physical": 26823,
+   "kernel_physical_delta": 22,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "51c6ed87e0d7084070d05476994e3f01f38c2ce902b45513a5834babba2f908f",
+   "kernel_changed": [
+    "security/sandbox/t3/child.rs"
+   ],
+   "kernel_passed": false,
+   "kernel_tokei": 21027,
+   "kernel_tokei_delta": 16,
+   "aggregate": 188832,
+   "aggregate_delta": 16,
+   "kloc_passed": false,
+   "over_budget": [
+    "aggregate 188832 >= 188817",
+    "maos-kernel-core 21027 > 21011"
+   ],
+   "per_crate_subset": {
+    "maos-kernel-core": 21027,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  },
+  "k12": {
+   "kernel_physical": 26849,
+   "kernel_physical_delta": 48,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "9be62ca7ad8c95365c7453bf247d3fbcd12c5a08676027fbbfed8a7845ee2884",
+   "kernel_changed": [
+    "security/sandbox/linux.rs",
+    "security/sandbox/t3/child.rs"
+   ],
+   "kernel_passed": false,
+   "kernel_tokei": 21045,
+   "kernel_tokei_delta": 34,
+   "aggregate": 188850,
+   "aggregate_delta": 34,
+   "kloc_passed": false,
+   "over_budget": [
+    "aggregate 188850 >= 188817",
+    "maos-kernel-core 21045 > 21011"
+   ],
+   "per_crate_subset": {
+    "maos-kernel-core": 21045,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  },
+  "k12r": {
+   "kernel_physical": 26827,
+   "kernel_physical_delta": 26,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "76a3521b1069c0000b3e7e791a3593174b589629a1a27cf042946f981c514f12",
+   "kernel_changed": [
+    "security/sandbox/t3/child.rs"
+   ],
+   "kernel_passed": false,
+   "kernel_tokei": 21028,
+   "kernel_tokei_delta": 17,
+   "aggregate": 188833,
+   "aggregate_delta": 17,
+   "kloc_passed": false,
+   "over_budget": [
+    "aggregate 188833 >= 188817",
+    "maos-kernel-core 21028 > 21011"
+   ],
+   "per_crate_subset": {
+    "maos-kernel-core": 21028,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  },
+  "k1w": {
+   "kernel_physical": 26819,
+   "kernel_physical_delta": 18,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "8c6a3f1b2a2ce7284a95e9c411e00bd99550003f56b2f16cb02f8680c55be2a8",
+   "kernel_changed": [
+    "security/sandbox/t3/child.rs"
+   ],
+   "kernel_passed": false,
+   "kernel_tokei": 21026,
+   "kernel_tokei_delta": 15,
+   "aggregate": 188831,
+   "aggregate_delta": 15,
+   "kloc_passed": false,
+   "over_budget": [
+    "aggregate 188831 >= 188817",
+    "maos-kernel-core 21026 > 21011"
+   ],
+   "per_crate_subset": {
+    "maos-kernel-core": 21026,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  },
+  "k1wr": {
+   "kernel_physical": 26841,
+   "kernel_physical_delta": 40,
+   "kernel_file_set_entries": 95,
+   "kernel_set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+   "kernel_changed": [
+    "security/sandbox/t3/child.rs"
+   ],
+   "kernel_passed": false,
+   "kernel_tokei": 21042,
+   "kernel_tokei_delta": 31,
+   "aggregate": 188847,
+   "aggregate_delta": 31,
+   "kloc_passed": false,
+   "over_budget": [
+    "aggregate 188847 >= 188817",
+    "maos-kernel-core 21042 > 21011"
+   ],
+   "per_crate_subset": {
+    "maos-kernel-core": 21042,
+    "maos-capability": 1433,
+    "maos-bin": 33195,
+    "maos-bench": 2451,
+    "maos-domain": 10093,
+    "xtask": 42860
+   }
+  }
+ },
+ "diffs": {
+  "k1": "k1-remove-confirmed-dead-payload.diff",
+  "k1w": "k1w-wait-snapshot-then-remove.diff",
+  "k2": "k2-pidfd-kill-libc.diff",
+  "k2r": "k2r-pidfd-kill-rustix.diff",
+  "k12": "k12-k1-k2-libc-bundle.diff",
+  "k12r": "k12r-k1-k2r-bundle.diff",
+  "k1wr": "k1wr-k1w-k2r-bundle.diff"
+ }
+}

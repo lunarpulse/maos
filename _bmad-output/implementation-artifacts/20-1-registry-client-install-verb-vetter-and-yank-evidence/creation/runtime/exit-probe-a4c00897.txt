@@ -1,0 +1,87 @@
+# 20-1 exit probe @ a4c00897; binaries:
+/mnt/build/cargo-maos/debug/maos 2026-11-01 13:51:43.761330000 +0000
+/mnt/build/cargo-maos/debug/maosctl 2026-11-01 13:47:19.699251752 +0000
+/mnt/build/cargo-maos/debug/maos-registry-server 2026-11-01 13:48:59.960119435 +0000
+/mnt/build/cargo-maos/debug/maos-spirit 2026-11-01 13:48:54.299183425 +0000
+/mnt/build/cargo-maos/debug/xtask 2026-11-01 13:46:32.393785183 +0000
+
+### L2 release-verify --sign (dev seed)
+$ env -i PATH=/usr/bin:/bin RELEASE_SIGNING_KEY=794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums /tmp/c201/dist/SHA256SUMS --output /tmp/c201/dist/SHA256SUMS.sig
+rc=0 (4 ms)
+release-verify: signed 2 entries from /tmp/c201/dist/SHA256SUMS → /tmp/c201/dist/SHA256SUMS.sig
+
+### L4 maosctl install --from-local --verify-only
+$ env -i PATH=/usr/bin:/bin HOME=/tmp/c201/home XDG_DATA_HOME=/tmp/c201/home/.local/share XDG_CONFIG_HOME=/tmp/c201/home/.config XDG_RUNTIME_DIR=/tmp/c201/run /mnt/build/cargo-maos/debug/maosctl install --from-local /tmp/c201/dist --verify-only
+rc=0 (86 ms)
+maosctl: verification passed for 2 file(s)
+  ✓ maos-linux-amd64 (e9767d13c6d762e7)
+  ✓ maosctl-linux-amd64 (c55c18dc9db09942)
+
+### L5 maos-registry-server --bind --root
+$ env -i PATH=/usr/bin:/bin HOME=/tmp/c201/home XDG_DATA_HOME=/tmp/c201/home/.local/share XDG_CONFIG_HOME=/tmp/c201/home/.config XDG_RUNTIME_DIR=/tmp/c201/run /mnt/build/cargo-maos/debug/maos-registry-server --bind 127.0.0.1:0 --root /tmp/c201/reg
+rc=1 (2 ms)
+maos-registry-server: not yet wired — Story 5.5d Task 13
+
+### L5-alt MAOS_ONE_SHOT=registry-server maos
+ready=1 after 3 polls
+registry.search -> 200 {"jsonrpc":"2.0","id":1,"result":{"items":[]}}
+registry.deprecate (no credential) -> 200 {"jsonrpc":"2.0","id":2,"result":{"yank_id":"yank-80","spirit_id":"anyone-elses-spirit","version":"0.1.0"}}
+maos 0.1.0-alpha.1 (v0.1-β scaffold; worker_threads target = 32)
+maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)
+maos: capability registry initialized (Story 1b.2)
+maos: enterprise PDP not configured — set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)
+yanks.json after probe:
+[
+  {
+    "spirit_id": "anyone-elses-spirit",
+    "version": "0.1.0",
+    "yanked_at_ns": 2885,
+    "reason": "unauthenticated yank probe"
+  }
+]
+
+### L7 maos-spirit publish --tier=public_untrusted
+$ env -i PATH=/usr/bin:/bin HOME=/tmp/c201/home XDG_DATA_HOME=/tmp/c201/home/.local/share XDG_CONFIG_HOME=/tmp/c201/home/.config XDG_RUNTIME_DIR=/tmp/c201/run MAOS_SPIRIT_SIGNING_KEY=e554737a7f825873624a9ce265aa3b3865382e9ae3e3ea320522feccb9256b14 /mnt/build/cargo-maos/debug/maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest /home/lunarpulse/dev_ws/examples/example-spirit-ts/manifest.toml --artifact /home/lunarpulse/dev_ws/examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+rc=1 (3 ms)
+maos-spirit: maos-spirit publish for non-`stub` registry URIs requires the kernel-side composition root; invoke through `maosctl publish` (Story 7.4+) or pipe a SignedPackage via --dry-run for downstream tooling. Resolved URI: 'http://127.0.0.1:6789/mcp'
+
+### L7b maos-spirit publish --tier=local (manifest's tier)
+$ env -i PATH=/usr/bin:/bin HOME=/tmp/c201/home XDG_DATA_HOME=/tmp/c201/home/.local/share XDG_CONFIG_HOME=/tmp/c201/home/.config XDG_RUNTIME_DIR=/tmp/c201/run MAOS_SPIRIT_SIGNING_KEY=e554737a7f825873624a9ce265aa3b3865382e9ae3e3ea320522feccb9256b14 /mnt/build/cargo-maos/debug/maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=local --manifest /home/lunarpulse/dev_ws/examples/example-spirit-ts/manifest.toml --artifact /home/lunarpulse/dev_ws/examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+rc=1 (2 ms)
+maos-spirit: maos-spirit publish for non-`stub` registry URIs requires the kernel-side composition root; invoke through `maosctl publish` (Story 7.4+) or pipe a SignedPackage via --dry-run for downstream tooling. Resolved URI: 'http://127.0.0.1:6789/mcp'
+
+### L8 maosctl spirit install
+$ env -i PATH=/usr/bin:/bin HOME=/tmp/c201/home XDG_DATA_HOME=/tmp/c201/home/.local/share XDG_CONFIG_HOME=/tmp/c201/home/.config XDG_RUNTIME_DIR=/tmp/c201/run /mnt/build/cargo-maos/debug/maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+rc=2 (3 ms)
+error: unrecognized subcommand 'install'
+
+Usage: maosctl spirit [OPTIONS] <COMMAND>
+
+For more information, try '--help'.
+
+### L9a maos init
+$ env -i PATH=/usr/bin:/bin HOME=/tmp/c201/home XDG_DATA_HOME=/tmp/c201/home/.local/share XDG_CONFIG_HOME=/tmp/c201/home/.config XDG_RUNTIME_DIR=/tmp/c201/run /mnt/build/cargo-maos/debug/maos init --plain
+rc=0 (22 ms)
+maos: initialized /tmp/c201/home/.maos
+maos: config written to /tmp/c201/home/.maos/config.toml  (6 default slots + retention=persist)
+maos: operator door endpoint tcp://127.0.0.1:41781 recorded in /tmp/c201/home/.maos/control.json
+maos: Transparency Log will be at /tmp/c201/home/.local/share/maos/audit/transparency.sqlite
+maos: to remove all data, run:  maos purge --yes
+
+### L9b replay maos shell, @example-spirit-ts
+$ printf '@example-spirit-ts hello\n' | MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=… maos shell --plain
+rc=0 (76 ms)
+maos 0.1.0-alpha.1 (v0.1-β scaffold; worker_threads target = 32)
+maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)
+maos: capability registry initialized (Story 1b.2)
+maos: enterprise PDP not configured — set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)
+maos: enterprise identity/at-rest/SIEM NOT configured — set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)
+maos: orchestrator buffer registry initialized (Story 3.4)
+maos: Transparency Log opened on-disk at /tmp/c201/home/.local/share/maos/audit/transparency.sqlite
+maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable
+maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)
+maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)
+maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)
+maos: Mailbox TL installer wired (Story 6.4)
+
+30:maos: unknown spirit 'example-spirit-ts' — known: hello-spirit

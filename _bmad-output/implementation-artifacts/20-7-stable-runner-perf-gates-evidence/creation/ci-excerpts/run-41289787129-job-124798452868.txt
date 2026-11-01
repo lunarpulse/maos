@@ -1,0 +1,52 @@
+# run 41289787129 job 124798452868 — excerpt (gh api repos/lunarpulse/maos/actions/jobs/124798452868/logs, fetched 2026-11-01; ANSI stripped, timestamps cut)
+  stderr ───
+
+    thread 'ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan' (60899) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:348:9:
+    the standalone Worker (pid 61396) is still in /proc after 5s
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.017s] (1293/5477) maos-bin::worker_manifests_2a builtin_probe_authority_cannot_admit_the_operator_echo_destination
+        PASS [   0.019s] (1294/5477) maos-bin::worker_manifests_2a crosshost_2a_codex_manifest_keeps_the_attested_long_form_sandbox_spelling
+        PASS [   0.025s] (1295/5477) maos-bin::worker_manifests_2a crosshost_2a_every_shipped_worker_manifest_resolves_to_an_adapter
+        PASS [   0.064s] (1296/5477) maos-bin::worker_manifests_2a crosshost_2a_founder_loop_topologies_are_routable_end_to_end
+        PASS [   0.051s] (1297/5477) maos-bin::worker_manifests_2a crosshost_2a_real_adapter_manifests_declare_an_isolation_posture
+        PASS [   0.014s] (1298/5477) maos-bin::worker_manifests_2a probe_identity_is_hermetic_without_widening_live_admission
+        PASS [  10.245s] (1299/5477) maos-bin::two_host_delegation_2b sink_uninstalled_acks_but_does_not_admit_or_serve_the_frame
+        PASS [  12.310s] (1300/5477) maos-bin::worker_freeze_19_2 twenty_spawn_token_revokes_stop_the_worker_within_the_teardown_budget
+        PASS [   0.039s] (1301/5477) maos-bin::worker_supervision_16_3 a_crash_the_observer_never_saw_is_still_handled_by_finish
+        PASS [   0.024s] (1302/5477) maos-bin::worker_supervision_16_3 a_crashed_delegation_reaches_its_local_orchestrators_mailbox_once
+        PASS [  10.113s] (1303/5477) maos-bin::worker_resource_limits_17_2 fd_request_above_inherited_hard_limit_refuses_before_worker_payload
+        PASS [   0.042s] (1304/5477) maos-bin::worker_supervision_16_3 a_planned_stop_of_a_delegated_worker_delivers_nothing
+        PASS [   0.025s] (1305/5477) maos-bin::worker_supervision_16_3 a_repeated_orphan_delivery_is_a_typed_duplicate_and_delivers_nothing
+        PASS [   0.028s] (1306/5477) maos-bin::worker_supervision_16_3 a_sigkilled_worker_reaches_handle_crash_at_its_own_pid
+        PASS [   0.029s] (1307/5477) maos-bin::worker_supervision_16_3 a_standalone_crash_delivers_nothing_with_the_seam_installed
+        PASS [   0.021s] (1308/5477) maos-bin::worker_supervision_16_3 a_stop_during_the_mint_never_spawns_the_child
+        PASS [   0.022s] (1309/5477) maos-bin::worker_supervision_16_3 a_supervised_worker_completes_on_a_single_worker_runtime
+        PASS [   0.028s] (1310/5477) maos-bin::worker_supervision_16_3 a_worker_that_exits_zero_is_unloaded_and_never_orphaned
+        PASS [   0.016s] (1311/5477) maos-bin::worker_supervision_16_3 a_worker_that_would_bind_after_stop_workers_is_refused
+        PASS [   0.096s] (1312/5477) maos-bin::worker_supervision_16_3 abandoning_a_binding_stops_its_cid_container
+        PASS [   0.033s] (1313/5477) maos-bin::worker_supervision_16_3 an_armed_root_resolver_reassigns_once_then_escalates
+        PASS [   0.026s] (1314/5477) maos-bin::worker_supervision_16_3 an_escalating_manifest_escalates_instead_of_nacking
+        PASS [   0.022s] (1315/5477) maos-bin::worker_supervision_16_3 an_injected_error_after_watch_leaves_no_bound_worker_behind
+        PASS [   0.026s] (1316/5477) maos-bin::worker_supervision_16_3 an_originator_not_loaded_on_this_root_stays_journal_only
+        PASS [   0.006s] (1317/5477) maos-bin::worker_supervision_16_3 binding_phase_transitions_cover_every_cell
+        PASS [   0.020s] (1318/5477) maos-bin::worker_supervision_16_3 concurrent_workers_get_distinct_ids_and_their_own_verdicts
+        PASS [   0.034s] (1319/5477) maos-bin::worker_supervision_16_3 container_attachment_before_pidfd_stops_cid_then_late_pidfd
+        PASS [   0.098s] (1320/5477) maos-bin::worker_supervision_16_3 direct_worker_unload_stops_its_cid_container
+        PASS [  10.677s] (1321/5477) maos-bin::worker_resource_limits_17_2 real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion
+        PASS [   0.048s] (1322/5477) maos-bin::worker_supervision_16_3 maos_run_refuses_a_one_shot_mode_in_the_same_process
+        PASS [   0.035s] (1323/5477) maos-bin::worker_supervision_16_3 stop_before_container_attachment_still_kills_late_cid
+        PASS [   0.084s] (1324/5477) maos-bin::worker_supervision_16_3 stopping_a_container_kills_its_cid_and_runtime_client
+        PASS [   1.355s] (1325/5477) maos-bin::worker_supervision_16_3 the_crash_scene_through_the_real_binary_lands_at_one_real_pid
+        PASS [   6.490s] (1326/5477) maos-bin::worker_supervision_16_3 a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean
+        PASS [   0.005s] (1327/5477) maos-bin::worker_supervision_16_3 the_orphan_frame_id_is_a_deterministic_derivation_of_the_delegation_id
+        PASS [   0.005s] (1328/5477) maos-bin::worker_supervision_16_3 the_root_replica_resolver_is_unarmed_by_default_and_spends_one_answer
+        PASS [   8.326s] (1329/5477) maos-bin::worker_supervision_16_3 the_fr4_call_feed_survives_every_worker_row_it_must_omit
+
+## nextest/libtest result lines
+        FAIL [  16.772s] (1292/5477) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+        PASS [   1.651s] (1341/5477) maos-bin::worker_terminal_facts_17_7 s3_external_sigkill_requires_pidfd_fact
+        PASS [   2.083s] (1155/5477) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+        PASS [   2.118s] (1137/5477) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+        PASS [   5.042s] (1353/5477) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+    test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... FAILED

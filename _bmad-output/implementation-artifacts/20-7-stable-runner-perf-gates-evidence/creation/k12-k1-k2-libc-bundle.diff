@@ -1,0 +1,87 @@
+diff -r head/crates/maos-kernel-core/src/security/sandbox/linux.rs k12/crates/maos-kernel-core/src/security/sandbox/linux.rs
+--- head/crates/maos-kernel-core/src/security/sandbox/linux.rs	2026-11-01 13:52:51.000000000 +0000
++++ k12/crates/maos-kernel-core/src/security/sandbox/linux.rs	2026-11-01 14:05:59.679709980 +0000
+@@ -555,6 +555,27 @@
+     Ok(unsafe { std::os::fd::OwnedFd::from_raw_fd(fd as libc::c_int) })
+ }
+ 
++/// `pidfd_send_signal(2)` SIGKILL; needs no container-runtime lock.
++#[doc(hidden)]
++pub fn pidfd_kill(pidfd: std::os::fd::BorrowedFd<'_>) -> io::Result<()> {
++    // SAFETY: pidfd_send_signal(2) takes a borrowed descriptor, a signal
++    // number, a null siginfo pointer and zero flags by value; it reads no
++    // caller memory.
++    let rc = unsafe {
++        libc::syscall(
++            libc::SYS_pidfd_send_signal,
++            pidfd.as_raw_fd(),
++            libc::SIGKILL,
++            std::ptr::null::<libc::siginfo_t>(),
++            0,
++        )
++    };
++    if rc < 0 {
++        return Err(io::Error::last_os_error());
++    }
++    Ok(())
++}
++
+ /// `poll(2)` once; the caller owns `EINTR` retries and deadlines.
+ #[doc(hidden)]
+ pub fn poll_ready(fds: &mut [libc::pollfd], timeout: std::time::Duration) -> io::Result<usize> {
+diff -r head/crates/maos-kernel-core/src/security/sandbox/t3/child.rs k12/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+--- head/crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-01 13:52:51.000000000 +0000
++++ k12/crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-01 14:06:06.140399794 +0000
+@@ -279,6 +279,26 @@
+         succeeded
+     }
+ 
++    /// SIGKILL the verified payload through its pidfd (pid 1 of the CID's
++    /// pid namespace, so the kernel ends every process in it).
++    #[cfg(target_os = "linux")]
++    fn kill_payload(&self) -> bool {
++        use std::os::fd::AsFd;
++        let identity = self
++            .identity
++            .lock()
++            .unwrap_or_else(|poisoned| poisoned.into_inner());
++        identity
++            .pidfd
++            .as_ref()
++            .is_some_and(|pidfd| crate::security::sandbox::linux::pidfd_kill(pidfd.as_fd()).is_ok())
++    }
++
++    #[cfg(not(target_os = "linux"))]
++    fn kill_payload(&self) -> bool {
++        false
++    }
++
+     pub fn kill_succeeded(&self) -> bool {
+         !self.lock().kill_failed
+     }
+@@ -406,7 +426,10 @@
+         let mut unconfirmed = None;
+         if started && !self.termination_confirmed() {
+             let confirm_by = overall.min(entry + KILL_BUDGET);
+-            let killed = self.kill(confirm_by);
++            // The verified payload pidfd needs no runtime lock: a stalled
++            // runtime CLI cannot leave a live payload behind.
++            let signalled = self.kill_payload();
++            let killed = self.kill(confirm_by) || signalled;
+             if !self.confirm(confirm_by) {
+                 unconfirmed = Some(if killed {
+                     R::TerminationUnconfirmed
+@@ -416,8 +439,12 @@
+             }
+         }
+         if started {
++            // A frozen snapshot plus a confirmed termination is enough to
++            // remove: a runtime still holding its lock must not turn a dead
++            // payload into a retained container.
+             let facts = self.facts_by(overall, true);
+-            if facts.is_none() || self.lock().snapshot_inflight {
++            let pending = self.lock().snapshot_inflight;
++            if facts.is_none() || (pending && !self.termination_confirmed()) {
+                 return Err(R::TerminationUnconfirmed);
+             }
+         }

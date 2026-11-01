@@ -1,0 +1,58 @@
+--- a/crates/maos-registry/src/bin/server.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-registry/src/bin/server.rs	2026-11-01 14:03:06.956335167 +0000
+@@ -1,7 +1,50 @@
+-//! maos-registry-server — thin binary entry-point.
++//! maos-registry-server — `--bind <addr> --root <dir> [--signing-key <path>]`.
+ //!
+-//! Wired in Task 13 (MAOS_ONE_SHOT=registry-server).
+-fn main() {
+-    eprintln!("maos-registry-server: not yet wired — Story 5.5d Task 13");
+-    std::process::exit(1);
++//! The same constructor the daemon's `MAOS_ONE_SHOT=registry-server` arm uses
++//! (`SpiritRegistryServer::new` over `LocalFsRegistryStorage::at_path`).
++use std::sync::Arc;
++
++use maos_registry::storage::LocalFsRegistryStorage;
++use maos_registry::SpiritRegistryServer;
++
++const USAGE: &str = "usage: maos-registry-server --bind <addr> --root <dir> [--signing-key <path>]";
++
++fn main() -> std::process::ExitCode {
++    match run(std::env::args().skip(1).collect()) {
++        Ok(()) => std::process::ExitCode::SUCCESS,
++        Err(error) => {
++            eprintln!("maos-registry-server: {error}");
++            std::process::ExitCode::from(2)
++        }
++    }
++}
++
++fn run(args: Vec<String>) -> Result<(), String> {
++    let (mut bind, mut root, mut key) = (None, None, None);
++    let mut it = args.into_iter();
++    while let Some(flag) = it.next() {
++        let value = it
++            .next()
++            .ok_or_else(|| format!("{flag} needs a value; {USAGE}"))?;
++        match flag.as_str() {
++            "--bind" => bind = Some(value),
++            "--root" => root = Some(value),
++            "--signing-key" => key = Some(value),
++            other => return Err(format!("unknown flag {other}; {USAGE}")),
++        }
++    }
++    let bind = bind.ok_or_else(|| USAGE.to_string())?;
++    let root = root.ok_or_else(|| USAGE.to_string())?;
++    let storage = LocalFsRegistryStorage::at_path(root.into())
++        .map_err(|error| format!("registry root: {error}"))?;
++    let mut server = SpiritRegistryServer::new(Arc::new(storage), bind, None);
++    if let Some(path) = key {
++        let text = std::fs::read_to_string(&path).map_err(|error| format!("{path}: {error}"))?;
++        let bytes = hex::decode(text.trim()).map_err(|error| format!("{path}: {error}"))?;
++        let seed: [u8; 32] = bytes
++            .try_into()
++            .map_err(|_| format!("{path}: expected a 32-byte hex seed"))?;
++        server = server.with_server_signing_key(seed);
++    }
++    server.run()
+ }

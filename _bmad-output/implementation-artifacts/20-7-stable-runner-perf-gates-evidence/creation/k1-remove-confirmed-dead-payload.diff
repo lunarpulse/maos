@@ -1,0 +1,17 @@
+diff -r head/crates/maos-kernel-core/src/security/sandbox/t3/child.rs k1/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+--- head/crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-01 13:52:51.000000000 +0000
++++ k1/crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-01 14:05:59.678743604 +0000
+@@ -416,8 +416,12 @@
+             }
+         }
+         if started {
++            // A frozen snapshot plus a confirmed termination is enough to
++            // remove: a runtime still holding its lock must not turn a dead
++            // payload into a retained container.
+             let facts = self.facts_by(overall, true);
+-            if facts.is_none() || self.lock().snapshot_inflight {
++            let pending = self.lock().snapshot_inflight;
++            if facts.is_none() || (pending && !self.termination_confirmed()) {
+                 return Err(R::TerminationUnconfirmed);
+             }
+         }

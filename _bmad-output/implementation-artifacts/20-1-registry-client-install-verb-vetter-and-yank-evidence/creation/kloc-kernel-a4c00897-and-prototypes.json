@@ -1,0 +1,249 @@
+{
+ "base": {
+  "kernel_rc": 0,
+  "kernel_physical": 26801,
+  "kernel_files": 95,
+  "changed": [],
+  "added": [],
+  "kloc_rc": 0,
+  "aggregate": 188816,
+  "over_budget": [],
+  "crates": {
+   "maos-kernel-core": 21011,
+   "maos-bin": 33195,
+   "maos-cli": 6396,
+   "maos-registry": 3452,
+   "maos-spirit-cli": 753,
+   "maos-compliance": 2032,
+   "maos-mcp": 1174,
+   "maos-capability": 1433,
+   "maos-domain": 10093,
+   "maos-iac": 8270,
+   "maos-shell": 608
+  }
+ },
+ "kq0-fence-only": {
+  "desc": "Quarantine arm fences every mediated action via the existing pause fence (set_paused), keeps the Spirit loaded, no drain/terminate; non-sticky (resume/unload lift it)",
+  "kernel_rc": 1,
+  "kernel_physical": 26844,
+  "kernel_physical_delta": 43,
+  "kernel_tokei": 21051,
+  "kernel_tokei_delta": 40,
+  "changed": [
+   "revocation/applier.rs"
+  ],
+  "aggregate": 188856,
+  "aggregate_delta": 40,
+  "crate_deltas": {
+   "maos-kernel-core": 40
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188856 >= 188817",
+   "maos-kernel-core 21051 > 21011"
+  ]
+ },
+ "fmt0-applier-format-control": {
+  "desc": "CONTROL, no semantic change: split the one >100-col json! line that makes rustfmt skip the apply_crl body; rustfmt then formats the whole block (the churn any applier edit pays under cargo fmt --all)",
+  "kernel_rc": 1,
+  "kernel_physical": 26841,
+  "kernel_physical_delta": 40,
+  "kernel_tokei": 21051,
+  "kernel_tokei_delta": 40,
+  "changed": [
+   "revocation/applier.rs"
+  ],
+  "aggregate": 188856,
+  "aggregate_delta": 40,
+  "crate_deltas": {
+   "maos-kernel-core": 40
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188856 >= 188817",
+   "maos-kernel-core 21051 > 21011"
+  ]
+ },
+ "kq1-sticky-quarantine": {
+  "desc": "Quarantine arm sets a dedicated quarantine fence (CapabilityRegistryAdapter.quarantined; is_paused = paused||quarantined, so every existing fence site honours it); a director resume cannot lift it; unload clears it; no drain/terminate",
+  "kernel_rc": 1,
+  "kernel_physical": 26869,
+  "kernel_physical_delta": 68,
+  "kernel_tokei": 21070,
+  "kernel_tokei_delta": 59,
+  "changed": [
+   "capability/mod.rs",
+   "revocation/applier.rs",
+   "scheduler/scheduler_loop.rs"
+  ],
+  "aggregate": 188875,
+  "aggregate_delta": 59,
+  "crate_deltas": {
+   "maos-kernel-core": 59
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188875 >= 188817",
+   "maos-kernel-core 21070 > 21011"
+  ]
+ },
+ "kq2-sticky-quarantine-plus-iac-egress": {
+  "desc": "KQ1 + the applier's held-but-unused IAC handle fences the quarantined pid's outbound bus frames (maos-iac fenced_senders checked first in deliver_typed; maos-domain IacBusError::SenderQuarantined). Exhaustive matches over IacBusError not searched; unload release of the sender fence not included",
+  "kernel_rc": 1,
+  "kernel_physical": 26870,
+  "kernel_physical_delta": 69,
+  "kernel_tokei": 21071,
+  "kernel_tokei_delta": 60,
+  "changed": [
+   "capability/mod.rs",
+   "revocation/applier.rs",
+   "scheduler/scheduler_loop.rs"
+  ],
+  "aggregate": 188902,
+  "aggregate_delta": 86,
+  "crate_deltas": {
+   "maos-domain": 2,
+   "maos-iac": 24,
+   "maos-kernel-core": 60
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188902 >= 188817",
+   "maos-domain 10095 > 10093",
+   "maos-iac 8294 > 8270",
+   "maos-kernel-core 21071 > 21011"
+  ]
+ },
+ "p-poller-edge-trigger": {
+  "desc": "deferred-work.md:1264 (D-18-0-12 B, owner 20-1): edge-trigger the revocation poller's failure print \u2014 first failure, recovery with the count; telemetry unchanged",
+  "kernel_rc": 1,
+  "kernel_physical": 26811,
+  "kernel_physical_delta": 10,
+  "kernel_tokei": 21020,
+  "kernel_tokei_delta": 9,
+  "changed": [
+   "revocation/poller.rs"
+  ],
+  "aggregate": 188825,
+  "aggregate_delta": 9,
+  "crate_deltas": {
+   "maos-kernel-core": 9
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188825 >= 188817",
+   "maos-kernel-core 21020 > 21011"
+  ]
+ },
+ "b-nonkernel-yank-quarantine": {
+  "desc": "D04 B non-kernel route: FR59 yank-policy quarantine via the existing pub Story 19-2 fence (CapabilityRegistryAdapter::set_paused) from maos-bin's TlYankObserver; the door refuses `pause` on a Running+fenced Spirit so pause->resume cannot lift it. FR13 CRL Quarantine arm (applier.rs:160-197, kernel) UNCHANGED: still drain+marker+terminate",
+  "kernel_rc": 0,
+  "kernel_physical": 26801,
+  "kernel_physical_delta": 0,
+  "kernel_tokei": 21011,
+  "kernel_tokei_delta": 0,
+  "changed": [],
+  "aggregate": 188859,
+  "aggregate_delta": 43,
+  "crate_deltas": {
+   "maos-bin": 43
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188859 >= 188817",
+   "maos-bin 33238 > 33195"
+  ]
+ },
+ "krec-kq1-p-bundle": {
+  "desc": "RECOMMENDED kernel bundle: KQ1 sticky quarantine + P poller edge-trigger",
+  "kernel_rc": 1,
+  "kernel_physical": 26879,
+  "kernel_physical_delta": 78,
+  "kernel_tokei": 21079,
+  "kernel_tokei_delta": 68,
+  "changed": [
+   "capability/mod.rs",
+   "revocation/applier.rs",
+   "revocation/poller.rs",
+   "scheduler/scheduler_loop.rs"
+  ],
+  "aggregate": 188884,
+  "aggregate_delta": 68,
+  "crate_deltas": {
+   "maos-kernel-core": 68
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188884 >= 188817",
+   "maos-kernel-core 21079 > 21011"
+  ]
+ },
+ "kalt-kq2-p-bundle": {
+  "desc": "ALT bundle: KQ2 (KQ1 + IAC egress fence) + P",
+  "kernel_rc": 1,
+  "kernel_physical": 26880,
+  "kernel_physical_delta": 79,
+  "kernel_tokei": 21080,
+  "kernel_tokei_delta": 69,
+  "changed": [
+   "capability/mod.rs",
+   "revocation/applier.rs",
+   "revocation/poller.rs",
+   "scheduler/scheduler_loop.rs"
+  ],
+  "aggregate": 188911,
+  "aggregate_delta": 95,
+  "crate_deltas": {
+   "maos-domain": 2,
+   "maos-iac": 24,
+   "maos-kernel-core": 69
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188911 >= 188817",
+   "maos-domain 10095 > 10093",
+   "maos-iac 8294 > 8270",
+   "maos-kernel-core 21080 > 21011"
+  ]
+ },
+ "kmin-kq0-p-bundle": {
+  "desc": "MIN bundle: KQ0 (non-sticky pause fence) + P",
+  "kernel_rc": 1,
+  "kernel_physical": 26854,
+  "kernel_physical_delta": 53,
+  "kernel_tokei": 21060,
+  "kernel_tokei_delta": 49,
+  "changed": [
+   "revocation/applier.rs",
+   "revocation/poller.rs"
+  ],
+  "aggregate": 188865,
+  "aggregate_delta": 49,
+  "crate_deltas": {
+   "maos-kernel-core": 49
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188865 >= 188817",
+   "maos-kernel-core 21060 > 21011"
+  ]
+ },
+ "s1-registry-server-binary": {
+  "desc": "AC1(a): maos-registry-server --bind/--root/--signing-key over SpiritRegistryServer::new + LocalFsRegistryStorage::at_path (std args, no new dep); readiness print exists at server.rs:88",
+  "kernel_rc": 0,
+  "kernel_physical": 26801,
+  "kernel_physical_delta": 0,
+  "kernel_tokei": 21011,
+  "kernel_tokei_delta": 0,
+  "changed": [],
+  "aggregate": 188854,
+  "aggregate_delta": 38,
+  "crate_deltas": {
+   "maos-registry": 38
+  },
+  "kloc_rc": 1,
+  "over_budget": [
+   "aggregate 188854 >= 188817"
+  ]
+ }
+}

@@ -1,0 +1,52 @@
+# run 40671240744 job 122758268359 — excerpt (gh api repos/lunarpulse/maos/actions/jobs/122758268359/logs, fetched 2026-11-01; ANSI stripped, timestamps cut)
+  stderr ───
+
+    thread 's3_external_sigkill_requires_pidfd_fact' (59999) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7.rs:426:5:
+    observer/orphan detection took 10.06302991s (bound 5s, runtime podman version 4.9.3); stderr: maos 0.1.0-alpha.1 (v0.1-β scaffold; worker_threads target = 4)
+    maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)
+    maos: capability registry initialized (Story 1b.2)
+    maos: enterprise PDP not configured — set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)
+    maos: enterprise identity/at-rest/SIEM NOT configured — set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)
+    maos: orchestrator buffer registry initialized (Story 3.4)
+    maos: Transparency Log opened on-disk at /tmp/maos-terminal-facts-17-7-external-sigkill-59998-1793184471586367855/home/audit/transparency.sqlite
+    maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable
+    maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)
+    maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)
+    maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)
+    maos: Mailbox TL installer wired (Story 6.4)
+    maos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)
+    maos: Spirit Scheduler wired (Story 5.1)
+    maos: CrashDetector wired (Story 5.3)
+    maos: telemetry hook pump wired (Story 17-4)
+    maos: KernelLifecycleResolver wired (Story 5.1)
+    maos: HotSwapCoordinator wired (Story 5.2)
+    maos: RevocationApplier + RevocationPoller wired (Story 5.4)
+    maos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false
+    maos: UpgradeOrchestrator wired (Story 5.4)
+    maos: Approval Manager initialized (v0.3-β auto-allow)
+    maos: operator door disabled — no /tmp/maos-terminal-facts-17-7-external-sigkill-59998-1793184471586367855/home/control.json; run `maos init`
+    maos: no providers configured — all inference calls return Unconfigured
+    maos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)
+    maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)
+    maos: root supervision armed
+    maos: escape-anomaly consumer wired (Story 17-10, ADR-024)
+    maos run: cli_wrapper cap-token mediation not granted (kernel policy denied capability issuance); proceeding under AC5 host-grant authority (operator policy `proc.exec` grant is Epic 9 surface). The CapabilityInvocation exit row is still journaled.
+    maos run: cli_wrapper '/home/runner/work/maos/maos/target/debug/worker-cli-fixture' exited (Exited { code: 125 }); 1 CliSubprocessOutput row(s) journaled to the Transparency Log
+    maos: escape-anomaly consumer stopped (final scan: 0 anomaly line(s), 0 failed scan(s))
+    Error: "maos run: standalone cli_wrapper worker did not complete (not_completed:process_crash)"
+
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.012s] (1247/5261) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_remove_failure_is_typed
+        PASS [   0.047s] (1248/5261) maos-bin::worker_terminal_facts_17_7 stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+        PASS [   0.007s] (1249/5261) maos-bin::worker_terminal_facts_17_7 stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+        PASS [  10.010s] (1250/5261) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+        PASS [   0.016s] (1251/5261) maos-bin::worker_terminal_facts_17_7 stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+
+## nextest/libtest result lines
+        FAIL [  11.539s] (1246/5261) maos-bin::worker_terminal_facts_17_7 s3_external_sigkill_requires_pidfd_fact
+        PASS [   1.569s] (1050/5261) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+        PASS [   1.715s] (1052/5261) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+        PASS [   3.161s] (1071/5261) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+        PASS [   5.032s] (1255/5261) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+    test s3_external_sigkill_requires_pidfd_fact ... FAILED

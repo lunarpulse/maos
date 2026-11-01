@@ -1,0 +1,52 @@
+# run 40237233599 job 121301291185 — excerpt (gh api repos/lunarpulse/maos/actions/jobs/121301291185/logs, fetched 2026-11-01; ANSI stripped, timestamps cut)
+    cap_token_verify P99 = 5670ns (ADR-030 budget: 5000ns)
+
+    thread 'cap_token_verify_p99_under_5us_hot_path' (69425) panicked at crates/maos-kernel-core/tests/cap_token_verify_assertion.rs:85:5:
+    ADR-030 binding broken: cap_token_verify P99 = 5670ns, budget = 5000ns
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        PASS [   0.007s] (2396/4900) maos-kernel-core::capability_invocation_audit fetch_emits_capability_invocation
+        PASS [   0.008s] (2397/4900) maos-kernel-core::capability_invocation_audit recall_emits_capability_invocation
+        PASS [   0.016s] (2398/4900) maos-kernel-core::capability_invocation_audit write_distillate_emits_capability_invocation
+        PASS [   0.006s] (2399/4900) maos-kernel-core::cli_subprocess_invocation_fr52 ac6_scenario_6_1_cli_subprocess_output_surface_typed_variants_present
+        PASS [   0.004s] (2400/4900) maos-kernel-core::cli_subprocess_invocation_fr52 ac6_scenario_6_2_cap_token_expired_propagation
+        PASS [   0.005s] (2401/4900) maos-kernel-core::cli_subprocess_invocation_fr52 ac6_scenario_6_3_subprocess_exit_127_audit_row_shape
+        PASS [   0.004s] (2402/4900) maos-kernel-core::cli_subprocess_invocation_fr52 ac6_scenario_6_4_t1_sandbox_refused_with_ecli_wrapper_requires_t3
+        PASS [   0.003s] (2403/4900) maos-kernel-core::cli_subprocess_invocation_fr52 ac6_scenario_6_5_firehose_drr_fairness_floor_signal_present
+        PASS [   0.107s] (2404/4900) maos-kernel-core::cli_wrapper_admission ac5_scenario_5_1_declared_matches_observed_admission_succeeds
+        PASS [   0.105s] (2405/4900) maos-kernel-core::cli_wrapper_admission ac5_scenario_5_2_minor_bump_mismatch_fires_eoutput_shape_adapter_mismatch
+        PASS [   0.106s] (2406/4900) maos-kernel-core::cli_wrapper_admission ac5_scenario_5_3_major_bump_mismatch_fires_eoutput_shape_adapter_mismatch
+        PASS [   0.005s] (2407/4900) maos-kernel-core::cli_wrapper_admission ac5_scenario_5_4_class_and_cli_wrapper_mutually_exclusive_via_error_variant
+        PASS [   0.005s] (2408/4900) maos-kernel-core::cli_wrapper_admission ac5_scenario_5_5_cli_binary_not_on_path_fires_ecli_binary_not_found
+        PASS [   0.005s] (2409/4900) maos-kernel-core::cli_wrapper_admission ac5_scenario_5_6_adapter_not_registered_typed_error
+        PASS [   0.105s] (2410/4900) maos-kernel-core::cli_wrapper_admission ac5_scenario_5_7_mock_claude_code_admits_and_runtime_forwards_frames
+        PASS [   0.006s] (2411/4900) maos-kernel-core::cli_wrapper_bridge_8_12 admission_rejects_respawn_with_context_fail_loud
+        PASS [   0.005s] (2412/4900) maos-kernel-core::cli_wrapper_bridge_8_12 admission_tier_grant_gate
+        PASS [   0.009s] (2413/4900) maos-kernel-core::cli_wrapper_bridge_8_12 antitheater_real_spawn_nonce_pid_and_reaped
+        PASS [   0.005s] (2414/4900) maos-kernel-core::cli_wrapper_bridge_8_12 cap_binding_mismatch_refuses_to_spawn
+        PASS [   0.007s] (2415/4900) maos-kernel-core::cli_wrapper_bridge_8_12 crash_detection_latency_under_2s_with_margin
+        PASS [   0.008s] (2416/4900) maos-kernel-core::cli_wrapper_bridge_8_12 crash_matrix_exit_codes_and_signals
+        PASS [   0.007s] (2417/4900) maos-kernel-core::cli_wrapper_bridge_8_12 redaction_trap_hex_token_never_lands_in_log
+        PASS [   0.007s] (2418/4900) maos-kernel-core::cli_wrapper_bridge_8_12 stderr_lines_are_captured_with_stream_provenance
+        PASS [   0.007s] (2419/4900) maos-kernel-core::cli_wrapper_bridge_8_12 stdout_drains_before_death_no_truncation
+        PASS [   0.004s] (2420/4900) maos-kernel-core::cli_wrapper_egress_admission_17_1 empty_policy_admits_without_a_proxy_but_nonempty_policy_refuses
+        PASS [   0.004s] (2421/4900) maos-kernel-core::cli_wrapper_egress_admission_17_1 every_requested_authority_requires_an_exact_host_grant
+        PASS [   0.005s] (2422/4900) maos-kernel-core::cli_wrapper_egress_admission_17_1 journaled_admission_rejects_egress_before_executing_the_probe
+        PASS [   0.004s] (2423/4900) maos-kernel-core::cli_wrapper_egress_admission_17_1 missing_host_grant_does_not_report_the_requested_tier_as_permitted
+        PASS [   0.106s] (2424/4900) maos-kernel-core::cli_wrapper_shape_mismatch_journal_7_4 clean_admission_writes_no_mismatch_frame
+        PASS [   1.147s] (2425/4900) maos-kernel-core::cap_audit_backpressure hot_path_never_blocks_under_audit_saturation
+        PASS [   0.006s] (2426/4900) maos-kernel-core::cli_wrapper_shape_mismatch_journal_7_4 non_shape_errors_are_not_journaled_as_shape_mismatch
+        PASS [   0.108s] (2427/4900) maos-kernel-core::cli_wrapper_shape_mismatch_journal_7_4 mismatch_is_journaled_with_version_diff
+        PASS [   0.008s] (2428/4900) maos-kernel-core::cli_wrapper_t3_boundary_17_1 a_plain_bridge_drops_ambient_credentials_and_keeps_its_explicit_environment
+        PASS [   0.004s] (2429/4900) maos-kernel-core::cli_wrapper_t3_boundary_17_1 all_nine_t3_postures_refuse_stdin_or_require_a_verified_launch
+        PASS [   0.018s] (2430/4900) maos-kernel-core::cli_wrapper_t3_boundary_17_1 an_unterminated_oversized_record_is_refused_at_the_bound_without_waiting_for_eof
+        PASS [   0.090s] (2431/4900) maos-kernel-core::cli_wrapper_t3_boundary_17_1 newline_frames_accept_the_limit_and_refuse_one_byte_over
+        PASS [   0.005s] (2432/4900) maos-kernel-core::cli_wrapper_t3_boundary_17_1 t3_without_verified_launch_data_never_runs_the_program
+
+## nextest/libtest result lines
+        PASS [   1.246s] ( 932/4900) maos-bin::root_shutdown_unload_16_3 ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+        PASS [   1.276s] ( 935/4900) maos-bin::root_shutdown_unload_16_3 ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+        PASS [   1.520s] ( 939/4900) maos-bin::root_shutdown_unload_16_3 cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+        PASS [   3.772s] (1117/4900) maos-bin::worker_terminal_facts_17_7 s3_external_sigkill_requires_pidfd_fact
+        PASS [   5.049s] (1128/4900) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+    test cap_token_verify_p99_under_5us_hot_path ... FAILED

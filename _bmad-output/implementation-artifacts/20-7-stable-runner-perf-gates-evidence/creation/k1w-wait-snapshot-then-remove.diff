@@ -1,0 +1,37 @@
+diff -ru head/crates/maos-kernel-core/src/security/sandbox/t3/child.rs k1w/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+--- head/crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-01 13:52:51.000000000 +0000
++++ k1w/crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-01 14:19:03.013928704 +0000
+@@ -374,6 +374,24 @@
+         verdict
+     }
+ 
++    /// Wait for an in-flight snapshot owner to publish (it is bounded by its
++    /// own deadline), so a stalled runtime cannot race removal away.
++    fn snapshot_settled(&self, by: Instant) -> bool {
++        let mut progress = self.lock();
++        while progress.snapshot_inflight {
++            let now = Instant::now();
++            if now >= by {
++                return false;
++            }
++            progress = self
++                .changed
++                .wait_timeout(progress, by - now)
++                .unwrap_or_else(|poisoned| poisoned.into_inner())
++                .0;
++        }
++        true
++    }
++
+     fn teardown_pending(&self) -> bool {
+         matches!(self.lock().teardown, Some(None))
+     }
+@@ -417,7 +435,7 @@
+         }
+         if started {
+             let facts = self.facts_by(overall, true);
+-            if facts.is_none() || self.lock().snapshot_inflight {
++            if facts.is_none() || !self.snapshot_settled(overall) {
+                 return Err(R::TerminationUnconfirmed);
+             }
+         }

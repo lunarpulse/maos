@@ -1,0 +1,92 @@
+--- a/crates/maos-bin/src/main.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-bin/src/main.rs	2026-11-01 14:02:34.445683563 +0000
+@@ -275,12 +275,25 @@
+ /// Transparency Log so every propagated yank is auditable (Story 7.2).
+ struct TlYankObserver {
+     tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
++    /// 20-1 (D04 B prototype) — `Some` when the operator's yank policy is
++    /// `quarantine`: the running Spirit keeps running, every mediated action
++    /// fails closed through the existing Story 19-2 fence.
++    quarantine: Option<(
++        Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
++        Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
++    )>,
+ }
+ 
+ #[cfg(feature = "network")]
+ impl TlYankObserver {
+-    fn new(tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>) -> Self {
+-        Self { tl }
++    fn new(
++        tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
++        quarantine: Option<(
++            Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
++            Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
++        )>,
++    ) -> Self {
++        Self { tl, quarantine }
+     }
+ }
+ 
+@@ -328,6 +341,25 @@
+             payload.to_string().as_bytes(),
+             maos_domain::invariants::i3::FrameOrigin::Kernel,
+         );
++        if let Some((capability, scheduler)) = &self.quarantine {
++            if let Some(pid) = scheduler.resolve_pid(entry.spirit_id.as_str()) {
++                capability.set_paused(pid, true);
++                let marker = serde_json::json!({
++                    "spirit_id": entry.spirit_id,
++                    "spirit_pid": pid,
++                    "quarantined": true,
++                    "cause": "registry-yank",
++                });
++                let _token = self.tl.insert_frame_event(
++                    maos_kernel_core::iac::transparency_log::FrameKind::CapabilityInvocation,
++                    pid,
++                    None,
++                    "spirit.quarantined",
++                    marker.to_string().as_bytes(),
++                    maos_domain::invariants::i3::FrameOrigin::Kernel,
++                );
++            }
++        }
+         let detected_at_unix_ms = std::time::SystemTime::now()
+             .duration_since(std::time::UNIX_EPOCH)
+             .map(|duration| duration.as_millis() as u64)
+@@ -3321,8 +3353,11 @@
+                     // Story 7.2 — wire the 5-min yank poller (Finding D3).
+                     let poll_interval = maos_registry::yank::resolve_poll_interval();
+                     if poll_interval.as_secs() > 0 {
+-                        let yank_observer =
+-                            Arc::new(TlYankObserver::new(Arc::clone(&transparency_log)));
++                        let yank_observer = Arc::new(TlYankObserver::new(
++                            Arc::clone(&transparency_log),
++                            (std::env::var("MAOS_YANK_POLICY").as_deref() == Ok("quarantine"))
++                                .then(|| (Arc::clone(&capability), Arc::clone(&scheduler))),
++                        ));
+                         let yank_poller = Arc::new(maos_registry::yank::YankPoller::new(
+                             Arc::clone(&registry_client)
+                                 as Arc<dyn maos_registry::yank::YankSource>,
+--- a/crates/maos-bin/src/operator_door.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-bin/src/operator_door.rs	2026-11-01 14:02:34.487683113 +0000
+@@ -843,6 +843,19 @@
+         // class of lie as the retired `stop` verb journaling a `Halt`. An
+         // operator who paused a Spirit and then "started" it must be told
+         // which verb actually resumes it.
++        // 20-1 (D04 B prototype) — a Running Spirit that is fenced is
++        // quarantined, not paused: pause→resume would lift the fence.
++        if verb == "pause"
++            && self.capability.is_paused(pid)
++            && self.scb_state(spirit_id) == Some(Scb::Running)
++        {
++            return OperatorOutcome::Conflict {
++                code: "spirit_quarantined".into(),
++                detail: format!(
++                    "spirit '{spirit_id}' is quarantined; unload it to end the quarantine"
++                ),
++            };
++        }
+         if verb == "start" {
+             let current = self.scb_state(spirit_id);
+             if current

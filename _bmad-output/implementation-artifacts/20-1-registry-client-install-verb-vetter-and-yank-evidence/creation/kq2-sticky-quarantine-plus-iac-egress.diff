@@ -1,0 +1,307 @@
+--- a/crates/maos-kernel-core/src/revocation/applier.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-kernel-core/src/revocation/applier.rs	2026-11-01 14:01:46.483195724 +0000
+@@ -121,8 +121,7 @@
+                 }
+                 matched_count += 1;
+                 revoked_count += 1;
+-                let tokens_revoked =
+-                    self.capability.revoke_all_for_pid(scb.pid);
++                let tokens_revoked = self.capability.revoke_all_for_pid(scb.pid);
+                 tokens_revoked_total += tokens_revoked;
+                 let in_flight_token_count = scb
+                     .task_assignments_in_flight
+@@ -141,34 +140,66 @@
+                     "in_flight_token_count": in_flight_token_count,
+                     "action": runtime.on_revocation_action.as_str(),
+                 }))
+-                .map_err(|error| RevocationError::Deserialize(format!("payload serialize: {error}")))?;
++                .map_err(|error| {
++                    RevocationError::Deserialize(format!("payload serialize: {error}"))
++                })?;
+                 self.tl.insert_frame_event(
+-                    FrameKind::SpiritRevoked, scb.pid, None, "spirit.revoked", &payload_bytes, FrameOrigin::Kernel,
++                    FrameKind::SpiritRevoked,
++                    scb.pid,
++                    None,
++                    "spirit.revoked",
++                    &payload_bytes,
++                    FrameOrigin::Kernel,
+                 );
+ 
+                 let receipts = match runtime.on_revocation_action {
+                     RevocationAction::TerminateImmediately => {
+                         let receipts = terminate_spirit(
+-                            &self.tl, &self.halt_registry, scb.pid, &scb.spirit_id,
+-                            maos_domain::halt::TerminationKind::RevocationTerminated, scb.boot_nonce,
++                            &self.tl,
++                            &self.halt_registry,
++                            scb.pid,
++                            &scb.spirit_id,
++                            maos_domain::halt::TerminationKind::RevocationTerminated,
++                            scb.boot_nonce,
+                         );
+                         self.scheduler.unload(scb.pid).await.map_err(|error| {
+-                            RevocationError::Io(format!("unload revoked spirit pid={}: {error}", scb.pid))
++                            RevocationError::Io(format!(
++                                "unload revoked spirit pid={}: {error}",
++                                scb.pid
++                            ))
+                         })?;
+                         receipts.len()
+                     }
+-                    RevocationAction::DrainThenTerminate | RevocationAction::Quarantine => {
+-                        if runtime.on_revocation_action == RevocationAction::Quarantine {
+-                            let marker_bytes = serde_json::to_vec(&serde_json::json!({
+-                                "spirit_id": scb.spirit_id, "spirit_pid": scb.pid, "quarantine_requested": true,
+-                            })).map_err(|error| RevocationError::Deserialize(format!("marker serialize: {error}")))?;
+-                            self.tl.insert_frame_event(
+-                                FrameKind::CapabilityInvocation, scb.pid, None, "spirit.quarantine_requested",
+-                                &marker_bytes, FrameOrigin::Kernel,
+-                            );
+-                        }
+-                        let deadline_ms = runtime.manifest.supervision.as_ref()
+-                            .map(|supervision| u64::from(supervision.progress_threshold_ms).saturating_mul(2))
++                    // FR13 (20-1): quarantine = running, but no new tool calls. Every
++                    // mediated action of the pid fails closed; the Spirit stays loaded
++                    // for forensic inspection and is never terminated by this arm.
++                    RevocationAction::Quarantine => {
++                        self.capability.set_quarantined(scb.pid, true);
++                        self._iac.set_sender_fenced(scb.pid, true);
++                        let marker_bytes = serde_json::to_vec(&serde_json::json!({
++                            "spirit_id": scb.spirit_id, "spirit_pid": scb.pid, "quarantined": true,
++                        }))
++                        .map_err(|error| {
++                            RevocationError::Deserialize(format!("marker serialize: {error}"))
++                        })?;
++                        self.tl.insert_frame_event(
++                            FrameKind::CapabilityInvocation,
++                            scb.pid,
++                            None,
++                            "spirit.quarantined",
++                            &marker_bytes,
++                            FrameOrigin::Kernel,
++                        );
++                        0
++                    }
++                    RevocationAction::DrainThenTerminate => {
++                        let deadline_ms = runtime
++                            .manifest
++                            .supervision
++                            .as_ref()
++                            .map(|supervision| {
++                                u64::from(supervision.progress_threshold_ms).saturating_mul(2)
++                            })
+                             .unwrap_or(60_000);
+                         let tl = Arc::clone(&self.tl);
+                         let halt_registry = Arc::clone(&self.halt_registry);
+@@ -180,11 +211,17 @@
+                         let handle = tokio::spawn(async move {
+                             tokio::time::sleep(std::time::Duration::from_millis(deadline_ms)).await;
+                             let _ = terminate_spirit(
+-                                &tl, &halt_registry, pid, &spirit_id,
+-                                maos_domain::halt::TerminationKind::RevocationTerminated, boot_nonce,
++                                &tl,
++                                &halt_registry,
++                                pid,
++                                &spirit_id,
++                                maos_domain::halt::TerminationKind::RevocationTerminated,
++                                boot_nonce,
+                             );
+                             if let Err(error) = scheduler.unload(pid).await {
+-                                eprintln!("revocation: deferred unload failed for pid={pid}: {error}");
++                                eprintln!(
++                                    "revocation: deferred unload failed for pid={pid}: {error}"
++                                );
+                             }
+                             if let Ok(mut drains) = active_drains.lock() {
+                                 drains.remove(&pid);
+@@ -198,19 +235,21 @@
+                     }
+                     _ => {
+                         return Err(RevocationError::UnsupportedAction(format!(
+-                            "{:?}", runtime.on_revocation_action
++                            "{:?}",
++                            runtime.on_revocation_action
+                         )));
+                     }
+                 };
+ 
+                 halt_receipts_produced += receipts;
+-                self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+-                    timestamp: monotonic_now_ns() / 1_000_000_000,
+-                    lifecycle_event: LifecycleEvent::Revoked,
+-                    spirit_id: scb.spirit_id.clone(),
+-                    payload: None,
+-                    effective_sandbox_tier: None,
+-                }));
++                self.journal
++                    .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
++                        timestamp: monotonic_now_ns() / 1_000_000_000,
++                        lifecycle_event: LifecycleEvent::Revoked,
++                        spirit_id: scb.spirit_id.clone(),
++                        payload: None,
++                        effective_sandbox_tier: None,
++                    }));
+                 per_spirit.push(ApplyEntry {
+                     spirit_id: scb.spirit_id.clone(),
+                     spirit_pid: scb.pid,
+@@ -224,7 +263,11 @@
+             }
+ 
+             let latency_ns = monotonic_now_ns().saturating_sub(start_ns);
+-            self.telemetry.record_iac_rt(Service::RevocationApplier, Outcome::Ok, latency_ns / 1000);
++            self.telemetry.record_iac_rt(
++                Service::RevocationApplier,
++                Outcome::Ok,
++                latency_ns / 1000,
++            );
+             Ok(ApplyReport {
+                 crl_id: crl.id,
+                 origin: crl.origin,
+@@ -235,7 +278,8 @@
+                 apply_latency_ns: latency_ns,
+                 per_spirit,
+             })
+-        }.await;
++        }
++        .await;
+ 
+         if result.is_err() {
+             self.rules.remove_locked(crl.id);
+--- a/crates/maos-kernel-core/src/capability/mod.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-kernel-core/src/capability/mod.rs	2026-11-01 14:01:46.458399246 +0000
+@@ -135,6 +135,9 @@
+     /// Story 19-2 (FR51 a) — pids the director paused: every mediated action
+     /// (issuance and verification) of a fenced pid fails closed until resume.
+     paused: std::sync::RwLock<std::collections::BTreeSet<u32>>,
++    /// FR13 (20-1) — pids a revocation quarantined: fenced like a pause, but a
++    /// director resume does not lift it; only unload or an operator release does.
++    quarantined: std::sync::RwLock<std::collections::BTreeSet<u32>>,
+ }
+ 
+ impl std::fmt::Debug for CapabilityRegistryAdapter {
+@@ -177,6 +180,7 @@
+             telemetry,
+             context: Arc::default(),
+             paused: std::sync::RwLock::default(),
++            quarantined: std::sync::RwLock::default(),
+         }
+     }
+ 
+@@ -348,9 +352,29 @@
+         self.tokens.verify(token, [0u8; 32], SandboxTier(0))
+     }
+ 
+-    /// Whether `spirit_pid` is fenced by a director pause.
++    /// Whether `spirit_pid` is fenced by a director pause or a quarantine.
+     pub fn is_paused(&self, spirit_pid: u32) -> bool {
+-        self.paused
++        self.is_quarantined(spirit_pid)
++            || self
++                .paused
++                .read()
++                .unwrap_or_else(|e| e.into_inner())
++                .contains(&spirit_pid)
++    }
++
++    /// FR13 (20-1) — quarantine (`true`) or release (`false`) `spirit_pid`.
++    pub fn set_quarantined(&self, spirit_pid: u32, quarantined: bool) {
++        let mut set = self.quarantined.write().unwrap_or_else(|e| e.into_inner());
++        if quarantined {
++            set.insert(spirit_pid);
++        } else {
++            set.remove(&spirit_pid);
++        }
++    }
++
++    /// Whether `spirit_pid` is quarantined (FR13).
++    pub fn is_quarantined(&self, spirit_pid: u32) -> bool {
++        self.quarantined
+             .read()
+             .unwrap_or_else(|e| e.into_inner())
+             .contains(&spirit_pid)
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs	2026-11-01 14:01:46.458559124 +0000
+@@ -570,6 +570,7 @@
+         self.capability.revoke_all_for_pid(spirit_pid);
+         self.capability.context_budget().remove(spirit_pid);
+         self.capability.set_paused(spirit_pid, false);
++        self.capability.set_quarantined(spirit_pid, false);
+         // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
+         let _ = self._halt_registry.drain_for_spirit(spirit_pid);
+         {
+--- a/crates/maos-iac/src/adapter.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-iac/src/adapter.rs	2026-11-01 14:01:46.599194488 +0000
+@@ -71,6 +71,8 @@
+     /// Bounded by session lifetime; eviction at MAX_LINEAGE_CACHE_ENTRIES.
+     frame_lineage_cache:
+         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
++    /// FR13 (20-1) — quarantined senders: their frames are refused before the log.
++    fenced_senders: std::sync::Arc<std::sync::RwLock<std::collections::BTreeSet<u32>>>,
+     /// Story 9.5b — optional OTel trace sink for IAC-frame span emission.
+     /// `None` = off (no-op branch; zero allocation). Wired from
+     /// composition root via [`IacBusAdapter::with_trace_sink`].
+@@ -104,12 +106,26 @@
+                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
+             }),
+             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
++            fenced_senders: std::sync::Arc::default(),
+             trace_sink: None,
+             #[cfg(feature = "spirit_test")]
+             isolation_hook: None,
+         }
+     }
+ 
++    /// FR13 (20-1) — fence (`true`) or release (`false`) a quarantined sender.
++    pub fn set_sender_fenced(&self, spirit_pid: u32, fenced: bool) {
++        let mut set = self
++            .fenced_senders
++            .write()
++            .unwrap_or_else(|e| e.into_inner());
++        if fenced {
++            set.insert(spirit_pid);
++        } else {
++            set.remove(&spirit_pid);
++        }
++    }
++
+     /// Story 6.1 — attach a DRR fairness scheduler in front of the TL writer.
+     pub fn with_drr_scheduler(mut self, drr: drr_scheduler::DrrScheduler) -> Self {
+         self.drr_scheduler = Some(drr);
+@@ -337,6 +353,16 @@
+         >,
+         maos_domain::iac_bus_types::IacBusError,
+     > {
++        if self
++            .fenced_senders
++            .read()
++            .unwrap_or_else(|e| e.into_inner())
++            .contains(&spirit_pid)
++        {
++            return Err(maos_domain::iac_bus_types::IacBusError::SenderQuarantined(
++                spirit_pid,
++            ));
++        }
+         // 0. I12 decorate decision frames BEFORE serialization (Story 3.3 AC5)
+         // so the logged payload already carries working_memory_digest_refs.
+         // digest_provider is injected from the composition root.
+@@ -861,6 +887,7 @@
+                 maos_domain::invariants::i12::WorkingMemoryDigestRefs::default()
+             }),
+             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
++            fenced_senders: std::sync::Arc::default(),
+             trace_sink: None,
+             #[cfg(feature = "spirit_test")]
+             isolation_hook: None,
+--- a/crates/maos-domain/src/iac_bus_types.rs	2026-11-01 13:52:51.000000000 +0000
++++ b/crates/maos-domain/src/iac_bus_types.rs	2026-11-01 14:01:46.459782581 +0000
+@@ -23,6 +23,9 @@
+     ChannelClosed(String, FrameKind),
+     #[error("frame serialization failed: {0}")]
+     SerializationFailed(String),
++    /// FR13 (20-1) — the sender is quarantined; nothing was logged or delivered.
++    #[error("spirit pid {0} is quarantined; its frames are refused")]
++    SenderQuarantined(u32),
+     /// Story 6.3 — cross-host routing requested but no A2A peer configured
+     /// for the named `host_id`. Replaces the v0.3-β `CrossHostUnsupported`
+     /// blanket reject — the kernel-core mailbox now routes through the

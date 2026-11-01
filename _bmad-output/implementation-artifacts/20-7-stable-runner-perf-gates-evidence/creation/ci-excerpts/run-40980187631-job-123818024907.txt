@@ -1,0 +1,39 @@
+# run 40980187631 job 123818024907 — excerpt (gh api repos/lunarpulse/maos/actions/jobs/123818024907/logs, fetched 2026-11-01; ANSI stripped, timestamps cut)
+---- ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan stdout ----
+
+thread 'ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan' (15667) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:348:9:
+the standalone Worker (pid 15781) is still in /proc after 5s
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 21.39s
+
+error: test failed, to rerun pass `-p maos-bin --test root_shutdown_unload_16_3`
+##[error]Process completed with exit code 101.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/5fbbf0b5-0084-4498-b427-5ec98b5ffc85' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+[command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+http.https://github.com/.extraheader
+[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Cleaning up orphan processes
+
+## nextest/libtest result lines
+test ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm ... ok
+test ac4_v2_butler_once_receipts_the_raised_halt_and_drains ... ok
+test ac4_v3_topology_once_unloads_every_loaded_spirit ... ok
+test ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker ... ok
+test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... FAILED
+test ac4_v4b_grandchild_is_stopped_with_its_worker_container ... ok
+test ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 ... ok

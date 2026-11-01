@@ -1,0 +1,101 @@
+# run 41008107054 job 123907517803 — excerpt (gh api repos/lunarpulse/maos/actions/jobs/123907517803/logs, fetched 2026-11-01; ANSI stripped, timestamps cut)
+---- cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains stdout ----
+
+thread 'cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains' (32661) panicked at crates/maos-bin/tests/root_shutdown_unload_16_3.rs:348:9:
+host B's hang Worker (pid 33003) is still in /proc after 5s
+
+
+failures:
+    cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.72s
+
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+
+Memory peak: 10.1M
+Memory swap peak: 0B
+{"gate":"check-multi-tenant-loom","evidence_state":"INDETERMINATE","passed":false,"oracle_green":false,"advisory":false,"disposition":{"v1_0":"advisory","v2_0":"advisory","v1_5":"advisory","v2_2":"blocking"},"ledger_enforced":true,"product_claim":"NOT_PROVEN(maos-bin-whole-package-parallel-isolation=INDETERMINATE)","operator_key_available":true,"operator_key_reason":"operator audit key lo
+##[error]Process completed with exit code 1.
+##[group]Run actions/upload-artifact@v4
+with:
+  name: evidence-ledger-check-multi-tenant-loom
+  path: tests/reports/evidence-ledger-check-multi-tenant-loom.json
+  if-no-files-found: error
+  retention-days: 90
+  compression-level: 6
+  overwrite: false
+  include-hidden-files: false
+env:
+  CARGO_TERM_COLOR: never
+  TOKEI_VERSION: 14.0.0
+  CARGO_DENY_VERSION: 0.19.4
+  CARGO_PUBLIC_API_VERSION: 0.51.0
+  MAOS_SECRETS_BACKEND: env
+  CARGO_NET_RETRY: 10
+  CARGO_HOME: /home/runner/.cargo
+  CARGO_INCREMENTAL: 0
+  CACHE_ON_FAILURE: false
+  MAOS_T3_RUNTIME: podman
+  MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+  MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: 208e03ed0596d291d46d43956614aeeeddb5e3dbfcc5e87457b0e53685501123
+  MAOS_AUDIT_KEY: /home/runner/work/_temp/maos-ci-evidence/audit-signing.key
+##[endgroup]
+(node:34874) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+With the provided path, there will be 1 file uploaded
+Artifact name is valid!
+Root directory input is valid!
+Beginning upload of artifact content to blob storage
+(node:34874) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Uploaded bytes 28402
+Finished uploading artifact content to blob storage!
+SHA256 digest of uploaded artifact zip is b68dd64d918017fe8eb306f6df6537be4c6355381936c57babfe792b78d76143
+Finalizing artifact upload
+Artifact evidence-ledger-check-multi-tenant-loom.zip successfully finalized. Artifact ID 12957174495
+Artifact evidence-ledger-check-multi-tenant-loom has been successfully uploaded! Final size is 28402 bytes. Artifact ID is 12957174495
+Artifact download URL: https://github.com/lunarpulse/maos/actions/runs/41008107054/artifacts/12957174495
+Post job cleanup.
+
+## nextest/libtest result lines
+test ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm ... ok
+test ac4_v2_butler_once_receipts_the_raised_halt_and_drains ... ok
+test ac4_v3_topology_once_unloads_every_loaded_spirit ... ok
+test ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker ... ok
+test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... ok
+test ac4_v4b_grandchild_is_stopped_with_its_worker_container ... ok
+test ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 ... ok
+test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains ... FAILED
+test cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown ... ok
+test cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants ... ok
+{"gate":"check-multi-tenant-loom","evidence_state":"INDETERMINATE","passed":false,"oracle_green":false,"advisory":false,"disposition":{"v1_0":"advisory","v2_0":"advisory","v1_5":"advisory","v2_2":"blocking"},"ledger_enforced":true,

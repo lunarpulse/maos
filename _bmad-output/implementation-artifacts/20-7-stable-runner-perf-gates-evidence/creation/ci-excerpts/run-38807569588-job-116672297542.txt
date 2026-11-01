@@ -1,0 +1,60 @@
+# run 38807569588 job 116672297542 — excerpt (gh api repos/lunarpulse/maos/actions/jobs/116672297542/logs, fetched 2026-11-01; ANSI stripped, timestamps cut)
+---- s3_external_sigkill_requires_pidfd_fact stdout ----
+
+thread 's3_external_sigkill_requires_pidfd_fact' (47100) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7.rs:430:5:
+observer/orphan detection took 10.032837094s (bound 5s, runtime podman version 4.9.3); stderr: maos 0.1.0-alpha.1 (v0.1-β scaffold; worker_threads target = 4)
+maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)
+maos: capability registry initialized (Story 1b.2)
+maos: enterprise PDP not configured — set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)
+maos: enterprise identity/at-rest/SIEM NOT configured — set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)
+maos: orchestrator buffer registry initialized (Story 3.4)
+maos: Transparency Log opened on-disk at /tmp/maos-terminal-facts-17-7-external-sigkill-46076-1792100544663777405/home/audit/transparency.sqlite
+maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable
+maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)
+maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)
+maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)
+maos: Mailbox TL installer wired (Story 6.4)
+maos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)
+maos: Spirit Scheduler wired (Story 5.1)
+maos: CrashDetector wired (Story 5.3)
+maos: KernelLifecycleResolver wired (Story 5.1)
+maos: HotSwapCoordinator wired (Story 5.2)
+maos: RevocationApplier + RevocationPoller wired (Story 5.4)
+maos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false
+maos: UpgradeOrchestrator wired (Story 5.4)
+maos: Approval Manager initialized (v0.3-β auto-allow)
+maos: operator door disabled — no /tmp/maos-terminal-facts-17-7-external-sigkill-46076-1792100544663777405/home/control.json; run `maos init`
+maos: no providers configured — all inference calls return Unconfigured
+maos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)
+maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)
+maos: root supervision armed
+maos run: cli_wrapper cap-token mediation not granted (kernel policy denied capability issuance); proceeding under AC5 host-grant authority (operator policy `proc.exec` grant is Epic 9 surface). The CapabilityInvocation exit row is still journaled.
+maos: T3 container 228d890ef5d6003f32debf732638490d4c05408850be448de7924e3d3ec703ae residue TerminationUnconfirmed; state retained at /run/user/1001/maos-worker-state/faa01e52/12c04bda
+maos run: cli_wrapper '/home/runner/work/maos/maos/target/debug/worker-cli-fixture' exited (Exited { code: 125 }); 2 CliSubprocessOutput row(s) journaled to the Transparency Log
+maos: preserving non-empty T3 state root for residue (directory not empty)
+maos: preserving non-empty T3 state root for residue (directory not empty)
+Error: "maos run: standalone cli_wrapper worker did not complete (not_completed:process_crash)"
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    s3_external_sigkill_requires_pidfd_fact
+
+test result: FAILED. 30 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.17s
+
+## nextest/libtest result lines
+test ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm ... ok
+test ac4_v2_butler_once_receipts_the_raised_halt_and_drains ... ok
+test ac4_v3_topology_once_unloads_every_loaded_spirit ... ok
+test ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker ... ok
+test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... ok
+test ac4_v4b_grandchild_is_stopped_with_its_worker_container ... ok
+test ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 ... ok
+test cap_token_verify_p99_under_100us_overall ... ok
+test cap_token_verify_p99_under_5us_hot_path ... ok
+test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains ... ok
+test cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown ... ok
+test cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants ... ok
+test s3_external_sigkill_requires_pidfd_fact ... FAILED
+test supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease ... ok
