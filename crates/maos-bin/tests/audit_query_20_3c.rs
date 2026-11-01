@@ -131,5 +131,17 @@ fn spirit_view_renders_a_tokenless_seed_task_assign() {
         out.status.code(),
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(String::from_utf8_lossy(&out.stdout).contains("recall-test") || !out.stdout.is_empty());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let seed_id = "31".repeat(16);
+    let seed_row = stdout
+        .lines()
+        .find(|line| line.contains("task.assign"))
+        .unwrap_or_else(|| panic!("the seed `task.assign` row is rendered; stdout:\n{stdout}"));
+    assert!(
+        seed_row.starts_with(&seed_id)
+            && seed_row.contains(&format!("{NONCE:016x}"))
+            && seed_row.contains(&format!("  {PID} "))
+            && seed_row.trim_end().ends_with("Standard"),
+        "the seed row renders its frame id, boot nonce, pid and intent; row:\n{seed_row}"
+    );
 }

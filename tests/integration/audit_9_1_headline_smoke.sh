@@ -179,9 +179,11 @@ echo "FR41 query --range 30d: PASS ($RANGE_LINES entries)"
 echo "::endgroup::"
 
 echo "::group::FR41 — --tag exact match on the intent column"
-# 20-3c AC8: --tag is a filter now, not a reserved flag. A tag no row carries
-# returns no rows and exits 0; a tag that is a mere substring of a real intent
-# must not match (exact, not --intent-contains).
+# 20-3c AC8: --tag is a filter now, not a reserved flag, and matches the
+# intent column EXACTLY (not a substring). This hosted smoke only proves the
+# negative leg — a tag no row carries returns no rows and exits 0; the
+# substring-must-not-match leg is witnessed locally by
+# crates/maos-bin/tests/audit_query_20_3c.rs (`--tag calibration` => no rows).
 TAG_NONE="$("${MAOSCTL}" audit query --tag no-such-tag-20-3c --format ndjson 2>/dev/null)" || {
     echo "FAIL: --tag with no matching row should exit 0" >&2
     exit 1

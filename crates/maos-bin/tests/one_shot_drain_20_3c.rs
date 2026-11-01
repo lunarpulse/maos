@@ -62,6 +62,13 @@ fn smoke_supervision_5_drains_its_audit_writer() {
     run_arm("smoke-supervision-5");
 }
 
+/// TIMING-BOUND, NOT HOLDER-RELEASE. This arm sets `MAOS_AUTO_REVERT_FAST=1`
+/// (`main.rs` upgrade-revoke arm), which shortens the kernel post-swap monitor's
+/// 30 s window to 300 ms (`post_swap_monitor.rs:45-49`). The monitor's
+/// `audit_tx`-carrying holders are kernel-side and cannot be released without a
+/// kernel change, so this test proves the drain completes once the window
+/// ends — it would NOT catch a leaked holder in this arm. The other four arms
+/// are holder-release witnesses.
 #[test]
 fn smoke_upgrade_revoke_5_drains_its_audit_writer() {
     run_arm("smoke-upgrade-revoke-5");
