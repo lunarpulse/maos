@@ -113,12 +113,17 @@ impl PostSwapMonitor {
                 .read()
                 .expect("spirits lock poisoned");
             if let Some(_scb) = map.get(&self.spirit_pid) {
-                let current_halt_ids: std::collections::BTreeSet<String> = self
-                    .coordinator
-                    .halt_registry_ref()
-                    .pending_halt_ids()
+                // A carried halt the operator resolved is terminal, not lost: it
+                // stays in the registry. Only a halt that LEFT it is a loss.
+                let registry = self.coordinator.halt_registry_ref();
+                let current_halt_ids: std::collections::BTreeSet<String> = snapshot
+                    .pre_swap_halt_ids
                     .iter()
-                    .map(|h| h.as_str().to_string())
+                    .filter(|id| {
+                        maos_domain::halt::HaltId::new(id.as_str())
+                            .is_ok_and(|id| registry.lookup_state(&id).is_some())
+                    })
+                    .cloned()
                     .collect();
                 if let Some(lost) =
                     detect_halt_set_loss(&snapshot.pre_swap_halt_ids, &current_halt_ids)
@@ -155,13 +160,11 @@ impl PostSwapMonitor {
     }
 }
 
-/// Pure halt-set-delta check: which snapshot halts are no longer pending?
+/// Pure halt-set-delta check: which snapshot halts are no longer present?
 ///
-/// The snapshot MUST hold only the halts expected to SURVIVE the swap — the
-/// post-drain pending set captured at commit. Halts the I14 gate drained-
-/// resolved are legitimately gone and must NOT appear here; otherwise this
-/// reports a false `HaltSetLoss` and the monitor auto-reverts a valid
-/// drained-with-pending swap (Story 12.5 review fix).
+/// The snapshot holds the halts the swap CARRIED (20-3c, FR53). A carried halt
+/// resolved by the operator inside the window is terminal but still present, so
+/// it is not reported; one that left the registry without a resolution is.
 fn detect_halt_set_loss(
     snapshot_halt_ids: &[String],
     current_pending: &std::collections::BTreeSet<String>,

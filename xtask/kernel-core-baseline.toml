@@ -502,7 +502,15 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26793
+src_lines = 26801
+# HISTORY: 20-3c landing 2 (audit-truth-and-halt-receipt-residuals), FLAG-Winston
+# R = K1p + E3 granted 2026-11-01 (rows203c/grant203c; ceiling 26817 physical /
+# 21044 tokei): exact formatted 26793 -> 26801 (+8 physical), tokei 20992 -> 21011
+# (+19); 95 files, surface unchanged. K1p: a hot swap carries the predecessor's
+# pending halts, no drain (halt/mod.rs, hot_swap/{precheck,coordinator,
+# post_swap_monitor}.rs); E3: RateLimited frame journaled or counted, never lost
+# (inference/mod.rs; maos-capability gains the RateLimited drop site). Production
+# --emit-pin hashes adopted exactly.
 # HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31:
 # FLAG-Winston exact formatted26680 -> 26793 (+113 physical), tokei20889 -> 20992 (+103);
 # 95 files unchanged, ZERO HEADROOM. Missing-identity debris, POSIX sidecar
@@ -912,7 +920,7 @@ src_lines = 26793
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "a7719696a749180a3fa6b7b8d62de4f25e75ea2c14497297e7b6ada17a0e2cc2"
+set_hash = "c023d0d7555bdd97e5511ea322cffdc83c1a7dcb69a8b8083a6d2587ee95eb41"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -926,20 +934,20 @@ set_hash = "a7719696a749180a3fa6b7b8d62de4f25e75ea2c14497297e7b6ada17a0e2cc2"
 "capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"
 "capability/working_memory/policy_runtime.rs" = "199858803e69787c8f981c18f4fa22201c8ad0f47d18638623606462e2e374b5"
 "compliance/mod.rs" = "46782179f13d4796d484317ab9eabad57d0b2e1d3c52a0eeb6a69834d788732a"
-"halt/mod.rs" = "ea1fb831c6d278c900821286fc127665039681b2e1166417a43d7bafd45c92bc"
+"halt/mod.rs" = "9fbfc85153ca1ab594e56562a2ea914c1385fe2b8617658a171d9293599e35f4"
 "halt/output_markers.rs" = "a320e7614f6b129e21853a5f98be10b8deeeb9f826d48cac829caf8cf236d893"
 "halt/resolver.rs" = "3756181d4a06e121fdd3b63818b45d20205e6acb9b43cc18fb5ad82c93ac6b1f"
 "halt/termination.rs" = "13f32e1f6dcca190621a5a47bff8fca181b63d79d10b20e9c6264080722f7a70"
 "hot_swap/archive.rs" = "a6e4ea60193e182b2dad8edeb793d3de366ef95b0be30e8c85756af78aeb7ddb"
-"hot_swap/coordinator.rs" = "0d6b6f4ef277206acc782699b05fb738ec7063e023b44c3956a838c79ad23b31"
+"hot_swap/coordinator.rs" = "cf4975c85db6ee84d00f43b603d4b2653e54b6f9058ce40f2e88307dd903dea9"
 "hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
 "hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
-"hot_swap/post_swap_monitor.rs" = "33bf93474c5b9d83012b5b4c9f032e13ff57dfa28c4b4cf03bbb80aa02e42b10"
-"hot_swap/precheck.rs" = "4a447575f94942c43e2784b5b4a6f38610a45ebf511333bc9df7a575446f740f"
+"hot_swap/post_swap_monitor.rs" = "5f1ef159078b114c29e220651a7b37fcf266921bdbead7f358d2b9dec67b3ac0"
+"hot_swap/precheck.rs" = "043d1c77bbdc978d955e4d9f9d136547ace1aea17b6b66e35dc6edf304e44ea1"
 "hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
-"inference/mod.rs" = "5c2235cb4c1f94309e8f4d26899a0ebdcc6cfbd91f96608ddc81740347d689ed"
+"inference/mod.rs" = "cbf9975f4c9da17c334df95be0cc2acced0f6a008cbcf249a01d963f7c1ff359"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
 "io/mod.rs" = "5cff233b27aa9d79793bd4fcda34270d2c98439b0c50c47059a0ee4f0718f032"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"

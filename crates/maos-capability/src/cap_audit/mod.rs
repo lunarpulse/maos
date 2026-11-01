@@ -32,10 +32,11 @@ pub enum AuditDropSite {
     SandboxBlock,
     AcpNotification,
     Quota,
+    RateLimited,
 }
 
 impl AuditDropSite {
-    const COUNT: usize = 8;
+    const COUNT: usize = 9;
 }
 
 /// Why an audit event did not reach the writer.

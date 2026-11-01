@@ -128,9 +128,9 @@ fn expected_kernel_response(category: &str, scenario_index: usize) -> &'static s
 }
 
 fn expected_swap_verdict(_scenario_index: usize) -> serde_json::Value {
-    // v0.3-β: drain_for_spirit drains all halts globally, so the wrapper
-    // always returns SafeDrained. Story 5.3 refines per-pid filtering and
-    // unlocks SafeMigrated / Violation paths at v0.5+.
+    // The isolation scenarios run `validate_swap_halt_continuity` on an empty
+    // halt registry, which carries nothing (20-3c K1p: a swap carries a Spirit's
+    // own pending halts and never drains), so the wrapper returns SafeDrained{0}.
     json!({"variant": "SafeDrained"})
 }
 

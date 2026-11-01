@@ -377,15 +377,13 @@ impl HotSwapCoordinator {
         // Step 11: Spawn PostSwapMonitor (30s window).
         saga.advance_to(SagaPhase::Committed);
 
-        // Story 12.5 review fix: snapshot the halts that must SURVIVE the swap
-        // — the CURRENT (post-drain) pending set. Step 3's I14 gate legitimately
-        // drained the predecessor's halts (resolution), so listing those
-        // pre-drain ids made the PostSwapMonitor flag every drained-with-pending
-        // swap as HaltSetLoss and auto-revert a valid swap. Only halts still
-        // pending after the gate must persist through the post-swap window.
+        // FR53 (20-3c K1p): the swap carried the predecessor's pending halts, so
+        // the halts that must SURVIVE the post-swap window are exactly that
+        // carried set. The monitor treats one as lost only if it left the
+        // registry; an operator resolving it in the window is not a loss.
         let pre_swap_halt_ids: Vec<String> = self
             .halt_registry
-            .pending_halt_ids()
+            .carried_for_spirit(predecessor_pid)
             .iter()
             .map(|h| h.as_str().to_string())
             .collect();

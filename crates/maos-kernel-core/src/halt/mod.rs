@@ -438,52 +438,45 @@ impl HaltRegistry {
         let map = self.pending.read().expect("HaltRegistry lock poisoned");
         map.get(halt_id).cloned()
     }
+
+    /// The halts a hot swap of `spirit_pid` carries: that Spirit's own
+    /// `PendingResolution` halts, read without mutation. Shared by the swap
+    /// gate and the precheck so both judge the same set.
+    pub(crate) fn carried_for_spirit(&self, spirit_pid: u32) -> Vec<HaltId> {
+        self.drain_for_spirit_dry_run(spirit_pid)
+            .into_iter()
+            .filter(|(_, state)| matches!(state, HaltState::PendingResolution))
+            .map(|(id, _)| id)
+            .collect()
+    }
 }
 
 /// I14 enforcement entry-point — used by Story 5.2's Hot-Swap Coordinator
 /// before initiating a swap.
 ///
-/// Drain-OR-migrate semantics per ADR-019 + architecture §3.2 I14:
-///   1. Snapshot predecessor's pending halt set.
-///   2. Attempt drain via `drain_for_spirit(predecessor_spirit_pid)`.
-///   3. After drain attempt, recompute the snapshot — if empty, swap is safe
-///      (`Ok(SwapVerdict::SafeDrained { drained_count })`).
-///   4. If drain failed, fall through to schema-compatible migration check
-///      via `validate_halt_set`.
-///   5. If `validate_halt_set` returns `Ok(())`, swap proceeds as
-///      `SwapVerdict::SafeMigrated { ... }`.
-///   6. Otherwise propagate `HaltContinuityError::*`.
+/// Carry-not-drain semantics (FR53, ADR-019 I14): a hot swap keeps the pid, so
+/// the predecessor's own pending halts stay pending with their identity,
+/// owner, fire time and replay payload. Nothing is drained — no halt ends
+/// without a receipt — and other Spirits' halts are never read. An
+/// incompatible successor refuses the swap with the halts intact
+/// (`HaltContinuityError::*`). `HotSwapPrecheck` predicts from the same set.
 pub fn validate_swap_halt_continuity(
     registry: &HaltRegistry,
     predecessor_spirit_pid: u32,
     predecessor_halt_protocol_version: u32,
     successor_accepted_versions: Option<&[u32]>,
 ) -> Result<SwapVerdict, HaltContinuityError> {
-    // 1. Snapshot BEFORE drain
-    let before_count = registry.pending_halt_ids().len();
-
-    // 2. Attempt drain for predecessor
-    let _drained = registry.drain_for_spirit(predecessor_spirit_pid);
-
-    // 3. Snapshot AFTER drain
-    let after_count = registry.pending_halt_ids().len();
-    let drained_count = before_count.saturating_sub(after_count);
-
-    // 4. If nothing left pending, swap is safe
-    if after_count == 0 {
-        return Ok(SwapVerdict::SafeDrained { drained_count });
+    let carried = registry.carried_for_spirit(predecessor_spirit_pid);
+    if carried.is_empty() {
+        return Ok(SwapVerdict::SafeDrained { drained_count: 0 });
     }
-
-    // 5. Fall through to migration check
-    let remaining = registry.pending_halt_ids();
     validate_halt_set(
-        &remaining,
+        &carried,
         predecessor_halt_protocol_version,
         successor_accepted_versions,
     )?;
-
     Ok(SwapVerdict::SafeMigrated {
-        migrated_count: remaining.len(),
+        migrated_count: carried.len(),
         predecessor_version: predecessor_halt_protocol_version,
         successor_versions: successor_accepted_versions.unwrap_or(&[]).to_vec(),
     })
@@ -655,7 +648,7 @@ mod swap_continuity_tests {
     }
 
     #[test]
-    fn drain_completes_returns_safe_drained() {
+    fn swap_carries_the_halt_instead_of_draining_it() {
         let registry = make_registry();
         // Insert a pending halt WITH metadata (Story 5.3 per-PID filter)
         let hid = HaltId::new("test-halt-001").unwrap();
@@ -681,8 +674,15 @@ mod swap_continuity_tests {
         assert_eq!(registry.pending_halt_ids().len(), 1);
 
         let verdict = validate_swap_halt_continuity(&registry, 1, 1, Some(&[1])).unwrap();
-        // per-PID drain clears the halt for spirit_pid=1
-        assert_eq!(verdict, SwapVerdict::SafeDrained { drained_count: 1 });
+        // FR53: the halt is carried, not drained — it is still pending afterwards.
+        assert!(matches!(
+            verdict,
+            SwapVerdict::SafeMigrated {
+                migrated_count: 1,
+                ..
+            }
+        ));
+        assert_eq!(registry.pending_halt_ids(), vec![hid]);
     }
 
     #[test]

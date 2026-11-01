@@ -10,20 +10,40 @@
 //! expected `PrecheckOutcome` variant.
 
 use maos_eval::hsis_corpus::{HsisCorpus, HsisScenario, SwapKind};
-use maos_kernel_core::halt::HaltRegistry;
+use maos_kernel_core::halt::{HaltRegistry, PendingHaltMetadata};
 use maos_kernel_core::hot_swap::precheck::{HotSwapPrecheck, PrecheckOutcome};
 
+use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::{HaltId, HaltState};
 
 /// Run a single HSIS scenario through HotSwapPrecheck::check.
 fn run_precheck(scenario: &HsisScenario) -> PrecheckOutcome {
     let registry = HaltRegistry::new();
 
-    // Populate the halt registry with predecessor's pending halts.
+    // Populate the halt registry with the predecessor's pending halts. A hot
+    // swap carries the halts its Spirit OWNS (20-3c, FR53), so each is owned by
+    // the scenario's predecessor pid.
+    let pid = scenario.preconditions.spirit_pid;
     for halt_name in &scenario.predecessor.pending_halts {
         let hid = HaltId::new(halt_name).expect("valid halt id");
         registry
-            .insert_pending(hid, HaltState::PendingResolution)
+            .insert_pending_with_metadata(
+                hid,
+                HaltState::PendingResolution,
+                PendingHaltMetadata {
+                    spirit_pid: pid,
+                    spirit_id: format!("spirit-{pid}"),
+                    payload: EpistemicHaltPayload {
+                        halt_id: halt_name.clone(),
+                        tag: "hsis".into(),
+                        value: 0.0,
+                        threshold: None,
+                        policy_id: "hsis".into(),
+                        derived_from: "hsis".into(),
+                    },
+                    fired_ns: 0,
+                },
+            )
             .expect("insert pending halt");
     }
 

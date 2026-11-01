@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
-//! AC5 FR53: an already-active halt, not a successor re-fire. The real swap
-//! currently drains the halt and metadata. Repair belongs to 20-3c member 12.
+//! AC5 FR53: an already-active halt, not a successor re-fire. The real hot swap
+//! CARRIES the halt (20-3c K1p, D-20-3c-01 A): identity, owner, fire time and
+//! replay payload survive. Red at 20-3b (the swap drained the halt), green here.
 use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::HaltState;
 use maos_kernel_core::capability::{
@@ -51,7 +52,6 @@ fn replay_context(registry: &HaltRegistry) -> Vec<(String, u32, String, u64, Vec
 }
 
 #[tokio::test]
-#[ignore = "owned by 20-3c: member 12 swap-halt receipt/continuity; validate_swap_halt_continuity drains the active halt and replay metadata before swap (20-3b AC5.4, deferred-work)"]
 async fn active_halt_keeps_identity_and_replay_context_across_hot_swap() {
     cap_tokens::init_monotonic_base();
     let tmp = tempfile::tempdir().unwrap();

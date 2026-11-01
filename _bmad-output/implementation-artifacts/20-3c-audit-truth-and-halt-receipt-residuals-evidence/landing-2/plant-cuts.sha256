@@ -1,0 +1,5 @@
+47c0383a4a04bea98cec3d1a3b2f2da0411f7c872162f6d4459b6792c1df3630  plant-cuts/P1-ac2-restore-drain.diff
+59a873413789137ba8ba728e38c41ede6b708e5737032984c500cc128d9b4c55  plant-cuts/P2-ac2-precheck-global-set.diff
+13237af274648421b28a8b88d64f3b09cd08c2df86fb856100c36e4086f7d9cd  plant-cuts/P3-ac2-monitor-pending-set.diff
+0b4d10ea8380400bc9c3f38a47dc352311f37ba561c8496104949dab89145fb4  plant-cuts/P4-ac3-no-runtime-noop.diff
+174501f35eb2419df875c9894946ead3dd9c7d9c333613f11f033abcffaa72a2  plant-cuts/P5-ac3-discard-delivery-error.diff

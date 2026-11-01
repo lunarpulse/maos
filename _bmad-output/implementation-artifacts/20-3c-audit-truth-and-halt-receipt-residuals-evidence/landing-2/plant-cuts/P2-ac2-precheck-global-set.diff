@@ -1,0 +1,11 @@
+--- a/crates/maos-kernel-core/src/hot_swap/precheck.rs
++++ b/crates/maos-kernel-core/src/hot_swap/precheck.rs
+@@ -49,7 +49,7 @@
+ 
+         let version_list = successor_accepted_versions.to_vec();
+         // FR53 (20-3c): the same carried set the real swap gate judges.
+-        let carried = halt_registry.carried_for_spirit(predecessor_pid);
++        let carried = halt_registry.pending_halt_ids();
+         let pending_count = carried.len();
+ 
+         let verdict = match schema_compat {

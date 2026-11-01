@@ -36,7 +36,7 @@ impl HotSwapPrecheck {
     /// a verdict without mutating the halt registry.
     pub fn check(
         halt_registry: &crate::halt::HaltRegistry,
-        _predecessor_pid: u32,
+        predecessor_pid: u32,
         predecessor_halt_protocol_version: u32,
         successor_accepted_versions: &[u32],
         predecessor_state_schema_version: u32,
@@ -48,14 +48,16 @@ impl HotSwapPrecheck {
         );
 
         let version_list = successor_accepted_versions.to_vec();
-        let pending_count = halt_registry.pending_halt_ids().len();
+        // FR53 (20-3c): the same carried set the real swap gate judges.
+        let carried = halt_registry.carried_for_spirit(predecessor_pid);
+        let pending_count = carried.len();
 
         let verdict = match schema_compat {
             SchemaCompat::Breaking => PrecheckOutcome::SchemaIncompatible,
             SchemaCompat::SameMajor | SchemaCompat::CrossMajor => {
                 // Check halt continuity dry-run style (no mutation).
                 match crate::halt::validate_halt_set(
-                    &halt_registry.pending_halt_ids(),
+                    &carried,
                     predecessor_halt_protocol_version,
                     Some(successor_accepted_versions),
                 ) {
@@ -98,7 +100,6 @@ impl HotSwapPrecheck {
 mod tests {
     use super::*;
     use crate::halt::HaltRegistry;
-    use maos_domain::halt::{HaltId, HaltState};
 
     fn make_registry() -> HaltRegistry {
         HaltRegistry::new()
@@ -117,22 +118,5 @@ mod tests {
         let registry = make_registry();
         let verdict = HotSwapPrecheck::check(&registry, 1, 1, &[1, 2], 0x0001_0000, 0x0002_0000);
         assert_eq!(verdict.schema_compat, SchemaCompat::CrossMajor);
-    }
-
-    #[test]
-    fn precheck_halt_continuity_violation() {
-        let registry = make_registry();
-        let hid = HaltId::new("halt-001").unwrap();
-        registry.insert_pending(hid, HaltState::PendingResolution);
-
-        let verdict = HotSwapPrecheck::check(
-            &registry,
-            1,
-            1,
-            &[/* empty — no compatible versions */],
-            1,
-            1,
-        );
-        assert_eq!(verdict.verdict, PrecheckOutcome::HaltContinuityViolation);
     }
 }

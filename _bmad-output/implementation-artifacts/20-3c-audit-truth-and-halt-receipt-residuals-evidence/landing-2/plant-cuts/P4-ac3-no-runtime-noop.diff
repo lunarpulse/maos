@@ -1,0 +1,25 @@
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -204,21 +204,7 @@
+                     }
+                 });
+             }
+-            Err(_) => match serde_json::to_vec(&frame.payload) {
+-                Ok(bytes) => {
+-                    self.transparency_log.insert_frame_event_with_sender(
+-                        FrameKind::RateLimited,
+-                        0,
+-                        crate::iac::mailbox::KERNEL_SENDER_SPIRIT_ID,
+-                        invoking_spirit_id,
+-                        None,
+-                        "standard",
+-                        &bytes,
+-                        FrameOrigin::Kernel,
+-                    );
+-                }
+-                Err(_) => record_drop(drop_site, AuditDropReason::Full),
+-            },
++            Err(_) => {}
+         }
+     }
+ 

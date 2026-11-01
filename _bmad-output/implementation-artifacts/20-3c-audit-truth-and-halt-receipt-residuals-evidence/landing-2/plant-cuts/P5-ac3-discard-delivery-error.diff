@@ -1,0 +1,13 @@
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -199,9 +199,7 @@
+         match tokio::runtime::Handle::try_current() {
+             Ok(runtime) => {
+                 runtime.spawn(async move {
+-                    if iac.deliver_typed(frame, 0, None).await.is_err() {
+-                        record_drop(drop_site, AuditDropReason::Full);
+-                    }
++                    let _ = iac.deliver_typed(frame, 0, None).await;
+                 });
+             }
+             Err(_) => match serde_json::to_vec(&frame.payload) {

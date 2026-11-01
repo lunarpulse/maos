@@ -10,6 +10,7 @@ pub mod router;
 
 use std::sync::Arc;
 
+use crate::capability::cap_audit::{record_drop, AuditDropReason, AuditDropSite};
 use maos_domain::invariants::i1::{CapabilityToken, Scope};
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i9::SandboxTier;
@@ -191,11 +192,33 @@ impl InferencePortAdapter {
         let iac = Arc::clone(iac);
         // Story 18-5 (D-10 A): spawn the delivery on the current runtime so the
         // frame is journaled and delivered; the synchronous
-        // InferenceError::RateLimited stays the primary contract.
-        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
-            runtime.spawn(async move {
-                let _ = iac.deliver_typed(frame, 0, None).await;
-            });
+        // InferenceError::RateLimited stays the primary contract. 20-3c EC5: the
+        // frame is never lost silently — a failed delivery is counted, and with
+        // no runtime the kind-23 row is journaled synchronously (not delivered).
+        let drop_site = AuditDropSite::RateLimited;
+        match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => {
+                runtime.spawn(async move {
+                    if iac.deliver_typed(frame, 0, None).await.is_err() {
+                        record_drop(drop_site, AuditDropReason::Full);
+                    }
+                });
+            }
+            Err(_) => match serde_json::to_vec(&frame.payload) {
+                Ok(bytes) => {
+                    self.transparency_log.insert_frame_event_with_sender(
+                        FrameKind::RateLimited,
+                        0,
+                        crate::iac::mailbox::KERNEL_SENDER_SPIRIT_ID,
+                        invoking_spirit_id,
+                        None,
+                        "standard",
+                        &bytes,
+                        FrameOrigin::Kernel,
+                    );
+                }
+                Err(_) => record_drop(drop_site, AuditDropReason::Full),
+            },
         }
     }
 

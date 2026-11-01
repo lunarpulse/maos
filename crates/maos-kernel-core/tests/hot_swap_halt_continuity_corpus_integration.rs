@@ -5,10 +5,11 @@
 //! scenarios. Story 5.2 owns the END-TO-END Hot-Swap Coordinator test; this
 //! file's `_corpus_integration` suffix marks the wrapper-level distinction.
 //!
-//! v0.3-β limitation: `drain_for_spirit` drains all halts globally, so the
-//! wrapper always returns `SafeDrained`. The `SafeMigrated` / `Violation`
-//! paths are structurally verified by the inline unit tests in
-//! `halt/mod.rs::swap_continuity_tests`.
+//! 20-3c (FR53, K1p): the wrapper CARRIES the predecessor's pending halts and
+//! never drains them. The corpus scenarios run against an empty registry, so
+//! they all return `SafeDrained { 0 }`; the `SafeMigrated` / `Violation` paths
+//! are exercised by the seeded-halt vectors below, the inline unit tests in
+//! `halt/mod.rs::swap_continuity_tests` and `halt_carry_20_3c.rs`.
 
 use std::path::Path;
 
@@ -69,14 +70,13 @@ fn halt_signal_observation_corpus_exercises_swap_continuity_wrapper() {
                 );
             }
             "SafeMigrated" | "Violation" => {
-                // v0.3-β: wrapper always returns SafeDrained because
-                // drain_for_spirit drains globally. The corpus still
-                // carries these variants for v0.5+ transition. Assert
-                // the wrapper produces the known-safe verdict and that
-                // no cross-Spirit halt-state leaked.
+                // The corpus carries these variants for the precheck, which
+                // seeds halts. This wrapper runs on an empty registry, so it
+                // carries nothing: the known-safe verdict, no cross-Spirit
+                // halt-state leaked.
                 assert!(
                     matches!(verdict, SwapVerdict::SafeDrained { .. }),
-                    "scenario {}: v0.3-β wrapper must return SafeDrained; got {:?}",
+                    "scenario {}: an empty registry carries nothing; got {:?}",
                     scenario.scenario_id,
                     verdict
                 );
@@ -87,7 +87,7 @@ fn halt_signal_observation_corpus_exercises_swap_continuity_wrapper() {
 }
 
 #[test]
-fn swap_continuity_with_seeded_halts_returns_safe_drained_nonzero() {
+fn swap_continuity_with_seeded_halts_carries_them_instead_of_draining() {
     use maos_domain::halt::HaltId;
     use maos_domain::halt::HaltState;
 
@@ -123,21 +123,27 @@ fn swap_continuity_with_seeded_halts_returns_safe_drained_nonzero() {
 
     assert_eq!(
         verdict,
-        SwapVerdict::SafeDrained { drained_count: 1 },
-        "with one pending halt, wrapper must drain and return SafeDrained {{ 1 }}"
+        SwapVerdict::SafeMigrated {
+            migrated_count: 1,
+            predecessor_version: 1,
+            successor_versions: vec![1],
+        },
+        "with one pending halt the wrapper carries it: SafeMigrated {{ 1 }}"
+    );
+    assert_eq!(
+        registry.pending_halt_ids().len(),
+        1,
+        "FR53: the halt is carried, not drained"
     );
 }
 
 /// Story 12.5's chain loop reuses the I14 gate for EVERY single-major hop. An
-/// in-place hot-swap preserves the spirit pid, so each hop's gate drains THAT
-/// hop's own real pending halt. Zero-dropped = every seeded halt across the
-/// chain is accounted for as drained-resolved (`before_count == drained_count`
-/// at each hop); NO hop is a vacuous `SafeDrained{0}`. (The TL-receipt-derived
-/// surviving count is proven separately by the journey leg
-/// `j3_blinded_halt_receipt_moves_persistent_agents_halted_count` — kernel-core
-/// cannot depend on `spirits/digest`.)
+/// in-place hot-swap preserves the spirit pid, so each hop's gate CARRIES that
+/// hop's own real pending halt (20-3c K1p: carry, never drain): hop one carries
+/// one halt, hop two carries both. Zero-dropped = every seeded halt is still
+/// pending after the chain; NO hop is a vacuous `SafeDrained{0}`.
 #[test]
-fn chain_walk_drains_a_real_pending_halt_at_every_hop_with_zero_dropped() {
+fn chain_walk_carries_every_real_pending_halt_at_every_hop_with_zero_dropped() {
     use maos_domain::halt::{HaltId, HaltState};
 
     const PID: u32 = 1205;
@@ -164,52 +170,32 @@ fn chain_walk_drains_a_real_pending_halt_at_every_hop_with_zero_dropped() {
             )
             .expect("seed pending halt");
     };
+    let carried = |verdict: &SwapVerdict| match verdict {
+        SwapVerdict::SafeMigrated { migrated_count, .. } => *migrated_count,
+        other => panic!("expected SafeMigrated, got {other:?}"),
+    };
 
-    // Hop 1 (1.0 -> 2.0): a real pending halt, drained and reconciled.
+    // Hop 1 (1.0 -> 2.0): a real pending halt, carried.
     seed("story-12-5-hop-1");
-    let before_hop_1 = registry.pending_halt_ids().len();
     let hop_1 =
         validate_swap_halt_continuity(&registry, PID, 1, Some(&[1])).expect("hop-1 I14 verdict");
-    assert_eq!(before_hop_1, 1, "hop one must carry a real pending halt");
-    assert_eq!(
-        hop_1,
-        SwapVerdict::SafeDrained {
-            drained_count: before_hop_1
-        }
-    );
+    assert_eq!(carried(&hop_1), 1, "hop one must carry a real pending halt");
 
-    // Hop 2 (2.0 -> 3.0): the in-place swap kept the pid, and the successor has
-    // accrued its OWN real pending halt — also drained and reconciled (NOT a
-    // vacuous SafeDrained{0}).
+    // Hop 2 (2.0 -> 3.0): the in-place swap kept the pid, the first halt is
+    // STILL pending and the successor accrued its own — both are carried.
     seed("story-12-5-hop-2");
-    let before_hop_2 = registry.pending_halt_ids().len();
     let hop_2 =
         validate_swap_halt_continuity(&registry, PID, 1, Some(&[1])).expect("hop-2 I14 verdict");
     assert_eq!(
-        before_hop_2, 1,
-        "hop two must ALSO carry a real pending halt"
-    );
-    assert_eq!(
-        hop_2,
-        SwapVerdict::SafeDrained {
-            drained_count: before_hop_2
-        }
+        carried(&hop_2),
+        2,
+        "hop two carries BOTH real pending halts"
     );
 
-    // Zero dropped across the whole chain: every seeded halt was drained-resolved.
-    let drained_total = match (hop_1, hop_2) {
-        (
-            SwapVerdict::SafeDrained { drained_count: a },
-            SwapVerdict::SafeDrained { drained_count: b },
-        ) => a + b,
-        other => panic!("expected SafeDrained at both hops, got {other:?}"),
-    };
+    // Zero dropped across the whole chain: nothing was drained.
     assert_eq!(
-        drained_total, 2,
-        "both hops' real pending halts are drained-resolved; zero dropped across the chain"
-    );
-    assert!(
-        registry.pending_halt_ids().is_empty(),
-        "I14 drains resolved halts; continuity is NOT read from this live registry"
+        registry.pending_halt_ids().len(),
+        2,
+        "I14 carries halts; continuity IS read from this live registry"
     );
 }

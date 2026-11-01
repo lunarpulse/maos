@@ -93,3 +93,16 @@ The landing re-measures after `cargo fmt --all` and re-pins the **exact lower** 
 Order: **L1** kernel-free (AC1 partial, AC4–AC11) lands first. **L2** (AC2, AC3, kernel pins, AC1 close) lands second. The story is `done` only after L2. Kernel pins move in one change at L2, serialized with 20-9, 20-13 and 20-14 kernel pin updates (one integration owner).
 
 Any figure above a ceiling returns to the operator as a measured request **before** landing.
+
+## Landing 2 — measured against the grant (2026-11-01, Dev203c2)
+
+Exact after `cargo fmt --all` (`kloc-check --json`, tokei 14.0.0; `check-kernel-baseline`), working tree on `3ea4bbb9`, not committed:
+
+| Row | Base | Landed | Δ | Ceiling | Under ceiling |
+|---|---:|---:|---:|---:|---:|
+| kernel physical (`src_lines`) | 26793 | **26801** | +8 | 26817 | 16 |
+| kernel tokei | 20992 | **21011** | +19 | 21044 | 33 |
+| maos-capability | 1432 | **1433** | +1 | 1434 | 1 |
+| aggregate (hardfail = measured + 1) | 188784 | **188804** (hardfail 188805) | +20 | 189478 | 674 |
+
+The prototype R measured +12 / +26; the re-cut is +8 / +19; it differs from the prototype in that the swap gate and the precheck share one `HaltRegistry::carried_for_spirit` helper instead of duplicating the filter, and the inline precheck test that seeded an owner-less halt moved into an integration vector (the per-change attribution of the −4 / −7 was not separately measured). Shape deviations from the filed prototypes, all inside the granted bundle: (1) the post-swap monitor now watches the carried set and counts only a halt that left the registry as lost (`coordinator.rs:380-389`, `post_swap_monitor.rs:116-127`) — K1p needs it, or an operator resolving a carried halt inside the 30 s window auto-reverts a valid swap; (2) the E3 failed-delivery drop uses `AuditDropReason::Full`, not `Closed`, so an undeliverable frame does not latch the process-wide `degraded` flag; (3) the synchronous row is written with its recipient (`insert_frame_event_with_sender`). ADR-069: 21011 is 989 under the 22000 alarm; no ENVELOPE ALARM row. Both pins and the per-file hashes re-fixed (`xtask/kernel-core-baseline.toml`, `xtask/kloc.toml`); the public surface did not move. Evidence: `20-3c-audit-truth-and-halt-receipt-residuals-evidence/landing-2/`.

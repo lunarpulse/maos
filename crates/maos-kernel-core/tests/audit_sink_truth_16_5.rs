@@ -286,6 +286,7 @@ fn every_audit_drop_site_counts_into_its_own_counter() {
         cap_audit::AuditDropSite::SandboxBlock,
         cap_audit::AuditDropSite::AcpNotification,
         cap_audit::AuditDropSite::Quota,
+        cap_audit::AuditDropSite::RateLimited,
     ];
     let before = cap_audit::audit_health_snapshot();
     for site in &sites {

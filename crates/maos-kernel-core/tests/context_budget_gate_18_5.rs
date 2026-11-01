@@ -372,3 +372,149 @@ async fn a_provider_429_journals_and_delivers_one_rate_limited_frame() {
         .expect("query");
     assert_eq!(rows.len(), 1, "exactly one kind-23 row");
 }
+
+// ---- 20-3c AC3 (EC5, D-20-3c-02 A, E3): a rate-limit frame is journaled or
+// ---- counted, never lost ---------------------------------------------------
+
+/// The `RateLimited` drop counter is process-wide; the two vectors below read
+/// it, so they never overlap.
+static RATE_LIMITED_HEALTH: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// An inference port whose provider answers 429, wired to an IAC bus on which
+/// the invoking Spirit is (or is not) registered.
+fn provider_429_rig(
+    register_invoking_spirit: bool,
+) -> (
+    InferencePortAdapter,
+    Arc<TransparencyLogAdapter>,
+    InferenceRequest,
+) {
+    let registry = registry(64);
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x20_3c));
+    let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
+        Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::new(
+            IacRtMetrics::new(),
+        ))),
+        Arc::clone(&tl),
+    ));
+    if register_invoking_spirit {
+        std::mem::forget(
+            iac.register_spirit_typed(&maos_spirit_abi::identity::SpiritId::from(format!(
+                "spirit:{P}"
+            )))
+            .expect("register"),
+        );
+    }
+    let provider: Arc<dyn Provider> = Arc::new(TooManyRequests);
+    let router = Arc::new(MultiProviderRouter::new(
+        [("anthropic".to_owned(), provider)].into_iter().collect(),
+        Some("anthropic".into()),
+    ));
+    let inference = InferencePortAdapter::new(
+        router,
+        Arc::clone(&registry),
+        Arc::clone(&tl),
+        Arc::new(IacRtMetrics::new()),
+    )
+    .with_iac(iac);
+    let token = mint(&registry, P, exits()[0].clone()).expect("provider scope");
+    let request = InferenceRequest::new(
+        P,
+        token,
+        "hello".into(),
+        InferenceOptions::default(),
+        Some("anthropic".into()),
+        Vec::new(),
+    );
+    (inference, tl, request)
+}
+
+fn rate_limited_rows(
+    tl: &TransparencyLogAdapter,
+) -> Vec<maos_kernel_core::iac::transparency_log::TransparencyLogEntry> {
+    tl.query_frames(FrameFilter {
+        kind: Some(FrameKind::RateLimited),
+        ..Default::default()
+    })
+    .expect("query")
+}
+
+/// AC3.2 first vector: no runtime on the calling thread, so nothing can be
+/// spawned. Before E3 the frame vanished (zero rows, health unchanged).
+#[test]
+fn a_429_with_no_runtime_journals_the_rate_limited_frame_synchronously() {
+    let _serial = RATE_LIMITED_HEALTH
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    assert!(
+        tokio::runtime::Handle::try_current().is_err(),
+        "this vector must run on a plain thread"
+    );
+    let (inference, tl, request) = provider_429_rig(true);
+    let before = cap_audit::audit_health_snapshot();
+
+    let err = inference.complete(request).expect_err("429");
+    assert!(matches!(err, InferenceError::RateLimited { .. }), "{err:?}");
+
+    let rows = rate_limited_rows(&tl);
+    assert_eq!(rows.len(), 1, "exactly one kind-23 row, journaled in-line");
+    let row = &rows[0];
+    assert_eq!(row.origin, maos_domain::invariants::i3::FrameOrigin::Kernel);
+    assert_eq!(row.from_spirit_id, "__kernel");
+    assert_eq!(row.to_spirit_id, format!("spirit:{P}"));
+    assert_eq!(row.spirit_pid, 0);
+    assert!(row.capability_token.is_none());
+    let payload = String::from_utf8(row.payload_redacted.clone()).expect("json payload");
+    assert!(
+        payload.contains("\"provider_id\":\"anthropic\""),
+        "{payload}"
+    );
+    assert_eq!(
+        cap_audit::audit_health_snapshot().count(cap_audit::AuditDropSite::RateLimited),
+        before.count(cap_audit::AuditDropSite::RateLimited),
+        "a journaled frame is not a drop"
+    );
+}
+
+/// AC3.2 second vector: a runtime exists but the delivery fails (the invoking
+/// Spirit has no mailbox). Before E3 the error was discarded by `let _ =`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_429_whose_spawned_delivery_fails_is_counted_as_a_rate_limited_drop() {
+    let (inference, tl, request) = provider_429_rig(false);
+    let _serial = RATE_LIMITED_HEALTH
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let before = cap_audit::audit_health_snapshot();
+
+    let err = inference.complete(request).expect_err("429");
+    assert!(matches!(err, InferenceError::RateLimited { .. }), "{err:?}");
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let counted =
+            cap_audit::audit_health_snapshot().count(cap_audit::AuditDropSite::RateLimited);
+        if counted > before.count(cap_audit::AuditDropSite::RateLimited) {
+            assert_eq!(
+                counted,
+                before.count(cap_audit::AuditDropSite::RateLimited) + 1,
+                "one failed delivery, one counted drop"
+            );
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the failed delivery was never counted: the frame was lost silently"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        cap_audit::audit_health_snapshot().degraded,
+        before.degraded,
+        "an undeliverable frame is not a dead audit writer"
+    );
+    assert_eq!(
+        rate_limited_rows(&tl).len(),
+        1,
+        "the row was journaled before the delivery failed (I2)"
+    );
+}

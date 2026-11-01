@@ -9,6 +9,17 @@
 #
 # Also run here: the T2 live escape-anomaly vector (AC7.3), which needs the real
 # runner and is green-or-skipped on the dev host.
+#
+# Landing 2 adds the `kernel-l2` job: the AC2/AC3 witnesses on the hosted
+# toolchain, then each recorded local plant re-applied from its cut diff
+# (sha256 in `../landing-2/plant-cuts.sha256`, checked first) with the matching
+# witness required to go RED. Cut diffs apply to the landing-2 tree only:
+#   P1 47c0383a4a04bea98cec3d1a3b2f2da0411f7c872162f6d4459b6792c1df3630  restore drain_for_spirit in the swap gate (AC2.5)
+#   P2 59a873413789137ba8ba728e38c41ede6b708e5737032984c500cc128d9b4c55  precheck judges the global pending set
+#   P3 13237af274648421b28a8b88d64f3b09cd08c2df86fb856100c36e4086f7d9cd  post-swap monitor judges the pending set
+#   P4 0b4d10ea8380400bc9c3f38a47dc352311f37ba561c8496104949dab89145fb4  no-runtime RateLimited arm is a no-op (AC3.4)
+#   P5 174501f35eb2419df875c9894946ead3dd9c7d9c333613f11f033abcffaa72a2  spawned delivery error discarded again
+# Not pushed; copied under .github/workflows only on an operator-approved branch.
 name: ci-20-3c-verify
 on:
   workflow_dispatch:
@@ -35,3 +46,49 @@ jobs:
         run: cargo test -p maos-bin --test two_host_delegation_2b -- --test-threads=1
       - name: AC7.3 — live escape anomaly (T2)
         run: cargo test -p maos-bin --test live_escape_anomaly_17_10 -- --test-threads=1
+  kernel-l2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EV: _bmad-output/implementation-artifacts/20-3c-audit-truth-and-halt-receipt-residuals-evidence/landing-2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: AC2/AC3 witnesses are green on the hosted toolchain
+        run: >
+          cargo test --locked --no-fail-fast -p maos-kernel-core
+          --test routed_halt_swap_20_3b --test halt_carry_20_3c
+          --test hot_swap_halt_continuity_corpus_integration
+          --test context_budget_gate_18_5 --test audit_sink_truth_16_5
+      - name: The recorded plant cuts are the ones under test
+        run: cd "$EV" && sha256sum -c plant-cuts.sha256
+      - name: P1 (AC2.5) — the swap gate drains again => FR53 witness and carry vectors red
+        run: |
+          git apply "$EV/plant-cuts/P1-ac2-restore-drain.diff"
+          if cargo test --locked --no-fail-fast -p maos-kernel-core --test routed_halt_swap_20_3b --test halt_carry_20_3c; then echo "plant P1 not detected"; exit 1; fi
+          git checkout -- crates/maos-kernel-core/src
+      - name: P2 — precheck judges the global pending set => (a)/(b) red
+        run: |
+          git apply "$EV/plant-cuts/P2-ac2-precheck-global-set.diff"
+          if cargo test --locked --no-fail-fast -p maos-kernel-core --test halt_carry_20_3c; then echo "plant P2 not detected"; exit 1; fi
+          git checkout -- crates/maos-kernel-core/src
+      - name: P3 — monitor judges the pending set => a resolved carried halt auto-reverts the swap
+        run: |
+          git apply "$EV/plant-cuts/P3-ac2-monitor-pending-set.diff"
+          if cargo test --locked --no-fail-fast -p maos-kernel-core --test halt_carry_20_3c; then echo "plant P3 not detected"; exit 1; fi
+          git checkout -- crates/maos-kernel-core/src
+      - name: P4 (AC3.4) — no-runtime RateLimited arm is a no-op => the synchronous-journal vector red
+        run: |
+          git apply "$EV/plant-cuts/P4-ac3-no-runtime-noop.diff"
+          if cargo test --locked --no-fail-fast -p maos-kernel-core --test context_budget_gate_18_5; then echo "plant P4 not detected"; exit 1; fi
+          git checkout -- crates/maos-kernel-core/src
+      - name: P5 — delivery error discarded => the counted-drop vector red
+        run: |
+          git apply "$EV/plant-cuts/P5-ac3-discard-delivery-error.diff"
+          if cargo test --locked --no-fail-fast -p maos-kernel-core --test context_budget_gate_18_5; then echo "plant P5 not detected"; exit 1; fi
+          git checkout -- crates/maos-kernel-core/src

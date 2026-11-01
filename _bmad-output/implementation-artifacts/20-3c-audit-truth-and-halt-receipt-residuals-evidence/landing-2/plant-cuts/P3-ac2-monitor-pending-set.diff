@@ -1,0 +1,20 @@
+--- a/crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs
++++ b/crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs
+@@ -116,14 +116,10 @@
+                 // A carried halt the operator resolved is terminal, not lost: it
+                 // stays in the registry. Only a halt that LEFT it is a loss.
+                 let registry = self.coordinator.halt_registry_ref();
+-                let current_halt_ids: std::collections::BTreeSet<String> = snapshot
+-                    .pre_swap_halt_ids
++                let current_halt_ids: std::collections::BTreeSet<String> = registry
++                    .pending_halt_ids()
+                     .iter()
+-                    .filter(|id| {
+-                        maos_domain::halt::HaltId::new(id.as_str())
+-                            .is_ok_and(|id| registry.lookup_state(&id).is_some())
+-                    })
+-                    .cloned()
++                    .map(|h| h.as_str().to_string())
+                     .collect();
+                 if let Some(lost) =
+                     detect_halt_set_loss(&snapshot.pre_swap_halt_ids, &current_halt_ids)

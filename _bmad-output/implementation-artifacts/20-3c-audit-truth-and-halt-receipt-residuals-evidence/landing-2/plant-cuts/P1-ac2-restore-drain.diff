@@ -1,0 +1,10 @@
+--- a/crates/maos-kernel-core/src/halt/mod.rs
++++ b/crates/maos-kernel-core/src/halt/mod.rs
+@@ -466,6 +466,7 @@
+     predecessor_halt_protocol_version: u32,
+     successor_accepted_versions: Option<&[u32]>,
+ ) -> Result<SwapVerdict, HaltContinuityError> {
++    let _drained = registry.drain_for_spirit(predecessor_spirit_pid);
+     let carried = registry.carried_for_spirit(predecessor_spirit_pid);
+     if carried.is_empty() {
+         return Ok(SwapVerdict::SafeDrained { drained_count: 0 });

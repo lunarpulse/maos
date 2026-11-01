@@ -231,16 +231,18 @@ fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(
     ] {
         assert!(runs.contains(command), "{command}");
     }
+    // The SDK witness is still a labelled red. The FR53 witness was un-ignored
+    // by 20-3c (K1p: a hot swap carries the halt) and must stay un-ignored.
     for (source, test, reason) in [
         (
             include_str!("../../crates/maos-spirit-sdk/tests/routed_sdk_20_3b.rs"),
             "sdk_harness_records_iac_frame_io_in_its_capture_report",
-            "ownerless and open",
+            Some("ownerless and open"),
         ),
         (
             include_str!("../../crates/maos-kernel-core/tests/routed_halt_swap_20_3b.rs"),
             "active_halt_keeps_identity_and_replay_context_across_hot_swap",
-            "owned by 20-3c",
+            None,
         ),
     ] {
         let source = syn::parse_file(source).map_err(|e| e.to_string())?;
@@ -251,16 +253,24 @@ fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(
                 syn::Item::Fn(f) if f.sig.ident == test => Some(f),
                 _ => None,
             })
-            .ok_or("routed red test missing")?;
-        assert!(
-            witness.attrs.iter().any(|attr| match &attr.meta {
-                syn::Meta::NameValue(value) if value.path.is_ident("ignore") =>
-                    matches!(&value.value, syn::Expr::Lit(lit)
-                    if matches!(&lit.lit, syn::Lit::Str(text) if text.value().contains(reason))),
-                _ => false,
-            }),
-            "{test}: missing explicit red owner/disposition"
-        );
+            .ok_or("routed test missing")?;
+        let ignore = witness
+            .attrs
+            .iter()
+            .find(|attr| attr.path().is_ident("ignore"));
+        match (reason, ignore) {
+            (Some(reason), Some(attr)) => assert!(
+                matches!(&attr.meta, syn::Meta::NameValue(value)
+                    if matches!(&value.value, syn::Expr::Lit(lit)
+                    if matches!(&lit.lit, syn::Lit::Str(text) if text.value().contains(reason)))),
+                "{test}: missing explicit red owner/disposition"
+            ),
+            (Some(_), None) => panic!("{test}: a labelled red must stay ignored until repaired"),
+            (None, ignore) => assert!(
+                ignore.is_none(),
+                "{test}: repaired witness is ignored again"
+            ),
+        }
     }
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -274,6 +284,8 @@ fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(
     );
     assert!(continuity.requirement_claims["FR53"]
         .contains("asserted, owner 20-9-spawned-form-lifecycle-hooks"));
+    assert!(continuity.requirement_claims["FR53"]
+        .contains("witnessed by routed_halt_swap_20_3b (green"));
     let ledger = include_str!("../../docs/invariants/README.md");
     assert!(ledger.contains("FR34 | asserted; owner: none (trigger-owned; see deferred-work)"));
     Ok(())
