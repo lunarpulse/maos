@@ -145,9 +145,9 @@ impl EndpointLease {
             options.mode(CONTROL_FILE_MODE);
         }
         let file = options.open(&path).map_err(io)?;
-        match file.try_lock() {
-            Ok(()) => {}
-            Err(std::fs::TryLockError::WouldBlock) => {
+        match try_lock_exclusive(&file) {
+            Ok(true) => {}
+            Ok(false) => {
                 return Err(EndpointLeaseError::Held {
                     control: control_file_path(home),
                     holder: std::fs::read_to_string(&path)
@@ -155,7 +155,7 @@ impl EndpointLease {
                         .and_then(|text| text.trim().parse().ok()),
                 });
             }
-            Err(std::fs::TryLockError::Error(source)) => return Err(io(source)),
+            Err(source) => return Err(io(source)),
         }
         file.set_len(0).map_err(io)?;
         (&file)
@@ -163,6 +163,24 @@ impl EndpointLease {
             .map_err(io)?;
         Ok(Self { _file: file })
     }
+}
+
+/// One non-blocking exclusive `flock`: `Ok(true)` when taken, `Ok(false)` when
+/// another open file description holds it. `File::try_lock` is stable only
+/// from Rust 1.89, above the workspace MSRV (1.88).
+#[cfg(unix)]
+fn try_lock_exclusive(file: &std::fs::File) -> std::io::Result<bool> {
+    match rustix::fs::flock(file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => Ok(true),
+        Err(rustix::io::Errno::WOULDBLOCK) => Ok(false),
+        Err(errno) => Err(errno.into()),
+    }
+}
+
+#[cfg(not(unix))]
+fn try_lock_exclusive(_file: &std::fs::File) -> std::io::Result<bool> {
+    // No `flock`; the door's non-unix story is `OfflineUnsupported`.
+    Err(std::io::ErrorKind::Unsupported.into())
 }
 
 /// The pid listening on loopback `addr`, when `/proc` can say so (Linux; `None`

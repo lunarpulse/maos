@@ -45,7 +45,7 @@ async fn a_peer_that_reads_the_request_and_never_answers_is_a_typed_response_par
     .await
     .expect("pin mira");
     let (server_config, _resolver) = build_server_config(
-        &[nash_leaf.der.clone()],
+        std::slice::from_ref(&nash_leaf.der),
         &nash_leaf.key_der,
         pins,
         posture(Some(&ca)),

@@ -318,9 +318,7 @@ impl Provider for TooManyRequests {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_provider_429_journals_and_delivers_one_rate_limited_frame() {
-    let _serial = RATE_LIMITED_HEALTH
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _serial = RATE_LIMITED_HEALTH.lock().await;
     let registry = registry(64);
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x18_05));
     let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
@@ -381,7 +379,7 @@ async fn a_provider_429_journals_and_delivers_one_rate_limited_frame() {
 
 /// The `RateLimited` drop counter is process-wide; every vector that drives a
 /// provider 429 through the inference port takes this lock, so none overlap.
-static RATE_LIMITED_HEALTH: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static RATE_LIMITED_HEALTH: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// An inference port whose provider answers 429, wired to an IAC bus on which
 /// the invoking Spirit is (or is not) registered.
@@ -446,9 +444,7 @@ fn rate_limited_rows(
 /// spawned. Before E3 the frame vanished (zero rows, health unchanged).
 #[test]
 fn a_429_with_no_runtime_journals_the_rate_limited_frame_synchronously() {
-    let _serial = RATE_LIMITED_HEALTH
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _serial = RATE_LIMITED_HEALTH.blocking_lock();
     assert!(
         tokio::runtime::Handle::try_current().is_err(),
         "this vector must run on a plain thread"
@@ -484,9 +480,7 @@ fn a_429_with_no_runtime_journals_the_rate_limited_frame_synchronously() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_429_whose_spawned_delivery_fails_is_counted_as_a_rate_limited_drop() {
     let (inference, tl, request) = provider_429_rig(false);
-    let _serial = RATE_LIMITED_HEALTH
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _serial = RATE_LIMITED_HEALTH.lock().await;
     let before = cap_audit::audit_health_snapshot();
 
     let err = inference.complete(request).expect_err("429");
