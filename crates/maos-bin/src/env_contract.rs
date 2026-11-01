@@ -439,6 +439,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_GOVERNANCE_ABI_PROPOSAL",
+        purpose: "JSON AbiExtensionProposal that `maosctl governance abi-extension` hands the governance-admit one-shot to journal as a GovernanceEvent (Story 20-3c, FR62(b))",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_LOOM_POSTGRES",
         purpose: "Collective-tier (Loom-lite) Postgres connection string; absent disables the collective tier (Story 10.4a)",
         stability: EnvStability::UserFacing,

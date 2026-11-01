@@ -1,0 +1,54 @@
+--- a/crates/maos-bin/src/delegation.rs
++++ b/crates/maos-bin/src/delegation.rs
+@@ -443,6 +443,7 @@
+         &mut self,
+         iac: &IacBusAdapter,
+         frame: IacFrame,
++        emitter_pid: u32,
+     ) -> Result<DelegationOutcome, String> {
+         let frame_id = frame.frame_id;
+         // Story 19-7 (D-19-7-09 A) — keep a copy for the re-pin hold ONLY when a hold
+@@ -452,7 +453,7 @@
+         // delegation `TaskAssign` carries a non-empty lineage (`assign_frame_remote`
+         // refuses an empty one).
+         let held = (self.repin_hold.is_some() && self.cross_host.is_some()).then(|| frame.clone());
+-        if let Err(error) = iac.deliver_typed(frame, 0, None).await {
++        if let Err(error) = iac.deliver_typed(frame, emitter_pid, None).await {
+             let hold = match (self.repin_hold, self.cross_host.as_ref(), held) {
+                 (Some(hold), Some(router), Some(held)) => awaiting_repin_peer(&error)
+                     .and_then(|peer| {
+@@ -576,12 +577,13 @@
+         iac: &IacBusAdapter,
+         seq: u64,
+         run_nonce: u64,
++        worker_pid: u32,
+     ) -> Result<usize, String> {
+         let mut frame_id = [0u8; 16];
+         frame_id[0..8].copy_from_slice(&seq.to_le_bytes());
+         frame_id[8..16].copy_from_slice(&run_nonce.to_le_bytes());
+         let frame = completion_frame(frame_id, seq, "completed".to_string());
+-        iac.deliver_typed(frame, 0, None)
++        iac.deliver_typed(frame, worker_pid, None)
+             .await
+             .map_err(|e| format!("completion journal failed: {e}"))?;
+         let mut drained = 0usize;
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -5226,7 +5226,7 @@
+                                 // the emit row is the evidence this Host holds, and the
+                                 // receiver's row is joined to it on `frame_id` by
+                                 // `j1-crosshost-2c`. No frame comes back in 2b.
+-                                match delegation_leg.delegate(&iac, frame).await? {
++                                match delegation_leg.delegate(&iac, frame, *emitter_pid).await? {
+                                     maos_bin::delegation::DelegationOutcome::RehearsedLocally {
+                                         goal,
+                                     } => {
+@@ -5490,7 +5490,7 @@
+                                 epic_next += 1;
+                             }
+                             let drained = delegation_leg
+-                                .journal_completion(&iac, delegation_seq, boot_nonce)
++                                .journal_completion(&iac, delegation_seq, boot_nonce, worker_run.spirit_pid)
+                                 .await?;
+                             emitter.complete_delegation();
+                             delegation_seq += 1;

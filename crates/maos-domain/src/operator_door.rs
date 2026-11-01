@@ -9,13 +9,15 @@
 //! all three already depend on; `maos-cli` cannot depend on `maos-shell`,
 //! because the edge runs the other way).
 //!
-//! ADR-062 keeps **one writer** of `control.json`: `maos init`. Rotation is
-//! `rm control.json && maos init`, never an in-place rewrite by a daemon —
-//! a second writer is a second trust path.
+//! ADR-062 keeps **one minter** of `control.json`: `maos init` mints the token
+//! and the first endpoint. Rotation is `rm control.json && maos init`. A root
+//! (20-3c, D10 A) holds an [`EndpointLease`] for its whole life and, only when
+//! a foreign process occupies the recorded port, rebinds and republishes the
+//! ENDPOINT through [`ControlFile::publish_atomic`] — never the token.
 //!
-//! ⚠ No lock file is declared here on purpose. Liveness (D-16-1-D) is `flock`
-//! on the store *directories' own handles*: a `.lock` file inside a store
-//! directory would change the file counts `erasure_uninstall_13_5b` asserts.
+//! The lease is a `flock` on `<home>/control.lease` (the home directory, not a
+//! store directory, so the file counts `erasure_uninstall_13_5b` asserts do not
+//! move); the kernel releases it when the root dies, so it cannot go stale.
 
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
@@ -92,6 +94,110 @@ pub fn maos_home() -> Result<Option<PathBuf>, MaosHomeError> {
 /// `<home>/control.json`.
 pub fn control_file_path(home: &Path) -> PathBuf {
     home.join(CONTROL_FILE_NAME)
+}
+
+/// The lease file's name inside the MAOS home.
+pub const CONTROL_LEASE_NAME: &str = "control.lease";
+
+/// A root's claim on its home's operator endpoint, held for the root's life.
+///
+/// A second root on the same home cannot take it and refuses `EndpointInUse`
+/// naming the holder; a port occupied while this lease is held is therefore a
+/// FOREIGN holder, never "another MAOS root".
+#[derive(Debug)]
+pub struct EndpointLease {
+    _file: std::fs::File,
+}
+
+/// Why [`EndpointLease::acquire`] did not grant the lease.
+#[derive(Debug, thiserror::Error)]
+pub enum EndpointLeaseError {
+    #[error(
+        "maos: operator endpoint is already served by another MAOS root (pid {}; {}) — EndpointInUse",
+        .holder.map_or_else(|| "unknown".to_owned(), |pid| pid.to_string()),
+        .control.display()
+    )]
+    Held {
+        control: PathBuf,
+        holder: Option<u32>,
+    },
+    #[error("maos: cannot take the operator endpoint lease {path}: {source}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
+impl EndpointLease {
+    /// Take the lease of `home`, recording this process's pid in it.
+    pub fn acquire(home: &Path) -> Result<Self, EndpointLeaseError> {
+        let path = home.join(CONTROL_LEASE_NAME);
+        let io = |source| EndpointLeaseError::Io {
+            path: path.clone(),
+            source,
+        };
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(CONTROL_FILE_MODE);
+        }
+        let file = options.open(&path).map_err(io)?;
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(std::fs::TryLockError::WouldBlock) => {
+                return Err(EndpointLeaseError::Held {
+                    control: control_file_path(home),
+                    holder: std::fs::read_to_string(&path)
+                        .ok()
+                        .and_then(|text| text.trim().parse().ok()),
+                });
+            }
+            Err(std::fs::TryLockError::Error(source)) => return Err(io(source)),
+        }
+        file.set_len(0).map_err(io)?;
+        (&file)
+            .write_all(format!("{}\n", std::process::id()).as_bytes())
+            .map_err(io)?;
+        Ok(Self { _file: file })
+    }
+}
+
+/// The pid listening on loopback `addr`, when `/proc` can say so (Linux; `None`
+/// elsewhere or for a socket another user owns).
+pub fn listener_pid(addr: SocketAddr) -> Option<u32> {
+    let SocketAddr::V4(v4) = addr else {
+        return None;
+    };
+    let local = format!(
+        "{:08X}:{:04X}",
+        u32::from_ne_bytes(v4.ip().octets()),
+        v4.port()
+    );
+    let table = std::fs::read_to_string("/proc/net/tcp").ok()?;
+    let inode = table.lines().skip(1).find_map(|line| {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        (fields.get(1) == Some(&local.as_str()) && fields.get(3) == Some(&"0A"))
+            .then(|| fields.get(9).map(|inode| (*inode).to_owned()))
+            .flatten()
+    })?;
+    let socket = format!("socket:[{inode}]");
+    std::fs::read_dir("/proc")
+        .ok()?
+        .flatten()
+        .find_map(|entry| {
+            let pid: u32 = entry.file_name().to_str()?.parse().ok()?;
+            let held = std::fs::read_dir(entry.path().join("fd"))
+                .ok()?
+                .flatten()
+                .any(|fd| {
+                    std::fs::read_link(fd.path())
+                        .is_ok_and(|link| link.as_os_str() == socket.as_str())
+                });
+            held.then_some(pid)
+        })
 }
 
 /// The door's discovery record, as `maos init` writes it and every other
@@ -319,6 +425,24 @@ impl ControlFile {
     /// publication, so concurrent initializers cannot overwrite one another
     /// and a reader never sees a partial door config.
     pub fn write_atomic(&self, path: &Path) -> Result<(), std::io::Error> {
+        self.write_via(path, false)
+    }
+
+    /// This record with its endpoint replaced (token and version unchanged).
+    pub fn with_endpoint(&self, endpoint: SocketAddr) -> Self {
+        Self {
+            endpoint: format!("{ENDPOINT_SCHEME}{endpoint}"),
+            ..self.clone()
+        }
+    }
+
+    /// Replace `path` with this record atomically (rename over the old file):
+    /// a client reads the old endpoint or the new one, never a partial file.
+    pub fn publish_atomic(&self, path: &Path) -> Result<(), std::io::Error> {
+        self.write_via(path, true)
+    }
+
+    fn write_via(&self, path: &Path, replace: bool) -> Result<(), std::io::Error> {
         let parent = path.parent().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -340,7 +464,11 @@ impl ControlFile {
             let mut file = options.open(&temp)?;
             file.write_all(&body)?;
             file.sync_all()?;
-            std::fs::hard_link(&temp, path)?;
+            if replace {
+                std::fs::rename(&temp, path)?;
+            } else {
+                std::fs::hard_link(&temp, path)?;
+            }
             std::fs::File::open(parent)?.sync_all()?;
             Ok(())
         })();

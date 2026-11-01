@@ -306,7 +306,7 @@ async fn run(dir: &Path, forbidden: bool) -> Run {
         NONCE,
         ESCAPE_TAIL_INTERVAL,
         Box::new(StampedLines(tx)),
-        maos_bin::escape_detector_consumer::tl_journal(Arc::downgrade(&world.tl)),
+        maos_bin::escape_detector_consumer::tl_journal(Arc::clone(&world.tl)),
     );
     let fault_runner = fixtures::fixture("maos-wasm-runner-fault-inject");
     let artifact = fixtures::fixture("echo_spirit.wasm");

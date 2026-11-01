@@ -1,0 +1,14 @@
+{
+ "init_rc": 0,
+ "endpoint": "127.0.0.1:40215",
+ "foreign_bind_after_init": "succeeded (init holds nothing)",
+ "holder_pid": 2350449,
+ "held_rc": 78,
+ "held_line": [
+  "maos: operator endpoint 127.0.0.1:40215 is already served by another MAOS root (/tmp/c203c/ep/maos-endpoint-20-3c-h7r60f17/maos-home/control.json) \u2014 EndpointInUse"
+ ],
+ "released_rc": 0,
+ "released_listen_line": [
+  "maos: operator HTTP listening on 127.0.0.1:40215"
+ ]
+}

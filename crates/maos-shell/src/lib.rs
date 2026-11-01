@@ -183,6 +183,8 @@ fn ensure_operator_door(
 pub fn run_audit_query(
     spirit: Option<&str>,
     format: &str,
+    intent_contains: Option<&str>,
+    tag: Option<&str>,
     _color_choice: ColorChoice, // Accepts caller's NO_COLOR intent; library functions emit no ANSI regardless.
 ) -> Result<(), Box<dyn std::error::Error>> {
     let db_path = transparency_log_path()?;
@@ -191,7 +193,11 @@ pub fn run_audit_query(
         return Err("audit log not found".into());
     }
 
-    let mut filter = maos_audit::AuditFilter::default();
+    let mut filter = maos_audit::AuditFilter {
+        intent_contains: intent_contains.map(str::to_owned),
+        tag: tag.map(str::to_owned),
+        ..Default::default()
+    };
     if let Some(s) = spirit {
         // Story 16-2 / D-16-2-F — the private `hello-spirit => pid 0` table
         // is DELETED; the name resolves through the identity rows like every

@@ -268,8 +268,12 @@ fn routed_witness_binaries_and_labelled_red_owners_remain_enrolled() -> Result<(
     let claims = read_claims(root)?;
     let continuity = claims.get("I14").ok_or("I14")?;
     assert!(matches!(continuity.claim, ClaimState::Asserted));
-    assert_eq!(continuity.owner.as_deref(), Some("20-3c"));
-    assert!(continuity.requirement_claims["FR53"].contains("asserted, owner 20-3c"));
+    assert_eq!(
+        continuity.owner.as_deref(),
+        Some("20-9-spawned-form-lifecycle-hooks")
+    );
+    assert!(continuity.requirement_claims["FR53"]
+        .contains("asserted, owner 20-9-spawned-form-lifecycle-hooks"));
     let ledger = include_str!("../../docs/invariants/README.md");
     assert!(ledger.contains("FR34 | asserted; owner: none (trigger-owned; see deferred-work)"));
     Ok(())

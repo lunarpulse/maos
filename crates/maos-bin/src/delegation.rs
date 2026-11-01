@@ -439,10 +439,14 @@ impl DelegationLeg {
     ///   intake sink to pump from and no goal to return; what this Host keeps is one
     ///   journaled emit row whose sixteen `frame_id` bytes are the join key for the
     ///   receiver's own row (AC3.1/AC3.3).
+    ///
+    /// `emitter_pid` is the admitted local Orchestrator that emits the frame: the
+    /// journaled `spirit_pid`, which participant recall selects on (20-3c AC6).
     pub async fn delegate(
         &mut self,
         iac: &IacBusAdapter,
         frame: IacFrame,
+        emitter_pid: u32,
     ) -> Result<DelegationOutcome, String> {
         let frame_id = frame.frame_id;
         // Story 19-7 (D-19-7-09 A) — keep a copy for the re-pin hold ONLY when a hold
@@ -452,7 +456,7 @@ impl DelegationLeg {
         // delegation `TaskAssign` carries a non-empty lineage (`assign_frame_remote`
         // refuses an empty one).
         let held = (self.repin_hold.is_some() && self.cross_host.is_some()).then(|| frame.clone());
-        if let Err(error) = iac.deliver_typed(frame, 0, None).await {
+        if let Err(error) = iac.deliver_typed(frame, emitter_pid, None).await {
             let hold = match (self.repin_hold, self.cross_host.as_ref(), held) {
                 (Some(hold), Some(router), Some(held)) => awaiting_repin_peer(&error)
                     .and_then(|peer| {
@@ -570,18 +574,20 @@ impl DelegationLeg {
     /// Returns the number of frames the Orchestrator actually drained, so the
     /// caller can prove the loop closed rather than assume it. Only a confirmed
     /// completion can be emitted: the payload is fixed to `"completed"` rather
-    /// than accepting an arbitrary adapter outcome label.
+    /// than accepting an arbitrary adapter outcome label. `worker_pid` is the
+    /// admitted Worker whose completion this is (the frame's `from` names it).
     pub async fn journal_completion(
         &mut self,
         iac: &IacBusAdapter,
         seq: u64,
         run_nonce: u64,
+        worker_pid: u32,
     ) -> Result<usize, String> {
         let mut frame_id = [0u8; 16];
         frame_id[0..8].copy_from_slice(&seq.to_le_bytes());
         frame_id[8..16].copy_from_slice(&run_nonce.to_le_bytes());
         let frame = completion_frame(frame_id, seq, "completed".to_string());
-        iac.deliver_typed(frame, 0, None)
+        iac.deliver_typed(frame, worker_pid, None)
             .await
             .map_err(|e| format!("completion journal failed: {e}"))?;
         let mut drained = 0usize;

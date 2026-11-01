@@ -1,0 +1,43 @@
+--- a/crates/maos-domain/src/halt.rs
++++ b/crates/maos-domain/src/halt.rs
+@@ -226,6 +226,8 @@
+     HaltRejection,
+     /// Story 5.4 — Spirit revoked via CRL propagation.
+     RevocationTerminated,
++    /// 20-3c — pending halt drained by a hot swap.
++    SwapDrained,
+ }
+ 
+ impl TerminationKind {
+@@ -236,6 +238,7 @@
+             Self::UnplannedCrash => "unplanned_crash",
+             Self::HaltRejection => "halt_rejection",
+             Self::RevocationTerminated => "revocation_terminated",
++            Self::SwapDrained => "swap_drained",
+         }
+     }
+ }
+--- a/crates/maos-kernel-core/src/hot_swap/coordinator.rs
++++ b/crates/maos-kernel-core/src/hot_swap/coordinator.rs
+@@ -162,6 +162,21 @@
+             .as_ref()
+             .map(|h| vec![h.version])
+             .unwrap_or_else(|| vec![1u32]);
++        // 20-3c member 12 (K2): a drained halt ends with a typed receipt.
++        if !self
++            .halt_registry
++            .drain_for_spirit_dry_run(predecessor_pid)
++            .is_empty()
++        {
++            let _receipts = crate::halt::terminate_spirit(
++                &self.tl,
++                &self.halt_registry,
++                predecessor_pid,
++                spirit_id,
++                maos_domain::halt::TerminationKind::SwapDrained,
++                predecessor_scb.boot_nonce,
++            );
++        }
+         match validate_swap_halt_continuity(
+             &self.halt_registry,
+             predecessor_pid,

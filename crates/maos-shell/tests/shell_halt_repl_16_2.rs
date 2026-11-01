@@ -779,6 +779,32 @@ fn at_directive_is_refused_while_a_halt_is_pending() {
     );
 }
 
+/// Story 20-3c AC11 (member 8) — a clarification of `64 KiB + 1` bytes is
+/// refused BEFORE `resolve_with_context`: nothing reaches the host (so nothing
+/// reaches memory or the journal), and the halt stays pending so the operator
+/// can retry. Exactly `64 KiB` is still accepted — the bound is the control.
+#[test]
+fn an_oversized_clarification_is_refused_before_it_reaches_the_host() {
+    let (host, handle) = FakeHost::ok(1);
+    let repl = LiveRepl::start(host, handle, Arc::new(Mutex::new(Vec::new())));
+    let _id = raise_live(&repl);
+
+    repl.input.send_line(&"x".repeat(64 * 1024 + 1));
+    repl.wait_for("clarification refused", "the oversized refusal");
+    let calls = repl.handle.snapshot();
+    assert!(
+        calls.resolutions.is_empty() && calls.recorded_turns.is_empty(),
+        "a refused clarification reaches no host surface"
+    );
+
+    repl.input.send_line(&"y".repeat(64 * 1024));
+    let calls = repl.wait_for_calls("the 64 KiB clarification submits", |c| {
+        !c.resolutions.is_empty()
+    });
+    assert_eq!(calls.resolutions.len(), 1);
+    assert_eq!(calls.resolutions[0].1.len(), 64 * 1024);
+}
+
 /// Trap 5's context race: state `Resumed`, context appearing a few ticks
 /// LATER — the Spirit proceeds WITH it once it lands.
 #[test]

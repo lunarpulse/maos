@@ -116,6 +116,37 @@ pub fn emit_vetter_key_event(
     );
 }
 
+/// Story 20-3c (FR62(b), D-20-3c-05 B) — journal an ABI-extension proposal or a
+/// status change as a `GovernanceEvent` (kind 28), carrying `recorded_at` (now)
+/// and the operator's `effective_at`. `maos_audit::load_ratification_frames`
+/// reads the `Ratified` ones back; `maos audit query --kind governance` lists
+/// them all.
+pub fn emit_abi_extension_event(
+    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
+    proposal: maos_domain::governance::AbiExtensionProposal,
+    effective_at_ns: u64,
+) -> Result<(), String> {
+    let recorded_at_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or(std::time::Duration::ZERO)
+        .as_nanos() as u64;
+    let bytes = serde_json::to_vec(&maos_domain::governance::GovernanceEventPayload {
+        recorded_at_ns,
+        effective_at_ns,
+        event: maos_domain::governance::GovernanceEventKind::AbiExtension(proposal),
+    })
+    .map_err(|error| format!("abi-extension governance serialization failed: {error}"))?;
+    let _token = tl.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
+        0,
+        None,
+        "governance:abi-extension",
+        &bytes,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    Ok(())
+}
+
 /// Story 9.4b AC-6/D7 — the deploy-time accountable operator identity stamped on
 /// every model-provenance governance event. Resolved from
 /// `MAOS_DEPLOYMENT_OPERATOR_ID`, defaulting to a stable single-operator

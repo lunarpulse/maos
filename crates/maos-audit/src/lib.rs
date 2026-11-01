@@ -146,6 +146,9 @@ pub struct AuditFilter {
     pub capability_token: Option<String>,
     /// FR41 — param-bound substring match on intent column.
     pub intent_contains: Option<String>,
+    /// FR41 — param-bound EXACT match on the intent column, where a halt
+    /// journals its tag (`halt::invoke_halt`).
+    pub tag: Option<String>,
 }
 
 /// Resolve the `kind` filter string to a concrete list of `i64` discriminators.
@@ -267,6 +270,10 @@ pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, Aud
     if let Some(sub) = &filter.intent_contains {
         where_clauses.push("intent LIKE '%' || ? || '%'".to_string());
         params.push(Box::new(sub.clone()));
+    }
+    if let Some(tag) = &filter.tag {
+        where_clauses.push("intent = ?".to_string());
+        params.push(Box::new(tag.clone()));
     }
 
     if !where_clauses.is_empty() {
@@ -446,6 +453,10 @@ pub fn query_with_redaction(
     if let Some(sub) = &filter.intent_contains {
         where_clauses.push("intent LIKE '%' || ? || '%'".to_string());
         params.push(Box::new(sub.clone()));
+    }
+    if let Some(tag) = &filter.tag {
+        where_clauses.push("intent = ?".to_string());
+        params.push(Box::new(tag.clone()));
     }
 
     if !where_clauses.is_empty() {

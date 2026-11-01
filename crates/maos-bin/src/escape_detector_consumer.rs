@@ -88,24 +88,25 @@ pub fn anomaly_flagged_payload(report: &AnomalyReport) -> String {
 
 /// Story 18-4 (D-18-4-07 A; review TIA-2) — the root's production journal:
 /// each anomaly as a [`ANOMALY_FLAGGED_INTENT`] `telemetry.event` frame
-/// carrying [`anomaly_flagged_payload`]. The TL is held weakly: the final
-/// scan runs after the audit drain, where a frame can no longer be written —
-/// said on stderr, never silent (deferred: 20-3c).
+/// carrying [`anomaly_flagged_payload`].
+///
+/// Story 20-3c (`deferred-work.md:1268`): the journal holds the log STRONGLY.
+/// It was held weakly and its `None` arm printed `escape-anomaly not journaled
+/// (the Transparency Log is closed)`, so the final scan — which runs after the
+/// audit drain, once the root has dropped its other handles — depended on
+/// someone else keeping the log alive. There is no closed-log arm to reach now.
 pub fn tl_journal(
-    tl: std::sync::Weak<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+    tl: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
 ) -> AnomalyJournal {
-    Box::new(move |report| match tl.upgrade() {
-        Some(tl) => {
-            let _ = tl.insert_frame_event(
-                maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
-                u32::try_from(report.spirit_pid).unwrap_or(0),
-                None,
-                ANOMALY_FLAGGED_INTENT,
-                anomaly_flagged_payload(report).as_bytes(),
-                maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
-            );
-        }
-        None => eprintln!("maos: escape-anomaly not journaled (the Transparency Log is closed)"),
+    Box::new(move |report| {
+        let _ = tl.insert_frame_event(
+            maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+            u32::try_from(report.spirit_pid).unwrap_or(0),
+            None,
+            ANOMALY_FLAGGED_INTENT,
+            anomaly_flagged_payload(report).as_bytes(),
+            maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+        );
     })
 }
 

@@ -178,20 +178,19 @@ fi
 echo "FR41 query --range 30d: PASS ($RANGE_LINES entries)"
 echo "::endgroup::"
 
-echo "::group::FR41 — --tag reserved error"
-set +e
-"${MAOSCTL}" audit query --tag test 2>"$TMPDIR_SMOKE/tag_stderr.txt"
-TAG_EXIT=$?
-set -e
-if [ "$TAG_EXIT" != "2" ]; then
-    echo "FAIL: --tag should exit 2, got $TAG_EXIT" >&2
-    exit 1
-fi
-grep -q "intent-contains" "$TMPDIR_SMOKE/tag_stderr.txt" || {
-    echo "FAIL: --tag error should mention --intent-contains" >&2
+echo "::group::FR41 — --tag exact match on the intent column"
+# 20-3c AC8: --tag is a filter now, not a reserved flag. A tag no row carries
+# returns no rows and exits 0; a tag that is a mere substring of a real intent
+# must not match (exact, not --intent-contains).
+TAG_NONE="$("${MAOSCTL}" audit query --tag no-such-tag-20-3c --format ndjson 2>/dev/null)" || {
+    echo "FAIL: --tag with no matching row should exit 0" >&2
     exit 1
 }
-echo "FR41 --tag reserved: PASS (exit 2 with diagnostic)"
+if echo "$TAG_NONE" | grep -q '"frame_id"'; then
+    echo "FAIL: --tag no-such-tag-20-3c returned rows" >&2
+    exit 1
+fi
+echo "FR41 --tag exact: PASS (exit 0, no rows for an unknown tag)"
 echo "::endgroup::"
 
 # ─── 2. FR42: subject-access ───────────────────────────────────────────

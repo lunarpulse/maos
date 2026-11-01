@@ -42,6 +42,7 @@ A proposal carries `(proposal-id, summary, ratification-status {Proposed, Ratifi
 - The base case is the empty set (`∅ ⊆ anything`), so the gate is **born green against the zero-delta baseline** on the commit that introduces it (introducing the gate moves no ABI). **There is NO `genesis`/bootstrap exemption flag** — the base case is set algebra, not a special-case branch (an exemption flag becomes a permanent loophole).
 - Ordering is proven on the **TL frame sequence, not git history** (squash-merge erases git order; TL seq is monotonic and tamper-evident).
 - No voting UI in scope.
+- **What the gate reads today (Story 20-3c, D-20-3c-05 B).** `xtask check-abi-ratification` reads the ratified proposals from `xtask/abi-ratifications.toml`, **not** from the Transparency Log; the "ancestor frame" ordering above is the rule the gate is meant to reach, and is NOT yet enforced by it. Proposals and each status change ARE now journaled as `GovernanceEvent` (kind 28, intent `governance:abi-extension`, with `recorded_at` and `effective_at`) by `maosctl governance abi-extension`; `maos_audit::load_ratification_frames` reads the `Ratified` ones back. Reconciling the gate onto those frames is a separate, un-owned change.
 
 ### 5. R11 — schema reference key references SCHEMA identity, never an instance
 

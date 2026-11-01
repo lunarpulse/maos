@@ -174,6 +174,50 @@ pub async fn unload_all_loaded(
     report
 }
 
+/// How a one-shot's audit-writer drain failed. A one-shot that cannot say its
+/// rows reached the Transparency Log must not exit 0 (20-3c member 11).
+pub enum AuditDrainError {
+    /// Some `audit_tx` holder outlived the drain window, so the writer never
+    /// saw the channel close.
+    TimedOut { secs: u64 },
+    /// The writer task itself panicked or was cancelled.
+    WriterFailed(String),
+}
+
+impl std::fmt::Display for AuditDrainError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TimedOut { secs } => write!(f, "audit writer drain timed out after {secs}s"),
+            Self::WriterFailed(error) => {
+                write!(f, "audit writer task failed during drain: {error}")
+            }
+        }
+    }
+}
+
+// `main` returns the error through `Debug`; the operator reads the sentence.
+impl std::fmt::Debug for AuditDrainError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl std::error::Error for AuditDrainError {}
+
+/// Await the cap-audit writer after every sender has dropped.
+pub async fn await_audit_drain(
+    writer: &mut tokio::task::JoinHandle<()>,
+    window: std::time::Duration,
+) -> Result<(), AuditDrainError> {
+    match tokio::time::timeout(window, writer).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(AuditDrainError::WriterFailed(error.to_string())),
+        Err(_) => Err(AuditDrainError::TimedOut {
+            secs: window.as_secs(),
+        }),
+    }
+}
+
 /// Finish the serving root after the door and other watchdogs have drained.
 ///
 /// Both hook callers must join before supervision stops and before any Spirit's

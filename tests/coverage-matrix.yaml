@@ -865,6 +865,9 @@ coverage:
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: FR62(b) proposal/ratification writer witnessed by
+      crates/maos-bin/tests/abi_extension_journal_20_3c.rs (Story 20-3c);
+      check-abi-ratification still reads xtask/abi-ratifications.toml
   FR63:
     gates: []
     enforcement: advisory-until-engagement

@@ -449,6 +449,18 @@ fn log_frame_count(db: &Path, frame_id: [u8; 16]) -> i64 {
         .expect("count transparency rows")
 }
 
+/// The `spirit_pid` a journaled row carries (20-3c AC6).
+fn log_spirit_pid(db: &Path, frame_id: [u8; 16]) -> i64 {
+    let connection = rusqlite::Connection::open(db).expect("open transparency log");
+    connection
+        .query_row(
+            "SELECT spirit_pid FROM transparency_log WHERE frame_id = ?1",
+            rusqlite::params![&frame_id[..]],
+            |row| row.get(0),
+        )
+        .expect("read the row's spirit pid")
+}
+
 /// §A6 review P9 — prove the OPERATOR-SELECTED fixture worker actually ran.
 /// Keyed on the fixture's deterministic stdout marker in a journaled
 /// `CliSubprocessOutput` payload, never on `kind` (H9: kind is a contaminated
@@ -581,6 +593,16 @@ fn two_daemon_delegation_is_joined_on_the_same_sixteen_bytes() {
         OUTCOME_LABELS.iter().any(|label| payload.contains(label)),
         "host B outcome must carry a WorkerCompletion label; payload: {payload}"
     );
+    // 20-3c AC6 — host A's emit row names the admitted Orchestrator that emitted
+    // it; host B's verified-peer intake and root-minted outcome rows stay pid 0
+    // (never a fabricated local pid for a remote sender).
+    assert_ne!(
+        log_spirit_pid(&fixture.host_a_log, host_a_frame_id),
+        0,
+        "host A's emit row must name its admitted emitter"
+    );
+    assert_eq!(log_spirit_pid(&fixture.host_b_log, host_b_frame_id), 0);
+    assert_eq!(log_spirit_pid(&fixture.host_b_log, outcome_id), 0);
     // §A6 review P9 — the worker must be THE fixture this manifest selects.
     // A different host-granted worker that happens to emit a valid completion
     // label would otherwise keep AC1.6 green; only the fixture's deterministic

@@ -1067,7 +1067,7 @@ const SPECS: &[TestLeg] = &[
             ],
         },
         TestLeg {
-            name: "spirit-route-and-tenant-audit-stage2-refusal-live",
+            name: "tenant-mode-boots-live",
             class: BindingClass::AdvisorySubstrate,
             args: &[
                 "test",

@@ -1,0 +1,153 @@
+--- a/crates/maos-capability/src/cap_audit/mod.rs
++++ b/crates/maos-capability/src/cap_audit/mod.rs
+@@ -32,10 +32,11 @@
+     SandboxBlock,
+     AcpNotification,
+     Quota,
++    RateLimited,
+ }
+ 
+ impl AuditDropSite {
+-    const COUNT: usize = 8;
++    const COUNT: usize = 9;
+ }
+ 
+ /// Why an audit event did not reach the writer.
+--- a/crates/maos-kernel-core/src/halt/mod.rs
++++ b/crates/maos-kernel-core/src/halt/mod.rs
+@@ -443,47 +443,32 @@
+ /// I14 enforcement entry-point — used by Story 5.2's Hot-Swap Coordinator
+ /// before initiating a swap.
+ ///
+-/// Drain-OR-migrate semantics per ADR-019 + architecture §3.2 I14:
+-///   1. Snapshot predecessor's pending halt set.
+-///   2. Attempt drain via `drain_for_spirit(predecessor_spirit_pid)`.
+-///   3. After drain attempt, recompute the snapshot — if empty, swap is safe
+-///      (`Ok(SwapVerdict::SafeDrained { drained_count })`).
+-///   4. If drain failed, fall through to schema-compatible migration check
+-///      via `validate_halt_set`.
+-///   5. If `validate_halt_set` returns `Ok(())`, swap proceeds as
+-///      `SwapVerdict::SafeMigrated { ... }`.
+-///   6. Otherwise propagate `HaltContinuityError::*`.
++/// Carry-not-drain semantics (FR53, ADR-019 I14): a hot swap keeps the pid,
++/// so the predecessor's pending halts stay pending with their identity, owner,
++/// fire time and replay payload. Nothing is drained, so no halt ends without a
++/// receipt; an incompatible successor refuses the swap instead.
+ pub fn validate_swap_halt_continuity(
+     registry: &HaltRegistry,
+     predecessor_spirit_pid: u32,
+     predecessor_halt_protocol_version: u32,
+     successor_accepted_versions: Option<&[u32]>,
+ ) -> Result<SwapVerdict, HaltContinuityError> {
+-    // 1. Snapshot BEFORE drain
+-    let before_count = registry.pending_halt_ids().len();
+-
+-    // 2. Attempt drain for predecessor
+-    let _drained = registry.drain_for_spirit(predecessor_spirit_pid);
+-
+-    // 3. Snapshot AFTER drain
+-    let after_count = registry.pending_halt_ids().len();
+-    let drained_count = before_count.saturating_sub(after_count);
+-
+-    // 4. If nothing left pending, swap is safe
+-    if after_count == 0 {
+-        return Ok(SwapVerdict::SafeDrained { drained_count });
++    let carried: Vec<HaltId> = registry
++        .drain_for_spirit_dry_run(predecessor_spirit_pid)
++        .into_iter()
++        .filter(|(_, state)| matches!(state, HaltState::PendingResolution))
++        .map(|(id, _)| id)
++        .collect();
++    if carried.is_empty() {
++        return Ok(SwapVerdict::SafeDrained { drained_count: 0 });
+     }
+-
+-    // 5. Fall through to migration check
+-    let remaining = registry.pending_halt_ids();
+     validate_halt_set(
+-        &remaining,
++        &carried,
+         predecessor_halt_protocol_version,
+         successor_accepted_versions,
+     )?;
+-
+     Ok(SwapVerdict::SafeMigrated {
+-        migrated_count: remaining.len(),
++        migrated_count: carried.len(),
+         predecessor_version: predecessor_halt_protocol_version,
+         successor_versions: successor_accepted_versions.unwrap_or(&[]).to_vec(),
+     })
+--- a/crates/maos-kernel-core/src/hot_swap/precheck.rs
++++ b/crates/maos-kernel-core/src/hot_swap/precheck.rs
+@@ -36,7 +36,7 @@
+     /// a verdict without mutating the halt registry.
+     pub fn check(
+         halt_registry: &crate::halt::HaltRegistry,
+-        _predecessor_pid: u32,
++        predecessor_pid: u32,
+         predecessor_halt_protocol_version: u32,
+         successor_accepted_versions: &[u32],
+         predecessor_state_schema_version: u32,
+@@ -48,14 +48,21 @@
+         );
+ 
+         let version_list = successor_accepted_versions.to_vec();
+-        let pending_count = halt_registry.pending_halt_ids().len();
++        // FR53 (20-3c): the predecessor's own pending halts are what a hot swap carries.
++        let carried: Vec<_> = halt_registry
++            .drain_for_spirit_dry_run(predecessor_pid)
++            .into_iter()
++            .filter(|(_, state)| matches!(state, maos_domain::halt::HaltState::PendingResolution))
++            .map(|(id, _)| id)
++            .collect();
++        let pending_count = carried.len();
+ 
+         let verdict = match schema_compat {
+             SchemaCompat::Breaking => PrecheckOutcome::SchemaIncompatible,
+             SchemaCompat::SameMajor | SchemaCompat::CrossMajor => {
+                 // Check halt continuity dry-run style (no mutation).
+                 match crate::halt::validate_halt_set(
+-                    &halt_registry.pending_halt_ids(),
++                    &carried,
+                     predecessor_halt_protocol_version,
+                     Some(successor_accepted_versions),
+                 ) {
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -191,11 +191,31 @@
+         let iac = Arc::clone(iac);
+         // Story 18-5 (D-10 A): spawn the delivery on the current runtime so the
+         // frame is journaled and delivered; the synchronous
+-        // InferenceError::RateLimited stays the primary contract.
+-        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+-            runtime.spawn(async move {
+-                let _ = iac.deliver_typed(frame, 0, None).await;
+-            });
++        // InferenceError::RateLimited stays the primary contract. 20-3c EC5:
++        // with no runtime the row is still journaled synchronously (not delivered).
++        match tokio::runtime::Handle::try_current() {
++            Ok(runtime) => {
++                runtime.spawn(async move {
++                    if iac.deliver_typed(frame, 0, None).await.is_err() {
++                        use crate::capability::cap_audit::{record_drop, AuditDropReason};
++                        record_drop(
++                            crate::capability::cap_audit::AuditDropSite::RateLimited,
++                            AuditDropReason::Closed,
++                        );
++                    }
++                });
++            }
++            Err(_) => {
++                let bytes = serde_json::to_vec(&frame.payload).unwrap_or_default();
++                self.transparency_log.insert_frame_event(
++                    FrameKind::RateLimited,
++                    0,
++                    None,
++                    "rate_limited",
++                    &bytes,
++                    FrameOrigin::Kernel,
++                );
++            }
+         }
+     }
+ 

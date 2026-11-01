@@ -1911,6 +1911,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 let mut audit_spirit: Option<String> = None;
                 let mut audit_format = "plain".to_string();
+                let (mut audit_intent, mut audit_tag): (Option<String>, Option<String>) =
+                    (None, None);
                 let mut rest = argv.iter().skip(2);
                 while let Some(a) = rest.next() {
                     match a.as_str() {
@@ -1927,6 +1929,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 return Err("--format requires a value (ndjson|plain)".into());
                             }
                         }
+                        "--intent-contains" | "--tag" => {
+                            let Some(value) = rest.next().cloned() else {
+                                return Err(format!("{a} requires a value").into());
+                            };
+                            if a == "--tag" {
+                                audit_tag = Some(value);
+                            } else {
+                                audit_intent = Some(value);
+                            }
+                        }
                         "--plain" => {
                             plain_flag = true;
                         }
@@ -1937,7 +1949,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     plain_flag,
                     &maos_cli::accessibility::RealEnv,
                 );
-                return maos_shell::run_audit_query(audit_spirit.as_deref(), &audit_format, color);
+                return maos_shell::run_audit_query(
+                    audit_spirit.as_deref(),
+                    &audit_format,
+                    audit_intent.as_deref(),
+                    audit_tag.as_deref(),
+                    color,
+                );
             }
             verbs::VerbName::Purge => {
                 run_purge(&argv[1..]);
@@ -3479,6 +3497,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         || std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
     let mut operator_http_server: Option<maos_control::OperatorHttpServer> = None;
     let mut operator_door_port: Option<Arc<maos_bin::operator_door::OperatorDoor>> = None;
+    // 20-3c (member 16, D10 A) — held for the root's life; `None` for an
+    // env-pair root, which has no home record to lease.
+    let mut endpoint_lease: Option<maos_domain::operator_door::EndpointLease> = None;
     if is_door_root {
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         // Env overrides, BOTH-OR-NEITHER, else `<maos_home()>/control.json`.
@@ -3518,6 +3539,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let control_path = maos_domain::operator_door::control_file_path(&home);
                     match maos_domain::operator_door::ControlFile::load(&control_path) {
                         Ok(control) => {
+                            // The lease comes BEFORE the bind: a second root on this
+                            // home is refused here, naming the holder, so an occupied
+                            // port found below can only be a foreign process.
+                            match maos_domain::operator_door::EndpointLease::acquire(&home) {
+                                Ok(lease) => endpoint_lease = Some(lease),
+                                Err(error) => {
+                                    eprintln!("{error}");
+                                    std::process::exit(78);
+                                }
+                            }
                             let bind = match control.endpoint_addr() {
                                 Ok(bind) => bind,
                                 Err(error) => {
@@ -3619,36 +3650,76 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         door.set_forget_pump(&hook_pump);
         operator_door_port = Some(door);
         if let Some(config) = operator_http_config {
-            let server = match maos_control::OperatorHttpServer::bind_with_commands(
-                config.clone(),
-                Arc::clone(&scheduler),
-                rotation_windows,
-                peer_versions,
-                self_identity,
-                operator_door_port
-                    .clone()
-                    .map(|door| door as Arc<dyn maos_control::OperatorCommandPort>),
-            ) {
+            let bind_door = |bind: std::net::SocketAddr| {
+                maos_control::OperatorHttpServer::bind_with_commands(
+                    maos_control::OperatorHttpConfig {
+                        bind,
+                        bearer_token: config.bearer_token.clone(),
+                    },
+                    Arc::clone(&scheduler),
+                    rotation_windows.clone(),
+                    peer_versions.clone(),
+                    self_identity.clone(),
+                    operator_door_port
+                        .clone()
+                        .map(|door| door as Arc<dyn maos_control::OperatorCommandPort>),
+                )
+            };
+            let server = match bind_door(config.bind) {
                 Ok(server) => server,
                 Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {
-                    // A second root on ONE endpoint is the bug the door
-                    // exists to remove: fail fast, typed, exit 78, naming
-                    // the discovery file. No fallback port.
-                    let named = maos_domain::operator_door::maos_home()
-                        .ok()
-                        .flatten()
-                        .map(|home| {
-                            maos_domain::operator_door::control_file_path(&home)
-                                .display()
-                                .to_string()
-                        })
-                        .unwrap_or_else(|| "control.json".to_string());
-                    eprintln!(
-                        "maos: operator endpoint {} is already served by another MAOS root \
-                         ({named}) — EndpointInUse",
-                        config.bind
-                    );
-                    std::process::exit(78);
+                    let holder = maos_domain::operator_door::listener_pid(config.bind)
+                        .map_or_else(|| "holder unknown".to_owned(), |pid| format!("pid {pid}"));
+                    if endpoint_lease.is_none() {
+                        eprintln!(
+                            "maos: operator endpoint {} is already in use ({holder}) — EndpointInUse",
+                            config.bind
+                        );
+                        std::process::exit(78);
+                    }
+                    // This root holds its home's lease, so whoever holds the
+                    // recorded port is not a MAOS root of this home: say so,
+                    // bind a free loopback port and publish that one (the
+                    // token is untouched). A second root never reaches here —
+                    // it is refused at the lease.
+                    let rebound = (|| -> Result<_, String> {
+                        let home = maos_domain::operator_door::maos_home()
+                            .map_err(|error| error.to_string())?
+                            .ok_or("no MAOS home to republish into")?;
+                        let path = maos_domain::operator_door::control_file_path(&home);
+                        let server = bind_door(std::net::SocketAddr::from((
+                            std::net::Ipv4Addr::LOCALHOST,
+                            0,
+                        )))
+                        .map_err(|error| format!("rebind failed: {error}"))?;
+                        maos_domain::operator_door::ControlFile::load(&path)
+                            .map_err(|error| error.to_string())?
+                            .with_endpoint(server.local_addr())
+                            .publish_atomic(&path)
+                            .map_err(|error| {
+                                format!("republish {} failed: {error}", path.display())
+                            })?;
+                        Ok(server)
+                    })();
+                    match rebound {
+                        Ok(server) => {
+                            eprintln!(
+                                "maos: recorded operator endpoint {} is held by a foreign process \
+                                 ({holder}), not a MAOS root; rebound and republished {}",
+                                config.bind,
+                                server.local_addr()
+                            );
+                            server
+                        }
+                        Err(error) => {
+                            eprintln!(
+                                "maos: recorded operator endpoint {} is held by a foreign process \
+                                 ({holder}) and could not be replaced: {error}",
+                                config.bind
+                            );
+                            std::process::exit(78);
+                        }
+                    }
                 }
                 Err(error) => {
                     eprintln!("maos: operator HTTP bind failed: {error}");
@@ -4674,7 +4745,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 boot_nonce,
                 maos_bin::escape_detector_consumer::ESCAPE_TAIL_INTERVAL,
                 Box::new(std::io::stderr()),
-                maos_bin::escape_detector_consumer::tl_journal(Arc::downgrade(&transparency_log)),
+                maos_bin::escape_detector_consumer::tl_journal(Arc::clone(&transparency_log)),
             ),
         );
         eprintln!("maos: escape-anomaly consumer wired (Story 17-10, ADR-024)");
@@ -5226,7 +5297,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // the emit row is the evidence this Host holds, and the
                                 // receiver's row is joined to it on `frame_id` by
                                 // `j1-crosshost-2c`. No frame comes back in 2b.
-                                match delegation_leg.delegate(&iac, frame).await? {
+                                match delegation_leg.delegate(&iac, frame, pid).await? {
                                     maos_bin::delegation::DelegationOutcome::RehearsedLocally {
                                         goal,
                                     } => {
@@ -5490,7 +5561,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 epic_next += 1;
                             }
                             let drained = delegation_leg
-                                .journal_completion(&iac, delegation_seq, boot_nonce)
+                                .journal_completion(&iac, delegation_seq, boot_nonce, worker_run.spirit_pid)
                                 .await?;
                             emitter.complete_delegation();
                             delegation_seq += 1;
@@ -6981,6 +7052,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("maos run: '{spirit_id}' loaded — entering serving loop");
         }
     }
+    // 20-3c (member 11) — every `audit_tx` holder the one-shot arms own, in the
+    // order the serving root drops them. The writer ends only when ALL senders
+    // drop, and a sender lives on in any Arc chain reaching the capability
+    // registry, so an arm that drops three of them waits out the whole window.
+    macro_rules! release_audit_tx_holders {
+        () => {
+            drop(audit_tx);
+            drop(inference);
+            drop(orchestrator);
+            drop(butler_seam.lock().unwrap_or_else(|e| e.into_inner()).take());
+            drop(scheduler);
+            drop(revocation_poller);
+            drop(policy);
+            drop(halt_registry);
+            drop(orchestrator_registry);
+            drop(spirit_host);
+            drop(lifecycle_resolver);
+            drop(upgrade_orchestrator);
+            drop(revocation_applier);
+            drop(hot_swap_coordinator);
+            drop(crash_detector);
+            drop(distillate_writer);
+            drop(memory);
+            drop(capability);
+            drop(telemetry);
+            drop(self_telemetry);
+            drop(log_recall_adapter);
+            drop(collective_port);
+            drop(delegation_leg);
+            drop(router);
+            drop(rate_limiter);
+            drop(crypto_provider);
+            drop(iac);
+            drop(mailbox);
+            drop(notification_dispatcher);
+        };
+    }
+
     // ─────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────
@@ -7248,6 +7357,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Story 9.3b — `maosctl governance admit` one-shot path.
         if mode == "governance-admit" {
+            if let Ok(raw) = std::env::var("MAOS_GOVERNANCE_ABI_PROPOSAL") {
+                let proposal: maos_domain::governance::AbiExtensionProposal =
+                    serde_json::from_str(&raw).map_err(|e| {
+                        format!("MAOS_GOVERNANCE_ABI_PROPOSAL is not a proposal: {e}")
+                    })?;
+                let effective_at_ns: u64 = std::env::var("MAOS_GOVERNANCE_EFFECTIVE_AT_NS")
+                    .map_err(|_| {
+                        "MAOS_GOVERNANCE_EFFECTIVE_AT_NS is required for governance-admit"
+                    })?
+                    .parse()
+                    .map_err(|_| "MAOS_GOVERNANCE_EFFECTIVE_AT_NS must be a u64")?;
+                let summary = format!("{} ({:?})", proposal.proposal_id, proposal.status);
+                maos_bin::admission::emit_abi_extension_event(
+                    &transparency_log,
+                    proposal,
+                    effective_at_ns,
+                )?;
+                eprintln!("maos: journaled ABI extension {summary}");
+                return Ok(());
+            }
             let schema_id = std::env::var("MAOS_GOVERNANCE_SCHEMA_ID")
                 .map_err(|_| "MAOS_GOVERNANCE_SCHEMA_ID is required for governance-admit")?;
             let version: u32 = std::env::var("MAOS_GOVERNANCE_VERSION")
@@ -7480,14 +7609,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Drain
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
+            drop(resolver);
+            release_audit_tx_holders!();
+            maos_bin::supervision::await_audit_drain(
+                &mut audit_writer,
+                std::time::Duration::from_secs(5),
+            )
+            .await?;
 
             eprintln!("maos: smoke-epic-4 complete — all 6 surfaces exercised");
             return Ok(());
@@ -7638,14 +7766,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{{\"hook\": \"on_consolidate\", \"outcome\": \"deferred_to_story_8_x\"}}");
 
             // Drain
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
+            release_audit_tx_holders!();
+            maos_bin::supervision::await_audit_drain(
+                &mut audit_writer,
+                std::time::Duration::from_secs(5),
+            )
+            .await?;
 
             eprintln!("maos: smoke-spirit-5 complete — 11 hooks exercised (5 fired, 6 deferred)");
             return Ok(());
@@ -7855,14 +7981,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             smoke_cancel.cancel();
 
             // Drain
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
+            release_audit_tx_holders!();
+            maos_bin::supervision::await_audit_drain(
+                &mut audit_writer,
+                std::time::Duration::from_secs(5),
+            )
+            .await?;
 
             eprintln!("maos: smoke-supervision-5 complete — 4 supervision surfaces exercised");
             return Ok(());
@@ -7870,6 +7994,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if mode == "smoke-upgrade-revoke-5" {
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+            // The post-swap monitor holds capability/iac/halt clones for its whole
+            // window (30 s), so the audit writer cannot drain before it ends.
+            std::env::set_var("MAOS_AUTO_REVERT_FAST", "1");
             let revocation_poller_cancel = tokio_util::sync::CancellationToken::new();
             let revocation_poller_handle =
                 Arc::clone(&revocation_poller).spawn(revocation_poller_cancel.child_token());
@@ -8151,16 +8278,12 @@ description = "smoke test spirit successor"
                     eprintln!("maos: RevocationPoller task failed during smoke drain: {error}")
                 }
             }
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), audit_writer).await {
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => {
-                    eprintln!("maos: audit writer drain timed out (acceptable in smoke test)")
-                }
-                _ => {}
-            }
+            release_audit_tx_holders!();
+            maos_bin::supervision::await_audit_drain(
+                &mut audit_writer,
+                std::time::Duration::from_secs(5),
+            )
+            .await?;
             eprintln!("maos: smoke-upgrade-revoke-5 complete — 3 surfaces exercised");
             return Ok(());
         }
@@ -9446,21 +9569,12 @@ description = "smoke test spirit successor"
         // guaranteed to reach SQLite. Without this, the row is intermittently
         // lost (the writer is `tokio::spawn`-ed and the runtime drops mid-flush
         // on process exit).
-        drop(audit_tx);
-        drop(inference);
-        drop(capability);
-        // Story 5.1 — scheduler + orchestrator hold Arc<CapabilityRegistryAdapter>
-        // which holds audit_tx clones; drop them so the channel closes.
-        drop(orchestrator);
-        drop(scheduler);
-        drop(lifecycle_resolver);
-        // `transparency_log` is moved into the writer task's closure (Arc), so
-        // awaiting the writer drains the queue and releases its Arc clone.
-        match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-            Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-        }
+        release_audit_tx_holders!();
+        maos_bin::supervision::await_audit_drain(
+            &mut audit_writer,
+            std::time::Duration::from_secs(5),
+        )
+        .await?;
 
         eprintln!("maos: one-shot complete — exiting cleanly");
         return Ok(());

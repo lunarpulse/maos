@@ -1,0 +1,288 @@
+{
+ "head": "3341f9e4",
+ "instrument": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/tmp/proto203c/<name>/xtask /mnt/build/cargo-maos/debug/xtask {check-kernel-baseline,kloc-check} --json, run from the git-archive copy root; rustfmt 1.9.0-stable --edition 2021 on changed files; tokei 14.0.0 via kloc-check",
+ "results": {
+  "base": {
+   "kernel_physical": 26793,
+   "kernel_files": 95,
+   "changed": [],
+   "aggregate": 188451,
+   "over_budget": [],
+   "per_crate": {
+    "maos-kernel-core": 20992,
+    "maos-bin": 33030,
+    "maos-capability": 1432,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "k1": {
+   "kernel_physical": 26778,
+   "kernel_files": 95,
+   "changed": [
+    "halt/mod.rs"
+   ],
+   "aggregate": 188452,
+   "over_budget": [
+    "aggregate 188452 >= 188452",
+    "maos-kernel-core 20993 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 20993,
+    "maos-bin": 33030,
+    "maos-capability": 1432,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "k1p": {
+   "kernel_physical": 26785,
+   "kernel_files": 95,
+   "changed": [
+    "halt/mod.rs",
+    "hot_swap/precheck.rs"
+   ],
+   "aggregate": 188458,
+   "over_budget": [
+    "aggregate 188458 >= 188452",
+    "maos-kernel-core 20999 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 20999,
+    "maos-bin": 33030,
+    "maos-capability": 1432,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "k2": {
+   "kernel_physical": 26808,
+   "kernel_files": 95,
+   "changed": [
+    "hot_swap/coordinator.rs"
+   ],
+   "aggregate": 188467,
+   "over_budget": [
+    "aggregate 188467 >= 188452",
+    "maos-domain 9979 > 9977",
+    "maos-kernel-core 21006 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 21006,
+    "maos-bin": 33030,
+    "maos-capability": 1432,
+    "maos-domain": 9979,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "e1": {
+   "kernel_physical": 26800,
+   "kernel_files": 95,
+   "changed": [
+    "inference/mod.rs"
+   ],
+   "aggregate": 188458,
+   "over_budget": [
+    "aggregate 188458 >= 188452",
+    "maos-capability 1433 > 1432",
+    "maos-kernel-core 20998 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 20998,
+    "maos-bin": 33030,
+    "maos-capability": 1433,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "e2": {
+   "kernel_physical": 26807,
+   "kernel_files": 95,
+   "changed": [
+    "inference/mod.rs"
+   ],
+   "aggregate": 188464,
+   "over_budget": [
+    "aggregate 188464 >= 188452",
+    "maos-kernel-core 21005 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 21005,
+    "maos-bin": 33030,
+    "maos-capability": 1432,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "e3": {
+   "kernel_physical": 26813,
+   "kernel_files": 95,
+   "changed": [
+    "inference/mod.rs"
+   ],
+   "aggregate": 188471,
+   "over_budget": [
+    "aggregate 188471 >= 188452",
+    "maos-capability 1433 > 1432",
+    "maos-kernel-core 21011 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 21011,
+    "maos-bin": 33030,
+    "maos-capability": 1433,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "krec": {
+   "kernel_physical": 26805,
+   "kernel_files": 95,
+   "changed": [
+    "halt/mod.rs",
+    "hot_swap/precheck.rs",
+    "inference/mod.rs"
+   ],
+   "aggregate": 188478,
+   "over_budget": [
+    "aggregate 188478 >= 188452",
+    "maos-capability 1433 > 1432",
+    "maos-kernel-core 21018 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 21018,
+    "maos-bin": 33030,
+    "maos-capability": 1433,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "kalt": {
+   "kernel_physical": 26792,
+   "kernel_files": 95,
+   "changed": [
+    "halt/mod.rs",
+    "hot_swap/precheck.rs",
+    "inference/mod.rs"
+   ],
+   "aggregate": 188465,
+   "over_budget": [
+    "aggregate 188465 >= 188452",
+    "maos-capability 1433 > 1432",
+    "maos-kernel-core 21005 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 21005,
+    "maos-bin": 33030,
+    "maos-capability": 1433,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "p17": {
+   "kernel_physical": 26793,
+   "kernel_files": 95,
+   "changed": [],
+   "aggregate": 188453,
+   "over_budget": [
+    "aggregate 188453 >= 188452",
+    "maos-bin 33032 > 33030"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 20992,
+    "maos-bin": 33032,
+    "maos-capability": 1432,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  },
+  "kall": {
+   "kernel_physical": 26805,
+   "kernel_files": 95,
+   "changed": [
+    "halt/mod.rs",
+    "hot_swap/precheck.rs",
+    "inference/mod.rs"
+   ],
+   "aggregate": 188480,
+   "over_budget": [
+    "aggregate 188480 >= 188452",
+    "maos-bin 33032 > 33030",
+    "maos-capability 1433 > 1432",
+    "maos-kernel-core 21018 > 20992"
+   ],
+   "per_crate": {
+    "maos-kernel-core": 21018,
+    "maos-bin": 33032,
+    "maos-capability": 1433,
+    "maos-domain": 9977,
+    "maos-cli": 6371,
+    "maos-audit": 7707,
+    "maos-shell": 602,
+    "maos-iac": 8270,
+    "maos-a2a-tcp": 1442,
+    "maos-control": 1496,
+    "xtask": 42841
+   }
+  }
+ }
+}

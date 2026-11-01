@@ -1,0 +1,14 @@
+smoke-epic-4 run1 rc=0 wall_ms=5212 drain_timeout_lines=1 panics=0
+smoke-epic-4 run2 rc=0 wall_ms=5236 drain_timeout_lines=1 panics=0
+smoke-epic-4 run3 rc=0 wall_ms=5234 drain_timeout_lines=1 panics=0
+smoke-spirit-5 run1 rc=0 wall_ms=5228 drain_timeout_lines=1 panics=0
+smoke-spirit-5 run2 rc=0 wall_ms=5218 drain_timeout_lines=1 panics=0
+smoke-spirit-5 run3 rc=0 wall_ms=5283 drain_timeout_lines=1 panics=0
+smoke-supervision-5 run1 rc=0 wall_ms=6259 drain_timeout_lines=1 panics=1
+smoke-supervision-5 run2 rc=0 wall_ms=6271 drain_timeout_lines=1 panics=1
+smoke-supervision-5 run3 rc=0 wall_ms=6219 drain_timeout_lines=1 panics=1
+hello-spirit run1 rc=0 wall_ms=5298 drain_timeout_lines=1 panics=0
+hello-spirit run2 rc=0 wall_ms=5310 drain_timeout_lines=1 panics=0
+hello-spirit run3 rc=0 wall_ms=5305 drain_timeout_lines=1 panics=0
+maos-shell run1 rc=0 wall_ms=304 drain_timeout_lines=0
+maos-shell run2 rc=0 wall_ms=335 drain_timeout_lines=0

@@ -249,7 +249,7 @@ pub fn trusted_evidence_tests(gate: &str, leg: &str) -> Option<&'static [&'stati
         ("check-reza-production-path", "gdpr-collective-erase-live") => {
             Some(&["collective_erase_moves_merkle_triple_and_blocks_stale_replication"])
         }
-        ("check-reza-production-path", "spirit-route-and-tenant-audit-stage2-refusal-live") => {
+        ("check-reza-production-path", "tenant-mode-boots-live") => {
             Some(&["tenant_mode_boots_on_live_substrate"])
         }
         ("check-multi-tenant-loom", "reza-three-team-three-region-journey") => {

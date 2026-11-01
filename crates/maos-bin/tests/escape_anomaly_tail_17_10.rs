@@ -136,7 +136,7 @@ async fn each_anomaly_is_journaled_before_its_line() {
     let tl = std::sync::Arc::new(TransparencyLogAdapter::open(&db, NONCE).unwrap());
     let (tx, mut rx) = unbounded_channel();
     let journal_tx = tx.clone();
-    let mut production = tl_journal(std::sync::Arc::downgrade(&tl));
+    let mut production = tl_journal(std::sync::Arc::clone(&tl));
     let tail = spawn_escape_anomaly_tail(
         db.clone(),
         NONCE,
@@ -172,6 +172,54 @@ async fn each_anomaly_is_journaled_before_its_line() {
     assert!(payload["summary"]
         .as_str()
         .is_some_and(|s| s.starts_with("escape-anomaly: spirit_pid=4243")));
+}
+
+/// Story 20-3c AC7 (`deferred-work.md:1268`) — a kill row that lands after the
+/// last tick is journaled by the teardown scan even when the journal holds the
+/// ONLY handle on the log, which is the position the root's final scan runs in
+/// once the audit drain has let go of everything else. The journal held the log
+/// weakly and printed `escape-anomaly not journaled` instead.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_kill_after_the_last_tick_is_journaled_by_the_teardown_scan() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("transparency.sqlite");
+    let log = std::sync::Arc::new(TransparencyLogAdapter::open(&db, NONCE).unwrap());
+    let (tx, mut rx) = unbounded_channel();
+    let tail = spawn_escape_anomaly_tail(
+        db.clone(),
+        NONCE,
+        Duration::from_secs(3600),
+        Box::new(Lines(tx)),
+        tl_journal(std::sync::Arc::clone(&log)),
+    );
+    tail.declare(4244, SandboxTier::T2);
+    kill(&log, 4244, SIGSYS);
+    drop(log);
+    tail.shutdown(true, false).await;
+    let lines = rest(&mut rx);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("escape-anomaly: spirit_pid=4244")),
+        "the teardown scan surfaces the kill: {lines:?}"
+    );
+    assert!(
+        !lines.iter().any(|l| l.contains("not journaled")),
+        "and never reports that it could not journal it: {lines:?}"
+    );
+    let journaled: i64 =
+        rusqlite::Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .unwrap()
+            .query_row(
+                "SELECT count(*) FROM transparency_log WHERE intent = ?1",
+                [ANOMALY_FLAGGED_INTENT],
+                |row| row.get(0),
+            )
+            .unwrap();
+    assert_eq!(
+        journaled, 1,
+        "one anomaly.flagged frame, written before the line"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -1158,3 +1158,23 @@ fn real_forget_tombstones_survive_replay_sealed_and_trajectory_export() {
         assert!(!serde_json::to_string(&signed).unwrap().contains("CANARY"));
     }
 }
+
+/// 20-3c AC8 — the root's tokenless seed `TaskAssign` (the 17-3d test root's
+/// row) is a delegation message, not a call: the `--spirit` plain view renders
+/// it instead of ending in `Fr4SchemaViolation`. A token-bearing `TaskAssign`
+/// still projects as a call, so nothing leaves the NDJSON feed.
+#[test]
+fn tokenless_task_assign_is_a_non_call_and_a_token_bearing_one_still_projects() {
+    let seed = tokenless("task.assign", "Standard", 3, "recall mediation payload");
+    assert_eq!(
+        classify_fr4_row(&seed),
+        Fr4RowDisposition::NonCallKernelEvent
+    );
+    let mut rendered = Vec::new();
+    to_fr4_plain(vec![seed], &mut rendered).expect("the --spirit plain view renders the seed");
+    assert!(!rendered.is_empty());
+    assert_eq!(
+        classify_fr4_row(&call_with_token("task.assign", "standard", 3)),
+        Fr4RowDisposition::Call
+    );
+}

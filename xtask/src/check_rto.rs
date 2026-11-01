@@ -90,7 +90,12 @@ pub fn run(
 
     // Write evidence for check_rto_gate to consume (weekly cadence path).
     if let Some(path) = evidence_output {
-        append_evidence(path, &report)?;
+        let mode = if source.is_some() {
+            "operational"
+        } else {
+            "synthetic"
+        };
+        append_evidence(path, &report, mode)?;
     }
 
     if json {
@@ -129,10 +134,10 @@ pub fn run(
 /// rto_seconds = 3600
 /// drill_success = true
 /// ```
-fn append_evidence(path: &str, report: &Report) -> Result<(), String> {
+fn append_evidence(path: &str, report: &Report, mode: &str) -> Result<(), String> {
     let drill_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let entry = format!(
-        "\n[[evidence]]\ndrill_date = \"{drill_date}\"\nrto_seconds = {rto}\ndrill_success = {ok}\nnotes = \"integrity={integ},rpo={rpo},frames={frames}\"\n",
+        "\n[[evidence]]\ndrill_date = \"{drill_date}\"\nrto_seconds = {rto}\ndrill_success = {ok}\nmode = \"{mode}\"\nnotes = \"integrity={integ},rpo={rpo},frames={frames}\"\n",
         rto = report.rto_seconds.round() as u64,
         ok = report.passed,
         integ = report.backup_integrity_verified,

@@ -75,6 +75,12 @@ pub const NON_CALL_KINDS: &[&str] = &[
     "context.limit",    // 33
 ];
 
+/// Kinds that are a non-call only WITHOUT a token (20-3c AC8): the bus
+/// `TaskAssign` is a delegation message between Spirits, and the root's own
+/// seed and delegation rows carry no capability token. A token-bearing row of
+/// the kind still projects as a call.
+pub const TOKENLESS_NON_CALL_KINDS: &[&str] = &["task.assign"];
+
 /// The payload value type a writer-shape entry pins for one key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PayloadType {
@@ -650,6 +656,11 @@ pub fn classify_fr4_row(entry: &AuditEntry) -> Fr4RowDisposition {
     }
     // (a) kinds that are never an external call by definition.
     if NON_CALL_KINDS.contains(&entry.kind.as_str()) {
+        return Fr4RowDisposition::NonCallKernelEvent;
+    }
+    if entry.capability_token_hex.is_none()
+        && TOKENLESS_NON_CALL_KINDS.contains(&entry.kind.as_str())
+    {
         return Fr4RowDisposition::NonCallKernelEvent;
     }
     let token_present = entry.capability_token_hex.is_some();

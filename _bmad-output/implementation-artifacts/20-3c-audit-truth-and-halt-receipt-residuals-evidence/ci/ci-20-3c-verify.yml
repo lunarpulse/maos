@@ -1,0 +1,37 @@
+# 20-3c landing 1 — branch-only hosted verification of the legs that need the T3
+# substrate and cannot run on the dev host. NOT under .github/workflows: it is
+# evidence, not a gate, and is copied there only on an operator-approved branch.
+#
+# Diff under test (sha256 b07547c92134f4b09da864a444c70c1ccb578a98766a8160274520bb9e60a43c):
+#   t3-two-host-delegation-2b.diff — host A's emit row names the admitted emitter
+#   (spirit_pid != 0); host B's verified-peer intake row and root-minted outcome
+#   row keep pid 0 (AC6.3, never a fabricated local pid for a remote sender).
+#
+# Also run here: the T2 live escape-anomaly vector (AC7.3), which needs the real
+# runner and is green-or-skipped on the dev host.
+name: ci-20-3c-verify
+on:
+  workflow_dispatch:
+jobs:
+  t3-legs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Verify the diff under test is the one recorded
+        run: |
+          git diff -- crates/maos-bin/tests/two_host_delegation_2b.rs | sha256sum
+          # expected: b07547c92134f4b09da864a444c70c1ccb578a98766a8160274520bb9e60a43c
+      - name: Build the worker CLI fixture
+        run: cargo run -p xtask -- build-test-fixtures --only worker-cli-fixture
+      - name: AC6.3 — cross-host delegation pid attribution (T3)
+        run: cargo test -p maos-bin --test two_host_delegation_2b -- --test-threads=1
+      - name: AC7.3 — live escape anomaly (T2)
+        run: cargo test -p maos-bin --test live_escape_anomaly_17_10 -- --test-threads=1

@@ -28,6 +28,14 @@ pub struct RtoEvidence {
     pub drill_success: bool,
     /// Optional notes.
     pub notes: Option<String>,
+    /// `synthetic` (generated frames — the weekly CI drill) or `operational` (a
+    /// real root's log). Rows written before 20-3c carry none and are synthetic.
+    #[serde(default = "synthetic_mode")]
+    pub mode: String,
+}
+
+fn synthetic_mode() -> String {
+    "synthetic".into()
 }
 
 /// Evidence file shape.
@@ -67,19 +75,30 @@ pub fn run(evidence_path: &str, json: bool) -> Result<(), String> {
     } else {
         Observation::Red
     };
+    // NFR-Ops-9's OPERATIONAL claim is never made from a synthetic drill (20-3c,
+    // D-20-3c-11 B): a green synthetic drill proves the restore path, nothing more.
+    let mode = report.latest_drill.as_ref().map(|drill| drill.mode.clone());
+    let operational = report.passed && mode.as_deref() == Some("operational");
+    let verdict = format!(
+        "{} [{} drill; operational NFR-Ops-9 claim: {operational}]",
+        report.verdict,
+        mode.as_deref().unwrap_or("no")
+    );
     OutOfLedgerVerdict::judge_registered(
         "check-rto-gate",
         observation,
         report.latest_drill.is_some(),
         CURRENT_PHASE,
-        &report.verdict,
+        &verdict,
     )?
     .finish(
         json,
         serde_json::json!({
             "threshold_secs": report.threshold_secs,
             "latest_drill": report.latest_drill,
-            "verdict": report.verdict,
+            "verdict": verdict,
+            "mode": mode,
+            "operational_claim": operational,
         }),
     )
 }

@@ -35,6 +35,8 @@ use maos_spirit_abi::identity::{HostId, SpiritRole};
 use orchestrator::{Orchestrator, DELEGATION_CONSENT_INTENT};
 
 const SENDER_BOOT_NONCE: u64 = 0x19_07;
+/// 20-3c AC6 — the admitted local Orchestrator that emits the held delegation.
+const EMITTER_PID: u32 = 41;
 
 /// One scripted peer verdict.
 #[derive(Clone, Copy)]
@@ -168,7 +170,7 @@ async fn unarmed_leg_fails_at_once_on_a_restart_refusal() {
     let mut h = harness(Arc::clone(&router), None).await;
     let error = h
         .leg
-        .delegate(&h.iac, h.frame.clone())
+        .delegate(&h.iac, h.frame.clone(), EMITTER_PID)
         .await
         .expect_err("an unarmed leg must not hold");
     assert!(
@@ -202,7 +204,7 @@ async fn armed_hold_resends_the_same_frame_until_ack_with_one_emit_row() {
     let frame_id = h.frame.frame_id;
     let outcome = h
         .leg
-        .delegate(&h.iac, h.frame.clone())
+        .delegate(&h.iac, h.frame.clone(), EMITTER_PID)
         .await
         .expect("the hold delivers once the peer ACKs");
     assert_eq!(outcome, DelegationOutcome::SentCrossHost { frame_id });
@@ -245,7 +247,7 @@ async fn armed_hold_survives_tls_refused_resends_and_delivers_on_a_later_ack() {
     let frame_id = h.frame.frame_id;
     let outcome = h
         .leg
-        .delegate(&h.iac, h.frame.clone())
+        .delegate(&h.iac, h.frame.clone(), EMITTER_PID)
         .await
         .expect("TLS-refused re-sends keep the hold until the peer ACKs");
     assert_eq!(outcome, DelegationOutcome::SentCrossHost { frame_id });
@@ -281,7 +283,7 @@ async fn a_different_refusal_ends_the_hold() {
     .await;
     let error = h
         .leg
-        .delegate(&h.iac, h.frame.clone())
+        .delegate(&h.iac, h.frame.clone(), EMITTER_PID)
         .await
         .expect_err("a fingerprint mismatch ends the hold");
     assert!(
@@ -306,7 +308,7 @@ async fn an_armed_hold_does_not_take_a_first_non_restart_refusal() {
         .await;
         let error = h
             .leg
-            .delegate(&h.iac, h.frame.clone())
+            .delegate(&h.iac, h.frame.clone(), EMITTER_PID)
             .await
             .expect_err("a non-restart first refusal fails at once");
         assert!(
@@ -334,7 +336,7 @@ async fn the_hold_expires_on_its_bound_without_spinning() {
     let started = tokio::time::Instant::now();
     let error = h
         .leg
-        .delegate(&h.iac, h.frame.clone())
+        .delegate(&h.iac, h.frame.clone(), EMITTER_PID)
         .await
         .expect_err("an unconsented hold expires");
     let waited = started.elapsed();
@@ -385,7 +387,7 @@ async fn a_hold_longer_than_the_request_lifetime_is_capped_at_it() {
     let started = tokio::time::Instant::now();
     let error = h
         .leg
-        .delegate(&h.iac, h.frame.clone())
+        .delegate(&h.iac, h.frame.clone(), EMITTER_PID)
         .await
         .expect_err("an unconsented hold expires at the request lifetime");
     let waited = started.elapsed();

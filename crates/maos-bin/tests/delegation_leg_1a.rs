@@ -21,6 +21,11 @@ use orchestrator::{Orchestrator, DELEGATION_CONSENT_INTENT};
 
 const TEST_RUN_NONCE: u64 = 0xA11CE;
 
+/// 20-3c AC6 — the admitted local Orchestrator that emits a delegation, and the
+/// Worker whose completion is journaled; neither is the root's pid 0.
+const EMITTER_PID: u32 = 41;
+const WORKER_PID: u32 = 42;
+
 struct Harness {
     iac: Arc<IacBusAdapter>,
     log: Arc<TransparencyLogAdapter>,
@@ -86,6 +91,7 @@ async fn delegation_round_trips_the_goal_through_the_real_wire() {
         .delegate(
             &h.iac,
             delegation_frame(&h.emitter, 1, TEST_RUN_NONCE, "build the thing"),
+            EMITTER_PID,
         )
         .await
         .expect("the frame routes, pumps, and is drained by the consumer");
@@ -112,6 +118,7 @@ async fn routed_frame_produces_exactly_one_local_delivery_and_no_reemit() {
         .delegate(
             &h.iac,
             delegation_frame(&h.emitter, 1, TEST_RUN_NONCE, "once only"),
+            EMITTER_PID,
         )
         .await
         .expect("first delegation succeeds");
@@ -123,6 +130,7 @@ async fn routed_frame_produces_exactly_one_local_delivery_and_no_reemit() {
         .delegate(
             &h.iac,
             delegation_frame(&h.emitter, 2, TEST_RUN_NONCE, "second goal"),
+            EMITTER_PID,
         )
         .await
         .expect("a second, distinct delegation also delivers exactly once");
@@ -169,6 +177,7 @@ async fn identical_sequences_from_distinct_runs_have_distinct_frame_ids() {
         .delegate(
             &h.iac,
             delegation_frame(&h.emitter, 1, first_run_nonce, "first run"),
+            EMITTER_PID,
         )
         .await
         .expect("first run inserts sequence one");
@@ -176,6 +185,7 @@ async fn identical_sequences_from_distinct_runs_have_distinct_frame_ids() {
         .delegate(
             &h.iac,
             delegation_frame(&h.emitter, 1, second_run_nonce, "second run"),
+            EMITTER_PID,
         )
         .await
         .expect("second run may reuse sequence one without a primary-key collision");
@@ -215,13 +225,14 @@ async fn completion_is_a_real_task_complete_frame_the_orchestrator_receives() {
         .delegate(
             &h.iac,
             delegation_frame(&h.emitter, 1, TEST_RUN_NONCE, "work"),
+            EMITTER_PID,
         )
         .await
         .unwrap();
 
     let drained = h
         .leg
-        .journal_completion(&h.iac, 2, TEST_RUN_NONCE)
+        .journal_completion(&h.iac, 2, TEST_RUN_NONCE, WORKER_PID)
         .await
         .expect("the completion frame delivers");
     assert_eq!(
@@ -248,6 +259,70 @@ async fn completion_is_a_real_task_complete_frame_the_orchestrator_receives() {
         FramePayload::TaskComplete(p) => assert_eq!(p.result, "completed"),
         other => panic!("expected TaskComplete, got {other:?}"),
     }
+}
+
+/// 20-3c AC6 (member 17) — a delegation row names the Spirit that emitted it:
+/// the `TaskAssign` the admitted Orchestrator emits, the `TaskComplete` the
+/// admitted Worker completes. Participant recall selects on that pid
+/// (`transparency_log.rs` `participant_predicate`), so the emitter recalls its
+/// own delegation frame and an unrelated Spirit does not. Both rows were pid 0
+/// at `3341f9e4`, which made them recallable by nobody.
+#[tokio::test]
+async fn delegation_rows_name_their_emitter_and_recall_follows_the_pid() {
+    use maos_domain::log_recall::LogRecallFilter;
+    use maos_domain::ports::LogRecallPort;
+    let mut h = harness().await;
+    h.leg
+        .delegate(
+            &h.iac,
+            delegation_frame(&h.emitter, 1, TEST_RUN_NONCE, "attributed"),
+            EMITTER_PID,
+        )
+        .await
+        .unwrap();
+    h.leg
+        .journal_completion(&h.iac, 2, TEST_RUN_NONCE, WORKER_PID)
+        .await
+        .unwrap();
+    let rows = |kind| {
+        h.log
+            .query_frames(FrameFilter {
+                kind: Some(kind),
+                ..Default::default()
+            })
+            .unwrap()
+    };
+    let assigns = rows(TlFrameKind::TaskAssign);
+    let completions = rows(TlFrameKind::TaskComplete);
+    assert_eq!(assigns.len(), 1);
+    assert_eq!(completions.len(), 1);
+    assert_eq!(
+        assigns[0].spirit_pid, EMITTER_PID,
+        "the emit row names its emitter"
+    );
+    assert_eq!(
+        completions[0].spirit_pid, WORKER_PID,
+        "the completion names its Worker"
+    );
+
+    let recall = maos_iac::adapter::log_recall::LogRecallAdapter::new(Arc::clone(&h.log));
+    let recalled = |pid| -> Vec<[u8; 16]> {
+        recall
+            .recall(pid, LogRecallFilter::default())
+            .unwrap()
+            .entries
+            .iter()
+            .map(|entry| entry.frame_id)
+            .collect()
+    };
+    assert!(
+        recalled(EMITTER_PID).contains(&assigns[0].frame_id),
+        "the emitter recalls its own delegation frame"
+    );
+    assert!(
+        !recalled(99).contains(&assigns[0].frame_id),
+        "an unrelated Spirit does not"
+    );
 }
 
 /// AC2.1 — set-once, proven through the production installer: the leg cannot be

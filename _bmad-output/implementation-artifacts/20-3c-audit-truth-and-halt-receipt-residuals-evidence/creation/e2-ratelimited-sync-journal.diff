@@ -1,0 +1,33 @@
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -191,11 +191,25 @@
+         let iac = Arc::clone(iac);
+         // Story 18-5 (D-10 A): spawn the delivery on the current runtime so the
+         // frame is journaled and delivered; the synchronous
+-        // InferenceError::RateLimited stays the primary contract.
+-        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+-            runtime.spawn(async move {
+-                let _ = iac.deliver_typed(frame, 0, None).await;
+-            });
++        // InferenceError::RateLimited stays the primary contract. 20-3c EC5:
++        // with no runtime the row is still journaled synchronously (not delivered).
++        match tokio::runtime::Handle::try_current() {
++            Ok(runtime) => {
++                runtime.spawn(async move {
++                    let _ = iac.deliver_typed(frame, 0, None).await;
++                });
++            }
++            Err(_) => {
++                let bytes = serde_json::to_vec(&frame.payload).unwrap_or_default();
++                self.transparency_log.insert_frame_event(
++                    FrameKind::RateLimited,
++                    0,
++                    None,
++                    "rate_limited",
++                    &bytes,
++                    FrameOrigin::Kernel,
++                );
++            }
+         }
+     }
+ 

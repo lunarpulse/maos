@@ -888,6 +888,36 @@ fn dispatch_governance(args: &GovernanceArgs, color: ColorChoice) -> ExitCode {
                 || governance_offline_arm(args, color),
             )
         }
+        // FR62(b) (20-3c, D-20-3c-05 B) — offline only: the one-shot child takes
+        // the exclusive store-lock set and journals the proposal.
+        GovernanceOp::AbiExtension {
+            proposal_id,
+            summary,
+            adr_ref,
+            status,
+            covered_change,
+            effective_at_ns,
+        } => {
+            let proposal = serde_json::json!({
+                "proposal_id": proposal_id,
+                "summary": summary,
+                "adr_ref": adr_ref,
+                "status": status,
+                "covered_changes": covered_change,
+            });
+            let bin = maos_bin_path();
+            let mut cmd = std::process::Command::new(&bin);
+            cmd.env("MAOS_ONE_SHOT", "governance-admit");
+            cmd.env("MAOS_GOVERNANCE_ABI_PROPOSAL", proposal.to_string());
+            cmd.env(
+                "MAOS_GOVERNANCE_EFFECTIVE_AT_NS",
+                effective_at_ns.to_string(),
+            );
+            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+                cmd.env("NO_COLOR", "1");
+            }
+            exec_and_forward(&mut cmd, &bin)
+        }
     }
 }
 
@@ -902,7 +932,10 @@ fn governance_offline_arm(args: &GovernanceArgs, color: ColorChoice) -> ExitCode
             supersedes,
             ratified_by,
             effective_at_ns,
-        } = &args.op;
+        } = &args.op
+        else {
+            return ExitCode::FAILURE;
+        };
         let bin = maos_bin_path();
         let mut cmd = std::process::Command::new(&bin);
         cmd.env("MAOS_ONE_SHOT", "governance-admit");
@@ -2763,24 +2796,18 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             boot,
             all_boots,
             tag,
-        }) => {
-            if let Some(_tag_val) = tag {
-                eprintln!("maosctl: audit query — --tag is reserved; use --intent-contains for substring matching on the intent column");
-                return ExitCode::from(2);
-            }
-            audit_query(
-                spirit.as_deref(),
-                range.as_deref(),
-                frame_kind.as_deref(),
-                intent_contains.as_deref(),
-                capability.as_deref(),
-                boot.as_ref().copied(),
-                *all_boots,
-                None,
-                *format,
-                color,
-            )
-        }
+        }) => audit_query(
+            spirit.as_deref(),
+            range.as_deref(),
+            frame_kind.as_deref(),
+            intent_contains.as_deref(),
+            capability.as_deref(),
+            boot.as_ref().copied(),
+            *all_boots,
+            tag.as_deref(),
+            *format,
+            color,
+        ),
         Some(AuditQuery::SealedExport {
             spirit,
             range,
@@ -2937,7 +2964,7 @@ fn audit_query(
     capability: Option<&str>,
     boot: Option<u64>,
     all_boots: bool,
-    _tag: Option<&str>,
+    tag: Option<&str>,
     format: AuditFormat,
     _color: ColorChoice,
 ) -> ExitCode {
@@ -3000,6 +3027,7 @@ fn audit_query(
     // FR41 new filter fields
     filter.kind = frame_kind.map(|s| s.to_string());
     filter.intent_contains = intent_contains.map(|s| s.to_string());
+    filter.tag = tag.map(|s| s.to_string());
     filter.capability_token = capability.map(|s| s.to_string());
     if let Some(b) = boot {
         if filter.boot_nonce.is_some() && filter.boot_nonce != Some(b) {
@@ -5623,23 +5651,6 @@ mod tests {
             Subcommand::Audit(args) => match &args.query {
                 Some(AuditQuery::Query { range, .. }) => {
                     assert_eq!(range.as_deref(), Some("30d"));
-                }
-                _ => panic!("expected AuditQuery::Query"),
-            },
-            _ => panic!("expected Audit subcommand"),
-        }
-    }
-
-    #[test]
-    fn audit_query_tag_parses_but_handler_errors() {
-        use crate::cli::AuditQuery;
-        // The flag parses; the handler rejects at runtime.
-        let cli = Cli::try_parse_from(["maosctl", "audit", "query", "--tag", "foo"])
-            .expect("--tag must parse as a valid flag");
-        match &cli.command {
-            Subcommand::Audit(args) => match &args.query {
-                Some(AuditQuery::Query { tag, .. }) => {
-                    assert_eq!(tag.as_deref(), Some("foo"));
                 }
                 _ => panic!("expected AuditQuery::Query"),
             },

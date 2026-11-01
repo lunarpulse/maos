@@ -1,0 +1,41 @@
+--- a/crates/maos-capability/src/cap_audit/mod.rs
++++ b/crates/maos-capability/src/cap_audit/mod.rs
+@@ -32,10 +32,11 @@
+     SandboxBlock,
+     AcpNotification,
+     Quota,
++    RateLimited,
+ }
+ 
+ impl AuditDropSite {
+-    const COUNT: usize = 8;
++    const COUNT: usize = 9;
+ }
+ 
+ /// Why an audit event did not reach the writer.
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -191,11 +191,18 @@
+         let iac = Arc::clone(iac);
+         // Story 18-5 (D-10 A): spawn the delivery on the current runtime so the
+         // frame is journaled and delivered; the synchronous
+-        // InferenceError::RateLimited stays the primary contract.
+-        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+-            runtime.spawn(async move {
+-                let _ = iac.deliver_typed(frame, 0, None).await;
+-            });
++        // InferenceError::RateLimited stays the primary contract. 20-3c EC5:
++        // a frame that cannot be journaled is a counted drop, never silent.
++        use crate::capability::cap_audit::{record_drop, AuditDropReason, AuditDropSite};
++        match tokio::runtime::Handle::try_current() {
++            Ok(runtime) => {
++                runtime.spawn(async move {
++                    if iac.deliver_typed(frame, 0, None).await.is_err() {
++                        record_drop(AuditDropSite::RateLimited, AuditDropReason::Closed);
++                    }
++                });
++            }
++            Err(_) => record_drop(AuditDropSite::RateLimited, AuditDropReason::Closed),
+         }
+     }
+ 

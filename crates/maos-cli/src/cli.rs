@@ -330,6 +330,28 @@ pub enum GovernanceOp {
         #[arg(long)]
         effective_at_ns: u64,
     },
+    /// Journal an ABI-extension proposal or a status change (FR62(b), ADR-045
+    /// §4) as a `GovernanceEvent` frame; offline, through the one-shot child.
+    AbiExtension {
+        /// Unique proposal id, e.g. `9.3b-FR62-FR64-kernel-repin`.
+        #[arg(long)]
+        proposal_id: String,
+        /// What ABI surface the proposal covers.
+        #[arg(long)]
+        summary: String,
+        /// Governing ADR reference, e.g. `ADR-045`.
+        #[arg(long)]
+        adr_ref: String,
+        /// `proposed`, `ratified` or `rejected`.
+        #[arg(long)]
+        status: String,
+        /// An abi-diff substring this proposal covers (repeatable).
+        #[arg(long)]
+        covered_change: Vec<String>,
+        /// When the decision takes effect (nanoseconds since Unix epoch).
+        #[arg(long)]
+        effective_at_ns: u64,
+    },
 }
 
 /// Story 9.2 — `maosctl forget --principal <id> [--reason <legal-hold>]`.
