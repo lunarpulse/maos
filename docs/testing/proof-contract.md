@@ -207,8 +207,9 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   fail closed with their path.
   `clippy-advisory` is deliberately outside this Blocking mirror and `aggregate.needs`: its non-denying
   `cargo clippy --workspace --all-targets --locked --message-format=json` output is checked by
-  `clippy-ratchet --input <jsonl>` against `xtask/clippy-baseline.toml` (hosted T0: 1456 warning occurrences,
-  904 source-distinct, measured by hosted run 41233186774 job `clippy-advisory`; hosted CI is the authority and
+  `clippy-ratchet --input <jsonl>` against `xtask/clippy-baseline.toml` (hosted: 1383 warning occurrences,
+  897 source-distinct, measured by hosted run 41305010381 job `clippy-advisory`, ratcheted down from the 20-3b hosted
+  figures 1456/904 of run 41233186774; hosted CI is the authority and
   a local toolchain may count lower). Both count ceilings ratchet; repeated library/lib-test emissions count separately.
   Source-distinct keys are package, level, code, message and primary source start/end ranges; target and
   secondary spans are excluded. Lower the pins when debt is intentionally reduced; do not increase them

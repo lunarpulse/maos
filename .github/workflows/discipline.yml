@@ -193,7 +193,7 @@ jobs:
   clippy-advisory:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # ADVISORY — owner: 20-3b; reason: hosted T0 has 1456/904 warnings (run 41233186774); ratchet prevents growth without claiming debt closure.
+    # ADVISORY — owner: 20-3b; reason: hosted baseline is 1383/897 warnings (run 41305010381; 20-3b hosted T0 was 1456/904); ratchet prevents growth without claiming debt closure.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v5

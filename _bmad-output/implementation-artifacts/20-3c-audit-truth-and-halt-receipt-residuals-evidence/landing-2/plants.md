@@ -86,3 +86,13 @@ Key red assertions at the old tree:
 - `P1` was run twice: the first run (without `--no-fail-fast`) stopped after the first failing test binary and never reached `routed_halt_swap_20_3b`; the recorded row and `plant-logs/P1-ac2-restore-drain.log` are the rerun with `--no-fail-fast`, which shows the FR53 witness red. The first run's other four plants are as recorded.
 - The drivers (`plant-drivers/run.py`, `t0.py`) apply the cut in place, run the command, restore from a pre-plant byte copy, and `cmp` + sha256 the result; `git apply --check` of every cut against the final tree passes, and `sha256sum -c plant-cuts.sha256` is OK.
 - The AC2 plant named in the story (restore `drain_for_spirit` in `validate_swap_halt_continuity`) is `P1`; the AC3 plant (no-op the no-runtime arm) is `P4`. `P2`, `P3`, `P5` are extra controls for contracts the story's AC text implies (precheck and swap judge one set; carrying must not make an operator resolution a "loss"; a failed delivery is counted).
+
+## Hosted discipline runs (control proof, 2026-11-01)
+
+The three discipline runs carry the hosted control proof; records are `../ci/run-<id>/{run.json,jobs.jsonl,totals.txt}`:
+
+- `41281999213` @ `1a1b11f3` (landing 1 + 2 incl. review patches): 183/189 success. Reds: `clippy-advisory` (job `124775631436`; 1,463 / 907 against the 1,456 / 904 baseline, three new warnings, fixed in `42489813`), `check-multi-tenant-loom` (job `124775636052`; `root_shutdown_unload_16_3.rs:348` `ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan`; known flake, owner 20-7), `workspace-test-suite` (job `124775636112`; `worker_terminal_facts_17_7.rs:426` `s3_external_sigkill_requires_pidfd_fact`; known flake, owner 20-7), and the dependents `v1-0-ship-gate` (`124784339984`), `v1-5-ship-gate` (`124784358861`), `aggregate` (`124784358898`).
+- `41289787129` @ `42489813` (clippy fixes): 167 success / 2 failure of the 169 jobs created. Reds: `workspace-test-suite` (job `124798452868`; the `root_shutdown_unload_16_3` `ac4_v4` flake, owner 20-7) and `clippy-advisory` (job `124798448341`; 1,458 / 903, three `maos-a2a-tcp` shared test-support warnings re-emitted per test binary, fixed in `77f7276a`).
+- `41305010381` @ `77f7276a` (final landing): **success, 189/189**. `clippy-advisory` measured 1,383 / 897 on its `clippy-advisory-diagnostics` artifact; `xtask/clippy-baseline.toml` is re-set to those figures.
+
+The landing is fully green. The local plants above remain the plant proof: the hosted-only legs `kernel-l2` and `t3-legs` of `../ci/ci-20-3c-verify.yml` were never pushed as a branch workflow and never run, so no hosted plant run is claimed.

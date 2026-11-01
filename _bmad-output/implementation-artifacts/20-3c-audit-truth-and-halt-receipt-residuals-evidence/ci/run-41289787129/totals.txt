@@ -1,0 +1,27 @@
+jobs 169 ran 169 conclusions {'success': 167, 'failure': 2}
+job-h 7.16
+wall_min 59.6
+ci-test-producer legs 2 sum_s 0 max_s 0
+wasm-host-tests legs 0 sum_s 0 max_s -
+cgroup-ceiling-delegated legs 0 sum_s 0 max_s -
+cgroup-ceiling-undelegated legs 0 sum_s 0 max_s -
+epic-17-exit legs 0 sum_s 0 max_s -
+epic-18-exit legs 0 sum_s 0 max_s -
+workspace-test-suite legs 1 sum_s 0 max_s 0
+producer ci-test-producer (arm64, ubuntu-24.04-arm) success dur_s 0 start+2513s done+413s
+producer ci-test-producer (x64, ubuntu-24.04) success dur_s 0 start+2649s done+844s
+producer_critical_path_min (first job start -> last producer done) 14.1
+last job to finish check-breaking-md done+59.6min
+--- top 12 families by job-s
+  example-spirit-ts-tests legs 1 sum_s 754
+  windows-check legs 1 sum_s 633
+  reproducible-build legs 1 sum_s 548
+  expensive-tests legs 1 sum_s 545
+  check-multi-tenant-loom legs 1 sum_s 536
+  epic-19-exit legs 1 sum_s 535
+  v01-evaluator-path legs 1 sum_s 533
+  smoke-discipline-7-1-5 legs 1 sum_s 530
+  maosctl-smoke legs 1 sum_s 496
+  audit-query-fr4-smoke legs 1 sum_s 486
+  check-enterprise-identity legs 1 sum_s 474
+  release-dry-run legs 2 sum_s 472
