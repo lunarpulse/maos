@@ -1,0 +1,385 @@
+name: ci-20-7-verify
+
+# Story 20-7 landing 1 — the HOSTED-ONLY legs, on the branch-only `ci/20-7-verify`
+# (precedent `ci/18-6-verify` run 40319842735). NEVER merged, never pushed by the
+# dev agent: the operator pushes the branch and records the run id in the story.
+# Nothing here ran locally: this dev host has no provisioned T3 substrate and no
+# valgrind.
+#
+# Legs (each names the AC it witnesses):
+#   diag-ac4        AC8.1  `ci/20-7-diag`: the ac4 family x20 with the permanent oracle
+#                          diagnostics (root stderr, /proc State/PPid, `podman ps -a`);
+#                          the result decides K2r (live payload) vs oracle (zombie).
+#   k2r-witness     AC8.3  podman `kill` shim sleeps 30 s; `rm` cannot kill a live
+#                          payload: `ac4_v4` reds at base_sha and is green at HEAD.
+#   k2r-plant       AC8.5  the pidfd signal removed (diff + sha256 below) => red.
+#   s3-both         AC7.5  S3 on ubuntu-24.04 (podman 4.9.3) and ubuntu-26.04 (5.7), no retry.
+#   real-spawn      AC6.2 harness mechanics: cap 5 T3 Workers, 60 s, 1 task/s, >=2 overlap.
+#   real-spawn-plant AC6.3 in-process stand-in for the T3 spawn => distinct-CID assertion red.
+#   tier-c          AC5    callgrind counts (prints the instruction figures to commit).
+#   tier-c-plant    AC5.2/AC10 allocation-free CPU work; instruction FAIL/allocation PASS.
+#
+# Cut diffs (`git apply`; sha256 of the exact patch text is checked before applying):
+#   k2r-plant      sha256 fb16d366e841fd6031b208b48437b15b79d2e14d82eba024fff1ac22a4c0aa8d
+#   tier-c-plant   sha256 f23de4c85b151d97593af49e6c07bbcfd1cbdaf4eac52fbea9b56753b7fb1ebe
+# Hosted instruction baselines: run 41372839255 / job 125046786606 (D-20-7-09 B).
+
+on:
+  push:
+    branches: ['ci/20-7-verify']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'tree under test (default: the pushed SHA)'
+        required: false
+      base_sha:
+        description: pre-landing tree for the failing-before witness
+        required: false
+        default: a4c0089785bfc037ff211bb2cb946c0a3d51e666
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  diag-ac4:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build the root-shutdown binaries
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
+      - name: The ac4 family, 20 times, failures printed in full
+        run: |
+          set -o pipefail
+          mkdir -p diag
+          : > diag/summary.txt
+          trap 'cat diag/run-*.status > diag/summary.txt' EXIT
+          for i in $(seq 1 20); do
+            echo "run $i: INCOMPLETE" > "diag/run-$i.status"
+            set +e
+            cargo nextest run --locked -p maos-bin --test root_shutdown_unload_16_3 \
+              -E 'test(ac4) | test(ac3_operator_door_unload_stops_a_live_worker_once)' \
+              --test-threads 1 --no-fail-fast 2>&1 | tee "diag/run-$i.log"
+            statuses=("${PIPESTATUS[@]}")
+            set -e
+            if [ "${statuses[0]}" -eq 0 ] && [ "${statuses[1]}" -eq 0 ]; then
+              echo "run $i: SUCCESS" > "diag/run-$i.status"
+            else
+              echo "run $i: FAILED nextest=${statuses[0]} tee=${statuses[1]}" > "diag/run-$i.status"
+            fi
+          done
+          cat diag/run-*.status > diag/summary.txt
+          cat diag/summary.txt
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: ac4-diag
+          path: diag
+
+  k2r-witness:
+    strategy:
+      fail-fast: false
+      matrix:
+        tree: [base, head]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - name: Resolve the failing-before revision from full history
+        if: matrix.tree == 'base'
+        env:
+          BASE_SHA: ${{ inputs.base_sha || 'a4c0089785bfc037ff211bb2cb946c0a3d51e666' }}
+        run: git checkout --detach "$(git rev-parse --verify "$BASE_SHA^{commit}")"
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-${{ matrix.tree }}-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Stall runtime kill and prevent force-removal from masking it
+        run: |
+          sudo mv /usr/bin/podman /usr/bin/podman.real
+          cat <<'SHIM' | sudo tee /usr/bin/podman >/dev/null
+          #!/bin/bash
+          case "$1" in
+            kill) sleep 30; exit 0 ;;
+            rm)
+              cid="${!#}"
+              running=$(timeout 8s /usr/bin/podman.real inspect --format '{{.State.Running}}' "$cid") || exit 125
+              if [ "$running" = true ]; then
+                echo "K2R_CONTROL: refusing rm of live payload $cid" >&2
+                exit 125
+              fi
+              ;;
+          esac
+          exec /usr/bin/podman.real "$@"
+          SHIM
+          sudo chmod 755 /usr/bin/podman
+      - name: Build the binaries
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
+      - name: ac4_v4 under the shim — RED at the base tree, GREEN at HEAD
+        run: |
+          set -uo pipefail
+          set +e
+          cargo nextest run --locked -p maos-bin --test root_shutdown_unload_16_3 -E 'test(ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan)' --test-threads 1 2>&1 | tee k2r-witness.log
+          statuses=("${PIPESTATUS[@]}")
+          status=${statuses[0]}
+          set -e
+          [ "${statuses[1]}" -eq 0 ]
+          if [ "${{ matrix.tree }}" = base ]; then
+            [ "$status" -eq 100 ] || { echo "FAILING-BEFORE WITNESS MISSING: expected test failure, got $status"; exit 1; }
+            grep -q 'is still in /proc after' k2r-witness.log
+          else
+            exit "$status"
+          fi
+
+  k2r-plant:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Stall runtime kill and prevent force-removal from masking it
+        run: |
+          sudo mv /usr/bin/podman /usr/bin/podman.real
+          cat <<'SHIM' | sudo tee /usr/bin/podman >/dev/null
+          #!/bin/bash
+          case "$1" in
+            kill) sleep 30; exit 0 ;;
+            rm)
+              cid="${!#}"
+              running=$(timeout 8s /usr/bin/podman.real inspect --format '{{.State.Running}}' "$cid") || exit 125
+              if [ "$running" = true ]; then
+                echo "K2R_CONTROL: refusing rm of live payload $cid" >&2
+                exit 125
+              fi
+              ;;
+          esac
+          exec /usr/bin/podman.real "$@"
+          SHIM
+          sudo chmod 755 /usr/bin/podman
+      - name: Plant — remove the pidfd signal
+        run: |
+          cat > k2r-plant.diff <<'PATCH'
+          --- a/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+          +++ b/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+          @@ -445,7 +445,7 @@
+                       let confirm_by = overall.min(entry + KILL_BUDGET);
+                       // The verified payload pidfd needs no runtime lock: a stalled
+                       // runtime CLI cannot leave a live payload behind.
+          -            let signalled = self.kill_payload();
+          +            let signalled = false;
+                       let killed = self.kill(confirm_by) || signalled;
+                       if !self.confirm(confirm_by) {
+                           unconfirmed = Some(if killed {
+          PATCH
+          echo "fb16d366e841fd6031b208b48437b15b79d2e14d82eba024fff1ac22a4c0aa8d  k2r-plant.diff" | sha256sum -c -
+          git apply k2r-plant.diff
+      - name: Build the binaries
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
+      - name: ac4_v4 must RED with the signal removed
+        run: |
+          set -uo pipefail
+          set +e
+          cargo nextest run --locked -p maos-bin --test root_shutdown_unload_16_3 -E 'test(ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan)' --test-threads 1 2>&1 | tee k2r-plant.log
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          [ "${statuses[1]}" -eq 0 ]
+          [ "${statuses[0]}" -eq 100 ] || { echo "PLANT NOT DETECTED: expected test failure, got ${statuses[0]}"; exit 1; }
+          grep -q 'the standalone Worker .*is still in /proc after' k2r-plant.log
+
+  s3-both:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build the binaries
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p worker --bin worker-cli-fixture
+      - name: S3 — no retry, no ignore
+        run: cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 -E 'test(s3_external_sigkill_requires_pidfd_fact)' --no-fail-fast
+
+  real-spawn:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Fixtures
+        run: cargo run --locked -p xtask -- build-test-fixtures
+      - name: Smoke — cap 5 real T3 Workers, 60 s, 1 task/s; harness mechanics only
+        env:
+          MAOS_20_7_FANOUT: smoke
+        run: cargo test --locked -p maos-bin --test nfr_perf_8_real_spawn_fanout_20_7 -- --nocapture
+
+  real-spawn-plant:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Fixtures
+        run: cargo run --locked -p xtask -- build-test-fixtures
+      - name: In-process stand-in for the T3 spawn must RED (distinct CIDs)
+        env:
+          MAOS_20_7_FANOUT: smoke
+          MAOS_20_7_FANOUT_IN_PROCESS: '1'
+        run: |
+          set -euo pipefail
+          cargo test --locked -p maos-bin --test nfr_perf_8_real_spawn_fanout_20_7 --no-run
+          set +e
+          cargo test --locked -p maos-bin --test nfr_perf_8_real_spawn_fanout_20_7 -- --nocapture 2>&1 | tee real-spawn-plant.log
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          [ "${statuses[1]}" -eq 0 ]
+          [ "${statuses[0]}" -eq 101 ] || { echo "PLANT NOT DETECTED: expected assertion failure, got ${statuses[0]}"; exit 1; }
+          grep -q 'AC6.2: every Worker is a distinct real container' real-spawn-plant.log
+
+  tier-c:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-tier-c-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends valgrind
+      - run: cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness
+      - name: Measure (prints the figures to commit into perf-budgets.toml `baseline`)
+        run: |
+          set -euo pipefail
+          mkdir -p tier-c
+          h="$PWD/target/debug/tier_c_harness"
+          m() { valgrind --tool=callgrind --toggle-collect=maos_tier_c_measured --callgrind-out-file="tier-c/$1.callgrind" "$h" "$1" "$2" > "tier-c/$1.json" 2> "tier-c/$1.valgrind.log"; }
+          m empty 0; m cap_token_verify 10000; m iac_routing 2000; m frame_lowering 10000
+          cargo run --locked -p xtask -- check-perf-counts --dir tier-c --json
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: tier-c-counts
+          path: tier-c
+
+  tier-c-plant:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-tier-c-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends valgrind
+      - name: Plant — allocation-neutral instruction work in the token-verify path
+        run: |
+          patch="_bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/ci/tier-c-plant.diff"
+          echo "f23de4c85b151d97593af49e6c07bbcfd1cbdaf4eac52fbea9b56753b7fb1ebe  $patch" | sha256sum -c -
+          git apply "$patch"
+      - run: cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness
+      - name: The Tier C comparison must RED
+        run: |
+          set -euo pipefail
+          mkdir -p tier-c
+          h="$PWD/target/debug/tier_c_harness"
+          m() { valgrind --tool=callgrind --toggle-collect=maos_tier_c_measured --callgrind-out-file="tier-c/$1.callgrind" "$h" "$1" "$2" > "tier-c/$1.json" 2> "tier-c/$1.valgrind.log"; }
+          m empty 0; m cap_token_verify 10000; m iac_routing 2000; m frame_lowering 10000
+          set +e
+          cargo run --locked -p xtask -- check-perf-counts --dir tier-c 2>&1 | tee tier-c/verdict.txt
+          statuses=("${PIPESTATUS[@]}")
+          status=${statuses[0]}
+          set -e
+          [ "${statuses[1]}" -eq 0 ]
+          grep -q '^PASS cap-token-verify-allocations' tier-c/verdict.txt
+          grep -q '^FAIL cap-token-verify-instructions' tier-c/verdict.txt
+          [ "$status" -ne 0 ] || { echo "PLANT NOT DETECTED: instruction row must be binding with a hosted baseline"; exit 1; }
