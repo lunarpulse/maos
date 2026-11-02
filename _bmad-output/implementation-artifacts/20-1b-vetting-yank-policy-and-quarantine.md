@@ -88,6 +88,13 @@ Rulings are recorded in the Decisions table of `20-1a-registry-publish-install-e
 1. `check-dev-record-completeness` passes at the final landing with no open `deferred-work.md` row owned by `20-1` (D:37, :56, :1093, :1147, :1264 → `CLOSED <date> by 20-1 @<commit>` with witness, or rule-10 re-owned); FR35/FR36/FR59 coverage rows (`coverage-matrix.yaml:617,622,841`) name their witnesses; FR37 stays `v2.0+` with the machinery witnessed; I5 owner re-pointed or closed.
 2. **Negative control:** with one live row left naming `20-1` and S:296 flipped to `done` in a scratch copy, the gate reds.
 
+## Inherited from 20-1a review
+
+- **F4 — overwrite of installed `name@version`:** AC10.1–2 covers refusal of a different publisher key, including a second registry, but does not require immutability against replacement with the same key. **PROPOSED (needs operator ruling at 20-1b dev start):** refuse changes to an already installed `name@version`, including same-key replacement, and witness both same-key and different-registry overwrite attempts. Source: `agent://SecReview201a`, F4.
+- **F5 — registry response as trust root, no pinning, plaintext HTTP:** AC10.1 covers first-publisher-key pinning after first contact; it does not authenticate that first contact or require TLS. **PROPOSED (needs operator ruling at 20-1b dev start):** define and enforce an authenticated first-contact trust root and authenticated transport for registry installation, with hostile-registry and network-interception refusal witnesses. Source: `agent://SecReview201a`, F5.
+- **F6 — yanked versions remain installable:** AC7–AC9 cover signed yank propagation and policy for running Spirits, not refusal at install. **PROPOSED (needs operator ruling at 20-1b dev start):** refuse installation of a yanked version and witness the refusal before persistence. Source: `agent://SecReview201a`, F6.
+- **Server-side authentication for `registry.publish` / `registry.deprecate`:** AC7.1–3 covers signed, authorized deprecate, not authentication of publish. CSRF/Host/Origin hardening landed in 20-1a and is not authentication. **PROPOSED (needs operator ruling at 20-1b dev start):** require server-side authentication and authorization for publish as well as deprecate, with unauthenticated and unauthorized mutation refusal witnesses. Sources: `agent://SecReview201a`, F1; `agent://BmadReview201a`, P1.
+
 
 ## Tasks / Subtasks
 
