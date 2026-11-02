@@ -1,0 +1,32 @@
+--- a/crates/maos-bin/src/purge.rs	2026-11-02 13:53:46.000000000 +0000
++++ b/crates/maos-bin/src/purge.rs	2026-11-02 14:37:05.573235757 +0000
+@@ -820,7 +820,7 @@
+             roots,
+             signature: None,
+             proof: None,
+-            next_step: "Remove the Cargo-owned binary with: cargo uninstall maos",
++            next_step: BINARY_REMOVAL_HINT,
+         };
+         serde_json::to_writer_pretty(&mut *file, &record).map_err(|error| PurgeError::Io {
+             operation: "encode receipt",
+@@ -840,6 +840,11 @@
+     }
+ }
+ 
++/// Story 20-2 (D09 A): purge removes MAOS data; the binaries belong to
++/// whichever installer placed them, and only that installer removes them.
++const BINARY_REMOVAL_HINT: &str = "remove the binaries with the installer that placed them: \
++    dpkg -r maos | rpm -e maos | pacman -R maos | brew uninstall maos | cargo uninstall maos-bin";
++
+ pub fn run(args: &[String]) -> Result<(), PurgeError> {
+     let options = PurgeOptions::parse(args)?;
+     // Fail closed when the home cannot be resolved: silently dropping the
+@@ -1039,7 +1044,7 @@
+     }
+     println!("maos purge: receipt: {}", receipt_path.display());
+     print_report_only_residue(&workspace_residue);
+-    println!("maos purge: remove the Cargo-owned binary with: cargo uninstall maos");
++    println!("maos purge: {BINARY_REMOVAL_HINT}");
+     if let Some(error) = finalize_error {
+         return Err(error);
+     }

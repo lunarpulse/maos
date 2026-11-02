@@ -1,0 +1,41 @@
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+index fca52210..14b22596 100644
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -92,13 +92,9 @@ impl InferencePortAdapter {
+         &self,
+         provider_id: &str,
+     ) -> Result<Option<maos_providers::BucketKey>, InferenceError> {
+-        // Intern the provider id into the static set.
+-        let interned: &'static str = match provider_id {
+-            "anthropic" => "anthropic",
+-            "openai" => "openai",
+-            "ollama" => "ollama",
+-            _ => return Err(InferenceError::Unconfigured),
+-        };
++        // Intern the provider id into the closed set `maos-providers` owns.
++        let interned =
++            maos_providers::intern_provider_id(provider_id).ok_or(InferenceError::Unconfigured)?;
+         // Recover the driver to read its credential_fingerprint.
+         let driver = self
+             .router
+diff --git a/crates/maos-providers/src/lib.rs b/crates/maos-providers/src/lib.rs
+index 4c2b9352..94f0f8af 100644
+--- a/crates/maos-providers/src/lib.rs
++++ b/crates/maos-providers/src/lib.rs
+@@ -27,6 +27,15 @@ pub use rate_limit::{
+ /// that already has consumers.
+ pub use provider::Provider as ProviderDriver;
+ 
++/// The closed set of provider ids a rate-limit bucket may name. An id outside
++/// it fails closed in the kernel adapter (Story 6.4 review fix).
++pub const PROVIDER_IDS: [&str; 5] = ["anthropic", "openai", "ollama", "gemini", "kimi"];
++
++/// Intern `id` into [`PROVIDER_IDS`]; `None` for an unknown provider.
++pub fn intern_provider_id(id: &str) -> Option<&'static str> {
++    PROVIDER_IDS.iter().copied().find(|known| *known == id)
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;

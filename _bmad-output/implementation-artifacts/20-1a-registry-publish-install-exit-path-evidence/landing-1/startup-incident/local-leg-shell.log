@@ -1,0 +1,13 @@
+{
+  "outcome": "receipt",
+  "publish_id": "pub-60",
+  "spirit_id": "example-spirit-ts",
+  "version": "0.1.0"
+}
+{"artifact_bytes":12453178,"effective_tier":"PublicUntrusted","manifest_bytes":796,"origin":{"Remote":{"uri":"http://127.0.0.1:6789/mcp"}},"outcome":"installed","sandbox_tier_floor":"T2","spirit_id":"example-spirit-ts","version":"0.1.0"}
+maos: initialized /tmp/tmp.ORrQyvy84Q/home/.maos
+maos: config written to /tmp/tmp.ORrQyvy84Q/home/.maos/config.toml  (6 default slots + retention=persist)
+maos: operator door endpoint tcp://127.0.0.1:42181 recorded in /tmp/tmp.ORrQyvy84Q/home/.maos/control.json
+maos: Transparency Log will be at /tmp/tmp.ORrQyvy84Q/home/.maos/audit/transparency.sqlite
+maos: to remove all data, run:  maos purge --yes
+/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1a-registry-publish-install-exit-path-evidence/landing-1/startup-incident/local-leg.sh: line 18: /usr/bin/time: No such file or directory

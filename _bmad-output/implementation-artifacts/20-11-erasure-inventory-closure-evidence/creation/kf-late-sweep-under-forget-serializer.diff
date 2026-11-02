@@ -1,0 +1,47 @@
+diff --git a/crates/maos-kernel-core/src/memory/mod.rs b/crates/maos-kernel-core/src/memory/mod.rs
+--- a/crates/maos-kernel-core/src/memory/mod.rs
++++ b/crates/maos-kernel-core/src/memory/mod.rs
+@@ -616,6 +616,43 @@
+         })
+     }
+ 
++    /// Story 20-11 (EC-13) — the post-notice late sweep under the serializer
++    /// that orders forget, hold placement and release: a principal placed
++    /// under a durable hold since its forget is not swept (`None`).
++    #[allow(clippy::type_complexity)]
++    pub fn late_forget_sweep(
++        &self,
++        principal_id: &str,
++    ) -> Result<
++        Option<(
++            Vec<String>,
++            Vec<String>,
++            Vec<maos_domain::memory::RedistillRequest>,
++            Vec<String>,
++            Vec<String>,
++        )>,
++        MemoryError,
++    > {
++        let _forget_guard = self
++            .forget_serialization
++            .lock()
++            .unwrap_or_else(std::sync::PoisonError::into_inner);
++        let storage = |e: maos_iac::adapter::transparency_log::AuditError| {
++            MemoryError::Storage(e.to_string())
++        };
++        if self
++            .transparency_log
++            .is_under_legal_hold(principal_id)
++            .map_err(storage)?
++        {
++            return Ok(None);
++        }
++        self.transparency_log
++            .scrub_forget_frames(principal_id)
++            .map(Some)
++            .map_err(storage)
++    }
++
+     /// Story 9.2 (P29) — release a durable legal hold so the principal may be
+     /// erased again.  Returns whether a hold was actually removed.
+     ///

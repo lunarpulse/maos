@@ -1,0 +1,18 @@
+diff --git a/crates/maos-kernel-core/src/io/mod.rs b/crates/maos-kernel-core/src/io/mod.rs
+index 51e7fa4e..14191fd7 100644
+--- a/crates/maos-kernel-core/src/io/mod.rs
++++ b/crates/maos-kernel-core/src/io/mod.rs
+@@ -122,6 +122,13 @@ impl IoSubsystemPort for IoSubsystemAdapter {
+         }
+         let response = match req.send_bytes(body) {
+             Ok(response) | Err(ureq::Error::Status(_, response)) => response,
++            // 18-8 review BH-1: ureq's BadHeader message echoes the whole header
++            // line (a credential); name the failure, never the value.
++            Err(ureq::Error::Transport(t)) if t.kind() == ureq::ErrorKind::BadHeader => {
++                return Err(IoError::Transport(format!(
++                    "ureq POST {url}: invalid request header (value withheld)"
++                )))
++            }
+             Err(e) => return Err(IoError::Transport(format!("ureq POST {url}: {e}"))),
+         };
+         let header = response.header(response_header).map(str::to_owned);

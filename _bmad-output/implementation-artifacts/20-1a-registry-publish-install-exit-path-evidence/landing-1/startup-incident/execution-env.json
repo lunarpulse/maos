@@ -1,0 +1,12 @@
+{
+  "CARGO_TARGET_DIR": null,
+  "CI": "unset",
+  "GITHUB_ACTIONS": "unset",
+  "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask",
+  "MAOS_17_2_CGROUP_MODE": "undelegated",
+  "target_override": false,
+  "cargo_clean": false,
+  "component_bytes": 12453178,
+  "component_sha256": "8a0fd996671396c86a9cd257fbc1aead3dc33196432ed8e634ea731e715b2420",
+  "temporary_phase_probes": "Instant::now/elapsed around compile_with_timeout, Spirit::instantiate and call_on_start; restored exact runner snapshot 4AD2 before final build"
+}

@@ -76,3 +76,44 @@ fn package_jobs_provision_registered_registry_siblings_before_tests() {
         );
     }
 }
+
+#[test]
+fn installed_component_proof_uses_the_accepted_release_profile() {
+    for source in [
+        include_str!("../../.github/workflows/discipline.yml"),
+        include_str!("../../_bmad-output/implementation-artifacts/20-1a-registry-publish-install-exit-path-evidence/ci/ci-20-1a-verify.yml"),
+    ] {
+        let workflow: serde_yaml::Value = serde_yaml::from_str(source).unwrap();
+        let steps = workflow["jobs"]["epic-20-exit"]["steps"]
+            .as_sequence()
+            .unwrap();
+        let build = steps
+            .iter()
+            .find_map(|step| {
+                step["run"]
+                    .as_str()
+                    .filter(|script| script.contains("--features wasm-host --bin maos"))
+            })
+            .expect("WASM-enabled daemon build must remain enrolled");
+        for command in [
+            "cargo build --locked --release -p maos-bin --features wasm-host --bin maos",
+            "cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner",
+            "cargo build --locked --release -p worker --bin worker-cli-fixture",
+        ] {
+            assert!(build.contains(command), "installed proof lacks {command}");
+        }
+        let execution = steps
+            .iter()
+            .find_map(|step| {
+                step["run"]
+                    .as_str()
+                    .filter(|script| script.contains("tee component.log"))
+            })
+            .expect("real installed-component execution must remain enrolled");
+        assert!(execution.contains("\"$target/release/maos\" init --plain"));
+        assert!(execution.contains("\"$target/release/maos\" run \"$manifest\" --once"));
+        assert!(execution.contains("/usr/bin/time -p sudo systemd-run"));
+        assert!(execution.contains("spirit_session_complete"));
+        assert!(!execution.contains("$target/debug/"));
+    }
+}

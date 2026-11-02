@@ -1,0 +1,77 @@
+diff --git a/crates/maos-iac/src/adapter/transparency_log.rs b/crates/maos-iac/src/adapter/transparency_log.rs
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1452,6 +1452,73 @@
+         )
+     }
+ 
++    /// Story 20-11 (FR65) — the Distillate frames (the I13 intent-lineage
++    /// carriers) written by the given `(boot_nonce, spirit_pid)` incarnations,
++    /// tombstones excluded, in log order.
++    pub fn distillates_written_by(
++        &self,
++        incarnations: &[(u64, u32)],
++    ) -> Result<Vec<ForgetFrame>, AuditError> {
++        let inner = self
++            .inner
++            .lock()
++            .expect("TransparencyLogAdapter inner poisoned");
++        let mut stmt = inner
++            .conn
++            .prepare_cached(
++                "SELECT frame_id, payload_redacted FROM transparency_log \
++                 WHERE boot_nonce = ?1 AND spirit_pid = ?2 AND kind = 11 \
++                 ORDER BY timestamp_ns ASC, frame_id ASC",
++            )
++            .map_err(AuditError::SqliteRead)?;
++        let mut found = Vec::new();
++        for &(boot_nonce, spirit_pid) in incarnations {
++            let mut rows = stmt
++                .query(rusqlite::params![boot_nonce as i64, spirit_pid as i64])
++                .map_err(AuditError::SqliteRead)?;
++            while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
++                let body: Vec<u8> = row.get(1).map_err(AuditError::SqliteRead)?;
++                if Self::is_kernel_tombstone(&body) {
++                    continue;
++                }
++                let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
++                found.push(ForgetFrame {
++                    frame_id: bytes
++                        .try_into()
++                        .map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?,
++                    kind: FrameKind::Distillate as i64,
++                    spirit_pid,
++                    boot_nonce,
++                    source_log_ref: Self::distillate_source_refs(&body).unwrap_or_default(),
++                });
++            }
++        }
++        Ok(found)
++    }
++
++    /// Story 20-11 — scrub one uninstalled Spirit's distillate (ADR-044
++    /// tombstone) and append its `distillate.redacted` marker naming the Spirit.
++    pub fn scrub_uninstalled_distillate(
++        &self,
++        spirit_id: &str,
++        frame_id: [u8; 16],
++    ) -> Result<(), AuditError> {
++        self.scrub_distillate_body(frame_id, "spirit-uninstall")?;
++        let payload = serde_json::json!({
++            "spirit_id": spirit_id,
++            "redacted_distillate_frame_id": format_frame_id_hex(&frame_id),
++        });
++        let _ = self.insert_frame_event(
++            FrameKind::TaskComplete,
++            0,
++            None,
++            "distillate.redacted",
++            payload.to_string().as_bytes(),
++            FrameOrigin::Kernel,
++        );
++        Ok(())
++    }
++
+     /// Story 9.2 — return every frame_id in the Transparency Log, sorted.
+     pub fn all_frame_ids(&self) -> Result<Vec<[u8; 16]>, AuditError> {
+         let inner = self

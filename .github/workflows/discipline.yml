@@ -2948,11 +2948,13 @@ jobs:
           wait "$server_pid"
           unset server_pid
       - uses: ./.github/actions/provision-t3-test-substrate
-      - name: Build the WASM-enabled execution surface
+      # Match 17-3c's accepted release launch: debug Cranelift compilation is
+      # inside the unchanged 360 s startup budget and the manifest's 10% CPU cap.
+      - name: Build the release WASM-enabled execution surface
         run: |
-          cargo build --locked -p maos-bin --features wasm-host --bin maos
-          cargo build --locked -p maos-wasm-host --bin maos-wasm-runner
-          cargo build --locked -p worker --bin worker-cli-fixture
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p worker --bin worker-cli-fixture
       - name: AC4 — execute the admitted installed component, not an engine-off refusal
         shell: bash
         run: |
@@ -2969,9 +2971,9 @@ jobs:
           [ "$ready" -eq 1 ] || { cat component-registry.log; exit 1; }
           MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" dist/maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
           dist/maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
-          "$target/debug/maos" init --plain
+          "$target/release/maos" init --plain
           manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["HOME"])/".local/share/maos/registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
-          sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/debug/maos" run "$manifest" --once 2>&1 | tee component.log
+          /usr/bin/time -p sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" run "$manifest" --once 2>&1 | tee component.log
           grep -F 'spirit_session_complete' component.log
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1,0 +1,96 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index bb7d7ff7..92466869 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -3936,6 +3936,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         }
+     }
+ 
++    match maos_providers::GeminiProvider::new(
++        Arc::clone(&io_arc),
++        "https://generativelanguage.googleapis.com".into(),
++        "gemini-3.5-flash-lite".into(),
++        Some(Arc::clone(&secret_store)),
++    ) {
++        Ok(provider) => {
++            providers_map.insert("gemini".into(), Arc::new(provider));
++            live_provider_available = true;
++            default_id.get_or_insert_with(|| "gemini".into());
++            eprintln!("maos: Gemini provider registered");
++        }
++        Err(maos_providers::ProviderError::Unconfigured) => {}
++        Err(error) => {
++            eprintln!("maos: Gemini provider configuration failed: {error}");
++            std::process::exit(78);
++        }
++    }
++
++    match maos_providers::OpenAiProvider::compatible(
++        "kimi",
++        maos_domain::ports::SecretKey::KimiApiKey,
++        Arc::clone(&io_arc),
++        "https://api.moonshot.ai".into(),
++        "kimi-k2.6".into(),
++        Some(Arc::clone(&secret_store)),
++    ) {
++        Ok(provider) => {
++            providers_map.insert("kimi".into(), Arc::new(provider));
++            live_provider_available = true;
++            default_id.get_or_insert_with(|| "kimi".into());
++            eprintln!("maos: Kimi provider registered");
++        }
++        Err(maos_providers::ProviderError::Unconfigured) => {}
++        Err(error) => {
++            eprintln!("maos: Kimi provider configuration failed: {error}");
++            std::process::exit(78);
++        }
++    }
++
+     {
+         let configured_ollama_url = std::env::var("MAOS_OLLAMA_URL").ok();
+         let ollama_is_explicit = configured_ollama_url
+@@ -4017,7 +4057,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             // driver also answers every id the kernel interns; a Spirit's
+             // token and request then name its own declared provider on a
+             // keyless runner. The default is unchanged.
+-            for id in ["anthropic", "openai", "ollama"] {
++            for id in maos_providers::PROVIDER_IDS {
+                 providers_map
+                     .entry(id.to_owned())
+                     .or_insert_with(|| Arc::clone(&replay));
+@@ -4044,6 +4084,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         } => {}
+     }
+ 
++    // Story 20-4 (D06) — `MAOS_DEFAULT_PROVIDER` names the router default; an
++    // unregistered or unknown id refuses the boot typed (never a silent fallback).
++    if let Some(selected) = std::env::var("MAOS_DEFAULT_PROVIDER")
++        .ok()
++        .filter(|v| !v.trim().is_empty())
++    {
++        if !providers_map.contains_key(&selected) {
++            return Err(format!(
++                "MAOS_DEFAULT_PROVIDER={selected}: not a registered provider (registered: {})",
++                providers_map.keys().cloned().collect::<Vec<_>>().join(", ")
++            )
++            .into());
++        }
++        default_id = Some(selected);
++    }
+     let router = Arc::new(
+         maos_kernel_core::inference::router::MultiProviderRouter::new(providers_map, default_id),
+     );
+diff --git a/crates/maos-providers/src/lib.rs b/crates/maos-providers/src/lib.rs
+index 4c2b9352..a499e538 100644
+--- a/crates/maos-providers/src/lib.rs
++++ b/crates/maos-providers/src/lib.rs
+@@ -27,6 +27,9 @@ pub use rate_limit::{
+ /// that already has consumers.
+ pub use provider::Provider as ProviderDriver;
+ 
++/// Every provider id the composition root may register (Story 20-4).
++pub const PROVIDER_IDS: [&str; 5] = ["anthropic", "openai", "ollama", "gemini", "kimi"];
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;

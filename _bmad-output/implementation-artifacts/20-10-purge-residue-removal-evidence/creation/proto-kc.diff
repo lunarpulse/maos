@@ -1,0 +1,33 @@
+diff -r base/crates/maos-kernel-core/src/security/sandbox/linux.rs kc/crates/maos-kernel-core/src/security/sandbox/linux.rs
+--- crates/maos-kernel-core/src/security/sandbox/linux.rs	2026-11-02 13:53:46.000000000 +0000
++++ crates/maos-kernel-core/src/security/sandbox/linux.rs	2026-11-02 14:31:12.597807387 +0000
+@@ -481,6 +481,11 @@
+     None
+ }
+ 
++/// The intermediate cgroup every owned native leaf lives under.
++pub const CGROUP_SLICE: &str = "maos.slice";
++/// The name prefix of an owned native leaf: `spirit-<id>-<daemon pid>-<seq>`.
++pub const CGROUP_LEAF_PREFIX: &str = "spirit-";
++
+ fn create_cgroup_dir(
+     root: &std::path::Path,
+     spirit_id: &str,
+@@ -489,7 +494,7 @@
+     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+     let sequence = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+     let safe_id = spirit_id.replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "_");
+-    let parent = root.join("maos.slice");
++    let parent = root.join(CGROUP_SLICE);
+     std::fs::create_dir_all(&parent)?;
+     let controllers = match (
+         caps.cpu_max_pct.is_some(),
+@@ -509,7 +514,7 @@
+         std::fs::write(parent.join("cgroup.subtree_control"), controllers)?;
+     }
+     let path = parent.join(format!(
+-        "spirit-{safe_id}-{}-{sequence}",
++        "{CGROUP_LEAF_PREFIX}{safe_id}-{}-{sequence}",
+         std::process::id()
+     ));
+     std::fs::create_dir(&path)?;

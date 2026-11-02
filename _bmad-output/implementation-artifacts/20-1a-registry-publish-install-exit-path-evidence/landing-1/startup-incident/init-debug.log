@@ -1,0 +1,5 @@
+maos: initialized /tmp/maos-startup-incident-b5ch6mtc/home/.maos
+maos: config written to /tmp/maos-startup-incident-b5ch6mtc/home/.maos/config.toml  (6 default slots + retention=persist)
+maos: operator door endpoint tcp://127.0.0.1:42313 recorded in /tmp/maos-startup-incident-b5ch6mtc/home/.maos/control.json
+maos: Transparency Log will be at /tmp/maos-startup-incident-b5ch6mtc/home/.maos/audit/transparency.sqlite
+maos: to remove all data, run:  maos purge --yes

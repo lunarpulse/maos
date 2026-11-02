@@ -1,0 +1,89 @@
+diff -r a/crates/maos-kernel-core/Cargo.toml ./crates/maos-kernel-core/Cargo.toml
+--- a/crates/maos-kernel-core/Cargo.toml	2026-11-02 13:53:46.000000000 +0000
++++ b/crates/maos-kernel-core/Cargo.toml	2026-11-02 14:36:33.826509043 +0000
+@@ -37,7 +37,7 @@
+ serde = { version = "1.0", features = ["derive"] }
+ serde_json = "1.0"
+ thiserror = "2.0"
+-ureq = { version = "2", features = ["tls"] }
++ureq = { version = "2", features = ["tls"], optional = true }
+ # Story 1a.3 — default CryptoProvider adapter (FR48 / NFR-Sec-15 / §8.6).
+ # `ring` 0.17 is the canonical Rust crypto-primitives crate; pulled
+ # in by rustls, quinn, webpki, tokio-rustls in the Rust ecosystem.
+@@ -82,7 +82,9 @@
+ windows = { version = "0.58", features = ["Win32_Security", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_Foundation"] }
+ 
+ [features]
+-default = []
++default = ["http"]
++# Story 20-2 (D-20-2-01 B) — the blocking HTTP client; off only in the air-gap build.
++http = ["dep:ureq"]
+ # Story 4.3 — cross-Spirit isolation framework hooks for Story 4.5 corpus.
+ spirit_test = ["maos-spirit-sdk", "maos-iac/spirit_test"]
+ # Story 5.5b AC4 — records every http_post URL for air-gapped validation.
+diff -r a/crates/maos-kernel-core/src/io/mod.rs ./crates/maos-kernel-core/src/io/mod.rs
+--- a/crates/maos-kernel-core/src/io/mod.rs	2026-11-02 13:53:46.000000000 +0000
++++ b/crates/maos-kernel-core/src/io/mod.rs	2026-11-02 14:36:33.851483467 +0000
+@@ -25,6 +25,7 @@
+ 
+ pub use maos_domain::ports::IoSubsystemPort;
+ 
++#[cfg(feature = "http")]
+ use std::io::Read;
+ 
+ use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
+@@ -62,6 +63,7 @@
+     }
+ }
+ 
++#[cfg(feature = "http")]
+ fn read_capped(response: ureq::Response, method: &str) -> Result<Vec<u8>, IoError> {
+     let mut buf = Vec::new();
+     response
+@@ -83,6 +85,7 @@
+     }
+ }
+ 
++#[cfg(feature = "http")]
+ impl IoSubsystemPort for IoSubsystemAdapter {
+     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
+         #[cfg(feature = "io_call_journal")]
+@@ -134,3 +137,38 @@
+         })
+     }
+ }
++
++/// Story 20-2 (D-20-2-01 B) — the air-gap build compiles HTTP out; every call
++/// is a typed transport refusal, never a silent success.
++#[cfg(not(feature = "http"))]
++fn compiled_out(method: &str, url: &str) -> IoError {
++    IoError::Transport(format!(
++        "{method} {url}: HTTP is compiled out of this build"
++    ))
++}
++
++#[cfg(not(feature = "http"))]
++impl IoSubsystemPort for IoSubsystemAdapter {
++    fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
++        Err(compiled_out("GET", url))
++    }
++
++    fn http_post(
++        &self,
++        url: &str,
++        _body: &[u8],
++        _headers: &[(&str, &str)],
++    ) -> Result<Vec<u8>, IoError> {
++        Err(compiled_out("POST", url))
++    }
++
++    fn http_post_exchange(
++        &self,
++        url: &str,
++        _body: &[u8],
++        _headers: &[(&str, &str)],
++        _response_header: &str,
++    ) -> Result<HttpExchange, IoError> {
++        Err(compiled_out("POST", url))
++    }
++}

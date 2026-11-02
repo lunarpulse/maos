@@ -1,0 +1,7 @@
+STARTUP-MEASUREMENT compile_start
+STARTUP-MEASUREMENT compile_seconds=13.580964
+STARTUP-MEASUREMENT instantiate_start
+STARTUP-MEASUREMENT instantiate_seconds=0.005675
+STARTUP-MEASUREMENT on_start_seconds=0.000484
+Content-Length: 0
+

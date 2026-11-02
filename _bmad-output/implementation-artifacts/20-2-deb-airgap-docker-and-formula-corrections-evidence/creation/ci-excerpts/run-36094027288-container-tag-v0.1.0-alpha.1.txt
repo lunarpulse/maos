@@ -1,0 +1,20 @@
+# gh run view 36094027288 (container.yml, tag v0.1.0-alpha.1 @ 0c661995), fetched 2026-11-02
+job=build-and-push conclusion=failure
+  step=Set up job conclusion=success
+  step=Run actions/checkout@v5 conclusion=success
+  step=Set up Docker Buildx conclusion=success
+  step=Log in to GHCR conclusion=success
+  step=Log in to Docker Hub conclusion=failure
+  step=Extract metadata conclusion=skipped
+  step=Build and push conclusion=skipped
+  step=Install cosign conclusion=skipped
+  step=Sign GHCR container image conclusion=skipped
+  step=Sign Docker Hub container image conclusion=skipped
+  step=Post Log in to Docker Hub conclusion=success
+  step=Post Log in to GHCR conclusion=success
+  step=Post Set up Docker Buildx conclusion=success
+  step=Post Run actions/checkout@v5 conclusion=success
+  step=Complete job conclusion=success
+# --log-failed excerpt
+build-and-push	UNKNOWN STEP	2026-09-25T04:20:36.4713771Z Login Succeeded!
+build-and-push	UNKNOWN STEP	2026-09-25T04:20:36.7186006Z ##[error]Username and password required

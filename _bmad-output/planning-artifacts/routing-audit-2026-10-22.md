@@ -21,8 +21,8 @@
 | `19-6-crash-originator-delivery-and-disposition` | 19-1 | FR12, FR50, NFR-Rel-1 | crash → mailbox delivery to the task originator with reassignment; all declared crash dispositions applied (production `NullReplicaResolver` replaced) | 0–small | `16-3…md:35-37` journaled, never mailbox-delivered; `main.rs:2795-2796` (→ `crates/maos-bin/src/main.rs:2997-2998` @d9bd59c4, 19-6 creation) |
 | `20-8-manifest-contract-completion` | 20-1 | FR8 | manifest declares `skills`, `explanation_shape`, `intent_promotion_set`, `swap_invariants`; signed manifest verified at admission | ◆ FLAG-Winston (admission) | `05-fr1-20-scout.md:10` four fields missing; unsigned admission |
 | `20-9-spawned-form-lifecycle-hooks` | 20-8 | FR55 | budgeted lifecycle triggers (incl. 17-4's idle-quiescent consolidation + live telemetry hooks) reach spawned forms (subprocess Worker, WASM); v1.0 third-party Spirits otherwise lack the hook ABI | ◆ FLAG-Winston | `17-4…md:51,135` "spawned forms receive neither new hook" |
-| `20-10-purge-residue-removal` | 20-2 | FR2 | `maos purge` removes owned T3 containers and cgroups it today only reports | 0 | `16-4-maos-uninstall-and-keyring.md:423-424` |
-| `20-11-erasure-inventory-closure` | 20-3c | FR65 | per-Spirit erasure inventory enumerates and removes intent lineage, pending halts and scheduled invocations (today `intent_lineage` is `VerifiedEmpty` by assumption; `scheduled_invocations` is `CoverageGap`) and the proof covers them | 0–small | `crates/maos-bin/src/main.rs:9290-9305` |
+| `20-10-purge-residue-removal` | starts when picked (D-20-10-09 B, ask s2010) | FR2 | `maos purge` removes owned T3 containers/cgroups/custody. The 16-4 report keys on `maos-` name (never cleanup authority, `t3/argv.rs:16-21`); `/sys/fs/cgroup/maos` is never created at HEAD, owned leaves are `maos.slice/spirit-*`. | 0, RULED ask s2010 | `purge.rs:1950-1984`; 20-10 creation C6/C7 |
+| `20-11-erasure-inventory-closure` | 20-3c | FR65 | per-Spirit erasure inventory enumerates and removes intent lineage, pending halts and scheduled invocations (today `intent_lineage` is `VerifiedEmpty` by assumption; `scheduled_invocations` is `CoverageGap`) and the proof covers them | KS +10/+6, RULED (ask s2011) | `crates/maos-bin/src/main.rs:10845-10860` |
 | `21-7-production-consent-granter-and-gate` | 21-2 | FR29 (production half) | a production granter sets `HeaderOnly`/`Withheld`, a production `ConsentGate` is installed, native senders carry a real pid (not 0); J3/Reza consent is real, not suite-delivered | 0 | `17-8…md:114` (rule-11 label), `:45` |
 | `21-8-three-protocol-session-witness` | 21-2 | success-criteria.md:50 | one binary-level session: launched by an ACP editor host, pulling tools from an MCP server, peering over A2A — ACP (5-5c), MCP (8-14b/c), A2A (8-6) each exist; the combined witness does not | 0 | no owner in the recovery map |
 
@@ -159,7 +159,7 @@ See `epics/requirements-inventory.md` § "Routing audit corrections (2026-10-22)
 | FR56 | Principal-scoped self-telemetry | unchanged | LIVE-VERIFIED | `smoke_epic_4.sh:19-42` | none |
 | FR60 | Offline signed-artifact import | unchanged | LIVE-VERIFIED | `subcommands.rs:1228-1355` | none |
 | FR63 | Stable catalogued typed errors | unchanged | LIVE-UNVERIFIED | no catalog/retryability/cause-chain witness | widen `20-3b` |
-| FR2 | Uninstall without orphaned state | 16-4 | PARTIAL | `16-4…md:423-424`: containers/cgroups reported, not removed | ADD `20-10` |
+| FR2 | Uninstall without orphaned state | 16-4 | PARTIAL; owned by 20-10, ready-for-dev | Report-only `maos-` name is never cleanup authority (`t3/argv.rs:16-21`); `/sys/fs/cgroup/maos` never created, real owned leaves `maos.slice/spirit-*` | `20-10` starts when picked, D-09 B (ask s2010); binary-removal hint/sentence stay 20-2 |
 | FR4 | Token-mediate every external call | 17-1 | PARTIAL | `17-1…md:111-121`: three refusals, not 1000-call proof | widen `19-3` |
 | FR47 | All inference through the Inference Port | 17-1 | narrowed by ADR-061 | `17-1…md:19` | PARK (ruling exists) |
 | FR5 | Sandbox floors and declared-scope confinement | 17-1/2/3b/3c | PARTIAL | `sprint-status.yaml:272` | `17-11` (exists) |
@@ -182,7 +182,7 @@ See `epics/requirements-inventory.md` § "Routing audit corrections (2026-10-22)
 | FR55 | Budgeted lifecycle triggers | 17-4 | PARTIAL: spawned forms excluded | `17-4…md:51,135` | ADD `20-9` |
 | FR61 | Disclosure policy with GPG key | unchanged | PARKED (ADR-047) | `SECURITY.md:11-22` | keep |
 | FR62(b) | Audit-queryable ABI proposals | 17-3b | PARTIAL: no TL emitter | `17-3b…md:37,252-253` | widen `20-3c` |
-| FR65 | Complete per-Spirit erasure inventory | 16-4 | MISROUTED | `main.rs:9290-9305`: lineage `VerifiedEmpty` by assumption; schedules `CoverageGap` | ADD `20-11` |
+| FR65 | Complete per-Spirit erasure inventory | 16-4 | MISROUTED | `main.rs:10845-10860`: lineage `VerifiedEmpty` by assumption; schedules `CoverageGap` | ADD `20-11` |
 | NFR-Rel-1 | Crash detection and orphan-frame deadlines | 16-3 | PARTIAL: no IAC delivery | `16-3…md:35-37,297` | ADD `19-6` |
 | NFR-Rel-2 | Reclassify hung Spirits ≤60 s | 16-3 | OWNED | `16-3…md:297,689-695` | none |
 | FR18/22/23a/26/27/38/40/42/43/44/46 | (as Appendix A) | unchanged | LIVE-VERIFIED | Appendix A rows | none |

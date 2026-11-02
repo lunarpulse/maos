@@ -1,0 +1,307 @@
+diff --git a/crates/maos-iac/src/adapter/transparency_log.rs b/crates/maos-iac/src/adapter/transparency_log.rs
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -512,6 +512,10 @@
+     std::array::from_fn(|i| token.0.get(i).copied().unwrap_or(0))
+ }
+ 
++/// EC-13 (Story 20-11): Transparency Log rows examined per lock hold by the
++/// forget scans.
++const FORGET_SCAN_PAGE: i64 = 4096;
++
+ /// SQL schema for both tables.
+ const SCHEMA_SQL: &str = "\
+ CREATE TABLE IF NOT EXISTS transparency_log (
+@@ -1452,6 +1456,73 @@
+         )
+     }
+ 
++    /// Story 20-11 (FR65) — the Distillate frames (the I13 intent-lineage
++    /// carriers) written by the given `(boot_nonce, spirit_pid)` incarnations,
++    /// tombstones excluded, in log order.
++    pub fn distillates_written_by(
++        &self,
++        incarnations: &[(u64, u32)],
++    ) -> Result<Vec<ForgetFrame>, AuditError> {
++        let inner = self
++            .inner
++            .lock()
++            .expect("TransparencyLogAdapter inner poisoned");
++        let mut stmt = inner
++            .conn
++            .prepare_cached(
++                "SELECT frame_id, payload_redacted FROM transparency_log \
++                 WHERE boot_nonce = ?1 AND spirit_pid = ?2 AND kind = 11 \
++                 ORDER BY timestamp_ns ASC, frame_id ASC",
++            )
++            .map_err(AuditError::SqliteRead)?;
++        let mut found = Vec::new();
++        for &(boot_nonce, spirit_pid) in incarnations {
++            let mut rows = stmt
++                .query(rusqlite::params![boot_nonce as i64, spirit_pid as i64])
++                .map_err(AuditError::SqliteRead)?;
++            while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
++                let body: Vec<u8> = row.get(1).map_err(AuditError::SqliteRead)?;
++                if Self::is_kernel_tombstone(&body) {
++                    continue;
++                }
++                let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
++                found.push(ForgetFrame {
++                    frame_id: bytes
++                        .try_into()
++                        .map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?,
++                    kind: FrameKind::Distillate as i64,
++                    spirit_pid,
++                    boot_nonce,
++                    source_log_ref: Self::distillate_source_refs(&body).unwrap_or_default(),
++                });
++            }
++        }
++        Ok(found)
++    }
++
++    /// Story 20-11 — scrub one uninstalled Spirit's distillate (ADR-044
++    /// tombstone) and append its `distillate.redacted` marker naming the Spirit.
++    pub fn scrub_uninstalled_distillate(
++        &self,
++        spirit_id: &str,
++        frame_id: [u8; 16],
++    ) -> Result<(), AuditError> {
++        self.scrub_distillate_body(frame_id, "spirit-uninstall")?;
++        let payload = serde_json::json!({
++            "spirit_id": spirit_id,
++            "redacted_distillate_frame_id": format_frame_id_hex(&frame_id),
++        });
++        let _ = self.insert_frame_event(
++            FrameKind::TaskComplete,
++            0,
++            None,
++            "distillate.redacted",
++            payload.to_string().as_bytes(),
++            FrameOrigin::Kernel,
++        );
++        Ok(())
++    }
++
+     /// Story 9.2 — return every frame_id in the Transparency Log, sorted.
+     pub fn all_frame_ids(&self) -> Result<Vec<[u8; 16]>, AuditError> {
+         let inner = self
+@@ -1552,84 +1623,123 @@
+         }
+     }
+ 
++    /// EC-13: run `sql` over consecutive stable-rowid windows of
++    /// [`FORGET_SCAN_PAGE`] rows, taking the log lock per window only, so a
++    /// large log never stalls log-before-deliver writers for a whole scan.
++    /// `sql` binds `?1` = principal, `?2`/`?3` = the exclusive/inclusive rowid
++    /// bounds; rows appended during the scan are reached by later windows.
++    fn scan_rowid_windows(
++        &self,
++        sql: &str,
++        principal: Option<&str>,
++        mut each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
++    ) -> Result<(), AuditError> {
++        let mut after = 0_i64;
++        loop {
++            let inner = self
++                .inner
++                .lock()
++                .expect("TransparencyLogAdapter inner poisoned");
++            let last: i64 = inner
++                .conn
++                .query_row(
++                    "SELECT coalesce(max(rowid), 0) FROM transparency_log",
++                    [],
++                    |row| row.get(0),
++                )
++                .map_err(AuditError::SqliteRead)?;
++            if after >= last {
++                return Ok(());
++            }
++            let upto = after.saturating_add(FORGET_SCAN_PAGE);
++            let mut stmt = inner
++                .conn
++                .prepare_cached(sql)
++                .map_err(AuditError::SqliteRead)?;
++            let mut rows = stmt
++                .query(rusqlite::params![principal, after, upto])
++                .map_err(AuditError::SqliteRead)?;
++            while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
++                each(row)?;
++            }
++            after = upto;
++        }
++    }
++
+     fn forget_frames(
+         &self,
+         principal: Option<&str>,
+         scrubbed: &std::collections::HashSet<String>,
+         include_prior: bool,
+     ) -> Result<Vec<ForgetFrame>, AuditError> {
+-        let inner = self
+-            .inner
+-            .lock()
+-            .expect("TransparencyLogAdapter inner poisoned");
+         // A failed earlier cascade may already have scrubbed a raw source.
+         // Flattened references still close that derivation on the re-run.
+-        let mut tombstones = inner
+-            .conn
+-            .prepare(
+-                "SELECT lower(hex(frame_id)) FROM transparency_log \
+-             WHERE CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
++        let mut prior = std::collections::HashSet::new();
++        self.scan_rowid_windows(
++            "SELECT lower(hex(frame_id)) FROM transparency_log \
++             WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND \
++             CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
+              THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 \
+              AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' \
+              AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') \
+              AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END",
+-            )
+-            .map_err(AuditError::SqliteRead)?;
+-        let prior = tombstones
+-            .query_map([], |row| row.get::<_, String>(0))
+-            .map_err(AuditError::SqliteRead)?
+-            .collect::<Result<std::collections::HashSet<_>, _>>()
+-            .map_err(AuditError::SqliteRead)?;
+-        let mut stmt = inner.conn.prepare(
+-            "SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted \
+-             FROM transparency_log WHERE \
++            None,
++            |row| {
++                prior.insert(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?);
++                Ok(())
++            },
++        )?;
++        let mut found = Vec::new();
++        self.scan_rowid_windows(
++            "SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted, timestamp_ns \
++             FROM transparency_log WHERE rowid > ?2 AND rowid <= ?3 AND \
+              ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) \
+              OR (?1 IS NULL AND kind = 11)) \
+              AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') \
+-             AND intent NOT LIKE 'principal.uninstall.%' \
+-             ORDER BY timestamp_ns ASC, frame_id ASC"
+-        ).map_err(AuditError::SqliteRead)?;
+-        let mut rows = stmt
+-            .query(rusqlite::params![principal])
+-            .map_err(AuditError::SqliteRead)?;
+-        let mut found = Vec::new();
+-        while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
+-            let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
+-            if let Some(id) = principal {
+-                if !principal_id_occurs(&body, id) {
+-                    continue;
++             AND intent NOT LIKE 'principal.uninstall.%'",
++            principal,
++            |row| {
++                let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
++                if let Some(id) = principal {
++                    if !principal_id_occurs(&body, id) {
++                        return Ok(());
++                    }
+                 }
+-            }
+-            let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
+-            let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
+-                match Self::distillate_source_refs(&body) {
+-                    Ok(refs) => refs,
+-                    Err(_) => Vec::new(),
++                let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
++                let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
++                    Self::distillate_source_refs(&body).unwrap_or_default()
++                } else {
++                    Vec::new()
++                };
++                if principal.is_none()
++                    && !source_log_ref
++                        .iter()
++                        .any(|id| scrubbed.contains(id) || (include_prior && prior.contains(id)))
++                {
++                    return Ok(());
+                 }
+-            } else {
+-                Vec::new()
+-            };
+-            if principal.is_none()
+-                && !source_log_ref
+-                    .iter()
+-                    .any(|id| scrubbed.contains(id) || (include_prior && prior.contains(id)))
+-            {
+-                continue;
+-            }
+-            source_log_ref.retain(|id| !prior.contains(id));
+-            let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
+-            let frame_id = bytes
+-                .try_into()
+-                .map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?;
+-            found.push(ForgetFrame {
+-                frame_id,
+-                kind,
+-                spirit_pid: row.get::<_, i64>(2).map_err(AuditError::SqliteRead)? as u32,
+-                boot_nonce: row.get::<_, i64>(3).map_err(AuditError::SqliteRead)? as u64,
+-                source_log_ref,
+-            });
+-        }
+-        Ok(found)
++                source_log_ref.retain(|id| !prior.contains(id));
++                let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
++                let frame_id = bytes
++                    .try_into()
++                    .map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?;
++                let timestamp_ns: i64 = row.get(5).map_err(AuditError::SqliteRead)?;
++                found.push((
++                    timestamp_ns,
++                    ForgetFrame {
++                        frame_id,
++                        kind,
++                        spirit_pid: row.get::<_, i64>(2).map_err(AuditError::SqliteRead)? as u32,
++                        boot_nonce: row.get::<_, i64>(3).map_err(AuditError::SqliteRead)? as u64,
++                        source_log_ref,
++                    },
++                ));
++                Ok(())
++            },
++        )?;
++        // The pre-EC-13 scan order (timestamp, frame id) is kept for receipts.
++        found.sort_by(|a, b| (a.0, a.1.frame_id).cmp(&(b.0, b.1.frame_id)));
++        Ok(found.into_iter().map(|(_, frame)| frame).collect())
+     }
+ 
+     /// Shared first/late sweep; held co-principals protect their entire derivation.
+@@ -1700,21 +1810,18 @@
+                 others.push(id);
+             }
+         }
+-        let inner = self
+-            .inner
+-            .lock()
+-            .expect("TransparencyLogAdapter inner poisoned");
+-        let mut stmt = inner
+-            .conn
+-            .prepare("SELECT lower(hex(frame_id)), payload_redacted FROM transparency_log WHERE kind = 11")
+-            .map_err(AuditError::SqliteRead)?;
+-        let mut rows = stmt.query([]).map_err(AuditError::SqliteRead)?;
+-        while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
+-            let body: Vec<u8> = row.get(1).map_err(AuditError::SqliteRead)?;
+-            if Self::distillate_source_refs(&body).is_err() {
+-                malformed.push(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?);
+-            }
+-        }
++        self.scan_rowid_windows(
++            "SELECT lower(hex(frame_id)), payload_redacted FROM transparency_log \
++             WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11",
++            None,
++            |row| {
++                let body: Vec<u8> = row.get(1).map_err(AuditError::SqliteRead)?;
++                if Self::distillate_source_refs(&body).is_err() {
++                    malformed.push(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?);
++                }
++                Ok(())
++            },
++        )?;
+         Ok((digests, others, requests, held, malformed))
+     }
+ 

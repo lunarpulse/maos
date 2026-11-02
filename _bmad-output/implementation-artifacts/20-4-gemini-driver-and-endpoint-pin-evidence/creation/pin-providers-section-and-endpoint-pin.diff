@@ -1,0 +1,222 @@
+diff --git a/crates/maos-bin/src/admission.rs b/crates/maos-bin/src/admission.rs
+index d9c16d1d..1eafeb14 100644
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -291,6 +291,12 @@ pub enum AdmissionRefusal {
+         archived_version: String,
+         successor_version: String,
+     },
++    /// Story 20-4 (FR3) — a `[providers]` entry names a provider the Spirit
++    /// does not declare in `provider.complete`, or one this root did not register.
++    ProviderUnavailable { provider: String },
++    /// Story 20-4 (FR3) — `sha256(endpoint_url)` of the registered driver is not
++    /// the manifest's `provider_endpoint_pin` (or its `endpoint_url` differs).
++    EndpointPinMismatch { provider: String },
+ }
+ 
+ impl AdmissionRefusal {
+@@ -316,6 +322,8 @@ impl AdmissionRefusal {
+             Self::Admission { .. } => "admission_refused",
+             Self::Start { .. } => "start_failed",
+             Self::MigratorMissing { .. } => "migrator_missing",
++            Self::ProviderUnavailable { .. } => "provider_unavailable",
++            Self::EndpointPinMismatch { .. } => "endpoint_pin_mismatch",
+         }
+     }
+ 
+@@ -388,6 +396,16 @@ impl std::fmt::Display for AdmissionRefusal {
+                  [migrates_from] names no pattern matching it (ADR-020 / FR11, refused at \
+                  the daemon's admission chokepoint)"
+             ),
++            Self::ProviderUnavailable { provider } => write!(
++                f,
++                "provider_unavailable: [providers] names '{provider}', which this Spirit does \
++                 not declare or this root did not register"
++            ),
++            Self::EndpointPinMismatch { provider } => write!(
++                f,
++                "endpoint_pin_mismatch: the registered '{provider}' endpoint does not match the \
++                 manifest's provider_endpoint_pin"
++            ),
+         }
+     }
+ }
+@@ -459,6 +477,8 @@ pub struct GatedManifest {
+     pub on_crash: Option<OnCrashSection>,
+     pub on_revocation: Option<OnRevocationSection>,
+     pub supervision: Option<SupervisionSection>,
++    /// Story 20-4 (FR3) — per-Spirit provider selection and endpoint pins.
++    pub providers: Option<maos_kernel_core::security::ProvidersSection>,
+     /// The raw text, kept for the model-provenance gate, which parses its own
+     /// section out of the whole document, and for the FR11 archive record.
+     pub manifest_toml: String,
+@@ -694,6 +714,25 @@ pub fn gate_manifest(
+     let on_revocation =
+         optional_section(&root, "on_revocation", OnRevocationSection::from_toml_str)?;
+     let supervision = optional_section(&root, "supervision", SupervisionSection::from_toml_str)?;
++    let providers = optional_section(
++        &root,
++        "providers",
++        maos_kernel_core::security::ProvidersSection::from_toml_str,
++    )?;
++    if let Some(section) = &providers {
++        let declared = &caps_required.provider.complete;
++        for config in std::iter::once(&section.primary).chain(&section.fallback) {
++            let prefix = format!("{}.", config.id);
++            if !declared
++                .iter()
++                .any(|d| *d == config.id || d.starts_with(&prefix))
++            {
++                return Err(AdmissionRefusal::ProviderUnavailable {
++                    provider: config.id.clone(),
++                });
++            }
++        }
++    }
+     // The component's manifest has now passed every structural gate. The
+     // refusal is feature-selected because a published binary's engine closure
+     // is an export-control property, not runtime configuration.
+@@ -720,10 +759,42 @@ pub fn gate_manifest(
+         on_crash,
+         on_revocation,
+         supervision,
++        providers,
+         manifest_toml: manifest_toml.to_owned(),
+     })
+ }
+ 
++/// Story 20-4 (FR3) — every `[providers]` entry must name a registered driver,
++/// and a pinned entry must match `sha256(endpoint_url)` of that driver exactly
++/// (the registered base URL's bytes; no normalisation).
++pub fn check_provider_pins(
++    providers: &maos_kernel_core::security::ProvidersSection,
++    endpoints: &BTreeMap<String, String>,
++) -> Result<(), AdmissionRefusal> {
++    use sha2::Digest;
++    for config in std::iter::once(&providers.primary).chain(&providers.fallback) {
++        let Some(endpoint) = endpoints.get(&config.id) else {
++            return Err(AdmissionRefusal::ProviderUnavailable {
++                provider: config.id.clone(),
++            });
++        };
++        let pin_ok = config
++            .provider_endpoint_pin
++            .as_deref()
++            .is_none_or(|pin| hex::encode(sha2::Sha256::digest(endpoint.as_bytes())) == pin);
++        let url_ok = config
++            .endpoint_url
++            .as_deref()
++            .is_none_or(|url| url == endpoint);
++        if !(pin_ok && url_ok) {
++            return Err(AdmissionRefusal::EndpointPinMismatch {
++                provider: config.id.clone(),
++            });
++        }
++    }
++    Ok(())
++}
++
+ /// An optional `[name]` section, serialized the way `gate_manifest` serializes
+ /// every section and parsed by its manifest type. Absent ⇒ `None`; present and
+ /// malformed ⇒ the gate-7 refusal.
+@@ -787,6 +858,8 @@ pub struct AdmissionDeps<'a> {
+     /// receives `on_consolidate`, and `on_telemetry_event` while its live
+     /// class is Observer.
+     pub hooks: Option<&'a crate::hook_pump::HookPump>,
++    /// Story 20-4 — provider id → registered endpoint base URL.
++    pub endpoints: &'a BTreeMap<String, String>,
+ }
+ 
+ /// Whether the triple runs its third leg.
+@@ -900,6 +973,12 @@ pub async fn load_admit_start(
+     // Admission runs at the SCHEDULER-ASSIGNED pid: capability mediation is
+     // keyed by pid, so admitting a placeholder would fail every live port
+     // closed.
++    if let Some(providers) = &gated.providers {
++        if let Err(refusal) = check_provider_pins(providers, deps.endpoints) {
++            rollback(deps, pid, &spirit_id).await;
++            return Err(refusal);
++        }
++    }
+     let spec = match deps.security.admit_spirit(
+         pid,
+         &spirit_id,
+@@ -914,7 +993,7 @@ pub async fn load_admit_start(
+         None,
+         None,
+         None,
+-        None,
++        gated.providers.as_ref(),
+         Some(&gated.class_section),
+     ) {
+         Ok(spec) => spec,
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index bb7d7ff7..0eea2a10 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -3897,6 +3897,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         std::collections::BTreeMap::new();
+     let mut live_provider_available = false;
+     let mut default_id: Option<String> = None;
++    // Story 20-4 (FR3) — provider id → registered endpoint, read by admission's
++    // endpoint-pin check; captured before replay/record wrapping replaces drivers.
++    let mut endpoints: std::collections::BTreeMap<String, String> = Default::default();
+ 
+     match AnthropicProvider::new(
+         Arc::clone(&io_arc),
+@@ -3906,6 +3909,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     ) {
+         Ok(provider) => {
+             providers_map.insert("anthropic".into(), Arc::new(provider));
++            endpoints.insert("anthropic".into(), "https://api.anthropic.com".into());
+             live_provider_available = true;
+             default_id.get_or_insert_with(|| "anthropic".into());
+             eprintln!("maos: Anthropic provider registered");
+@@ -3925,6 +3929,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     ) {
+         Ok(provider) => {
+             providers_map.insert("openai".into(), Arc::new(provider));
++            endpoints.insert("openai".into(), "https://api.openai.com".into());
+             live_provider_available = true;
+             default_id.get_or_insert_with(|| "openai".into());
+             eprintln!("maos: OpenAI provider registered");
+@@ -3943,6 +3948,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             .is_some_and(|url| !url.trim().is_empty() && url != "skip");
+         let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
+         if !ollama_url.is_empty() && ollama_url != "skip" {
++            endpoints.insert("ollama".into(), ollama_url.clone());
+             if let Ok(provider) = maos_providers::OllamaProvider::new(
+                 Arc::clone(&io_arc),
+                 ollama_url,
+@@ -4332,6 +4338,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         maos_bin::installed_spirits::InstalledSpirits::boot(
+             installed_manifests,
+             &maos_bin::admission::AdmissionDeps {
++                endpoints: &endpoints,
+                 scheduler: &scheduler,
+                 security: &security,
+                 transparency_log: &transparency_log,
+@@ -5815,6 +5822,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                     // the standalone arm and the door.
+                     let admitted = maos_bin::admission::load_admit_start(
+                         &maos_bin::admission::AdmissionDeps {
++                            endpoints: &endpoints,
+                             scheduler: &scheduler,
+                             security: &security,
+                             transparency_log: &transparency_log,
+@@ -6699,6 +6707,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             // `Loaded` SCB the way `main.rs` did until this story.
+             let admitted = maos_bin::admission::load_admit_start(
+                 &maos_bin::admission::AdmissionDeps {
++                    endpoints: &endpoints,
+                     scheduler: &scheduler,
+                     security: &security,
+                     transparency_log: &transparency_log,
+@@ -10252,6 +10261,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
+                 })?;
+         let admitted = maos_bin::admission::load_admit_start(
+             &maos_bin::admission::AdmissionDeps {
++                endpoints: &endpoints,
+                 scheduler: &self.scheduler,
+                 security: &self.security,
+                 transparency_log: &self.transparency_log,

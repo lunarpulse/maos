@@ -1,0 +1,20 @@
+diff -r base/crates/maos-kernel-core/src/security/sandbox/t3/child.rs kr/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+--- crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-02 13:53:46.000000000 +0000
++++ crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-02 14:31:11.319127753 +0000
+@@ -787,10 +787,12 @@
+         identity.started = true;
+     }
+ 
+-    /// Own an already-started CID on `runtime` without spawning (test seam
+-    /// for stub runtimes; production owns CIDs only through `spawn_t3`).
+-    #[doc(hidden)]
+-    pub fn adopt(runtime: ContainerRuntime, cid: String, state_dir: &Path) -> Self {
++    /// Reclaim custody of a CID this MAOS created and no live process owns
++    /// (`maos purge`; stub-runtime tests). The caller proves ownership; the
++    /// teardown verdict and residue are the same as for a spawned CID, and
++    /// `state_dir` (retained receipts or a fresh private directory) is removed
++    /// only on a clean verdict. `spawn_t3` remains the only creator.
++    pub fn reclaim(runtime: ContainerRuntime, cid: String, state_dir: &Path) -> Self {
+         let guard = Self::own(runtime, cid, state_dir, None);
+         guard
+             .terminal

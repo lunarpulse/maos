@@ -1,0 +1,125 @@
+{
+  "instrument": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=<copy>/xtask /mnt/build/cargo-maos/debug/xtask {check-kernel-baseline,kloc-check} --json; copies = git archive a8af3215 under /tmp/proto202 (deleted after measurement); rustfmt 1.9.0 edition 2021; prototypes never compiled",
+  "head": "a8af3215",
+  "base": {
+    "kernel": {
+      "passed": true,
+      "actual-lines": 26841,
+      "pinned-lines": 26841,
+      "file-set-entries": 95,
+      "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "changed": [],
+      "added": [],
+      "removed": []
+    },
+    "kloc": {
+      "passed": true,
+      "alarm": true,
+      "aggregate": 191826,
+      "over_budget": [],
+      "per_crate": {
+        "maos-kernel-core": 21042,
+        "maos-bin": 33498,
+        "xtask": 44406,
+        "maos-cli": 6429,
+        "maos-loom-lite": 5277,
+        "maos-shell": 615
+      }
+    }
+  },
+  "ka_kernel_core_http_feature": {
+    "kernel": {
+      "passed": false,
+      "actual-lines": 26879,
+      "pinned-lines": 26841,
+      "file-set-entries": 95,
+      "set-hash": "436e85ec27383e95bfda810762e1bd82dc60e2a350994ca192a3a84aceefcdec",
+      "changed": [
+        "io/mod.rs"
+      ],
+      "added": [],
+      "removed": []
+    },
+    "kloc": {
+      "passed": false,
+      "alarm": true,
+      "aggregate": 191858,
+      "over_budget": [
+        "aggregate 191858 >= 191827",
+        "maos-kernel-core 21074 > 21042"
+      ],
+      "per_crate": {
+        "maos-kernel-core": 21074,
+        "maos-bin": 33498,
+        "xtask": 44406,
+        "maos-cli": 6429,
+        "maos-loom-lite": 5277,
+        "maos-shell": 615
+      }
+    }
+  },
+  "binA_run_refusal_plus_purge_hint": {
+    "kernel": {
+      "passed": true,
+      "actual-lines": 26841,
+      "pinned-lines": 26841,
+      "file-set-entries": 95,
+      "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "changed": [],
+      "added": [],
+      "removed": []
+    },
+    "kloc": {
+      "passed": true,
+      "alarm": true,
+      "aggregate": 191808,
+      "over_budget": [],
+      "per_crate": {
+        "maos-kernel-core": 21042,
+        "maos-bin": 33480,
+        "xtask": 44406,
+        "maos-cli": 6429,
+        "maos-loom-lite": 5277,
+        "maos-shell": 615
+      }
+    }
+  },
+  "binP_purge_hint_only": {
+    "kloc": {
+      "passed": false,
+      "alarm": true,
+      "aggregate": 191828,
+      "over_budget": [
+        "aggregate 191828 >= 191827",
+        "maos-bin 33500 > 33498"
+      ],
+      "per_crate": {
+        "maos-kernel-core": 21042,
+        "maos-bin": 33500,
+        "xtask": 44406,
+        "maos-cli": 6429,
+        "maos-loom-lite": 5277,
+        "maos-shell": 615
+      }
+    }
+  },
+  "xt_ship_gate_enrolment": {
+    "kloc": {
+      "passed": false,
+      "alarm": true,
+      "aggregate": 191828,
+      "over_budget": [
+        "aggregate 191828 >= 191827",
+        "xtask 44408 > 44406"
+      ],
+      "per_crate": {
+        "maos-kernel-core": 21042,
+        "maos-bin": 33498,
+        "xtask": 44408,
+        "maos-cli": 6429,
+        "maos-loom-lite": 5277,
+        "maos-shell": 615
+      }
+    }
+  }
+}

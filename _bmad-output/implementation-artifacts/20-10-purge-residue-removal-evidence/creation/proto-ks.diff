@@ -1,0 +1,13 @@
+diff -r base/crates/maos-kernel-core/src/security/sandbox/mod.rs ks/crates/maos-kernel-core/src/security/sandbox/mod.rs
+--- crates/maos-kernel-core/src/security/sandbox/mod.rs	2026-11-02 13:53:46.000000000 +0000
++++ crates/maos-kernel-core/src/security/sandbox/mod.rs	2026-11-02 14:31:13.361630474 +0000
+@@ -129,6 +129,9 @@
+                     "maos-sandbox: cgroup cleanup failed; residue may remain at {}: {error}",
+                     path.display()
+                 );
++            } else if let Some(slice) = path.parent() {
++                // EBUSY while a sibling leaf lives: only the last one out removes it.
++                let _ = std::fs::remove_dir(slice);
+             }
+         }
+     }

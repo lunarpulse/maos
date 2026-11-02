@@ -1,0 +1,270 @@
+{
+  "head": "a8af3215",
+  "crates_last_change": "47631284",
+  "instrument": "/mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json / kloc-check --json, CARGO_MANIFEST_DIR=<copy>/xtask, cwd=<copy>, env -u CI -u GITHUB_ACTIONS",
+  "base": {
+    "kernel_physical": 26841,
+    "files": 95,
+    "set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+    "kernel_tokei": 21042,
+    "aggregate": 191826,
+    "alarm": true,
+    "over_budget": [],
+    "per_crate": {
+      "maos-providers": 1425,
+      "maos-bin": 33498,
+      "maos-manifest": 4604,
+      "maos-domain": 10099,
+      "maos-secrets": 536,
+      "xtask": 44406,
+      "maos-kernel-core": 21042
+    }
+  },
+  "prototypes": {
+    "ka": {
+      "diff": "ka-intern-gemini-kimi.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26843,
+      "kernel_physical_delta": 2,
+      "kernel_tokei": 21044,
+      "kernel_tokei_delta": 2,
+      "kernel_changed_files": [
+        "inference/mod.rs"
+      ],
+      "per_crate_delta": {
+        "maos-kernel-core": 2
+      },
+      "aggregate": 191828,
+      "aggregate_delta": 2,
+      "kb_rc": 1,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191828 >= 191827",
+        "maos-kernel-core 21044 > 21042"
+      ]
+    },
+    "kb": {
+      "diff": "kb-intern-set-in-providers.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26837,
+      "kernel_physical_delta": -4,
+      "kernel_tokei": 21038,
+      "kernel_tokei_delta": -4,
+      "kernel_changed_files": [
+        "inference/mod.rs"
+      ],
+      "per_crate_delta": {
+        "maos-kernel-core": -4,
+        "maos-providers": 3
+      },
+      "aggregate": 191825,
+      "aggregate_delta": -1,
+      "kb_rc": 1,
+      "kloc_rc": 0,
+      "over_budget": []
+    },
+    "kio1": {
+      "diff": "kio1-badheader-redaction.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26848,
+      "kernel_physical_delta": 7,
+      "kernel_tokei": 21047,
+      "kernel_tokei_delta": 5,
+      "kernel_changed_files": [
+        "io/mod.rs"
+      ],
+      "per_crate_delta": {
+        "maos-kernel-core": 5
+      },
+      "aggregate": 191831,
+      "aggregate_delta": 5,
+      "kb_rc": 1,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191831 >= 191827",
+        "maos-kernel-core 21047 > 21042"
+      ]
+    },
+    "kio2": {
+      "diff": "kio2-non2xx-truncate-keep-status.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26845,
+      "kernel_physical_delta": 4,
+      "kernel_tokei": 21044,
+      "kernel_tokei_delta": 2,
+      "kernel_changed_files": [
+        "io/mod.rs"
+      ],
+      "per_crate_delta": {
+        "maos-kernel-core": 2
+      },
+      "aggregate": 191828,
+      "aggregate_delta": 2,
+      "kb_rc": 1,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191828 >= 191827",
+        "maos-kernel-core 21044 > 21042"
+      ]
+    },
+    "r": {
+      "diff": "r-ka-kio1-kio2-bundle.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26854,
+      "kernel_physical_delta": 13,
+      "kernel_tokei": 21051,
+      "kernel_tokei_delta": 9,
+      "kernel_changed_files": [
+        "inference/mod.rs",
+        "io/mod.rs"
+      ],
+      "per_crate_delta": {
+        "maos-kernel-core": 9
+      },
+      "aggregate": 191835,
+      "aggregate_delta": 9,
+      "kb_rc": 1,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191835 >= 191827",
+        "maos-kernel-core 21051 > 21042"
+      ]
+    },
+    "rprime": {
+      "diff": "rprime-kb-kio1-kio2-bundle.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26848,
+      "kernel_physical_delta": 7,
+      "kernel_tokei": 21045,
+      "kernel_tokei_delta": 3,
+      "kernel_changed_files": [
+        "inference/mod.rs",
+        "io/mod.rs"
+      ],
+      "per_crate_delta": {
+        "maos-kernel-core": 3,
+        "maos-providers": 3
+      },
+      "aggregate": 191832,
+      "aggregate_delta": 6,
+      "kb_rc": 1,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191832 >= 191827",
+        "maos-kernel-core 21045 > 21042"
+      ]
+    },
+    "g1": {
+      "diff": "g1-gemini-driver.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26841,
+      "kernel_physical_delta": 0,
+      "kernel_tokei": 21042,
+      "kernel_tokei_delta": 0,
+      "kernel_changed_files": [],
+      "per_crate_delta": {
+        "maos-providers": 142
+      },
+      "aggregate": 191968,
+      "aggregate_delta": 142,
+      "kb_rc": 0,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191968 >= 191827"
+      ]
+    },
+    "k1": {
+      "diff": "k1-kimi-openai-compatible.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26841,
+      "kernel_physical_delta": 0,
+      "kernel_tokei": 21042,
+      "kernel_tokei_delta": 0,
+      "kernel_changed_files": [],
+      "per_crate_delta": {
+        "maos-providers": 26
+      },
+      "aggregate": 191852,
+      "aggregate_delta": 26,
+      "kb_rc": 0,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191852 >= 191827"
+      ]
+    },
+    "sec": {
+      "diff": "sec-secret-keys-env-purge.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26841,
+      "kernel_physical_delta": 0,
+      "kernel_tokei": 21042,
+      "kernel_tokei_delta": 0,
+      "kernel_changed_files": [],
+      "per_crate_delta": {
+        "maos-bin": 17,
+        "maos-domain": 8
+      },
+      "aggregate": 191851,
+      "aggregate_delta": 25,
+      "kb_rc": 0,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191851 >= 191827",
+        "maos-bin 33515 > 33498",
+        "maos-domain 10107 > 10099"
+      ]
+    },
+    "sel": {
+      "diff": "sel-registration-and-default-selector.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26841,
+      "kernel_physical_delta": 0,
+      "kernel_tokei": 21042,
+      "kernel_tokei_delta": 0,
+      "kernel_changed_files": [],
+      "per_crate_delta": {
+        "maos-bin": 51,
+        "maos-providers": 1
+      },
+      "aggregate": 191878,
+      "aggregate_delta": 52,
+      "kb_rc": 0,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191878 >= 191827",
+        "maos-bin 33549 > 33498"
+      ]
+    },
+    "pin": {
+      "diff": "pin-providers-section-and-endpoint-pin.diff",
+      "apply_check_rc": 0,
+      "apply_err": "",
+      "kernel_physical": 26841,
+      "kernel_physical_delta": 0,
+      "kernel_tokei": 21042,
+      "kernel_tokei_delta": 0,
+      "kernel_changed_files": [],
+      "per_crate_delta": {
+        "maos-bin": 77
+      },
+      "aggregate": 191903,
+      "aggregate_delta": 77,
+      "kb_rc": 0,
+      "kloc_rc": 1,
+      "over_budget": [
+        "aggregate 191903 >= 191827",
+        "maos-bin 33575 > 33498"
+      ]
+    }
+  }
+}

@@ -1,0 +1,95 @@
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+index fca52210..14b22596 100644
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -92,13 +92,9 @@ impl InferencePortAdapter {
+         &self,
+         provider_id: &str,
+     ) -> Result<Option<maos_providers::BucketKey>, InferenceError> {
+-        // Intern the provider id into the static set.
+-        let interned: &'static str = match provider_id {
+-            "anthropic" => "anthropic",
+-            "openai" => "openai",
+-            "ollama" => "ollama",
+-            _ => return Err(InferenceError::Unconfigured),
+-        };
++        // Intern the provider id into the closed set `maos-providers` owns.
++        let interned =
++            maos_providers::intern_provider_id(provider_id).ok_or(InferenceError::Unconfigured)?;
+         // Recover the driver to read its credential_fingerprint.
+         let driver = self
+             .router
+diff --git a/crates/maos-kernel-core/src/io/mod.rs b/crates/maos-kernel-core/src/io/mod.rs
+index 51e7fa4e..c030ab60 100644
+--- a/crates/maos-kernel-core/src/io/mod.rs
++++ b/crates/maos-kernel-core/src/io/mod.rs
+@@ -62,14 +62,18 @@ impl IoSubsystemAdapter {
+     }
+ }
+ 
+-fn read_capped(response: ureq::Response, method: &str) -> Result<Vec<u8>, IoError> {
++/// `truncate`: a non-2xx body over the cap is cut at the cap so its status
++/// survives (18-8 review EC-6); a 2xx body over the cap is still an error.
++fn read_capped(response: ureq::Response, method: &str, truncate: bool) -> Result<Vec<u8>, IoError> {
+     let mut buf = Vec::new();
+     response
+         .into_reader()
+         .take(MAX_RESPONSE_BYTES as u64 + 1)
+         .read_to_end(&mut buf)
+         .map_err(|e| IoError::Decode(format!("ureq {method} body: {e}")))?;
+-    if buf.len() > MAX_RESPONSE_BYTES {
++    if buf.len() > MAX_RESPONSE_BYTES && truncate {
++        buf.truncate(MAX_RESPONSE_BYTES);
++    } else if buf.len() > MAX_RESPONSE_BYTES {
+         return Err(IoError::Decode(format!(
+             "response body exceeds {MAX_RESPONSE_BYTES} byte limit"
+         )));
+@@ -91,7 +95,7 @@ impl IoSubsystemPort for IoSubsystemAdapter {
+         let response = ureq::get(url)
+             .call()
+             .map_err(|e| IoError::Transport(format!("ureq GET {url}: {e}")))?;
+-        read_capped(response, "GET")
++        read_capped(response, "GET", false)
+     }
+ 
+     fn http_post(
+@@ -122,11 +126,18 @@ impl IoSubsystemPort for IoSubsystemAdapter {
+         }
+         let response = match req.send_bytes(body) {
+             Ok(response) | Err(ureq::Error::Status(_, response)) => response,
++            // 18-8 review BH-1: ureq's BadHeader message echoes the whole header
++            // line (a credential); name the failure, never the value.
++            Err(ureq::Error::Transport(t)) if t.kind() == ureq::ErrorKind::BadHeader => {
++                return Err(IoError::Transport(format!(
++                    "ureq POST {url}: invalid request header (value withheld)"
++                )))
++            }
+             Err(e) => return Err(IoError::Transport(format!("ureq POST {url}: {e}"))),
+         };
+         let header = response.header(response_header).map(str::to_owned);
+         let status = response.status();
+-        let body = read_capped(response, "POST")?;
++        let body = read_capped(response, "POST", !(200..=299).contains(&status))?;
+         Ok(HttpExchange {
+             status,
+             body,
+diff --git a/crates/maos-providers/src/lib.rs b/crates/maos-providers/src/lib.rs
+index 4c2b9352..94f0f8af 100644
+--- a/crates/maos-providers/src/lib.rs
++++ b/crates/maos-providers/src/lib.rs
+@@ -27,6 +27,15 @@ pub use rate_limit::{
+ /// that already has consumers.
+ pub use provider::Provider as ProviderDriver;
+ 
++/// The closed set of provider ids a rate-limit bucket may name. An id outside
++/// it fails closed in the kernel adapter (Story 6.4 review fix).
++pub const PROVIDER_IDS: [&str; 5] = ["anthropic", "openai", "ollama", "gemini", "kimi"];
++
++/// Intern `id` into [`PROVIDER_IDS`]; `None` for an unknown provider.
++pub fn intern_provider_id(id: &str) -> Option<&'static str> {
++    PROVIDER_IDS.iter().copied().find(|known| *known == id)
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;

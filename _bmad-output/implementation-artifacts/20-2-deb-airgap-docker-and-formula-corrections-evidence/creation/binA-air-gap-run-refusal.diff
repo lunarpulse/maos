@@ -1,0 +1,47 @@
+--- a/crates/maos-bin/src/main.rs	2026-11-02 13:53:46.000000000 +0000
++++ b/crates/maos-bin/src/main.rs	2026-11-02 14:37:05.535215783 +0000
+@@ -1583,37 +1583,15 @@
+ 
+ #[cfg(not(feature = "network"))]
+ fn air_gap_run(_args: &[String]) {
+-    // AC-4: the substrate boots, runs, and produces a Transparency Log entry
+-    // even with networking compiled out. Real offline inference is a v1.0/9.4b
+-    // follow-up; at v0.5 we write a no-op TL entry and emit a clear diagnostic.
+-    let tl_path = resolved_transparency_log_path();
+-    if let Some(parent) = tl_path.parent() {
+-        let _ = std::fs::create_dir_all(parent);
+-    }
+-    // Best-effort offline entry: append a sentinel line to a plain-text stub file
+-    // next to the TL so the operator can observe that the substrate attempted to
+-    // boot. The real TL is SQLite and may not exist yet in an air-gap install.
+-    let stub = tl_path.with_extension("airgap-stub.log");
+-    let entry = format!(
+-        "{} air-gap boot stub\n",
+-        std::time::SystemTime::UNIX_EPOCH
+-            .elapsed()
+-            .map(|d| d.as_secs())
+-            .unwrap_or(0)
+-    );
+-    if let Err(e) = std::fs::OpenOptions::new()
+-        .create(true)
+-        .append(true)
+-        .open(&stub)
+-        .and_then(|mut f| std::io::Write::write_all(&mut f, entry.as_bytes()))
+-    {
+-        eprintln!("air-gap run: failed to write TL stub: {e}");
+-        std::process::exit(1);
+-    }
++    // Story 20-2 (D-20-2-01 A): this build has no substrate boot. It refuses
++    // rather than writing a stub file that reads like a boot record; the
++    // air-gapped deployment witness runs the default build in a network
++    // namespace (NFR-Ops-12).
+     eprintln!(
+-        "air-gap run: offline inference is stubbed; TL stub written to {}",
+-        stub.display()
++        "maos run: unavailable in the air-gap build (no substrate boot); \
++         run the default build inside an isolated network namespace"
+     );
++    std::process::exit(2);
+ }
+ 
+ #[cfg(not(feature = "network"))]

@@ -1,0 +1,48 @@
+diff --git a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -529,14 +529,24 @@
+     /// `on_unload` hook. A failing Worker hook leaves that child to
+     /// supervision as the documented residual.
+     pub async fn unload(&self, spirit_pid: u32) -> Result<(), LifecycleError> {
++        self.unload_receipted(spirit_pid).await.map(|_| ())
++    }
++
++    /// Story 20-11 — [`Self::unload`] returning the halt receipts its
++    /// termination wrote, so the uninstall proof counts the pending halts
++    /// this unload ended. Empty when the Spirit was absent or already unloaded.
++    pub async fn unload_receipted(
++        &self,
++        spirit_pid: u32,
++    ) -> Result<Vec<maos_domain::halt::HaltReceipt>, LifecycleError> {
+         let scb = match self.get_scb_optional(spirit_pid) {
+             Some(scb) => scb,
+-            None => return Ok(()),
++            None => return Ok(Vec::new()),
+         };
+ 
+         let current = scb.current_state();
+         if current == ScbLifecycleState::Unloaded {
+-            return Ok(());
++            return Ok(Vec::new());
+         }
+ 
+         scb.transition(
+@@ -559,7 +569,7 @@
+ 
+         // Story 16-6 — UNCONDITIONAL cleanup, ahead of the hook.
+         // Story 5.3 — produce halt-receipts for planned unload (NFR-Rel-11)
+-        let _receipts = terminate_spirit(
++        let receipts = terminate_spirit(
+             &self.tl,
+             &self._halt_registry,
+             spirit_pid,
+@@ -589,7 +599,7 @@
+             return Err(error);
+         }
+ 
+-        Ok(())
++        Ok(receipts)
+     }
+ 
+     /// DRR picker — select next Running Spirit to dispatch.

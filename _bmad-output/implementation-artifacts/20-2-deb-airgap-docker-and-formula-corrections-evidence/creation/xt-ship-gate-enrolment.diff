@@ -1,0 +1,12 @@
+--- a/xtask/src/check_ship_gate_completeness.rs	2026-11-02 13:53:46.000000000 +0000
++++ b/xtask/src/check_ship_gate_completeness.rs	2026-11-02 14:37:30.349064917 +0000
+@@ -15,6 +15,9 @@
+ /// The authoritative ship-gate set, reconciled in both directions with the
+ /// registry. Only explicitly mapped cadence jobs may omit the per-commit edge.
+ const EXPECTED_GATES: &[&str] = &[
++    // Story 20-2 (NFR-Ops-12) — air-gap symbol gate and netns deployment witness.
++    "check-air-gap",
++    "air-gap-netns-witness",
+     "ccac-n600-ship-gate",
+     "nfr-rel-3-hsis-95pct",
+     "check-stability-matrix",

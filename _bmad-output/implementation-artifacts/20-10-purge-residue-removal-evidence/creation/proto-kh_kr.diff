@@ -1,0 +1,81 @@
+diff -ruN base/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs kh_kr/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+--- crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs	2026-11-02 13:53:46.000000000 +0000
++++ crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs	2026-11-02 14:31:38.704699142 +0000
+@@ -267,6 +267,8 @@
+     pub launch_custody: Option<std::sync::Arc<ContainerLaunchCustody>>,
+     /// Optional per-run workspace, bind-mounted rw at `/workspace`.
+     pub workspace: Option<std::path::PathBuf>,
++    /// Optional owner identity, recorded as the `maos.owner` label.
++    pub owner: Option<String>,
+ }
+ 
+ /// A message handed from an OS reader thread to the kernel over the bounded mpsc.
+@@ -579,6 +581,7 @@
+                 env: &spec.env,
+                 launch_custody: launch.launch_custody.as_ref(),
+                 workspace: launch.workspace.as_deref(),
++                owner: launch.owner.as_deref(),
+             };
+             return spawn_t3(&spec.sandbox, &launch.image, argv, spawn_context)
+                 .map(|child| BridgeChild::Container(child, launch.image))
+diff -ruN base/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs kh_kr/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+--- crates/maos-kernel-core/src/security/sandbox/t3/argv.rs	2026-11-02 13:53:46.000000000 +0000
++++ crates/maos-kernel-core/src/security/sandbox/t3/argv.rs	2026-11-02 14:31:38.704127332 +0000
+@@ -34,6 +34,7 @@
+     state_dir: &Path,
+     egress_socket: Option<&Path>,
+     workspace: Option<&Path>,
++    owner: Option<&str>,
+     env: &[(String, String)],
+ ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+     let mut seen_names = std::collections::HashSet::new();
+@@ -103,6 +104,9 @@
+         argv.push(format!("--volume={}:/workspace:rw,U", dir.display()));
+         argv.push("--workdir=/workspace".to_string());
+     }
++    if let Some(owner) = owner {
++        argv.push(format!("--label=maos.owner={owner}"));
++    }
+     argv.extend(env.iter().map(|(name, _)| format!("--env={name}")));
+     argv.push(image_ref);
+     argv.push("--".to_string());
+diff -ruN base/crates/maos-kernel-core/src/security/sandbox/t3/child.rs kh_kr/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+--- crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-02 13:53:46.000000000 +0000
++++ crates/maos-kernel-core/src/security/sandbox/t3/child.rs	2026-11-02 14:31:38.704972554 +0000
+@@ -787,10 +787,12 @@
+         identity.started = true;
+     }
+ 
+-    /// Own an already-started CID on `runtime` without spawning (test seam
+-    /// for stub runtimes; production owns CIDs only through `spawn_t3`).
+-    #[doc(hidden)]
+-    pub fn adopt(runtime: ContainerRuntime, cid: String, state_dir: &Path) -> Self {
++    /// Reclaim custody of a CID this MAOS created and no live process owns
++    /// (`maos purge`; stub-runtime tests). The caller proves ownership; the
++    /// teardown verdict and residue are the same as for a spawned CID, and
++    /// `state_dir` (retained receipts or a fresh private directory) is removed
++    /// only on a clean verdict. `spawn_t3` remains the only creator.
++    pub fn reclaim(runtime: ContainerRuntime, cid: String, state_dir: &Path) -> Self {
+         let guard = Self::own(runtime, cid, state_dir, None);
+         guard
+             .terminal
+diff -ruN base/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs kh_kr/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+--- crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs	2026-11-02 13:53:46.000000000 +0000
++++ crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs	2026-11-02 14:31:38.703902011 +0000
+@@ -53,6 +53,8 @@
+     pub launch_custody: Option<&'a std::sync::Arc<ContainerLaunchCustody>>,
+     /// Optional per-run workspace, bind-mounted rw at `/workspace`.
+     pub workspace: Option<&'a Path>,
++    /// Optional owner identity, recorded as the `maos.owner` label.
++    pub owner: Option<&'a str>,
+ }
+ 
+ /// Construct a runtime client command with ambient credentials removed.
+@@ -420,6 +422,7 @@
+         parent.state_dir,
+         parent.egress_socket,
+         parent.workspace,
++        parent.owner,
+         parent.env,
+     )
+     .map_err(|error| SpawnError::T3ImageInspect {

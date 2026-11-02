@@ -568,7 +568,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR61 GPG key (documented deviation, ADR-047) | unchanged |
 | FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the `maos:spirit@2.0.0` break is the first **recorded** WIT ABI-extension proposal — a ratified `xtask/abi-ratifications.toml` entry gated by `wit_corpus.rs`; no Transparency-Log emitter exists or is claimed — epic-17 R17-59, R17-67) |
 | FR64 cost dimensions (PARTIAL) | `20-14-complete-cost-attribution` (v1.0: per-task + per-principal token attribution, **RULED 2026-10-25**, audit DECIDE-2 split); CPU-time / storage-I/O dimensions v1.1 (PRD DELTA-2026-10-25) |
-| FR65 pending halts + lineage in erasure proof (PARTIAL) | 16-4 |
+| FR65 pending halts + lineage in erasure proof (PARTIAL) | `20-11-erasure-inventory-closure` |
 | NFR-Test-4 per-class halt-recall (UNMEASURED) | 18-2, 21-1 |
 | NFR-Aud-7 five-metric gate (TAUTOLOGY) | 18-3 |
 | NFR-Rel-1/2 floors (UNMEASURED) | 16-3 |
@@ -576,7 +576,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | NFR-Onb-1/Test-8 external cohort (NEVER RUN) | `ops-external-cohort-and-pen-test` (honest N via 20-3) |
 | NFR-Sec-13 own-leaf rotation, NFR-Rel-6 durable pins | 21-3 |
 | NFR-Maint-1 one instrument | 21-4 |
-| NFR-Ops-12 air-gap artifact | 20-2 |
+| NFR-Ops-12 air-gapped substrate/journaling witness (not a separate shipped artifact) | 20-2 — shipped default build under `unshare -n` (D-20-2-01 A, ask s202) |
 | NFR-Meta-3 coverage matrix generated | 20-3 |
 
 **Journeys:** J0 → 16-2 · J-Butler → 18-1/18-4 · J-Researcher → 18-3 · J1 → 19-4 · J3 → 21-2 · J4 → 21-1 · Reza → 21-2 · J6 (Diego) → 20-1 + `ops-external-cohort-and-pen-test`.
@@ -592,8 +592,8 @@ Source: `../routing-audit-2026-10-22.md` — every row of the Recovery Coverage 
 | FR12/FR50, NFR-Rel-1 crash → originator delivery, dispositions | 16-3 (journaled, never mailbox-delivered; production `NullReplicaResolver`) | `19-6-crash-originator-delivery-and-disposition` (after 19-1) |
 | FR8 manifest fields (`skills`, `explanation_shape`, `intent_promotion_set`, `swap_invariants`) + signed admission | "already LIVE" | `20-8-manifest-contract-completion` ◆ FLAG-Winston (after 20-1) |
 | FR55 lifecycle hooks for spawned forms | 17-4 (compiled-in only) | `20-9-spawned-form-lifecycle-hooks` ◆ FLAG-Winston (after 20-8) |
-| FR2 purge residue (containers, cgroups) | 16-4 (reported, not removed) | `20-10-purge-residue-removal` (after 20-2) |
-| FR65 erasure inventory (intent lineage, pending halts, schedules) | 16-4 (`main.rs:9290-9305` assumes lineage empty; schedules `CoverageGap`) | `20-11-erasure-inventory-closure` (after 20-3c) |
+| FR2 purge residue (containers, cgroups) | 16-4 (reported, not removed) | `20-10-purge-residue-removal` (starts when picked, D-20-10-09 B RULED 2026-11-02, ask s2010; binary-removal hint/sentence stay with 20-2) |
+| FR65 erasure inventory (intent lineage, pending halts, schedules) | 16-4 (`main.rs:10845-10860` assumes lineage empty; schedules `CoverageGap`) | `20-11-erasure-inventory-closure` (after 20-3c) |
 | FR29 production consent granter + `ConsentGate`; native pid | 17-8 (rule-11 label: none in production) | `21-7-production-consent-granter-and-gate` (after 21-2) |
 | Success-criteria "three-protocol coherence" (ACP + MCP + A2A, one session) | none | `21-8-three-protocol-session-witness` (after 21-2) |
 | FR14 human task envelope, FR19 halt-policy schema/CLI, FR24 re-emission provenance | 19-1 (ACs are machine dispatch only) | 19-1 — ACs widened at the E19 preflight |

@@ -278,7 +278,7 @@ D13 RULED A (2026-11-01, rows203c; `PF:297`). Their 20-7 consequence is in AC7�
 
 ### Overlap (serialize; re-measure)
 
-- **`maos-kernel-core` pins** — 20-8, 20-9, 20-13, 20-14 forecast kernel touches; one integration owner per pin update (PF §6 "Pooled write surfaces"). K1w/K2r touch `t3/child.rs` only; 20-10 (purge of owned T3 residue) reads the same residue categories — coordinate the `TerminationUnconfirmed` meaning.
+- **`maos-kernel-core` pins** — 20-8, 20-9, 20-13, 20-14 forecast kernel touches; one integration owner per pin update (PF §6 "Pooled write surfaces"). K1w/K2r touch `t3/child.rs` only; 20-10 (purge of owned T3 residue) reads the same residue categories — coordinate the `TerminationUnconfirmed` meaning. → Coordinated at 20-10 creation: purge consumes `TerminationUnconfirmed` as "liveness unknown, CID/state retained" and never emits it (20-10 AC5.1).
 - **`xtask` and `discipline.yml`** — 20-5 (release precondition: fuzz chain + perf verdict share `check_release_precondition.rs`), 20-16 (`prepush` set), 20-15 (build-once archive for the new jobs).
 - **`maos-bin/src/supervision.rs`** — 20-9 (spawned lifecycle) edits supervision; AC9's change is local to the drop/unload pair.
 

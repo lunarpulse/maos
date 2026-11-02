@@ -714,6 +714,8 @@ OD4 SEPARATE STORY (scope text only until authored): unmask real HTTP status (40
 
 W3. MAOS_ANTHROPIC_MODEL / MAOS_OPENAI_MODEL / MAOS_OLLAMA_MODEL / MAOS_DEFAULT_PROVIDER read at provider construction (main.rs:3059-3086), defaults = current literals; empty-string = unset (MAOS_JOURNAL_PATH empty-guard precedent, maos-audit/src/lib.rs:1423-1428); register 4 UserFacing entries in env_contract.rs — check-env-contract stays BLOCKING-green (12.6 mechanism, NOT a new completeness test); 14.7 migration carries entries to the shared home; gpt-4o-mini currency verified in-story before the OpenAI default is trusted (OD3). Depends: gate story (shared-file ordering only). ACs per input package §W3 (AC3.1-3.4 with AC3.3 corrected to "gate green").
 
+**Re-scope 2026-11-02 (D06 D, ask s204):** The charter above is historical. `MAOS_DEFAULT_PROVIDER` moved to `20-4-gemini-driver-and-endpoint-pin`; this lane retains only `MAOS_ANTHROPIC_MODEL`, `MAOS_OPENAI_MODEL` and `MAOS_OLLAMA_MODEL` (three UserFacing entries). `sprint-status.yaml` carries the current owner note.
+
 ## 15-1-green-at-head
 
 Fix 4 red aggregate gates (empty-kernel I9 rows, service-boundary 9 'other' symbols, kloc maos-domain +51/aggregate D17, env-contract main.rs:2669-2670) + t_14_2a_post_grace_journal.rs:362 tracing race. Exit: aggregate green on tree content.

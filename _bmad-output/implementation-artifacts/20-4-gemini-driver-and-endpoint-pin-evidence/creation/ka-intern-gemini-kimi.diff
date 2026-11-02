@@ -1,0 +1,13 @@
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+index fca52210..41f9def3 100644
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -97,6 +97,8 @@ impl InferencePortAdapter {
+             "anthropic" => "anthropic",
+             "openai" => "openai",
+             "ollama" => "ollama",
++            "gemini" => "gemini",
++            "kimi" => "kimi",
+             _ => return Err(InferenceError::Unconfigured),
+         };
+         // Recover the driver to read its credential_fingerprint.

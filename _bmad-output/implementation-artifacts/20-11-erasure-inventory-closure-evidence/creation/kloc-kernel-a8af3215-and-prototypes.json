@@ -1,0 +1,212 @@
+{
+ "base": {
+  "check_kernel_baseline_rc": 0,
+  "kernel_physical": 26841,
+  "kernel_changed_files": [],
+  "kernel_added_files": [],
+  "kloc_check_rc": 0,
+  "aggregate": 191826,
+  "over_budget": [],
+  "tokei": {
+   "maos-kernel-core": 21042,
+   "maos-iac": 8270,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "kh": {
+  "check_kernel_baseline_rc": 1,
+  "kernel_physical": 26851,
+  "kernel_changed_files": [
+   "scheduler/scheduler_loop.rs"
+  ],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191832,
+  "over_budget": [
+   "aggregate 191832 >= 191827",
+   "maos-kernel-core 21048 > 21042"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21048,
+   "maos-iac": 8270,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "ks": {
+  "check_kernel_baseline_rc": 1,
+  "kernel_physical": 26851,
+  "kernel_changed_files": [
+   "scheduler/schedule_watchdog.rs"
+  ],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191832,
+  "over_budget": [
+   "aggregate 191832 >= 191827",
+   "maos-kernel-core 21048 > 21042"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21048,
+   "maos-iac": 8270,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "kf": {
+  "check_kernel_baseline_rc": 1,
+  "kernel_physical": 26878,
+  "kernel_changed_files": [
+   "memory/mod.rs"
+  ],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191859,
+  "over_budget": [
+   "aggregate 191859 >= 191827",
+   "maos-kernel-core 21075 > 21042"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21075,
+   "maos-iac": 8270,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "khks": {
+  "check_kernel_baseline_rc": 1,
+  "kernel_physical": 26861,
+  "kernel_changed_files": [
+   "scheduler/schedule_watchdog.rs",
+   "scheduler/scheduler_loop.rs"
+  ],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191838,
+  "over_budget": [
+   "aggregate 191838 >= 191827",
+   "maos-kernel-core 21054 > 21042"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21054,
+   "maos-iac": 8270,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "kall": {
+  "check_kernel_baseline_rc": 1,
+  "kernel_physical": 26898,
+  "kernel_changed_files": [
+   "memory/mod.rs",
+   "scheduler/schedule_watchdog.rs",
+   "scheduler/scheduler_loop.rs"
+  ],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191871,
+  "over_budget": [
+   "aggregate 191871 >= 191827",
+   "maos-kernel-core 21087 > 21042"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21087,
+   "maos-iac": 8270,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "p1": {
+  "check_kernel_baseline_rc": 0,
+  "kernel_physical": 26841,
+  "kernel_changed_files": [],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191856,
+  "over_budget": [
+   "aggregate 191856 >= 191827",
+   "maos-iac 8300 > 8270"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21042,
+   "maos-iac": 8300,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "p2": {
+  "check_kernel_baseline_rc": 0,
+  "kernel_physical": 26841,
+  "kernel_changed_files": [],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191886,
+  "over_budget": [
+   "aggregate 191886 >= 191827",
+   "maos-iac 8330 > 8270"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21042,
+   "maos-iac": 8330,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "nk": {
+  "check_kernel_baseline_rc": 0,
+  "kernel_physical": 26841,
+  "kernel_changed_files": [],
+  "kernel_added_files": [],
+  "kloc_check_rc": 1,
+  "aggregate": 191916,
+  "over_budget": [
+   "aggregate 191916 >= 191827",
+   "maos-iac 8360 > 8270"
+  ],
+  "tokei": {
+   "maos-kernel-core": 21042,
+   "maos-iac": 8360,
+   "maos-bin": 33498,
+   "maos-audit": 7721,
+   "maos-registry": 4248,
+   "maos-domain": 10099,
+   "maos-cli": 6429,
+   "xtask": 44406
+  }
+ },
+ "_method": "git archive a8af3215 copies under /tmp/proto2011/<name>; rustfmt 1.9.0 --edition 2021 on each changed file; env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=<copy>/xtask /mnt/build/cargo-maos/debug/xtask {check-kernel-baseline,kloc-check} --json from the copy root; not compiled",
+ "_base_set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59"
+}

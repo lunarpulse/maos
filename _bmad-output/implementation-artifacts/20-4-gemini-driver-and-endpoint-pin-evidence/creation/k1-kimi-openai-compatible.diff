@@ -1,0 +1,142 @@
+diff --git a/crates/maos-providers/src/openai.rs b/crates/maos-providers/src/openai.rs
+index 08761f5d..2d418df4 100644
+--- a/crates/maos-providers/src/openai.rs
++++ b/crates/maos-providers/src/openai.rs
+@@ -17,6 +17,8 @@ use crate::provider::{Provider, ProviderError};
+ 
+ /// OpenAI provider driver.
+ pub struct OpenAiProvider {
++    /// Attribution id: `openai`, or an OpenAI-compatible vendor (`kimi`).
++    provider_id: &'static str,
+     api_key: String,
+     endpoint_url: String,
+     model_id: String,
+@@ -30,12 +32,32 @@ impl OpenAiProvider {
+         endpoint_url: String,
+         model_id: String,
+         secret_store: Option<std::sync::Arc<dyn SecretStore>>,
++    ) -> Result<Self, ProviderError> {
++        Self::compatible(
++            "openai",
++            SecretKey::OpenAiApiKey,
++            transport,
++            endpoint_url,
++            model_id,
++            secret_store,
++        )
++    }
++
++    /// An OpenAI-compatible vendor (Kimi: `https://api.moonshot.ai`, the same
++    /// `/v1/chat/completions` shape) under its own id and credential.
++    pub fn compatible(
++        provider_id: &'static str,
++        secret: SecretKey,
++        transport: std::sync::Arc<dyn IoSubsystemPort>,
++        endpoint_url: String,
++        model_id: String,
++        secret_store: Option<std::sync::Arc<dyn SecretStore>>,
+     ) -> Result<Self, ProviderError> {
+         let Some(secret_store) = secret_store else {
+             return Err(ProviderError::Unconfigured);
+         };
+         let api_key = secret_store
+-            .get(SecretKey::OpenAiApiKey)
++            .get(secret)
+             // Story 16-4 review — a credential-store `get` failure is NOT a
+             // transport failure: the fallback store has already journaled the
+             // store-level telemetry, and the composition root degrades to a
+@@ -43,12 +65,9 @@ impl OpenAiProvider {
+             .map_err(|_| ProviderError::Unconfigured)?
+             .filter(|key| !key.trim().is_empty())
+             .ok_or(ProviderError::Unconfigured)?;
+-        Ok(Self::with_api_key(
+-            transport,
+-            endpoint_url,
+-            model_id,
+-            api_key,
+-        ))
++        let mut provider = Self::with_api_key(transport, endpoint_url, model_id, api_key);
++        provider.provider_id = provider_id;
++        Ok(provider)
+     }
+ 
+     /// Create from an explicit API key (for tests).
+@@ -60,6 +79,7 @@ impl OpenAiProvider {
+         api_key: String,
+     ) -> Self {
+         Self {
++            provider_id: "openai",
+             api_key,
+             endpoint_url,
+             model_id,
+@@ -94,7 +114,12 @@ impl Provider for OpenAiProvider {
+         let response_json: serde_json::Value = serde_json::from_slice(&response_bytes)
+             .map_err(|e| ProviderError::Serde(e.to_string()))?;
+ 
+-        parse_openai_response(&response_json, &self.endpoint_url, &self.model_id)
++        parse_openai_response(
++            &response_json,
++            self.provider_id,
++            &self.endpoint_url,
++            &self.model_id,
++        )
+     }
+ }
+ 
+@@ -114,6 +139,7 @@ fn build_openai_request_body(req: &InferenceRequest, model_id: &str) -> serde_js
+ 
+ fn parse_openai_response(
+     json: &serde_json::Value,
++    provider_id: &str,
+     endpoint_url: &str,
+     model_id: &str,
+ ) -> Result<InferenceResponse, ProviderError> {
+@@ -157,7 +183,7 @@ fn parse_openai_response(
+             output_tokens,
+         },
+         provider_attribution: ProviderAttribution {
+-            provider_id: "openai".into(),
++            provider_id: provider_id.into(),
+             endpoint_url: endpoint_url.into(),
+             model_id: Some(model_id.into()),
+         },
+@@ -298,7 +324,8 @@ mod tests {
+             "choices": [{ "message": { "content": "Greetings!" }, "finish_reason": "stop" }],
+             "usage": { "prompt_tokens": 5, "completion_tokens": 10 }
+         });
+-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
++        let resp = parse_openai_response(&json, "openai", "https://api.openai.com", "gpt-4o-mini")
++            .unwrap();
+         assert_eq!(resp.text, "Greetings!");
+         assert!(matches!(resp.stop_reason, StopReason::StopSequence));
+         assert_eq!(resp.usage.input_tokens, 5);
+@@ -312,7 +339,8 @@ mod tests {
+             "choices": [{ "message": { "content": "truncated" }, "finish_reason": "length" }],
+             "usage": { "prompt_tokens": 1, "completion_tokens": 2 }
+         });
+-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
++        let resp = parse_openai_response(&json, "openai", "https://api.openai.com", "gpt-4o-mini")
++            .unwrap();
+         assert!(matches!(resp.stop_reason, StopReason::MaxTokens));
+     }
+ 
+@@ -322,7 +350,8 @@ mod tests {
+             "choices": [{ "message": { "content": "filtered" }, "finish_reason": "content_filter" }],
+             "usage": { "prompt_tokens": 1, "completion_tokens": 1 }
+         });
+-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
++        let resp = parse_openai_response(&json, "openai", "https://api.openai.com", "gpt-4o-mini")
++            .unwrap();
+         assert!(
+             matches!(resp.stop_reason, StopReason::ProviderStop(ref s) if s == "content_filter")
+         );
+@@ -333,7 +362,8 @@ mod tests {
+         let json = serde_json::json!({
+             "choices": [{ "message": { "content": "text" }, "finish_reason": "stop" }]
+         });
+-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
++        let resp = parse_openai_response(&json, "openai", "https://api.openai.com", "gpt-4o-mini")
++            .unwrap();
+         assert_eq!(resp.usage.input_tokens, 0);
+         assert_eq!(resp.usage.output_tokens, 0);
+     }

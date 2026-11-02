@@ -1,0 +1,408 @@
+---
+story_id: '20.4'
+story_key: 20-4-gemini-driver-and-endpoint-pin
+created: 2026-11-02
+context_commit: a8af3215
+baseline_commit: a8af3215
+security_sensitive: true
+kernel_grant: "RULED 2026-11-02 (ask s204; D-20-4-06 A + D-20-4-07 A; R = KA + KIO1 + KIO2): measured at a8af3215 from 26841 physical / 21042 tokei, +13 / +9. Ceilings (STOP above): kernel ≤ 26867 physical / 21060 tokei; L2 kernel last. The second or later kernel landing re-bases; cumulative STOP above 21209 tokei, ADR-069 alarm 22000; expected cumulative with 20-1b +68 and 20-11 +6 is 21125."
+kloc_grant: "RULED 2026-11-02 (ask s204; D-20-4-11 A; D02 A ×2 measured / ×3 unmeasured). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): maos-providers ≤ 1898; maos-bin ≤ 33950; maos-domain ≤ 10115; maos-manifest ≤ 4610; xtask ≤ 44466; kernel ≤ 26867 / 21060 (see kernel_grant); aggregate ≤ 192851. Every other crate 0."
+review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-71`): a kernel FLAG-Winston row (D-20-4-06/07), secrets handling (two new credentials, header redaction, AC3.4, AC8.1) and a refusing control (the endpoint pin, AC6). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC1.1 (key placement), AC6 and AC8, Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
+---
+
+# Story 20.4: Gemini driver and endpoint pin enforcement
+
+Status: ready-for-dev
+
+<!-- Created 2026-11-02 at a8af3215 (main, one docs commit ahead of origin/main 47631284; `git log -1 -- crates xtask` = 47631284) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30). Preflight D06 is OPEN; D-20-4-01…11 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran (parent rule): cites re-read at HEAD (`creation/cites-a8af3215.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); the epic's AC1 shell line run on the prebuilt binary in an isolated home (`creation/runtime/`). Stale E20 §20-4 cites are corrected through `creation/records-owed.md` §A. -->
+
+**Status rationale — ready-for-dev, not blocked.** Every AC is hermetic (mock transport, seeded cassettes, loopback
+listeners). Two inputs gate parts of it: D06 decides who creates `MAOS_DEFAULT_PROVIDER` (AC1.5, AC3.3 wait for the
+`provider-model-env-overrides` row only under D06 A), and the model ids are a policy edit (D-20-4-03, owner Winston).
+Live Gemini/Kimi calls are operator legs and need L2's kernel row first (C21).
+
+> **The capability:** *an operator can run any Spirit on Anthropic, OpenAI, Gemini, Kimi or a local Ollama — the Spirit's own `[providers]` choice where it makes one — and a Spirit that pins its provider endpoint is refused, before any token is minted, by a root whose configured endpoint is not the one it pinned.*
+
+**Closes:**
+- Epic-20 §20-4 (E20@HEAD:201-209) as amended 2026-10-30 (D01 A; preflight §3.4): epic AC1 → AC1 + AC3, AC2 → AC6, AC3 → AC4; plus the D01 A widening (R:47): Kimi → AC2, per-Spirit selection → AC5.
+- FR3 (`prd/functional-requirements.md:26`) except Bedrock (parked, S:344): Gemini, Kimi, per-Spirit selection, endpoint locking.
+- `deferred-work.md:1297` (ureq `BadHeader` echoes a provider credential) → AC3.4 + AC8.1; `:1298` (non-2xx over 10 MiB loses its status) → AC8.2. Both name this key as owner.
+- `tests/coverage-matrix.yaml:566-570` (FR3 `gates: []`) → AC9.
+
+**Does NOT close, and says so:**
+- Live Gemini/Kimi round trips with a paid key (`ops-live-gemini-leg`, S:342; Kimi per D-20-4-09). This story's replay lines prove selection and routing; the round-trip tests prove the wire shape against fixtures; neither is a vendor call.
+- The three `MAOS_*_MODEL` overrides of `provider-model-env-overrides` (S:224) unless D06 rules B; per-Spirit *model* or *endpoint* reconfiguration (D-20-4-04 D); Bedrock/Vertex/KMS (S:344).
+- Real HTTP status for the existing drivers (`provider-error-surfacing`, S:225: `http_post` flattens non-2xx to `Transport`, `io/mod.rs:97-108`); the Gemini driver uses `http_post_exchange` and gets real status for itself only.
+- The FR38 runtime provider-endpoint drift check in registry admission (vacuous in production, C23) — D-20-4-10.
+- Worker CLI proxies (`worker_cli.rs:749,815`) and their egress grants; crypto-provider selection (20-13); cost-attribution completeness (20-14).
+
+## Story
+
+As **an operator who chooses inference providers per deployment and per Spirit — including air-gapped hosts on a local model**,
+I want **Gemini and Kimi drivers beside the existing three, a default I can name, a Spirit's own `[providers]` choice honoured, and its endpoint pin enforced**,
+so that **a Spirit runs on the provider I configured, and a pinned Spirit never talks to an endpoint it did not pin.**
+
+**Contract:**
+- Epic §20-4 (E20@HEAD:201-209) as amended 2026-10-30 (D01 A, preflight `epic-20-preflight-2026-10-30.md` §3.4, §2 row 20-4, D06) — create-story may tighten, not add uncited ACs: AC2/AC5 are the received R:47 charter (E20:205), AC7/AC8 the received D:1297/D:1298 rows, AC4 the epic's AC3 corrected to the closed 17-5 gate.
+- Tracker `sprint-status.yaml:302`; rules 9–11 (E20 confidence rules, E20:59-61); proof contract `docs/testing/proof-contract.md:10-31` (one final-tree run + one plant per AC), `:33-71` (review, tiers; a manifest change widens the focused set, `:48-53`).
+
+## Inventory at HEAD — measured, not assumed
+
+Method: every cite re-read at `a8af3215`; witnesses located by `grep` over `crates/*/tests` and inline test modules;
+the epic's AC1 line run on the prebuilt HEAD binary (`creation/runtime/selector-probe-a8af3215.txt`); no cargo.
+
+| # | Charter item | Disposition | Code at HEAD | Witness / measurement | AC |
+|---|---|---|---|---|---|
+| 1 | Gemini driver | **missing** | providers `src/` = anthropic/openai/ollama/fixture_replay/rate_limit/provider/lib (1425 tokei); FR47 denies `gemini-rs`, `google-generative-ai` (`xtask/fr47-vendor-sdk-denylist.toml:16-17`) | — | AC1 |
+| 2 | Kimi driver | **missing**; OpenAI driver fits the wire | `openai.rs:81` `{endpoint}/v1/chat/completions` + Bearer; attribution fixed `"openai"` `:160`, key fixed `OpenAiApiKey` `:38`; Kimi = `https://api.moonshot.ai` + same path (vendor overview, C24) | `openai_round_trip_test.rs` (3) | AC2 |
+| 3 | Credentials | **missing** | `SecretKey` = Anthropic, OpenAI, 8 MCP bearers (`crates/maos-domain/src/ports/secret_store.rs:10-15,51-78`) | `provisioning-checklist.md:42` "no credential name exists" | AC3 |
+| 4 | Registration / default | literals, first-registered default | `main.rs:3896-3963`; replay interns `anthropic/openai/ollama` `:4020-4024`; shell mints the router default `:4374`, `shell_host.rs:112-122` | — | AC3 |
+| 5 | `MAOS_DEFAULT_PROVIDER` | **missing** | `git grep` 0 | measured: set to `gemini`, TL row `infer:anthropic->replay:default` (S2) | AC1, AC3 |
+| 6 | Epic AC1 shell line | **red** | cassette `cassettes/providers/gemini-shell-intro.json` absent | measured **rc 1** (S1) | AC1 |
+| 7 | Model currency | **exists, blind to new providers** | `xtask/model-currency.toml` (anthropic/openai/ollama); scan regex `check_model_currency.rs:241-243`, hosts `:287-293` | measured: Gemini+Kimi constructors with unlisted ids → rc 0, 16 pins (= HEAD) | AC4 |
+| 8 | `[providers]` per-Spirit section | **parse-only, never read** | schema `manifest.rs:2413-2536` (ids anthropic/openai/ollama `:2413`); `gate_manifest` ignores it (`admission.rs:590-723`); `admit_spirit(.., providers = None, ..)` `admission.rs:917` | `ProvidersSection` unit tests `manifest.rs:4281-4398`; kernel `ProviderSwitched` fed by tests only (`crates/maos-kernel-core/tests/provider_switched_journal.rs`) | AC5 |
+| 9 | Per-Spirit binding today | declaration order | `declared_providers` `main.rs:890-904`; Researcher `spirits/researcher/src/lib.rs:487`; Orchestrator `orchestrator_root.rs:221-237`; shell = router default | `researcher_inference_18_3.rs:301` (unregistered refused) | AC5 |
+| 10 | Endpoint pin | **false** (silently ignored) | field `manifest.rs:2454`, 64-hex check `:2510-2516`; no consumer | — | AC6 |
+| 11 | Kernel provider-id set | **refuses Gemini/Kimi** under the limiter | `inference/mod.rs:91-109` (match `:96-101`); limiter in every mode but explicit replay (`inference_mode.rs:95-97`) | `inference_fallback_authz_18_1.rs` (adapter harness to reuse) | AC7 ◆ |
+| 12 | Kernel IO credential echo | **open** (D:1297) | `io/mod.rs:123-126` `Err(e) => Transport(format!("ureq POST {url}: {e}"))` | MCP half closed by 18-8 (`maos-mcp/src/transport/streamable_http.rs:85`) | AC3.4, AC8 ◆ |
+| 13 | Kernel IO status loss | **open** (D:1298) | `read_capped` `io/mod.rs:65-78`, POST `:129` | — | AC8 ◆ |
+
+## Current-tree corrections — read before implementing
+
+Full OLD → NEW: `creation/cites-a8af3215.md` (C1–C24, T1–T3, P1–P3, L1–L5).
+
+| Premise (epic / preflight / tracker) | Fact at `a8af3215` and consequence |
+|---|---|
+| "kernel-Δ 0" (E20:77,203,208; PF:123) | The kernel interns a closed provider-id set and refuses `gemini`/`kimi` whenever the rate limiter is installed (live, record, deterministic); D:1297/D:1298 are kernel IO rows owned here. Measured R = +13 / +9 (C9, P3). |
+| "model id is a literal with a `// model-currency` marker until the lane lands" (E20:209) | Closed by 17-5; the gate exists but cannot see a Gemini/Kimi constructor (measured, C10). AC4 extends it. |
+| "governed by `xtask/fr63-typed-errors.toml`" (E20:208) | No gate reads that file (C8). The refusal's contract is its `AdmissionRefusal` code and the AC6 plant. |
+| "enforced at provider construction / `InferencePortAdapter`" (E20:208; S:302) | Endpoints are fixed at boot; the pin lives in a Spirit manifest that admission never reads (C14). Enforcement point: admission (D-20-4-05). |
+| "the shell line replies from the cassette" proves the driver (E20:207) | Replay swaps every driver for the cassette provider (`main.rs:3998-4025`): it proves selection/routing/scope, never the wire (C16). |
+| `[providers].primary` "not used for selection" (E20:207) | Not read at all; `fallback` ids are also refused by the kernel at call time unless equal to the primary (`inference/mod.rs:291-293`). |
+| Anchors `main.rs:3081-3100,3136`, `manifest.rs:2103,2159-2171`, `anthropic.rs` 307, providers 1570, `sprint-status.yaml:294` | `main.rs:3896-3963,4073-4085`; `manifest.rs:2454,2510-2516`; 427; 1425 tokei; S:344 (C2–C6, C11). |
+
+## Kernel and kloc pricing — measured at creation
+
+**Instrument:** prebuilt `/mnt/build/cargo-maos/debug/xtask` (`check-kernel-baseline --json`, `kloc-check --json`) run
+from a `git archive a8af3215` copy root per prototype; the untouched copy reproduces the tree exactly (26841 / 95 files
+/ set hash `db39bc4a…`; kernel 21042 tokei; aggregate 191826). Detail and diffs: `creation/measurements.md`,
+`creation/kloc-kernel-a8af3215-and-prototypes.json`.
+
+**Kernel (◆ FLAG-Winston, PROPOSED):**
+
+| Shape | Kernel physical | Kernel tokei | Other | Diff |
+|---|---:|---:|---|---|
+| KA `bucket_key` interns `gemini`, `kimi` (D-06 A) | +2 (26843) | +2 (21044) | — | `ka-intern-gemini-kimi.diff` |
+| KB closed set moved to `maos_providers::intern_provider_id` (D-06 B) | −4 (26837) | −4 (21038) | maos-providers +3 | `kb-intern-set-in-providers.diff` |
+| KIO1 `BadHeader` → "value withheld" (D:1297; D-07 A) | +7 (26848) | +5 (21047) | — | `kio1-badheader-redaction.diff` |
+| KIO2 non-2xx over the cap truncated, status kept (D:1298; D-07 A) | +4 (26845) | +2 (21044) | — | `kio2-non2xx-truncate-keep-status.diff` |
+| **R = KA + KIO1 + KIO2 (recommended)** | **+13 (26854)** | **+9 (21051)** | — | `r-ka-kio1-kio2-bundle.diff` |
+| R′ = KB + KIO1 + KIO2 | +7 (26848) | +3 (21045) | maos-providers +3 | `rprime-kb-kio1-kio2-bundle.diff` |
+| Rmin = KA only (D-07 C) | +2 | +2 | D:1297/1298 re-routed | `ka-intern-gemini-kimi.diff` |
+| none (D-06 C) | 0 | 0 | live/record Gemini/Kimi refused `Unconfigured` | — |
+
+Both pins move with any kernel shape (content hashes of `inference/mod.rs`, `io/mod.rs`). Not compiled ([INFERENCE];
+measurement owed 1–2).
+
+**kloc forecast** (tokei; HEAD = every pin, 1 line aggregate room; recommended options):
+
+| Crate · component | Measured / forecast | Basis |
+|---|---:|---|
+| maos-kernel-core · R (AC7, AC8) | **+9** (physical +13) | prototype `r` |
+| maos-providers · `gemini.rs` (AC1) | **+142** | prototype `g1` |
+| maos-providers · `OpenAiProvider::compatible` for Kimi (AC2) | **+26** | prototype `k1` |
+| maos-providers · `PROVIDER_IDS` (AC3) | **+1** | prototype `sel` |
+| maos-providers · credential byte check for four keyed drivers (AC3.4), optional `gemini`/`kimi` quota defaults | +10…+45 [INFERENCE] | 18-8 bearer check `streamable_http.rs:81-87`; `rate_limit.rs:276-293` |
+| maos-domain · two `SecretKey` variants (AC3.1) | **+8** | prototype `sec` |
+| maos-bin · env rows + purge labels (AC3.1) | **+17** | prototype `sec` |
+| maos-bin · registration, replay ids, `MAOS_DEFAULT_PROVIDER` (AC3.2–3.3) | **+51** | prototype `sel` |
+| maos-bin · `[providers]` parse, declared check, pin check, two refusals, deps plumbing (AC5.1, AC6) | **+77** | prototype `pin` |
+| maos-bin · binding sites honour `primary`; `fallback` refusal; endpoint entries for Gemini/Kimi (AC5.3) | +24…+54 [INFERENCE] | `main.rs:890-904,4374`; `orchestrator_root.rs:221-237` |
+| maos-manifest · `ALLOWED_PROVIDER_IDS` (AC5.2) | 0…+2 [INFERENCE] | `manifest.rs:2413` |
+| xtask · currency scan of Gemini + `compatible` constructors, five hosts (AC4) | +5…+20 [INFERENCE] | `check_model_currency.rs:239-295` |
+| spirits (`spirits/researcher/src`), tests, fixtures, cassettes, toml data, docs | uncharged | `kloc_check.rs:300-317` |
+| **aggregate** | **+331 measured; +331…+452 total** | sum |
+
+**Envelope (D-20-4-11 A, PROPOSED; D02 A ×2 measured / ×3 unmeasured upper; ceilings, not reservations):**
+
+| Crate | HEAD | Forecast | Ceiling with allowance | L1 ceiling | Inherited room | Operator ruling needed |
+|---|---:|---:|---:|---:|---:|---|
+| maos-kernel-core (physical / tokei) | 26841 / 21042 | +13 / +9 | **26867 / 21060** | — (L2) | 0 | **yes — FLAG-Winston** |
+| maos-providers | 1425 | +169 meas, +10…+45 | **1898** (pin 2000 kept) | 1898 | 575 numeric | yes (aggregate) |
+| maos-bin | 33498 | +145 meas, +24…+54 | **33950** | 33950 | 0 | yes |
+| maos-domain | 10099 | +8 meas | **10115** | 10115 | 0 | yes |
+| maos-manifest | 4604 | 0…+2 | **4610** | 4610 | 0 | yes |
+| xtask | 44406 | +5…+20 | **44466** | 44466 | 0 | yes |
+| aggregate | 191826 | +331…+452 | **192851** (+662 + 363); hardfail = measured + 1 | 192833 | 1 | yes |
+
+maos-bin interaction: 20-1b's Part-B maos-bin ceiling was computed from 33195 (S:297, 20-1a frontmatter); every
+story re-measures against the exact landed pins of the one before it. Pins land exact after `cargo fmt --all`; a lower
+measurement lowers the pin.
+
+**Operator-ruling list (every draw above the inherited room; PROPOSED):** (1) FLAG-Winston kernel row R (D-20-4-06 +
+D-20-4-07; R′/Rmin/none priced); (2) maos-providers ≤ 1898; (3) maos-bin ≤ 33950; (4) maos-domain ≤ 10115;
+(5) maos-manifest ≤ 4610; (6) xtask ≤ 44466; (7) aggregate ≤ 192851, hardfail measured + 1; (8) D06 and
+D-20-4-01…11. Each figure lands exact, with a HISTORY row citing this key with `->` (D11 A).
+
+## Decisions — RULED 2026-11-02 (ask s204)
+
+**Rulings 2026-11-02 (ask s204):** The operator ruled D06 D and every D-20-4-01…11 row exactly as recommended. 20-4 creates `MAOS_DEFAULT_PROVIDER`; the existing lane retains the three `MAOS_*_MODEL` overrides. Kernel row R and the ceilings are granted as recorded in frontmatter.
+
+| ID | Question | Options | Recommendation and evidence | Status |
+|---|---|---|---|---|
+| **D06** (preflight) | Who creates `MAOS_DEFAULT_PROVIDER` (AC1's selector) | **A** author `provider-model-env-overrides` (S:224) first, then 20-4 · **B** 20-4 absorbs the whole four-variable charter (`tracker-notes-archive-2026-09-04.md:713-715`) and the lane row retires by explicit migration · **C** hard-coded/global default only · **D** *(added at creation)* 20-4 creates `MAOS_DEFAULT_PROVIDER` only (prototype `sel`, inside maos-bin +51); the lane keeps the three `MAOS_*_MODEL` overrides, its note re-scoped | **D.** The selector is the only part of that charter AC1 needs and it sits in the exact builder block this story rewrites (`main.rs:3896-4049`) — A serialises two stories over the same 60 lines with no story file yet for the lane. The model overrides are not a drive-by: an env-supplied model id is a pin the 17-5 gate cannot scan (it reads literals, `check_model_currency.rs:24-26`), which is why the lane carries "currency verified in-story" (OD3); B pulls that design in. C fails the epic's own AC1 command. | RULED 2026-11-02: **D** (ask s204) |
+| **D-20-4-01** | Gemini wire shape | **A** native `generateContent` (`POST {endpoint}/v1beta/models/{model}:generateContent`), key in `x-goog-api-key`, through `http_post_exchange` (status as data) — prototype `g1`, +142 · **B** Gemini's OpenAI-compatible endpoint through the OpenAI driver with a path parameter · **C** native through `http_post` (non-2xx flattened to `Transport`, like the siblings) | **A.** The epic names a hand-rolled native driver (E20:207); `generateContent` is the documented REST method (`https://ai.google.dev/api/generate-content`, read 2026-11-02). Status as data lets a Gemini 429 reach the kernel's existing `RateLimited` mapping (`inference/mod.rs:338-354`), which C cannot. B couples Gemini to a compatibility layer and still needs a path change in `openai.rs:81`. The key never goes in the URL: the URL is echoed in transport errors (`io/mod.rs:106,125`) and journaled (`:117-118`) — the vendor's own curl sample uses `?key=` (AC1.4 plants exactly that). | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-02** | Kimi driver | **A** `OpenAiProvider::compatible(provider_id, secret_key, …)`; Kimi = id `kimi`, `KimiApiKey`, `https://api.moonshot.ai` — prototype `k1`, +26 · **B** a separate `kimi.rs` (copy of `openai.rs`, ≈ +120 [INFERENCE]) · **C** Kimi's Anthropic-compatible endpoint (`/anthropic/v1/messages`) through a generalised `AnthropicProvider` | **A.** Kimi documents OpenAI Chat Completions compatibility at base `https://api.moonshot.ai/v1` (`https://platform.kimi.ai/docs/api/overview.md`); the driver's URL shape already matches (`openai.rs:81`), only attribution (`:160`) and key (`:38`) are fixed. B duplicates 200 lines that drift; C is a second compatibility layer with no advantage. | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-03** | Default model pins (policy, Winston) | **A** `gemini-3.5-flash-lite` + `kimi-k2.6` (the cost tier, matching the `claude-haiku-4-5-20251001`/`gpt-4o-mini` defaults) · **B** `gemini-3.8-flash` + `kimi-k3.1-pro` (capability tier) · **C** the operator names them at T0 | **A, re-verified on the vendor pages at T0.** Google lists `gemini-3.5-flash-lite` as Stable and recommends 3.5 Flash-Lite or 3.8 Flash for new projects (`https://ai.google.dev/gemini-api/docs/models`, read 2026-11-02); Kimi's K2.6 quickstart uses `kimi-k2.6` (`https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart.md`). Either way every chosen id enters `xtask/model-currency.toml` `allowed` and the price book before it appears in `main.rs` (AC4). | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-04** | Per-Spirit provider selection (R:47) | **A** the Spirit manifest's `[providers]` (existing Story 5.5b schema): read at admission; `primary.id` must be declared in `provider.complete` and registered, and becomes the Spirit's bound provider at every binding site; `endpoint_url`/`model_id` are assertions (must equal the registered driver's); a non-empty `fallback` is refused typed; `admit_spirit` receives the section (kernel `ProviderSwitched` journal, no kernel line) · **B** an operator per-Spirit table in `~/.maos/config.toml` (`[spirits.<name>] provider = …`), manifests untouched · **C** A + B (author declares and pins, operator re-selects among declared providers) · **D** per-Spirit driver instances honouring a manifest `endpoint_url`/`model_id` (a router per Spirit) | **A.** Lands the schema the epic's AC2 already binds the pin to, with no new config surface; the kernel journal for a provider switch exists and is unfed (`security/mod.rs:417-448`). `fallback` is refused rather than silently unused: the kernel refuses any fallback id the token does not name (`inference/mod.rs:291-293`). Boundary, stated: an operator cannot re-select the provider of a signed third-party Spirit without editing its manifest (breaking its signature) — that is C's reason to exist, at ≈ 2× cost and a config schema; D needs per-Spirit routers through `port_builder` (`main.rs:4089-4114`) and the shell path. | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-05** | Where the endpoint pin is enforced (epic AC2) | **A** admission (maos-bin): `check_provider_pins` before `admit_spirit` at every production admission site, against the per-id configured-endpoint table (every `PROVIDER_IDS` id, key or not; captured before replay/record wrapping); `sha256` of the exact base-URL bytes; typed `endpoint_pin_mismatch`; prototype `pin`, +77 with AC5.1 · **B** per request, a pinned wrapper around each Spirit's port in `port_builder` · **C** A + B | **A.** Endpoints are fixed once per boot (literals; `MAOS_OLLAMA_URL` read once, `main.rs:3940`), so admission sees the only value a call can use and refuses before a token exists. B misses the shell path (it uses the shared adapter, `main.rs:4073-4085`, not `port_builder`) and re-checks an immutable value per call; C pays both. Never in `inference/mod.rs` (E20:208). | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-06** | Kernel provider-id set (FLAG-Winston) | **A** KA: two arms (+2 / +2) · **B** KB: the set moves to `maos_providers::intern_provider_id` (kernel −4 / −4, providers +3) · **C** no kernel: Gemini/Kimi in explicit replay only; live/record/deterministic refused `Unconfigured` | **A.** Smallest change that makes FR3 live true; the fail-closed list stays under kernel review (the Story 6.4 review fix, `inference/mod.rs:86-90`). B shrinks the kernel but moves a fail-closed security list to a crate no FLAG reviews — the next provider would widen it unreviewed. C leaves `ops-live-gemini-leg` unrunnable (record mode installs the limiter, C21). | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-07** | D:1297 / D:1298 (kernel IO, owned here) | **A** KIO1 + KIO2 in the kernel (+11 / +7) **and** a provider-side credential byte check (0x21–0x7E) at construction for the four keyed drivers · **B** provider-side check only for D:1297 (the kernel echo stays reachable by any future header-carrying caller, labelled) + KIO2 · **C** re-route both (rule 10) and keep the kernel to KA | **A.** The kernel adapter is the one choke point every header-carrying caller crosses (providers, MCP); 18-8 closed only MCP's half (`streamable_http.rs:85`). The provider-side check gives a typed refusal before any request — the 18-8 precedent. C re-routes rows the ledger already assigned here with the same FLAG review (D:1297-1298). | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-08** | Landing shape | **A** one key, two landings: L1 kernel-free (AC1–AC6, AC9 partial) · L2 kernel last (AC7, AC8, AC9 close); `done` after L2 · **B** one landing · **C** split keys `20-4a`/`20-4b` | **A.** The creation contract puts kernel last; L1 alone makes every replay line and the pin true, L2 makes live true. C adds keys (and the doc-gate churn 20-7 recorded on a rename) for a +13-line kernel row. Interim state, stated: between L1 and L2 a box whose only key is Gemini or Kimi defaults to it and its live/record/deterministic calls fail closed `Unconfigured` (typed, never silent); no release tag between the landings (20-5 runs last, PF:124). | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-09** | Kimi live proof (PF:123 "live Kimi proof unmeasured") | **A** widen `ops-live-gemini-leg`'s note to record a Kimi cassette too (key unchanged) · **B** a new `ops-live-kimi-leg` row · **C** fixture-only, labelled | **A.** Same operator, same mode, same leg shape; renaming or adding keys touches the doc gates (20-7 incident, `20-7-…md:374`). C leaves FR3's Kimi claim fixture-only forever. | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-10** | FR38 runtime provider-endpoint drift check is vacuous (found at creation, C23) | **A** fix here: the two production registry admission callers (`maos-registry/src/install.rs:50-59`, `maos-cli/src/subcommands.rs:1402-1410`, both in `maosctl`, where no provider is built) receive `runtime_provider_endpoint` from a provider-endpoint table shared through maos-providers · **B** route to `20-13-pluggable-crypto-provider-selection`, which owns the twin `runtime_crypto_provider` default (`maos-registry/src/admission.rs:138-145`) and names the runtime context (E20:312) · **C** ownerless, labelled | **B.** Rule 10(b): 20-13 already touches the same struct and the runtime context; this story does not touch registry admission, and A needs the daemon's endpoint table outside the daemon. Filed as a `deferred-work.md` row with PROPOSED owner 20-13 (records-owed X4); a different ruling re-points it. | RULED 2026-11-02: **B** (ask s204) |
+| **D-20-4-11** | Per-crate envelope (D02 A applied) | **A** the envelope above (×3 unmeasured / ×2 measured) · **B** exact measured grants only, every review correction re-asks · **C** allowance ×1.3 (rule 6) | **A.** 20-3b and 20-3c landed at 2–3× creation forecasts; 20-7 L1 review corrections added +387 xtask inside its ceiling (`xtask/kloc.toml:339` history). | RULED 2026-11-02: **A** (ask s204) |
+
+## Acceptance Criteria
+
+*(Epic §20-4 as amended 2026-10-30; clauses marked (D-…) carry the PROPOSED recommendation and are rewritten by a
+different ruling. Every AC names a failing-before witness and a plant. **local** = hermetic on the dev host;
+**hosted** = the discipline run.)*
+
+### L1 — kernel-free
+
+#### AC1 — Gemini answers: the driver round-trips and the shell selects it (epic AC1; D-20-4-01 A) — the command
+
+1. `crates/maos-providers/src/gemini.rs` (`GeminiProvider::{new, with_api_key}`, prototype `g1`): `POST {endpoint}/v1beta/models/{model}:generateContent` with `x-goog-api-key` and `content-type: application/json`; body `contents: [{role: "user", parts: [{text}]}]`, `generationConfig: {maxOutputTokens, temperature?}`; `options.model_id` overrides the configured model (as `anthropic.rs:79`); sent through `http_post_exchange` so a non-2xx is `ProviderError::ProviderRejected { status, body }`; the response text is every `candidates[0].content.parts[*].text` concatenated; `finishReason` `STOP` → `StopSequence`, `MAX_TOKENS` → `MaxTokens`, any other → `ProviderStop(<value>)`; usage from `usageMetadata.promptTokenCount` / `candidatesTokenCount`; attribution `gemini`; `credential_fingerprint` overridden. No vendor SDK (FR47). The key never appears in a URL.
+2. **Witness (local):** `cargo test -p maos-providers --test gemini_round_trip_test` (new) over a *recording* `MockTransport` (captures URL, headers, body; returns a fixture status + body) and fixtures `crates/maos-providers/tests/fixtures/gemini_{success,max_tokens,multi_part,safety,error_429}_response.json`: asserts path and model, the header, that the key is absent from the URL and body, every parsed field, and `429` → `ProviderRejected { status: 429, .. }`.
+3. **Failing-before (local):** the test target and `gemini.rs` do not exist at `a8af3215` (C3).
+4. **Plant (local, one):** send the key as a `?key=` query parameter (the vendor's documented curl form) ⇒ the no-key-in-URL assertion reds.
+5. **The command (local; after AC3):** `printf '@hello-spirit hello\n' | MAOS_DEFAULT_PROVIDER=gemini MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=crates/maos-journey-test/cassettes/providers/gemini-shell-intro.json maos shell` exits 0, prints the cassette reply, and the Transparency Log carries `infer:gemini->replay:…` for hello-spirit's turn under a `ProviderInfer { provider: "gemini" }` token. The seed cassette (`provenance: "seed"`, attribution `provider_id: "replay"`, as `cassettes/j0/shell-intro.json`) is new; `ops-live-gemini-leg` replaces it with `live-record`. Measured at HEAD: **rc 1** (cassette absent) and, with the J0 cassette, `infer:anthropic->replay:default` (`creation/runtime/selector-probe-a8af3215.txt` S1, S2). Witness: `crates/maos-bin/tests/provider_selection_20_4.rs` runs the built binary in an isolated home and reads the TL row. **This line proves selection, routing and the minted scope; it never exercises the Gemini wire (C16) — AC1.2 does.**
+
+#### AC2 — Kimi through the OpenAI-compatible driver (R:47; D-20-4-02 A)
+
+1. `OpenAiProvider::compatible(provider_id, secret_key, transport, endpoint, model, store)` (prototype `k1`); `OpenAiProvider::new` delegates with `("openai", SecretKey::OpenAiApiKey)`; attribution names `provider_id`. Kimi = `compatible("kimi", SecretKey::KimiApiKey, …, "https://api.moonshot.ai", <D-20-4-03 model>)`.
+2. **Witness (local):** `cargo test -p maos-providers --test kimi_round_trip_test` (new; recording transport; `tests/fixtures/kimi_{success,max_tokens}_response.json`): URL `https://api.moonshot.ai/v1/chat/completions`, `Authorization: Bearer <key>`, attribution `kimi`. `openai_round_trip_test` unchanged and green. The replay line of AC1.5 with `MAOS_DEFAULT_PROVIDER=kimi` and `cassettes/providers/kimi-shell-intro.json` gives `infer:kimi->…` (same witness file).
+3. **Failing-before (local):** attribution is the literal `"openai"` (`openai.rs:160`) and no Kimi key exists (`secret_store.rs:10-15`).
+4. **Plant (local):** restore the `"openai"` literal in `parse_openai_response` ⇒ the Kimi attribution assertion reds.
+
+#### AC3 — credentials, registration and the named default (D06 per ruling; D-20-4-07 A provider half)
+
+1. `SecretKey::{GeminiApiKey, KimiApiKey}` → `gemini-api-key`/`MAOS_GEMINI_API_KEY`, `kimi-api-key`/`MAOS_KIMI_API_KEY`; `ALL` 10 → 12 (keyring migration `main.rs:3827-3858` and purge `purge.rs:333-340` follow `ALL`); purge labels; `env_contract.rs` UserFacing rows (`check-env-contract` green). Prototype `sec`.
+2. The builder registers Gemini (`https://generativelanguage.googleapis.com`) and Kimi (`https://api.moonshot.ai`) after OpenAI and before Ollama, so the default of every box without the new keys is unchanged; replay answers every id in `maos_providers::PROVIDER_IDS` (`main.rs:4020-4024`). Prototype `sel`.
+3. (D06 D/B) `MAOS_DEFAULT_PROVIDER=<id>` names the router default; empty = unset; an id that is not registered refuses the boot with a message naming the registered ids (never a silent fallback). Under D06 A this clause is the lane's and AC1.5 waits for it.
+4. (D-20-4-07 A) Each keyed driver (anthropic, openai, gemini, kimi) refuses at construction a credential with any byte outside 0x21–0x7E, with a message naming the key, never its value; the root refuses the boot (exit 78, `main.rs:3914-3917` pattern). No new `ProviderError` variant: the kernel matches it exhaustively (`inference/mod.rs:357-365`) — adding one is a kernel line outside the ruled row (STOP).
+5. **Failing-before (local):** measured S2 (selector ignored); `MAOS_GEMINI_API_KEY` registers nothing (no `SecretKey`). Witnesses in `provider_selection_20_4.rs`: selector honoured; unknown id (`bedrock`) refused naming the registered ids; a `MAOS_GEMINI_API_KEY` carrying `\u{1}` refuses the boot and the stderr does not contain the key.
+6. **Plant (local):** ignore `MAOS_DEFAULT_PROVIDER` ⇒ the `infer:gemini->` assertion reds.
+
+#### AC4 — new model pins are governed (epic AC3, corrected to the closed 17-5 gate; D-20-4-03)
+
+1. `xtask/model-currency.toml` gains `[providers.gemini]` and `[providers.kimi]` (`allowed` per D-20-4-03, vendor pages cited and dated in its header, policy owner Winston `:7-9`); the `main.rs` defaults and the hello-spirit declarations `gemini.<id>`, `kimi.<id>` (`spirits/hello-spirit/manifest.toml:14`; the shell mints the router default and issuance refuses an undeclared provider, L5) are allowed pins.
+2. `xtask/src/check_model_currency.rs` scans `GeminiProvider::{new, with_api_key}` (model = third argument) and `OpenAiProvider::compatible` (model = fifth argument) and requires all five hosts (`:239-295`); module doc `:18-26` updated.
+3. `xtask/provider-pricing.toml` gains a row per default model from the vendors' pricing pages (`cost-reconcile` matches `(provider, model)` exactly, header `:1-7`).
+4. **Failing-before (measured):** with Gemini and Kimi constructors naming ids absent from the data file the gate passes — rc 0, 16 pins, identical to HEAD (`creation/measurements.md` §Gate blindness). Witness vectors in `xtask/tests/model_currency_gate.rs`: an unknown `gemini` id in a `main.rs` fixture reds; a retired `kimi` id reds; a fixture without a Kimi constructor reds.
+5. **Plant (local):** drop `Gemini` from the constructor regex ⇒ the Gemini vector reds.
+
+#### AC5 — a Spirit's own provider choice is honoured (R:47; D-20-4-04 A)
+
+1. `gate_manifest` (`admission.rs:590-723`) reads `[providers]` into `GatedManifest.providers` (prototype `pin`); every `primary`/`fallback` id must be declared in `provider.complete` (else typed `provider_unavailable`); a non-empty `fallback` is refused typed (`fallback_unsupported`: the kernel refuses fallback ids the token does not name, `inference/mod.rs:291-293`).
+2. `crates/maos-manifest/src/manifest.rs:2413` allows `gemini` and `kimi`; the two tests asserting `kimi` unsupported (`:4325-4337` and the fallback case after it) re-target an id that stays unsupported (`bedrock`).
+3. The Spirit's bound provider is `[providers].primary.id` when present (it must be a router id at boot — explicit replay answers every `PROVIDER_IDS` id, `main.rs:4020-4024` — else `provider_unavailable` at admission), otherwise today's rule — at every binding site: shell (`main.rs:4374`), Butler (`first_declared_provider`, `:890-892`), Researcher (`spirits/researcher/src/lib.rs:487`), Orchestrator (`orchestrator_root.rs:221-237`).
+4. `admit_spirit` receives `gated.providers.as_ref()` (`admission.rs:917`), feeding the kernel's existing `ProviderSwitched` journal (`security/mod.rs:417-448`) — no kernel line.
+5. **Failing-before (local):** a Researcher manifest declaring `anthropic` and `openai` with `[providers] primary.id = "openai"` binds `anthropic` at HEAD (section ignored, C14). Witness in `provider_selection_20_4.rs` (replay registers every id; the TL intent names the bound provider).
+6. **Plant (local):** the binding ignores `primary` ⇒ the openai-binding vector reds.
+
+#### AC6 — the endpoint pin refuses (epic AC2; D-20-4-05 A) ◆ control (rule 11)
+
+1. Every production admission path runs `check_provider_pins` before `admit_spirit` mints anything. The endpoint table holds, for every id in `maos_providers::PROVIDER_IDS`, the endpoint this boot is configured with (the literal, or `MAOS_OLLAMA_URL`) whether or not its credential is present — so the check means the same in live, record and keyless replay, and is captured before replay/record wrapping (prototype `pin` recorded only registered drivers; the dev widens it). Each `[providers]` entry's id must be in that table, `hex(sha256(<endpoint bytes>)) == provider_endpoint_pin` — the exact base URL the driver was built with, no normalisation (`printf %s <url> | sha256sum`) — and `endpoint_url`, when given, equals it; otherwise the typed refusal `endpoint_pin_mismatch` and the admission rolls back.
+2. T0 classifies every `admit_spirit` caller (`admission.rs:903`; `main.rs:4461` shell; `:8238,9560,11734,14861`) as production or smoke/test; each production site checks or names in the record why it cannot carry `[providers]`.
+3. Air-gap vector: a Spirit declaring `ollama` and pinned to `sha256("http://127.0.0.1:11434")` is admitted with `MAOS_OLLAMA_URL=http://127.0.0.1:11434` and refused with `MAOS_OLLAMA_URL=http://10.0.0.5:11434`.
+4. **Failing-before (local):** at HEAD a manifest carrying a wrong 64-hex pin is admitted (C14). Witness `crates/maos-bin/tests/provider_endpoint_pin_20_4.rs` (door/run admission of a temp manifest; replay mode; no network).
+5. **Plant (local, one):** skip the hash comparison ⇒ the wrong-pin vector admits ⇒ red.
+6. Security reading at review: no path admits a `[providers]`-bearing Spirit without the check; the pin locks configuration, not network identity (TLS/DNS trust stays with ureq/webpki) — the operator doc says so. The refusal's contract is its code, not an FR63 catalog row (no gate reads that file, C8).
+
+### L2 — kernel last
+
+#### AC7 — Gemini and Kimi pass the rate-limit id set (D-20-4-06 A) ◆ FLAG-Winston
+
+1. `bucket_key` (`inference/mod.rs:96-101`) interns `gemini` and `kimi` (`ka-intern-gemini-kimi.diff`); any other id still `Unconfigured` (fail-closed kept). Quotas default to 1000 rpm (`rate_limit.rs:314-319`) unless explicit `gemini`/`kimi` defaults are added in maos-providers.
+2. **Failing-before (local):** `crates/maos-kernel-core/tests/inference_provider_ids_20_4.rs` (the `inference_fallback_authz_18_1.rs` harness shape): adapter with a rate limiter, a router holding `gemini` and a `ProviderInfer { provider: "gemini" }` token ⇒ `Err(Unconfigured)` at `a8af3215`; after: `Ok`, bucket key `gemini`; `bedrock` stays `Unconfigured`; every id in `maos_providers::PROVIDER_IDS` passes `bucket_key` (the two lists cannot drift).
+3. **Plant (local):** drop the `gemini` arm ⇒ red.
+
+#### AC8 — the kernel IO adapter never echoes a credential and never loses a status (D:1297, D:1298; D-20-4-07 A) ◆ FLAG-Winston
+
+1. KIO1 (`kio1-badheader-redaction.diff`): a `BadHeader` transport error becomes `ureq POST <url>: invalid request header (value withheld)`. **Failing-before (local):** a kernel-core test sends a header value `sk-secret\u{1}tail` through `IoSubsystemAdapter::http_post_exchange` (to a loopback listener unless ureq validates before connecting, measurement 2) ⇒ at HEAD the error contains `sk-secret`; after, it does not.
+2. KIO2 (`kio2-non2xx-truncate-keep-status.diff`): a non-2xx body over 10 MiB is cut at the cap and keeps its status; a 2xx over the cap is still `Decode`. **Failing-before (local):** a loopback listener answering `401` with 10 MiB + 1 bytes ⇒ HEAD `Err(IoError::Decode)`; after `Ok(HttpExchange { status: 401, body.len() == 10 MiB })`.
+3. **Plants (local, two, named — each row has no other falsifier):** revert KIO1 ⇒ AC8.1 red; revert KIO2 ⇒ AC8.2 red.
+
+#### AC9 — records
+
+1. `tests/coverage-matrix.yaml:566-570` FR3 names AC1/AC2/AC5/AC6 witnesses; `docs/maos.dev/run-maos.md:75` names the new keys, `MAOS_DEFAULT_PROVIDER`, `[providers]` and the pin's hash definition and boundary.
+2. At `done`: D:1297, D:1298 `CLOSED <date> by 20-4 @<commit>` with witness; `check-dev-record-completeness` passes; `ops-live-gemini-leg` note says L2 landed (it can record); epic corrections via `creation/records-owed.md` §A.
+
+## Tasks / Subtasks
+
+- [ ] **T0 — Preflight.** Operator rulings on D06 and D-20-4-01…11 recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" 1–7 (item 6 classifies the admission sites; item 7 the vendor ids/prices). Re-measure every cite this story touches (rule 9). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
+- [ ] **T1 — Gemini driver (AC1.1–1.4).** `gemini.rs`, recording transport, five fixtures, round-trip test, plant.
+- [ ] **T2 — Kimi (AC2).** `compatible`, fixtures, test, plant.
+- [ ] **T3 — Keys, registration, default, credential check (AC3, AC1.5).** `SecretKey`, env rows, purge labels, builder, replay ids, selector, hello-spirit declarations, the two seed cassettes, `provider_selection_20_4.rs`, plant.
+- [ ] **T4 — Currency (AC4).** Data, price rows, scan extension, vectors, plant.
+- [ ] **T5 — Per-Spirit selection (AC5).** `[providers]` read, declared check, fallback refusal, binding sites, `admit_spirit` argument, manifest ids/tests, witness, plant.
+- [ ] **T6 — Endpoint pin (AC6).** Endpoint table, `check_provider_pins` at each production site, refusal codes, air-gap vector, witness, plant, operator doc.
+- [ ] **T7 — L1 landing (D-20-4-08 A).** Exact pins inside the ruled envelope; `check-env-contract`, `check-model-currency`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree + plants. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
+- [ ] **T8 — Kernel id set (AC7)** under the ruled row: red-before test, KA, plant.
+- [ ] **T9 — Kernel IO (AC8)** under the ruled row: two red-before tests, KIO1, KIO2, two plants.
+- [ ] **T10 — L2 landing + records (AC9).** Both kernel pins + content hashes `inference/mod.rs`, `io/mod.rs` (re-base on 20-1b if it landed first); FLAG-Winston decision record (precedent `20-7-flag-winston-decision.md`); `cargo test -p maos-kernel-core --lib`; hosted run; ledger closures; coverage; docs.
+
+## Dev Notes
+
+### What changes, by file
+
+| Area | Files | AC |
+|---|---|---|
+| Providers | NEW `crates/maos-providers/src/gemini.rs`; `src/openai.rs:18-165` (`compatible`, attribution); `src/lib.rs:8-28` (module, exports, `PROVIDER_IDS`); `src/anthropic.rs:25-51`, `src/openai.rs:26-52` (credential byte check); optional `src/rate_limit.rs:275-293`; NEW `tests/{gemini,kimi}_round_trip_test.rs`, `tests/fixtures/{gemini,kimi}_*.json` | AC1–AC3 |
+| Domain | `crates/maos-domain/src/ports/secret_store.rs:10-78` | AC3 |
+| Bin | `crates/maos-bin/src/main.rs:3896-4049` (registration, replay ids, selector, endpoint table), `:4374` (shell binding), `:890-904` (Butler), the four `AdmissionDeps` sites `:4334,5817,6701,10254`; `src/admission.rs:234-394` (refusals), `:440-465` (`GatedManifest`), `:590-723` (`gate_manifest`), `:778-790` (`AdmissionDeps`), `:903-919` (check + `providers` argument); `src/orchestrator_root.rs:221-237`; `src/env_contract.rs:84-93`; `src/purge.rs:333-340`; NEW `tests/provider_selection_20_4.rs`, `tests/provider_endpoint_pin_20_4.rs` | AC1, AC3, AC5, AC6 |
+| Researcher (uncharged) | `spirits/researcher/src/lib.rs:487` | AC5 |
+| Manifest | `crates/maos-manifest/src/manifest.rs:2413`, tests `:4325-4398` | AC5 |
+| Kernel ◆ (L2) | `crates/maos-kernel-core/src/inference/mod.rs:96-101`; `src/io/mod.rs:65-78,86-136`; NEW `tests/inference_provider_ids_20_4.rs`, `tests/io_redaction_and_status_20_4.rs`; pins `xtask/kernel-core-baseline.toml:505` + EOF HISTORY, `xtask/kloc.toml:264` | AC7, AC8 |
+| xtask / data | `xtask/src/check_model_currency.rs:18-26,239-295`; `xtask/model-currency.toml`; `xtask/provider-pricing.toml`; `xtask/tests/model_currency_gate.rs`; `xtask/kloc.toml` rows | AC4 |
+| Manifests / cassettes | `spirits/hello-spirit/manifest.toml:14`; NEW `crates/maos-journey-test/cassettes/providers/{gemini,kimi}-shell-intro.json` | AC1, AC2, AC4 |
+| Docs / records | `docs/maos.dev/run-maos.md:65-103`; `tests/coverage-matrix.yaml:566-570`; `deferred-work.md:1297-1298` | AC9 |
+
+### Overlap (serialize; re-measure)
+
+- **`maos-bin` `main.rs` builder and `admission.rs`** — 20-1b (yank policy in `TlYankObserver`, `main.rs:276-347`; admission identity), 20-8 (manifest fields at `manifest.rs:228-237,2423-2454` — the same `[providers]` region, E20:258), 20-13 (crypto selection at the same composition root). One integration owner per file per landing.
+- **Kernel pins** — 20-1b's row (re-base rule above); 20-8/9/13/14 forecast kernel touches.
+- **`provider-error-surfacing`** (S:225) owns real status for the existing drivers; AC1 gives Gemini real status without touching the others.
+- **`provider-model-env-overrides`** (S:224) — D06.
+
+### Current state that must be preserved
+
+- Default provider of every existing box (registration order; Gemini/Kimi register only with their keys).
+- 15-6 inference-mode lattice: explicit replay contacts no provider and answers every interned id (`main.rs:3998-4025`); a present-but-empty cassette stays present (`:3979-3982`).
+- Fail-closed rate limiting for unknown ids (`inference/mod.rs:86-101`); capability check per call (`:250-272`); the fallback-id refusal (`:291-293`).
+- 17-11: hello-spirit declares every provider the router can default to (`spirits/hello-spirit/manifest.toml:12-14`).
+- 17-5: every model literal the gate scans stays scanned; `findings.is_empty()` never passes a gate that scanned nothing (`check_model_currency.rs:33-39`).
+- 16-4: purge removes every MAOS credential via `SecretKey::ALL` (`purge.rs:333-340`); the keyring migration covers `ALL` (`main.rs:3827-3858`).
+
+### Guardrails
+
+- No kernel line without the ruled FLAG-Winston row; any `crates/maos-kernel-core/src` change outside AC7/AC8's shapes is STOP — including a new `ProviderError` variant (exhaustive kernel match `inference/mod.rs:357-365`).
+- No vendor SDK (FR47 denylist); no network in any test (loopback listeners only); no paid key, no live call outside the operator leg.
+- A credential never reaches a URL, an error string, a log line or the Transparency Log (`ProviderAttribution.endpoint_url` is journaled and enters cost frames, `inference/mod.rs:437-461`).
+- Seed cassettes say `provenance: "seed"` and attribute `replay`; nothing in the tree claims a Gemini/Kimi live round trip until the operator leg records one.
+- One cargo process per checkout; `env -u CI -u GITHUB_ACTIONS`; inherit the target directory, never override or clean it; plants byte-restored in the real tree (`proof-contract.md:24-31`). A manifest change widens the focused set (`proof-contract.md:48-53`): every reader of `spirits/hello-spirit/manifest.toml`, `gate_manifest`, `from_toml_str`, plus `spirit_boundary_invariants` and `check-corpus`.
+
+### Proven-red controls (rule 11; proof contract)
+
+| Control | Plant | Expected red | Leg |
+|---|---|---|---|
+| Key placement (AC1) | `?key=` in the URL | no-key-in-URL assertion | local |
+| Kimi attribution (AC2) | `"openai"` literal restored | Kimi attribution assertion | local |
+| Default selector (AC3) | env ignored | `infer:gemini->` assertion | local |
+| Currency scan (AC4) | `Gemini` dropped from the regex | Gemini vector | local |
+| Per-Spirit binding (AC5) | `primary` ignored | openai-binding vector | local |
+| Endpoint pin (AC6) | hash comparison skipped | wrong-pin vector admits | local |
+| Kernel id set (AC7) | `gemini` arm dropped | `Unconfigured` | local |
+| Header redaction (AC8.1) | KIO1 reverted | secret in error | local |
+| Status kept (AC8.2) | KIO2 reverted | `Decode` | local |
+
+### Tests and commands
+
+```bash
+# local; one cargo process per checkout; inherit the target directory
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-providers -p maos-domain -p maos-manifest -p xtask
+env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-providers --test gemini_round_trip_test --test kimi_round_trip_test
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test provider_selection_20_4 --test provider_endpoint_pin_20_4
+env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-kernel-core --test inference_provider_ids_20_4 --test io_redaction_and_status_20_4   # L2
+env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --lib                                                                     # L2
+env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --test spirit_boundary_invariants                                         # manifest change
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- check-model-currency
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- check-env-contract
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- check-corpus
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- check-kernel-baseline
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- kloc-check --json
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- check-dev-record-completeness
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- check-epic-close-coherence
+env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- prepush
+```
+
+### Review plan (`proof-contract.md:33-71`)
+
+DIFFICULT: Blind + Edge (opus-5.5), Acceptance (opus-5.5), Security reading on AC1.1/AC1.4 (key placement), AC3.4,
+AC6 (the pin's coverage and boundary) and AC8 (credential echo), Test Infrastructure (glm-5.3). Focused suites per
+touched crate + the manifest-reader widening + `cargo test -p maos-kernel-core --lib` at L2; the reviewer reads the
+plant record, never re-runs plants except for a disputed finding.
+
+### Previous-story intelligence (20-1a, 20-7, 18-8, 18-1, 17-11, 17-5, 15-6)
+
+- 20-1a: landed installed-Spirit dispatch and boot re-verification through `admission.rs`/`main.rs` (`850e4c00`, `8143326b`, `47631284`); its hosted run found faults local runs did not — run the hosted discipline once on the final tree before calling L1 done.
+- 20-7: kernel landed at exactly the prototype's figure (26841 / 21042); the re-base rule with 20-1b is binding; a key rename broke two doc gates prepush does not run (`20-7-…md:374`) — this story renames no key.
+- 18-8: closed D:1297's MCP half by refusing non-visible-ASCII bearers before the port (`maos-mcp/src/transport/mod.rs:60-63`, `streamable_http.rs:85`) — AC3.4's precedent; it named this key for the kernel half.
+- 18-1: replay answers every interned id so a Spirit's own declared provider works keyless (`main.rs:4016-4024`) — extend, do not fork, that list.
+- 17-11: adding `openai` to a manifest widened the focused set and the landing run found two reds the focused set missed (`proof-contract.md:48-53`).
+- 17-5: the currency gate fails closed on a missing host constructor (`check_model_currency.rs:287-293`) — extend the host list, never relax it.
+- 15-6: `MAOS_INFERENCE_MODE` resolves once after provider eligibility (`main.rs:3965-3991`); a live key marks a provider eligible (`env_contract.rs:84-93` purposes).
+
+### Git intelligence
+
+`a8af3215` (20-7 D-20-7-09/10/11 records), `47631284` (20-1a hosted-found fixes; aggregate 191826), `0836ff40`,
+`03ee4a4e`, `8143326b` (20-1a review corrections). No commit since `1fd4de31` touched `crates/maos-providers`,
+`inference/mod.rs` or `io/mod.rs`; `main.rs` is unchanged since `8143326b`.
+
+### Library / framework (read 2026-11-02)
+
+No new crate. Gemini REST: `POST https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent`,
+request `contents[]`/`generationConfig`, response `candidates[].content.parts[].text`, `finishReason`
+(`STOP`, `MAX_TOKENS`, `SAFETY`, …), `usageMetadata.promptTokenCount`/`candidatesTokenCount`
+(`https://ai.google.dev/api/generate-content`); key header `x-goog-api-key`; current stable ids
+(`https://ai.google.dev/gemini-api/docs/models`). Kimi: base `https://api.moonshot.ai/v1`, `POST /chat/completions`,
+`Authorization: Bearer`, keys bound to their platform (`https://platform.kimi.ai/docs/api/overview.md`); ids via
+`GET /v1/models` (`https://platform.kimi.ai/docs/api/list-models.md`). `ureq` 2.12.1 (locked), `sha2`/`hex`
+already maos-bin dependencies (`crates/maos-bin/Cargo.toml:100-101`).
+
+### References
+
+E20@HEAD:7,49,55,59-61,77,201-209,380; preflight `epic-20-preflight-2026-10-30.md:63,79,123,139,227-231,285-286,290,295`;
+tracker `sprint-status.yaml:224-225,302,342,344`; `deferred-work.md:1297-1298`; `routing-audit-2026-10-22.md:47`;
+PRD `functional-requirements.md:26`; `tests/coverage-matrix.yaml:566-570`; `docs/runbooks/provisioning-checklist.md:42`;
+ADR-005 (provider drivers), ADR-064 (replay selector), ADR-069 (`:35-46`).
+
+## Dev Agent Record
+
+### Story context creation
+
+Created 2026-11-02 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter measured contract) at `a8af3215`,
+without cargo (parent rule).
+
+**Inputs:** E20 §20-4 at HEAD (amended 2026-10-30, PF §3.4) — stale cites corrected here and owed to E20
+(`creation/records-owed.md` §A); preflight D06 and §2/§3.4 rows; tracker `:224-225,302,342,344`; D:1297-1298; FR3;
+R:47; direct reads of every cited range (`creation/cites-a8af3215.md`); kloc and kernel by the prebuilt gate binary on
+`/tmp/proto204` `git archive` copies (`creation/kloc-kernel-a8af3215-and-prototypes.json`); prototypes KA, KB, KIO1,
+KIO2, R, R′, G1, K1, SEC, SEL, PIN saved as diffs (`git apply --check` clean), `rustfmt`'d, never applied to the tree;
+the AC1 shell line run on the prebuilt binary (`creation/runtime/`); vendor docs read 2026-11-02.
+
+**Measurements owed:** `creation/measurements.md` "Not measured here" 1–7.
+
+**Records owed:** `creation/records-owed.md` (§A epic corrections; §B ledger; §O operator prerequisites; rulings; landing).
+
+**Revert:** no crate source modified (prototypes only under `/tmp/proto204`, deleted); no cargo/test ran;
+`intent-lineage-coverage-report.md` untouched.
+
+**Gates after the record edits** (prebuilt `/mnt/build/cargo-maos/debug/xtask`, `env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=…/xtask`, `--json`, in-tree; `creation/gates/*.json`): `check-dev-record-completeness` rc 0 (197 done stories, 167 deferred-owner assertions, 0 violations); `check-epic-close-coherence` rc 0 (21 epics, pin 26841, 0 violations); `check-decision-register` rc 0 (23 rows, 0 findings); `check-exit-commands` rc 0 (2 blocks, 10 tokens, 0 findings); `check-kernel-baseline` rc 0 (26841 / 95 files, set hash `db39bc4a…`). `kloc-check` in-tree rc 1 — `maos-wasm-host 2420 > 2412`, aggregate 191834: an uncommitted sibling edit to `crates/maos-wasm-host/src/runner.rs`, not this creation (no crate source touched here); the HEAD `git archive` copy measured rc 0, aggregate 191826 (`creation/measurements.md`).
+
+### Agent Model Used
+
+anthropic/claude-opus-5-5 (creation).
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+
+## Change Log
+
+- 2026-11-02: Story created at `a8af3215` (ready-for-dev; D06 open, D-20-4-01…11 PROPOSED). Kernel-Δ 0 disproved: the kernel's provider-id set refuses Gemini/Kimi under the rate limiter and D:1297/D:1298 are kernel rows owned here — R = KA + KIO1 + KIO2 priced +13 / +9 by reverted prototype. Measured: the epic's AC1 line exits 1 and the selector is ignored (`infer:anthropic->replay:default`); the currency gate passes with unscanned Gemini/Kimi pins; `[providers]` and its pin are never read.
+- 2026-11-02: Operator rulings recorded (ask s204): D06 D and D-20-4-01…11 as recommended; kernel R = KA + KIO1 + KIO2 and ceilings per frontmatter. Status remains ready-for-dev.

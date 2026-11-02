@@ -1,0 +1,68 @@
+diff --git a/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs b/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
+--- a/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
++++ b/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
+@@ -130,6 +130,16 @@
+             .unwrap_or(0)
+     }
+ 
++    /// Story 20-11 — drop an uninstalled Spirit's per-process firing state:
++    /// its rate-limit buckets (keyed by Spirit id) and last-fire stamps
++    /// (keyed by pid). Returns the number of entries removed.
++    pub fn forget_spirit(&self, spirit_id: &str, spirit_pid: u32) -> usize {
++        let before = self.rate_limits.len() + self.last_fire_ns.len();
++        self.rate_limits.retain(|(id, _), _| id != spirit_id);
++        self.last_fire_ns.retain(|(pid, _), _| *pid != spirit_pid);
++        before.saturating_sub(self.rate_limits.len() + self.last_fire_ns.len())
++    }
++
+     /// Spawn the watchdog background task.
+     ///
+     /// Polls the SCB map every `poll_interval_ms` (default 1000ms; with
+diff --git a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -529,14 +529,24 @@
+     /// `on_unload` hook. A failing Worker hook leaves that child to
+     /// supervision as the documented residual.
+     pub async fn unload(&self, spirit_pid: u32) -> Result<(), LifecycleError> {
++        self.unload_receipted(spirit_pid).await.map(|_| ())
++    }
++
++    /// Story 20-11 — [`Self::unload`] returning the halt receipts its
++    /// termination wrote, so the uninstall proof counts the pending halts
++    /// this unload ended. Empty when the Spirit was absent or already unloaded.
++    pub async fn unload_receipted(
++        &self,
++        spirit_pid: u32,
++    ) -> Result<Vec<maos_domain::halt::HaltReceipt>, LifecycleError> {
+         let scb = match self.get_scb_optional(spirit_pid) {
+             Some(scb) => scb,
+-            None => return Ok(()),
++            None => return Ok(Vec::new()),
+         };
+ 
+         let current = scb.current_state();
+         if current == ScbLifecycleState::Unloaded {
+-            return Ok(());
++            return Ok(Vec::new());
+         }
+ 
+         scb.transition(
+@@ -559,7 +569,7 @@
+ 
+         // Story 16-6 — UNCONDITIONAL cleanup, ahead of the hook.
+         // Story 5.3 — produce halt-receipts for planned unload (NFR-Rel-11)
+-        let _receipts = terminate_spirit(
++        let receipts = terminate_spirit(
+             &self.tl,
+             &self._halt_registry,
+             spirit_pid,
+@@ -589,7 +599,7 @@
+             return Err(error);
+         }
+ 
+-        Ok(())
++        Ok(receipts)
+     }
+ 
+     /// DRR picker — select next Running Spirit to dispatch.

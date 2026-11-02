@@ -132,3 +132,17 @@ See [routing audit, lines 68–71](routing-audit-2026-10-22.md#L68-L71). The tes
 - Any model overrides used in this session are **session-only**, not a durable change to tracked model policy. The tracked role policy remains [proof contract, lines 55–71](../../docs/testing/proof-contract.md#L55-L71); no tracked policy change is implied by an override.
 - The original session plan is recoverable at the local JSONL path and line above, but that file is not portable with this repository. No repository citation establishes a present host swap/init/sweep state, explicit resolution of the old `_bmad/custom/` commit question, or a fresh current calendar forecast; those remain unknown rather than invented.
 - **2026-10-28 snapshot (history only):** 20-15 and 20-16 landed on main (271e2a33..b35c9284, operator-authorized) and the discipline run 40609213235 @ b35c9284 is green (attempt 1, 191/191 jobs). CI cost per landing run fell from 13.71 to 10.63 job-hours and from 73.8 to 43.3 minutes wall (evidence `_bmad-output/implementation-artifacts/20-15-evidence/ci/run-40609213235/`). The "local, unpushed" and "uncommitted 20-15/20-16 work in progress" statements above describe 2026-10-27 and are superseded by this landing; E19 xtask envelope rebase is recorded in `epics/epic-19-founder-loop-w4.md` (derived arithmetic, confirm at the 19-1 preflight).
+
+## 2026-11-02 four-story ruling addendum
+
+These rows supersede older forecasts/sequence assumptions only for the named stories; the historical snapshot above is unchanged. All four remain `ready-for-dev`, not implemented or closed. Source: each story's §Decisions/frontmatter and [current tracker](../implementation-artifacts/sprint-status.yaml).
+
+| Story | Operator ruling | Planning consequence |
+|---|---|---|
+| [20-2](../implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections.md) | D-20-2-01…14 as recommended, ask s202; D09 A confirmed | Kernel 0; bin 33534, xtask 44860, aggregate 192316 ceilings. Default-build netns/TL witness, no shipped stub air-gap artifact; rendered recipes, signed deb/RPM attachments; publication waits for credentials. |
+| [20-4](../implementation-artifacts/20-4-gemini-driver-and-endpoint-pin.md) | D06 D and D-20-4-01…11 as recommended, ask s204 | 20-4 owns default selector; model overrides stay on their lane. R = KA + KIO1 + KIO2 +13/+9, kernel ceiling 26867/21060; L1 kernel-free, L2 last. Kimi live proof shares the Gemini operator row after L2; FR38 runtime-context drift routed to 20-13. |
+| [20-10](../implementation-artifacts/20-10-purge-residue-removal.md) | D-20-10-01…10 as recommended, ask s2010; -09 B | Kernel 0; bin 34548, aggregate 192876 ceilings. Starts when picked, not after 20-2; binary hint/sentence reserved to 20-2. Ownership is not the report's name prefix; `TerminationUnconfirmed` consumed, never emitted. |
+| [20-11](../implementation-artifacts/20-11-erasure-inventory-closure.md) | D-20-11-01…10 as recommended, ask s2011; -02 B, -03 B, -04 A | KS +10/+6, kernel ceiling 26861/21054; L1 kernel-free, L2 last. Large-log EC-13 is D:1331; all-boot lineage/halts and both proof verifiers covered. |
+
+Later kernel landings re-base on 20-1b/20-4/20-11: expected measured cumulative 21125 tokei; STOP above cumulative 21209, below ADR-069's 22000 alarm. These are grants and planning records, not landing measurements.
+

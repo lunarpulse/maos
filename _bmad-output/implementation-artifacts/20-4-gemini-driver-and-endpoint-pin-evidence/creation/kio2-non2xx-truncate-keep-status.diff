@@ -1,0 +1,43 @@
+diff --git a/crates/maos-kernel-core/src/io/mod.rs b/crates/maos-kernel-core/src/io/mod.rs
+index 51e7fa4e..4855fa7b 100644
+--- a/crates/maos-kernel-core/src/io/mod.rs
++++ b/crates/maos-kernel-core/src/io/mod.rs
+@@ -62,14 +62,18 @@ impl IoSubsystemAdapter {
+     }
+ }
+ 
+-fn read_capped(response: ureq::Response, method: &str) -> Result<Vec<u8>, IoError> {
++/// `truncate`: a non-2xx body over the cap is cut at the cap so its status
++/// survives (18-8 review EC-6); a 2xx body over the cap is still an error.
++fn read_capped(response: ureq::Response, method: &str, truncate: bool) -> Result<Vec<u8>, IoError> {
+     let mut buf = Vec::new();
+     response
+         .into_reader()
+         .take(MAX_RESPONSE_BYTES as u64 + 1)
+         .read_to_end(&mut buf)
+         .map_err(|e| IoError::Decode(format!("ureq {method} body: {e}")))?;
+-    if buf.len() > MAX_RESPONSE_BYTES {
++    if buf.len() > MAX_RESPONSE_BYTES && truncate {
++        buf.truncate(MAX_RESPONSE_BYTES);
++    } else if buf.len() > MAX_RESPONSE_BYTES {
+         return Err(IoError::Decode(format!(
+             "response body exceeds {MAX_RESPONSE_BYTES} byte limit"
+         )));
+@@ -91,7 +95,7 @@ impl IoSubsystemPort for IoSubsystemAdapter {
+         let response = ureq::get(url)
+             .call()
+             .map_err(|e| IoError::Transport(format!("ureq GET {url}: {e}")))?;
+-        read_capped(response, "GET")
++        read_capped(response, "GET", false)
+     }
+ 
+     fn http_post(
+@@ -126,7 +130,7 @@ impl IoSubsystemPort for IoSubsystemAdapter {
+         };
+         let header = response.header(response_header).map(str::to_owned);
+         let status = response.status();
+-        let body = read_capped(response, "POST")?;
++        let body = read_capped(response, "POST", !(200..=299).contains(&status))?;
+         Ok(HttpExchange {
+             status,
+             body,
