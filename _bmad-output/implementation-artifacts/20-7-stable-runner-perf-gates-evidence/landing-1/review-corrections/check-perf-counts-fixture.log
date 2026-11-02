@@ -1,0 +1,9 @@
+ABSENT cap-token-verify-instructions — measured 0.0 instructions; no committed baseline
+check-perf-counts: WOULD BLOCK once binding: cap-token-verify-instructions is ABSENT
+PASS cap-token-verify-allocations — measured 1.0 allocations (baseline 1)
+ABSENT iac-routing-instructions — measured 0.0 instructions; no committed baseline
+check-perf-counts: WOULD BLOCK once binding: iac-routing-instructions is ABSENT
+PASS iac-routing-allocations — measured 21.2 allocations (baseline 21.24)
+ABSENT frame-lowering-instructions — measured 0.0 instructions; no committed baseline
+check-perf-counts: WOULD BLOCK once binding: frame-lowering-instructions is ABSENT
+PASS frame-lowering-allocations — measured 3.0 allocations (baseline 3)

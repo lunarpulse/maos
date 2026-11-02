@@ -32,9 +32,10 @@ use crate::perf_budgets::{self, Budgets, Direction, Metric};
 const GATE: &str = "check-perf-verdict";
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Record {
     Calibration {
+        run_id: String,
         sha: String,
         ts: String,
         fingerprint: String,
@@ -48,6 +49,8 @@ pub enum Record {
         fsync_median_ns: f64,
     },
     Metric {
+        run_id: String,
+        process_runs: Vec<String>,
         sha: String,
         ts: String,
         fingerprint: String,
@@ -59,6 +62,11 @@ pub enum Record {
         verdict: String,
     },
     Rebaseline {
+        sha: String,
+        run_id: String,
+        actor: String,
+        review: String,
+        writer: String,
         ts: String,
         fingerprint: String,
         metric: String,
@@ -116,10 +124,99 @@ pub fn parse_ledger(text: &str) -> Result<Vec<Record>, String> {
         .enumerate()
         .filter(|(_, line)| !line.trim().is_empty())
         .map(|(index, line)| {
-            serde_json::from_str(line)
-                .map_err(|error| format!("perf-ledger line {}: {error}", index + 1))
+            let record: Record = serde_json::from_str(line)
+                .map_err(|error| format!("perf-ledger line {}: {error}", index + 1))?;
+            validate_record(&record, Utc::now())
+                .map_err(|e| format!("perf-ledger line {}: {e}", index + 1))?;
+            Ok(record)
         })
         .collect()
+}
+
+pub fn instant(ts: &str) -> Result<DateTime<Utc>, String> {
+    DateTime::parse_from_rfc3339(ts)
+        .map(|t| t.to_utc())
+        .map_err(|e| format!("invalid timestamp {ts}: {e}"))
+}
+pub fn validate_record(record: &Record, now: DateTime<Utc>) -> Result<(), String> {
+    if instant(record.ts())? > now {
+        return Err("future record refused".into());
+    }
+    let positive = |v: f64| v.is_finite() && v >= 0.0;
+    let valid = match record {
+        Record::Calibration {
+            sha,
+            run_id,
+            fingerprint,
+            cpu_cv_pct,
+            fsync_cv_pct,
+            cpu_drift_pct,
+            fsync_drift_pct,
+            cpu_median_ns,
+            fsync_median_ns,
+            ..
+        } => {
+            !sha.is_empty()
+                && !run_id.is_empty()
+                && !fingerprint.is_empty()
+                && [*cpu_cv_pct, *fsync_cv_pct, *cpu_median_ns, *fsync_median_ns]
+                    .into_iter()
+                    .all(positive)
+                && cpu_drift_pct.is_finite()
+                && fsync_drift_pct.is_finite()
+        }
+        Record::Metric {
+            sha,
+            run_id,
+            process_runs,
+            fingerprint,
+            runs,
+            ..
+        } => {
+            !sha.is_empty()
+                && !run_id.is_empty()
+                && !fingerprint.is_empty()
+                && runs.len() == 5
+                && runs.iter().copied().all(positive)
+                && process_runs.len() == 5
+                && process_runs.iter().all(|r| !r.is_empty())
+                && process_runs
+                    .iter()
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    == 5
+        }
+        Record::Rebaseline {
+            sha,
+            run_id,
+            actor,
+            review,
+            writer,
+            median,
+            mad,
+            reason,
+            fingerprint,
+            metric,
+            ..
+        } => {
+            !sha.is_empty()
+                && !run_id.is_empty()
+                && !actor.is_empty()
+                && review.starts_with("https://github.com/")
+                && review.contains("/pull/")
+                && writer == "perf-ledger-append"
+                && !reason.trim().is_empty()
+                && !fingerprint.is_empty()
+                && !metric.is_empty()
+                && positive(*median)
+                && positive(*mad)
+        }
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err("invalid record identity, observations, numbers or rebaseline provenance".into())
+    }
 }
 
 fn median(values: &[f64]) -> f64 {
@@ -182,28 +279,47 @@ fn judge(budgets: &Budgets, metric: &Metric, sha: &str, ledger: &[Record]) -> Me
         Record::Metric {
             sha: record_sha,
             metric: id,
+            run_id,
             ts,
             fingerprint,
             runs,
             ..
-        } if record_sha == sha && *id == metric.id => Some((ts, fingerprint, runs)),
+        } if record_sha == sha && *id == metric.id => Some((ts, fingerprint, runs, run_id)),
         _ => None,
     });
-    let Some((ts, fingerprint, runs)) = own else {
+    let Some((ts, fingerprint, runs, run_id)) = own else {
         return out(Verdict::Absent, format!("no record for SHA {sha}"));
     };
-    if runs.is_empty() {
-        return out(Verdict::Indeterminate, "record carries no runs".into());
+    if runs.len() != 5 || runs.iter().any(|v| !v.is_finite() || *v < 0.0) {
+        return out(
+            Verdict::Indeterminate,
+            "exactly five finite process runs required".into(),
+        );
+    }
+    if ledger
+        .iter()
+        .filter(
+            |r| matches!(r, Record::Metric { sha: s, metric: id, .. } if s==sha && id==&metric.id),
+        )
+        .count()
+        != 1
+    {
+        return out(Verdict::Fail, "duplicate SHA/metric verdict refused; preserve original evidence and use an explicitly selected new run".into());
     }
     let calibration = ledger.iter().rev().find_map(|record| match record {
         Record::Calibration {
             sha: record_sha,
+            run_id: calibration_run,
+            fingerprint: calibration_fingerprint,
             cpu_cv_pct,
             fsync_cv_pct,
             cpu_drift_pct,
             fsync_drift_pct,
             ..
-        } if record_sha == sha => {
+        } if record_sha == sha
+            && calibration_run == run_id
+            && calibration_fingerprint == fingerprint =>
+        {
             Some((*cpu_cv_pct, *fsync_cv_pct, *cpu_drift_pct, *fsync_drift_pct))
         }
         _ => None,
@@ -259,41 +375,49 @@ fn judge(budgets: &Budgets, metric: &Metric, sha: &str, ledger: &[Record]) -> Me
                 runs,
                 branch,
                 verdict,
+                ..
             } if record_sha != sha
                 && *id == metric.id
                 && record_fingerprint == fingerprint
                 && branch == "main"
                 && verdict == "PASS"
-                && record_ts < ts =>
+                && instant(record_ts).ok() < instant(ts).ok() =>
             {
                 Some((record_ts, representative(runs)))
             }
             _ => None,
         })
         .collect();
-    history.sort_by(|a, b| a.0.cmp(b.0));
+    history.sort_by_key(|a| instant(a.0).ok());
     let recent: Vec<f64> = history
         .iter()
         .rev()
         .take(protocol.baseline_runs)
         .map(|(_, v)| *v)
         .collect();
-    let rebaseline = ledger.iter().rev().find_map(|record| match record {
-        Record::Rebaseline {
-            ts: record_ts,
-            fingerprint: record_fingerprint,
-            metric: id,
-            median,
-            mad,
-            ..
-        } if *id == metric.id
-            && record_fingerprint == fingerprint
-            && history.last().is_none_or(|(last, _)| record_ts >= *last) =>
-        {
-            Some((*median, *mad))
-        }
-        _ => None,
-    });
+    let rebaseline = ledger
+        .iter()
+        .filter_map(|record| match record {
+            Record::Rebaseline {
+                ts: record_ts,
+                fingerprint: record_fingerprint,
+                metric: id,
+                median,
+                mad,
+                ..
+            } if *id == metric.id
+                && record_fingerprint == fingerprint
+                && instant(record_ts).ok() <= instant(ts).ok()
+                && history
+                    .last()
+                    .is_none_or(|(last, _)| instant(record_ts).ok() >= instant(last).ok()) =>
+            {
+                Some((instant(record_ts).ok(), (*median, *mad)))
+            }
+            _ => None,
+        })
+        .max_by_key(|(ts, _)| *ts)
+        .map(|(_, pair)| pair);
     let (baseline, baseline_mad) = match (rebaseline, recent.is_empty()) {
         (Some(pair), _) => pair,
         (None, false) => {
@@ -338,15 +462,22 @@ pub fn staleness(
     ledger: &[Record],
     now: DateTime<Utc>,
 ) -> Result<Option<i64>, String> {
-    let newest = ledger
+    let times = ledger
         .iter()
-        .map(Record::ts)
+        .map(|r| {
+            let t = instant(r.ts())?;
+            if t > now {
+                return Err("perf-ledger future timestamp refused".into());
+            }
+            Ok(t)
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let newest = times
+        .into_iter()
         .max()
         .ok_or("perf-ledger holds no entries")?;
-    let newest = DateTime::parse_from_rfc3339(newest)
-        .map_err(|error| format!("perf-ledger ts {newest:?}: {error}"))?;
-    let age = (now - newest.with_timezone(&Utc)).num_hours();
-    Ok((age > budgets.protocol.stale_hours).then_some(age))
+    let age = now - newest;
+    Ok((age > chrono::Duration::hours(budgets.protocol.stale_hours)).then_some(age.num_hours()))
 }
 
 /// The ledger text: a file, a directory holding `ledger.jsonl`, or the

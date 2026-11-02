@@ -6,10 +6,9 @@ name: perf
 #
 # Tier W: wall-clock latency and throughput against the budgets of
 # `xtask/perf-budgets.toml`, on trusted code only. Triggers: `push` to `main`,
-# `schedule`, `workflow_dispatch` and `pull_request` — the last only behind the
-# job-level same-repository guard, so a fork's code never reaches the host
-# (never `pull_request_target`). The host job holds `permissions: contents:
-# read` and reads no secret; results leave as an artifact and the GitHub-hosted
+# `schedule` and main-only `workflow_dispatch`. Operator-controlled perf-host
+# environment and runner-group restrictions are the admission boundary.
+# The host holds contents: read and reads no secret;
 # `append` job (the only job with a write token) appends them to the
 # `perf-ledger` branch.
 #
@@ -28,7 +27,6 @@ on:
     # Weekly one-hour NFR-Perf-8 real-spawn soak (Sunday).
     - cron: '7 1 * * 0'
   workflow_dispatch:
-  pull_request:
 
 permissions:
   contents: read
@@ -42,8 +40,8 @@ env:
 
 jobs:
   tier-w:
-    # Same-repository guard: `maos-perf` never runs a fork's code.
-    if: ${{ vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule != '7 1 * * 0' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    environment: perf-host
+    if: ${{ github.ref == 'refs/heads/main' && vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule != '7 1 * * 0' }}
     runs-on: [self-hosted, maos-perf]
     timeout-minutes: 120
     steps:
@@ -111,7 +109,8 @@ jobs:
     # NFR-Perf-8: 50 real T3 Workers through the real WorkerSupervisor, 10
     # tasks/s, one hour. Weekly only; needs rootless podman + the signed T3
     # image lock on the host (operator prerequisite O4).
-    if: ${{ vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule == '7 1 * * 0' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    environment: perf-host
+    if: ${{ github.ref == 'refs/heads/main' && vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule == '7 1 * * 0' }}
     runs-on: [self-hosted, maos-perf]
     timeout-minutes: 150
     steps:
@@ -136,12 +135,15 @@ jobs:
     # The only job holding a write token, and it runs on a GitHub-hosted runner:
     # the perf host never holds one (ADR-068 §4). Never for a pull request.
     needs: [tier-w]
-    if: ${{ github.event_name != 'pull_request' && needs.tier-w.result == 'success' }}
+    if: ${{ github.ref == 'refs/heads/main' && needs.tier-w.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       # The collector fails loudly when the branch is missing (ADR-068 §6).
       - uses: actions/checkout@v5
         with:
@@ -150,13 +152,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+      - name: Build trusted collector before downloading host artifacts
+        run: |
+          cargo build --locked -p xtask
+          cp target/debug/xtask "$RUNNER_TEMP/perf-xtask"
       - uses: actions/download-artifact@v4
         with:
           name: perf-results
           path: results
       - name: Append the run to the ledger
         run: |
-          cargo run --locked -p xtask -- perf-ledger-append \
+          "$RUNNER_TEMP/perf-xtask" perf-ledger-append \
             --ledger perf-ledger/ledger.jsonl --logs results/logs \
             --calibration results/calibration.json \
             --sha "$GITHUB_SHA" --branch "${GITHUB_REF_NAME}" \

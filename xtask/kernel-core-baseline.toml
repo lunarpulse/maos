@@ -503,6 +503,10 @@
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
 src_lines = 26841
+# HISTORY: 20-7 landing 1 review corrections; D11 exact formatted re-pin:
+# 26841 physical / 21042 tokei, unchanged, 95 files and set hash unchanged.
+# No permanent kernel src edit: production signing correction is bench-only.
+# Ceilings 26881/21073 retained; no kernel growth consumed.
 # HISTORY: 20-7 landing 1 (stable-runner-perf-gates), FLAG-Winston R = K1w + K2r
 # (rows207; ceiling 26881 physical / 21073 tokei): exact formatted 26801 -> 26841
 # (+40 physical), tokei 21011 -> 21042 (+31), as the creation prototype measured;

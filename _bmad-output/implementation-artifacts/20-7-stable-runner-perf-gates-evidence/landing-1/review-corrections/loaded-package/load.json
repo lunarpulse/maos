@@ -1,0 +1,8 @@
+{
+  "generator": "sha256sum /dev/zero",
+  "processes": 32,
+  "cpus": 32,
+  "target": "/mnt/build/cargo-maos",
+  "completed_iterations": 50,
+  "all_load_processes_reaped": true
+}

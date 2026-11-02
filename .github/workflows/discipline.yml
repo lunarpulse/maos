@@ -641,14 +641,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: cargo test -p xtask --test check_test_budget_proven_red
 
-  # Story 20-7 AC2 (ADR-068 §4) — the stable performance runner only ever runs
-  # trusted code. `.github/workflows/perf.yml` is the only workflow that may
-  # target the `maos-perf` label, on `push` to main / `schedule` /
-  # `workflow_dispatch` / same-repository `pull_request` only (never
-  # `pull_request_target`), behind the job-level fork guard, holding exactly
-  # `permissions: contents: read`. Hermetic (reads the committed workflows) and
-  # BLOCKING at every phase: this is the only thing between a fork pull request
-  # and code execution on the perf host. The four plants run in the same job.
+  # Story 20-7 AC2 — structural runner policy, defense in depth only.
+  # Host jobs accept push-to-main, schedule and main-only dispatch; never PR
+  # or comment events. Operator environment/runner-group protections (O3) and
+  # fork approval (O7) must be verified before enabling the host. This
+  # PR-editable gate is not an immutable runner admission boundary.
   check-perf-runner-policy:
     runs-on: ubuntu-latest
     timeout-minutes: 15

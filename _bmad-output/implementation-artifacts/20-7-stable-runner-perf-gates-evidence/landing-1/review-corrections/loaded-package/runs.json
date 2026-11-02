@@ -1,0 +1,352 @@
+[
+  {
+    "iteration": 1,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 144.006,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 2,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.875,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 3,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.385,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 4,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.208,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 5,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.648,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 6,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.805,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 7,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.724,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 8,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.549,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 9,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.299,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 10,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.579,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 11,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.223,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 12,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.584,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 13,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.331,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 14,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 29.357,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 15,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 32.303,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 16,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.927,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 17,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.154,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 18,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 35.614,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 19,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 30.056,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 20,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.254,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 21,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.283,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 22,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 100,
+    "seconds": 26.559,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 23,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.933,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 24,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.596,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 25,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.119,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 26,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.516,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 27,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.954,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 28,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.718,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 29,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.923,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 30,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.171,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 31,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 30.64,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 32,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 30.385,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 33,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.191,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 34,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.879,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 35,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.802,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 36,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.478,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 37,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 29.52,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 38,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.181,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 39,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.291,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 40,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.131,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 41,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.689,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 42,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.962,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 43,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 28.02,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 44,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 32.303,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 45,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 29.189,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 46,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.495,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 47,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 27.807,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 48,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.142,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 49,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 26.858,
+    "load_processes_live_at_start": 32
+  },
+  {
+    "iteration": 50,
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "exit_code": 100,
+    "seconds": 28.351,
+    "load_processes_live_at_start": 32
+  }
+]

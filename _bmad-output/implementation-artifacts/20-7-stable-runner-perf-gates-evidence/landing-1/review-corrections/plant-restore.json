@@ -1,0 +1,22 @@
+{
+  "/home/lunarpulse/dev_ws/xtask/src/check_perf_verdict.rs": {
+    "identical": true,
+    "sha256": "9dd6645f7d08a9b2d4e72e0c63229c87d9f6cb7b959e564ceddaace1d0971f53"
+  },
+  "/home/lunarpulse/dev_ws/crates/maos-bench/src/decision.rs": {
+    "identical": true,
+    "sha256": "27577b8dc68059a97189f6d416ccac05176348328986f1ef1552dc949bd205e9"
+  },
+  "/home/lunarpulse/dev_ws/crates/maos-kernel-core/src/security/sandbox/t3/child.rs": {
+    "identical": true,
+    "sha256": "24e150ba7b73e2a8759a5f21d3ea646c06241030150f5d93fc979b790b97b285"
+  },
+  "/home/lunarpulse/dev_ws/crates/maos-bin/src/supervision.rs": {
+    "identical": true,
+    "sha256": "e812d778b977e4839efcbe111632a5cdeb1ba6d59e5036d1ba9da82ec3ba8809"
+  },
+  "/home/lunarpulse/dev_ws/crates/maos-kernel-core/tests/cap_token_verify_assertion.rs": {
+    "identical": true,
+    "sha256": "c198166e83e9464719f567dd57602aefc9d6ccb80afbc783ade41f86384b36a9"
+  }
+}

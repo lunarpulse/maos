@@ -13,12 +13,12 @@ fingerprint, calibration or ledger entry exists until the host produces one.
 | Tier | Where | Trigger | Gate |
 |---|---|---|---|
 | C — counts | GitHub-hosted `ubuntu-24.04`, fork-safe | every pull request | `check-perf-counts` (`discipline.yml`) |
-| W — wall clock | the `maos-perf` host only | `push` to `main`, nightly `schedule`, weekly soak, `workflow_dispatch`, same-repository `pull_request` | `check-perf-verdict` on the ledger |
+| W — wall clock | the `maos-perf` host only | `push` to `main`, nightly `schedule`, weekly soak, main-only `workflow_dispatch` | `check-perf-verdict` on the ledger |
 
-`.github/workflows/perf.yml` is the only workflow that may name `maos-perf`; `check-perf-runner-policy`
-(blocking) refuses a second workflow, a missing fork guard, `pull_request_target` (or any trigger
-outside `push`-to-`main` / `schedule` / `workflow_dispatch` / `pull_request`) and permissions wider
-than `contents: read` on a host job.
+`.github/workflows/perf.yml` is the only allowed host workflow. The structural
+policy refuses PR/comment triggers, ambiguous selectors, aliases, non-exact
+main-ref guards, host secrets and permissions wider than `contents: read`.
+This gate is defense in depth, NOT the admission boundary: a PR can edit code.
 
 ## 2. Host setup (ADR-068 §2–§4)
 
@@ -34,9 +34,21 @@ than `contents: read` on a host job.
    temporary directories; outbound-only firewall (GitHub and the package registries); key-only SSH.
 4. Rootless podman and the signed T3 image lock on the host, for the weekly NFR-Perf-8 soak
    (operator prerequisite O4).
-5. Repository settings: require approval for fork pull-request workflows (defence in depth; the fork
-   guard is the control); create the `perf-ledger` branch (empty `ledger.jsonl`), writable by the
-   GitHub-hosted `append` job only.
+5. **O3 — OPERATOR prerequisite, before enabling the host:** configure the
+   `perf-host` environment with deployment branches restricted to protected
+   `main`, required reviewers, and prevent self-review/bypass where available.
+   Configure the runner group to allow only this repository's
+   `.github/workflows/perf.yml@refs/heads/main`; no general repository-wide host
+   access. Verify in Settings → Environments → perf-host and organization
+   Settings → Actions → Runner groups → selected workflows. Save screenshots
+   or API exports of both restrictions; a non-main dispatch must be denied.
+   If the account plan cannot enforce workflow/ref scoping, do not enable it.
+   Create `perf-ledger` with force pushes/deletions prohibited and writes limited
+   to the trusted hosted append job.
+   **O7 — OPERATOR prerequisite:** Settings → Actions → General → Fork pull
+   request workflows: require approval for **all outside collaborators**.
+   Verify with the repository Actions permissions API/UI export and a fork PR
+   awaiting approval. This is additional defense, not a substitute for O3.
 6. Register the runner with label `maos-perf`, then set the repository variable
    `MAOS_PERF_RUNNER_ENABLED=true`. Until it is set no host job queues. Update
    `provisioning-checklist.md` (row *stable performance runner*) in the same change.
@@ -68,6 +80,13 @@ calibration record), makes every verdict of that run `INDETERMINATE`. Each bench
 times as separate processes; a metric is the median of the five per-run quantiles, and a spread over
 its `noise_tolerance` is `INDETERMINATE`.
 
+`GITHUB_RUN_ID` and `GITHUB_RUN_ATTEMPT` identify one run/attempt; calibration
+and metric records must match both that identity and the fingerprint. Logs
+must be named `run-1-*.log` through `run-5-*.log`; each registered bench metric
+must appear exactly once in each process run. Malformed, duplicate or missing
+observations refuse the entire append. Re-appending an observed SHA is refused,
+so a rerun cannot replace a FAIL with PASS.
+
 ## 6. Verdicts and the ledger
 
 `cargo run -p xtask -- check-perf-verdict --sha <SHA> [--ledger <file|dir>]` prints `PASS`, `FAIL`,
@@ -87,11 +106,17 @@ current phase. That is Story 20-7 landing 2; it needs this host.
 
 ## 8. Maintenance window and re-baseline
 
-OS, kernel, firmware and hardware changes happen in a maintenance window, followed by a calibration
-run. A deliberate change of speed, or a new fingerprint, re-baselines through a pull request that
-states the measured figure and the reason in the same commit: a `rebaseline` ledger record
-(`{"kind":"rebaseline","fingerprint","metric","median","mad","reason"}`) for Tier W, a changed
-`baseline` row in `xtask/perf-budgets.toml` for Tier C.
+OS, kernel, firmware and hardware changes happen in a maintenance window.
+After review, use the trusted main build of `perf-ledger-append --rebaseline
+request.json` alongside `--ledger`, `--sha`, `--branch main` and `--fingerprint`.
+The request has exactly `metric`, `median`, `mad`,
+`reason`, `review` (a GitHub pull-request URL). The append tool alone generates
+`writer`, `actor`, `sha`, `run_id` and timestamp provenance from the trusted
+main run. Ledger-branch protection is required: provenance is validated, not a
+cryptographic defense against an operator who can rewrite that branch.
+Median/MAD must be finite and nonnegative. A rebaseline only applies to
+measurements at or after its instant; later maintenance never rewrites an old
+verdict. Tier C changes its reviewed `baseline` in `xtask/perf-budgets.toml`.
 
 ## 9. Ledger staleness
 

@@ -15,6 +15,7 @@ use serde::Deserialize;
 pub const PATH: &str = "xtask/perf-budgets.toml";
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Protocol {
     /// The GA phase the dispositions are read at; equals `gate_common::CURRENT_PHASE`.
     pub phase: String,
@@ -40,6 +41,7 @@ pub enum Direction {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Metric {
     pub id: String,
     /// NFR / §13.1 / success-criteria / ADR id the budget comes from.
@@ -72,13 +74,66 @@ impl Metric {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Budgets {
     pub protocol: Protocol,
     pub metric: Vec<Metric>,
 }
 
 pub fn parse(text: &str) -> Result<Budgets, String> {
-    toml::from_str(text).map_err(|error| format!("{PATH}: {error}"))
+    let budgets: Budgets = toml::from_str(text).map_err(|error| format!("{PATH}: {error}"))?;
+    let phases = ["v1_0", "v1_5", "v2_0", "v2_2"];
+    let p = &budgets.protocol;
+    if !phases.contains(&p.phase.as_str())
+        || p.baseline_runs == 0
+        || p.stale_hours <= 0
+        || [
+            p.calibration_cv_max_pct,
+            p.calibration_drift_max_pct,
+            p.mad_multiplier,
+        ]
+        .iter()
+        .any(|v| !v.is_finite() || *v < 0.0)
+    {
+        return Err(format!("{PATH}: invalid protocol"));
+    }
+    let mut ids = std::collections::HashSet::new();
+    for m in &budgets.metric {
+        let wall = m.tier == "W";
+        if !ids.insert(&m.id)
+            || m.id.is_empty()
+            || m.requirement.is_empty()
+            || m.instrument.is_empty()
+            || !["W", "C"].contains(&m.tier.as_str())
+            || !["p50", "p95", "p99", "p99.9", "sustained", "count"].contains(&m.quantile.as_str())
+            || [m.noise_tolerance, m.regression_tolerance]
+                .iter()
+                .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+            || m.budget
+                .into_iter()
+                .chain(m.baseline)
+                .any(|v| !v.is_finite() || v < 0.0)
+            || m.disposition.is_empty()
+            || m.disposition.iter().any(|(p, d)| {
+                !phases.contains(&p.as_str()) || !["advisory", "blocking"].contains(&d.as_str())
+            })
+            || (wall
+                && (m.budget.is_none()
+                    || !["us", "frames_per_s"].contains(&m.unit.as_str())
+                    || m.path.is_some()
+                    || m.baseline.is_some()))
+            || (!wall
+                && (m.path.as_ref().is_none_or(String::is_empty)
+                    || m.quantile != "count"
+                    || !["allocations", "instructions"].contains(&m.unit.as_str())
+                    || m.budget.is_some()
+                    || m.direction != Direction::Max
+                    || (m.binding_at(&p.phase) && m.baseline.is_none())))
+        {
+            return Err(format!("{PATH}: invalid metric {}", m.id));
+        }
+    }
+    Ok(budgets)
 }
 
 pub fn load(root: &Path) -> Result<Budgets, String> {

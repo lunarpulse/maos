@@ -1,0 +1,254 @@
+[
+  {
+    "name": "kloc-before-pin",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 1,
+    "seconds": 0.416
+  },
+  {
+    "name": "kernel-before-pin",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json",
+    "exit_code": 0,
+    "seconds": 0.012
+  },
+  {
+    "name": "kloc-check",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask kloc-check",
+    "exit_code": 0,
+    "seconds": 0.035
+  },
+  {
+    "name": "check-kernel-baseline",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-kernel-baseline",
+    "exit_code": 0,
+    "seconds": 0.011
+  },
+  {
+    "name": "check-service-boundary",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-service-boundary",
+    "exit_code": 0,
+    "seconds": 1.235
+  },
+  {
+    "name": "check-env-contract",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-env-contract",
+    "exit_code": 0,
+    "seconds": 0.44
+  },
+  {
+    "name": "check-serde-error-handling",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-serde-error-handling",
+    "exit_code": 0,
+    "seconds": 0.238
+  },
+  {
+    "name": "check-composition-root-completeness",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-composition-root-completeness",
+    "exit_code": 0,
+    "seconds": 0.04
+  },
+  {
+    "name": "check-j1-loopback-delegation",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-j1-loopback-delegation",
+    "exit_code": 0,
+    "seconds": 0.039
+  },
+  {
+    "name": "check-dev-record-completeness",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-dev-record-completeness",
+    "exit_code": 0,
+    "seconds": 0.107
+  },
+  {
+    "name": "check-epic-close-coherence",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-epic-close-coherence",
+    "exit_code": 0,
+    "seconds": 0.021
+  },
+  {
+    "name": "check-review-findings-resolved",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-review-findings-resolved",
+    "exit_code": 0,
+    "seconds": 0.068
+  },
+  {
+    "name": "check-test-cost",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-test-cost",
+    "exit_code": 0,
+    "seconds": 0.261
+  },
+  {
+    "name": "invariant-lock",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask invariant-lock",
+    "exit_code": 0,
+    "seconds": 0.64
+  },
+  {
+    "name": "coverage-matrix",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask coverage-matrix",
+    "exit_code": 0,
+    "seconds": 0.013
+  },
+  {
+    "name": "check-coverage-matrix-completeness",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-coverage-matrix-completeness",
+    "exit_code": 0,
+    "seconds": 0.012
+  },
+  {
+    "name": "check-perf-runner-policy",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-perf-runner-policy",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "name": "check-perf-verdict",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-perf-verdict --sha s-pass --ledger /home/lunarpulse/dev_ws/xtask/tests/fixtures/perf-ledger",
+    "exit_code": 0,
+    "seconds": 0.011
+  },
+  {
+    "name": "check-perf-counts-fixture",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-perf-counts --dir /tmp/perf-review-counts-hdmw6hjs",
+    "exit_code": 0,
+    "seconds": 0.009
+  },
+  {
+    "name": "check-test-budget",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-test-budget --junit /mnt/build/cargo-maos/nextest/ci/junit.xml",
+    "exit_code": 0,
+    "seconds": 0.02
+  },
+  {
+    "name": "check-test-budget-final-serial",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-test-budget --junit /mnt/build/cargo-maos/nextest/ci/junit.xml",
+    "exit_code": 0,
+    "seconds": 0.03
+  },
+  {
+    "name": "fmt-all-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "exit_code": 0
+  },
+  {
+    "name": "build-all-targets-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo build --locked --all-targets -p xtask -p maos-kernel-core -p maos-bin -p maos-bench --features maos-bench/kernel_measurement",
+    "exit_code": 0
+  },
+  {
+    "name": "focused-perf-gates-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo test --locked -p xtask --test perf_gates_20_7",
+    "exit_code": 0,
+    "tests": 35
+  },
+  {
+    "name": "focused-fanout-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-bin --test nfr_perf_8_real_spawn_fanout_20_7",
+    "exit_code": 0,
+    "tests": 3,
+    "boundary": "real T3 workload SKIP without profile/substrate"
+  },
+  {
+    "name": "workspace-serial-before-pin-citation-fix",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --no-fail-fast --profile ci --test-threads 1",
+    "exit_code": 100,
+    "passed": 5515,
+    "failed": 2,
+    "reason": "D11 pin comment omitted full story key; fixed"
+  },
+  {
+    "name": "workspace-serial-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --no-fail-fast --profile ci --test-threads 1",
+    "exit_code": 0,
+    "passed": 5517,
+    "skipped": 138,
+    "seconds": 613.984
+  },
+  {
+    "name": "workspace-default-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --no-fail-fast",
+    "exit_code": 0,
+    "passed": 5517,
+    "skipped": 138,
+    "seconds": 41.165
+  },
+  {
+    "name": "workspace-all-targets",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo build --workspace --locked --all-targets",
+    "exit_code": 0
+  },
+  {
+    "name": "production-signing-bench",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo bench --locked -p maos-kernel-core --bench hot_path_budgets",
+    "exit_code": 0,
+    "token_issuance_p99_us": 39.514,
+    "budget_us": 5,
+    "boundary": "local optimized single-process observation; advisory breach, not stable-runner evidence"
+  },
+  {
+    "name": "clippy-real-stream",
+    "command": "bash -o pipefail -c 'env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json | tee /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/landing-1/review-corrections/clippy.jsonl'",
+    "exit_code": 0
+  },
+  {
+    "name": "clippy-ratchet",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask clippy-ratchet --input /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/landing-1/review-corrections/clippy.jsonl",
+    "exit_code": 0,
+    "occurrences": 1339,
+    "source_distinct": 876,
+    "hosted_baseline": [
+      1383,
+      897
+    ]
+  },
+  {
+    "name": "cargo-deny",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo deny check",
+    "exit_code": 0
+  },
+  {
+    "name": "whole-package-loaded",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --no-fail-fast",
+    "iterations": 50,
+    "passed_iterations": 48,
+    "failed_iterations": [
+      22,
+      50
+    ],
+    "exit_codes": "loaded-package/runs.json",
+    "load": "32 sha256sum /dev/zero processes; all reaped"
+  },
+  {
+    "name": "five-regression-plants",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p xtask -p maos-bin -p maos-kernel-core --no-fail-fast --test-threads 1 -E 'test(the_median_decides_a_budget_breach_not_the_best_of_five) | test(the_budget_file_is_the_only_home_of_budget_literals) | test(teardown_waits_for_a_stalled_snapshot_owner_then_removes_the_container_20_7) | test(barrier_failure_unwinds_with_exactly_one_panic_20_7) | test(cap_token_verify_plus_audit_enqueue_p99_under_nfr_perf_3)'",
+    "exit_code": 100,
+    "tests": 5,
+    "failed": 5,
+    "expected_red": true,
+    "restore": "plant-restore.json"
+  },
+  {
+    "name": "allocation-neutral-instruction-plant-build",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness",
+    "exit_code": 0
+  },
+  {
+    "name": "allocation-neutral-instruction-plant-observation",
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/tier_c_harness cap_token_verify 10000",
+    "exit_code": 0,
+    "unplanted_allocations": 10000,
+    "planted_allocations": 10000,
+    "source_restored_identical": true,
+    "sha256": "3d12396dca30774b2248db910151f4484aaa29dfbad77bf8a728a736a0727bda"
+  },
+  {
+    "name": "prescribed-prepush",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo run -q --locked -p xtask -- prepush",
+    "exit_code": 0,
+    "checks_run": 84,
+    "skipped_with_reason": 8,
+    "red": 0,
+    "captured_skip_diagnostics": 82,
+    "seconds": 564.507
+  }
+]

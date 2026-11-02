@@ -26,7 +26,6 @@ use maos_domain::invariants::i7::{ScalarTapEvent, TelemetryTopic};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::capability::CapabilityRegistryPort;
-use maos_domain::ports::crypto::{CryptoError, CryptoProvider};
 use maos_domain::ports::{MemoryManagerPort, TelemetryStreamPort};
 use maos_kernel_core::capability::cap_audit;
 use maos_kernel_core::capability::cap_policy::{
@@ -45,30 +44,6 @@ use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 
 const WARMUP: usize = 2_000;
 const SAMPLES: usize = 20_000;
-
-struct Mock;
-
-impl CryptoProvider for Mock {
-    fn verify_signature(&self, _pk: &[u8], _msg: &[u8], _sig: &[u8]) -> Result<(), CryptoError> {
-        Ok(())
-    }
-    fn seal_for_export(
-        &self,
-        _k: &[u8],
-        _n: &[u8],
-        _a: &[u8],
-        p: &[u8],
-    ) -> Result<Vec<u8>, CryptoError> {
-        Ok(p.to_vec())
-    }
-    fn sign_capability_token(&self, _sk: &[u8], bytes: &[u8]) -> Result<Vec<u8>, CryptoError> {
-        let mut sig = [0u8; 64];
-        for (i, b) in bytes.iter().enumerate() {
-            sig[i % 64] ^= *b;
-        }
-        Ok(sig.to_vec())
-    }
-}
 
 /// P99 in microseconds of `SAMPLES` timed calls after `WARMUP` untimed ones.
 fn p99_us(mut call: impl FnMut()) -> f64 {
@@ -90,7 +65,7 @@ fn issuance() -> f64 {
     let (audit_tx, mut audit_rx) = cap_audit::channel();
     std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     let ring = CapTokensShardRing::new(
-        Arc::new(Mock),
+        Arc::new(maos_kernel_core::api::RingCryptoProvider),
         Ed25519SigningKey::new([0u8; 32]),
         0xDEAD_BEEF,
         audit_tx,
@@ -126,7 +101,7 @@ fn dispatch() -> f64 {
     let (audit_tx, mut audit_rx) = cap_audit::channel();
     std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     let registry = CapabilityRegistryAdapter::new(
-        Arc::new(Mock),
+        Arc::new(maos_kernel_core::api::RingCryptoProvider),
         Ed25519SigningKey::new([0u8; 32]),
         0xDEAD_BEEF,
         Arc::new(policy),

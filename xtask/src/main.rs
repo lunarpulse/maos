@@ -854,17 +854,21 @@ enum Commands {
         #[arg(long)]
         ledger: String,
         /// Directory of bench logs carrying `MAOS-PERF {..}` lines, one file per run.
-        #[arg(long)]
-        logs: String,
+        #[arg(long, required_unless_present = "rebaseline")]
+        logs: Option<String>,
         /// File holding the `perf-calibrate` line.
-        #[arg(long)]
-        calibration: String,
+        #[arg(long, required_unless_present = "rebaseline")]
+        calibration: Option<String>,
         #[arg(long)]
         sha: String,
         #[arg(long, default_value = "main")]
         branch: String,
         #[arg(long)]
         fingerprint: String,
+        /// Reviewed rebaseline request JSON: metric, median, mad, reason, review.
+        /// Provenance is generated here, never accepted from the request.
+        #[arg(long)]
+        rebaseline: Option<String>,
     },
     /// Story 9.4 R-AG1 — air-gap no-network-symbols CI gate + dirty-fixture bite.
     #[command(name = "check-air-gap")]
@@ -1484,7 +1488,16 @@ fn main() {
             sha,
             branch,
             fingerprint,
-        } => perf_ledger::append(&ledger, &logs, &calibration, &sha, &branch, &fingerprint),
+            rebaseline,
+        } => match (rebaseline, logs, calibration) {
+            (Some(request), _, _) => {
+                perf_ledger::rebaseline(&ledger, &request, &sha, &branch, &fingerprint)
+            }
+            (None, Some(logs), Some(calibration)) => {
+                perf_ledger::append(&ledger, &logs, &calibration, &sha, &branch, &fingerprint)
+            }
+            _ => Err("append requires logs and calibration, or a rebaseline request".into()),
+        },
         Commands::CheckAirGap {
             binary,
             build_first,

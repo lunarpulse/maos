@@ -220,12 +220,12 @@ on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
-  pull_request:
 permissions:
   contents: read
 jobs:
   tier-w:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    environment: perf-host
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, maos-perf]
     steps:
       - uses: actions/checkout@v5
@@ -275,10 +275,7 @@ fn refusal_1_a_second_workflow_targeting_the_perf_runner() {
 
 #[test]
 fn refusal_2_perf_yml_without_its_fork_guard() {
-    let perf = PERF_YML.replace(
-        "    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\n",
-        "",
-    );
+    let perf = PERF_YML.replace("    if: github.ref == 'refs/heads/main'\n", "");
     let found = findings(&perf, OTHER_YML);
     assert!(found.iter().any(|f| f.contains("fork guard")), "{found:?}");
 }
@@ -286,8 +283,8 @@ fn refusal_2_perf_yml_without_its_fork_guard() {
 #[test]
 fn refusal_3_pull_request_target_added() {
     let perf = PERF_YML.replace(
-        "  pull_request:\n",
-        "  pull_request:\n  pull_request_target:\n",
+        "  workflow_dispatch:\n",
+        "  workflow_dispatch:\n  pull_request_target:\n",
     );
     let found = findings(&perf, OTHER_YML);
     assert!(
@@ -542,4 +539,449 @@ fn tier_c_blocks_on_an_allocation_count_over_tolerance_and_passes_at_the_baselin
         "a 10% allocation regression must block"
     );
     assert!(String::from_utf8_lossy(&over.stdout).contains("FAIL cap-token-verify-allocations"));
+}
+
+#[test]
+fn refusal_vectors_for_runner_policy_bypasses() {
+    for selector in [
+        "self-hosted",
+        "[self-hosted]",
+        "${{ vars.HOST }}",
+        "\"maos\\x2dperf\"",
+        "{group: perf}",
+        "*host",
+    ] {
+        let perf = PERF_YML.replace("[self-hosted, maos-perf]", selector);
+        assert!(!findings(&perf, OTHER_YML).is_empty(), "{selector}");
+        let other = OTHER_YML.replace("ubuntu-latest", selector);
+        assert!(!findings(PERF_YML, &other).is_empty(), "{selector}");
+    }
+    for condition in [
+        "true || github.ref == 'refs/heads/main'",
+        "a || github.event.pull_request.head.repo.full_name == github.repository",
+        "true||github.event.pull_request.head.repo.full_name == github.repository",
+        "github.ref == 'refs/heads/main' || true",
+    ] {
+        assert!(!findings(
+            &PERF_YML.replace("github.ref == 'refs/heads/main'", condition),
+            OTHER_YML
+        )
+        .is_empty());
+    }
+    for event in ["pull_request", "pull_request_target", "issue_comment"] {
+        assert!(!findings(
+            &PERF_YML.replace(
+                "  workflow_dispatch:",
+                &format!("  workflow_dispatch:\n  {event}:")
+            ),
+            OTHER_YML
+        )
+        .is_empty());
+    }
+    for expression in [
+        "${{ secrets.X }}",
+        "${{ secrets['X'] }}",
+        "${{ toJSON(secrets) }}",
+    ] {
+        let perf = format!("env:\n  LEAK: \"{expression}\"\n{PERF_YML}");
+        assert!(findings(&perf, OTHER_YML)
+            .iter()
+            .any(|f| f.contains("secrets")));
+    }
+    for extra in [
+        "    uses: owner/repo/.github/workflows/a.yml@main\n",
+        "    env: &host {X: ok}\n",
+    ] {
+        assert!(!findings(
+            &PERF_YML.replace("  tier-w:\n", &format!("  tier-w:\n{extra}")),
+            OTHER_YML
+        )
+        .is_empty());
+    }
+}
+
+#[test]
+fn malformed_counts_never_pass() {
+    use xtask::check_perf_counts::{figure, Measured};
+    let budgets = perf_budgets::load(&repo_root()).unwrap();
+    let row = budgets
+        .metric
+        .iter()
+        .find(|m| m.unit == "instructions")
+        .unwrap();
+    let empty = Measured {
+        iterations: 0,
+        allocations: 0,
+        instructions: 100,
+    };
+    assert!(figure(
+        row,
+        &Measured {
+            iterations: 0,
+            allocations: 0,
+            instructions: 100
+        },
+        &empty
+    )
+    .is_err());
+    assert!(figure(
+        row,
+        &Measured {
+            iterations: 1,
+            allocations: 0,
+            instructions: 99
+        },
+        &empty
+    )
+    .is_err());
+    for value in [f64::NAN, f64::INFINITY, -1.0] {
+        assert_eq!(judge(row, value).0, Verdict::Fail);
+    }
+}
+
+#[test]
+fn malformed_budget_semantics_are_refused() {
+    let text = fixture("budgets.toml");
+    for (from, to) in [
+        ("tier = \"W\"", "tier = \"V\""),
+        ("budget = 5000", "budgt = 5000"),
+        ("unit = \"us\"", "unit = \"seconds\""),
+        ("\"blocking\"", "\"blokcing\""),
+        ("noise_tolerance = 0.4", "noise_tolerance = nan"),
+        ("budget = 5000", "budget = -1"),
+        ("fixture-throughput", "fixture-latency"),
+        ("phase = \"v1_5\"", "phase = \"unknown\""),
+    ] {
+        assert!(
+            perf_budgets::parse(&text.replace(from, to)).is_err(),
+            "{to}"
+        );
+    }
+}
+
+#[test]
+fn malformed_metric_lines_are_not_filtered() {
+    use xtask::perf_ledger::metrics_in;
+    for text in [
+        "MAOS-PERF not-json",
+        "MAOS-PERF {\"metric\":\"x\"}",
+        "MAOS-PERF {\"metric\":\"x\",\"value\":-1}",
+        "MAOS-PERF {\"metric\":\"x\",\"value\":1}\nMAOS-PERF {\"metric\":\"x\",\"value\":2}",
+    ] {
+        assert!(metrics_in(text).is_err(), "{text}");
+    }
+}
+
+#[test]
+fn ledger_observation_identity_and_provenance_vectors() {
+    let text = fixture("ledger.jsonl");
+    let rows: Vec<serde_json::Value> = text
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    let metric = rows
+        .iter()
+        .find(|r| r["sha"] == "s-pass" && r["kind"] == "metric")
+        .unwrap();
+    for (field, value) in [
+        ("runs", serde_json::json!([1000])),
+        ("process_runs", serde_json::json!(["1", "1", "2", "3", "4"])),
+        ("ts", serde_json::json!("2099-01-01T00:00:00Z")),
+    ] {
+        let mut row = metric.clone();
+        row[field] = value;
+        assert!(parse_ledger(&row.to_string()).is_err());
+    }
+    let budgets = perf_budgets::parse(&fixture("budgets.toml")).unwrap();
+    let mut ledger = parse_ledger(&text).unwrap();
+    ledger.push(serde_json::from_value(metric.clone()).unwrap());
+    assert_eq!(
+        verdicts(&budgets, "s-pass", &ledger)[0].verdict,
+        Verdict::Fail
+    );
+    for field in ["run_id", "fingerprint"] {
+        let changed = rows
+            .iter()
+            .map(|r| {
+                let mut r = r.clone();
+                if r["sha"] == "s-pass" && r["kind"] == "calibration" {
+                    r[field] = "other".into();
+                }
+                r.to_string()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert_eq!(
+            verdicts(&budgets, "s-pass", &parse_ledger(&changed).unwrap())[0].verdict,
+            Verdict::Indeterminate
+        );
+    }
+    let rebaseline = rows.iter().find(|r| r["kind"] == "rebaseline").unwrap();
+    for field in ["writer", "actor", "review", "run_id", "reason"] {
+        let mut row = rebaseline.clone();
+        row[field] = "".into();
+        assert!(parse_ledger(&row.to_string()).is_err(), "{field}");
+    }
+    let mut later = rebaseline.clone();
+    later["ts"] = "2026-11-01T00:00:01Z".into();
+    later["fingerprint"] = "fp-a".into();
+    later["median"] = 999999.into();
+    let mut ledger = parse_ledger(&text).unwrap();
+    ledger.push(serde_json::from_value(later).unwrap());
+    assert_eq!(
+        verdicts(&budgets, "s-regress", &ledger)[0].verdict,
+        Verdict::Fail
+    );
+    let now = chrono::DateTime::parse_from_rfc3339("2026-11-03T00:00:01Z")
+        .unwrap()
+        .to_utc();
+    assert!(staleness(&budgets, &parse_ledger(&text).unwrap(), now)
+        .unwrap()
+        .is_some());
+}
+
+#[test]
+fn issuance_instrument_uses_the_production_signing_provider() {
+    let source =
+        fs::read_to_string(repo_root().join("crates/maos-kernel-core/benches/hot_path_budgets.rs"))
+            .unwrap();
+    assert!(source.contains("Arc::new(maos_kernel_core::api::RingCryptoProvider)"));
+    assert!(!source.contains("impl CryptoProvider for Mock"));
+}
+
+#[test]
+fn append_refuses_missing_duplicate_malformed_or_mismatched_observations() {
+    let root = repo_root();
+    let budgets = perf_budgets::load(&root).unwrap();
+    for variant in [
+        "valid",
+        "missing-run",
+        "missing-metric",
+        "duplicate",
+        "malformed",
+        "kind",
+        "sha",
+        "fingerprint",
+        "run_id",
+        "second-sha",
+    ] {
+        let scratch = tempfile::tempdir().unwrap();
+        let logs = scratch.path().join("logs");
+        fs::create_dir(&logs).unwrap();
+        let ledger = scratch.path().join("ledger.jsonl");
+        let calibration = scratch.path().join("calibration.json");
+        let mut cal: serde_json::Value =
+            serde_json::from_str(fixture("ledger.jsonl").lines().next().unwrap()).unwrap();
+        cal["sha"] = "new-sha".into();
+        cal["run_id"] = "123/1".into();
+        if ["kind", "sha", "fingerprint", "run_id"].contains(&variant) {
+            cal[variant] = "wrong".into();
+        }
+        fs::write(&calibration, cal.to_string()).unwrap();
+        fs::write(
+            &ledger,
+            if variant == "second-sha" {
+                fixture("ledger.jsonl").replace("s-pass", "new-sha")
+            } else {
+                fixture("ledger.jsonl")
+            },
+        )
+        .unwrap();
+        for run in 1..=5 {
+            if variant == "missing-run" && run == 5 {
+                continue;
+            }
+            let mut lines = Vec::new();
+            for metric in budgets
+                .metric
+                .iter()
+                .filter(|m| m.tier == "W" && m.instrument.contains("/benches/"))
+            {
+                if variant == "missing-metric"
+                    && metric.id == "hot-path-token-issuance-p99"
+                    && run == 5
+                {
+                    continue;
+                }
+                lines.push(format!(
+                    "MAOS-PERF {}",
+                    serde_json::json!({"metric":metric.id,"value":1})
+                ));
+            }
+            if run == 1 && variant == "duplicate" {
+                lines.push(lines[0].clone());
+            }
+            if run == 1 && variant == "malformed" {
+                lines.push("MAOS-PERF broken".into());
+            }
+            fs::write(logs.join(format!("run-{run}-all.log")), lines.join("\n")).unwrap();
+        }
+        let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .current_dir(&root)
+            .env("GITHUB_RUN_ID", "123")
+            .env("GITHUB_RUN_ATTEMPT", "1")
+            .args(["perf-ledger-append", "--ledger"])
+            .arg(&ledger)
+            .arg("--logs")
+            .arg(&logs)
+            .arg("--calibration")
+            .arg(&calibration)
+            .args([
+                "--sha",
+                "new-sha",
+                "--branch",
+                "main",
+                "--fingerprint",
+                "fp-a",
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.success(),
+            variant == "valid",
+            "{variant}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn workflow_trust_and_diagnostic_status_contracts() {
+    let perf: serde_yaml::Value = serde_yaml::from_str(
+        &fs::read_to_string(repo_root().join(".github/workflows/perf.yml")).unwrap(),
+    )
+    .unwrap();
+    assert!(perf["on"].get("pull_request").is_none());
+    let append = &perf["jobs"]["append"];
+    assert_eq!(
+        append["if"].as_str(),
+        Some("${{ github.ref == 'refs/heads/main' && needs.tier-w.result == 'success' }}")
+    );
+    assert_eq!(
+        append["steps"][0]["with"]["persist-credentials"].as_bool(),
+        Some(false)
+    );
+    assert_eq!(
+        append["steps"][0]["with"]["ref"].as_str(),
+        Some("${{ github.sha }}")
+    );
+    let source=fs::read_to_string(repo_root().join("_bmad-output/implementation-artifacts/20-7-stable-runner-perf-gates-evidence/ci/ci-20-7-verify.yml")).unwrap();
+    let workflow: serde_yaml::Value = serde_yaml::from_str(&source).unwrap();
+    let script = workflow["jobs"]["diag-ac4"]["steps"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .filter_map(|s| s["run"].as_str())
+        .find(|s| s.contains("diag/summary.txt"))
+        .unwrap();
+    for required in [
+        "set -o pipefail",
+        "PIPESTATUS",
+        "INCOMPLETE",
+        "SUCCESS",
+        "FAILED",
+    ] {
+        assert!(script.contains(required), "{required}");
+    }
+}
+
+#[test]
+fn escaped_host_and_matrix_expansion_cannot_bypass_admission() {
+    let escaped = PERF_YML.replace(
+        "[self-hosted, maos-perf]",
+        "[self-hosted, \"maos\\x2dperf\"]",
+    );
+    assert!(findings(&escaped, OTHER_YML)
+        .iter()
+        .any(|f| f.contains("escaped")));
+    let matrix=OTHER_YML.replace("runs-on: ubuntu-latest","runs-on: ${{ matrix.os }}\n    strategy:\n      matrix:\n        os: [self-hosted]\n        include:\n          - os: ubuntu-latest");
+    assert!(!findings(PERF_YML, &matrix).is_empty());
+}
+
+#[test]
+fn ledger_timestamps_compare_instants_not_offsets_or_truncated_hours() {
+    let budgets = perf_budgets::parse(&fixture("budgets.toml")).unwrap();
+    let mut row: serde_json::Value =
+        serde_json::from_str(fixture("ledger.jsonl").lines().next().unwrap()).unwrap();
+    row["ts"] = "2026-11-01T00:00:00+01:00".into();
+    let mut later = row.clone();
+    later["ts"] = "2026-10-31T23:30:00Z".into();
+    let ledger = parse_ledger(&format!("{row}\n{later}")).unwrap();
+    let at = chrono::DateTime::parse_from_rfc3339("2026-11-02T23:15:00Z")
+        .unwrap()
+        .to_utc();
+    assert_eq!(staleness(&budgets, &ledger, at).unwrap(), None);
+    let future = chrono::DateTime::parse_from_rfc3339("2026-10-31T22:00:00Z")
+        .unwrap()
+        .to_utc();
+    assert!(staleness(&budgets, &ledger, future).is_err());
+}
+
+#[test]
+fn rebaseline_writer_generates_provenance_and_refuses_forged_fields() {
+    for variant in [
+        "valid",
+        "writer",
+        "negative-mad",
+        "negative-median",
+        "missing-review",
+        "branch",
+    ] {
+        let scratch = tempfile::tempdir().unwrap();
+        let ledger = scratch.path().join("ledger.jsonl");
+        let request = scratch.path().join("request.json");
+        fs::write(&ledger, "").unwrap();
+        let mut row = serde_json::json!({"metric":"hot-path-token-issuance-p99","median":5.0,"mad":0.0,"reason":"reviewed measurement","review":"https://github.com/lunarpulse/maos/pull/1"});
+        match variant {
+            "writer" => row["writer"] = "forged".into(),
+            "negative-mad" => row["mad"] = (-1).into(),
+            "negative-median" => row["median"] = (-1).into(),
+            "missing-review" => row["review"] = "".into(),
+            _ => {}
+        }
+        fs::write(&request, row.to_string()).unwrap();
+        let result = Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .current_dir(repo_root())
+            .env(
+                "GITHUB_REF",
+                if variant == "branch" {
+                    "refs/heads/topic"
+                } else {
+                    "refs/heads/main"
+                },
+            )
+            .env("GITHUB_SHA", "trusted-sha")
+            .env("GITHUB_RUN_ID", "123")
+            .env("GITHUB_RUN_ATTEMPT", "1")
+            .env("GITHUB_ACTOR", "operator")
+            .args(["perf-ledger-append", "--ledger"])
+            .arg(&ledger)
+            .arg("--rebaseline")
+            .arg(&request)
+            .args([
+                "--sha",
+                "trusted-sha",
+                "--branch",
+                "main",
+                "--fingerprint",
+                "fp",
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(
+            result.status.success(),
+            variant == "valid",
+            "{variant}: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        if variant == "valid" {
+            let text = fs::read_to_string(&ledger).unwrap();
+            let rows = parse_ledger(&text).unwrap();
+            assert!(
+                matches!(&rows[0],xtask::check_perf_verdict::Record::Rebaseline {writer,actor,run_id,..} if writer=="perf-ledger-append" && actor=="operator" && run_id=="123/1")
+            );
+        } else {
+            assert!(fs::read_to_string(&ledger).unwrap().is_empty());
+        }
+    }
 }

@@ -61,6 +61,14 @@ fn measure(dir: &Path, path: &str, need_instructions: bool) -> Result<Measured, 
     } else {
         0
     };
+    if json["path"].as_str() != Some(path)
+        || (path != EMPTY && field("iterations")? == 0)
+        || (path == EMPTY && (field("iterations")? != 0 || field("allocations")? != 0))
+    {
+        return Err(format!(
+            "{path}.json: invalid path/iterations/empty baseline"
+        ));
+    }
     Ok(Measured {
         iterations: field("iterations")?,
         allocations: field("allocations")?,
@@ -69,14 +77,25 @@ fn measure(dir: &Path, path: &str, need_instructions: bool) -> Result<Measured, 
 }
 
 /// Per-iteration figure for one Tier C row.
-fn figure(metric: &Metric, path: &Measured, empty: &Measured) -> f64 {
-    match metric.unit.as_str() {
-        "allocations" => path.allocations as f64 / path.iterations as f64,
-        _ => path.instructions.saturating_sub(empty.instructions) as f64 / path.iterations as f64,
+pub fn figure(metric: &Metric, path: &Measured, empty: &Measured) -> Result<f64, String> {
+    if path.iterations == 0
+        || (metric.unit == "instructions" && path.instructions < empty.instructions)
+    {
+        return Err("invalid measured iterations or instruction total below empty baseline".into());
     }
+    Ok(match metric.unit.as_str() {
+        "allocations" => path.allocations as f64 / path.iterations as f64,
+        _ => (path.instructions - empty.instructions) as f64 / path.iterations as f64,
+    })
 }
 
 pub fn judge(metric: &Metric, measured: f64) -> (Verdict, String) {
+    if !measured.is_finite() || measured < 0.0 {
+        return (
+            Verdict::Fail,
+            "invalid non-finite or negative measurement".into(),
+        );
+    }
     let Some(baseline) = metric.baseline else {
         return (
             Verdict::Absent,
@@ -120,7 +139,7 @@ pub fn run(dir: &str, json: bool) -> Result<(), String> {
         let path = metric.path.as_deref().unwrap_or(&metric.id);
         let measured = measure(dir, path, metric.unit == "instructions")
             .map_err(|error| format!("{GATE}: {error}"))?;
-        let (verdict, reason) = judge(metric, figure(metric, &measured, &empty));
+        let (verdict, reason) = judge(metric, figure(metric, &measured, &empty)?);
         let binding = metric.binding_at(&budgets.protocol.phase);
         println!("{} {} — {reason}", verdict.as_str(), metric.id);
         if verdict != Verdict::Pass && !binding {

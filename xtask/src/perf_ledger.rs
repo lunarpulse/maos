@@ -49,7 +49,16 @@ fn now_rfc3339() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
+fn run_identity() -> Result<String, String> {
+    let id = std::env::var("GITHUB_RUN_ID").map_err(|_| "GITHUB_RUN_ID required")?;
+    let attempt = std::env::var("GITHUB_RUN_ATTEMPT").map_err(|_| "GITHUB_RUN_ATTEMPT required")?;
+    if id.is_empty() || attempt.is_empty() {
+        return Err("empty run identity".into());
+    }
+    Ok(format!("{id}/{attempt}"))
+}
 pub fn calibrate(sha: &str, fingerprint: &str, reference: Option<&str>) -> Result<(), String> {
+    let run_id = run_identity()?;
     let mut cpu = Vec::with_capacity(RUNS);
     for _ in 0..RUNS {
         let start = Instant::now();
@@ -75,6 +84,7 @@ pub fn calibrate(sha: &str, fingerprint: &str, reference: Option<&str>) -> Resul
         "{}",
         serde_json::json!({
             "kind": "calibration", "sha": sha, "ts": now_rfc3339(), "fingerprint": fingerprint,
+            "run_id": run_id,
             "cpu_cv_pct": cpu_cv, "fsync_cv_pct": fsync_cv,
             "cpu_drift_pct": drift(cpu_median, cpu_ref), "fsync_drift_pct": drift(fsync_median, fsync_ref),
             "cpu_median_ns": cpu_median, "fsync_median_ns": fsync_median,
@@ -108,12 +118,23 @@ fn reference_medians(ledger: &str, fingerprint: &str) -> Result<(f64, f64), Stri
 }
 
 /// `(metric, value)` pairs from one bench log.
-fn metrics_in(log: &str) -> Vec<(String, f64)> {
-    log.lines()
-        .filter_map(|line| line.strip_prefix(METRIC_PREFIX))
-        .filter_map(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-        .filter_map(|v| Some((v["metric"].as_str()?.to_owned(), v["value"].as_f64()?)))
-        .collect()
+pub fn metrics_in(log: &str) -> Result<Vec<(String, f64)>, String> {
+    let mut out = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for line in log.lines().filter(|l| l.starts_with("MAOS-PERF")) {
+        let json = line
+            .strip_prefix(METRIC_PREFIX)
+            .ok_or("malformed metric prefix")?;
+        let v: serde_json::Value =
+            serde_json::from_str(json).map_err(|e| format!("malformed metric: {e}"))?;
+        let id = v["metric"].as_str().ok_or("missing metric id")?;
+        let value = v["value"].as_f64().ok_or("missing finite metric value")?;
+        if !value.is_finite() || value < 0.0 || !seen.insert(id.to_owned()) {
+            return Err(format!("invalid or duplicate metric {id}"));
+        }
+        out.push((id.to_owned(), value));
+    }
+    Ok(out)
 }
 
 pub fn append(
@@ -126,6 +147,7 @@ pub fn append(
 ) -> Result<(), String> {
     let root = std::env::current_dir().map_err(|error| format!("perf-ledger-append: {error}"))?;
     let budgets = perf_budgets::load(&root)?;
+    let run_id = run_identity()?;
     let existing = std::fs::read_to_string(ledger).map_err(|error| {
         format!("perf-ledger-append: the perf-ledger is missing at {ledger}: {error}")
     })?;
@@ -134,6 +156,19 @@ pub fn append(
         .map_err(|error| format!("perf-ledger-append: {calibration}: {error}"))?;
     let calibration_record: Record = serde_json::from_str(calibration_line.trim())
         .map_err(|error| format!("perf-ledger-append: {calibration}: {error}"))?;
+    crate::check_perf_verdict::validate_record(&calibration_record, chrono::Utc::now())?;
+    if !matches!(&calibration_record, Record::Calibration { sha: s, fingerprint: f, run_id: r, .. } if s==sha && f==fingerprint && r==&run_id)
+    {
+        return Err(
+            "calibration kind/sha/fingerprint/run_id disagrees with append arguments".into(),
+        );
+    }
+    if records
+        .iter()
+        .any(|r| matches!(r, Record::Metric { sha: s, .. } if s==sha))
+    {
+        return Err("SHA already has observations; cannot overwrite its verdict".into());
+    }
     let ts = now_rfc3339();
     let mut by_run: Vec<_> = std::fs::read_dir(logs)
         .map_err(|error| format!("perf-ledger-append: {logs}: {error}"))?
@@ -141,18 +176,54 @@ pub fn append(
         .map(|entry| entry.path())
         .collect();
     by_run.sort();
-    let mut runs: std::collections::BTreeMap<String, Vec<f64>> = std::collections::BTreeMap::new();
+    let expected: std::collections::BTreeSet<_> = budgets
+        .metric
+        .iter()
+        .filter(|m| m.tier == "W" && m.instrument.contains("/benches/"))
+        .map(|m| m.id.clone())
+        .collect();
+    let mut observations =
+        std::collections::BTreeMap::<String, std::collections::BTreeMap<String, f64>>::new();
     for path in by_run {
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("invalid log filename")?;
+        let process = name
+            .strip_prefix("run-")
+            .and_then(|n| n.split('-').next())
+            .filter(|n| ["1", "2", "3", "4", "5"].contains(n))
+            .ok_or("log must identify process run-1 through run-5")?;
         let text = std::fs::read_to_string(&path)
             .map_err(|error| format!("{}: {error}", path.display()))?;
-        for (metric, value) in metrics_in(&text) {
-            runs.entry(metric).or_default().push(value);
+        for (metric, value) in metrics_in(&text)? {
+            if !expected.contains(&metric) {
+                return Err(format!("unregistered metric {metric}"));
+            }
+            if observations
+                .entry(metric.clone())
+                .or_default()
+                .insert(process.to_owned(), value)
+                .is_some()
+            {
+                return Err(format!("duplicate {metric} process {process}"));
+            }
         }
+    }
+    if expected
+        .iter()
+        .any(|m| observations.get(m).is_none_or(|v| v.len() != 5))
+    {
+        return Err("every metric requires exactly five distinct process runs".into());
     }
     records.push(calibration_record);
     let mut lines = vec![calibration_line.trim().to_owned()];
-    for (metric, values) in runs {
+    for (metric, observations) in observations {
+        let process_runs: Vec<_> = observations.keys().cloned().collect();
+        let values: Vec<_> = observations.values().copied().collect();
         records.push(Record::Metric {
+            run_id: run_id.clone(),
+            process_runs: process_runs.clone(),
             sha: sha.to_owned(),
             ts: ts.clone(),
             fingerprint: fingerprint.to_owned(),
@@ -168,6 +239,7 @@ pub fn append(
         lines.push(
             serde_json::json!({
                 "kind": "metric", "sha": sha, "ts": ts, "fingerprint": fingerprint,
+                "run_id": run_id, "process_runs": process_runs,
                 "metric": metric, "runs": values, "branch": branch, "verdict": verdict,
             })
             .to_string(),
@@ -181,4 +253,65 @@ pub fn append(
         writeln!(file, "{line}").map_err(|error| format!("perf-ledger-append: {error}"))?;
     }
     Ok(())
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct RebaselineRequest {
+    metric: String,
+    median: f64,
+    mad: f64,
+    reason: String,
+    review: String,
+}
+
+pub fn rebaseline(
+    ledger: &str,
+    request: &str,
+    sha: &str,
+    branch: &str,
+    fingerprint: &str,
+) -> Result<(), String> {
+    if branch != "main"
+        || std::env::var("GITHUB_REF").as_deref() != Ok("refs/heads/main")
+        || std::env::var("GITHUB_SHA").as_deref() != Ok(sha)
+    {
+        return Err("rebaseline requires trusted main ref and SHA".into());
+    }
+    let request: RebaselineRequest =
+        serde_json::from_str(&std::fs::read_to_string(request).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    let root = std::env::current_dir().map_err(|e| e.to_string())?;
+    if !perf_budgets::load(&root)?
+        .metric
+        .iter()
+        .any(|m| m.id == request.metric && m.tier == "W")
+    {
+        return Err("unknown Tier W rebaseline metric".into());
+    }
+    let existing = std::fs::read_to_string(ledger).map_err(|e| e.to_string())?;
+    parse_ledger(&existing)?;
+    let mut value = serde_json::to_value(request).map_err(|e| e.to_string())?;
+    let fields = value.as_object_mut().ok_or("request object required")?;
+    for (key, val) in [
+        ("kind", "rebaseline".to_owned()),
+        ("ts", now_rfc3339()),
+        ("sha", sha.to_owned()),
+        ("fingerprint", fingerprint.to_owned()),
+        ("run_id", run_identity()?),
+        (
+            "actor",
+            std::env::var("GITHUB_ACTOR").map_err(|e| e.to_string())?,
+        ),
+        ("writer", "perf-ledger-append".to_owned()),
+    ] {
+        fields.insert(key.into(), val.into());
+    }
+    let line = value.to_string();
+    parse_ledger(&line)?;
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(ledger)
+        .map_err(|e| e.to_string())?;
+    writeln!(file, "{line}").map_err(|e| e.to_string())
 }

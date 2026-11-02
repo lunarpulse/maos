@@ -1417,6 +1417,8 @@ coverage:
       row (`adr-030-cap-token-verify-p99`) on the stable runner. The hosted test
       keeps NFR-Perf-3's 100us as a named catastrophe guard and times verify + audit
       enqueue.
+      Instruction baselines are ABSENT/advisory: AC5 instruction enforcement is
+      not complete; proposed D-20-7-09 requires an operator ruling.
   NFR-Perf-4:
     gates: [nfr-perf-4-posture-shift]
     corpora: []
@@ -1437,8 +1439,9 @@ coverage:
     notes: >
       Story 20-7 AC4 — a 30-day-sized audit fixture: single-Spirit P99 <= 2 s and
       global P99 <= 10 s. NOT claimed: the production WASM `recall` route's separate
-      latency leg (R17-154/157) — owed by 20-7 landing 2 (blocker: no WASM guest
-      harness for benches); asserted only for the CLI audit-query path.
+      latency leg (R17-154/157). Missing WASM guest harness blocks this unchanged
+      AC4.1 leg; proposed D-20-7-10 (move to L2) is not yet authorized. Current
+      evidence asserts only the CLI audit-query path.
   NFR-Perf-6:
     gates: [nfr-perf-6-hook-dispatch-envelope]
     corpora: []

@@ -48,14 +48,16 @@ Not applied (shared line): `sprint-status.yaml:1` `last_updated: 2026-10-31` →
 |---|---|---|---|---|
 | O1 | Rented single-tenant bare-metal Tier W host per ADR-068 §2–§4 (≥ 16 physical cores, NVMe, ≥ 64 GB, Ubuntu 26.04 LTS kernel held; boot-time tuning; unprivileged runner, one job at a time, label `maos-perf`, job hooks wiping workspace/tmp, outbound-only firewall, key-only SSH) + fingerprint and calibration report | L2 (AC1.4, AC6.1 soak, AC11, AC12.1) | Lunarpulse (`ops-stable-perf-runner`, `sprint-status.yaml:327`; rental, money, network) | absent: `gh api repos/lunarpulse/maos/actions/runners` → 0; `provisioning-checklist.md:44` `absent` |
 | O2 | `perf-ledger` branch created and writable by the GitHub-hosted append job only (precedent `rto-ledger`, `.github/workflows/rpo-rto-cadence.yml:17-30`) | AC1 (live), AC11 | Lunarpulse (repository admin) | absent (`git ls-remote origin` lists `fuzz-ledger`, `rto-ledger` only) |
-| O3 | Repository setting "require approval for fork pull-request workflows" (defence in depth; the fork guard is the control, `ADR-068…md:101-103`) | before `perf.yml` targets a real runner | Lunarpulse (repository admin) | not measured (settings API not queried) |
+| O3 | **OPERATOR setting, L1 security correction:** `perf-host` environment restricted to protected main with required reviewers; runner group restricted to this repository's `.github/workflows/perf.yml@refs/heads/main`. Verify environment deployment-branch/reviewer settings and runner-group selected-workflow/ref settings via UI/API export; a non-main dispatch must be denied. A PR-editable fork guard is not admission. | before enabling any real perf runner | Lunarpulse (repository/organization admin) | unverified: no settings export or non-main denial witness supplied |
 | O4 | Rootless podman + the signed T3 image lock/trust anchor on the perf host, for AC6's Tier W soak (D-20-7-06 A only) | L2 AC6.1 | Lunarpulse (host); image trust anchor with `ops-live-worker-under-17-1-profile` | absent (host absent) |
 | O5 | Runner registration (token, label) and the maintenance-window calendar the runbook names | L2 | Lunarpulse | absent |
 | O6 | Hosting-provider account and billing for the rental | O1 | Lunarpulse | not inventoried (PF:137 "current secret/host availability unmeasured") |
+| O7 | **OPERATOR setting:** require approval for fork pull-request workflows from all outside collaborators. Verify Settings → Actions → General (or repository Actions permissions API export), plus a fork PR awaiting approval. Additional defense, not a substitute for O3. | before enabling any real perf runner | Lunarpulse (repository admin) | unverified: settings not queried in this correction assignment |
 | — | Fuzz-ledger access | **not a 20-7 input** (20-5's T3 24 h chain, PF:124) | — | `fuzz-ledger` branch exists |
 | — | CI-log read token | diagnosis only | — | available on the dev host (all 14 logs fetched); `provisioning-checklist.md:45` row is the orchestrator's to update |
 
 Tracker owed (orchestrator): `sprint-status.yaml:327` (`ops-stable-perf-runner`) append "20-7 created 2026-11-01: L1 needs nothing from this row; L2 needs O1–O5 (`20-7-…-evidence/creation/records-owed.md` §O)".
+Review correction: L2 prerequisites now include **O3 and O7** as documented in `docs/runbooks/perf-runner.md`; repository code does not configure or prove these operator settings.
 
 ## Records owed after the rulings (not now)
 

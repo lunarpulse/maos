@@ -14,14 +14,14 @@ name: ci-20-7-verify
 #                          pre-landing tree (`base_sha`, a4c00897) and is green at HEAD.
 #   k2r-plant       AC8.5  the pidfd signal removed (diff + sha256 below) => red.
 #   s3-both         AC7.5  S3 on ubuntu-24.04 (podman 4.9.3) and ubuntu-26.04 (5.7), no retry.
-#   real-spawn      AC6.2  hosted smoke: 5 real T3 Workers, 60 s: distinct CIDs and child pids.
+#   real-spawn      AC6.2 harness mechanics: cap 5 T3 Workers, 60 s, 1 task/s, >=2 overlap.
 #   real-spawn-plant AC6.3 in-process stand-in for the T3 spawn => distinct-CID assertion red.
 #   tier-c          AC5    callgrind counts (prints the instruction figures to commit).
-#   tier-c-plant    AC5.2/AC10 an extra verify loop in the harness (diff + sha256) => red.
+#   tier-c-plant    AC5.2/AC10 allocation-free CPU work; instruction FAIL/allocation PASS.
 #
 # Cut diffs (`git apply`; sha256 of the exact patch text is checked before applying):
 #   k2r-plant      sha256 fb16d366e841fd6031b208b48437b15b79d2e14d82eba024fff1ac22a4c0aa8d
-#   tier-c-plant   sha256 a4bccab5ef953310c1288326a05a5e118aa692b430b3302ad3f0d2fb1a7d1bd5
+#   tier-c-plant requires committed hosted instruction baselines (R3 decision pending).
 
 on:
   push:
@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: tree under test (default: the pushed SHA)
+        description: 'tree under test (default: the pushed SHA)'
         required: false
       base_sha:
         description: pre-landing tree for the failing-before witness
@@ -67,13 +67,25 @@ jobs:
           cargo build -p worker --bin worker-cli-fixture
       - name: The ac4 family, 20 times, failures printed in full
         run: |
+          set -o pipefail
           mkdir -p diag
+          : > diag/summary.txt
+          trap 'cat diag/run-*.status > diag/summary.txt' EXIT
           for i in $(seq 1 20); do
+            echo "run $i: INCOMPLETE" > "diag/run-$i.status"
+            set +e
             cargo nextest run --locked -p maos-bin --test root_shutdown_unload_16_3 \
               -E 'test(ac4) | test(ac3_operator_door_unload_stops_a_live_worker_once)' \
-              --test-threads 1 --no-fail-fast 2>&1 | tee "diag/run-$i.log" || echo "run $i: RED (kept in the artifact)" >> diag/summary.txt
+              --test-threads 1 --no-fail-fast 2>&1 | tee "diag/run-$i.log"
+            statuses=("${PIPESTATUS[@]}")
+            set -e
+            if [ "${statuses[0]}" -eq 0 ] && [ "${statuses[1]}" -eq 0 ]; then
+              echo "run $i: SUCCESS" > "diag/run-$i.status"
+            else
+              echo "run $i: FAILED nextest=${statuses[0]} tee=${statuses[1]}" > "diag/run-$i.status"
+            fi
           done
-          touch diag/summary.txt
+          cat diag/run-*.status > diag/summary.txt
           cat diag/summary.txt
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -220,7 +232,7 @@ jobs:
       - uses: ./.github/actions/provision-t3-test-substrate
       - name: Fixtures
         run: cargo run --locked -p xtask -- build-test-fixtures
-      - name: Smoke — 5 real T3 Workers, 60 s, 10 tasks/s
+      - name: Smoke — cap 5 real T3 Workers, 60 s, 1 task/s; harness mechanics only
         env:
           MAOS_20_7_FANOUT: smoke
         run: cargo test --locked -p maos-bin --test nfr_perf_8_real_spawn_fanout_20_7 -- --nocapture
@@ -296,23 +308,25 @@ jobs:
         with:
           key: verify-tier-c-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends valgrind
-      - name: Plant — an extra loop in the token-verify harness path
+      - name: Plant — allocation-neutral instruction work in the token-verify path
         run: |
-          cat > tier-c-plant.diff <<'PATCH'
-          --- a/crates/maos-bench/src/bin/tier_c_harness.rs
-          +++ b/crates/maos-bench/src/bin/tier_c_harness.rs
-          @@ -155,6 +155,8 @@
-                           &mut || {
-                               ring.verify(&token, posture, SandboxTier(2))
-                                   .expect("verify");
-          +                    ring.verify(&token, posture, SandboxTier(2))
-          +                        .expect("verify");
-                           },
-                           iterations,
-                       )
-          PATCH
-          echo "a4bccab5ef953310c1288326a05a5e118aa692b430b3302ad3f0d2fb1a7d1bd5  tier-c-plant.diff" | sha256sum -c -
-          git apply tier-c-plant.diff
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("crates/maos-bench/src/bin/tier_c_harness.rs")
+          text = p.read_text()
+          old = '.expect("verify");'
+          assert text.count(old) == 1
+          extra = '''
+                              let mut state = std::hint::black_box(0x12345678u64);
+                              for _ in 0..1000 {
+                                  state ^= state << 13;
+                                  state ^= state >> 7;
+                                  state ^= state << 17;
+                                  std::hint::black_box(state);
+                              }
+          '''
+          p.write_text(text.replace(old, old + extra))
+          PY
       - run: cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness
       - name: The Tier C comparison must RED
         run: |
@@ -321,6 +335,10 @@ jobs:
           h="$PWD/target/debug/tier_c_harness"
           m() { valgrind --tool=callgrind --toggle-collect=maos_tier_c_measured --callgrind-out-file="tier-c/$1.callgrind" "$h" "$1" "$2" > "tier-c/$1.json" 2> "tier-c/$1.valgrind.log"; }
           m empty 0; m cap_token_verify 10000; m iac_routing 2000; m frame_lowering 10000
-          if cargo run --locked -p xtask -- check-perf-counts --dir tier-c; then
-            echo "PLANT NOT DETECTED: Tier C stayed green with a doubled verify path"; exit 1
-          fi
+          set +e
+          cargo run --locked -p xtask -- check-perf-counts --dir tier-c | tee tier-c/verdict.txt
+          status=${PIPESTATUS[0]}
+          set -e
+          grep -q '^PASS cap-token-verify-allocations' tier-c/verdict.txt
+          grep -q '^FAIL cap-token-verify-instructions' tier-c/verdict.txt
+          [ "$status" -ne 0 ] || { echo "PLANT NOT DETECTED: instruction row must be binding with a hosted baseline"; exit 1; }

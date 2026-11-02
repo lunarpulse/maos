@@ -1,197 +1,213 @@
 #![forbid(unsafe_code)]
-
-//! Story 20-7 AC2 — `check-perf-runner-policy` (ADR-068 §4): the stable
-//! performance runner only ever runs trusted code. On a public repository a
-//! self-hosted runner that executes fork code is remote code execution on that
-//! host, so this gate is the only thing between a fork pull request and it.
-//!
-//! Refusals (each proven red by a plant in `xtask/tests/check_perf_runner_policy_20_7.rs`):
-//!
-//! 1. a workflow other than `perf.yml` that mentions the `maos-perf` label;
-//! 2. `perf.yml` absent, or triggered by anything but `push` to `main`,
-//!    `schedule`, `workflow_dispatch` and `pull_request` (so never
-//!    `pull_request_target`, `workflow_run`, …);
-//! 3. a `maos-perf` job in a `pull_request` workflow without the job-level
-//!    same-repository guard;
-//! 4. a `maos-perf` job whose permissions are not exactly `contents: read`
-//!    (absent permissions are the token's wider default), or that reads `secrets.`.
-
-use std::path::Path;
-
+//! Repository policy is defense in depth; operator runner-group and environment
+//! protections, not PR-editable code, are the runner admission boundary.
 use serde_yaml::Value;
-
+use std::path::Path;
 const GATE: &str = "check-perf-runner-policy";
-const LABEL: &str = "maos-perf";
 const WORKFLOWS: &str = ".github/workflows";
 const PERF: &str = "perf.yml";
-const FORK_GUARD: &str = "github.event.pull_request.head.repo.full_name == github.repository";
-const TRIGGERS: [&str; 4] = ["push", "schedule", "workflow_dispatch", "pull_request"];
-
-fn key<'a>(value: &'a Value, name: &str) -> Option<&'a Value> {
-    value.get(name)
-}
-
-/// `on:` parses as the boolean `true` under YAML 1.1 loaders; serde_yaml keeps `on`.
-fn triggers(workflow: &Value) -> Vec<String> {
-    let on = key(workflow, "on").or_else(|| workflow.get(Value::Bool(true)));
-    match on {
-        Some(Value::String(name)) => vec![name.clone()],
-        Some(Value::Sequence(names)) => names
+const HOST: [&str; 2] = ["self-hosted", "maos-perf"];
+const HOSTED: [&str; 9] = [
+    "ubuntu-latest",
+    "ubuntu-24.04",
+    "ubuntu-22.04",
+    "ubuntu-26.04",
+    "ubuntu-24.04-arm",
+    "ubuntu-26.04-arm",
+    "windows-latest",
+    "macos-latest",
+    "macos-14",
+];
+const MAIN: &str = "github.ref == 'refs/heads/main'";
+fn triggers(w: &Value) -> Vec<String> {
+    match w.get("on") {
+        Some(Value::String(s)) => vec![s.clone()],
+        Some(Value::Sequence(s)) => s
             .iter()
-            .filter_map(|name| name.as_str().map(str::to_owned))
+            .map(|v| v.as_str().unwrap_or("INVALID").to_owned())
             .collect(),
-        Some(Value::Mapping(map)) => map
+        Some(Value::Mapping(m)) => m
             .keys()
-            .filter_map(|name| name.as_str().map(str::to_owned))
+            .map(|v| v.as_str().unwrap_or("INVALID").to_owned())
             .collect(),
-        _ => Vec::new(),
+        _ => vec!["INVALID".into()],
     }
 }
-
-fn targets_runner(job: &Value) -> bool {
-    key(job, "runs-on")
-        .and_then(|runs_on| serde_yaml::to_string(runs_on).ok())
-        .is_some_and(|text| text.contains(LABEL))
+fn expression(s: &str) -> &str {
+    let s = s.trim();
+    s.strip_prefix("${{")
+        .and_then(|s| s.strip_suffix("}}"))
+        .unwrap_or(s)
+        .trim()
 }
-
-/// Exactly `{contents: read}`; anything else (or nothing) is wider.
-fn contents_read_only(permissions: Option<&Value>) -> bool {
-    let Some(Value::Mapping(map)) = permissions else {
+fn secret(v: &Value) -> bool {
+    match v {
+        Value::String(s) => s.split("${{").skip(1).any(|e| {
+            e.split("}}").next().is_some_and(|e| {
+                e.split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                    .any(|t| t.eq_ignore_ascii_case("secrets"))
+            })
+        }),
+        Value::Sequence(s) => s.iter().any(secret),
+        Value::Mapping(m) => m.iter().any(|(k, v)| secret(k) || secret(v)),
+        _ => false,
+    }
+}
+fn hosted(job: &Value) -> bool {
+    let Some(selector) = job.get("runs-on").and_then(Value::as_str) else {
         return false;
     };
-    map.len() == 1 && map.get("contents").and_then(Value::as_str) == Some("read")
-}
-
-fn audit_perf(workflow: &Value, findings: &mut Vec<String>) {
-    let events = triggers(workflow);
-    for event in &events {
-        if !TRIGGERS.contains(&event.as_str()) {
-            findings.push(format!(
-                "{WORKFLOWS}/{PERF}: trigger `{event}` can reach the runner with code a fork controls; only {TRIGGERS:?} are allowed"
-            ));
-        }
+    if HOSTED.contains(&selector) {
+        return true;
     }
-    let on = key(workflow, "on").or_else(|| workflow.get(Value::Bool(true)));
-    if let Some(branches) = on
-        .and_then(|on| key(on, "push"))
-        .and_then(|push| key(push, "branches"))
-    {
-        if branches
-            .as_sequence()
-            .is_none_or(|b| b.iter().any(|n| n.as_str() != Some("main")))
-        {
-            findings.push(format!(
-                "{WORKFLOWS}/{PERF}: `push` must be restricted to `main`"
-            ));
-        }
-    } else if events.iter().any(|event| event == "push") {
-        findings.push(format!(
-            "{WORKFLOWS}/{PERF}: `push` must name `branches: [main]`"
-        ));
-    }
-    let pull_request = events.iter().any(|event| event == "pull_request");
-    let Some(Value::Mapping(jobs)) = key(workflow, "jobs") else {
-        return;
+    let axis = match selector {
+        "${{ matrix.os }}" => "os",
+        "${{ matrix.image }}" => "image",
+        _ => return false,
     };
-    for (name, job) in jobs {
-        if !targets_runner(job) {
+    let Some(matrix) = job
+        .get("strategy")
+        .and_then(|v| v.get("matrix"))
+        .and_then(Value::as_mapping)
+        .filter(|m| m.len() == 1)
+    else {
+        return false;
+    };
+    let hosted = |v: &Value| v.as_str().is_some_and(|s| HOSTED.contains(&s));
+    if let Some(values) = matrix.get(axis).and_then(Value::as_sequence) {
+        return !values.is_empty() && values.iter().all(hosted);
+    }
+    matrix
+        .get("include")
+        .and_then(Value::as_sequence)
+        .is_some_and(|rows| {
+            !rows.is_empty() && rows.iter().all(|v| v.get(axis).is_some_and(hosted))
+        })
+}
+pub fn audit(root: &Path) -> Result<Vec<String>, String> {
+    let mut findings = Vec::new();
+    let mut seen = false;
+    let anchors = regex::Regex::new(r"(?:^|[\s:\[,])[*&][A-Za-z_][A-Za-z0-9_-]*")
+        .map_err(|e| e.to_string())?;
+    for entry in std::fs::read_dir(root.join(WORKFLOWS)).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if !matches!(
+            path.extension().and_then(|s| s.to_str()),
+            Some("yml" | "yaml")
+        ) {
             continue;
         }
-        let name = name.as_str().unwrap_or("?");
-        let guard = key(job, "if")
-            .and_then(Value::as_str)
-            .is_some_and(|condition| condition.contains(FORK_GUARD));
-        if pull_request && !guard {
-            findings.push(format!(
-                "{WORKFLOWS}/{PERF}: job `{name}` runs on `{LABEL}` in a pull_request workflow without the job-level fork guard `{FORK_GUARD}`"
-            ));
-        }
-        let permissions = key(job, "permissions").or_else(|| key(workflow, "permissions"));
-        if !contents_read_only(permissions) {
-            findings.push(format!(
-                "{WORKFLOWS}/{PERF}: job `{name}` on `{LABEL}` must hold exactly `permissions: {{contents: read}}` (no write token on the host)"
-            ));
-        }
-        if serde_yaml::to_string(job).is_ok_and(|text| text.contains("secrets.")) {
-            findings.push(format!(
-                "{WORKFLOWS}/{PERF}: job `{name}` on `{LABEL}` reads a repository secret"
-            ));
-        }
-    }
-}
-
-/// Every finding over the workflows under `root`; empty means the policy holds.
-pub fn audit(root: &Path) -> Result<Vec<String>, String> {
-    let dir = root.join(WORKFLOWS);
-    let mut files: Vec<_> = std::fs::read_dir(&dir)
-        .map_err(|error| format!("{GATE}: cannot read {WORKFLOWS}: {error}"))?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            matches!(
-                path.extension().and_then(|e| e.to_str()),
-                Some("yml" | "yaml")
-            )
-        })
-        .collect();
-    files.sort();
-    let mut findings = Vec::new();
-    let mut perf_seen = false;
-    for path in files {
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("?")
-            .to_owned();
-        let text = std::fs::read_to_string(&path)
-            .map_err(|error| format!("{GATE}: cannot read {name}: {error}"))?;
-        if name == PERF {
-            perf_seen = true;
-            match serde_yaml::from_str::<Value>(&text) {
-                Ok(workflow) => audit_perf(&workflow, &mut findings),
-                Err(error) => findings.push(format!("{WORKFLOWS}/{name}: unparsable: {error}")),
+        let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("?");
+        seen |= name == PERF;
+        let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let w: Value = match serde_yaml::from_str(&text) {
+            Ok(w) => w,
+            Err(e) => {
+                findings.push(format!("{name}: unparsable: {e}"));
+                continue;
             }
-        } else if text
+        };
+        // Do not resolve anchors/aliases differently from GitHub. They are not
+        // part of this repository's accepted workflow language.
+        if text
             .lines()
-            .any(|line| !line.trim_start().starts_with('#') && line.contains(LABEL))
+            .any(|l| !l.trim_start().starts_with('#') && anchors.is_match(l))
         {
-            findings.push(format!(
-                "{WORKFLOWS}/{name}: names the `{LABEL}` runner; only {PERF} may"
-            ));
+            findings.push(format!("{name}: YAML anchors/aliases refused"));
+        }
+        let mut runner_indent = None;
+        for line in text
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
+        {
+            let indent = line.len() - line.trim_start().len();
+            if line.trim_start().starts_with("runs-on:") {
+                runner_indent = Some(indent);
+            } else if runner_indent.is_some_and(|n| indent <= n) {
+                runner_indent = None;
+            }
+            if runner_indent.is_some() && line.contains('\\') {
+                findings.push(format!("{name}: escaped runner labels refused"));
+            }
+        }
+        let Some(jobs) = w.get("jobs").and_then(Value::as_mapping) else {
+            findings.push(format!("{name}: jobs missing"));
+            continue;
+        };
+        for (id, job) in jobs {
+            if hosted(job) && job.get("uses").is_none() {
+                continue;
+            }
+            let id = id.as_str().unwrap_or("?");
+            let prefix = format!("{name}: job {id}");
+            let exact_host = job
+                .get("runs-on")
+                .and_then(Value::as_sequence)
+                .is_some_and(|s| {
+                    s.len() == 2 && s.iter().zip(HOST).all(|(v, s)| v.as_str() == Some(s))
+                });
+            if name != PERF || !exact_host || job.get("uses").is_some() {
+                findings.push(format!("{prefix}: ambiguous or unapproved host selector; only perf.yml may target [self-hosted, maos-perf]"));
+            }
+            for event in triggers(&w) {
+                if !["push", "schedule", "workflow_dispatch"].contains(&event.as_str()) {
+                    findings.push(format!("{prefix}: host workflow trigger {event} refused (including pull_request, pull_request_target, issue_comment)"));
+                }
+                if event == "push"
+                    && w.get("on")
+                        .and_then(|v| v.get("push"))
+                        .and_then(|v| v.get("branches"))
+                        .and_then(Value::as_sequence)
+                        .is_none_or(|s| s.len() != 1 || s[0].as_str() != Some("main"))
+                {
+                    findings.push(format!("{prefix}: push must be restricted to main"));
+                }
+            }
+            let condition = job
+                .get("if")
+                .and_then(Value::as_str)
+                .map(expression)
+                .unwrap_or("");
+            let accepted = [MAIN.to_owned(), format!("{MAIN} && vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule != '7 1 * * 0'"), format!("{MAIN} && vars.MAOS_PERF_RUNNER_ENABLED == 'true' && github.event.schedule == '7 1 * * 0'")];
+            if !accepted.iter().any(|s| s == condition) {
+                findings.push(format!("{prefix}: exact main-ref guard required; fork guard or substring is not admission"));
+            }
+            if job.get("environment").and_then(Value::as_str) != Some("perf-host") {
+                findings.push(format!("{prefix}: environment perf-host required"));
+            }
+            let permissions = job
+                .get("permissions")
+                .or_else(|| w.get("permissions"))
+                .and_then(Value::as_mapping);
+            if permissions.is_none_or(|m| {
+                m.len() != 1 || m.get("contents").and_then(Value::as_str) != Some("read")
+            }) {
+                findings.push(format!("{prefix}: must hold exactly contents: read"));
+            }
+            if secret(job) || w.get("env").is_some_and(secret) {
+                findings.push(format!("{prefix}: repository secrets refused"));
+            }
         }
     }
-    if !perf_seen {
-        findings.push(format!("{WORKFLOWS}/{PERF}: absent"));
+    if !seen {
+        findings.push("perf.yml: absent".into());
     }
     Ok(findings)
 }
-
 pub fn run(json: bool) -> Result<(), String> {
-    let root = std::env::current_dir().map_err(|error| format!("{GATE}: no cwd: {error}"))?;
-    let findings = audit(&root)?;
+    let findings = audit(&std::env::current_dir().map_err(|e| e.to_string())?)?;
     if json {
         println!(
             "{}",
-            serde_json::json!({ "gate": GATE, "passed": findings.is_empty(), "findings": findings })
+            serde_json::json!({"gate":GATE,"passed":findings.is_empty(),"findings":findings})
         );
     }
     if findings.is_empty() {
-        if !json {
-            println!("{GATE}: PASS — only {PERF} targets `{LABEL}`, trusted triggers, fork guard, contents: read");
-        }
-        return Ok(());
+        println!(
+            "{GATE}: PASS — structural selectors, trusted triggers, exact guards, read-only host"
+        );
+        Ok(())
+    } else {
+        Err(format!("{GATE}: FAIL — {}", findings.join("\n")))
     }
-    let message = format!(
-        "{GATE}: FAIL — {} finding(s):\n{}",
-        findings.len(),
-        findings
-            .iter()
-            .map(|f| format!("- {f}\n"))
-            .collect::<String>()
-    );
-    crate::gate_common::emit_command(json, "error", &message);
-    if !json {
-        eprintln!("{message}");
-    }
-    Err(message)
 }

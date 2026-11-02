@@ -1,0 +1,2 @@
+workspace aggregate KLOC alarm: configured threshold=158608, current=190590
+kloc-check: PASSED (aggregate=190590 LOC)

@@ -88,19 +88,20 @@ Tier C catches most regressions before merge; Tier W decides whether MAOS keeps 
 ### 4. Security — the runner only ever runs trusted code
 
 - `.github/workflows/perf.yml` is the only workflow that may target the runner label `maos-perf`.
-  It triggers on `push` to `main`, `schedule`, `workflow_dispatch`, and `pull_request` **only** when
-  the head repository is this repository — never a fork (a job-level `if:`) — and never on
-  `pull_request_target`.
-- `check-perf-runner-policy` (xtask) enforces that, proven red by planting each violation: a second
-  workflow that uses `maos-perf`, a removed fork guard, an added `pull_request_target`.
+  It triggers only on `push` to `main`, `schedule`, and main-ref
+  `workflow_dispatch`; host jobs never share a PR or comment trigger.
+  Operator-controlled `perf-host` environment branch protection and runner-group
+  access scoped to this repository's perf workflow at `refs/heads/main` are
+  prerequisites. `check-perf-runner-policy` checks the structural repository
+  policy as defense in depth; it cannot enforce settings outside the repository.
 - The runner account is unprivileged, with no sudo. `perf.yml` holds `permissions: contents: read`;
   results leave the host as a workflow artifact, and a GitHub-hosted follow-up job appends them to
   the ledger, so the host never holds a write token or a repository secret.
 - Runner job hooks (`ACTIONS_RUNNER_HOOK_JOB_STARTED`, `ACTIONS_RUNNER_HOOK_JOB_COMPLETED`) wipe the
   workspace and temporary directories before and after every job.
 - Network: outbound only to GitHub and the package registries the build needs; inbound only the
-  operator's key-only SSH or a management VPN. The repository requires approval for fork
-  pull-request workflows as defence in depth; the fork guard is the control.
+  operator's key-only SSH or a management VPN. Required approval for all outside
+  collaborator fork workflows is additional defense, not the admission boundary.
 
 ### 5. Measurement protocol — no silent pass
 

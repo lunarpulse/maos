@@ -19,10 +19,10 @@
 //! Selector (`MAOS_20_7_FANOUT`), absent => a named SKIP so the workspace suite
 //! stays fast and the claim is only ever the runner's or the smoke job's:
 //!
-//! * `smoke` — 5 Workers, 60 s, 10 tasks/s (hosted, `provision-t3-test-substrate`):
-//!   asserts the spawns are REAL: distinct CIDs and child pids equal to the
-//!   Worker count run, each with a `cli_wrapper_loaded` and `cli_wrapper_exit`
-//!   event, none dropped;
+//! * `smoke` — at most 5 Workers, 60 s, 1 task/s (hosted substrate): requires
+//!   at least two concurrently loaded Workers, distinct identities, paired
+//!   lifecycle events and lossless producer/admission/completion accounting.
+//!   This proves harness mechanics, NOT NFR-Perf-8's required rate/population.
 //! * `soak` — 50 Workers, 3600 s, 10 tasks/s (Tier W, weekly): additionally the
 //!   `nfr-perf-8-fanout-dispatch-p99` row of `xtask/perf-budgets.toml`.
 //!
@@ -42,7 +42,7 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use maos_bin::supervision::{WorkerSupervisor, WorkerTask};
 use maos_bin::worker_spawn::{parse_run_args, run_cli_wrapper_manifest};
@@ -75,7 +75,7 @@ fn profile() -> Option<Profile> {
         name,
         workers: env_number("MAOS_20_7_FANOUT_WORKERS").map_or(workers, |n| n as usize),
         secs: env_number("MAOS_20_7_FANOUT_SECS").unwrap_or(secs),
-        rate: env_number("MAOS_20_7_FANOUT_RATE").unwrap_or(10),
+        rate: env_number("MAOS_20_7_FANOUT_RATE").unwrap_or(if name == "smoke" { 1 } else { 10 }),
     })
 }
 
@@ -211,17 +211,25 @@ async fn fan_out_child(profile: Profile) {
     let (tl, capability, policy, supervisor) = supervisor_world(&dir);
     let in_process = std::env::var_os("MAOS_20_7_FANOUT_IN_PROCESS").is_some();
     let slots = Arc::new(tokio::sync::Semaphore::new(profile.workers));
-    let mut interval = tokio::time::interval(Duration::from_millis(1000 / profile.rate.max(1)));
-    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    let started = Instant::now();
+    assert!(profile.workers > 0 && profile.rate > 0 && profile.secs > 0);
+    let started = tokio::time::Instant::now();
     let mut tasks = Vec::new();
-    let mut index = 0usize;
-    while started.elapsed() < Duration::from_secs(profile.secs) {
-        interval.tick().await;
-        let permit = Arc::clone(&slots).acquire_owned().await.expect("semaphore");
-        index += 1;
-        let task_index = index;
+    let scheduled = profile.secs * profile.rate;
+    let mut admitted = 0u64;
+    let mut peak = 0usize;
+    for index in 0..scheduled {
+        tokio::time::sleep_until(
+            started + Duration::from_nanos(index * 1_000_000_000 / profile.rate),
+        )
+        .await;
+        // Never let admission delay the producer and silently skip arrivals.
         let dispatch_ns = now_ns();
+        let Ok(permit) = Arc::clone(&slots).try_acquire_owned() else {
+            continue;
+        };
+        admitted += 1;
+        peak = peak.max(profile.workers - slots.available_permits());
+        let task_index = index as usize + 1;
         let (manifest, run) = (manifest.clone(), run.clone());
         let (tl, capability, policy) = (
             Arc::clone(&tl),
@@ -269,6 +277,10 @@ async fn fan_out_child(profile: Profile) {
     for task in tasks {
         task.await.expect("task thread");
     }
+    println!(
+        "MAOS-20-7-LOAD {}",
+        serde_json::json!({"scheduled":scheduled,"admitted":admitted,"peak":peak,"elapsed_ns":started.elapsed().as_nanos() as u64})
+    );
     supervisor.stop_workers();
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -277,7 +289,8 @@ async fn fan_out_child(profile: Profile) {
 struct Observed {
     /// spirit_pid -> (child_pid, container_id, loaded arrival ns).
     loaded: Vec<(u64, u64, String, u64)>,
-    exited: usize,
+    exited: Vec<(u64, u64)>,
+    load: Option<(u64, u64, usize, u64)>,
     /// (index, spirit_pid, dispatch_ns); `error` tasks are dropped ones.
     tasks: Vec<(u64, Option<u64>, u64)>,
     errors: Vec<String>,
@@ -291,6 +304,9 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
         );
         return;
     };
+    if !t3_substrate::require_t3("NFR-Perf-8 real-spawn fan-out") {
+        return;
+    }
     if std::env::var_os(CHILD).is_some() {
         if !t3_substrate::require_t3("NFR-Perf-8 real-spawn fan-out") {
             return;
@@ -318,6 +334,16 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
                 let arrived = now_ns();
                 let mut observed = observed.lock().expect("observed");
+                if let Some(json) = line.strip_prefix("MAOS-20-7-LOAD ") {
+                    let v: serde_json::Value = serde_json::from_str(json).expect("load line");
+                    observed.load = Some((
+                        v["scheduled"].as_u64().unwrap(),
+                        v["admitted"].as_u64().unwrap(),
+                        v["peak"].as_u64().unwrap() as usize,
+                        v["elapsed_ns"].as_u64().unwrap(),
+                    ));
+                    continue;
+                }
                 if let Some(json) = line.strip_prefix(TASK_PREFIX) {
                     let value: serde_json::Value = serde_json::from_str(json).expect("task line");
                     match value["spirit_pid"].as_u64() {
@@ -345,7 +371,10 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
                         event["container_id"].as_str().unwrap_or("").to_owned(),
                         arrived,
                     )),
-                    Some("cli_wrapper_exit") => observed.exited += 1,
+                    Some("cli_wrapper_exit") => observed.exited.push((
+                        event["child_pid"].as_u64().expect("exit child identity"),
+                        arrived,
+                    )),
                     _ => {}
                 }
             }
@@ -371,12 +400,55 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
         profile.name,
         observed.tasks.len(),
         observed.loaded.len(),
-        observed.exited,
+        observed.exited.len(),
         cids.len(),
         child_pids.len()
     );
     assert!(status.success(), "the fan-out child failed: {status:?}");
     assert!(ran > 0, "no Worker ran");
+    let required_population = if profile.name == "smoke" {
+        profile.workers.min(2)
+    } else {
+        profile.workers
+    };
+    let (scheduled, admitted, peak, elapsed_ns) =
+        observed.load.expect("producer accounting required");
+    assert_load(
+        profile.secs * profile.rate,
+        required_population,
+        scheduled,
+        admitted,
+        ran,
+        peak,
+        elapsed_ns,
+        profile.secs,
+    );
+    let exits: HashSet<_> = observed.exited.iter().map(|(pid, _)| *pid).collect();
+    assert_eq!(
+        exits, child_pids,
+        "exit events must pair with each loaded Worker child identity"
+    );
+    let mut population = Vec::new();
+    for (_, child, _, loaded) in &observed.loaded {
+        let (_, exited) = observed
+            .exited
+            .iter()
+            .find(|(p, _)| p == child)
+            .expect("matching exit");
+        assert!(loaded <= exited, "Worker exit preceded its load");
+        population.push((*loaded, 1i64));
+        population.push((*exited, -1i64));
+    }
+    population.sort_unstable();
+    let (mut active, mut loaded_peak) = (0i64, 0i64);
+    for (_, delta) in population {
+        active += delta;
+        loaded_peak = loaded_peak.max(active);
+    }
+    assert!(
+        loaded_peak >= required_population as i64,
+        "required concurrently loaded Worker population not reached"
+    );
     assert_eq!(dropped, 0, "dropped tasks: {:?}", observed.errors);
     assert_eq!(
         cids.len(),
@@ -394,7 +466,11 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
         ran,
         "one cli_wrapper_loaded per Worker"
     );
-    assert_eq!(observed.exited, ran, "one cli_wrapper_exit per Worker");
+    assert_eq!(
+        observed.exited.len(),
+        ran,
+        "one cli_wrapper_exit per Worker"
+    );
     let mut latencies_us: Vec<f64> = observed
         .tasks
         .iter()
@@ -418,4 +494,42 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
         budgets::report("nfr-perf-8-fanout-dispatch-p99", p99),
         "NFR-Perf-8 dispatch P99 {p99} us breaches its binding budget"
     );
+}
+
+fn assert_load(
+    expected: u64,
+    workers: usize,
+    scheduled: u64,
+    admitted: u64,
+    completed: usize,
+    peak: usize,
+    elapsed_ns: u64,
+    secs: u64,
+) {
+    assert_eq!(scheduled, expected, "fixed-rate scheduled population");
+    assert_eq!(
+        admitted, scheduled,
+        "no arrivals may be silently dropped at admission"
+    );
+    assert_eq!(
+        completed as u64, scheduled,
+        "all scheduled tasks must complete"
+    );
+    assert!(peak >= workers, "required concurrent Worker population");
+    assert!(
+        elapsed_ns <= (secs + 30) * 1_000_000_000,
+        "completion rate below required load"
+    );
+}
+
+#[test]
+#[should_panic(expected = "no arrivals may be silently dropped")]
+fn slow_serial_admission_cannot_pass_the_fanout_contract() {
+    assert_load(600, 5, 600, 60, 60, 1, 60_000_000_000, 60);
+}
+
+#[test]
+#[should_panic(expected = "required concurrent Worker population")]
+fn serial_population_cannot_pass_the_fanout_contract() {
+    assert_load(600, 5, 600, 600, 600, 1, 60_000_000_000, 60);
 }
