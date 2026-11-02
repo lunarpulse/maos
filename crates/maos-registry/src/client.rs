@@ -167,7 +167,9 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
 
                 // A floor is a minimum obligation, not a ceiling: Local permits
                 // signature-and-claim-verified PublicUntrusted installs.
-                if (server_tier as u8) < (self.config.tier_floor as u8) {
+                if crate::admission::tier_strictness(server_tier)
+                    < crate::admission::tier_strictness(self.config.tier_floor)
+                {
                     return Err(RegistryError::TierFloorViolation {
                         server_reported: server_tier,
                         operator_floor: self.config.tier_floor,

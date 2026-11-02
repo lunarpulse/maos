@@ -7,7 +7,7 @@
 //! Per the kernel-stays-small invariant: NO `tokio::net`, NO `axum`, NO `hyper`.
 //! Transport dependency is `std::net` + `std::io::BufRead` + `serde_json`.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -18,6 +18,11 @@ use crate::operations::{ArtifactArgs, DeprecateArgs, ManifestArgs, SearchArgs, Y
 use crate::storage::RegistryStorage;
 
 use maos_domain::ports::registry::SignedPackage;
+
+const MAX_CONNECTIONS: usize = 8;
+const MAX_HEADER_BYTES: usize = 16 * 1024;
+const MAX_HEADERS: usize = 64;
+const REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// JSON-RPC 2.0 request frame.
 #[derive(Debug, serde::Deserialize)]
@@ -114,19 +119,30 @@ impl SpiritRegistryServer {
         let storage = self.storage;
         let server_signing_key = self.server_signing_key;
         let _ = &self.org_pubkey;
-        let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
+        let mut handles: Vec<(TcpStream, thread::JoinHandle<()>)> =
+            Vec::with_capacity(MAX_CONNECTIONS);
 
         loop {
             if shutdown.load(Ordering::SeqCst) {
                 break;
             }
-            handles.retain(|handle| !handle.is_finished());
+            handles.retain(|(_, handle)| !handle.is_finished());
             match listener.accept() {
-                Ok((stream, _)) => {
+                Ok((mut stream, _)) => {
+                    if handles.len() >= MAX_CONNECTIONS {
+                        let _ =
+                            stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
+                        let _ = reject_http(&mut stream, "503 Service Unavailable");
+                        continue;
+                    }
+                    let cancel = stream.try_clone().map_err(|e| e.to_string())?;
                     let s = Arc::clone(&storage);
-                    handles.push(thread::spawn(move || {
-                        let _ = handle_connection(s, server_signing_key, stream);
-                    }));
+                    handles.push((
+                        cancel,
+                        thread::spawn(move || {
+                            let _ = handle_connection(s, server_signing_key, stream);
+                        }),
+                    ));
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -137,8 +153,11 @@ impl SpiritRegistryServer {
             }
         }
 
-        for h in handles {
-            let _ = h.join();
+        for (stream, _) in &handles {
+            let _ = stream.shutdown(std::net::Shutdown::Both);
+        }
+        for (_, handle) in handles {
+            let _ = handle.join();
         }
 
         Ok(())
@@ -197,49 +216,21 @@ impl RegistryServerArgs {
 fn handle_connection(
     storage: Arc<dyn RegistryStorage>,
     server_signing_key: Option<[u8; 32]>,
-    mut stream: TcpStream,
+    stream: TcpStream,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(30)))
-        .ok();
-    stream
-        .set_write_timeout(Some(std::time::Duration::from_secs(30)))
-        .ok();
-
-    // Read the HTTP request
-    let mut reader = BufReader::new(
-        stream
-            .try_clone()
-            .map_err(|e| format!("TcpStream::try_clone failed: {e}"))?,
-    );
-
-    let mut request_line = String::new();
-    if reader.read_line(&mut request_line).is_err() {
-        return Ok(());
-    }
-
-    // Only handle POST /mcp
-    let parts: Vec<&str> = request_line.trim().split_whitespace().collect();
-    if parts.len() < 2 || parts[0] != "POST" {
-        let _ = write!(stream, "HTTP/1.1 405 Method Not Allowed\r\n\r\n");
-        return Ok(());
-    }
-
-    // Skip headers until empty line
-    let mut content_length: usize = 0;
-    loop {
-        let mut line = String::new();
-        if reader.read_line(&mut line).is_err() {
+    let deadline = std::time::Instant::now() + REQUEST_DEADLINE;
+    let mut reader = BufReader::new(DeadlineStream {
+        stream: stream.try_clone()?,
+        deadline,
+    });
+    let mut stream = DeadlineStream { stream, deadline };
+    let content_length = match read_request_headers(&mut reader) {
+        Ok(length) => length,
+        Err(status) => {
+            reject_http(&mut stream, status)?;
             return Ok(());
         }
-        let line = line.trim().to_string();
-        if line.is_empty() {
-            break;
-        }
-        if let Some(val) = line.to_lowercase().strip_prefix("content-length:") {
-            content_length = val.trim().parse().unwrap_or(0);
-        }
-    }
+    };
 
     const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
     if content_length > MAX_BODY_SIZE {
@@ -253,7 +244,6 @@ fn handle_connection(
     // Read body
     let mut body = vec![0u8; content_length];
     if content_length > 0 {
-        use std::io::Read;
         if reader.read_exact(&mut body).is_err() {
             let _ = write!(stream, "HTTP/1.1 400 Bad Request\r\n\r\n");
             return Ok(());
@@ -323,16 +313,19 @@ fn handle_connection(
     };
 
     let result = if request.method == "tools/call" {
-        let method = request
-            .params
-            .get("name")
-            .and_then(serde_json::Value::as_str)
-            .ok_or("tools/call requires name")?;
-        let args = request
-            .params
-            .get("arguments")
-            .ok_or("tools/call requires arguments")?;
-        handle_result(method, args)
+        (|| {
+            let method = request
+                .params
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("tools/call requires name")?;
+            let args = request
+                .params
+                .get("arguments")
+                .filter(|args| args.is_object())
+                .ok_or("tools/call requires arguments object")?;
+            handle_result(method, args)
+        })()
     } else {
         handle_result(&request.method, &request.params)
     };
@@ -364,6 +357,169 @@ fn handle_connection(
     let _ = stream.write_all(http_response.as_bytes());
     let _ = stream.flush();
     Ok(())
+}
+
+fn reject_http(stream: &mut impl Write, status: &str) -> std::io::Result<()> {
+    write!(
+        stream,
+        "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    )
+}
+
+fn loopback_authority(value: &str) -> bool {
+    if let Ok(socket) = value.parse::<std::net::SocketAddr>() {
+        return socket.ip().is_loopback();
+    }
+    let host = if let Some(host) = value.strip_prefix('[').and_then(|v| v.strip_suffix(']')) {
+        host
+    } else if let Some((host, port)) = value.rsplit_once(':') {
+        if value
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+        {
+            return true;
+        }
+        if port.parse::<u16>().is_err() {
+            return false;
+        }
+        host
+    } else {
+        value
+    };
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
+fn read_request_headers(reader: &mut impl BufRead) -> Result<usize, &'static str> {
+    let mut line = String::new();
+    let mut bytes = 0;
+    let mut next_line = |line: &mut String| -> Result<(), &'static str> {
+        line.clear();
+        let remaining = MAX_HEADER_BYTES - bytes;
+        let read = (&mut *reader)
+            .take((remaining + 1) as u64)
+            .read_line(line)
+            .map_err(|e| {
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+                ) {
+                    "408 Request Timeout"
+                } else {
+                    "400 Bad Request"
+                }
+            })?;
+        if read > remaining {
+            return Err("431 Request Header Fields Too Large");
+        }
+        bytes += read;
+        if read == 0 || !line.ends_with("\r\n") {
+            return Err("400 Bad Request");
+        }
+        Ok(())
+    };
+    next_line(&mut line)?;
+    let mut parts = line.split_whitespace();
+    if parts.next() != Some("POST") {
+        return Err("405 Method Not Allowed");
+    }
+    if parts.next() != Some("/mcp") {
+        return Err("404 Not Found");
+    }
+    if parts.next() != Some("HTTP/1.1") || parts.next().is_some() {
+        return Err("400 Bad Request");
+    }
+    let (mut host, mut json, mut origin) = (false, false, false);
+    let mut length = None;
+    for _ in 0..=MAX_HEADERS {
+        next_line(&mut line)?;
+        if line == "\r\n" {
+            if !host {
+                return Err("400 Bad Request");
+            }
+            if !json {
+                return Err("415 Unsupported Media Type");
+            }
+            return length.ok_or("411 Length Required");
+        }
+        let (name, value) = line.trim_end().split_once(':').ok_or("400 Bad Request")?;
+        let value = value.trim();
+        if name.eq_ignore_ascii_case("host") {
+            if host {
+                return Err("400 Bad Request");
+            }
+            if !loopback_authority(value) {
+                return Err("403 Forbidden");
+            }
+            host = true;
+        } else if name.eq_ignore_ascii_case("origin") {
+            if origin {
+                return Err("400 Bad Request");
+            }
+            if !value
+                .strip_prefix("http://")
+                .or_else(|| value.strip_prefix("https://"))
+                .is_some_and(loopback_authority)
+            {
+                return Err("403 Forbidden");
+            }
+            origin = true;
+        } else if name.eq_ignore_ascii_case("content-type") {
+            if json {
+                return Err("400 Bad Request");
+            }
+            if !value
+                .split(';')
+                .next()
+                .is_some_and(|v| v.trim().eq_ignore_ascii_case("application/json"))
+            {
+                return Err("415 Unsupported Media Type");
+            }
+            json = true;
+        } else if name.eq_ignore_ascii_case("content-length") {
+            if length
+                .replace(value.parse().map_err(|_| "400 Bad Request")?)
+                .is_some()
+            {
+                return Err("400 Bad Request");
+            }
+        } else if name.eq_ignore_ascii_case("transfer-encoding") {
+            return Err("400 Bad Request");
+        }
+    }
+    Err("431 Request Header Fields Too Large")
+}
+
+struct DeadlineStream {
+    stream: TcpStream,
+    deadline: std::time::Instant,
+}
+impl DeadlineStream {
+    fn remaining(&self) -> std::io::Result<std::time::Duration> {
+        self.deadline
+            .checked_duration_since(std::time::Instant::now())
+            .filter(|d| !d.is_zero())
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::TimedOut, "registry request deadline")
+            })
+    }
+}
+impl Read for DeadlineStream {
+    fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+        self.stream.set_read_timeout(Some(self.remaining()?))?;
+        self.stream.read(bytes)
+    }
+}
+impl Write for DeadlineStream {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.stream.set_write_timeout(Some(self.remaining()?))?;
+        self.stream.write(bytes)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.stream.flush()
+    }
 }
 
 #[cfg(test)]

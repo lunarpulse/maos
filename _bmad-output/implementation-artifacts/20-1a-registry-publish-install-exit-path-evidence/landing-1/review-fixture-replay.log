@@ -1,0 +1,417 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `ComplianceClaimEnvelope` and `SigningAlg`
+   --> crates/maos-registry/src/server.rs:529:39
+    |
+529 |     use maos_spirit_abi::compliance::{ComplianceClaimEnvelope, SigningAlg};
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused imports: `Read` and `Write`
+   --> crates/maos-registry/src/server.rs:530:19
+    |
+530 |     use std::io::{Read, Write};
+    |                   ^^^^  ^^^^^
+
+warning: unused import: `std::net::TcpStream`
+   --> crates/maos-registry/src/server.rs:531:9
+    |
+531 |     use std::net::TcpStream;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::time::Duration`
+   --> crates/maos-registry/src/server.rs:532:9
+    |
+532 |     use std::time::Duration;
+    |         ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY — never use in production admission
+   --> crates/maos-registry/src/compliance_verify.rs:129:24
+    |
+129 |         let (kp, pk) = seeded_keypair(0x150C_04A5);
+    |                        ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: function `temp_storage` is never used
+   --> crates/maos-registry/src/server.rs:534:8
+    |
+534 |     fn temp_storage() -> Arc<dyn RegistryStorage> {
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+warning: `maos-registry` (lib test) generated 12 warnings (6 duplicates) (run `cargo fix --lib -p maos-registry --tests` to apply 4 suggestions)
+warning: `maos-registry` (lib) generated 6 warnings (run `cargo fix --lib -p maos-registry` to apply 6 suggestions)
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: unused import: `maos_domain::ports::registry::SpiritRegistryClient`
+ --> crates/maos-spirit-cli/tests/publish_happy_path_test.rs:8:5
+  |
+8 | use maos_domain::ports::registry::SpiritRegistryClient;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (test "publish_happy_path_test") generated 1 warning (run `cargo fix --test "publish_happy_path_test" -p maos-spirit-cli` to apply 1 suggestion)
+warning: field `clock_ns` is never read
+  --> crates/maos-registry/tests/fr59_yank_propagation_within_5min_test.rs:16:5
+   |
+14 | struct ControlledSource {
+   |        ---------------- field in this struct
+15 |     pending: Mutex<Vec<YankEntry>>,
+16 |     clock_ns: Arc<AtomicU64>,
+   |     ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY — never use in production admission
+  --> crates/maos-registry/tests/runtime_drift_test.rs:47:20
+   |
+47 |     let (kp, pk) = seeded_keypair(0x150C_04A5);
+   |                    ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: `maos-registry` (test "fr59_yank_propagation_within_5min_test") generated 1 warning
+warning: `maos-registry` (test "runtime_drift_test") generated 1 warning
+warning: function `hex_to_64bytes` is never used
+  --> crates/maos-registry/tests/registry_roundtrip_test.rs:47:4
+   |
+47 | fn hex_to_64bytes(hex: &str) -> [u8; 64] {
+   |    ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `hex_to_32bytes` is never used
+  --> crates/maos-registry/tests/registry_roundtrip_test.rs:53:4
+   |
+53 | fn hex_to_32bytes(hex: &str) -> [u8; 32] {
+   |    ^^^^^^^^^^^^^^
+
+warning: `maos-registry` (test "registry_roundtrip_test") generated 2 warnings
+warning: unused imports: `AtomicUsize` and `Ordering`
+ --> crates/maos-registry/tests/search_lock_contention_test.rs:3:25
+  |
+3 | use std::sync::atomic::{AtomicUsize, Ordering};
+  |                         ^^^^^^^^^^^  ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::sync::Arc`
+ --> crates/maos-registry/tests/search_lock_contention_test.rs:4:5
+  |
+4 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `SearchResultItem` and `YankEntry`
+ --> crates/maos-registry/tests/search_lock_contention_test.rs:7:18
+  |
+7 |     SearchQuery, SearchResultItem, SpiritId, YankEntry, YankReason,
+  |                  ^^^^^^^^^^^^^^^^            ^^^^^^^^^
+
+warning: `maos-registry` (test "search_lock_contention_test") generated 3 warnings (run `cargo fix --test "search_lock_contention_test" -p maos-registry` to apply 3 suggestions)
+warning: unused imports: `PublishReceipt` and `YankReason`
+  --> crates/maos-registry/tests/end_to_end_test.rs:16:5
+   |
+16 |     PublishReceipt, SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, YankReason,
+   |     ^^^^^^^^^^^^^^                                                              ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `AdmissionDecision`
+  --> crates/maos-registry/tests/end_to_end_test.rs:19:67
+   |
+19 |     admit_spirit, admit_spirit_with_attestation, AdmissionConfig, AdmissionDecision, AdmissionError,
+   |                                                                   ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient`
+  --> crates/maos-registry/tests/end_to_end_test.rs:22:5
+   |
+22 | use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `SpiritRegistryClient`
+  --> crates/maos-registry/tests/end_to_end_test.rs:16:59
+   |
+16 |     PublishReceipt, SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, YankReason,
+   |                                                           ^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-registry` (test "end_to_end_test") generated 4 warnings (run `cargo fix --test "end_to_end_test" -p maos-registry` to apply 3 suggestions)
+warning: `maos-spirit-cli` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.00s
+────────────
+ Nextest run ID f9fc5331-88a6-4374-a252-a5bdf9a0f542 with nextest profile: default
+    Starting 141 tests across 19 binaries (2 tests skipped)
+        PASS [   0.005s] (  1/141) maos-registry admission::tests::attestation_promotes_public_untrusted_before_strictest_of
+        PASS [   0.003s] (  2/141) maos-registry admission::tests::local_unsigned_allowed_when_policy_permits
+        PASS [   0.003s] (  3/141) maos-registry admission::tests::local_unsigned_rejected_when_policy_strict
+        PASS [   0.004s] (  4/141) maos-registry admission::tests::org_internal_signature_matches_admits
+        PASS [   0.004s] (  5/141) maos-registry admission::tests::org_internal_signature_mismatch_rejects
+        PASS [   0.003s] (  6/141) maos-registry admission::tests::org_internal_signature_requires_org_key
+        PASS [   0.003s] (  7/141) maos-registry admission::tests::provenance_absent_admits_when_not_required_ac11
+        PASS [   0.003s] (  8/141) maos-registry admission::tests::provenance_absent_but_required_rejects_catalogued
+        PASS [   0.003s] (  9/141) maos-registry admission::tests::provenance_content_hash_is_deterministic
+        PASS [   0.004s] ( 10/141) maos-registry admission::tests::provenance_free_text_lineage_rejects_malformed
+        PASS [   0.003s] ( 11/141) maos-registry admission::tests::provenance_present_valid_returns_record_with_content_hash
+        PASS [   0.003s] ( 12/141) maos-registry admission::tests::provenance_stale_rejects
+        PASS [   0.004s] ( 13/141) maos-registry admission::tests::public_untrusted_with_fingerprint_drift_rejects
+        PASS [   0.003s] ( 14/141) maos-registry admission::tests::public_untrusted_with_t3_floor_returns_t3_sandbox
+        PASS [   0.004s] ( 15/141) maos-registry admission::tests::public_untrusted_with_tampered_envelope_rejects
+        PASS [   0.003s] ( 16/141) maos-registry admission::tests::public_untrusted_with_valid_envelope_admits
+        PASS [   0.003s] ( 17/141) maos-registry admission::tests::public_vetted_tier_always_rejects
+        PASS [   0.003s] ( 18/141) maos-registry admission::tests::strictest_of_resolves_all_combinations
+        PASS [   0.003s] ( 19/141) maos-registry admission::tests::strictest_of_resolves_correctly_local_vs_public_untrusted
+        PASS [   0.005s] ( 20/141) maos-registry admission::tests::vetted_promotion_preserves_compliance_envelope_verification
+        PASS [   0.005s] ( 21/141) maos-registry admission::tests::vetted_with_expired_attestation_is_rejected
+        PASS [   0.005s] ( 22/141) maos-registry admission::tests::vetted_with_forged_attestation_signature_is_rejected
+        PASS [   0.005s] ( 23/141) maos-registry admission::tests::vetted_with_unenrolled_vetter_is_rejected
+        PASS [   0.005s] ( 24/141) maos-registry admission::tests::vetted_with_valid_attestation_admits
+        PASS [   0.004s] ( 25/141) maos-registry admission::tests::vetted_without_attestation_is_deferred
+        PASS [   0.003s] ( 26/141) maos-registry admission::tests::wrapper_delegates_non_vetted_tiers
+        PASS [   0.003s] ( 27/141) maos-registry compliance_verify::tests::fingerprint_mismatch_is_rejected_via_delegation
+        PASS [   0.003s] ( 28/141) maos-registry compliance_verify::tests::tampered_signature_is_rejected_via_delegation
+        PASS [   0.003s] ( 29/141) maos-registry fixture_replay::tests::fixture_empty_queue_returns_transport_error
+        PASS [   0.003s] ( 30/141) maos-registry fixture_replay::tests::fixture_errors_propagate
+        PASS [   0.003s] ( 31/141) maos-registry fixture_replay::tests::fixture_records_calls
+        PASS [   0.003s] ( 32/141) maos-registry fixture_replay::tests::fixture_search_returns_queued_response
+        PASS [   0.003s] ( 33/141) maos-registry http::tests::later_resolved_address_is_tried_after_connection_refusal
+        PASS [   0.003s] ( 34/141) maos-registry import::tests::divergent_manifest_rejects
+        PASS [   0.003s] ( 35/141) maos-registry import::tests::extract_and_verify_consistent_bundle
+        PASS [   0.003s] ( 36/141) maos-registry import::tests::missing_signed_package_json_rejects
+        PASS [   0.003s] ( 37/141) maos-registry operations::tests::artifact_args_serde_roundtrip
+        PASS [   0.003s] ( 38/141) maos-registry operations::tests::deprecate_args_serde_roundtrip
+        PASS [   0.003s] ( 39/141) maos-registry operations::tests::manifest_args_serde_roundtrip
+        PASS [   0.002s] ( 40/141) maos-registry operations::tests::operation_serialization_is_snake_case
+        PASS [   0.002s] ( 41/141) maos-registry operations::tests::search_args_defaults
+        PASS [   0.003s] ( 42/141) maos-registry operations::tests::search_args_serde_roundtrip
+        PASS [   0.003s] ( 43/141) maos-registry operations::tests::yanks_since_args_serde_roundtrip
+        PASS [   0.015s] ( 44/141) maos-registry storage::tests::put_and_get_artifact
+        PASS [   0.015s] ( 45/141) maos-registry storage::tests::put_and_get_manifest
+        PASS [   0.015s] ( 46/141) maos-registry storage::tests::search_excludes_yanked_by_default
+        PASS [   0.014s] ( 47/141) maos-registry storage::tests::search_finds_spirit_by_name
+        PASS [   0.014s] ( 48/141) maos-registry storage::tests::search_includes_yanked_when_requested
+        PASS [   0.002s] ( 49/141) maos-registry storage::tests::version_not_found_error
+        PASS [   0.014s] ( 50/141) maos-registry storage::tests::yanks_since_returns_filtered_entries
+        PASS [   0.003s] ( 51/141) maos-registry yank::cursor_tests::cursor_round_trips_through_disk
+        PASS [   0.003s] ( 52/141) maos-registry yank::cursor_tests::missing_cursor_returns_none
+        PASS [   0.002s] ( 53/141) maos-registry yank::tests::cache_advances_to_max_yanked_at_ns_on_apply
+        PASS [   0.003s] ( 54/141) maos-registry yank::tests::cache_does_not_regress_on_empty_list
+        PASS [   0.002s] ( 55/141) maos-registry yank::tests::poll_once_with_monotonic_now_ns_used
+        PASS [   0.003s] ( 56/141) maos-registry yank::tests::poll_once_with_no_yanks_returns_zero
+        PASS [   0.002s] ( 57/141) maos-registry yank::tests::poll_once_with_two_yanks_emits_two_tl_rows
+        PASS [   0.004s] ( 58/141) maos-registry::end_to_end_test e2e_compliance_fingerprint_mismatch_rejected
+        PASS [   0.003s] ( 59/141) maos-registry::end_to_end_test e2e_local_tier_admit_unsigned
+        PASS [   0.004s] ( 60/141) maos-registry::end_to_end_test e2e_public_untrusted_admit_with_valid_compliance
+        PASS [   0.005s] ( 61/141) maos-registry::end_to_end_test e2e_public_vetted_always_rejected
+        PASS [   0.016s] ( 62/141) maos-registry::end_to_end_test e2e_storage_publish_and_retrieve
+        PASS [   0.015s] ( 63/141) maos-registry::end_to_end_test e2e_storage_search
+        PASS [   0.003s] ( 64/141) maos-registry::end_to_end_test e2e_strictest_of_three_sources
+        PASS [   0.003s] ( 65/141) maos-registry::end_to_end_test e2e_t3_sandbox_for_public_untrusted
+        PASS [   0.005s] ( 66/141) maos-registry::form_admission_17_3b rust_inproc_is_refused_before_every_admission_tier
+        PASS [   0.004s] ( 67/141) maos-registry::form_admission_17_3b structural_class_reads_have_the_named_typed_outcomes
+        PASS [   0.004s] ( 68/141) maos-registry::form_admission_17_3b structural_fkcs_reads_refuse_every_evasion_shape
+        PASS [   0.008s] ( 69/141) maos-registry::form_admission_17_3b wasm_component_uses_t2_at_each_admission_tier
+        PASS [   0.003s] ( 70/141) maos-registry::fr59_yank_propagation_within_5min_test fr59_300s_boundary_passes
+        PASS [   0.003s] ( 71/141) maos-registry::fr59_yank_propagation_within_5min_test fr59_301s_violates
+        PASS [   0.002s] ( 72/141) maos-registry::fr59_yank_propagation_within_5min_test fr59_poll_interval_resolver_clamps_correctly
+        PASS [   0.002s] ( 73/141) maos-registry::fr59_yank_propagation_within_5min_test fr59_yank_propagates_within_5min_window
+        PASS [   0.003s] ( 74/141) maos-registry::import_air_gap_test admit_spirit_local_unsigned_passes
+        PASS [   0.003s] ( 75/141) maos-registry::import_air_gap_test admit_spirit_public_untrusted_without_sig_fails
+        PASS [   0.003s] ( 76/141) maos-registry::import_air_gap_test divergent_manifest_rejects
+        PASS [   0.003s] ( 77/141) maos-registry::import_air_gap_test extract_bundle_happy_path
+        PASS [   0.002s] ( 78/141) maos-registry::import_air_gap_test missing_signed_package_rejects
+        PASS [   0.014s] ( 79/141) maos-registry::import_air_gap_test origin_roundtrips_through_storage
+        PASS [   0.014s] ( 80/141) maos-registry::import_air_gap_test publish_with_origin_persists_origin_file
+        PASS [   0.014s] ( 81/141) maos-registry::import_air_gap_test published_origin_persists_without_origin_file
+        PASS [   0.003s] ( 82/141) maos-registry::import_air_gap_test verify_consistent_bundle_ok
+        PASS [   0.003s] ( 83/141) maos-registry::registry_roundtrip_test all_fixtures_have_valid_structure
+        PASS [   0.003s] ( 84/141) maos-registry::registry_roundtrip_test fixture_replay_publish_roundtrip
+        PASS [   0.004s] ( 85/141) maos-registry::registry_roundtrip_test fixture_replay_search_roundtrip
+        PASS [   0.003s] ( 86/141) maos-registry::registry_roundtrip_test malformed_fixtures_rejected_with_typed_error
+        PASS [   0.004s] ( 87/141) maos-registry::registry_roundtrip_test well_formed_fixtures_admit_or_error_as_expected
+        PASS [   0.554s] ( 88/141) maos-registry::registry_security_20_1a browser_and_rebinding_requests_cannot_publish
+        PASS [   0.054s] ( 89/141) maos-registry::registry_security_20_1a connection_population_is_bounded
+        PASS [   0.254s] ( 90/141) maos-registry::registry_security_20_1a header_bytes_and_count_are_bounded
+        PASS [   0.019s] ( 91/141) maos-registry::registry_security_20_1a index_persistence_failure_cannot_return_a_receipt
+        PASS [   0.203s] ( 92/141) maos-registry::registry_security_20_1a malformed_tools_call_has_a_json_rpc_error
+        PASS [   0.019s] ( 93/141) maos-registry::registry_security_20_1a registry_inbox_is_not_an_operator_install
+        PASS [   1.257s] ( 94/141) maos-registry::registry_security_20_1a server_tier_floor_uses_admission_policy_ordering
+        PASS [   0.019s] ( 95/141) maos-registry::registry_security_20_1a sibling_provenance_refuses_an_unrecorded_executable
+        PASS [   0.205s] ( 96/141) maos-registry::registry_security_20_1a sigterm_cancels_an_active_trickling_connection
+        PASS [   0.254s] ( 97/141) maos-registry::registry_security_20_1a traversal_publish_is_an_rpc_error_without_escape_files
+        FAIL [   5.162s] ( 98/141) maos-registry::registry_security_20_1a trickling_request_has_an_absolute_deadline
+  stdout ───
+
+    running 1 test
+    test trickling_request_has_an_absolute_deadline ... FAILED
+
+    failures:
+
+    failures:
+        trickling_request_has_an_absolute_deadline
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 5.16s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:39095
+
+    thread 'trickling_request_has_an_absolute_deadline' (237949) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:179:5:
+    trickled reads must expire absolutely: Err(Os { code: 104, kind: ConnectionReset, message: "Connection reset by peer" })
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: trickling_request_has_an_absolute_deadline
+                 at ./tests/registry_security_20_1a.rs:179:5
+       3: registry_security_20_1a::trickling_request_has_an_absolute_deadline::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:155:48
+       4: <registry_security_20_1a::trickling_request_has_an_absolute_deadline::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        PASS [   0.155s] ( 99/141) maos-registry::registry_server_bin_20_1 standalone_server_roundtrip_isolates_root_and_exits_cleanly
+        PASS [   0.004s] (100/141) maos-registry::registry_server_bin_20_1 unauthenticated_development_server_refuses_non_loopback_bind
+        PASS [   0.004s] (101/141) maos-registry::runtime_drift_test crypto_provider_drift_rejects_naming_field
+        PASS [   0.003s] (102/141) maos-registry::runtime_drift_test honest_claim_with_matching_runtime_override_admits
+        PASS [   0.003s] (103/141) maos-registry::runtime_drift_test manifest_matching_envelope_still_admits
+        PASS [   0.004s] (104/141) maos-registry::runtime_drift_test provider_endpoint_drift_rejects_naming_field
+        PASS [   0.003s] (105/141) maos-registry::runtime_drift_test trust_tier_drift_rejects_naming_field
+        PASS [   0.018s] (106/141) maos-registry::search_lock_contention_test search_acquires_yanks_lock_once
+        PASS [   0.013s] (107/141) maos-registry::search_lock_contention_test yank_visibility_preserved_after_contention_fix
+        PASS [   0.004s] (108/141) maos-registry::vetting_attestation_gate fkcs_off_surface_refusal_precedes_a_valid_attestation
+        PASS [   0.005s] (109/141) maos-registry::vetting_attestation_gate leg1_round_trip_issue_promote_revoke
+        PASS [   0.004s] (110/141) maos-registry::vetting_attestation_gate leg2_forged_signature_refused
+        PASS [   0.004s] (111/141) maos-registry::vetting_attestation_gate leg3_expired_attestation_refused
+        PASS [   0.006s] (112/141) maos-registry::vetting_attestation_gate leg4_forged_vetter_key_refused
+        PASS [   0.006s] (113/141) maos-registry::vetting_attestation_gate leg5_upgrade_flap_control
+        PASS [   0.002s] (114/141) maos-registry::vetting_attestation_gate leg7_four_cause_distinguishability
+        PASS [   0.002s] (115/141) maos-spirit-cli publish::tests::parse_tier_accepts_public_vetted
+        PASS [   0.003s] (116/141) maos-spirit-cli publish::tests::parse_tier_accepts_three_valid_tiers
+        PASS [   0.002s] (117/141) maos-spirit-cli publish::tests::parse_tier_rejects_unknown
+        PASS [   0.002s] (118/141) maos-spirit-cli publish::tests::resolve_registry_uri_rejects_whitespace_only
+        PASS [   0.002s] (119/141) maos-spirit-cli publish::tests::resolve_registry_uri_trims_whitespace
+        PASS [   0.002s] (120/141) maos-spirit-cli publish::tests::tier_to_cli_string_round_trips
+        PASS [   0.003s] (121/141) maos-spirit-cli signing::tests::base64_with_padding_decodes_correctly
+        PASS [   0.003s] (122/141) maos-spirit-cli signing::tests::base64_without_padding_fails
+        PASS [   0.003s] (123/141) maos-spirit-cli signing::tests::derive_keypair_round_trips_signature
+        PASS [   0.003s] (124/141) maos-spirit-cli signing::tests::extract_spirit_id_and_version_parses_minimal_manifest
+        PASS [   0.003s] (125/141) maos-spirit-cli signing::tests::extract_spirit_id_prefers_spirit_id_over_name
+        PASS [   0.002s] (126/141) maos-spirit-cli signing::tests::hex_seed_loads
+        PASS [   0.003s] (127/141) maos-spirit-cli signing::tests::hex_seed_with_prefix_and_whitespace_loads
+        PASS [   0.003s] (128/141) maos-spirit-cli::compliance_claim_autopopulate_test auto_populated_envelope_is_self_attested
+        PASS [   0.003s] (129/141) maos-spirit-cli::compliance_claim_autopopulate_test auto_populated_envelope_passes_structural_verify
+        PASS [   0.003s] (130/141) maos-spirit-cli::compliance_claim_autopopulate_test external_envelope_overrides_auto_population
+        PASS [   0.003s] (131/141) maos-spirit-cli::publish_happy_path_test build_signed_package_produces_valid_signature_envelope
+        PASS [   0.003s] (132/141) maos-spirit-cli::publish_happy_path_test dry_run_prints_signed_package_without_dispatch
+        PASS [   0.003s] (133/141) maos-spirit-cli::publish_happy_path_test publishes_local_tier_against_fixture_replay
+        PASS [   0.004s] (134/141) maos-spirit-cli::publish_happy_path_test publishes_public_untrusted_with_envelope
+        PASS [   0.204s] (135/141) maos-spirit-cli::publish_live_20_1 publish_real_address_returns_receipt_and_manifest
+        PASS [   0.004s] (136/141) maos-spirit-cli::publish_signing_test raw_hex_key_loads_correctly
+        PASS [   0.003s] (137/141) maos-spirit-cli::publish_signing_test signature_verifies_via_ed25519_round_trip
+        PASS [   0.004s] (138/141) maos-spirit-cli::publish_signing_test tampered_artifact_makes_signature_fail
+        PASS [   0.003s] (139/141) maos-spirit-cli::publish_tier_validation_test accepts_public_vetted_via_parse_tier
+        PASS [   0.003s] (140/141) maos-spirit-cli::publish_tier_validation_test rejects_tier_mismatch_with_manifest
+        PASS [   0.002s] (141/141) maos-spirit-cli::publish_tier_validation_test rejects_unknown_tier_via_parse_tier
+────────────
+     Summary [   8.935s] 141 tests run: 140 passed, 1 failed, 2 skipped
+        FAIL [   5.162s] ( 98/141) maos-registry::registry_security_20_1a trickling_request_has_an_absolute_deadline
+error: test run failed

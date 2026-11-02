@@ -1,4 +1,5 @@
 pub mod abi_diff;
+pub mod build_test_fixtures;
 pub mod check_empty_kernel;
 pub mod check_error_catalog;
 pub mod check_service_boundary;

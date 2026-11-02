@@ -1,0 +1,1 @@
+check-j1-loopback-delegation: PASS — frame-borne route intact, consent refusals proven and enrolled, cross-host wire identity proven by the two-daemon test; boundary: the loopback rehearsal arm's `frame.from.host_id` is unverified = true (permanent for that arm — NOT a rung-2 flip)

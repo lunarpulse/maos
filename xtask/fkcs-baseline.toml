@@ -38,9 +38,15 @@ ratifier = "Lunarpulse"
 # materialization; operator-ratified admission-path change, review required.
 # RE-PINNED after 18-7-live-skill-authoring-and-revisions review 2026-10-26:
 # all-state/discovered version ceiling, finite evidence and pre-journal destination checks.
+# RE-PINNED — 20-1a-registry-publish-install-exit-path landing 1 review, P3:
+# Main adjudicated the behavior-preserving extraction of `score` into shared
+# `tier_strictness` (Local0 / OrgInternal1 / PublicUntrusted2 / PublicVetted3).
+# 9b66a40a2d25e4c8fabca5d3cd6185d8eade65c1de8989480d8dd107fd2451d6 ->
+# 5b3fe85c6abdbf45ea73b57edae6f427d1e4b445b6ae9c4ac24ba5a77798a4f4.
+# No kernel source, frozen tag, file set, or admission behavior changed.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "9b66a40a2d25e4c8fabca5d3cd6185d8eade65c1de8989480d8dd107fd2451d6"
+sha256 = "5b3fe85c6abdbf45ea73b57edae6f427d1e4b445b6ae9c4ac24ba5a77798a4f4"

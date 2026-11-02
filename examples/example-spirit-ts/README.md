@@ -48,6 +48,21 @@ published engine-off binary reports `wasm_engine_off`, never â€œunknown spiritâ€
 The installed manifest and `dist/spirit.wasm` also support the governed `maos run
 <installed-manifest-path> --once` path on an explicitly WASM-enabled build.
 
+Operator installs have a separate, atomically switched `installed-index.json`
+under `~/.local/share/maos/registry`; its paths are relative to `installed/`.
+The server's `spirits/` tree is an inbox, never a boot inventory. Reinstall older
+packages through `maosctl spirit install` to enroll them; old inbox entries are
+not implicitly trusted. Every boot re-verifies the package signature and
+ComplianceClaim and compares the manifest and materialized component with the
+signed bytes. A modified install gets a typed `admission_refused` outcome.
+`hello-spirit` and `butler` are reserved shell names and cannot be installed.
+
+The development HTTP endpoint accepts only JSON `POST /mcp` requests with a
+loopback Host and, when present, a loopback Origin. It bounds headers to 16 KiB /
+64 fields, active connections to eight, and request I/O to an absolute five
+seconds; shutdown cancels active sockets before draining workers. These browser
+and resource guards are not mutation authentication.
+
 This registry is loopback-only development infrastructure. Mutation authentication,
 publisher-name pinning and signed yanks remain owned by story 20-1b; do not expose
 it through a public listener or proxy. This proves the mechanism, not independent

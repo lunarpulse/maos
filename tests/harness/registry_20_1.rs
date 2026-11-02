@@ -5,6 +5,8 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
+#[path = "fixtures.rs"]
+mod fixtures;
 
 pub struct Scratch(pub PathBuf);
 impl Scratch {
@@ -39,14 +41,8 @@ impl Drop for Scratch {
     }
 }
 
-pub fn sibling(own: &str, name: &str) -> PathBuf {
-    let path = Path::new(own).with_file_name(name);
-    assert!(
-        path.is_file(),
-        "build all exit binaries first: {}",
-        path.display()
-    );
-    path
+pub fn sibling(name: &str) -> PathBuf {
+    fixtures::fixture(name)
 }
 pub fn rpc(addr: &str, method: &str, params: serde_json::Value) -> serde_json::Value {
     let mut stream = TcpStream::connect(addr).unwrap();
@@ -59,7 +55,7 @@ pub fn rpc(addr: &str, method: &str, params: serde_json::Value) -> serde_json::V
     .unwrap();
     write!(
         stream,
-        "POST /mcp HTTP/1.1\r\nHost: {addr}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "POST /mcp HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     )
     .unwrap();
@@ -197,4 +193,20 @@ pub fn example(scratch: &Scratch) -> PathBuf {
     let path = scratch.0.join("manifest.toml");
     std::fs::write(&path, text).unwrap();
     path
+}
+
+pub fn installed_version(scratch: &Scratch) -> PathBuf {
+    maos_registry::storage::LocalFsRegistryStorage::at_path(
+        scratch.0.join("home/.local/share/maos/registry"),
+    )
+    .unwrap()
+    .installed_manifests()
+    .unwrap()
+    .into_iter()
+    .find(|(name, _)| name == "example-spirit-ts")
+    .unwrap()
+    .1
+    .parent()
+    .unwrap()
+    .to_owned()
 }

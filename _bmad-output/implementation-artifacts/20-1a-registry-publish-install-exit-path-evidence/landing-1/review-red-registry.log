@@ -1,0 +1,442 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling ring v0.17.14
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:177:27
+    |
+177 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.42s
+────────────
+ Nextest run ID 9f228143-9a83-4707-8ebf-ed75666bfa4b with nextest profile: default
+    Starting 9 tests across 1 binary
+        FAIL [   0.109s] (1/9) maos-registry::registry_security_20_1a browser_and_rebinding_requests_cannot_publish
+  stdout ───
+
+    running 1 test
+    test browser_and_rebinding_requests_cannot_publish ... FAILED
+
+    failures:
+
+    failures:
+        browser_and_rebinding_requests_cannot_publish
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.11s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:40767
+
+    thread 'browser_and_rebinding_requests_cannot_publish' (3942864) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:36:9:
+    POST /mcp HTTP/1.1
+    Host: rebinding.example
+    Content-Type: application/json: HTTP/1.1 200 OK
+    Content-Type: application/json
+    Content-Length: 97
+    Connection: close
+
+    {"jsonrpc":"2.0","id":1,"result":{"publish_id":"pub-80","spirit_id":"browser","version":"1.0.0"}}
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: browser_and_rebinding_requests_cannot_publish
+                 at ./tests/registry_security_20_1a.rs:36:9
+       3: registry_security_20_1a::browser_and_rebinding_requests_cannot_publish::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:24:51
+       4: <registry_security_20_1a::browser_and_rebinding_requests_cannot_publish::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.055s] (2/9) maos-registry::registry_security_20_1a connection_population_is_bounded
+  stdout ───
+
+    running 1 test
+    test connection_population_is_bounded ... FAILED
+
+    failures:
+
+    failures:
+        connection_population_is_bounded
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.05s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:39579
+
+    thread 'connection_population_is_bounded' (3942918) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:88:5:
+    assertion failed: String::from_utf8_lossy(&response).starts_with("HTTP/1.1 503")
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::panic
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+       3: connection_population_is_bounded
+                 at ./tests/registry_security_20_1a.rs:88:5
+       4: registry_security_20_1a::connection_population_is_bounded::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:84:38
+       5: <registry_security_20_1a::connection_population_is_bounded::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.104s] (3/9) maos-registry::registry_security_20_1a header_bytes_and_count_are_bounded
+  stdout ───
+
+    running 1 test
+    test header_bytes_and_count_are_bounded ... FAILED
+
+    failures:
+
+    failures:
+        header_bytes_and_count_are_bounded
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.10s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:40955
+
+    thread 'header_bytes_and_count_are_bounded' (3942930) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:80:9:
+    assertion failed: String::from_utf8_lossy(&response).starts_with("HTTP/1.1 431")
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::panic
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+       3: header_bytes_and_count_are_bounded
+                 at ./tests/registry_security_20_1a.rs:80:9
+       4: registry_security_20_1a::header_bytes_and_count_are_bounded::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:76:40
+       5: <registry_security_20_1a::header_bytes_and_count_are_bounded::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.019s] (4/9) maos-registry::registry_security_20_1a index_persistence_failure_cannot_return_a_receipt
+  stdout ───
+
+    running 1 test
+    test index_persistence_failure_cannot_return_a_receipt ... FAILED
+
+    failures:
+
+    failures:
+        index_persistence_failure_cannot_return_a_receipt
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'index_persistence_failure_cannot_return_a_receipt' (3942983) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:72:5:
+    assertion failed: store.put(&pkg.spirit_id, &pkg.version, &pkg).is_err()
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::panic
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+       3: index_persistence_failure_cannot_return_a_receipt
+                 at ./tests/registry_security_20_1a.rs:72:5
+       4: registry_security_20_1a::index_persistence_failure_cannot_return_a_receipt::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:67:55
+       5: <registry_security_20_1a::index_persistence_failure_cannot_return_a_receipt::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.104s] (5/9) maos-registry::registry_security_20_1a malformed_tools_call_has_a_json_rpc_error
+  stdout ───
+
+    running 1 test
+    test malformed_tools_call_has_a_json_rpc_error ... FAILED
+
+    failures:
+
+    failures:
+        malformed_tools_call_has_a_json_rpc_error
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.10s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:34521
+
+    thread 'malformed_tools_call_has_a_json_rpc_error' (3942985) panicked at crates/maos-registry/tests/../../../tests/harness/registry_20_1.rs:69:68:
+    called `Option::unwrap()` on a `None` value
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::panic
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+       3: core::option::unwrap_failed
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:2251:5
+       4: unwrap<usize>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1014:21
+       5: rpc
+                 at ./tests/../../../tests/harness/registry_20_1.rs:69:68
+       6: malformed_tools_call_has_a_json_rpc_error
+                 at ./tests/registry_security_20_1a.rs:44:22
+       7: registry_security_20_1a::malformed_tools_call_has_a_json_rpc_error::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:41:47
+       8: <registry_security_20_1a::malformed_tools_call_has_a_json_rpc_error::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       9: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.019s] (6/9) maos-registry::registry_security_20_1a registry_inbox_is_not_an_operator_install
+  stdout ───
+
+    running 1 test
+    test registry_inbox_is_not_an_operator_install ... FAILED
+
+    failures:
+
+    failures:
+        registry_inbox_is_not_an_operator_install
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'registry_inbox_is_not_an_operator_install' (3943038) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:64:5:
+    publish is not operator admission
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: registry_inbox_is_not_an_operator_install
+                 at ./tests/registry_security_20_1a.rs:64:5
+       3: registry_security_20_1a::registry_inbox_is_not_an_operator_install::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:59:47
+       4: <registry_security_20_1a::registry_inbox_is_not_an_operator_install::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.023s] (7/9) maos-registry::registry_security_20_1a sibling_provenance_refuses_an_unrecorded_executable
+  stdout ───
+
+    running 1 test
+    test sibling_provenance_refuses_an_unrecorded_executable ... FAILED
+
+    failures:
+
+    failures:
+        sibling_provenance_refuses_an_unrecorded_executable
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'sibling_provenance_refuses_an_unrecorded_executable' (3943040) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:108:5:
+    assertion failed: std::panic::catch_unwind(||
+                sibling(own.to_str().unwrap(),
+                    "unrecorded-registry-20-1a")).is_err()
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::panic
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+       3: sibling_provenance_refuses_an_unrecorded_executable
+                 at ./tests/registry_security_20_1a.rs:108:5
+       4: registry_security_20_1a::sibling_provenance_refuses_an_unrecorded_executable::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:105:57
+       5: <registry_security_20_1a::sibling_provenance_refuses_an_unrecorded_executable::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.104s] (8/9) maos-registry::registry_security_20_1a traversal_publish_is_an_rpc_error_without_escape_files
+  stdout ───
+
+    running 1 test
+    test traversal_publish_is_an_rpc_error_without_escape_files ... FAILED
+
+    failures:
+
+    failures:
+        traversal_publish_is_an_rpc_error_without_escape_files
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.10s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:40731
+
+    thread 'traversal_publish_is_an_rpc_error_without_escape_files' (3943042) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:54:9:
+    {"id":1,"jsonrpc":"2.0","result":{"publish_id":"pub-90","spirit_id":"../../escaped","version":"1"}}
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: traversal_publish_is_an_rpc_error_without_escape_files
+                 at ./tests/registry_security_20_1a.rs:54:9
+       3: registry_security_20_1a::traversal_publish_is_an_rpc_error_without_escape_files::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:50:60
+       4: <registry_security_20_1a::traversal_publish_is_an_rpc_error_without_escape_files::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   7.364s] (9/9) maos-registry::registry_security_20_1a trickling_request_has_an_absolute_deadline
+  stdout ───
+
+    running 1 test
+    test trickling_request_has_an_absolute_deadline ... FAILED
+
+    failures:
+
+    failures:
+        trickling_request_has_an_absolute_deadline
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 7.36s
+
+  stderr ───
+    maos-registry: listening on 127.0.0.1:43749
+
+    thread 'trickling_request_has_an_absolute_deadline' (3943096) panicked at crates/maos-registry/tests/registry_security_20_1a.rs:101:5:
+    trickled reads must expire absolutely: Err(Os { code: 11, kind: WouldBlock, message: "Resource temporarily unavailable" })
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: trickling_request_has_an_absolute_deadline
+                 at ./tests/registry_security_20_1a.rs:101:5
+       3: registry_security_20_1a::trickling_request_has_an_absolute_deadline::{closure#0}
+                 at ./tests/registry_security_20_1a.rs:92:48
+       4: <registry_security_20_1a::trickling_request_has_an_absolute_deadline::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+────────────
+     Summary [   7.904s] 9 tests run: 0 passed, 9 failed, 0 skipped
+        FAIL [   0.109s] (1/9) maos-registry::registry_security_20_1a browser_and_rebinding_requests_cannot_publish
+        FAIL [   0.055s] (2/9) maos-registry::registry_security_20_1a connection_population_is_bounded
+        FAIL [   0.104s] (3/9) maos-registry::registry_security_20_1a header_bytes_and_count_are_bounded
+        FAIL [   0.019s] (4/9) maos-registry::registry_security_20_1a index_persistence_failure_cannot_return_a_receipt
+        FAIL [   0.104s] (5/9) maos-registry::registry_security_20_1a malformed_tools_call_has_a_json_rpc_error
+        FAIL [   0.019s] (6/9) maos-registry::registry_security_20_1a registry_inbox_is_not_an_operator_install
+        FAIL [   0.023s] (7/9) maos-registry::registry_security_20_1a sibling_provenance_refuses_an_unrecorded_executable
+        FAIL [   0.104s] (8/9) maos-registry::registry_security_20_1a traversal_publish_is_an_rpc_error_without_escape_files
+        FAIL [   7.364s] (9/9) maos-registry::registry_security_20_1a trickling_request_has_an_absolute_deadline
+error: test run failed

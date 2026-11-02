@@ -60,12 +60,8 @@ impl IoSubsystemPort for RegistryHttp {
             format!("{authority}:80")
         };
         let timeout = Duration::from_secs(30);
-        let address = socket
-            .to_socket_addrs()
-            .map_err(transport)?
-            .next()
-            .ok_or_else(|| IoError::InvalidUrl("endpoint has no address".into()))?;
-        let mut stream = TcpStream::connect_timeout(&address, timeout).map_err(transport)?;
+        let addresses = socket.to_socket_addrs().map_err(transport)?;
+        let mut stream = connect_addresses(addresses, timeout).map_err(transport)?;
         stream.set_read_timeout(Some(timeout)).map_err(transport)?;
         stream.set_write_timeout(Some(timeout)).map_err(transport)?;
         write!(stream, "POST {path} HTTP/1.1\r\nHost: {authority}\r\nContent-Length: {}\r\nConnection: close\r\n", body.len()).map_err(transport)?;
@@ -134,6 +130,33 @@ impl IoSubsystemPort for RegistryHttp {
         })
     }
 }
+fn connect_addresses(
+    addresses: impl IntoIterator<Item = std::net::SocketAddr>,
+    timeout: Duration,
+) -> std::io::Result<TcpStream> {
+    let deadline = std::time::Instant::now() + timeout;
+    let mut last = std::io::Error::new(
+        std::io::ErrorKind::AddrNotAvailable,
+        "endpoint has no address",
+    );
+    for address in addresses {
+        let Some(remaining) = deadline
+            .checked_duration_since(std::time::Instant::now())
+            .filter(|d| !d.is_zero())
+        else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "registry connect deadline",
+            ));
+        };
+        match TcpStream::connect_timeout(&address, remaining.min(Duration::from_secs(2))) {
+            Ok(stream) => return Ok(stream),
+            Err(error) => last = error,
+        }
+    }
+    Err(last)
+}
+
 fn transport(error: std::io::Error) -> IoError {
     IoError::Transport(error.to_string())
 }
@@ -144,4 +167,17 @@ fn read_header_line(reader: &mut impl BufRead, line: &mut String) -> Result<(), 
         return Err(IoError::Decode("truncated or oversized HTTP header".into()));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn later_resolved_address_is_tried_after_connection_refusal() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let good = listener.local_addr().unwrap();
+        let rejected = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
+        let stream = connect_addresses([rejected, good], Duration::from_secs(2)).unwrap();
+        assert_eq!(stream.peer_addr().unwrap(), good);
+    }
 }

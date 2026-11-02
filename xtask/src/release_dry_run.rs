@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use maos_audit::release_verify::{generate_sha256sums, sha256_hex};
@@ -165,6 +165,8 @@ fn build_and_stage(dist_dir: &Path, requested_targets: &[&str]) -> Result<(), St
     fs::create_dir_all(dist_dir)
         .map_err(|error| format!("create dist directory {}: {error}", dist_dir.display()))?;
     clean_staged_release_outputs(dist_dir)?;
+    let root = std::env::current_dir().map_err(|e| format!("release working directory: {e}"))?;
+    let target_dir = crate::build_test_fixtures::target_dir("cargo", &root)?;
 
     for target in targets {
         for artifact in ARTIFACTS {
@@ -179,6 +181,7 @@ fn build_and_stage(dist_dir: &Path, requested_targets: &[&str]) -> Result<(), St
                 artifact.package,
                 "--bin",
                 artifact.binary,
+                "--message-format=json",
             ]);
             if target.triple == "aarch64-unknown-linux-gnu" {
                 command.env(
@@ -187,25 +190,11 @@ fn build_and_stage(dist_dir: &Path, requested_targets: &[&str]) -> Result<(), St
                 );
                 command.env("CC_aarch64_unknown_linux_gnu", "aarch64-linux-gnu-gcc");
             }
-            let status = command.status().map_err(|error| {
-                format!(
-                    "launch cargo build for {} on {}: {error}",
-                    artifact.binary, target.triple
-                )
-            })?;
-            if !status.success() {
-                return Err(format!(
-                    "cargo build failed for {} on {} with {status}",
-                    artifact.binary, target.triple
-                ));
-            }
-
-            let source = std::env::var_os("CARGO_TARGET_DIR")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("target"))
+            let source = target_dir
                 .join(target.triple)
                 .join("release")
                 .join(artifact.binary);
+            require_built_executable(&mut command, artifact.binary, &source)?;
             let filename = artifact_filename(artifact.binary, target);
             fs::copy(&source, dist_dir.join(&filename)).map_err(|error| {
                 format!(
@@ -217,6 +206,74 @@ fn build_and_stage(dist_dir: &Path, requested_targets: &[&str]) -> Result<(), St
         }
     }
     Ok(())
+}
+
+fn require_built_executable(
+    command: &mut Command,
+    binary: &str,
+    expected: &Path,
+) -> Result<(), String> {
+    use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
+    #[derive(serde::Deserialize)]
+    struct TargetName<'a> {
+        #[serde(borrow)]
+        name: &'a str,
+    }
+    #[derive(serde::Deserialize)]
+    struct CargoMessage<'a> {
+        #[serde(borrow)]
+        reason: &'a str,
+        #[serde(borrow)]
+        target: Option<TargetName<'a>>,
+        #[serde(borrow)]
+        executable: Option<&'a str>,
+    }
+    let mut child = command
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("launch release build: {e}"))?;
+    let mut reader = BufReader::new(child.stdout.take().expect("piped Cargo stdout"));
+    let result = (|| {
+        let mut line = String::new();
+        let mut reported = false;
+        while reader
+            .read_line(&mut line)
+            .map_err(|e| format!("read Cargo artifact receipt: {e}"))?
+            != 0
+        {
+            if let Ok(message) = serde_json::from_str::<CargoMessage<'_>>(&line) {
+                if message.reason == "compiler-artifact"
+                    && message.target.is_some_and(|t| t.name == binary)
+                {
+                    if let Some(path) = message.executable {
+                        if Path::new(path) != expected {
+                            return Err(format!(
+                                "Cargo built {path}, outside resolved target {}",
+                                expected.display()
+                            ));
+                        }
+                        reported = true;
+                    }
+                }
+            }
+            line.clear();
+        }
+        if !reported {
+            return Err(format!(
+                "Cargo emitted no executable receipt for {binary}; refusing stale staging"
+            ));
+        }
+        Ok(())
+    })();
+    drop(reader);
+    let status = child
+        .wait()
+        .map_err(|e| format!("wait for release build: {e}"))?;
+    if !status.success() {
+        return Err(format!("cargo build failed for {binary}: {status}"));
+    }
+    result
 }
 
 fn remove_if_present(path: &Path) -> Result<(), String> {

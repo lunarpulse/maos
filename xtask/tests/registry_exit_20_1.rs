@@ -35,6 +35,8 @@ fn registry_release_set_and_exit_job_are_enrolled() {
         "trap",
         "wasm_engine_off",
         "unknown spirit",
+        "--features wasm-host",
+        "spirit_session_complete",
     ] {
         assert!(script.contains(required), "exit job lacks {required}");
     }

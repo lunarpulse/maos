@@ -22,7 +22,7 @@ impl InstalledSpirits {
     ) -> Self {
         let mut result = Self::default();
         for (name, path) in manifests {
-            let text = match std::fs::read_to_string(&path) {
+            let text = match maos_registry::install::verify_installed(&name, &path) {
                 Ok(text) => text,
                 Err(error) => {
                     crate::admission::emit_vetter_key_event(
@@ -31,14 +31,16 @@ impl InstalledSpirits {
                         "unknown",
                         false,
                         "N/A",
-                        &format!("manifest_unreadable: {error}"),
+                        &format!("installed_package_invalid: {error}"),
                     );
-                    result.refusals.insert(
-                        name,
-                        AdmissionRefusal::ManifestUnreadable {
-                            detail: error.to_string(),
-                        },
+                    let refusal = AdmissionRefusal::Admission {
+                        detail: error.to_string(),
+                    };
+                    eprintln!(
+                        "maos: installed spirit '{name}' refused at boot: {} ({refusal})",
+                        refusal.code()
                     );
+                    result.refusals.insert(name, refusal);
                     continue;
                 }
             };

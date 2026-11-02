@@ -20,7 +20,7 @@ fn offline_install_persists_remote_origin_and_rejects_tampering() {
     let server = InProcessServer::start(&scratch);
     let output = publish(
         &scratch,
-        &sibling(env!("CARGO_BIN_EXE_maosctl"), "maos-spirit"),
+        &sibling("maos-spirit"),
         &server.addr,
         &example(&scratch),
     );
@@ -35,9 +35,7 @@ fn offline_install_persists_remote_origin_and_rejects_tampering() {
         "install: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let version = scratch
-        .0
-        .join("home/.local/share/maos/registry/spirits/example-spirit-ts/0.1.0");
+    let version = installed_version(&scratch);
     let origin: serde_json::Value =
         serde_json::from_slice(&std::fs::read(version.join("origin.json")).unwrap()).unwrap();
     assert_eq!(
@@ -69,12 +67,7 @@ fn install_refuses_registry_rust_inproc_before_persisting() {
             "trust_tier = \"public-untrusted\"",
         );
     std::fs::write(&path, text).unwrap();
-    let output = publish(
-        &scratch,
-        &sibling(env!("CARGO_BIN_EXE_maosctl"), "maos-spirit"),
-        &server.addr,
-        &path,
-    );
+    let output = publish(&scratch, &sibling("maos-spirit"), &server.addr, &path);
     assert!(
         output.status.success(),
         "{}",
@@ -100,7 +93,7 @@ fn install_refuses_registry_rust_inproc_before_persisting() {
     );
     assert!(!scratch
         .0
-        .join("home/.local/share/maos/registry/spirits/researcher")
+        .join("home/.local/share/maos/registry/installed/researcher")
         .exists());
 }
 
@@ -110,7 +103,7 @@ fn wrong_publisher_key_and_claim_signature_are_refused() {
     let server = InProcessServer::start(&scratch);
     let output = publish(
         &scratch,
-        &sibling(env!("CARGO_BIN_EXE_maosctl"), "maos-spirit"),
+        &sibling("maos-spirit"),
         &server.addr,
         &example(&scratch),
     );
@@ -136,7 +129,7 @@ fn wrong_publisher_key_and_claim_signature_are_refused() {
     );
     assert!(!scratch
         .0
-        .join("home/.local/share/maos/registry/spirits/example-spirit-ts")
+        .join("home/.local/share/maos/registry/installed/example-spirit-ts")
         .exists());
 }
 
@@ -147,7 +140,7 @@ fn configured_org_key_requires_a_valid_server_tier_signature() {
         let server = InProcessServer::start_signed(&scratch, signed.then_some([0x53; 32]));
         let output = publish(
             &scratch,
-            &sibling(env!("CARGO_BIN_EXE_maosctl"), "maos-spirit"),
+            &sibling("maos-spirit"),
             &server.addr,
             &example(&scratch),
         );
@@ -198,5 +191,114 @@ fn configured_org_key_requires_a_valid_server_tier_signature() {
             !output.status.success(),
             "configured tier floor must not silently downgrade"
         );
+    }
+}
+
+#[test]
+fn materialization_failure_never_activates_a_partial_install() {
+    let scratch = Scratch::new();
+    let server = InProcessServer::start(&scratch);
+    let manifest = example(&scratch);
+    let text = std::fs::read_to_string(&manifest)
+        .unwrap()
+        .replace("dist/spirit.wasm", "artifact.bin/spirit.wasm");
+    std::fs::write(&manifest, text).unwrap();
+    assert!(
+        publish(&scratch, &sibling("maos-spirit"), &server.addr, &manifest)
+            .status
+            .success()
+    );
+    let output = install(&scratch, &server.addr);
+    assert!(
+        !output.status.success(),
+        "file/parent conflict must fail materialization"
+    );
+    let storage = maos_registry::storage::LocalFsRegistryStorage::at_path(
+        scratch.0.join("home/.local/share/maos/registry"),
+    )
+    .unwrap();
+    assert!(
+        storage.installed_manifests().unwrap().is_empty(),
+        "failed install cannot become boot-visible"
+    );
+}
+
+#[test]
+fn independently_keyed_server_is_verified_and_wrong_key_never_persists() {
+    for configured_seed in [[0x74; 32], [0x75; 32]] {
+        let scratch = Scratch::new();
+        let server = InProcessServer::start_signed(&scratch, Some([0x74; 32]));
+        assert!(publish(
+            &scratch,
+            &sibling("maos-spirit"),
+            &server.addr,
+            &example(&scratch)
+        )
+        .status
+        .success());
+        let key = ed25519_dalek::SigningKey::from_bytes(&configured_seed).verifying_key();
+        let output = scratch
+            .command(std::path::Path::new(env!("CARGO_BIN_EXE_maosctl")))
+            .env(
+                "MAOS_REGISTRY_ORG_SIGNING_PUBKEY",
+                hex::encode(key.as_bytes()),
+            )
+            .args([
+                "spirit",
+                "install",
+                "example-spirit-ts@0.1.0",
+                "--registry-uri",
+                &format!("http://{}/mcp", server.addr),
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.success(),
+            configured_seed == [0x74; 32],
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let storage = maos_registry::storage::LocalFsRegistryStorage::at_path(
+            scratch.0.join("home/.local/share/maos/registry"),
+        )
+        .unwrap();
+        assert_eq!(
+            storage.installed_manifests().unwrap().is_empty(),
+            configured_seed != [0x74; 32]
+        );
+    }
+}
+
+#[test]
+fn built_in_shell_names_are_reserved_before_admission() {
+    for name in ["hello-spirit", "butler"] {
+        let scratch = Scratch::new();
+        let server = InProcessServer::start(&scratch);
+        let manifest = example(&scratch);
+        let text = std::fs::read_to_string(&manifest)
+            .unwrap()
+            .replace("example-spirit-ts", name);
+        std::fs::write(&manifest, text).unwrap();
+        assert!(
+            publish(&scratch, &sibling("maos-spirit"), &server.addr, &manifest)
+                .status
+                .success()
+        );
+        let output = scratch
+            .command(std::path::Path::new(env!("CARGO_BIN_EXE_maosctl")))
+            .args([
+                "spirit",
+                "install",
+                &format!("{name}@0.1.0"),
+                "--registry-uri",
+                &format!("http://{}/mcp", server.addr),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            !output.status.success(),
+            "built-in {name} cannot be shadowed"
+        );
+        assert!(String::from_utf8_lossy(&output.stderr).contains("reserved"));
     }
 }

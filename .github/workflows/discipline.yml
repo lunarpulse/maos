@@ -2947,6 +2947,32 @@ jobs:
           kill -TERM "$server_pid"
           wait "$server_pid"
           unset server_pid
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build the WASM-enabled execution surface
+        run: |
+          cargo build --locked -p maos-bin --features wasm-host --bin maos
+          cargo build --locked -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked -p worker --bin worker-cli-fixture
+      - name: AC4 — execute the admitted installed component, not an engine-off refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          scratch="$(mktemp -d)"
+          export HOME="$scratch/home" XDG_DATA_HOME="$scratch/home/.local/share" MAOS_HOME="$scratch/home/.maos"
+          mkdir -p "$HOME"
+          dist/maos-registry-server --bind 127.0.0.1:6789 --root "$scratch/registry" > component-registry.log 2>&1 &
+          server_pid=$!
+          trap 'kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; rm -rf "$scratch"' EXIT
+          ready=0
+          for i in $(seq 1 50); do if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi; sleep 0.1; done
+          [ "$ready" -eq 1 ] || { cat component-registry.log; exit 1; }
+          MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" dist/maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+          dist/maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+          "$target/debug/maos" init --plain
+          manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["HOME"])/".local/share/maos/registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
+          sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/debug/maos" run "$manifest" --once 2>&1 | tee component.log
+          grep -F 'spirit_session_complete' component.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -2954,6 +2980,8 @@ jobs:
           path: |
             registry.log
             shell.log
+            component.log
+            component-registry.log
 
   epic-19-exit:
     runs-on: ubuntu-24.04

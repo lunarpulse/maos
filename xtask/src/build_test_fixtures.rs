@@ -162,6 +162,49 @@ fn fixtures(root: &Path, target: &Path, fixture_dir: &Path, release: bool) -> Ve
             artefacts: vec![("maosctl", target.join(profile).join("maosctl"))],
         },
         Fixture {
+            name: "maos-registry-server",
+            package: "maos-registry",
+            manifest: workspace.clone(),
+            args: [
+                s(&[
+                    "build",
+                    "--locked",
+                    "-p",
+                    "maos-registry",
+                    "--bin",
+                    "maos-registry-server",
+                ]),
+                s(profile_flag),
+            ]
+            .concat(),
+            env: Vec::new(),
+            copy: None,
+            artefacts: vec![(
+                "maos-registry-server",
+                target.join(profile).join("maos-registry-server"),
+            )],
+        },
+        Fixture {
+            name: "maos-spirit",
+            package: "maos-spirit-cli",
+            manifest: workspace.clone(),
+            args: [
+                s(&[
+                    "build",
+                    "--locked",
+                    "-p",
+                    "maos-spirit-cli",
+                    "--bin",
+                    "maos-spirit",
+                ]),
+                s(profile_flag),
+            ]
+            .concat(),
+            env: Vec::new(),
+            copy: None,
+            artefacts: vec![("maos-spirit", target.join(profile).join("maos-spirit"))],
+        },
+        Fixture {
             name: "maos-wasm-runner",
             package: "maos-wasm-host",
             manifest: workspace.clone(),
@@ -274,7 +317,7 @@ fn metadata(cargo: &str, root: &Path, args: &[&str]) -> Result<serde_json::Value
 
 /// `cargo metadata`'s `target_directory` — honours `CARGO_TARGET_DIR` and
 /// `.cargo/config.toml` exactly as the test build does.
-fn target_dir(cargo: &str, root: &Path) -> Result<PathBuf, String> {
+pub(crate) fn target_dir(cargo: &str, root: &Path) -> Result<PathBuf, String> {
     metadata(cargo, root, &["--no-deps"])?["target_directory"]
         .as_str()
         .map(PathBuf::from)

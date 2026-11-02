@@ -503,6 +503,16 @@ pub fn validate_model_provenance(
     }
 }
 
+/// The admission policy ordering, deliberately independent of ABI discriminants.
+pub(crate) fn tier_strictness(tier: TrustTier) -> u8 {
+    match tier {
+        TrustTier::Local => 0,
+        TrustTier::OrgInternal => 1,
+        TrustTier::PublicUntrusted => 2,
+        TrustTier::PublicVetted => 3,
+    }
+}
+
 /// Strictest-of ordering: PublicUntrusted > OrgInternal > Local.
 /// PublicVetted ranks most restricted: [`admit_spirit`] defers it
 /// (`PublicVettedDeferred`); only [`admit_spirit_with_attestation`] admits it,
@@ -512,19 +522,9 @@ fn strictest_of(
     registry_origin_tier: TrustTier,
     op_floor: TrustTier,
 ) -> TrustTier {
-    // Convert each tier to a strictness score (higher = more restricted)
-    fn score(t: TrustTier) -> u8 {
-        match t {
-            TrustTier::Local => 0,
-            TrustTier::OrgInternal => 1,
-            TrustTier::PublicUntrusted => 2,
-            TrustTier::PublicVetted => 3, // Most restricted
-        }
-    }
-
-    let winning_score = score(manifest_tier)
-        .max(score(registry_origin_tier))
-        .max(score(op_floor));
+    let winning_score = tier_strictness(manifest_tier)
+        .max(tier_strictness(registry_origin_tier))
+        .max(tier_strictness(op_floor));
 
     match winning_score {
         0 => TrustTier::Local,

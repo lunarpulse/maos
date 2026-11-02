@@ -4308,7 +4308,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 20-1a: only serving/shell roots enumerate installs, never diagnostic one-shots.
     let installed_manifests =
         if shell_mode || (run_args.is_none() && std::env::var_os("MAOS_ONE_SHOT").is_none()) {
-            maos_registry::storage::LocalFsRegistryStorage::new()?.installed_manifests()?
+            maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
         } else {
             Vec::new()
         };

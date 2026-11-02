@@ -370,6 +370,8 @@ ADR-069 (`:35-46`); `docs/runbooks/provisioning-checklist.md:44`; 19-3 `…md:10
 
 ## Dev Agent Record
 
+**Incident:** Hosted landing run `41372776259` on main `9f64dd02` had `clippy-advisory` red at 1385/899 (fixed at source; local 1339/875), and `check-exit-commands` and `check-decision-register` red from the stale `20-1` key after the split (fixed). The split-key rename broke two hosted doc gates that prepush does not run; when renaming story keys, run `check-exit-commands` and `check-decision-register`.
+
 ### Story context creation
 
 Created 2026-11-01 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter measured contract) at `a4c00897`,

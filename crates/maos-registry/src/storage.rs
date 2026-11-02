@@ -106,12 +106,7 @@ pub struct LocalFsRegistryStorage {
 impl LocalFsRegistryStorage {
     /// Construct storage rooted at `~/.local/share/maos/registry/`.
     pub fn new() -> Result<Self, io::Error> {
-        let home = dirs_fallback();
-        let root = home
-            .join(".local")
-            .join("share")
-            .join("maos")
-            .join("registry");
+        let root = Self::default_root();
         fs::create_dir_all(root.join("spirits"))?;
         let index = Self::load_index(&root);
         let yanks = Self::load_yanks(&root);
@@ -133,46 +128,103 @@ impl LocalFsRegistryStorage {
             yanks: Mutex::new(yanks),
         })
     }
-
-    /// One active version per installed name: the last version persisted by the operator.
-    pub fn installed_manifests(&self) -> Result<Vec<(String, PathBuf)>, StorageError> {
-        let index = self
-            .index
-            .lock()
-            .map_err(|e| StorageError::Io(e.to_string()))?;
-        Ok(index
-            .iter()
-            .filter_map(|(name, versions)| {
-                let version = versions.last()?;
-                Some((
-                    name.clone(),
-                    self.version_dir(&version.spirit_id, &version.version)
-                        .join("manifest.toml"),
-                ))
-            })
-            .collect())
+    fn default_root() -> PathBuf {
+        dirs_fallback().join(".local/share/maos/registry")
     }
 
-    /// Preserve the signed manifest's relative component location for `maos run`.
-    /// Called only after registry admission has validated the class declaration.
-    pub fn materialize_component(&self, pkg: &SignedPackage) -> Result<(), StorageError> {
-        let document = maos_manifest::ManifestDocument::parse(&pkg.manifest_toml)
-            .map_err(|e| StorageError::Serde(e.to_string()))?;
-        if let Some(class) = document
-            .class_section()
-            .map_err(|e| StorageError::Serde(e.to_string()))?
-        {
-            if let Some(artifact) = class.artifact {
-                let path = self
-                    .version_dir(&pkg.spirit_id, &pkg.version)
-                    .join(artifact);
-                fs::create_dir_all(path.parent().expect("artifact has version parent"))
-                    .map_err(|e| StorageError::Io(e.to_string()))?;
-                fs::write(path, &pkg.artifact_bytes)
-                    .map_err(|e| StorageError::Io(e.to_string()))?;
+    /// Enumerate boot inventory without creating registry or home directories.
+    pub fn default_installed_manifests() -> Result<Vec<(String, PathBuf)>, StorageError> {
+        Self::installed_manifests_at(&Self::default_root())
+    }
+
+    /// Only the operator install transaction publishes this inventory.
+    /// Registry inbox publications never become boot-visible.
+    pub fn installed_manifests(&self) -> Result<Vec<(String, PathBuf)>, StorageError> {
+        Self::installed_manifests_at(&self.root)
+    }
+
+    fn installed_manifests_at(root: &Path) -> Result<Vec<(String, PathBuf)>, StorageError> {
+        Self::load_installs(root)?
+            .into_iter()
+            .map(|(name, relative)| {
+                path_segment(&name)?;
+                let path = Path::new(&relative);
+                let mut parts = path.components();
+                if parts.next() != Some(std::path::Component::Normal(name.as_ref()))
+                    || !matches!(parts.next(), Some(std::path::Component::Normal(_)))
+                    || parts.next().is_some()
+                {
+                    return Err(StorageError::InvalidSegment(relative));
+                }
+                Ok((
+                    name,
+                    root.join("installed").join(path).join("manifest.toml"),
+                ))
+            })
+            .collect()
+    }
+
+    fn load_installs(root: &Path) -> Result<BTreeMap<String, String>, StorageError> {
+        match fs::read(root.join("installed-index.json")) {
+            Ok(bytes) => {
+                serde_json::from_slice(&bytes).map_err(|e| StorageError::Serde(e.to_string()))
             }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(BTreeMap::new()),
+            Err(e) => Err(StorageError::Io(e.to_string())),
         }
-        Ok(())
+    }
+
+    /// Prepare every file before the atomic inventory switch. A failed install
+    /// cannot replace an active generation or activate partially written bytes.
+    pub(crate) fn install_package(
+        &self,
+        pkg: &SignedPackage,
+        origin: &crate::origin::RegistryOrigin,
+    ) -> Result<(), StorageError> {
+        path_segment(pkg.spirit_id.as_str())?;
+        path_segment(&pkg.version)?;
+        let parent = self.root.join("installed").join(pkg.spirit_id.as_str());
+        fs::create_dir_all(&parent).map_err(|e| StorageError::Io(e.to_string()))?;
+        let generation = format!("{}-{}", pkg.version, unique_suffix());
+        let directory = parent.join(&generation);
+        fs::create_dir(&directory).map_err(|e| StorageError::Io(e.to_string()))?;
+        let result = (|| {
+            Self::write_package(&directory, pkg)?;
+            let document = maos_manifest::ManifestDocument::parse(&pkg.manifest_toml)
+                .map_err(|e| StorageError::Serde(e.to_string()))?;
+            if let Some(class) = document
+                .class_section()
+                .map_err(|e| StorageError::Serde(e.to_string()))?
+            {
+                if let Some(artifact) = class.artifact {
+                    let path = directory.join(artifact);
+                    fs::create_dir_all(path.parent().expect("artifact has version parent"))
+                        .map_err(|e| StorageError::Io(e.to_string()))?;
+                    fs::write(path, &pkg.artifact_bytes)
+                        .map_err(|e| StorageError::Io(e.to_string()))?;
+                }
+            }
+            write_json_atomic(&directory.join("origin.json"), origin)?;
+            let mut installs = Self::load_installs(&self.root)?;
+            installs.insert(
+                pkg.spirit_id.as_str().to_owned(),
+                format!("{}/{generation}", pkg.spirit_id.as_str()),
+            );
+            write_json_atomic(&self.root.join("installed-index.json"), &installs)
+        })();
+        if result.is_err() {
+            let _ = fs::remove_dir_all(&directory);
+            let _ = fs::remove_dir(&parent);
+        }
+        result
+    }
+
+    fn write_package(directory: &Path, pkg: &SignedPackage) -> Result<(), StorageError> {
+        fs::write(directory.join("manifest.toml"), &pkg.manifest_toml)
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        fs::write(directory.join("artifact.bin"), &pkg.artifact_bytes)
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        write_json_atomic(&directory.join("signed_package.json"), pkg)
     }
 
     fn load_index(root: &Path) -> BTreeMap<String, Vec<SearchResultItem>> {
@@ -211,10 +263,11 @@ impl LocalFsRegistryStorage {
         }
     }
 
-    fn save_index_data(root: &Path, index: &BTreeMap<String, Vec<SearchResultItem>>) {
-        if let Ok(json) = serde_json::to_vec_pretty(index) {
-            let _ = fs::write(root.join("index.json"), &json);
-        }
+    fn save_index_data(
+        root: &Path,
+        index: &BTreeMap<String, Vec<SearchResultItem>>,
+    ) -> Result<(), StorageError> {
+        write_json_atomic(&root.join("index.json"), index)
     }
 
     fn save_yanks_data(root: &Path, yanks: &[YankEntry]) {
@@ -223,12 +276,15 @@ impl LocalFsRegistryStorage {
         }
     }
 
-    fn spirit_dir(&self, spirit_id: &SpiritId) -> PathBuf {
-        self.root.join("spirits").join(spirit_id.as_str())
+    fn spirit_dir(&self, spirit_id: &SpiritId) -> Result<PathBuf, StorageError> {
+        Ok(self
+            .root
+            .join("spirits")
+            .join(path_segment(spirit_id.as_str())?))
     }
 
-    fn version_dir(&self, spirit_id: &SpiritId, version: &str) -> PathBuf {
-        self.spirit_dir(spirit_id).join(version)
+    fn version_dir(&self, spirit_id: &SpiritId, version: &str) -> Result<PathBuf, StorageError> {
+        Ok(self.spirit_dir(spirit_id)?.join(path_segment(version)?))
     }
 }
 
@@ -239,7 +295,7 @@ impl LocalFsRegistryStorage {
         version: &str,
         origin: &crate::origin::RegistryOrigin,
     ) -> Result<(), StorageError> {
-        let vdir = self.version_dir(spirit_id, version);
+        let vdir = self.version_dir(spirit_id, version)?;
         let origin_json =
             serde_json::to_vec_pretty(origin).map_err(|e| StorageError::Serde(e.to_string()))?;
         fs::write(vdir.join("origin.json"), &origin_json)
@@ -255,37 +311,39 @@ impl RegistryStorage for LocalFsRegistryStorage {
         version: &str,
         pkg: &SignedPackage,
     ) -> Result<(), StorageError> {
-        let vdir = self.version_dir(spirit_id, version);
-        fs::create_dir_all(&vdir).map_err(|e| StorageError::Io(e.to_string()))?;
-
-        // Write manifest.toml
-        fs::write(vdir.join("manifest.toml"), &pkg.manifest_toml)
-            .map_err(|e| StorageError::Io(e.to_string()))?;
-        // Write artifact.bin
-        fs::write(vdir.join("artifact.bin"), &pkg.artifact_bytes)
-            .map_err(|e| StorageError::Io(e.to_string()))?;
-        // Write signed_package.json
-        let pkg_json =
-            serde_json::to_vec_pretty(pkg).map_err(|e| StorageError::Serde(e.to_string()))?;
-        fs::write(vdir.join("signed_package.json"), &pkg_json)
-            .map_err(|e| StorageError::Io(e.to_string()))?;
-
-        // Update index
-        let index_snapshot = {
-            let mut idx = self
-                .index
-                .lock()
-                .map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?;
-            let items = idx.entry(spirit_id.as_str().to_string()).or_default();
-            items.retain(|i| i.version != version);
-            items.push(SearchResultItem::new(
-                spirit_id.clone(),
-                version.to_string(),
-                extract_summary(&pkg.manifest_toml),
+        let vdir = self.version_dir(spirit_id, version)?;
+        if pkg.spirit_id != *spirit_id || pkg.version != version {
+            return Err(StorageError::InvalidSegment(
+                "package identity mismatch".into(),
             ));
-            idx.clone()
-        };
-        Self::save_index_data(&self.root, &index_snapshot);
+        }
+        fs::create_dir_all(&vdir).map_err(|e| StorageError::Io(e.to_string()))?;
+        Self::write_package(&vdir, pkg)?;
+
+        let mut idx = self
+            .index
+            .lock()
+            .map_err(|e| StorageError::Io(format!("index lock poisoned: {e}")))?;
+        let name = spirit_id.as_str();
+        let previous = idx.get(name).cloned();
+        let items = idx.entry(name.to_owned()).or_default();
+        items.retain(|i| i.version != version);
+        items.push(SearchResultItem::new(
+            spirit_id.clone(),
+            version.to_owned(),
+            extract_summary(&pkg.manifest_toml),
+        ));
+        if let Err(error) = Self::save_index_data(&self.root, &idx) {
+            match previous {
+                Some(items) => {
+                    idx.insert(name.to_owned(), items);
+                }
+                None => {
+                    idx.remove(name);
+                }
+            }
+            return Err(error);
+        }
 
         Ok(())
     }
@@ -306,7 +364,7 @@ impl RegistryStorage for LocalFsRegistryStorage {
         spirit_id: &SpiritId,
         version: &str,
     ) -> Result<SignedManifest, StorageError> {
-        let vdir = self.version_dir(spirit_id, version);
+        let vdir = self.version_dir(spirit_id, version)?;
         let manifest_toml =
             fs::read(vdir.join("manifest.toml")).map_err(|_| StorageError::VersionNotFound {
                 spirit_id: spirit_id.as_str().to_string(),
@@ -331,7 +389,7 @@ impl RegistryStorage for LocalFsRegistryStorage {
         spirit_id: &SpiritId,
         version: &str,
     ) -> Result<SignedArtifact, StorageError> {
-        let vdir = self.version_dir(spirit_id, version);
+        let vdir = self.version_dir(spirit_id, version)?;
         let artifact_bytes =
             fs::read(vdir.join("artifact.bin")).map_err(|_| StorageError::VersionNotFound {
                 spirit_id: spirit_id.as_str().to_string(),
@@ -455,8 +513,7 @@ impl RegistryStorage for LocalFsRegistryStorage {
         version: &str,
         sidecar: &[u8],
     ) -> Result<(), StorageError> {
-        path_segment(spirit_id.as_str())?;
-        let vdir = self.version_dir(spirit_id, path_segment(version)?);
+        let vdir = self.version_dir(spirit_id, version)?;
         fs::create_dir_all(&vdir).map_err(|e| StorageError::Io(e.to_string()))?;
         fs::write(vdir.join(BENCHMARK_FILE), sidecar).map_err(|e| StorageError::Io(e.to_string()))
     }
@@ -466,14 +523,13 @@ impl RegistryStorage for LocalFsRegistryStorage {
         spirit_id: &SpiritId,
         version: Option<&str>,
     ) -> Result<(String, Vec<u8>), StorageError> {
-        path_segment(spirit_id.as_str())?;
         let not_found = |version: &str| StorageError::BenchmarkNotFound {
             spirit_id: spirit_id.as_str().to_string(),
             version: version.to_string(),
         };
         let version = match version {
-            Some(version) => path_segment(version)?.to_owned(),
-            None => fs::read_dir(self.spirit_dir(spirit_id))
+            Some(version) => version.to_owned(),
+            None => fs::read_dir(self.spirit_dir(spirit_id)?)
                 .map_err(|_| not_found("any"))?
                 .flatten()
                 .filter(|entry| entry.path().join(BENCHMARK_FILE).is_file())
@@ -485,7 +541,7 @@ impl RegistryStorage for LocalFsRegistryStorage {
                 })
                 .ok_or_else(|| not_found("any"))?,
         };
-        let bytes = fs::read(self.version_dir(spirit_id, &version).join(BENCHMARK_FILE))
+        let bytes = fs::read(self.version_dir(spirit_id, &version)?.join(BENCHMARK_FILE))
             .map_err(|_| not_found(&version))?;
         Ok((version, bytes))
     }
@@ -496,11 +552,46 @@ pub const BENCHMARK_FILE: &str = "benchmark.signed.json";
 
 /// One directory name under the registry root: never empty, `.`/`..`, or a
 /// path separator.
-fn path_segment(segment: &str) -> Result<&str, StorageError> {
-    if segment.is_empty() || segment == "." || segment == ".." || segment.contains(['/', '\\']) {
+pub(crate) fn path_segment(segment: &str) -> Result<&str, StorageError> {
+    if segment.is_empty()
+        || segment == "."
+        || segment == ".."
+        || segment.len() > 128
+        || !segment
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._-+".contains(&b))
+    {
         return Err(StorageError::InvalidSegment(segment.to_owned()));
     }
     Ok(segment)
+}
+
+fn unique_suffix() -> String {
+    static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    format!(
+        "{}-{}",
+        std::process::id(),
+        SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    )
+}
+
+fn write_json_atomic(path: &Path, value: &impl serde::Serialize) -> Result<(), StorageError> {
+    let temporary = path.with_extension(format!("tmp-{}", unique_suffix()));
+    let result = (|| {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        serde_json::to_writer(&file, value).map_err(|e| StorageError::Serde(e.to_string()))?;
+        file.sync_all()
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        fs::rename(&temporary, path).map_err(|e| StorageError::Io(e.to_string()))
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 /// Truncate a string at a character boundary, keeping at most `max_chars` characters.
@@ -688,5 +779,14 @@ mod tests {
         let sid = SpiritId::from("nonexistent");
         let err = s.get_manifest(&sid, "1.0.0").unwrap_err();
         assert!(matches!(err, StorageError::VersionNotFound { .. }));
+    }
+    #[test]
+    fn absent_install_inventory_does_not_create_a_store() {
+        let root = std::env::temp_dir().join(format!("read-only-inventory-{}", unique_suffix()));
+        assert!(!root.exists());
+        assert!(LocalFsRegistryStorage::installed_manifests_at(&root)
+            .unwrap()
+            .is_empty());
+        assert!(!root.exists(), "inventory discovery is read-only");
     }
 }
