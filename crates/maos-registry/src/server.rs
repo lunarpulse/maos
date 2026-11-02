@@ -140,7 +140,9 @@ impl SpiritRegistryServer {
                     handles.push((
                         cancel,
                         thread::spawn(move || {
-                            let _ = handle_connection(s, server_signing_key, stream);
+                            if let Err(error) = handle_connection(s, server_signing_key, stream) {
+                                eprintln!("maos-registry: connection error: {error}");
+                            }
                         }),
                     ));
                 }
@@ -216,14 +218,13 @@ impl RegistryServerArgs {
 fn handle_connection(
     storage: Arc<dyn RegistryStorage>,
     server_signing_key: Option<[u8; 32]>,
-    stream: TcpStream,
+    mut stream: TcpStream,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let deadline = std::time::Instant::now() + REQUEST_DEADLINE;
     let mut reader = BufReader::new(DeadlineStream {
         stream: stream.try_clone()?,
         deadline,
     });
-    let mut stream = DeadlineStream { stream, deadline };
     let content_length = match read_request_headers(&mut reader) {
         Ok(length) => length,
         Err(status) => {
@@ -234,20 +235,23 @@ fn handle_connection(
 
     const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
     if content_length > MAX_BODY_SIZE {
-        let _ = write!(
-            stream,
-            "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\n\r\n"
-        );
+        reject_http(&mut stream, "413 Payload Too Large")?;
         return Ok(());
     }
 
-    // Read body
+    // The request deadline bounds reads, not dispatch or the response write.
     let mut body = vec![0u8; content_length];
-    if content_length > 0 {
-        if reader.read_exact(&mut body).is_err() {
-            let _ = write!(stream, "HTTP/1.1 400 Bad Request\r\n\r\n");
-            return Ok(());
-        }
+    if let Err(error) = reader.read_exact(&mut body) {
+        let status = if matches!(
+            error.kind(),
+            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+        ) {
+            "408 Request Timeout"
+        } else {
+            "400 Bad Request"
+        };
+        reject_http(&mut stream, status)?;
+        return Ok(());
     }
 
     // Parse JSON-RPC request
@@ -264,12 +268,7 @@ fn handle_connection(
                 }),
             };
             let resp_json = serde_json::to_vec(&resp)?;
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-                resp_json.len(),
-                String::from_utf8_lossy(&resp_json)
-            );
-            let _ = stream.write_all(response.as_bytes());
+            respond_http(&mut stream, "200 OK", &resp_json)?;
             return Ok(());
         }
     };
@@ -349,21 +348,42 @@ fn handle_connection(
     };
 
     let resp_json = serde_json::to_vec(&response)?;
-    let http_response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        resp_json.len(),
-        String::from_utf8_lossy(&resp_json)
-    );
-    let _ = stream.write_all(http_response.as_bytes());
-    let _ = stream.flush();
+    respond_http(&mut stream, "200 OK", &resp_json)?;
     Ok(())
 }
 
-fn reject_http(stream: &mut impl Write, status: &str) -> std::io::Result<()> {
+fn reject_http(stream: &mut TcpStream, status: &str) -> std::io::Result<()> {
+    respond_http(stream, status, &[])
+}
+
+fn respond_http(stream: &mut TcpStream, status: &str, body: &[u8]) -> std::io::Result<()> {
+    // A consumed request deadline must never suppress an HTTP error (or a
+    // successful publish receipt after durable storage). Writes have their own
+    // absolute bound; do not extend the five-second request-read deadline.
+    let mut writer = DeadlineStream {
+        stream: stream.try_clone()?,
+        deadline: std::time::Instant::now() + REQUEST_DEADLINE,
+    };
     write!(
-        stream,
-        "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-    )
+        writer,
+        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    )?;
+    writer.write_all(body)?;
+    writer.flush()?;
+    stream.shutdown(std::net::Shutdown::Write)?;
+    // FIN delivers a complete response even when rejecting before the body.
+    // Drain unread input briefly to avoid a reset on close, without allowing a
+    // trickling peer to hold a worker beyond an absolute close deadline.
+    let mut drain = DeadlineStream {
+        stream: stream.try_clone()?,
+        deadline: std::time::Instant::now() + std::time::Duration::from_millis(100),
+    };
+    let _ = std::io::copy(
+        &mut (&mut drain).take(64 * 1024 * 1024),
+        &mut std::io::sink(),
+    );
+    Ok(())
 }
 
 fn loopback_authority(value: &str) -> bool {

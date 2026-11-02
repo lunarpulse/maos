@@ -1,0 +1,5 @@
+maosctl: verification passed for 4 file(s)
+  ✓ maos-linux-amd64 (d8ad5c12f8b2fe90)
+  ✓ maos-registry-server-linux-amd64 (59ae5e5a92eabad4)
+  ✓ maos-spirit-linux-amd64 (2a00801890bb4b04)
+  ✓ maosctl-linux-amd64 (31370a90e71dbce5)

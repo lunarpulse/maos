@@ -41,3 +41,38 @@ fn registry_release_set_and_exit_job_are_enrolled() {
         assert!(script.contains(required), "exit job lacks {required}");
     }
 }
+
+#[test]
+fn package_jobs_provision_registered_registry_siblings_before_tests() {
+    let workflow: serde_yaml::Value =
+        serde_yaml::from_str(include_str!("../../.github/workflows/discipline.yml")).unwrap();
+    for (job, consumer) in [
+        ("check-multi-tenant-loom", "check-multi-tenant-loom --json"),
+        ("air-gap-import-corpus", "cargo test -p maos-spirit-cli"),
+    ] {
+        let steps = workflow["jobs"][job]["steps"].as_sequence().unwrap();
+        let setup = steps
+            .iter()
+            .position(|step| {
+                step["run"].as_str().is_some_and(|script| {
+                    script.contains("build-test-fixtures")
+                        && ["maosctl", "maos-registry-server", "maos-spirit"]
+                            .iter()
+                            .all(|binary| script.contains(binary))
+                })
+            })
+            .expect("registered sibling provenance must be built");
+        let test = steps
+            .iter()
+            .position(|step| {
+                step["run"]
+                    .as_str()
+                    .is_some_and(|script| script.contains(consumer))
+            })
+            .expect("package consumer must remain enrolled");
+        assert!(
+            setup < test,
+            "{job} must provision siblings before {consumer}"
+        );
+    }
+}

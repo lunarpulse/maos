@@ -1,0 +1,31 @@
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/lunarpulse/dev_ws/deny.toml:64:6
+   │
+64 │     "MPL-2.0",
+   │      ━━━━━━━ unmatched license allowance
+
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/lunarpulse/dev_ws/deny.toml:65:6
+   │
+65 │     "OpenSSL",  # Story 1a.3 — ring 0.17 (Rust crypto primitives; de-facto standard)
+   │      ━━━━━━━ unmatched license allowance
+
+warning[license-not-encountered]: license was not encountered
+   ┌─ /home/lunarpulse/dev_ws/deny.toml:62:6
+   │
+62 │     "Unicode-DFS-2016",
+   │      ━━━━━━━━━━━━━━━━ unmatched license allowance
+
+warning[unnecessary-skip]: skip 'serde_spanned' applied to a crate with only one version
+    ┌─ /home/lunarpulse/dev_ws/deny.toml:136:15
+    │
+136 │     { name = "serde_spanned" },
+    │               ━━━━━━━━━━━━━ unnecessary skip configuration
+
+warning[unnecessary-skip]: skip 'toml' applied to a crate with only one version
+    ┌─ /home/lunarpulse/dev_ws/deny.toml:137:15
+    │
+137 │     { name = "toml" },
+    │               ━━━━ unnecessary skip configuration
+
+advisories ok, bans ok, licenses ok, sources ok

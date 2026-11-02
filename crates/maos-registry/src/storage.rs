@@ -583,7 +583,12 @@ fn write_json_atomic(path: &Path, value: &impl serde::Serialize) -> Result<(), S
             .create_new(true)
             .open(&temporary)
             .map_err(|e| StorageError::Io(e.to_string()))?;
-        serde_json::to_writer(&file, value).map_err(|e| StorageError::Serde(e.to_string()))?;
+        // Serializing byte arrays directly to File emits a syscall per token.
+        // Buffer writes, but flush before sync/rename to retain atomic durability.
+        let mut writer = std::io::BufWriter::new(&file);
+        serde_json::to_writer(&mut writer, value)
+            .map_err(|e| StorageError::Serde(e.to_string()))?;
+        std::io::Write::flush(&mut writer).map_err(|e| StorageError::Io(e.to_string()))?;
         file.sync_all()
             .map_err(|e| StorageError::Io(e.to_string()))?;
         fs::rename(&temporary, path).map_err(|e| StorageError::Io(e.to_string()))

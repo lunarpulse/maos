@@ -168,12 +168,12 @@ impl InstalledSpirits {
             intent_lineage: Default::default(),
         };
         let runtime = tokio::runtime::Handle::current();
-        let delivery =
-            tokio::task::block_in_place(|| runtime.block_on(iac.deliver_typed(frame, 0, None)));
-        Some(match delivery {
-            Ok(_) => format!("maos: message delivered to spirit '{name}'"),
-            Err(error) => format!("maos: spirit '{name}' dispatch refused: {error}"),
-        })
+        Some(tokio::task::block_in_place(|| {
+            match runtime.block_on(iac.deliver_typed(frame, 0, None)) {
+                Ok(_) => format!("maos: message delivered to spirit '{name}'"),
+                Err(error) => format!("maos: spirit '{name}' dispatch refused: {error}"),
+            }
+        }))
     }
     pub async fn join(self) {
         #[cfg(feature = "wasm-host")]

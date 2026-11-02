@@ -3919,7 +3919,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo build -p maos-cli -p maos-spirit-cli
+      - name: Build registered siblings for the publisher package suite
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,maos-registry-server,maos-spirit
       - run: cargo test -p maos-registry --test import_air_gap_test -- --nocapture
       - run: cargo test -p maos-spirit-cli --features fixture_replay -- --nocapture
 
@@ -5506,20 +5507,10 @@ jobs:
             maos_team_c
       # Story 17-1 — the whole-package maos-bin leg runs every T3 Worker suite.
       - uses: ./.github/actions/provision-t3-test-substrate
-      # The `maos-bin-whole-package-parallel-isolation` leg runs a debug
-      # `cargo test -p maos-bin`, whose tests resolve `worker-cli-fixture` and
-      # `maosctl` as siblings of the running debug `maos` — and `cargo test -p
-      # maos-bin` builds neither (other packages). Without this step the leg
-      # stops at its FIRST failing binary, `drain_once_audit_writer`, with
-      # "cli_wrapper command 'worker-cli-fixture' not found (checked
-      # daemon-sibling, deps/ parent, and $PATH)" — reproduced locally
-      # 2026-09-21 by moving exactly these two debug binaries aside. The gate
-      # reported it as `[INDETERMINATE]: ` with an EMPTY reason, so the cause
-      # was invisible from the check-run annotation.
-      - name: Build debug siblings for the maos-bin whole-package leg
-        run: |
-          cargo build -p maos-cli --bin maosctl
-          cargo build -p worker --bin worker-cli-fixture
+      # Whole-package tests consume cross-package executables through the
+      # fixture manifest, never presence-only paths or cargo spawned by tests.
+      - name: Build registered debug siblings for the maos-bin whole-package leg
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit
       # Operator ruling 2026-09-24: the DEDICATED CI-only evidence audit key.
       # Without it the required `reza-three-team-three-region-journey` leg is
       # ABSENT (xtask/src/check_multi_tenant_loom.rs:192) and this gate — and

@@ -621,7 +621,7 @@ coverage:
     valid_until: '2027-05-12'
     notes: |
       20-1a AC2/AC5 exercises a fresh publisher key over the real loopback
-      registry transport. Mechanism-proven only; no J6 independent-author claim.
+      registry transport. Mechanism-proven only; no independent-author claim.
   FR36:
     gates: [epic-20-exit]
     corpora: []

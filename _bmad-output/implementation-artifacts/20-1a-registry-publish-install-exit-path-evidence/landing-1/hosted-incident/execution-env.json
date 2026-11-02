@@ -1,0 +1,10 @@
+{
+  "cargo_target_dir": null,
+  "CI": "unset",
+  "GITHUB_ACTIONS": "unset",
+  "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask",
+  "MAOS_17_2_CGROUP_MODE": "undelegated",
+  "target_override": false,
+  "cargo_clean": false,
+  "command_capture": "Python subprocess.run(argv, env=baseenv) with CI/GITHUB_ACTIONS removed; runtime commands use isolated HOME/XDG paths; exact argv and exits in commands.jsonl"
+}

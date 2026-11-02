@@ -1,0 +1,14 @@
+[
+  {
+    "direction": "request",
+    "bytes": 34782539,
+    "seconds": 30.282288813992636,
+    "prefix": "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:54697\r\nContent-Length: 34782286\r\nConnection: close\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nMCP-Protocol-Version: 2026-07-28\r\nMcp-Method: tools/call\r\nMcp-Name: registry.publish"
+  },
+  {
+    "direction": "response",
+    "bytes": 0,
+    "seconds": 40.96346557798097,
+    "prefix": ""
+  }
+]

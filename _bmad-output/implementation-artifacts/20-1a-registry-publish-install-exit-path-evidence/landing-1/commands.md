@@ -2,7 +2,13 @@
 
 This regenerated ledger preserves all initial and review-round captured records, including failed attempts and expected-red plants. It does not claim hosted execution. CI/GITHUB_ACTIONS were unset for cargo/check execution. Early Python-Eval subprocesses did not export CARGO_TARGET_DIR; subsequent bash captures inherited `/mnt/build/cargo-maos`. No CARGO_TARGET_DIR override or cargo clean was used. Environment columns describe inherited/configured values, not extra argv or a target-dir override.
 
-## Final reviewed-source outcome
+## Latest hosted-exit incident repair
+
+See [hosted-incident/summary.md](hosted-incident/summary.md),[exact command ledger](hosted-incident/commands.jsonl),and [execution environment](hosted-incident/execution-env.json). All four real release binaries and the actual12.45MB example publish/install/shell flow pass locally. Packet capture and binary red/green witnesses identify unbuffered atomic JSON writes plus an expired response deadline; binary rejection vectors require complete HTTP framing and clean EOF.
+
+Final incident-source matrix: all-target build0; serial/default **5549/5549**,138 skipped,both0; fresh serial budget0; static gates0; clippy **1335/873**,baseline1383/897 unchanged,ratchet0; deny0; prescribed prepush **0** (83 pass,8 skip,1 timing advisory). Registry4248,aggregate191826,hardfail191827; kernel26841/21042 unchanged. Complete local multi-tenant gate remains1 on an unrelated hook timing assertion; repaired setup/unchanged boot witnesses pass from an empty fixture-manifest directory. Actual T3 execution is blocked by Podman clone EPERM/non-systemd PID1; no post-fix hosted rerun claimed.
+
+## Prior review-correction outcome (historical)
 
 - Fmt, workspace all-target build, focused registry/install/boot/release vectors and registered fixture builds: exit0.
 - Corrected-source full serial workspace: **5545/5545**,138 skipped, exit0; its saved serial junit budget gate exit0,593 binaries,Σ615.957 s, no findings.
@@ -247,6 +253,6 @@ The original `commands.json` and append-only `captured-commands.jsonl` are the m
 | 226 | [review-close-kernel.log](review-close-kernel.log) | 0 | 0.011 | `{"CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask", "CARGO_TARGET_DIR": "/mnt/build/cargo-maos", "MAOS_17_2_CGROUP_MODE": "undelegated"}` | `env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json` |
 
 
-## Outstanding custody
+## Prior review-correction custody (historical)
 
 Hosted `epic-20-exit`, its P7 no-server readiness control, actual installed-component execution and real T3 remain unrun/unpushed here. The complete cut handoff is `../ci/ci-20-1a-verify.yml`; readiness patch SHA-256 is `8cdf9a4ca1acf57083cdbc03f18d065b25d9c1541b8324b8d7f2643785fb33dc`. No author-self-review or hosted post-fix clippy result is claimed. Kernel src/baselines remain unchanged; the earlier benchmark unused-mut exception was expressly authorized and uncharged. Auth/yank/cursor/key-pin/kernel-poller work remains20-1b. Final prepush is explicitly **not green**, and its known20-7 failure is left for Main's ruling. No budgets were widened, tests narrowed, status flipped, commit made or push performed by this agent.

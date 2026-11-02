@@ -1,0 +1,17 @@
+time="2026-11-02T10:51:57Z" level=warning msg="\"/\" is not a shared mount, this could cause issues or missing mounts with rootless containers"
+cannot clone: Operation not permitted
+Error: cannot re-exec process
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/scripts/provision_t3_tests.py", line 111, in <module>
+    main()
+    ~~~~^^
+  File "/home/lunarpulse/dev_ws/scripts/provision_t3_tests.py", line 49, in main
+    run([runtime, 'pull', IMAGE])
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lunarpulse/dev_ws/scripts/provision_t3_tests.py", line 20, in run
+    return subprocess.run(arguments, env=environment, check=True, **kwargs)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/usr/bin/podman', 'pull', 'docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794']' returned non-zero exit status 125.

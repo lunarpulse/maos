@@ -1,0 +1,3 @@
+/usr/bin/podman
+/usr/bin/systemd-run
+/usr/bin/sudo

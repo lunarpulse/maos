@@ -1,0 +1,4 @@
+
+> @local/example-spirit-ts@0.1.0 componentize
+> componentize-js dist/index.js --wit wit --world-name spirit --disable http fetch-event -o dist/spirit.wasm
+

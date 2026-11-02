@@ -1,0 +1,47 @@
+{
+  "scope": "20-1a hosted incident and three assigned hosted discipline repairs",
+  "registry": 4248,
+  "aggregate": 191826,
+  "aggregate_hardfail": 191827,
+  "kernel_physical": 26841,
+  "kernel_tokei": 21042,
+  "serial": {
+    "passed": 5549,
+    "skipped": 138,
+    "exit": 0,
+    "suite_seconds": 650.632
+  },
+  "default": {
+    "passed": 5549,
+    "skipped": 138,
+    "exit": 0,
+    "suite_seconds": 42.974
+  },
+  "serial_budget": {
+    "exit": 0,
+    "binaries": 593,
+    "sum_seconds": 650.247
+  },
+  "clippy": {
+    "occurrences": 1335,
+    "source_distinct": 873,
+    "baseline_occurrences": 1383,
+    "baseline_source_distinct": 897,
+    "exit": 0
+  },
+  "prepush": {
+    "exit": 0,
+    "pass": 83,
+    "skip": 8,
+    "advisory": 1
+  },
+  "multi_tenant_gate": {
+    "exit": 1,
+    "reason": "unrelated hook_pump_17_4 budget-overrun timing assertion; installed witnesses passed separately from fresh manifest directory"
+  },
+  "unverified": [
+    "post-fix hosted run",
+    "hosted no-server readiness plant",
+    "actual successful T3 installed component execution (host Podman clone EPERM and non-systemd PID1)"
+  ]
+}

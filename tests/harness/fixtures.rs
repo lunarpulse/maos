@@ -468,7 +468,7 @@ pub fn fixture(name: &str) -> PathBuf {
     let entry = match manifest_entry(name) {
         Ok(Some(entry)) => entry,
         Ok(None) => missing(&format!(
-            "no `{name}` entry in {} (or no manifest)",
+            "no `{name}` entry in {} (or no manifest); provision with `{BUILD_FIXTURES} --only {name}`",
             fixture_dir().join("manifest.json").display()
         )),
         Err(error) => missing(&error),
@@ -476,7 +476,7 @@ pub fn fixture(name: &str) -> PathBuf {
     // A listed but absent artefact is unbuilt, not stale provenance.
     if !entry.path.is_file() {
         missing(&format!(
-            "`{name}`: {} does not exist",
+            "`{name}`: {} does not exist; provision with `{BUILD_FIXTURES} --only {name}`",
             entry.path.display()
         ));
     }
@@ -489,7 +489,9 @@ pub fn fixture(name: &str) -> PathBuf {
         &root,
         VerificationMode::runtime(),
     ) {
-        stale(&format!("`{name}`: {error}"));
+        stale(&format!(
+            "`{name}`: {error}; provision with `{BUILD_FIXTURES} --only {name}`"
+        ));
     }
     entry.path
 }

@@ -160,6 +160,17 @@ pub fn publish(
     std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
     let artifact = scratch.0.join("spirit.wasm");
     std::fs::write(&artifact, b"\0asm\x0d\0\x01\0").unwrap();
+    publish_artifact(scratch, publisher, addr, manifest, &artifact, &key)
+}
+
+pub fn publish_artifact(
+    scratch: &Scratch,
+    publisher: &Path,
+    addr: &str,
+    manifest: &Path,
+    artifact: &Path,
+    key: &Path,
+) -> std::process::Output {
     scratch
         .command(publisher)
         .args([

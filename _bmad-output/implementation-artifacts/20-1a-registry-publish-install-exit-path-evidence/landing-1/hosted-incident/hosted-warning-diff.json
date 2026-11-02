@@ -1,0 +1,35 @@
+{
+  "baseline_run": 41305010381,
+  "failing_run": 41423605076,
+  "new": [
+    {
+      "file": "crates/maos-registry/src/server.rs",
+      "lint": "clippy::collapsible_if",
+      "message": "this `if` statement can be collapsed",
+      "lines": [
+        246,
+        246
+      ]
+    },
+    {
+      "file": "crates/maos-bin/src/installed_spirits.rs",
+      "lint": "clippy::result_large_err",
+      "message": "the `Err`-variant returned from this closure is very large",
+      "lines": [
+        172,
+        172
+      ]
+    }
+  ],
+  "removed": [
+    {
+      "file": "crates/maos-registry/src/server.rs",
+      "lint": "clippy::trim_split_whitespace",
+      "message": "found call to `str::trim` before `str::split_whitespace`",
+      "lines": [
+        151,
+        151
+      ]
+    }
+  ]
+}

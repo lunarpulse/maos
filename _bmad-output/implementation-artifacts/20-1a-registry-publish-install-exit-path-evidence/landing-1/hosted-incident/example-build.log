@@ -1,0 +1,16 @@
+
+> @local/example-spirit-ts@0.1.0 build
+> npm run guest-types && tsc
+
+
+> @local/example-spirit-ts@0.1.0 guest-types
+> jco guest-types wit --world-name spirit --out-dir src/bindings --strict
+
+
+  Generated Guest Typescript Definition Files (.d.ts):
+
+ - src/bindings/interfaces/maos-spirit-context.d.ts  [30m[3m0.81 KiB[23m[39m
+ - src/bindings/interfaces/maos-spirit-frames.d.ts   [30m[3m13.1 KiB[23m[39m
+ - src/bindings/interfaces/maos-spirit-recall.d.ts   [30m[3m2.69 KiB[23m[39m
+ - src/bindings/spirit.d.ts                          [30m[3m1.14 KiB[23m[39m
+

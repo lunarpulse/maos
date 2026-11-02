@@ -1,0 +1,27 @@
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: '@local/example-spirit-ts@0.1.0',
+npm WARN EBADENGINE   required: { node: '^22.20 || ^24.12 || >=25' },
+npm WARN EBADENGINE   current: { node: 'v20.19.2', npm: '9.2.0' }
+npm WARN EBADENGINE }
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: '@napi-rs/lzma-linux-x64-gnu@1.5.1',
+npm WARN EBADENGINE   required: { node: '^22.20 || ^24.12 || >=25' },
+npm WARN EBADENGINE   current: { node: 'v20.19.2', npm: '9.2.0' }
+npm WARN EBADENGINE }
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: '@napi-rs/lzma@1.5.1',
+npm WARN EBADENGINE   required: { node: '^22.20 || ^24.12 || >=25' },
+npm WARN EBADENGINE   current: { node: 'v20.19.2', npm: '9.2.0' }
+npm WARN EBADENGINE }
+
+added 3 packages, changed 16 packages, and audited 245 packages in 15s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+11 vulnerabilities (7 moderate, 1 high, 3 critical)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
