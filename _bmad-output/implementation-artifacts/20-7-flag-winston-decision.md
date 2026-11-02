@@ -12,8 +12,11 @@
 | ID | Decision | Status |
 |---|---|---|
 | **D-20-7-01** | S3: **A, K1w** — before removal, teardown waits (bounded by its own deadline) for an in-flight snapshot owner to publish, then removes; snapshot-before-removal order kept. | RULED 2026-11-01/02: **A** |
-| **D-20-7-02** | ac4: **A, K2r** — teardown SIGKILLs the verified payload pidfd (`rustix::process::pidfd_send_signal`, feature `process`) before the bounded runtime `kill`; gated on the hosted diagnostic (`ci/20-7-diag`). | RULED: **A** |
+| **D-20-7-02** | ac4: **A, K2r** — teardown SIGKILLs the verified payload pidfd before bounded runtime `kill`; amended by D-20-7-11 C: defense-in-depth, not a proven historical flake repair. | RULED: **A**, amended |
 | D-20-7-03…08 | supervisor drop-panic repair (A); cap-token claim relocated (A); one key, two landings (A); real-spawn bench via `WorkerSupervisor` (A); Tier C valgrind/callgrind + counting allocator (A); per-crate envelope ×2/×3 (A). | RULED: **A** each |
+| **D-20-7-09** | Hosted callgrind measurements and committed binding instruction baselines; instruction-only plant proves instruction FAIL with allocation PASS. | RULED **B**, 2026-11-02; done |
+| **D-20-7-10** | Move production WASM recall benchmark to L2, blocked on the missing guest harness; L1 audit-query is not recall coverage. | RULED **A**, 2026-11-02 |
+| **D-20-7-11** | Retain K2r as defense against runtime-cleanup unavailability; retract AC8.3 and AC8.5 historical failing-before equivalence. Retain K1w, zombie-aware oracle and diagnostics; no further hosted cycle. | RULED **C**, 2026-11-02 (ask k2r) |
 
 ## Kernel grant R = K1w + K2r
 
@@ -37,4 +40,4 @@ The `20-1b` (FR13 real quarantine) kernel grant and this one were each computed 
 | maos-bin | 33195 | 33315 | 33215 | 100 |
 | aggregate hardfail (measured + 1) | 188817 | 192568 | 190204 | — |
 
-Pins are exact; unused headroom is not held. Hosted-only legs (K2r diagnostic, S3/ac4 witnesses, Tier C instruction baselines, the real-spawn smoke) are unrun at landing; see the story's Dev Agent Record.
+Pins are unchanged and exact; unused headroom is not held. K2r +22 physical / +16 tokei remains within the grant. Hosted run 41423701978 produced 9/10 green job outcomes, with the base witness contradicting AC8.3; diagnostic ran post-repair and cannot choose K2r versus oracle. See the story and hosted evidence index for the individual legs and boundaries.

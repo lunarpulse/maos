@@ -36,6 +36,27 @@ The operator executed `../ci/ci-20-7-verify.yml` on `ci/20-7-verify`, run
 tree `7cae45bcfe23739cb7c8350d2d3b5e23b86aa65d` (branch-only workflow on
 `9f64dd02`). Nothing in this section was executed on the dev host.
 
+### Hosted verify result index — 2026-11-02
+
+[`41423701978`](https://github.com/lunarpulse/maos/actions/runs/41423701978), `ci/20-7-verify`, tree main `03ee4a4e` plus branch workflow: 9/10 job outcomes green; the base witness job failed because its expected test failure did not occur. Plant jobs are green when their intended red is detected.
+
+| Leg | Observed result |
+|---|---|
+| `diag-ac4` | 20/20 green at HEAD; post-repair code, so cannot decide K2r versus oracle. Job `125205090740`. |
+| `s3-both` ubuntu-24.04 | Green, podman 4.9.3. |
+| `s3-both` ubuntu-26.04 | Green, podman 5.7. |
+| `real-spawn` | Green smoke. |
+| `real-spawn-plant` | Distinct-CID assertion red as intended. |
+| `tier-c` | Green; binding baselines measured in run 41372839255 job 125046786606, raw artifact 13110004159, rustc 1.99.1 / valgrind 3.22.0: cap-token-verify 12944.0156, iac-routing 997449.662, frame-lowering 188885.9382 instructions. |
+| `tier-c-plant` | Instruction FAIL, allocation PASS, as intended. |
+| `k2r-witness` HEAD | Green; job `125205091337`. |
+| `k2r-plant` | Intended red under injected composite failure; payload `S`, container Up, job `125205091514`. Not a historical failing-before witness. |
+| `k2r-witness` base `a4c00897` | **Contradiction:** `ac4_v4` PASSED in 14.147 s under stalled-kill shim; job `125205091430` failed its expected-red check. AC8.3 retracted by D-20-7-11 C. |
+
+Neither these shim logs nor the earlier kill-only plant trace actual shim calls; the historical cause remains unidentified. The earlier kill-only plant passed without K2r (run 41372839255 job 125046786727); forced removal masking it is possible, not traced. The diagnostic in that first run was also post-repair.
+
+Citation correction: run 41233186774 job 124631445292 failed on `worker_freeze_19_2`'s missing TL table; its `ac4_v4` and cohort v5 passed. Run 41243340929 job 124661589790 is S3, not an ac4 PID-oracle failure. Actual historical ac4 PID-presence failures include 41281999213 job 124775636052 and 41289787129 job 124798452868; their state-blind logs do not distinguish a live payload from a zombie.
+
 ### Hosted diagnoses and workflow corrections
 
 Line references below are the downloaded individual job logs (timestamps retained).
