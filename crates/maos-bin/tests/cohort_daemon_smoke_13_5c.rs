@@ -928,7 +928,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 19-3 — 33 → 34: `worker_workspace.rs` joins it.
     // Story 19-6 — 34 → 35: `replica_resolver.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 35] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 36] = [
         ("main.rs", include_str!("../src/main.rs")),
         (
             "skill_authoring.rs",
@@ -1017,6 +1017,10 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // must never seed the manifest-derived policy table.
         ("operator_door.rs", include_str!("../src/operator_door.rs")),
         ("shell_host.rs", include_str!("../src/shell_host.rs")),
+        (
+            "installed_spirits.rs",
+            include_str!("../src/installed_spirits.rs"),
+        ),
         // Story 16-3 (D-16-3-C/M) — Worker supervision and root shutdown.
         // Listed so the 13.5d negative covers it: the supervisor receives
         // already-constructed kernel handles and a host-granted tier, and must

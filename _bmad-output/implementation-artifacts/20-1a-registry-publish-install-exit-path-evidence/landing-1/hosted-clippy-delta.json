@@ -1,0 +1,104 @@
+{
+  "baseline_run": 41305010381,
+  "landing_run": 41372776259,
+  "baseline_counts": [
+    1383,
+    897
+  ],
+  "landing_counts": [
+    1385,
+    899
+  ],
+  "scope": "20-7 performance files; same warning key method as clippy_ratchet.rs",
+  "new": [
+    {
+      "key": [
+        "path+file:///home/runner/work/maos/maos/crates/maos-bench#0.1.0-alpha.1",
+        "warning",
+        "clippy::unnecessary_map_or",
+        "this `map_or` can be simplified",
+        [
+          [
+            "crates/maos-bench/src/decision.rs",
+            30,
+            18,
+            30,
+            69
+          ]
+        ]
+      ],
+      "rendered": "warning: this `map_or` can be simplified\n  --> crates/maos-bench/src/decision.rs:30:18\n   |\n30 |     let j6_met = j6.map_or(true, |j| j.not_measured || j.budget_met);\n   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_map_or\n   = note: `#[warn(clippy::unnecessary_map_or)]` on by default\nhelp: use `is_none_or` instead\n   |\n30 -     let j6_met = j6.map_or(true, |j| j.not_measured || j.budget_met);\n30 +     let j6_met = j6.is_none_or(|j| j.not_measured || j.budget_met);\n   |\n\n"
+    },
+    {
+      "key": [
+        "path+file:///home/runner/work/maos/maos/crates/maos-bench#0.1.0-alpha.1",
+        "warning",
+        "clippy::unnecessary_unwrap",
+        "called `unwrap_err` on `measurement_result` after checking its variant with `is_err`",
+        [
+          [
+            "crates/maos-bench/src/harness/j1.rs",
+            135,
+            20,
+            135,
+            51
+          ]
+        ]
+      ],
+      "rendered": "warning: called `unwrap_err` on `measurement_result` after checking its variant with `is_err`\n   --> crates/maos-bench/src/harness/j1.rs:135:20\n    |\n133 |     if measurement_result.is_err() {\n    |     ------------------------------ help: try: `if let Err(<item>) = measurement_result`\n134 |         guard.kill_and_reap();\n135 |         return Err(measurement_result.unwrap_err());\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unnecessary_unwrap\n    = note: `#[warn(clippy::unnecessary_unwrap)]` on by default\n\n"
+    },
+    {
+      "key": [
+        "path+file:///home/runner/work/maos/maos/crates/maos-bench#0.1.0-alpha.1",
+        "warning",
+        "clippy::redundant_closure",
+        "redundant closure",
+        [
+          [
+            "crates/maos-bench/src/harness/j1.rs",
+            235,
+            22,
+            235,
+            43
+          ]
+        ]
+      ],
+      "rendered": "warning: redundant closure\n   --> crates/maos-bench/src/harness/j1.rs:235:22\n    |\n235 |             .map_err(|e| BenchError::Io(e))?;\n    |                      ^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `BenchError::Io`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#redundant_closure\n    = note: `#[warn(clippy::redundant_closure)]` on by default\n\n"
+    },
+    {
+      "key": [
+        "path+file:///home/runner/work/maos/maos/crates/maos-bin#0.1.0-alpha.1",
+        "warning",
+        "clippy::too_many_arguments",
+        "this function has too many arguments (8/7)",
+        [
+          [
+            "crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs",
+            499,
+            1,
+            508,
+            2
+          ]
+        ]
+      ],
+      "rendered": "warning: this function has too many arguments (8/7)\n   --> crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs:499:1\n    |\n499 | / fn assert_load(\n500 | |     expected: u64,\n501 | |     workers: usize,\n502 | |     scheduled: u64,\n...   |\n507 | |     secs: u64,\n508 | | ) {\n    | |_^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#too_many_arguments\n    = note: `#[warn(clippy::too_many_arguments)]` on by default\n\n"
+    }
+  ],
+  "removed_count": 3,
+  "semantic_method": "Compare package, lint code, message and primary filenames to separate new lints from moved source ranges; the committed count method still includes the exact primary ranges.",
+  "semantic_additions": [
+    {
+      "code": "clippy::too_many_arguments",
+      "file": "crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs",
+      "hosted_line": 499,
+      "fix": "Group expected task/population requirements in one tuple; seven named arguments remain, no allow attribute."
+    },
+    {
+      "code": "unused_mut",
+      "file": "crates/maos-kernel-core/benches/hot_path_budgets.rs",
+      "hosted_line": 146,
+      "fix": "Remove only the unused mut, explicitly authorized by Main; pinned kernel src is untouched."
+    }
+  ],
+  "authority": "GitHub clippy-advisory-diagnostics artifacts downloaded read-only from runs 41305010381 and 41372776259; baseline file is unchanged."
+}

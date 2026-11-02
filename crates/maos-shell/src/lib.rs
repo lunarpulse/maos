@@ -263,6 +263,11 @@ pub trait ShellHost: Send + Sync {
     /// The scheduler-assigned pid of the loaded hello-spirit.
     fn spirit_pid(&self) -> u32;
 
+    /// Route an installed name, including a typed boot refusal; None means unknown.
+    fn dispatch_installed(&self, _name: &str, _message: &str) -> Option<String> {
+        None
+    }
+
     /// Issue this turn's capability token (`cap.issue` at the real pid).
     fn issue_turn_token(&self) -> Result<CapabilityToken, CapError>;
 
@@ -522,6 +527,10 @@ fn handle_line(
         return Ok(());
     }
     if spirit_name != "hello-spirit" {
+        if let Some(response) = host.dispatch_installed(spirit_name, msg) {
+            print_line(output, color_choice, &response)?;
+            return Ok(());
+        }
         print_line(
             output,
             color_choice,

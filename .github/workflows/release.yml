@@ -73,7 +73,7 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
-        run: cargo build --release -p maos-bin -p maos-cli --locked --target ${{ matrix.target }}
+        run: cargo build --release -p maos-bin -p maos-cli -p maos-registry -p maos-spirit-cli --locked --target ${{ matrix.target }}
       - name: Check mock-not-in-release
         run: cargo run -p xtask -- check-mock-not-in-release --binary target/${{ matrix.target }}/release/maos --json
       - name: Package artifacts
@@ -81,6 +81,8 @@ jobs:
           mkdir -p dist
           cp target/${{ matrix.target }}/release/maos dist/maos-${{ matrix.suffix }}
           cp target/${{ matrix.target }}/release/maosctl dist/maosctl-${{ matrix.suffix }}
+          cp target/${{ matrix.target }}/release/maos-registry-server dist/maos-registry-server-${{ matrix.suffix }}
+          cp target/${{ matrix.target }}/release/maos-spirit dist/maos-spirit-${{ matrix.suffix }}
       - uses: actions/upload-artifact@v4
         with:
           name: maos-${{ matrix.suffix }}
@@ -89,6 +91,14 @@ jobs:
         with:
           name: maosctl-${{ matrix.suffix }}
           path: dist/maosctl-${{ matrix.suffix }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maos-registry-server-${{ matrix.suffix }}
+          path: dist/maos-registry-server-${{ matrix.suffix }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maos-spirit-${{ matrix.suffix }}
+          path: dist/maos-spirit-${{ matrix.suffix }}
 
   sign-and-publish:
     needs: build
@@ -145,10 +155,16 @@ jobs:
           files: |
             dist/maos-linux-amd64
             dist/maosctl-linux-amd64
+            dist/maos-registry-server-linux-amd64
+            dist/maos-spirit-linux-amd64
             dist/maos-linux-arm64
             dist/maosctl-linux-arm64
+            dist/maos-registry-server-linux-arm64
+            dist/maos-spirit-linux-arm64
             dist/maos-darwin-arm64
             dist/maosctl-darwin-arm64
+            dist/maos-registry-server-darwin-arm64
+            dist/maos-spirit-darwin-arm64
             dist/SHA256SUMS
             dist/SHA256SUMS.sig
           fail_on_unmatched_files: true

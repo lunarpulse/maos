@@ -615,15 +615,23 @@ coverage:
       per-language SDK with assertion macros + judge-LLM agreement layer +
       registry publish path is Story 7.1 at v0.5+.
   FR35:
-    gates: []
+    gates: [epic-20-exit]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: |
+      20-1a AC2/AC5 exercises a fresh publisher key over the real loopback
+      registry transport. Mechanism-proven only; no J6 independent-author claim.
   FR36:
-    gates: []
+    gates: [epic-20-exit]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: |
+      20-1a AC3/AC5 installs offline (no running daemon) after publisher signature,
+      signed ComplianceClaim, form and operator policy verification. The default
+      published binary reports the installed component's typed wasm_engine_off
+      boot refusal. Name pinning and authenticated yank policy remain 20-1b.
   FR37:
     gates: []
     corpora: []

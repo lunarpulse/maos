@@ -2893,6 +2893,68 @@ jobs:
   # (section 2 judged 0.31 ≤ 0.5): three frames, no halt, and `demo-j1` must exit
   # non-zero naming `ambiguity-halt-within-2-frames`. The AC5 resume vector
   # (`epic_halt_resume_19_4`: halt → door resolve → resumed section) runs last.
+  # 20-1a AC5: mechanism-proven, with a fresh publisher key; not J6 independence.
+  epic-20-exit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the example component at this SHA
+        working-directory: examples/example-spirit-ts
+        run: npm ci && npm run build && npm run componentize
+      - name: Epic-20 release, publish, install and truthful shell dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p xtask -- release-dry-run
+          RELEASE_SIGNING_KEY=794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
+          for b in maos maosctl maos-registry-server maos-spirit; do ln -sf "$b-linux-amd64" "dist/$b"; done
+          export PATH="$PWD/dist:$PATH"
+          scratch="$(mktemp -d)"
+          export HOME="$scratch/home"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_RUNTIME_DIR="$scratch/run"
+          mkdir -p "$HOME" "$XDG_RUNTIME_DIR"
+          cleanup() {
+            if [ -n "${server_pid:-}" ]; then kill -TERM "$server_pid" 2>/dev/null || true; wait "$server_pid" || true; fi
+            rm -rf "$scratch"
+          }
+          trap cleanup EXIT
+          maosctl install --from-local ./dist --verify-only
+          maos-registry-server --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
+          server_pid=$!
+          ready=0
+          for i in $(seq 1 50); do
+            if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi
+            sleep 0.1
+          done
+          if [ "$ready" -ne 1 ]; then echo "::error::registry readiness failed within 5 s"; cat registry.log; exit 1; fi
+          MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
+          maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+          maos init --plain
+          printf '@example-spirit-ts hello\n' | MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" maos shell --plain > shell.log 2>&1
+          cat shell.log
+          grep -Fx "maos: spirit 'example-spirit-ts' refused at boot: wasm_engine_off" shell.log
+          if grep -F "unknown spirit 'example-spirit-ts'" shell.log; then exit 1; fi
+          kill -TERM "$server_pid"
+          wait "$server_pid"
+          unset server_pid
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-20-exit
+          path: |
+            registry.log
+            shell.log
+
   epic-19-exit:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -6507,6 +6569,7 @@ jobs:
       - epic-17-exit
       - epic-18-exit
       - epic-19-exit
+      - epic-20-exit
       - multi-provider-drift-tests
       - retract-corpus-tests
       - check-serde-error-handling

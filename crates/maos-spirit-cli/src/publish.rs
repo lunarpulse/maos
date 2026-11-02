@@ -225,10 +225,7 @@ fn map_registry_error(e: RegistryError) -> CliError {
 /// Public entry point used by the binary: resolves the registry URI, builds
 /// a client, and runs the publish flow.
 ///
-/// At v1.0 only `stub` (fixture-replay; for CI) and explicit
-/// non-stub URIs are supported. Non-stub URIs return `Unconfigured` if the
-/// in-process MCP client construction fails — operators should rely on the
-/// `maos-bin` composition root for production publish flows.
+/// Real addresses use the registry's leaf HTTP adapter; `stub` stays opt-in.
 pub async fn run_publish(args: PublishArgs) -> anyhow::Result<()> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
@@ -264,12 +261,10 @@ pub async fn run_publish(args: PublishArgs) -> anyhow::Result<()> {
         }
     }
 
-    Err(anyhow::anyhow!(
-        "maos-spirit publish for non-`stub` registry URIs requires the kernel-side \
-         composition root; invoke through `maosctl publish` (Story 7.4+) or pipe a \
-         SignedPackage via --dry-run for downstream tooling. Resolved URI: '{}'",
-        uri
-    ))
+    let client = maos_registry::McpSpiritRegistryClient::http(uri, Default::default())?;
+    let outcome = run_publish_with_client(&args, &client).map_err(|e| anyhow::anyhow!(e))?;
+    println!("{}", serde_json::to_string_pretty(&outcome)?);
+    Ok(())
 }
 
 fn resolve_registry_uri(arg: Option<&str>) -> String {

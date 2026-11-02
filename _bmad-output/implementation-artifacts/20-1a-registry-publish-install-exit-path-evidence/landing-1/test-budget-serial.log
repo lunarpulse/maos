@@ -1,0 +1,18 @@
+::error::check-test-budget: FAIL — 4 finding(s):
+- maos-bin::observer_activity_corpus_17_4 took 89.834 s (Σ per-test time) over 16 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::one_daemon_one_door_16_1 took 46.948 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-iac::participant_recall_17_8 took 53.076 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- xtask::bin/xtask took 33.745 s (Σ per-test time) over 463 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+
+check-test-budget: FAIL — 4 finding(s):
+- maos-bin::observer_activity_corpus_17_4 took 89.834 s (Σ per-test time) over 16 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::one_daemon_one_door_16_1 took 46.948 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-iac::participant_recall_17_8 took 53.076 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- xtask::bin/xtask took 33.745 s (Σ per-test time) over 463 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+
+check-test-budget: FAIL — 4 finding(s):
+- maos-bin::observer_activity_corpus_17_4 took 89.834 s (Σ per-test time) over 16 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-bin::one_daemon_one_door_16_1 took 46.948 s (Σ per-test time) over 38 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- maos-iac::participant_recall_17_8 took 53.076 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+- xtask::bin/xtask took 33.745 s (Σ per-test time) over 463 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml
+

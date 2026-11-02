@@ -1,0 +1,5 @@
+    Blocking waiting for file lock on build directory
+
+Ran in a temporary shell while the session shell is busy with another command: session variables and functions were unavailable, and nothing set here persists.
+
+Backgrounded as job bg_102 (killed once it has run 3600s in total; `timeout: 0` disables the deadline); its output is injected into the conversation as a follow-up the moment it finishes. Do NOT poll for it (no `sleep`, `ps`, `pgrep`, `top`, `pidwait`, log tailing): every poll is a wasted turn. Do other work, or end your reply and wait to be woken.

@@ -1,0 +1,119 @@
+{
+  "production_measurement": {
+    "passed": true,
+    "alarm": true,
+    "aggregate": 191380,
+    "per_crate": {
+      "(unknown:spikes)": 144,
+      "(unknown:templates)": 11,
+      "maos-a2a": 304,
+      "maos-a2a-core": 5037,
+      "maos-a2a-tcp": 1442,
+      "maos-acp": 642,
+      "maos-attrs": 11,
+      "maos-audit": 7721,
+      "maos-bench": 2737,
+      "maos-bin": 33496,
+      "maos-cap-registry": 0,
+      "maos-capability": 1433,
+      "maos-cli": 6429,
+      "maos-cohort": 5873,
+      "maos-compliance": 2032,
+      "maos-control": 1496,
+      "maos-corpus-gen": 2341,
+      "maos-director-surface": 784,
+      "maos-domain": 10099,
+      "maos-egress": 1769,
+      "maos-escape-detector": 347,
+      "maos-eval": 4675,
+      "maos-exec-deps": 358,
+      "maos-fkcs": 482,
+      "maos-frame-codec": 249,
+      "maos-host": 37,
+      "maos-iac": 8270,
+      "maos-journal": 0,
+      "maos-journey-test": 946,
+      "maos-kernel-core": 21042,
+      "maos-loom-lite": 5277,
+      "maos-manifest": 4604,
+      "maos-mcp": 1174,
+      "maos-notify-push": 248,
+      "maos-orchestrator-buffer": 0,
+      "maos-pdp": 438,
+      "maos-persistence": 1,
+      "maos-providers": 1425,
+      "maos-registry": 3905,
+      "maos-secrets": 536,
+      "maos-shell": 615,
+      "maos-siem": 447,
+      "maos-skill": 1234,
+      "maos-spirit-abi": 1042,
+      "maos-spirit-cli": 755,
+      "maos-spirit-derive": 350,
+      "maos-spirit-hello": 382,
+      "maos-spirit-sdk": 1085,
+      "maos-sso": 391,
+      "maos-telemetry": 547,
+      "maos-wasm-host": 2412,
+      "maos-wire": 0,
+      "xtask": 44305
+    },
+    "over_budget": []
+  },
+  "serial": {
+    "passed": 5526,
+    "skipped": 138,
+    "exit_code": 0,
+    "junit": "serial-idle-final-junit.xml"
+  },
+  "wasm_undelegated_serial": {
+    "passed": 820,
+    "skipped": 15,
+    "exit_code": 0
+  },
+  "budget_comparison": {
+    "maos-bin::observer_activity_corpus_17_4": {
+      "contention_sample_seconds": 89.834,
+      "fresh_sample_seconds": 7.282,
+      "budget_seconds": 30,
+      "historical_exception_registered": false
+    },
+    "maos-bin::one_daemon_one_door_16_1": {
+      "contention_sample_seconds": 46.948,
+      "fresh_sample_seconds": 21.064,
+      "budget_seconds": 30,
+      "historical_exception_registered": false
+    },
+    "maos-iac::participant_recall_17_8": {
+      "contention_sample_seconds": 53.076,
+      "fresh_sample_seconds": 25.739,
+      "budget_seconds": 30,
+      "historical_exception_registered": false
+    },
+    "xtask::bin/xtask": {
+      "contention_sample_seconds": 33.745,
+      "fresh_sample_seconds": 16.38,
+      "budget_seconds": 30,
+      "historical_exception_registered": false
+    }
+  },
+  "prepush": {
+    "exit_code": 0,
+    "pass_records": 84,
+    "skip_records": 7,
+    "advisory_records": 1,
+    "default_profile_budget_advisories": {
+      "maos-bin::one_daemon_one_door_16_1": 30.541,
+      "maos-iac::participant_recall_17_8": 40.382
+    }
+  },
+  "clippy": {
+    "occurrences": 1339,
+    "source_distinct": 875,
+    "unchanged_baseline": [
+      1383,
+      897
+    ]
+  },
+  "hosted_execution": "not run or pushed"
+}

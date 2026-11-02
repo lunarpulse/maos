@@ -2369,6 +2369,30 @@ fn dispatch_revocations(args: &RevocationsArgs, _color: ColorChoice) -> ExitCode
 
 fn dispatch_spirit(args: &SpiritArgs, _color: ColorChoice) -> ExitCode {
     match &args.op {
+        SpiritOp::Install {
+            spec,
+            registry_uri,
+            vetting_attestation,
+            vetter_keyring,
+        } => {
+            match maos_registry::install::install(
+                spec,
+                registry_uri,
+                vetting_attestation.as_deref(),
+                vetter_keyring.as_deref(),
+            )
+            .and_then(|summary| Ok(serde_json::to_string(&summary)?))
+            {
+                Ok(summary) => {
+                    println!("{summary}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("maosctl spirit install: {error}");
+                    ExitCode::from(1)
+                }
+            }
+        }
         SpiritOp::HotSwapPrecheck {
             spirit,
             from,

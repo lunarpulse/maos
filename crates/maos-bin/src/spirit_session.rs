@@ -56,6 +56,7 @@ pub const MAX_AUTHORIZATION_CLAIMS_BYTES: usize = 16 * 1024;
 /// before it is stopped (planned) and, if still alive, killed.
 pub const TERMINATION_GRACE: Duration = Duration::from_secs(1);
 
+#[derive(Clone)]
 pub struct SessionDeps {
     pub supervisor: Arc<WorkerSupervisor>,
     pub capability: Arc<CapabilityRegistryAdapter>,

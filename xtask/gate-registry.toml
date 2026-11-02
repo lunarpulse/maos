@@ -197,6 +197,8 @@ gates = [
     # was `-p`/`--test`-scoped, so the exit line's final clause was performed
     # by hand on a developer's box and nowhere else (a gap, not a demotion).
     "workspace-test-suite",
+    # 20-1a AC5 — registry publish/install mechanism; aggregate blocks on the job.
+    "epic-20-exit",
     # Story 17-5 — model-pin currency: every vendor model id pinned in a
     # manifest, the price book or a `main.rs` provider constructor is checked
     # against `xtask/model-currency.toml`. Offline; names `file:line`.

@@ -406,6 +406,14 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
     );
     assert!(status.success(), "the fan-out child failed: {status:?}");
     assert!(ran > 0, "no Worker ran");
+    // Establish real container identity before evaluating population/timing:
+    // the in-process stand-in must fail this assertion, not a missing-event check.
+    assert_eq!(
+        cids.len(),
+        ran,
+        "AC6.2: every Worker is a distinct real container (CIDs {} != Workers {ran})",
+        cids.len()
+    );
     let required_population = if profile.name == "smoke" {
         profile.workers.min(2)
     } else {
@@ -414,8 +422,7 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
     let (scheduled, admitted, peak, elapsed_ns) =
         observed.load.expect("producer accounting required");
     assert_load(
-        profile.secs * profile.rate,
-        required_population,
+        (profile.secs * profile.rate, required_population),
         scheduled,
         admitted,
         ran,
@@ -450,12 +457,6 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
         "required concurrently loaded Worker population not reached"
     );
     assert_eq!(dropped, 0, "dropped tasks: {:?}", observed.errors);
-    assert_eq!(
-        cids.len(),
-        ran,
-        "AC6.2: every Worker is a distinct real container (CIDs {} != Workers {ran})",
-        cids.len()
-    );
     assert_eq!(
         child_pids.len(),
         ran,
@@ -497,8 +498,7 @@ fn real_t3_workers_fan_out_through_the_real_supervisor() {
 }
 
 fn assert_load(
-    expected: u64,
-    workers: usize,
+    (expected, workers): (u64, usize),
     scheduled: u64,
     admitted: u64,
     completed: usize,
@@ -525,11 +525,11 @@ fn assert_load(
 #[test]
 #[should_panic(expected = "no arrivals may be silently dropped")]
 fn slow_serial_admission_cannot_pass_the_fanout_contract() {
-    assert_load(600, 5, 600, 60, 60, 1, 60_000_000_000, 60);
+    assert_load((600, 5), 600, 60, 60, 1, 60_000_000_000, 60);
 }
 
 #[test]
 #[should_panic(expected = "required concurrent Worker population")]
 fn serial_population_cannot_pass_the_fanout_contract() {
-    assert_load(600, 5, 600, 600, 600, 1, 60_000_000_000, 60);
+    assert_load((600, 5), 600, 600, 600, 1, 60_000_000_000, 60);
 }

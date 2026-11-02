@@ -1,0 +1,4 @@
+serde-error-handling: crates/maos-registry/src/server.rs:276: `serde_json::to_vec` followed by `.unwrap_or_else(...)` — propagate via `.map_err(|e| <CrateError>::Serialize(e.to_string()))?` instead
+serde-error-handling: crates/maos-registry/src/server.rs:368: `serde_json::to_vec` followed by `.unwrap_or_else(...)` — propagate via `.map_err(|e| <CrateError>::Serialize(e.to_string()))?` instead
+check-serde-error-handling: FAILED — 2 violations across 1 files
+check-serde-error-handling failed: 2 violations

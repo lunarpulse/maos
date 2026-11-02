@@ -1,0 +1,59 @@
+running 2 tests
+failures:
+
+---- offline_install_persists_remote_origin_and_rejects_tampering stdout ----
+
+thread 'offline_install_persists_remote_origin_and_rejects_tampering' (2766242) panicked at crates/maos-cli/tests/spirit_install_20_1.rs:14:5:
+install: maosctl spirit install: server-reported tier 'PublicUntrusted' exceeds operator floor 'Local'
+
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: offline_install_persists_remote_origin_and_rejects_tampering
+             at ./tests/spirit_install_20_1.rs:14:5
+   3: spirit_install_20_1::offline_install_persists_remote_origin_and_rejects_tampering::{closure#0}
+             at ./tests/spirit_install_20_1.rs:8:66
+   4: <spirit_install_20_1::offline_install_persists_remote_origin_and_rejects_tampering::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- install_refuses_registry_rust_inproc_before_persisting stdout ----
+
+thread 'install_refuses_registry_rust_inproc_before_persisting' (2766241) panicked at crates/maos-cli/tests/spirit_install_20_1.rs:36:5:
+maosctl spirit install: server-reported tier 'PublicUntrusted' exceeds operator floor 'Local'
+
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: panic_display<alloc::borrow::Cow<str>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:259:5
+   3: install_refuses_registry_rust_inproc_before_persisting
+             at ./tests/spirit_install_20_1.rs:36:5
+   4: spirit_install_20_1::install_refuses_registry_rust_inproc_before_persisting::{closure#0}
+             at ./tests/spirit_install_20_1.rs:26:60
+   5: <spirit_install_20_1::install_refuses_registry_rust_inproc_before_persisting::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    install_refuses_registry_rust_inproc_before_persisting
+    offline_install_persists_remote_origin_and_rejects_tampering
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+error: test failed, to rerun pass `-p maos-cli --test spirit_install_20_1`
+[raw output: artifact://10634]
+
+
+Wall time: 24.98 seconds
+
+Command exited with code 101

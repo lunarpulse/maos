@@ -143,7 +143,7 @@ fn memory_reads() -> (f64, f64) {
         log,
     );
     let namespace = MemoryNamespace::Default;
-    let mut read = |tier: MemoryTier| {
+    let read = |tier: MemoryTier| {
         memory
             .write(7, tier, &namespace, "k", MemoryValue::Text("v".into()))
             .expect("seed value");

@@ -1,0 +1,12 @@
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -2929,8 +2929,7 @@
+           }
+           trap cleanup EXIT
+           maosctl install --from-local ./dist --verify-only
+-          maos-registry-server --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
+-          server_pid=$!
++          : > registry.log # planted: registry server is not started
+           ready=0
+           for i in $(seq 1 50); do
+             if (exec 3<>/dev/tcp/127.0.0.1/6789) 2>/dev/null; then ready=1; break; fi

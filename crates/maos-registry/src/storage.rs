@@ -134,6 +134,47 @@ impl LocalFsRegistryStorage {
         })
     }
 
+    /// One active version per installed name: the last version persisted by the operator.
+    pub fn installed_manifests(&self) -> Result<Vec<(String, PathBuf)>, StorageError> {
+        let index = self
+            .index
+            .lock()
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        Ok(index
+            .iter()
+            .filter_map(|(name, versions)| {
+                let version = versions.last()?;
+                Some((
+                    name.clone(),
+                    self.version_dir(&version.spirit_id, &version.version)
+                        .join("manifest.toml"),
+                ))
+            })
+            .collect())
+    }
+
+    /// Preserve the signed manifest's relative component location for `maos run`.
+    /// Called only after registry admission has validated the class declaration.
+    pub fn materialize_component(&self, pkg: &SignedPackage) -> Result<(), StorageError> {
+        let document = maos_manifest::ManifestDocument::parse(&pkg.manifest_toml)
+            .map_err(|e| StorageError::Serde(e.to_string()))?;
+        if let Some(class) = document
+            .class_section()
+            .map_err(|e| StorageError::Serde(e.to_string()))?
+        {
+            if let Some(artifact) = class.artifact {
+                let path = self
+                    .version_dir(&pkg.spirit_id, &pkg.version)
+                    .join(artifact);
+                fs::create_dir_all(path.parent().expect("artifact has version parent"))
+                    .map_err(|e| StorageError::Io(e.to_string()))?;
+                fs::write(path, &pkg.artifact_bytes)
+                    .map_err(|e| StorageError::Io(e.to_string()))?;
+            }
+        }
+        Ok(())
+    }
+
     fn load_index(root: &Path) -> BTreeMap<String, Vec<SearchResultItem>> {
         let path = root.join("index.json");
         if path.exists() {
@@ -300,13 +341,15 @@ impl RegistryStorage for LocalFsRegistryStorage {
             .map_err(|e| StorageError::Io(e.to_string()))?;
         let pkg: SignedPackage =
             serde_json::from_str(&pkg_json).map_err(|e| StorageError::Serde(e.to_string()))?;
-        Ok(SignedArtifact::new(
+        let mut artifact = SignedArtifact::new(
             spirit_id.clone(),
             version.to_string(),
             artifact_bytes,
             pkg.signature,
             pkg.publisher_pubkey,
-        ))
+        );
+        artifact.compliance_envelope = Some(pkg.compliance_envelope);
+        Ok(artifact)
     }
 
     fn search(&self, q: &SearchQuery) -> Result<SearchResults, StorageError> {

@@ -54,7 +54,6 @@ pub struct SpiritRegistryServer {
     org_pubkey: Option<[u8; 32]>,
     /// Story 7.2 — Ed25519 signing key for server-side tier attestation.
     server_signing_key: Option<[u8; 32]>,
-    shutdown: AtomicBool,
 }
 
 impl SpiritRegistryServer {
@@ -69,7 +68,6 @@ impl SpiritRegistryServer {
             listen_addr,
             org_pubkey,
             server_signing_key: None,
-            shutdown: AtomicBool::new(false),
         }
     }
 
@@ -79,25 +77,50 @@ impl SpiritRegistryServer {
         self
     }
 
-    /// Block on the HTTP listener.  On SIGTERM, clean exit.
-    pub fn run(self) -> Result<(), String> {
+    /// Run the loopback development server, draining workers on SIGTERM.
+    pub async fn run(self) -> Result<(), String> {
         let listener = TcpListener::bind(&self.listen_addr).map_err(|e| format!("bind: {e}"))?;
+        #[cfg(unix)]
+        let mut terminate =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .map_err(|e| format!("SIGTERM: {e}"))?;
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let stop = Arc::clone(&shutdown);
+        let mut worker = tokio::task::spawn_blocking(move || self.serve(listener, stop));
+        tokio::select! {
+            result = &mut worker => return result.map_err(|e| e.to_string())?,
+            result = tokio::signal::ctrl_c() => { result.map_err(|e| e.to_string())?; },
+            _ = async {
+                #[cfg(unix)]
+                terminate.recv().await;
+                #[cfg(not(unix))]
+                std::future::pending::<()>().await;
+            } => {},
+        }
+        shutdown.store(true, Ordering::SeqCst);
+        worker.await.map_err(|e| e.to_string())?
+    }
+
+    /// Serve an already-bound loopback listener; caller owns its shutdown flag.
+    pub fn serve(self, listener: TcpListener, shutdown: Arc<AtomicBool>) -> Result<(), String> {
         let addr = listener
             .local_addr()
             .map_err(|e| format!("local_addr: {e}"))?;
-        eprintln!("maos-registry: listening on {}", addr);
-
+        if !addr.ip().is_loopback() {
+            return Err("unauthenticated development registry requires a loopback bind (20-1b owns mutation authentication)".into());
+        }
+        listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+        eprintln!("maos-registry: listening on {addr}");
         let storage = self.storage;
         let server_signing_key = self.server_signing_key;
         let _ = &self.org_pubkey;
-
-        listener.set_nonblocking(true).ok();
         let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
 
         loop {
-            if self.shutdown.load(Ordering::SeqCst) {
+            if shutdown.load(Ordering::SeqCst) {
                 break;
             }
+            handles.retain(|handle| !handle.is_finished());
             match listener.accept() {
                 Ok((stream, _)) => {
                     let s = Arc::clone(&storage);
@@ -119,6 +142,54 @@ impl SpiritRegistryServer {
         }
 
         Ok(())
+    }
+}
+
+/// Shared standalone/daemon construction. No root means the operator's local store.
+#[derive(Default)]
+pub struct RegistryServerArgs {
+    pub bind: Option<String>,
+    pub root: Option<std::path::PathBuf>,
+    pub signing_key: Option<std::path::PathBuf>,
+}
+
+impl RegistryServerArgs {
+    pub fn parse(args: impl Iterator<Item = String>) -> Result<Self, String> {
+        let mut result = Self::default();
+        let mut args = args;
+        while let Some(flag) = args.next() {
+            let value = args.next().ok_or_else(|| format!("{flag} needs a value"))?;
+            match flag.as_str() {
+                "--bind" => result.bind = Some(value),
+                "--root" => result.root = Some(value.into()),
+                "--signing-key" => result.signing_key = Some(value.into()),
+                _ => return Err(format!("unknown registry flag {flag}")),
+            }
+        }
+        Ok(result)
+    }
+
+    pub fn build(self) -> Result<SpiritRegistryServer, String> {
+        let storage = match self.root {
+            Some(root) => crate::storage::LocalFsRegistryStorage::at_path(root),
+            None => crate::storage::LocalFsRegistryStorage::new(),
+        }
+        .map_err(|e| format!("registry root: {e}"))?;
+        let mut server = SpiritRegistryServer::new(
+            Arc::new(storage),
+            self.bind.unwrap_or_else(|| "127.0.0.1:6789".into()),
+            None,
+        );
+        if let Some(path) = self.signing_key {
+            let text =
+                std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let seed = hex::decode(text.trim())
+                .map_err(|e| format!("signing key hex: {e}"))?
+                .try_into()
+                .map_err(|_| "signing key must be a 32-byte hex seed")?;
+            server = server.with_server_signing_key(seed);
+        }
+        Ok(server)
     }
 }
 
@@ -202,17 +273,7 @@ fn handle_connection(
                     message: format!("Parse error: {e}"),
                 }),
             };
-            let resp_json = serde_json::to_vec(&resp).unwrap_or_else(|e| {
-                eprintln!("maos-registry: serde error: {e}");
-                Vec::new()
-            });
-            if resp_json.is_empty() {
-                let _ = write!(
-                    stream,
-                    "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"
-                );
-                return Ok(());
-            }
+            let resp_json = serde_json::to_vec(&resp)?;
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                 resp_json.len(),
@@ -261,7 +322,20 @@ fn handle_connection(
         }
     };
 
-    let result = handle_result(&request.method, &request.params);
+    let result = if request.method == "tools/call" {
+        let method = request
+            .params
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("tools/call requires name")?;
+        let args = request
+            .params
+            .get("arguments")
+            .ok_or("tools/call requires arguments")?;
+        handle_result(method, args)
+    } else {
+        handle_result(&request.method, &request.params)
+    };
 
     let response = match result {
         Ok(value) => JsonRpcResponse {
@@ -281,17 +355,7 @@ fn handle_connection(
         },
     };
 
-    let resp_json = serde_json::to_vec(&response).unwrap_or_else(|e| {
-        eprintln!("maos-registry: serde error: {e}");
-        Vec::new()
-    });
-    if resp_json.is_empty() {
-        let _ = write!(
-            stream,
-            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"
-        );
-        return Ok(());
-    }
+    let resp_json = serde_json::to_vec(&response)?;
     let http_response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         resp_json.len(),

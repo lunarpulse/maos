@@ -17,6 +17,10 @@ const NO_LOCAL_FORM: &[(&str, &str)] = &[
         "scene fixture setup plus mutation/twin reconciliation, not a standalone xtask gate",
     ),
     (
+        "epic-20-exit",
+        "hosted componentization, four release artifacts, development signing and isolated registry/HOME; not a standalone local gate",
+    ),
+    (
         "release-dry-run",
         "CI target matrix, release artifacts and signing context",
     ),

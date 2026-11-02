@@ -1,0 +1,36 @@
+running 1 test
+failures:
+
+---- publish_real_address_returns_receipt_and_manifest stdout ----
+
+thread 'publish_real_address_returns_receipt_and_manifest' (2762122) panicked at crates/maos-spirit-cli/tests/publish_live_20_1.rs:9:5:
+publish live: maos-spirit: manifest parse failure: manifest missing `spirit_id` or `name`
+
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: publish_real_address_returns_receipt_and_manifest
+             at ./tests/publish_live_20_1.rs:9:5
+   3: publish_live_20_1::publish_real_address_returns_receipt_and_manifest::{closure#0}
+             at ./tests/publish_live_20_1.rs:5:55
+   4: <publish_live_20_1::publish_real_address_returns_receipt_and_manifest::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    publish_real_address_returns_receipt_and_manifest
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p maos-spirit-cli --test publish_live_20_1`
+[raw output: artifact://10629]
+
+
+Wall time: 16.35 seconds
+
+Command exited with code 101

@@ -42,6 +42,33 @@ pub struct McpSpiritRegistryClient {
 }
 
 impl McpSpiritRegistryClient {
+    /// Construct the standalone admission-time HTTP client, without the kernel.
+    pub fn http(uri: String, config: RegistryClientConfig) -> Result<Self, RegistryError> {
+        use maos_domain::ports::mcp::McpTransportId;
+        use maos_mcp::client::{McpClientImpl, McpServerEntry};
+        use maos_mcp::transport::{streamable_http::StreamableHttpTransport, McpTransport};
+        use std::collections::BTreeMap;
+        let transport: Arc<dyn McpTransport> = Arc::new(StreamableHttpTransport::new(
+            Arc::new(crate::http::RegistryHttp),
+            uri,
+            None,
+        ));
+        let name = "spirit-registry".to_owned();
+        let mcp = McpClientImpl::new(
+            BTreeMap::from([(McpTransportId::StreamableHttp, transport)]),
+            McpTransportId::StreamableHttp,
+            BTreeMap::from([(
+                name.clone(),
+                McpServerEntry {
+                    name: name.clone(),
+                    transport: McpTransportId::StreamableHttp,
+                    fallback_transport: None,
+                },
+            )]),
+        )
+        .map_err(map_mcp_err)?;
+        Ok(Self::new(Arc::new(mcp), name).with_config(config))
+    }
     /// Construct a new kernel-side registry client.
     pub fn new(mcp_client: Arc<dyn McpClient + Send + Sync>, registry_server_name: String) -> Self {
         Self {
@@ -138,8 +165,9 @@ impl SpiritRegistryClient for McpSpiritRegistryClient {
                     });
                 }
 
-                // Apply tier floor check.
-                if (server_tier as u8) > (self.config.tier_floor as u8) {
+                // A floor is a minimum obligation, not a ceiling: Local permits
+                // signature-and-claim-verified PublicUntrusted installs.
+                if (server_tier as u8) < (self.config.tier_floor as u8) {
                     return Err(RegistryError::TierFloorViolation {
                         server_reported: server_tier,
                         operator_floor: self.config.tier_floor,

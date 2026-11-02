@@ -63,7 +63,7 @@ fn named_step<'a>(job: &'a Value, name: &str) -> &'a Value {
 }
 
 #[test]
-fn release_workflow_flattens_and_publishes_the_explicit_six_binary_set() {
+fn release_workflow_flattens_and_publishes_the_explicit_artifact_set() {
     let workflow = workflow();
     let jobs = key(&workflow, "jobs");
     let build = key(jobs, "build");
@@ -120,6 +120,8 @@ fn release_workflow_flattens_and_publishes_the_explicit_six_binary_set() {
         .expect("build command");
     assert!(build_command.contains("-p maos-bin"));
     assert!(build_command.contains("-p maos-cli"));
+    assert!(build_command.contains("-p maos-registry"));
+    assert!(build_command.contains("-p maos-spirit-cli"));
 
     let upload_targets: Vec<(&str, &str)> = steps(build)
         .iter()

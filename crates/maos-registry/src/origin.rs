@@ -14,6 +14,8 @@ pub enum RegistryOrigin {
         /// SHA-256 of the tar bundle that was imported.
         bundle_sha256: String,
     },
+    /// Downloaded and signature-verified without a running daemon.
+    Remote { uri: String },
 }
 
 impl Default for RegistryOrigin {

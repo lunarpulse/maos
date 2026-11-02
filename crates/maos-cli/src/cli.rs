@@ -913,6 +913,17 @@ pub struct SpiritArgs {
 /// Spirit subcommands.
 #[derive(clap::Subcommand, Debug)]
 pub enum SpiritOp {
+    /// Install a signature-verified Spirit without a running daemon.
+    Install {
+        /// Registry name and exact version: <name>@<version>.
+        spec: String,
+        #[arg(long)]
+        registry_uri: String,
+        #[arg(long, requires = "vetter_keyring")]
+        vetting_attestation: Option<std::path::PathBuf>,
+        #[arg(long, requires = "vetting_attestation")]
+        vetter_keyring: Option<std::path::PathBuf>,
+    },
     /// Run a hot-swap precondition check (ADR-036, REPORTING-ONLY at v0.3-β).
     /// Prints JSON verdict to stdout. Exit 0 = safe; exit 2 = violation.
     HotSwapPrecheck {

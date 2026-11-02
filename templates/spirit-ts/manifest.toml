@@ -6,7 +6,7 @@ manifest_schema_version = 5
 min_substrate_version = "0.1.0-alpha.1"
 forms = ["wasm-component"]
 artifact = "dist/spirit.wasm"
-trust_tier = "local"
+trust_tier = "public-untrusted"
 description = "A MAOS WebAssembly-component Spirit scaffolded from templates/spirit-ts."
 
 [capabilities.required.iac]

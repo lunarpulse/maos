@@ -201,6 +201,10 @@ pub fn extract_spirit_id_and_version(manifest_toml: &[u8]) -> Result<(String, St
         .parse()
         .map_err(|e| CliError::ManifestParse(format!("TOML parse error: {e}")))?;
 
+    let manifest = manifest
+        .get("class")
+        .or_else(|| manifest.get("spirit"))
+        .unwrap_or(&manifest);
     let spirit_id = manifest
         .get("spirit_id")
         .or_else(|| manifest.get("name"))

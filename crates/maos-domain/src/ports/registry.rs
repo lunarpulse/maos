@@ -209,6 +209,8 @@ pub struct SignedArtifact {
     pub signature: [u8; 64],
     #[doc = "Construct via [`SignedArtifact::new`] — signer's Ed25519 public key (32 bytes)."]
     pub signer_pubkey: [u8; 32],
+    /// Publisher's signed claim, transported with the artifact for offline admission.
+    pub compliance_envelope: Option<ComplianceClaimEnvelope>,
 }
 
 impl SignedArtifact {
@@ -225,6 +227,7 @@ impl SignedArtifact {
             artifact_bytes,
             signature,
             signer_pubkey,
+            compliance_envelope: None,
         }
     }
 }
@@ -430,7 +433,7 @@ pub enum RegistryError {
     ServerTierSignatureRequired { reason: String },
 
     #[error(
-        "server-reported tier '{server_reported:?}' exceeds operator floor '{operator_floor:?}'"
+        "server-reported tier '{server_reported:?}' is below operator floor '{operator_floor:?}'"
     )]
     TierFloorViolation {
         server_reported: TrustTier,
@@ -538,12 +541,13 @@ impl<'de> serde::Deserialize<'de> for SignedManifest {
 impl serde::Serialize for SignedArtifact {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("SignedArtifact", 5)?;
+        let mut state = serializer.serialize_struct("SignedArtifact", 6)?;
         state.serialize_field("spirit_id", &self.spirit_id)?;
         state.serialize_field("version", &self.version)?;
         state.serialize_field("artifact_bytes", &self.artifact_bytes)?;
         state.serialize_field("signature", &hex::encode(&self.signature[..]))?;
         state.serialize_field("signer_pubkey", &hex::encode(&self.signer_pubkey[..]))?;
+        state.serialize_field("compliance_envelope", &self.compliance_envelope)?;
         state.end()
     }
 }
@@ -557,6 +561,8 @@ impl<'de> serde::Deserialize<'de> for SignedArtifact {
             artifact_bytes: Vec<u8>,
             signature: String,
             signer_pubkey: String,
+            #[serde(default)]
+            compliance_envelope: Option<ComplianceClaimEnvelope>,
         }
         let h = Helper::deserialize(deserializer)?;
         let signature = hex::decode(&h.signature)
@@ -580,6 +586,7 @@ impl<'de> serde::Deserialize<'de> for SignedArtifact {
             artifact_bytes: h.artifact_bytes,
             signature,
             signer_pubkey,
+            compliance_envelope: h.compliance_envelope,
         })
     }
 }

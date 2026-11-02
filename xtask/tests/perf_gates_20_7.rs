@@ -481,10 +481,10 @@ fn a_count_over_tolerance_fails_and_a_missing_baseline_is_absent() {
     assert_eq!(judge(&row, 50.0).0, Verdict::Absent);
 }
 
-fn counts_dir(extra_allocations: f64) -> tempfile::TempDir {
+fn counts_dir(extra_allocations: f64, extra_instructions: f64) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let budgets = perf_budgets::load(&repo_root()).expect("budgets");
-    let write = |path: &str, iterations: u64, allocations: u64| {
+    let write = |path: &str, iterations: u64, allocations: u64, instructions: u64| {
         fs::write(
             dir.path().join(format!("{path}.json")),
             format!(
@@ -494,11 +494,13 @@ fn counts_dir(extra_allocations: f64) -> tempfile::TempDir {
         .expect("count json");
         fs::write(
             dir.path().join(format!("{path}.callgrind")),
-            "events: Ir\ntotals: 1000\n",
+            format!("events: Ir\ntotals: {instructions}\n"),
         )
         .expect("callgrind");
     };
-    write("empty", 0, 0);
+    let iterations = 10_000;
+    let empty_instructions = 1000;
+    write("empty", 0, 0, empty_instructions);
     for metric in budgets
         .metric
         .iter()
@@ -506,17 +508,26 @@ fn counts_dir(extra_allocations: f64) -> tempfile::TempDir {
     {
         let baseline = metric.baseline.expect("allocation rows are baselined");
         let path = metric.path.as_deref().expect("path");
+        let instruction_baseline = budgets
+            .metric
+            .iter()
+            .find(|m| m.tier == "C" && m.unit == "instructions" && m.path == metric.path)
+            .and_then(|m| m.baseline)
+            .expect("hosted instruction baseline");
         write(
             path,
-            1000,
-            (baseline * 1000.0 * (1.0 + extra_allocations)).round() as u64,
+            iterations,
+            (baseline * iterations as f64 * (1.0 + extra_allocations)).round() as u64,
+            empty_instructions
+                + (instruction_baseline * iterations as f64 * (1.0 + extra_instructions)).round()
+                    as u64,
         );
     }
     dir
 }
 
 #[test]
-fn tier_c_blocks_on_an_allocation_count_over_tolerance_and_passes_at_the_baseline() {
+fn tier_c_binds_hosted_counts_and_detects_instruction_and_allocation_regressions() {
     let run = |dir: &Path| {
         Command::new(env!("CARGO_BIN_EXE_xtask"))
             .current_dir(repo_root())
@@ -525,7 +536,7 @@ fn tier_c_blocks_on_an_allocation_count_over_tolerance_and_passes_at_the_baselin
             .output()
             .expect("run check-perf-counts")
     };
-    let at_baseline = run(counts_dir(0.0).path());
+    let at_baseline = run(counts_dir(0.0, 0.0).path());
     assert!(
         at_baseline.status.success(),
         "{}",
@@ -533,12 +544,29 @@ fn tier_c_blocks_on_an_allocation_count_over_tolerance_and_passes_at_the_baselin
     );
     let text = String::from_utf8_lossy(&at_baseline.stdout);
     assert!(text.contains("PASS cap-token-verify-allocations"), "{text}");
-    let over = run(counts_dir(0.10).path());
+    assert!(!text.contains("ABSENT"), "{text}");
+    let budgets = perf_budgets::load(&repo_root()).expect("budgets");
+    for metric in budgets.metric.iter().filter(|m| m.tier == "C") {
+        assert!(metric.binding_at(&budgets.protocol.phase), "{}", metric.id);
+        assert!(text.contains(&format!("PASS {} ", metric.id)), "{text}");
+    }
+    let over = run(counts_dir(0.10, 0.0).path());
     assert!(
         !over.status.success(),
         "a 10% allocation regression must block"
     );
     assert!(String::from_utf8_lossy(&over.stdout).contains("FAIL cap-token-verify-allocations"));
+    let instructions = run(counts_dir(0.0, 0.10).path());
+    assert!(
+        !instructions.status.success(),
+        "a 10% instruction regression must block"
+    );
+    let text = String::from_utf8_lossy(&instructions.stdout);
+    assert!(
+        text.contains("FAIL cap-token-verify-instructions"),
+        "{text}"
+    );
+    assert!(text.contains("PASS cap-token-verify-allocations"), "{text}");
 }
 
 #[test]

@@ -33,6 +33,14 @@ pub const ARTIFACTS: &[Artifact] = &[
         package: "maos-cli",
         binary: "maosctl",
     },
+    Artifact {
+        package: "maos-registry",
+        binary: "maos-registry-server",
+    },
+    Artifact {
+        package: "maos-spirit-cli",
+        binary: "maos-spirit",
+    },
 ];
 
 /// Written by the manifest path, never a release artifact. Cleared before a
@@ -165,11 +173,6 @@ fn build_and_stage(dist_dir: &Path, requested_targets: &[&str]) -> Result<(), St
                 "build",
                 "--release",
                 "--locked",
-                // Pinned, not inherited: staging below reads `target/<triple>/release`,
-                // and an ambient CARGO_TARGET_DIR would build elsewhere and leave this
-                // path holding a stale binary that still hashes and signs green.
-                "--target-dir",
-                "target",
                 "--target",
                 target.triple,
                 "-p",
@@ -197,7 +200,9 @@ fn build_and_stage(dist_dir: &Path, requested_targets: &[&str]) -> Result<(), St
                 ));
             }
 
-            let source = PathBuf::from("target")
+            let source = std::env::var_os("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("target"))
                 .join(target.triple)
                 .join("release")
                 .join(artifact.binary);

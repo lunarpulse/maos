@@ -1,0 +1,2 @@
+check-dependency-closure: maos-kernel-core PASSED (0 violations)
+check-dependency-closure: maos-domain PASSED (0 violations)

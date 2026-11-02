@@ -1,0 +1,213 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling libc v0.2.189
+   Compiling serde v1.0.229
+   Compiling cfg-if v1.0.5
+   Compiling typenum v1.20.1
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.151
+   Compiling thiserror v2.0.21
+   Compiling zeroize v1.9.0
+   Compiling rustix v1.1.5
+   Compiling find-msvc-tools v0.1.14
+   Compiling memchr v2.8.3
+   Compiling shlex v2.0.1
+   Compiling bitflags v2.13.2
+   Compiling indexmap v2.14.2
+   Compiling regex-syntax v0.8.11
+   Compiling anyhow v1.0.104
+   Compiling log v0.4.34
+   Compiling clap_builder v4.6.6
+   Compiling thread_local v1.1.9
+   Compiling cc v1.5.1
+   Compiling tracing-log v0.2.0
+   Compiling generic-array v0.14.7
+   Compiling regex-automata v0.4.18
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling getrandom v0.3.4
+   Compiling getrandom v0.2.17
+   Compiling errno v0.3.14
+   Compiling filetime v0.2.29
+   Compiling mio v1.2.3
+   Compiling ring v0.17.14
+   Compiling matchers v0.2.0
+   Compiling syn v3.0.6
+   Compiling syn v2.0.119
+   Compiling digest v0.10.7
+   Compiling tar v0.4.46
+   Compiling signal-hook-registry v1.4.8
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling async-trait v0.1.92
+   Compiling clap_derive v4.6.4
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling tracing-attributes v0.1.31
+   Compiling tokio-macros v2.7.0
+   Compiling maos-attrs v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-attrs)
+   Compiling curve25519-dalek v4.1.3
+   Compiling tokio v1.53.3
+   Compiling tracing v0.1.44
+   Compiling clap v4.6.6
+   Compiling smallvec v1.16.2
+   Compiling maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi)
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling serde_cbor v0.11.2
+   Compiling ed25519-dalek v2.2.0
+   Compiling toml_edit v0.22.27
+   Compiling tracing-subscriber v0.3.23
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+   Compiling toml v0.8.23
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+   Compiling maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest)
+   Compiling maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp)
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:169:27
+    |
+169 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+   Compiling maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: unused import: `Instant`
+ --> crates/maos-spirit-cli/tests/../../../tests/harness/registry_20_1.rs:7:27
+  |
+7 | use std::time::{Duration, Instant};
+  |                           ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (test "publish_live_20_1") generated 1 warning (run `cargo fix --test "publish_live_20_1" -p maos-spirit-cli` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 44.66s
+     Running tests/publish_live_20_1.rs (target/debug/deps/publish_live_20_1-160a722d045f3dfd)
+
+running 1 test
+test publish_real_address_returns_receipt_and_manifest ... FAILED
+
+failures:
+
+---- publish_real_address_returns_receipt_and_manifest stdout ----
+
+thread 'publish_real_address_returns_receipt_and_manifest' (2759792) panicked at crates/maos-spirit-cli/tests/publish_live_20_1.rs:9:5:
+publish live: maos-spirit: maos-spirit publish for non-`stub` registry URIs requires the kernel-side composition root; resolved URI: 'http://127.0.0.1:38291/mcp'
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    publish_real_address_returns_receipt_and_manifest
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p maos-spirit-cli --test publish_live_20_1`

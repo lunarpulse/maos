@@ -24,6 +24,19 @@ compiles the guest entrypoint to `dist/index.js`. `npm run componentize` turns
 that JavaScript into `dist/spirit.wasm`; the component imports no
 `wasi:http` interface.
 
+## Publishing
+
+The scaffold declares `public-untrusted`; publish with `maos-spirit publish
+--tier=public_untrusted --manifest manifest.toml --artifact dist/spirit.wasm
+--signing-key <publisher-key-file> --registry-uri http://127.0.0.1:6789/mcp`.
+The key file is a 32-byte Ed25519 seed (raw or hex) with mode `0600`.
+`maosctl spirit install <name>@<version> --registry-uri <uri>` verifies signatures,
+ComplianceClaim, form and operator tier policy without a running daemon.
+An installed component is recognized by the shell; a published engine-off binary
+reports `wasm_engine_off`. The development registry is loopback-only until
+20-1b supplies mutation authentication and publisher-name pinning.
+
+
 ## Governed launch
 
 The manifest declares `wasm-component`, `dist/spirit.wasm`, and T2. Build both

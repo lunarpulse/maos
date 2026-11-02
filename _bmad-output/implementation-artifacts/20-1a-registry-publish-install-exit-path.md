@@ -6,7 +6,7 @@ context_commit: a4c00897
 baseline_commit: a4c00897
 security_sensitive: true
 kernel_grant: "none for 20-1a: kernel-free (AC1–AC5). The FLAG-Winston row R (D-20-1-02 A KQ1 + D-20-1-03 A P; measured +78 physical / +68 tokei from HEAD 26801 / 21011; ceilings kernel ≤ 26957 / 21147) is granted to 20-1b only, which lands last; the interaction with 20-7's row R is recorded in 20-1b's kernel_grant (cumulative tokei ≤ 21209, else STOP)."
-kloc_grant: "RULED 2026-11-01/02 (ask rows201; D-20-1-11 A; D02 A ×2 measured / ×3 unmeasured). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): maos-registry ≤ 5163; maos-spirit-cli ≤ 2043; maos-cli ≤ 6666 (above its 6382 STOP; inside the reserved 6856 pin, D-20-1-05 A); maos-bin ≤ 34410; maos-shell ≤ 728; maos-compliance ≤ 2122; maos-domain ≤ 10153; xtask ≤ 42920; aggregate ≤ 193768. The kernel ceiling 26957 / 21147 is 20-1b's (see kernel_grant)."
+kloc_grant: "RULED 2026-11-01/02 (ask rows201; D-20-1-11 A; D02 A ×2 measured / ×3 unmeasured). One-key ceilings (STOP above; aggregate hardfail = measured + 1 at landing): maos-registry ≤ 5163; maos-spirit-cli ≤ 2043; maos-cli ≤ 6666 (above its 6382 STOP; inside the reserved 6856 pin, D-20-1-05 A); maos-bin ≤ 34410; maos-shell ≤ 728; maos-compliance ≤ 2122; maos-domain ≤ 10153; xtask ≤ 45830 (20-7's ruled higher pin supersedes this story's historical 42920, operator landing instruction 2026-11-02); aggregate ≤ 193768. The kernel ceiling 26957 / 21147 is 20-1b's (see kernel_grant)."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): a kernel FLAG-Winston grant (D-20-1-02/03), signatures and supply-chain trust (AC6, AC7, AC10), cross-Spirit isolation (AC11). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC6/AC7/AC10/AC11, Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -351,19 +351,85 @@ Created 2026-11-01 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter me
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+anthropic/claude-opus-5-5 (creation); openai-codex/gpt-6.1-sol (20-1a landing 1 implementation).
 
 ### Debug Log References
 
 - Creation evidence: `20-1-registry-client-install-verb-vetter-and-yank-evidence/creation/{measurements.md, cites-a4c00897.md, records-owed.md, kloc-kernel-a4c00897-and-prototypes.json, fmt0-applier-format-control.diff, kq0-fence-only.diff, kq1-sticky-quarantine.diff, kq2-sticky-quarantine-plus-iac-egress.diff, p-poller-edge-trigger.diff, krec-kq1-p-bundle.diff, kalt-kq2-p-bundle.diff, kmin-kq0-p-bundle.diff, b-nonkernel-yank-quarantine.diff, s1-registry-server-binary.diff, runtime/{exit-probe.sh, exit-probe-a4c00897.txt}, gates/*}`.
+- Landing evidence: [commands](20-1a-registry-publish-install-exit-path-evidence/landing-1/commands.md), [plants](20-1a-registry-publish-install-exit-path-evidence/landing-1/plants.md), `20-1a-registry-publish-install-exit-path-evidence/landing-1/{captured-commands.jsonl,commands.json,serial-junit.xml,*.log}`.
+- Hosted-only handoff, not run or pushed: [ci-20-1a-verify.yml](20-1a-registry-publish-install-exit-path-evidence/ci/ci-20-1a-verify.yml), with `ac5-no-server.diff` and its SHA-256.
 
 ### Completion Notes List
+
+#### 20-1a landing 1 implementation — 2026-11-02
+
+**Scope and custody.** Implemented AC1–AC5 only. The parent explicitly reaffirmed the split: signed yanks/origin, persistent yank sequence/cursors, first-publisher pin/storage identity and the kernel poller remain 20-1b. The registry is therefore gated to loopback development use; no public listener/proxy is claimed safe. Main owns the corresponding shared deferred-work row. No status or tracker flip, commit, push, `.devcontainer` edit, kernel source edit or corpus tracking was performed. New environment-variable names: none; existing registry policy names are reused. `installed_spirits.rs` is enrolled in `SCANNED_SOURCE_FILES` (36 files).
+
+**Implementation.** Shared `RegistryServerArgs` construction serves both entry points, respects explicit roots/signing keys, prints readiness and drains on SIGTERM. The standalone HTTP leaf feeds the existing MCP transport/client; the server accepts its `tools/call` envelope. Publish also needed to recognize schema-5 `[class]` identity, rather than only legacy top-level identity. Install lives in maos-registry; maos-cli is the clap variant/call/JSON print only. The artifact wire response now carries the signed ComplianceClaim needed for real admission. Install checks requested/signed identities, publisher signature, existing admission, optional vetting and configured server tier signatures before persistence, records `Remote { uri }`, and materializes the validated relative component artifact. The consumer floor comparison was corrected to a minimum, not a ceiling, so the default Local policy does not reject PublicUntrusted before admission. Boot enumerates active persisted versions, retains/journals typed refusals, and routes installed names through the shell host. The WASM-enabled branch uses the existing admission triple and supervised session; its feature build/execution remains unverified below. Release staging/signing/upload now declares all four binaries and honors the inherited target directory. The new aggregate job builds the fixture at its SHA, isolates HOME/root, explicitly fails readiness, reaps the server and asserts the exact engine-off line. FR35/FR36 coverage rows enroll that job without an independent-author claim.
+
+**AC witnesses (all final-tree green in the serial workspace run).**
+
+| AC | Witness | Red-before / plant | Green observation |
+|---|---|---|---|
+| AC1 | `crates/maos-registry/tests/registry_server_bin_20_1.rs:7` | Actual server stub red, rc101; ignore-root plant rc101 (`--root must own the package`) | Client round-trip/root custody/SIGTERM vector passed; non-loopback rejection passed |
+| AC2 | `crates/maos-spirit-cli/tests/publish_live_20_1.rs:5` | Restored pre-story real-address guard, rc101 | Live in-process-server publish/receipt/manifest round-trip passed |
+| AC3 | `crates/maos-cli/tests/spirit_install_20_1.rs:18,61,108,144` | Prebuild CLI rc2; admission-bypass plant rc101 on real `spirits/researcher` | Remote-origin persistence, tampered artifact, wrong publisher key, forged claim, rust-inproc refusal, org signature requirement and tier floor vectors passed |
+| AC4 | `crates/maos-bin/tests/installed_spirit_dispatch_20_1.rs:6` | Creation exit probe `unknown spirit`; hello-only fallback reconstruction rc101 | Exact `maos: spirit 'example-spirit-ts' refused at boot: wasm_engine_off`, never unknown, passed |
+| AC5 | `xtask/tests/registry_exit_20_1.rs:4` | Pre-landing two-binary denominator reconstructed, rc101 | Four-binary/job/aggregate enrollment vector and existing release workflow/manifest vectors passed; hosted execution is not claimed |
+
+**Plants.** Four local AC1–AC4 mutations plus the separately named AC5 before-state reconstruction ran in the real checkout; all were copy-backed, `cmp`-verified and touched. Wall clocks and hashes are in `plants.md`. AC5's required no-server hosted plant is cut, SHA-256 `8cdf9a4ca1acf57083cdbc03f18d065b25d9c1541b8324b8d7f2643785fb33dc`, but has not run. The initial capture named `ac5-red` actually passed because compilation observed the edited table; it is explicitly not red evidence.
+
+**Exact post-fmt measurement and pins.** `kloc-check --json` rc0 after re-pin; aggregate 191380, hardfail 191381, `over_budget=[]`. The final serde repair removes 20 lines of server fallback scaffolding, so maos-registry is 3905 rather than the earlier 3925. xtask **44297 → 44305** (20-1a landing 1; the 20-7 grant **45830** supersedes this story's historical 42920 ceiling). Every changed row retains its prior HISTORY. The maos-cli reserved pin remains 6856, with consumed 6396 → 6429 and the story STOP ceiling 6666 recorded.
+
+| Crate | Measured | Ruled ceiling | Landed pin |
+|---|---:|---:|---:|
+| maos-registry | 3905 | 5163 | 3905 |
+| maos-spirit-cli | 755 | 2043 | 755 |
+| maos-cli | 6429 | 6666 | 6856 reserved |
+| maos-bin | 33496 | 34410 | 33496 |
+| maos-shell | 615 | 728 | 615 |
+| maos-domain | 10099 | 10153 | 10099 |
+| maos-compliance (unchanged) | 2032 | 2122 | unchanged |
+| xtask | 44305 | 45830 | 44305 |
+| aggregate | 191380 | 193768 | hardfail 191381 |
+| kernel (physical / tokei) | 26841 / 21042 | no change allowed | unchanged |
+
+`check-kernel-baseline --json` rc0: 95 files, changed/added/removed all empty; set hash `db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59`.
+
+**Historical red verification, preserved.** The initial focused nextest returned 100 (2699/2700): the new epic-20 hosted context needed the same local-mirroring exemption already used by epic-19; that test-only expectation was corrected. The first serial workspace run returned 100 (5507/5526, 19 failures, 138 skipped) because release fixture binaries were stale after the domain change; `serial-junit.xml` preserves it. `xtask build-test-fixtures` then returned 0, and the repaired serial workspace run passed **5526/5526**, 138 skipped (1099.808 s suite runtime). No test was narrowed or disabled.
+
+**Final local matrix.** After Main explicitly resumed verification, `cargo fmt --all` returned 0; final workspace all-target build returned 0 (117.585 s after the serde repair). The WASM-feature all-target build returned 0, and the properly configured `MAOS_17_2_CGROUP_MODE=undelegated` WASM-feature suite passed **820/820**, 15 skipped, serially. The earlier feature attempt without that mode returned 100 and is retained rather than claimed green. Registry/spirit-cli `fixture_replay` passed 129/129 (2 skipped); kernel lib passed 253/253; `spirit_boundary_invariants` passed 1/1. The corrected 20-7 perf-gate selector passed 35/35 and the fanout contract tests passed 3/3 (the real T3 leg explicitly skips without substrate). The earlier nonexistent `perf_budgets_20_7` test-target invocation returned 101; it was a selector error, not a test failure. `check-perf-counts --dir /tmp/v207-tier-c-counts --json` returned 0 with all **six binding PASS** verdicts; exit-command and decision-register checks returned 0.
+
+**Final gates.** All returned 0: kloc, kernel baseline, service boundary, env contract, serde error handling, composition root, J1 delegation, dev-record completeness, epic-close coherence, review findings, test cost, invariant lock, coverage matrix, coverage completeness, perf-runner policy, dependency closure, corpus, ship-gate completeness and cargo deny. The serde gate originally returned 1 on two existing server `to_vec(...).unwrap_or_else(...)` fallback blocks, newly exposed by the runnable server; both now propagate the real serde error with `?`, deleting 20 lines rather than suppressing the gate. Exact pins were lowered to the final measured values above.
+
+**One fresh serial timing sample, not a default retry.** Main ruled the prior sample contention-tainted (disk pressure and concurrent cleanup/build work), forbade widening budgets and authorized one fresh serial junit. The pre-sample process check found no cargo/rustc/clippy-driver processes (ps exit 1 means no matches); load averages were 11.62/10.18/16.39. The fresh `--profile ci --test-threads 1` workspace run returned 0: **5526/5526 passed**, 138 skipped, 616.630 s suite runtime. `check-test-budget` on `serial-idle-final-junit.xml` returned 0: 591 binaries, Σ 616.423 s, no findings. Both samples remain recorded:
+
+| Binary | Contention-tainted Σ seconds | Fresh Σ seconds | Unchanged budget |
+|---|---:|---:|---:|
+| `maos-bin::observer_activity_corpus_17_4` | 89.834 | 7.282 | 30 |
+| `maos-bin::one_daemon_one_door_16_1` | 46.948 | 21.064 | 30 |
+| `maos-iac::participant_recall_17_8` | 53.076 | 25.739 | 30 |
+| `xtask::bin/xtask` | 33.745 | 16.380 | 30 |
+
+The earlier serial budget check returned 1. Current budget configuration and its git history register no known-slow exception for these four names; no exception was added here.
+
+**Clippy and benchmark exception.** A real, non-denying final workspace/all-target clippy stream returned 0 and the ratchet returned 0: **1339 occurrences / 875 source-distinct**, versus the unchanged **1383/897** baseline. Read-only hosted artifacts (41305010381 vs 41372776259) isolated two new lints behind hosted 1385/899: the 20-7 fanout helper's eight arguments and an unused `mut` in `maos-kernel-core/benches/hot_path_budgets.rs:146`. Main explicitly authorized only that benchmark `mut` removal; the helper now groups its requirements in a tuple. No lint allow or baseline change was made. Bench files are uncharged, and both kernel-baseline and kloc checks remained 0 with kernel **26841/21042** unchanged. No post-fix hosted count is claimed.
+
+**Prescribed prepush.** With inherited `/mnt/build/cargo-maos`, `CI`/`GITHUB_ACTIONS` unset, `CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask` and `MAOS_17_2_CGROUP_MODE=undelegated`, the exact `.../debug/xtask prepush --json` returned **0** (446.140 s): 84 pass records, 7 skips, one advisory. The original prepush returned 1 only for the now-repaired serde gate. The final prepush's unrestricted-default timing advisory is not hidden: one-daemon Σ30.541 s and participant-recall Σ40.382 s exceeded 30 s; the separately required fresh serial budget check passed without changing either budget.
+
+**Remaining observations and unverified custody.** The separately requested unrestricted default workspace run returned 100: 5520/5526 passed, five failed and one timed out, 138 skipped. Each failure's name, symptom-family/new classification and same-line rule-10 disposition is recorded in [default-failures](20-1a-registry-publish-install-exit-path-evidence/landing-1/default-failures.md); each passed serially, and that default run was not retried-to-green or erased. Hosted `epic-20-exit`, its no-server readiness plant, installed component execution and real T3 remain unrun locally and unpushed; the complete cut handoff is linked above. Review is not performed by the implementation author. 20-1b's auth/yank/cursor/key-pin/kernel work and shared deferred-work ownership remain outside this landing. All exercised commands and exits are in `commands.md`/`captured-commands.jsonl`; early Eval cargo commands lacked the exported target-dir variable, as recorded, while subsequent/final captures inherited the required target unchanged.
+
 
 ### File List
 
 - Creation: this story file; `20-1-…-evidence/creation/*`; `sprint-status.yaml:296`.
+- Landing production: `Cargo.lock`; `crates/maos-registry/Cargo.toml`, `src/{bin/server.rs,server.rs,http.rs,client.rs,install.rs,lib.rs,origin.rs,storage.rs}`; `crates/maos-domain/src/ports/registry.rs`; `crates/maos-spirit-cli/src/{publish.rs,signing.rs}`; `crates/maos-cli/src/{cli.rs,subcommands.rs}`; `crates/maos-bin/src/{lib.rs,main.rs,installed_spirits.rs,shell_host.rs,spirit_session.rs}`; `crates/maos-shell/src/lib.rs`; `xtask/src/release_dry_run.rs`, `xtask/{gate-registry.toml,kloc.toml}`.
+- Landing tests: `tests/harness/registry_20_1.rs`; `crates/maos-registry/tests/registry_server_bin_20_1.rs`; `crates/maos-spirit-cli/tests/publish_live_20_1.rs`; `crates/maos-cli/tests/spirit_install_20_1.rs`; `crates/maos-bin/tests/{installed_spirit_dispatch_20_1.rs,cohort_daemon_smoke_13_5c.rs}`; `xtask/tests/{registry_exit_20_1.rs,release_dry_run_gate.rs,release_workflow_15_4.rs,prepush_blocking_20_3b.rs}`.
+- Authorized 20-7 diagnostic repairs during verification: `crates/maos-bin/tests/nfr_perf_8_real_spawn_fanout_20_7.rs` (group helper requirements, no behavioral weakening); `crates/maos-kernel-core/benches/hot_path_budgets.rs:146` (remove only unused `mut`, no pinned `src` change).
+- Landing release/docs/evidence: `.github/workflows/{release.yml,discipline.yml}`; `examples/example-spirit-ts/{manifest.toml,README.md}`; `templates/spirit-ts/{manifest.toml,README.md}`; `tests/coverage-matrix.yaml` FR35/FR36 only; this story's Dev Agent Record; `20-1a-registry-publish-install-exit-path-evidence/{landing-1,ci}/**`.
 
 ### Change Log
 
 - 2026-11-01: Story created at `a4c00897` (ready-for-dev; D09, D12 and D-20-1-01…11 PROPOSED). Inventory measured: exit lines 2/4 runnable, 5 rc 1, 7 rc 1, 8 rc 2, 9 `unknown spirit`; the daemon registry arm functional and its `registry.deprecate` unauthenticated; yank stamps process-relative and the cursor unwired; FR13 quarantine terminates. Kernel priced by prototype (R = KQ1 + P +78 / +68 incl. +40 / +40 rustfmt churn; R′ +79 / +69 + iac/domain +26; Rmin +53 / +49; non-kernel B maos-bin +43, FR13 still false); S1 maos-registry +38; total forecast +810…+1,686; envelope and operator-ruling list filed; split proposed (D-20-1-01 B).
 - 2026-11-01: Split into 20-1a/20-1b under D-20-1-01 B (ask split201); rulings 2026-11-01/02 (ask rows201) recorded in Decisions. The 20-1 sprint key is retired; kernel grant R (KQ1 + P, +78 / +68) is held by 20-1b only.
+- 2026-11-02: 20-1a landing 1 implementation, local red controls and continued verification recorded without status flips. Final source build, 5526/5526 serial workspace, 820/820 WASM-feature serial, required static gates, serial timing budget, deny and prescribed prepush passed; registry/aggregate were re-pinned after direct serde propagation removed 20 lines. The earlier unrestricted default failures, prepush default timing advisory and unrun hosted/T3 legs remain explicitly recorded.

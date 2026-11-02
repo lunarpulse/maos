@@ -1,0 +1,5 @@
+error: cannot update the lock file /home/lunarpulse/dev_ws/Cargo.lock because --locked was passed to prevent this
+help: to generate the lock file without accessing the network, remove the --locked flag and use --offline instead.
+
+
+Command exited with code 101

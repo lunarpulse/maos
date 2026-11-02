@@ -24,6 +24,36 @@ compiles the guest entrypoint to `dist/index.js`. `npm run componentize` turns
 that JavaScript into `dist/spirit.wasm`; the component imports no
 `wasi:http` interface.
 
+## Publish and install
+
+The checked-in tier is `public-untrusted` (`--tier=public_untrusted` on the author
+CLI). Start a development registry with
+`maos-registry-server --bind 127.0.0.1:6789 --root <throwaway-directory>`, then,
+from this example directory:
+
+```bash
+maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted \
+  --manifest manifest.toml --artifact dist/spirit.wasm --signing-key <publisher-key-file>
+maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
+```
+
+The key file is a 32-byte Ed25519 seed (raw or hex) with mode `0600`. Installation
+needs no daemon: publisher signature, signed ComplianceClaim, form admission and
+operator tier policy are checked before persistence. With an operator registry
+org key configured, the registry's tier signature is mandatory; pass the
+corresponding seed with the server's `--signing-key`.
+
+`maos init` followed by `maos shell` recognizes `@example-spirit-ts hello`. The
+published engine-off binary reports `wasm_engine_off`, never “unknown spirit”.
+The installed manifest and `dist/spirit.wasm` also support the governed `maos run
+<installed-manifest-path> --once` path on an explicitly WASM-enabled build.
+
+This registry is loopback-only development infrastructure. Mutation authentication,
+publisher-name pinning and signed yanks remain owned by story 20-1b; do not expose
+it through a public listener or proxy. This proves the mechanism, not independent
+third-party authorship or an accredited vetter ecosystem.
+
+
 ## Governed launch
 
 The manifest declares `wasm-component`, `dist/spirit.wasm`, and T2. Build both

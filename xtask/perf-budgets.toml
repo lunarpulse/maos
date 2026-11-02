@@ -321,8 +321,10 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory" }
 # counting allocator (allocations). `baseline` is the committed figure; a row
 # without one reads ABSENT. A deliberate change re-baselines here, in the same
 # commit, with the measured figure and the reason (ADR-068 §6).
-# Instruction rows are ADVISORY until their first hosted callgrind measurement
-# is committed (callgrind is not installed on the dev host); allocation rows bind.
+# Hosted instruction baselines: run 41372839255, job 125046786606, 2026-11-02;
+# debug rustc 1.99.1, Valgrind 3.22.0. Exact empty-subtracted per-iteration figures
+# and provenance: 20-7 evidence/landing-1/plants.md. Measured Tier C rows bind;
+# unmeasured metrics remain advisory. The opening 2% count tolerance is unchanged.
 
 [[metric]]
 id = "cap-token-verify-instructions"
@@ -335,7 +337,8 @@ regression_tolerance = 0.02
 tier = "C"
 path = "cap_token_verify"
 instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
-disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+baseline = 12944.0156
 
 [[metric]]
 id = "cap-token-verify-allocations"
@@ -365,7 +368,8 @@ regression_tolerance = 0.02
 tier = "C"
 path = "iac_routing"
 instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
-disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+baseline = 997449.662
 
 [[metric]]
 id = "iac-routing-allocations"
@@ -394,7 +398,8 @@ regression_tolerance = 0.02
 tier = "C"
 path = "frame_lowering"
 instrument = "crates/maos-bench/src/bin/tier_c_harness.rs"
-disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+baseline = 188885.9382
 
 [[metric]]
 id = "frame-lowering-allocations"

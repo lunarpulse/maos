@@ -1,0 +1,18 @@
+--- a/crates/maos-bench/src/bin/tier_c_harness.rs
++++ b/crates/maos-bench/src/bin/tier_c_harness.rs
+@@ -154,8 +154,15 @@
+             measure(
+                 &mut || {
+                     ring.verify(&token, posture, SandboxTier(2))
+                         .expect("verify");
++                    let mut state = std::hint::black_box(0x12345678u64);
++                    for _ in 0..1000 {
++                        state ^= state << 13;
++                        state ^= state >> 7;
++                        state ^= state << 17;
++                        std::hint::black_box(state);
++                    }
+                 },
+                 iterations,
+             )
+         }

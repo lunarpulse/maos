@@ -1868,7 +1868,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut shell_mode = false;
     let mut plain_flag = false;
     let (mut eval_record, mut distill_record) = (None, false);
-    match verbs::dispatch(&argv) {
+    let verb_args = if std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("registry-server")
+        && argv
+            .first()
+            .is_some_and(|arg| matches!(arg.as_str(), "--bind" | "--root" | "--signing-key"))
+    {
+        // This documented one-shot owns --bind/--root/--signing-key, not daemon verbs.
+        &[][..]
+    } else {
+        argv.as_slice()
+    };
+    match verbs::dispatch(verb_args) {
         verbs::Outcome::Help => {
             verbs::print_help(&mut std::io::stdout());
             let _ = std::io::Write::flush(&mut std::io::stdout());
@@ -4295,6 +4305,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => None,
             },
         });
+    // 20-1a: only serving/shell roots enumerate installs, never diagnostic one-shots.
+    let installed_manifests =
+        if shell_mode || (run_args.is_none() && std::env::var_os("MAOS_ONE_SHOT").is_none()) {
+            maos_registry::storage::LocalFsRegistryStorage::new()?.installed_manifests()?
+        } else {
+            Vec::new()
+        };
+    #[allow(unused_mut)]
+    let mut installed_supervision: Option<maos_bin::supervision::RootSupervision> = None;
+    #[cfg(feature = "wasm-host")]
+    if !installed_manifests.is_empty() {
+        installed_supervision = Some(maos_bin::supervision::RootSupervision::arm(
+            Arc::clone(&scheduler),
+            Arc::clone(&crash_detector),
+            Arc::clone(&transparency_log),
+            Arc::clone(&shared_journal),
+            Arc::clone(&halt_registry),
+            Arc::clone(&iac),
+            Arc::clone(&telemetry),
+            Arc::clone(&notification_dispatcher),
+            boot_nonce,
+        ));
+    }
+    let installed_spirits = Arc::new(
+        maos_bin::installed_spirits::InstalledSpirits::boot(
+            installed_manifests,
+            &maos_bin::admission::AdmissionDeps {
+                scheduler: &scheduler,
+                security: &security,
+                transparency_log: &transparency_log,
+                journal: &shared_journal,
+                memory: &memory,
+                pid_by_spirit_id: &pid_by_spirit_id,
+                hooks: None,
+            },
+            boot_nonce,
+            #[cfg(feature = "wasm-host")]
+            spirit_host.as_deref(),
+            #[cfg(feature = "wasm-host")]
+            installed_supervision
+                .as_ref()
+                .map(|root| maos_bin::spirit_session::SessionDeps {
+                    supervisor: Arc::clone(root.supervisor()),
+                    capability: Arc::clone(&capability),
+                    security: Arc::clone(&security),
+                    iac: Arc::clone(&iac),
+                    journal: Arc::clone(&transparency_log),
+                    log_recall: Arc::clone(&log_recall_adapter),
+                    lifecycle_journal: Arc::clone(&shared_journal),
+                    pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
+                    enterprise: enterprise_runtime.clone(),
+                    pdp: enterprise_pdp_runtime.clone(),
+                }),
+        )
+        .await,
+    );
     // Story 8.14a — kernel-rendered shell dispatch.
     if shell_mode {
         if let Some(mode) = inference_mode_value.as_deref() {
@@ -4456,7 +4522,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Arc::clone(&halt_registry),
                 Arc::clone(&memory),
                 door_port,
-            );
+            )
+            .with_installed(Arc::clone(&installed_spirits), Arc::clone(&iac));
             // D-16-2-B I/O seam: production passes a fresh `BufReader` over
             // stdin (NOT `stdin().lock()` — a MutexGuard is not `Send` and
             // the reader moves to its own thread in D-16-2-D) and `stdout()`
@@ -4515,6 +4582,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         // Story 17-4 (AC2.6) — the hook pump is joined before the unload.
         hook_pump.shutdown().await;
+        if let Some(root) = installed_supervision.take() {
+            root.stop_and_join().await;
+        }
+        Arc::try_unwrap(installed_spirits)
+            .ok()
+            .expect("shell host released installs")
+            .join()
+            .await;
         let shell_result = maos_bin::shell_host::finish_shell_session(
             shell_result,
             &scheduler,
@@ -4674,7 +4749,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Why not BEFORE this point: every `MAOS_ONE_SHOT` arm lies between the run
     // block and the serving tail, and an armed listener there would swallow the
     // SIGTERM the arm is supposed to die from.
-    let mut root_supervision: Option<maos_bin::supervision::RootSupervision> = None;
+    let mut root_supervision = installed_supervision.take();
     let mut escape_tail: Option<maos_bin::escape_detector_consumer::EscapeAnomalyTail> = None;
     let mut post_unload_stop: Option<Arc<dyn Fn(u32) + Send + Sync>> = None;
     // Story 18-1 (review ruling D-18-1-R4) — a serving Butler's digest
@@ -8978,12 +9053,13 @@ description = "smoke test spirit successor"
         }
 
         if mode == "registry-server" {
-            use maos_registry::storage::LocalFsRegistryStorage;
-            use maos_registry::SpiritRegistryServer;
-            eprintln!("maos: registry-server mode — starting SpiritRegistryServer");
-            let storage = std::sync::Arc::new(LocalFsRegistryStorage::new()?);
-            let server = SpiritRegistryServer::new(storage, "127.0.0.1:6789".into(), None);
-            server.run().map_err(|e| format!("registry server: {e}"))?;
+            let server =
+                maos_registry::server::RegistryServerArgs::parse(std::env::args().skip(1))?
+                    .build()?;
+            server
+                .run()
+                .await
+                .map_err(|e| format!("registry server: {e}"))?;
             return Ok(());
         }
 
@@ -9780,6 +9856,11 @@ description = "smoke test spirit successor"
         post_unload_stop.as_deref(),
     )
     .await;
+    Arc::try_unwrap(installed_spirits)
+        .ok()
+        .expect("serving root released installs")
+        .join()
+        .await;
     drop(root_shutdown_tail);
 
     // Story 2.5 (A7 / D11) + Story 16-1 (T7, §11 row 3) — drain the cap-audit

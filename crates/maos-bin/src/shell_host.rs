@@ -49,6 +49,11 @@ pub struct ShellHost {
     /// The SAME operator door `maosctl halt resolve` reaches (D-16-2-C):
     /// one mechanism, two surfaces.
     door: Arc<dyn OperatorCommandPort>,
+    #[cfg(feature = "network")]
+    installed: Option<(
+        Arc<crate::installed_spirits::InstalledSpirits>,
+        Arc<maos_iac::adapter::IacBusAdapter>,
+    )>,
 }
 
 impl ShellHost {
@@ -73,9 +78,20 @@ impl ShellHost {
             halt_registry,
             memory,
             door,
+            #[cfg(feature = "network")]
+            installed: None,
         }
     }
 
+    #[cfg(feature = "network")]
+    pub fn with_installed(
+        mut self,
+        installed: Arc<crate::installed_spirits::InstalledSpirits>,
+        iac: Arc<maos_iac::adapter::IacBusAdapter>,
+    ) -> Self {
+        self.installed = Some((installed, iac));
+        self
+    }
     /// The context key the kernel's `KernelHaltResolver` writes the resolution
     /// text under (`resolver.rs` — the Story 4.3 delivery channel).
     fn context_key(halt_id: &str) -> String {
@@ -84,6 +100,11 @@ impl ShellHost {
 }
 
 impl maos_shell::ShellHost for ShellHost {
+    #[cfg(feature = "network")]
+    fn dispatch_installed(&self, name: &str, message: &str) -> Option<String> {
+        let (installed, iac) = self.installed.as_ref()?;
+        installed.dispatch(name, message, iac)
+    }
     fn spirit_pid(&self) -> u32 {
         self.spirit_pid
     }

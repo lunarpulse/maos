@@ -1,0 +1,8 @@
+error: unrecognized subcommand 'install'
+
+Usage: maosctl spirit [OPTIONS] <COMMAND>
+
+For more information, try '--help'.
+
+
+Command exited with code 2

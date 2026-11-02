@@ -1,0 +1,140 @@
+[
+  {
+    "command": [
+      "/home/lunarpulse/.cargo/bin/cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "/home/lunarpulse/dev_ws/Cargo.toml",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_server_bin_20_1",
+      "standalone_server_roundtrip_isolates_root_and_exits_cleanly"
+    ],
+    "exit_code": 101,
+    "seconds": 13.007,
+    "log": "ac1-red.log"
+  },
+  {
+    "command": [
+      "/home/lunarpulse/.cargo/bin/cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "/home/lunarpulse/dev_ws/Cargo.toml",
+      "-p",
+      "maos-registry",
+      "--test",
+      "registry_server_bin_20_1"
+    ],
+    "exit_code": 0,
+    "seconds": 7.005,
+    "log": "ac1-green.log"
+  },
+  {
+    "command": [
+      "/home/lunarpulse/.cargo/bin/cargo",
+      "generate-lockfile",
+      "--offline",
+      "--manifest-path",
+      "/home/lunarpulse/dev_ws/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "seconds": 1.338,
+    "log": "lockfile.log"
+  },
+  {
+    "command": [
+      "/home/lunarpulse/.cargo/bin/cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "/home/lunarpulse/dev_ws/Cargo.toml",
+      "-p",
+      "maos-spirit-cli",
+      "--test",
+      "publish_live_20_1"
+    ],
+    "exit_code": 101,
+    "seconds": 44.766,
+    "log": "ac2-red-plant.log"
+  },
+  {
+    "command": [
+      "/usr/bin/cp",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1a-registry-publish-install-exit-path-evidence/landing-1/restore/publish.rs",
+      "/home/lunarpulse/dev_ws/crates/maos-spirit-cli/src/publish.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.012,
+    "log": "ac2-restore-copy.log"
+  },
+  {
+    "command": [
+      "/usr/bin/cmp",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-1a-registry-publish-install-exit-path-evidence/landing-1/restore/publish.rs",
+      "/home/lunarpulse/dev_ws/crates/maos-spirit-cli/src/publish.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.004,
+    "log": "ac2-restore-cmp.log"
+  },
+  {
+    "command": [
+      "/usr/bin/touch",
+      "/home/lunarpulse/dev_ws/crates/maos-spirit-cli/src/publish.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.004,
+    "log": "ac2-restore-touch.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp",
+    "exit_code": 2,
+    "log": "ac3-red.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo test --locked --manifest-path /home/lunarpulse/dev_ws/Cargo.toml -p maos-spirit-cli --test publish_live_20_1",
+    "exit_code": 101,
+    "seconds": 0.909,
+    "log": "ac2-green.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo test --locked --manifest-path /home/lunarpulse/dev_ws/Cargo.toml -p maos-spirit-cli --test publish_live_20_1",
+    "exit_code": 101,
+    "seconds": 16.358,
+    "log": "ac2-green-final.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo test --locked --manifest-path /home/lunarpulse/dev_ws/Cargo.toml -p maos-spirit-cli --test publish_live_20_1",
+    "exit_code": 0,
+    "seconds": 6.75,
+    "log": "ac2-green-identity.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo test --locked --manifest-path /home/lunarpulse/dev_ws/Cargo.toml -p maos-cli --test spirit_install_20_1",
+    "exit_code": 101,
+    "seconds": 24.986,
+    "log": "ac3-green.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo test --locked --manifest-path /home/lunarpulse/dev_ws/Cargo.toml -p xtask --test registry_exit_20_1",
+    "exit_code": 0,
+    "seconds": 374.56,
+    "log": "ac5-red.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo test --locked --manifest-path /home/lunarpulse/dev_ws/Cargo.toml -p maos-cli --test spirit_install_20_1",
+    "exit_code": null,
+    "disposition": "Cancelled while waiting on the prior cargo build lock; no test result was produced.",
+    "seconds": 60.521,
+    "log": "ac3-green-floor.log"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo fmt --all --manifest-path /home/lunarpulse/dev_ws/Cargo.toml",
+    "exit_code": 0,
+    "seconds": 2.928,
+    "log": "fmt.log"
+  }
+]
