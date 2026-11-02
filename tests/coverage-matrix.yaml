@@ -410,9 +410,18 @@ coverage:
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
-    notes: 1a.4 ships `maosctl unload` and `maosctl install` stubs (real
-      uninstall body lands at Story 1b.5b); cargo-test verifies the help-tree
-      surface; no behavior gate at v0.1-α
+    notes: |
+      Story 20-10: maos_uninstall_16_4 and worker_workspace_19_3 preserve purge,
+      retention, receipts and workspace cleanup. purge_residue_20_10 witnesses
+      home-scoped label/name/mount authority, refusal twins, inert dry runs,
+      absent-CID custody and receipt conventions. Unit
+      ac4_dead_empty_live_creator_populated_and_symlink_twins covers the cgroup
+      walk. Hosted epic-17-exit runs root_crash_retains_stopped_container_and_purge_reports_it
+      and purge_cgroup_native_binding_and_dead_creator_twins on ubuntu-24.04/26.04
+      for real retained CID/custody removal, other-home/impostor twins, and
+      delegated cgroup/native-naming binding. --keep-log is the documented
+      operator-selected exception to complete erasure; binaries belong to the
+      package manager (20-2), and per-Spirit erasure belongs to 20-11.
   FR20:
     gates: []
     corpora: []

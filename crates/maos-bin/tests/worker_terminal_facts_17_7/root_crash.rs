@@ -1,6 +1,6 @@
-//! AC4.7: a stale container after a daemon crash is never restarted with its
-//! stored bearer, a second root creates a new CID, and `maos purge --dry-run`
-//! reports the retained container. Real runtime, CI-only.
+//! A crashed root's owned containers and CID custody are purged, without
+//! touching another home's Worker or a label-less impostor. Real runtime,
+//! hosted `epic-17-exit` only.
 
 use std::io::BufRead as _;
 use std::path::{Path, PathBuf};
@@ -98,6 +98,57 @@ fn state(cid: &str) -> (String, String) {
     (status.to_owned(), started.to_owned())
 }
 
+struct Containers(Vec<String>);
+impl Drop for Containers {
+    fn drop(&mut self) {
+        for cid in &self.0 {
+            let _ = runtime(&["rm", "--force", "--volumes", "--time=0", cid]);
+        }
+    }
+}
+struct LiveRoot(Child);
+impl Drop for LiveRoot {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+fn exists_code(cid: &str) -> Option<i32> {
+    Command::new("timeout")
+        .arg("8s")
+        .arg(std::env::var("MAOS_T3_RUNTIME").expect("runtime"))
+        .args(["container", "exists", cid])
+        .status()
+        .expect("exists")
+        .code()
+}
+fn custody_dirs(cid: &str) -> Vec<PathBuf> {
+    let mut roots = vec![std::env::temp_dir().join(format!(
+        "maos-worker-state-{}",
+        rustix::process::geteuid().as_raw()
+    ))];
+    if let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR") {
+        roots.push(PathBuf::from(runtime).join("maos-worker-state"));
+    }
+    let mut found = Vec::new();
+    for root in roots {
+        if let Ok(processes) = std::fs::read_dir(root) {
+            for process in processes.flatten() {
+                if let Ok(spawns) = std::fs::read_dir(process.path()) {
+                    for spawn in spawns.flatten() {
+                        if std::fs::read_to_string(spawn.path().join("cid"))
+                            .is_ok_and(|text| text.trim() == cid)
+                        {
+                            found.push(spawn.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    found
+}
+
 #[test]
 fn root_crash_retains_stopped_container_and_purge_reports_it() {
     if !super::scene("root-crash") {
@@ -109,7 +160,9 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
     let manifest = dir.path().join("worker.toml");
     std::fs::write(&manifest, MANIFEST).expect("manifest");
 
+    let mut cleanup = Containers(Vec::new());
     let (mut first, old) = start_root(&home, &manifest);
+    cleanup.0.push(old.clone());
     first.kill().expect("SIGKILL the root mid-Worker");
     first.wait().expect("reap killed root");
     // Stop the test-owned CID externally; `stop` can return before the
@@ -133,6 +186,7 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
     );
 
     let (mut second, new) = start_root(&home, &manifest);
+    cleanup.0.push(new.clone());
     assert_ne!(old, new, "the second root creates its own CID");
     let observe_by = Instant::now() + Duration::from_secs(3);
     while Instant::now() < observe_by {
@@ -146,16 +200,132 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
     second.kill().expect("stop second root");
     second.wait().expect("reap second root");
 
-    let name = runtime(&["inspect", "--format", "{{.Name}}", &old]).expect("old container name");
+    let old_custody = custody_dirs(&old);
+    let new_custody = custody_dirs(&new);
+    assert!(
+        !old_custody.is_empty() && !new_custody.is_empty(),
+        "crashed roots retained CID custody"
+    );
+    let foreign_home = dir.path().join("foreign-home");
+    std::fs::create_dir_all(&foreign_home).expect("foreign home");
+    let (foreign, foreign_cid) = start_root(&foreign_home, &manifest);
+    let _foreign = LiveRoot(foreign);
+    cleanup.0.push(foreign_cid.clone());
+    let image = runtime(&["inspect", "--format", "{{.Image}}", &old]).expect("fixture image");
+    let impostor = runtime(&[
+        "create",
+        "--name",
+        &format!("maos-impostor-{}", std::process::id()),
+        &image,
+    ])
+    .expect("label-less container");
+    cleanup.0.push(impostor.clone());
     let purge = maos(&home, &["purge", "--dry-run"])
         .output()
-        .expect("run maos purge --dry-run");
-    let report = String::from_utf8_lossy(&purge.stdout);
+        .expect("dry purge");
     assert!(
-        report.contains(&format!("leaked container {name}")),
-        "purge must report the retained container {name}: {report}"
+        purge.status.success(),
+        "dry purge failed: {}",
+        String::from_utf8_lossy(&purge.stderr)
     );
-    for cid in [old, new] {
-        let _ = runtime(&["rm", "--force", "--volumes", "--time=0", &cid]);
+    assert_eq!(exists_code(&old), Some(0), "dry run removed a container");
+    let receipt = dir.path().join("receipt.json");
+    let purge = maos(
+        &home,
+        &[
+            "purge",
+            "--yes",
+            "--receipt",
+            receipt.to_str().expect("receipt path"),
+        ],
+    )
+    .output()
+    .expect("confirmed purge");
+    assert!(
+        purge.status.success(),
+        "purge failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&purge.stdout),
+        String::from_utf8_lossy(&purge.stderr)
+    );
+    for cid in [&old, &new] {
+        assert_eq!(exists_code(cid), Some(1), "owned CID {cid} survived purge");
     }
+    for cid in [&foreign_cid, &impostor] {
+        assert_eq!(exists_code(cid), Some(0), "non-owned CID {cid} was touched");
+    }
+    for path in old_custody.iter().chain(&new_custody) {
+        assert!(!path.exists(), "CID custody survived: {}", path.display());
+    }
+}
+
+#[test]
+fn purge_cgroup_native_binding_and_dead_creator_twins() {
+    if !super::scene("purge-cgroups") {
+        return;
+    }
+    use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec};
+    let mut spec = SandboxSpec::new_for_test(maos_domain::invariants::i9::SandboxTier::T0);
+    spec.spirit_id = "purge-native-binding".into();
+    spec.resolved_caps.pids_max = Some(32);
+    let mut command = Command::new("/bin/sleep");
+    command.arg("60");
+    let native = spawn_sandboxed(&spec, &mut command).expect("delegated native child");
+    let native_leaf = native
+        .cgroup_path()
+        .expect("kernel cgroup path")
+        .to_path_buf();
+    let slice = native_leaf.parent().expect("slice");
+    assert!(
+        !Path::new("/proc/2147483647").exists(),
+        "fixture dead creator PID"
+    );
+    let empty = slice.join("spirit-purge-empty-2147483647-1");
+    let populated = slice.join("spirit-purge-populated-2147483647-2");
+    std::fs::create_dir(&empty).expect("empty dead-creator leaf");
+    std::fs::create_dir(&populated).expect("populated dead-creator leaf");
+    struct Leaves(Vec<PathBuf>);
+    impl Drop for Leaves {
+        fn drop(&mut self) {
+            for p in &self.0 {
+                let _ = std::fs::remove_dir(p);
+            }
+        }
+    }
+    let _leaves = Leaves(vec![empty.clone(), populated.clone()]);
+    let member = LiveRoot(
+        Command::new("/bin/sleep")
+            .arg("60")
+            .spawn()
+            .expect("test member"),
+    );
+    std::fs::write(populated.join("cgroup.procs"), member.0.id().to_string())
+        .expect("populate twin");
+    let dir = tempfile::tempdir().expect("purge home");
+    let home = dir.path().join("home");
+    std::fs::create_dir(&home).expect("home");
+    let receipt = dir.path().join("receipt.json");
+    let purge = maos(
+        &home,
+        &[
+            "purge",
+            "--yes",
+            "--receipt",
+            receipt.to_str().expect("receipt"),
+        ],
+    )
+    .output()
+    .expect("purge");
+    assert!(
+        purge.status.success(),
+        "{}",
+        String::from_utf8_lossy(&purge.stderr)
+    );
+    let report = String::from_utf8_lossy(&purge.stdout);
+    assert!(!empty.exists(), "dead-creator empty leaf survived");
+    assert!(
+        report.contains(&format!("retained cgroup {}", native_leaf.display())),
+        "kernel naming must bind to purge's actual matcher: {report}"
+    );
+    assert!(native_leaf.exists(), "live creator leaf removed");
+    assert!(populated.exists(), "populated leaf removed");
 }

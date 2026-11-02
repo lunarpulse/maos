@@ -9,6 +9,9 @@
 
 use std::path::{Path, PathBuf};
 
+#[path = "purge_runtime.rs"]
+mod runtime_residue;
+
 /// Who authored a root entry. Purge may remove only [`WrittenBy::Maos`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -907,6 +910,14 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
     }
     let protected = protected_paths(options.keep_log, &audit_path, &planned);
     let sibling_logs = sibling_team_logs(options.keep_log, &audit_path);
+    let runtime = match runtime_residue::Inventory::collect(&planned) {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            drop(locks);
+            snapshot.restore()?;
+            return Err(error);
+        }
+    };
     if !options.confirmed {
         let dry_run = print_dry_run(
             &planned,
@@ -926,6 +937,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
         for (_, label) in known_secret_keys() {
             println!("maos purge: would remove credential: {label}");
         }
+        runtime.dry_run();
         drop(locks);
         snapshot.restore()?;
         print_report_only_residue(&[]);
@@ -957,6 +969,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
         // rows; indexing them at filesystem_root_count would overwrite the
         // sibling dispositions.
         let secret_offset = receipt_roots.len() - known_secret_keys().len();
+        receipt_roots.extend(runtime.receipt_rows());
         let receipt = ReceiptFile::create(receipt_path.clone(), &receipt_roots)?;
         Ok((receipt_path, receipt_roots, secret_offset, receipt))
     })();
@@ -972,6 +985,14 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
     let keyring = keyring_store();
     let mut left_files = Vec::new();
     let mut workspace_residue = Vec::new();
+    let runtime_offset = secret_offset + known_secret_keys().len();
+    runtime.remove(|index, disposition| {
+        receipt_roots[runtime_offset + index].disposition = disposition.to_string();
+        Ok(())
+    })?;
+    // A crash leaves honest `pending` rows. Batch volatile custody outcomes:
+    // thousands of empty roots must not rewrite the entire receipt N times.
+    receipt.update(&receipt_roots)?;
     let dispositions = remove_planned_roots(
         &planned,
         &protected,
@@ -1425,32 +1446,13 @@ fn workspace_removal_command(path: &Path) -> String {
 /// wedged runtime must not stall purge after the receipt is written. `false`
 /// on a missing runtime, a failed removal or the deadline.
 fn podman_unshare_remove(path: &Path) -> bool {
-    use std::process::Stdio;
-    let Ok(mut child) = std::process::Command::new("podman")
-        .args(["unshare", "rm", "-rf", "--one-file-system"])
-        .arg(path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    else {
+    let Some(path) = path.to_str() else {
         return false;
     };
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return status.success(),
-            Ok(None) if std::time::Instant::now() < deadline => {
-                std::thread::sleep(std::time::Duration::from_millis(50));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return false;
-            }
-            Err(_) => return false,
-        }
-    }
+    matches!(
+        runtime_residue::podman(&["unshare", "rm", "-rf", "--one-file-system", path], 120),
+        maos_kernel_core::security::sandbox::t3::spawn::Invocation::Exited { status, .. } if status.success()
+    )
 }
 
 #[cfg(unix)]
@@ -1949,12 +1951,6 @@ fn leaf_name(path: &Path) -> String {
 /// `podman unshare` removed (Story 19-3), each with its exact command.
 fn print_report_only_residue(workspace_residue: &[PathBuf]) {
     let mut printed_heading = false;
-    let cgroup = Path::new("/sys/fs/cgroup/maos");
-    if cgroup.exists() {
-        println!("maos purge: residue MAOS cannot remove for you:");
-        println!("  cgroup subtree: {} (report-only)", cgroup.display());
-        printed_heading = true;
-    }
     for root in workspace_residue {
         if !printed_heading {
             println!("maos purge: residue MAOS cannot remove for you:");
@@ -1965,21 +1961,6 @@ fn print_report_only_residue(workspace_residue: &[PathBuf]) {
             leaf_name(root),
             workspace_removal_command(root)
         );
-    }
-    for runtime in ["podman", "docker"] {
-        if runtime == "podman" && !podman_storage_exists() {
-            continue;
-        }
-        let Some(names) = probe_container_names(runtime) else {
-            continue;
-        };
-        for name in names.lines().filter(|name| name.starts_with("maos-")) {
-            if !printed_heading {
-                println!("maos purge: residue MAOS cannot remove for you:");
-                printed_heading = true;
-            }
-            println!("  leaked container {name}: run `{runtime} rm -f {name}`");
-        }
     }
 }
 
@@ -2010,40 +1991,4 @@ fn podman_storage_exists() -> bool {
         .is_some_and(|data| data.join("containers/storage").exists())
         || dir("XDG_CONFIG_HOME", ".config")
             .is_some_and(|config| config.join("containers/storage.conf").exists())
-}
-
-/// `runtime ps` with a hard deadline: a wedged container daemon must not
-/// stall purge after the receipt is already written. Two seconds, then the
-/// child is killed and the probe skipped.
-fn probe_container_names(runtime: &str) -> Option<String> {
-    use std::io::Read;
-    use std::process::Stdio;
-    let mut child = std::process::Command::new(runtime)
-        .args(["ps", "-a", "--format", "{{.Names}}"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if std::time::Instant::now() < deadline => {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-            Err(_) => return None,
-        }
-    };
-    if !status.success() {
-        return None;
-    }
-    let mut names = String::new();
-    child.stdout.take()?.read_to_string(&mut names).ok()?;
-    Some(names)
 }

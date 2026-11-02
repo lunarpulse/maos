@@ -1,0 +1,33 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -259,29 +259,7 @@
+ }
+ fn remove_container(cid: &str) -> Option<ContainerResidue> {
+     use ContainerResidue as R;
+-    let removal = match podman(&["rm", "--force", "--volumes", "--time=0", cid], 10) {
+-        Invocation::Exited {
+-            status,
+-            stderr,
+-            stderr_complete,
+-            ..
+-        } => {
+-            if !stderr_complete {
+-                Some(R::VolumeCleanupUnconfirmed)
+-            } else if status.success() {
+-                None
+-            } else if String::from_utf8_lossy(&stderr)
+-                .to_ascii_lowercase()
+-                .contains("volume")
+-            {
+-                Some(R::VolumeCleanupUnconfirmed)
+-            } else {
+-                Some(R::RemoveFailed)
+-            }
+-        }
+-        Invocation::TimedOut => Some(R::RemoveTimeout),
+-        Invocation::Failed => Some(R::RemoveFailed),
+-    };
++    let removal = None;
+     match exists(cid) {
+         Some(false) => removal,
+         Some(true) => Some(removal.unwrap_or(R::StillExists)),

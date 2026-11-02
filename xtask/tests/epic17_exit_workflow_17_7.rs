@@ -242,7 +242,7 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
     assert_eq!(images, ["ubuntu-24.04", "ubuntu-26.04"]);
     assert_eq!(job["runs-on"].as_str(), Some("${{ matrix.image }}"));
     assert_eq!(job["env"]["MAOS_FIXTURE_TRANSPORT"].as_str(), Some("1"));
-    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(33));
+    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(34));
     assert!(job["env"]["MAOS_CGROUP_CANARY_ARCHIVE"].is_null());
     for value in job["env"].as_mapping().expect("job environment").values() {
         assert!(
@@ -259,6 +259,7 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
         .collect();
     assert_eq!(required, [
         "root_crash::root_crash_retains_stopped_container_and_purge_reports_it",
+        "root_crash::purge_cgroup_native_binding_and_dead_creator_twins",
         "runtime_scenes::client_first_stop_snapshots_only_a_terminal_state",
         "runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding",
         "runtime_scenes::ownership_is_by_cid_never_by_requested_name",

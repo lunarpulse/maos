@@ -1,0 +1,2 @@
+{"gate":"check-perf-runner-policy","passed":true,"findings":[]}
+check-perf-runner-policy: PASS — structural selectors, trusted triggers, exact guards, read-only host

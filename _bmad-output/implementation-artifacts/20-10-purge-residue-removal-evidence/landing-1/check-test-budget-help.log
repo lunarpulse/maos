@@ -1,0 +1,8 @@
+Story 20-12 AC1 — every test binary in a nextest junit report keeps its Σ per-test time under its `xtask/test-budgets.toml` budget, and the suite under its total; stale `[[exception]]` rows red
+
+Usage: xtask check-test-budget [OPTIONS] --junit <JUNIT>
+
+Options:
+      --junit <JUNIT>  
+      --json           
+  -h, --help           Print help

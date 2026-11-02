@@ -73,6 +73,12 @@ every deletion root. It records `in-progress` first and finalizes `complete`
 after removals. Signature and externally verifiable proof fields are present but
 remain null until the v1.0 NFR-Aud-12 signing work lands.
 
+Runtime rows use the same schema and convention: `podman://<CID>` for owned
+containers, `cgroup://<path>` for cgroups, and directory paths for T3 custody.
+Rows start `pending` before any removal and finish `removed` or `left (<residue>)`.
+Like 19-3 workspace residue, surviving runtime residue alone does not change
+`complete` to `partial`; an error note does. Read the rows, not only status.
+
 ## Consequences
 
 Adding a new MAOS-written durable root now requires extending one typed function
@@ -84,10 +90,26 @@ same boundary.
 Documentation describes the two-stage removal: purge MAOS-owned state, then run
 `cargo uninstall maos` for the Cargo-owned executable.
 
-ACP sockets have no cleanup entry because MAOS uses NDJSON over stdio and does
-not create them. Container and cgroup residue is report-only: purge prints the
-operator command or location but does not invoke a container runtime or remove
-kernel-managed cgroup files.
+ACP sockets have no cleanup entry because MAOS uses NDJSON over stdio. Purge
+enumerates podman containers with `maos.spirit_id`, then checks both that label
+and `maos.boot_nonce`, the exact `maos-<spirit_id>-<boot_nonce>` name, and the
+`/workspace` mount source against this home's Worker workspace roots,
+component-wise without filesystem canonicalization of runtime text. Only owned
+64-hex CIDs reach bounded `rm --force --volumes --time=0` followed by
+`container exists`; containers precede workspace deletion. MAOS-labelled
+containers without that authority stay report-only with the exact removal
+command; label-less containers are ignored even when named `maos-*`.
+
+On Linux, purge rmdirs euid-owned `maos.slice/spirit-<id>-<creator pid>-<seq>`
+leaves only when `cgroup.events` reports `populated 0` and the creator has no
+`/proc/<pid>`, then the empty slice. It never kills members or writes
+`cgroup.kill`. Private mode-0700, euid-owned T3 custody directories under the
+runtime/temp state roots are reclaimed only after their CID is confirmed
+absent; unknown/present-CID custody stays, followed by empty process/root
+directory cleanup. Directory traversal and control-file reads do not follow
+links. A dry run invokes only `ps`/`inspect` and changes no state, including
+podman storage; spawn removal is reported as conditional on CID absence.
+Purge never edits user-namespace mappings, podman configuration or storage.
 
 ## Verification
 
@@ -95,6 +117,14 @@ kernel-managed cgroup files.
 `MAOS_HOME`, `XDG_DATA_HOME`, and `XDG_CONFIG_HOME`; dry-run safety; confirmed
 removal; operator-file preservation; lock refusal; receipt placement; and
 `--keep-log` checkpoint behavior.
+
+`purge_residue_20_10` binds container authority/refusal twins, dry-run verbs,
+receipt ordering, custody, and the post-removal residue vocabulary. Unit
+`ac4_dead_empty_live_creator_populated_and_symlink_twins` binds the temp cgroup
+walk. The hosted `epic-17-exit` root-crash scene removes real retained CIDs and
+custody while preserving another home's Worker and an impostor;
+`purge_cgroup_native_binding_and_dead_creator_twins` binds kernel naming and
+real delegated empty/populated leaves.
 
 The verb-table tests bind `purge` in network and air-gap builds. The environment
 contract gate binds `MAOS_SECRETS_BACKEND` and `MAOS_CRL_PATH` at the composition

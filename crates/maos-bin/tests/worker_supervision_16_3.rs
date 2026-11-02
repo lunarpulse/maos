@@ -1213,17 +1213,19 @@ async fn a_stop_during_the_mint_never_spawns_the_child() {
     LazyLock::force(&WORKER_FIXTURE_BUILT);
     let dir = scratch_dir("stop-in-mint");
     let world = KernelWorld::new(&dir);
-    let latch: Arc<Mutex<Option<Arc<WorkerSupervisor>>>> = Arc::new(Mutex::new(None));
+    // A strong latch formed supervisor -> seam -> latch -> supervisor and
+    // prevented Drop from reclaiming its empty T3 process root (20-10 T0).
+    let latch = Arc::new(Mutex::new(std::sync::Weak::<WorkerSupervisor>::new()));
     let latch_for_hook = Arc::clone(&latch);
     let supervisor = world.supervisor(maos_bin::supervision::SupervisorSeams {
         after_mint: Some(Arc::new(move || {
-            if let Some(supervisor) = latch_for_hook.lock().expect("latch").as_ref() {
+            if let Some(supervisor) = latch_for_hook.lock().expect("latch").upgrade() {
                 supervisor.stop_workers();
             }
         })),
         ..Default::default()
     });
-    *latch.lock().expect("latch") = Some(Arc::clone(&supervisor));
+    *latch.lock().expect("latch") = Arc::downgrade(&supervisor);
     let manifest = write_worker_manifest(&dir, Some("hang"), None);
 
     let error = run_worker(&world, &supervisor, manifest, WorkerTask::Standalone)
@@ -1256,6 +1258,12 @@ async fn a_stop_during_the_mint_never_spawns_the_child() {
     assert!(
         world.scheduler.resolve_pid("worker").is_none(),
         "no lock is held across abandon, so the SCB is really gone"
+    );
+    let weak = Arc::downgrade(&supervisor);
+    drop(supervisor);
+    assert!(
+        weak.upgrade().is_none(),
+        "the test seam must not retain its supervisor"
     );
 }
 

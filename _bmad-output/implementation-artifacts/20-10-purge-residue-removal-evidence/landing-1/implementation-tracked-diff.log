@@ -1,0 +1,947 @@
+diff --git a/.github/workflows/discipline.yml b/.github/workflows/discipline.yml
+index 5c1a1411..47c7b2fd 100644
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -2259,9 +2259,10 @@ jobs:
+       CARGO: /bin/false
+       MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
+       MAOS_FIXTURE_TRANSPORT: '1'
+-      EPIC17_TERMINAL_SUITE_TESTS: 33
++      EPIC17_TERMINAL_SUITE_TESTS: 34
+       EPIC17_TERMINAL_REQUIRED_TESTS: |
+         root_crash::root_crash_retains_stopped_container_and_purge_reports_it
++        root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+         runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+         runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+         runtime_scenes::ownership_is_by_cid_never_by_requested_name
+diff --git a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md
+index a92a2983..78183441 100644
+--- a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md
++++ b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md
+@@ -3,7 +3,7 @@ story_id: '20.10'
+ story_key: 20-10-purge-residue-removal
+ created: 2026-11-02
+ context_commit: a8af3215
+-baseline_commit: a8af3215
++baseline_commit: d3e3f586cb325c16a691cd19d1fd62588b288a0d
+ security_sensitive: true
+ kernel_grant: "RULED 2026-11-02 (ask s2010): kernel-Δ 0; no kernel grant. HEAD pins 26841 physical / 21042 tokei."
+ kloc_grant: "RULED 2026-11-02 (ask s2010; D-20-10-10 A; D02 A ×3 unmeasured). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): maos-bin ≤ 34548; aggregate ≤ 192876; every other crate 0. The later maos-bin lander re-bases its draw on the then-current pin."
+@@ -433,13 +433,139 @@ podman unavailable; 8,903 empty process roots).
+ ### Agent Model Used
+ 
+ anthropic/claude-opus-5-5 (creation).
++openai-codex/gpt-6.1-sol (20-10 landing 1 implementation; no independent review claimed).
+ 
+ ### Debug Log References
+ 
++- [Exact command/exit-code ledger](20-10-purge-residue-removal-evidence/landing-1/commands.md) and [machine-readable ledger](20-10-purge-residue-removal-evidence/landing-1/commands.json).
++- [Per-AC witnesses, mutations, hashes, wall times and byte-restores](20-10-purge-residue-removal-evidence/landing-1/plants.md).
++- [Baseline reds](20-10-purge-residue-removal-evidence/landing-1/red-before-head.log), [restored focused suite](20-10-purge-residue-removal-evidence/landing-1/focused-restored-green.log), [serial workspace](20-10-purge-residue-removal-evidence/landing-1/workspace-final-serial.log), [default workspace](20-10-purge-residue-removal-evidence/landing-1/workspace-default.log).
++- [Prescribed prepush](20-10-purge-residue-removal-evidence/landing-1/prepush.log), [fresh serial budget](20-10-purge-residue-removal-evidence/landing-1/check-test-budget.log), [final clippy ratchet](20-10-purge-residue-removal-evidence/landing-1/clippy-final-ratchet.log).
++- [Unpushed hosted verification cut](20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml), [hashed AC1 mutation](20-10-purge-residue-removal-evidence/ci/ac1-removal-noop.diff), [implementation diff digest](20-10-purge-residue-removal-evidence/landing-1/implementation.diff.sha256).
++
++
+ ### Completion Notes List
+ 
++#### 20-10 landing 1 — implementation and observed local proof
++
++Implementation baseline is `d3e3f586cb325c16a691cd19d1fd62588b288a0d`. No commit,
++push, CI-branch edit, packaging edit, kernel edit or status/tracker flip was made.
++The Cargo-owned binary hint remains unchanged. The original task checkboxes are
++not a claim that hosted execution occurred.
++
++- **AC1/AC2:** read-only label-filtered CID enumeration and inspect; require both
++  labels, their matching name and this home's `/workspace` source. Only parsed
++  CIDs reach forced removal and absence confirmation. Unattributable labelled
++  CIDs get the exact command, label-less names no authority. Store lock precedes
++  enumeration. Containers precede workspace deletion.
++- **AC3:** dry run uses only `ps`/`inspect`, keeps the storage guard and performs
++  no runtime removal or custody/cgroup mutation. Custody lines explicitly state
++  their absent-CID condition; no forbidden `exists` probe is hidden in dry run.
++- **AC4:** nofollow cgroup walk over a mount-root parameter; euid ownership,
++  `populated 0`, and positively absent creator PID before rmdir; empty slice
++  cleanup, retained member/creator diagnostics and exact commands, never kill.
++- **AC5:** private euid-owned mode-0700 custody, nofollow CID reads, absent-CID
++  spawn reclamation using the existing descriptor-relative tree remover, then
++  empty process/state roots. Missing/live/unknown CIDs remain. The process-root
++  producer diagnosed here is **test-only**: the stop-during-mint fixture held a
++  strong Arc cycle through its seam latch, so `WorkerSupervisor::drop` never
++  called `cleanup_state_root`. Three production one-shots left zero roots; the
++  HEAD fixture itself passed but changed its private root count 1 → 2. Replacing
++  the latch with Weak and asserting release made three fixed runs keep 2 → 2.
++  This does not attribute every historical host directory to that one fixture.
++- **AC6:** one maos-bin podman adapter reuses the existing capped, deadline-bound
++  kernel invocation and its four-key environment allowlist for every verb,
++  including 19-3 unshare. No new dependency or environment variable. Runtime rows
++  are all pending before removal; custody outcomes are batched to avoid N²
++  receipt rewrites. Schema 1 and the 19-3 `complete`/`left (<residue>)` convention
++  remain. `child.rs` and the entire kernel baseline remain byte-identical.
++- **AC7:** ADR-067, English and Korean run/cookbook docs, FR2 coverage notes,
++  egress custody comment, terminal-suite count 33 → 34 and its xtask reader are
++  updated. `podman://<CID>`, `cgroup://<path>` and directory receipt rows are
++  documented. No open deferred row is assigned to this story.
++
++| AC | Witness definition | HEAD red-before | Green-after / mutation |
++|---|---|---|---|
++| AC1 | `purge_residue_20_10.rs:127` `ac1_owned_cid_removed_before_workspaces_and_receipted` | observed, rc 100 | local PASS; real root-crash/no-op plant cut, not run |
++| AC2 | `purge_residue_20_10.rs:153` `ac2_other_home_missing_mount_mismatched_name_and_impostor_survive` | observed, rc 100 | PASS; name-prefix plant rc 100 |
++| AC3 | `purge_residue_20_10.rs:169` `ac3_dry_run_uses_only_readonly_verbs_and_preserves_custody` | observed, rc 100 | PASS; dry-run-removal plant rc 100 |
++| AC4 | `purge_runtime.rs:535` `ac4_dead_empty_live_creator_populated_and_symlink_twins`; `root_crash.rs:262` real delegated twin | hosted baseline witness cut, unexecuted | local PASS; dropped-creator-check plant rc 100 |
++| AC5 | `purge_residue_20_10.rs:192` `ac5_only_absent_cid_and_empty_state_are_reclaimed` | observed, rc 100 | PASS; skipped-exists plant rc 100; producer counts above |
++| AC6 | `purge_residue_20_10.rs:215` `ac6_runtime_helper_is_shared_and_receipt_convention_is_preserved` | observed, rc 100 | PASS; ambient-runner plant rc 100 |
++| AC7 | `purge_residue_20_10.rs:236` `ac7_adr_documents_home_scoped_runtime_removal` | observed, rc 100 | PASS; stale-ADR plant rc 100 |
++
++Six local plants, one per AC2–AC7, each restored by copy-back + cmp + touch
++(every restore command rc 0). Their total command wall time was 55.232 s.
++AC1's single hosted no-op plant is cut with its SHA-256, not locally claimed.
++
++| Measure | Baseline | Exact landing | Ruled ceiling |
++|---|---:|---:|---:|
++| maos-bin tokei | 33498 | **34037 (+539)** | 34548 |
++| kernel physical / tokei | 26841 / 21042 | **26841 / 21042** | unchanged |
++| xtask tokei | 44406 | **44406** | unchanged |
++| aggregate | 191826 | **192365 (+539)** | 192876 |
++| aggregate hardfail pin | 191827 | **192366 = measured + 1** | exact |
++
++Final pins were measured after `cargo fmt --all`, with `20-10 landing 1` HISTORY;
++no other crate grew and no ceiling was exceeded. Kernel gate: 95 files,
++`changed = added = removed = []`, set hash `db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59`.
++
++**Observed verification:** final all-target workspace build rc 0; restored focused
++suite 142/142 PASS; final serial workspace 5562/5562 PASS, 138 configured skips;
++default workspace 5562/5562 PASS, 138 configured skips. Fresh serial junit budget
++passed: 594 binaries, 646.231 s summed test time, no findings. Local T3 scenes
++self-skip, so none of those counts is claimed as real-podman proof.
++
++All requested structural gates exited 0: kloc-check, check-kernel-baseline,
++check-service-boundary, check-env-contract, check-serde-error-handling,
++check-composition-root-completeness, check-j1-loopback-delegation,
++check-dev-record-completeness, check-epic-close-coherence,
++check-review-findings-resolved, check-test-cost, invariant-lock, coverage-matrix
++(`--dry-run`), check-coverage-matrix-completeness, check-exit-commands,
++check-decision-register, check-ff-j6 and check-perf-runner-policy. Cargo deny rc 0.
++Non-denying clippy rc 0; final ratchet **1335 occurrences / 873 source-distinct**,
++no warning in either new file. The only introduced warning was test-only
++`format_in_format_args`, fixed before the final stream; the unchanged xtask
++reader warning is `needless_borrows_for_generic_args` at line 15. The hosted
++1383/897 baseline was not edited; same-toolchain base/final lint/file comparison
++is included in the unpushed workflow, not claimed executed.
++
++The exact prescribed prepush environment (`env -u CI -u GITHUB_ACTIONS`,
++`CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask`,
++`MAOS_17_2_CGROUP_MODE=undelegated`) exited **0**. Its loaded-run budget gate was
++advisory-red for five binaries; exact timings and same-line rule-10 citations
++are recorded in `deferred-work.md:3`, owner `20-7-stable-runner-perf-gates`.
++It was not retried-to-green. No timing baseline or exception was raised.
++
++**Earlier reds repaired, not hidden:** the first focused run timed out in
++`init_prints_an_executable_truthful_purge_instruction`; its separate default-home
++helper still inherited the shared temp state root. All purge fixture commands
++now isolate TMPDIR, and custody receipt updates are batched. The first workspace
++serial run had exactly one failure: the old xtask terminal count/required-name
++pin. Its reader was migrated to 34 and the new scene; the final serial run passed.
++
++**Unverified / externally owed:** real rootless podman and delegated cgroups are
++unavailable locally, and Docker is absent. The hosted T0 measurements (mount
++source/filter semantics/removal outcomes/Docker `--pidfile` refusal), real
++root-crash ownership/custody twins, native cgroup binding, baseline AC4 witness,
++AC1 plant/restored green, the 34-scene epic-17 matrix, hosted clippy comparison,
++macOS guard and independent difficult-tier review remain unexecuted here.
++The workflow stops if Docker contradicts D-20-10-06 A. Host loads were recorded
++before the serial run and budget check; they were not zero, so the green serial
++budget is **not an idle-host certification**. No hosted workflow was pushed.
++Routing-audit `witnessed @commit` completion remains at the eventual done boundary,
++not fabricated in this uncommitted implementation record.
++
++
+ ### File List
+ 
++- [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [custody comment](../../crates/maos-bin/src/egress.rs).
++- [New hermetic witnesses](../../crates/maos-bin/tests/purge_residue_20_10.rs), [purge fixture isolation](../../crates/maos-bin/tests/maos_uninstall_16_4.rs), [producer harness-cycle fix](../../crates/maos-bin/tests/worker_supervision_16_3.rs), [real hosted scenes](../../crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs), [source scanner enrollment](../../crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs).
++- [Terminal job pin](../../.github/workflows/discipline.yml), [pin reader](../../xtask/tests/epic17_exit_workflow_17_7.rs), [exact KLOC pins](../../xtask/kloc.toml).
++- [ADR-067](../../docs/adr/ADR-067-maos-data-root-layout-and-purge.md), [operator guide](../../docs/maos.dev/run-maos.md), [site guide](../../docs-site/docs/run-maos.md), [Korean guide](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md), [cookbook](../../docs-site/docs/cookbook/cli-wrapper-spirit.md), [Korean cookbook](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md).
++- [FR2 coverage row](../../tests/coverage-matrix.yaml), [loaded-budget disposition](deferred-work.md), this Dev Agent Record, and [landing/hosted-cut evidence](20-10-purge-residue-removal-evidence/landing-1/plants.md).
++
++
+ ## Change Log
+ 
+ - 2026-11-02: Story created at `a8af3215` (ready-for-dev; D-20-10-01…10 PROPOSED). E20 §20-10 cites corrected in place
+@@ -447,3 +573,7 @@ anthropic/claude-opus-5-5 (creation).
+   (`maos.slice/spirit-*`) and the T3 custody under the worker state root (8,903 empty process roots on the dev host) are
+   outside purge. Kernel 0 recommended; KH/KR/KC/KS priced +10/+8, +2/−1, +5/+1, +3/+2.
+ - 2026-11-02: Operator rulings recorded (ask s2010): D-20-10-01…10 as recommended; kernel-Δ 0 and ceilings per frontmatter. Status remains ready-for-dev.
++- 2026-11-02: 20-10 landing 1 implemented with kernel-Δ 0, exact maos-bin 34037 /
++  aggregate 192365 (hardfail 192366), six locally proven-red byte-restored plants,
++  final serial/default workspace suites and prescribed prepush rc 0. Hosted-only
++  witnesses and the AC1 mutation cut but not pushed/run; status intentionally unchanged.
+diff --git a/_bmad-output/implementation-artifacts/deferred-work.md b/_bmad-output/implementation-artifacts/deferred-work.md
+index c03ecfe8..35a8498e 100644
+--- a/_bmad-output/implementation-artifacts/deferred-work.md
++++ b/_bmad-output/implementation-artifacts/deferred-work.md
+@@ -1,3 +1,7 @@
++## Deferred from: Story 20-10 landing 1 loaded prepush
++
++- **Loaded-run budget timings — Owner: `20-7-stable-runner-perf-gates`.** Prescribed 20-10 prepush exited 0 with an advisory budget failure: `butler::hallucination` 32.680 s, `maos-bin::hook_pump_17_4` 32.074 s, `maos-bin::one_daemon_one_door_16_1` 30.223 s, `maos-iac::participant_recall_17_8` 50.524 s, and `xtask::bin/xtask` 33.722 s against their 30 s binary budgets. The earlier fresh serial junit passed with no findings (646.231 s sum); the loaded prepush was not retried-to-green. Same-line rule-10 evidence: `20-10-purge-residue-removal-evidence/landing-1/prepush.log:552`, `20-10-purge-residue-removal-evidence/landing-1/check-test-budget.log:1`, Story `20-10-purge-residue-removal` Dev Agent Record. Stable-runner/idle-host budget calibration, not 20-10 runtime reclamation. Status: open.
++
+ ## Deferred from: Stories 20-1a and 20-7 landing 1
+ 
+ - **Unauthenticated registry listeners.** **Owner: `20-1b-vetting-yank-policy-and-quarantine`**. The registry server and daemon listener refuse non-loopback binding but remain unauthenticated; CSRF/Host/Origin hardening landed in 20-1a and does not authenticate mutations. AC7 covers signed deprecate, not publish; proposed publish authentication requires an operator ruling at 20-1b dev start. Sources: `20-1b-vetting-yank-policy-and-quarantine.md:48-50,96`; `agent://SecReview201a` F1; `agent://BmadReview201a` P1; Story `20-1a-registry-publish-install-exit-path` AC1 and Dev Agent Record. Status: open.
+diff --git a/crates/maos-bin/src/egress.rs b/crates/maos-bin/src/egress.rs
+index f970d753..297a1307 100644
+--- a/crates/maos-bin/src/egress.rs
++++ b/crates/maos-bin/src/egress.rs
+@@ -237,8 +237,8 @@ impl Drop for WorkerEgress {
+     }
+ }
+ 
+-/// T3 state is volatile root-owned custody, not durable user data: this keeps
+-/// private pid/CID receipts outside MAOS_HOME and ADR-067's purge inventory.
++/// T3 custody stays outside durable MAOS_HOME. ADR-067 purge reclaims absent-CID
++/// spawn directories and empty process roots; unknown/live custody is retained.
+ pub fn create_worker_state_root() -> io::Result<PathBuf> {
+     if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
+         let runtime_dir = PathBuf::from(runtime_dir);
+diff --git a/crates/maos-bin/src/purge.rs b/crates/maos-bin/src/purge.rs
+index e7c79195..66d961ce 100644
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+@@ -9,6 +9,9 @@
+ 
+ use std::path::{Path, PathBuf};
+ 
++#[path = "purge_runtime.rs"]
++mod runtime_residue;
++
+ /// Who authored a root entry. Purge may remove only [`WrittenBy::Maos`].
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+ #[serde(rename_all = "lowercase")]
+@@ -907,6 +910,14 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
+     }
+     let protected = protected_paths(options.keep_log, &audit_path, &planned);
+     let sibling_logs = sibling_team_logs(options.keep_log, &audit_path);
++    let runtime = match runtime_residue::Inventory::collect(&planned) {
++        Ok(runtime) => runtime,
++        Err(error) => {
++            drop(locks);
++            snapshot.restore()?;
++            return Err(error);
++        }
++    };
+     if !options.confirmed {
+         let dry_run = print_dry_run(
+             &planned,
+@@ -926,6 +937,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
+         for (_, label) in known_secret_keys() {
+             println!("maos purge: would remove credential: {label}");
+         }
++        runtime.dry_run();
+         drop(locks);
+         snapshot.restore()?;
+         print_report_only_residue(&[]);
+@@ -957,6 +969,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
+         // rows; indexing them at filesystem_root_count would overwrite the
+         // sibling dispositions.
+         let secret_offset = receipt_roots.len() - known_secret_keys().len();
++        receipt_roots.extend(runtime.receipt_rows());
+         let receipt = ReceiptFile::create(receipt_path.clone(), &receipt_roots)?;
+         Ok((receipt_path, receipt_roots, secret_offset, receipt))
+     })();
+@@ -972,6 +985,14 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
+     let keyring = keyring_store();
+     let mut left_files = Vec::new();
+     let mut workspace_residue = Vec::new();
++    let runtime_offset = secret_offset + known_secret_keys().len();
++    runtime.remove(|index, disposition| {
++        receipt_roots[runtime_offset + index].disposition = disposition.to_string();
++        Ok(())
++    })?;
++    // A crash leaves honest `pending` rows. Batch volatile custody outcomes:
++    // thousands of empty roots must not rewrite the entire receipt N times.
++    receipt.update(&receipt_roots)?;
+     let dispositions = remove_planned_roots(
+         &planned,
+         &protected,
+@@ -1425,32 +1446,13 @@ fn workspace_removal_command(path: &Path) -> String {
+ /// wedged runtime must not stall purge after the receipt is written. `false`
+ /// on a missing runtime, a failed removal or the deadline.
+ fn podman_unshare_remove(path: &Path) -> bool {
+-    use std::process::Stdio;
+-    let Ok(mut child) = std::process::Command::new("podman")
+-        .args(["unshare", "rm", "-rf", "--one-file-system"])
+-        .arg(path)
+-        .stdin(Stdio::null())
+-        .stdout(Stdio::null())
+-        .stderr(Stdio::null())
+-        .spawn()
+-    else {
++    let Some(path) = path.to_str() else {
+         return false;
+     };
+-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+-    loop {
+-        match child.try_wait() {
+-            Ok(Some(status)) => return status.success(),
+-            Ok(None) if std::time::Instant::now() < deadline => {
+-                std::thread::sleep(std::time::Duration::from_millis(50));
+-            }
+-            Ok(None) => {
+-                let _ = child.kill();
+-                let _ = child.wait();
+-                return false;
+-            }
+-            Err(_) => return false,
+-        }
+-    }
++    matches!(
++        runtime_residue::podman(&["unshare", "rm", "-rf", "--one-file-system", path], 120),
++        maos_kernel_core::security::sandbox::t3::spawn::Invocation::Exited { status, .. } if status.success()
++    )
+ }
+ 
+ #[cfg(unix)]
+@@ -1949,12 +1951,6 @@ fn leaf_name(path: &Path) -> String {
+ /// `podman unshare` removed (Story 19-3), each with its exact command.
+ fn print_report_only_residue(workspace_residue: &[PathBuf]) {
+     let mut printed_heading = false;
+-    let cgroup = Path::new("/sys/fs/cgroup/maos");
+-    if cgroup.exists() {
+-        println!("maos purge: residue MAOS cannot remove for you:");
+-        println!("  cgroup subtree: {} (report-only)", cgroup.display());
+-        printed_heading = true;
+-    }
+     for root in workspace_residue {
+         if !printed_heading {
+             println!("maos purge: residue MAOS cannot remove for you:");
+@@ -1966,21 +1962,6 @@ fn print_report_only_residue(workspace_residue: &[PathBuf]) {
+             workspace_removal_command(root)
+         );
+     }
+-    for runtime in ["podman", "docker"] {
+-        if runtime == "podman" && !podman_storage_exists() {
+-            continue;
+-        }
+-        let Some(names) = probe_container_names(runtime) else {
+-            continue;
+-        };
+-        for name in names.lines().filter(|name| name.starts_with("maos-")) {
+-            if !printed_heading {
+-                println!("maos purge: residue MAOS cannot remove for you:");
+-                printed_heading = true;
+-            }
+-            println!("  leaked container {name}: run `{runtime} rm -f {name}`");
+-        }
+-    }
+ }
+ 
+ /// `podman ps` INITIALISES rootless storage on first use, so probing a host
+@@ -2011,39 +1992,3 @@ fn podman_storage_exists() -> bool {
+         || dir("XDG_CONFIG_HOME", ".config")
+             .is_some_and(|config| config.join("containers/storage.conf").exists())
+ }
+-
+-/// `runtime ps` with a hard deadline: a wedged container daemon must not
+-/// stall purge after the receipt is already written. Two seconds, then the
+-/// child is killed and the probe skipped.
+-fn probe_container_names(runtime: &str) -> Option<String> {
+-    use std::io::Read;
+-    use std::process::Stdio;
+-    let mut child = std::process::Command::new(runtime)
+-        .args(["ps", "-a", "--format", "{{.Names}}"])
+-        .stdin(Stdio::null())
+-        .stdout(Stdio::piped())
+-        .stderr(Stdio::null())
+-        .spawn()
+-        .ok()?;
+-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+-    let status = loop {
+-        match child.try_wait() {
+-            Ok(Some(status)) => break status,
+-            Ok(None) if std::time::Instant::now() < deadline => {
+-                std::thread::sleep(std::time::Duration::from_millis(10));
+-            }
+-            Ok(None) => {
+-                let _ = child.kill();
+-                let _ = child.wait();
+-                return None;
+-            }
+-            Err(_) => return None,
+-        }
+-    };
+-    if !status.success() {
+-        return None;
+-    }
+-    let mut names = String::new();
+-    child.stdout.take()?.read_to_string(&mut names).ok()?;
+-    Some(names)
+-}
+diff --git a/crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs b/crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs
+index 7f8e2b66..663faf29 100755
+--- a/crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs
++++ b/crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs
+@@ -928,7 +928,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
+     // Story 19-3 — 33 → 34: `worker_workspace.rs` joins it.
+     // Story 19-6 — 34 → 35: `replica_resolver.rs` joins it.
+     // Ring the doorbell, do not widen the wall.
+-    const SCANNED_SOURCE_FILES: [(&str, &str); 36] = [
++    const SCANNED_SOURCE_FILES: [(&str, &str); 37] = [
+         ("main.rs", include_str!("../src/main.rs")),
+         (
+             "skill_authoring.rs",
+@@ -1029,6 +1029,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
+         // Story 16-4 — authoritative typed MAOS-footprint enumeration and
+         // offline purge. It must not seed manifest-derived policy scopes.
+         ("purge.rs", include_str!("../src/purge.rs")),
++        ("purge_runtime.rs", include_str!("../src/purge_runtime.rs")),
+         // Story 17-3c — governed sessions over the subprocess frame bridge.
+         // The session adopts one admitted SCB and reads its declared
+         // `iac.send` peer classes from that admission result, never from the
+diff --git a/crates/maos-bin/tests/maos_uninstall_16_4.rs b/crates/maos-bin/tests/maos_uninstall_16_4.rs
+index b84c6a5c..33ee7604 100644
+--- a/crates/maos-bin/tests/maos_uninstall_16_4.rs
++++ b/crates/maos-bin/tests/maos_uninstall_16_4.rs
+@@ -115,6 +115,7 @@ fn maos_command(root: &Path) -> Command {
+     command
+         .env_clear()
+         .current_dir(root)
++        .env("TMPDIR", root)
+         .env("HOME", root.join("home"))
+         .env("MAOS_HOME", root.join("maos-home"))
+         .env("XDG_DATA_HOME", root.join("xdg-data"))
+@@ -825,6 +826,7 @@ fn override_audit_db_without_maos_home_is_the_resolved_log_keep_log_retains_it()
+     let purge = Command::new(env!("CARGO_BIN_EXE_maos"))
+         .env_clear()
+         .current_dir(root)
++        .env("TMPDIR", root)
+         .env("HOME", root.join("home"))
+         .env("XDG_DATA_HOME", root.join("xdg-data"))
+         .env("XDG_CONFIG_HOME", root.join("xdg-config"))
+@@ -1379,6 +1381,7 @@ fn purge_dry_run_enumerates_the_legacy_tmp_leg_when_home_is_unset() {
+     let dry_run = Command::new(env!("CARGO_BIN_EXE_maos"))
+         .env_clear()
+         .current_dir(root)
++        .env("TMPDIR", root)
+         .env("XDG_DATA_HOME", root.join("xdg-data"))
+         .env("XDG_CONFIG_HOME", root.join("xdg-config"))
+         .env("MAOS_CRL_PATH", root.join("crl"))
+@@ -1967,6 +1970,7 @@ fn apply_default_home_environment(command: &mut Command, root: &Path) {
+     command
+         .env_clear()
+         .current_dir(root)
++        .env("TMPDIR", root)
+         .env("HOME", root.join("home"))
+         .env("XDG_DATA_HOME", root.join("xdg-data"))
+         .env("XDG_CONFIG_HOME", root.join("xdg-config"))
+diff --git a/crates/maos-bin/tests/worker_supervision_16_3.rs b/crates/maos-bin/tests/worker_supervision_16_3.rs
+index 07fc425a..b9bacb0b 100644
+--- a/crates/maos-bin/tests/worker_supervision_16_3.rs
++++ b/crates/maos-bin/tests/worker_supervision_16_3.rs
+@@ -1213,17 +1213,19 @@ async fn a_stop_during_the_mint_never_spawns_the_child() {
+     LazyLock::force(&WORKER_FIXTURE_BUILT);
+     let dir = scratch_dir("stop-in-mint");
+     let world = KernelWorld::new(&dir);
+-    let latch: Arc<Mutex<Option<Arc<WorkerSupervisor>>>> = Arc::new(Mutex::new(None));
++    // A strong latch formed supervisor -> seam -> latch -> supervisor and
++    // prevented Drop from reclaiming its empty T3 process root (20-10 T0).
++    let latch = Arc::new(Mutex::new(std::sync::Weak::<WorkerSupervisor>::new()));
+     let latch_for_hook = Arc::clone(&latch);
+     let supervisor = world.supervisor(maos_bin::supervision::SupervisorSeams {
+         after_mint: Some(Arc::new(move || {
+-            if let Some(supervisor) = latch_for_hook.lock().expect("latch").as_ref() {
++            if let Some(supervisor) = latch_for_hook.lock().expect("latch").upgrade() {
+                 supervisor.stop_workers();
+             }
+         })),
+         ..Default::default()
+     });
+-    *latch.lock().expect("latch") = Some(Arc::clone(&supervisor));
++    *latch.lock().expect("latch") = Arc::downgrade(&supervisor);
+     let manifest = write_worker_manifest(&dir, Some("hang"), None);
+ 
+     let error = run_worker(&world, &supervisor, manifest, WorkerTask::Standalone)
+@@ -1257,6 +1259,12 @@ async fn a_stop_during_the_mint_never_spawns_the_child() {
+         world.scheduler.resolve_pid("worker").is_none(),
+         "no lock is held across abandon, so the SCB is really gone"
+     );
++    let weak = Arc::downgrade(&supervisor);
++    drop(supervisor);
++    assert!(
++        weak.upgrade().is_none(),
++        "the test seam must not retain its supervisor"
++    );
+ }
+ 
+ #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+diff --git a/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs b/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
+index 4b170dbe..70b8a183 100644
+--- a/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
++++ b/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
+@@ -1,6 +1,6 @@
+-//! AC4.7: a stale container after a daemon crash is never restarted with its
+-//! stored bearer, a second root creates a new CID, and `maos purge --dry-run`
+-//! reports the retained container. Real runtime, CI-only.
++//! A crashed root's owned containers and CID custody are purged, without
++//! touching another home's Worker or a label-less impostor. Real runtime,
++//! hosted `epic-17-exit` only.
+ 
+ use std::io::BufRead as _;
+ use std::path::{Path, PathBuf};
+@@ -98,6 +98,57 @@ fn state(cid: &str) -> (String, String) {
+     (status.to_owned(), started.to_owned())
+ }
+ 
++struct Containers(Vec<String>);
++impl Drop for Containers {
++    fn drop(&mut self) {
++        for cid in &self.0 {
++            let _ = runtime(&["rm", "--force", "--volumes", "--time=0", cid]);
++        }
++    }
++}
++struct LiveRoot(Child);
++impl Drop for LiveRoot {
++    fn drop(&mut self) {
++        let _ = self.0.kill();
++        let _ = self.0.wait();
++    }
++}
++fn exists_code(cid: &str) -> Option<i32> {
++    Command::new("timeout")
++        .arg("8s")
++        .arg(std::env::var("MAOS_T3_RUNTIME").expect("runtime"))
++        .args(["container", "exists", cid])
++        .status()
++        .expect("exists")
++        .code()
++}
++fn custody_dirs(cid: &str) -> Vec<PathBuf> {
++    let mut roots = vec![std::env::temp_dir().join(format!(
++        "maos-worker-state-{}",
++        rustix::process::geteuid().as_raw()
++    ))];
++    if let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR") {
++        roots.push(PathBuf::from(runtime).join("maos-worker-state"));
++    }
++    let mut found = Vec::new();
++    for root in roots {
++        if let Ok(processes) = std::fs::read_dir(root) {
++            for process in processes.flatten() {
++                if let Ok(spawns) = std::fs::read_dir(process.path()) {
++                    for spawn in spawns.flatten() {
++                        if std::fs::read_to_string(spawn.path().join("cid"))
++                            .is_ok_and(|text| text.trim() == cid)
++                        {
++                            found.push(spawn.path());
++                        }
++                    }
++                }
++            }
++        }
++    }
++    found
++}
++
+ #[test]
+ fn root_crash_retains_stopped_container_and_purge_reports_it() {
+     if !super::scene("root-crash") {
+@@ -109,7 +160,9 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
+     let manifest = dir.path().join("worker.toml");
+     std::fs::write(&manifest, MANIFEST).expect("manifest");
+ 
++    let mut cleanup = Containers(Vec::new());
+     let (mut first, old) = start_root(&home, &manifest);
++    cleanup.0.push(old.clone());
+     first.kill().expect("SIGKILL the root mid-Worker");
+     first.wait().expect("reap killed root");
+     // Stop the test-owned CID externally; `stop` can return before the
+@@ -133,6 +186,7 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
+     );
+ 
+     let (mut second, new) = start_root(&home, &manifest);
++    cleanup.0.push(new.clone());
+     assert_ne!(old, new, "the second root creates its own CID");
+     let observe_by = Instant::now() + Duration::from_secs(3);
+     while Instant::now() < observe_by {
+@@ -146,16 +200,132 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
+     second.kill().expect("stop second root");
+     second.wait().expect("reap second root");
+ 
+-    let name = runtime(&["inspect", "--format", "{{.Name}}", &old]).expect("old container name");
++    let old_custody = custody_dirs(&old);
++    let new_custody = custody_dirs(&new);
++    assert!(
++        !old_custody.is_empty() && !new_custody.is_empty(),
++        "crashed roots retained CID custody"
++    );
++    let foreign_home = dir.path().join("foreign-home");
++    std::fs::create_dir_all(&foreign_home).expect("foreign home");
++    let (foreign, foreign_cid) = start_root(&foreign_home, &manifest);
++    let _foreign = LiveRoot(foreign);
++    cleanup.0.push(foreign_cid.clone());
++    let image = runtime(&["inspect", "--format", "{{.Image}}", &old]).expect("fixture image");
++    let impostor = runtime(&[
++        "create",
++        "--name",
++        &format!("maos-impostor-{}", std::process::id()),
++        &image,
++    ])
++    .expect("label-less container");
++    cleanup.0.push(impostor.clone());
+     let purge = maos(&home, &["purge", "--dry-run"])
+         .output()
+-        .expect("run maos purge --dry-run");
+-    let report = String::from_utf8_lossy(&purge.stdout);
++        .expect("dry purge");
++    assert!(
++        purge.status.success(),
++        "dry purge failed: {}",
++        String::from_utf8_lossy(&purge.stderr)
++    );
++    assert_eq!(exists_code(&old), Some(0), "dry run removed a container");
++    let receipt = dir.path().join("receipt.json");
++    let purge = maos(
++        &home,
++        &[
++            "purge",
++            "--yes",
++            "--receipt",
++            receipt.to_str().expect("receipt path"),
++        ],
++    )
++    .output()
++    .expect("confirmed purge");
+     assert!(
+-        report.contains(&format!("leaked container {name}")),
+-        "purge must report the retained container {name}: {report}"
++        purge.status.success(),
++        "purge failed: stdout={} stderr={}",
++        String::from_utf8_lossy(&purge.stdout),
++        String::from_utf8_lossy(&purge.stderr)
+     );
+-    for cid in [old, new] {
+-        let _ = runtime(&["rm", "--force", "--volumes", "--time=0", &cid]);
++    for cid in [&old, &new] {
++        assert_eq!(exists_code(cid), Some(1), "owned CID {cid} survived purge");
+     }
++    for cid in [&foreign_cid, &impostor] {
++        assert_eq!(exists_code(cid), Some(0), "non-owned CID {cid} was touched");
++    }
++    for path in old_custody.iter().chain(&new_custody) {
++        assert!(!path.exists(), "CID custody survived: {}", path.display());
++    }
++}
++
++#[test]
++fn purge_cgroup_native_binding_and_dead_creator_twins() {
++    if !super::scene("purge-cgroups") {
++        return;
++    }
++    use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec};
++    let mut spec = SandboxSpec::new_for_test(maos_domain::invariants::i9::SandboxTier::T0);
++    spec.spirit_id = "purge-native-binding".into();
++    spec.resolved_caps.pids_max = Some(32);
++    let mut command = Command::new("/bin/sleep");
++    command.arg("60");
++    let native = spawn_sandboxed(&spec, &mut command).expect("delegated native child");
++    let native_leaf = native
++        .cgroup_path()
++        .expect("kernel cgroup path")
++        .to_path_buf();
++    let slice = native_leaf.parent().expect("slice");
++    assert!(
++        !Path::new("/proc/2147483647").exists(),
++        "fixture dead creator PID"
++    );
++    let empty = slice.join("spirit-purge-empty-2147483647-1");
++    let populated = slice.join("spirit-purge-populated-2147483647-2");
++    std::fs::create_dir(&empty).expect("empty dead-creator leaf");
++    std::fs::create_dir(&populated).expect("populated dead-creator leaf");
++    struct Leaves(Vec<PathBuf>);
++    impl Drop for Leaves {
++        fn drop(&mut self) {
++            for p in &self.0 {
++                let _ = std::fs::remove_dir(p);
++            }
++        }
++    }
++    let _leaves = Leaves(vec![empty.clone(), populated.clone()]);
++    let member = LiveRoot(
++        Command::new("/bin/sleep")
++            .arg("60")
++            .spawn()
++            .expect("test member"),
++    );
++    std::fs::write(populated.join("cgroup.procs"), member.0.id().to_string())
++        .expect("populate twin");
++    let dir = tempfile::tempdir().expect("purge home");
++    let home = dir.path().join("home");
++    std::fs::create_dir(&home).expect("home");
++    let receipt = dir.path().join("receipt.json");
++    let purge = maos(
++        &home,
++        &[
++            "purge",
++            "--yes",
++            "--receipt",
++            receipt.to_str().expect("receipt"),
++        ],
++    )
++    .output()
++    .expect("purge");
++    assert!(
++        purge.status.success(),
++        "{}",
++        String::from_utf8_lossy(&purge.stderr)
++    );
++    let report = String::from_utf8_lossy(&purge.stdout);
++    assert!(!empty.exists(), "dead-creator empty leaf survived");
++    assert!(
++        report.contains(&format!("retained cgroup {}", native_leaf.display())),
++        "kernel naming must bind to purge's actual matcher: {report}"
++    );
++    assert!(native_leaf.exists(), "live creator leaf removed");
++    assert!(populated.exists(), "populated leaf removed");
+ }
+diff --git a/docs-site/docs/cookbook/cli-wrapper-spirit.md b/docs-site/docs/cookbook/cli-wrapper-spirit.md
+index d4e33a44..37ed68d1 100644
+--- a/docs-site/docs/cookbook/cli-wrapper-spirit.md
++++ b/docs-site/docs/cookbook/cli-wrapper-spirit.md
+@@ -62,6 +62,13 @@ The source tree's live manifests declare their vendor endpoint: `spirits/worker/
+ 
+ **Workspace:** Each Worker run gets a fresh workspace at `<workspaces root>/<container_name>/`. The workspaces root is `MAOS_WORKER_WORKSPACES_ROOT` when set (an absolute path, used as written; a relative path is refused), otherwise `<MAOS_HOME>/workspaces` (`MAOS_HOME`, otherwise `$HOME/.maos`). MAOS creates the root `0700` if it is missing and refuses it unless it is a directory, not a symlink, owned by the daemon's user with mode `0700`. It creates each workspace `0755` inside the root and mounts it with `--volume=<dir>:/workspace:rw,U` and `--workdir=/workspace`. It is the Worker's working directory and its only persistent writable path; the daemon's own working directory never reaches the Worker. The container root is `--read-only` with podman's default read-only tmpfs mounts, so the Worker can also write to the 64 MiB `/tmp` tmpfs and to `/run`, `/var/tmp` and `/dev/shm`; all of them are ephemeral, go away with the container, and never count as an effect. Because of `:U`, podman chowns the workspace to the container user's mapped subuid, so the files the Worker writes are owned by that subuid on the host. The workspace is kept after the Worker exits and MAOS does not delete it; its absolute path is the `workspace` field of the `cli_wrapper_loaded` and `worker_completion` events and of the `worker.completion-verdict` Transparency Log row. If the spawn fails before the Worker runs, MAOS removes the still-empty workspace; when it cannot, it prints `maos run: Worker workspace <dir> kept after a failed spawn: <error>`. Inspect or remove it inside the rootless user namespace: `podman unshare ls -laR <workspace>`, `podman unshare rm -rf <workspace>`. `maos purge` covers both `<MAOS_HOME>/workspaces` and a configured `MAOS_WORKER_WORKSPACES_ROOT`: it removes Worker-owned files with `podman unshare rm -rf --one-file-system`, and when that fails it leaves them and prints that command as residue.
+ 
++Confirmed `maos purge --yes` removes retained containers before workspaces only
++when both MAOS identity labels, the name, and this home's `/workspace` source
++agree. Other-home or unattributable containers remain report-only; label-less
++containers are ignored. Absent-CID T3 custody and empty dead-creator cgroups
++are reclaimed, never live/unknown custody or populated cgroups. Receipt rows
++name each result; `complete` does not mean every `left (<residue>)` row is gone.
++
+ **Disk use:** Workspaces have no size quota. A runaway Worker can write until the filesystem holding the workspaces root is full; with the default root, that is the filesystem holding `MAOS_HOME`, including the Transparency Log, and retained workspaces accumulate across runs. Set `MAOS_WORKER_WORKSPACES_ROOT` to a directory on a separate filesystem to keep Worker output off the audit store. After each Worker run MAOS checks the free space on the workspace's filesystem and, below 1 GiB (1073741824 bytes), prints `maos run: WARNING: Worker workspaces filesystem at <workspace> has <n> bytes free (below 1073741824); …` to stderr; if the check itself fails it prints `maos run: WARNING: cannot check free space on Worker workspaces filesystem at <workspace>: <error>`. The warning neither refuses nor stops the run, and it is not journaled. The missing size cap is a claim boundary (`RELEASE-HOLDS.md`, Claim boundaries row 20): MAOS does not claim that a Worker's disk use is bounded.
+ 
+ **Effect oracle:** After the Worker exits, MAOS compares the workspace with its pre-spawn snapshot (empty, because the workspace is fresh) by metadata only: relative path, file type, size, and `mtime_ns`. No file content is read, symlinks are recorded and never followed, and the walk stops at 10 000 entries. A larger tree, or an entry that cannot be read, is a typed refusal (`workspace walk refused …`), never a silent truncation. The result is reported as `workspace_effect`, either `{"created":n,"modified":n,"removed":n}` or `{"refused":"<reason>"}`, on the `worker_completion` event and in the `worker.completion-verdict` row. Because the workspace starts empty, a walk refused after it listed an entry (over the cap, or an unreadable entry below `/workspace`) still proves the Worker created something and counts as an effect; only a workspace that cannot be listed at all leaves the effect unproven. For `codex` and `claude`, a `Completed` adapter verdict with an empty diff or an unlistable workspace becomes `not_completed:no_effect_evidence`; `codex` still also needs its native `file_change` evidence, and `claude` still needs an empty `permission_denials`. The fixtures report the effect but are not gated. A non-empty diff proves that the Worker changed something in its workspace, not that it produced the requested artifact.
+diff --git a/docs-site/docs/run-maos.md b/docs-site/docs/run-maos.md
+index e569b0b6..43141def 100644
+--- a/docs-site/docs/run-maos.md
++++ b/docs-site/docs/run-maos.md
+@@ -111,6 +111,20 @@ operation holds a store, and writes a JSON receipt outside the deleted roots.
+ After a successful purge, remove the Cargo-owned binary with
+ `cargo uninstall maos`.
+ 
++On Linux, confirmed purge first removes this home's T3 containers: both MAOS
++identity labels, their matching name, and a `/workspace` mount under this
++home's workspace roots must agree. Other-home or unattributable labelled
++containers are only reported with a removal command; label-less containers
++are ignored. Empty dead-creator `maos.slice/spirit-*` leaves are removed, never
++populated or live-creator leaves and never by killing. Private T3 custody is
++removed only for confirmed-absent CIDs, then empty process/state roots;
++unknown/live custody is retained. Dry-run custody lines are conditional on
++that absence check and invoke only read-only `ps`/`inspect`. Receipts add
++`podman://<CID>`, `cgroup://<path>` and custody-directory rows, without changing
++the schema: `left (<residue>)` can coexist with status `complete`, as with
++Worker workspace residue. Read every row. User-namespace mappings and podman
++storage/configuration are never edited.
++
+ `maos purge --keep-log --yes` checkpoints and keeps the Transparency Log. This
+ also keeps shared-memory rows and the principal namespace index when they share
+ that database, including capability-token rows and legacy `shell.turn` text.
+diff --git a/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md b/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md
+index 9db9b70b..096f21bf 100644
+--- a/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md
++++ b/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md
+@@ -63,6 +63,13 @@ permitted_egress_destinations = ["api.openai.com"]
+ 
+ **Workspace:** 각 Worker 실행은 `<workspaces root>/<container_name>/`에 새 workspace를 받습니다. workspaces root는 `MAOS_WORKER_WORKSPACES_ROOT`가 설정되어 있으면 그 값이고(절대 경로를 쓰인 그대로 사용하며 상대 경로는 거부), 아니면 `<MAOS_HOME>/workspaces`입니다(`MAOS_HOME`, 없으면 `$HOME/.maos`). MAOS는 root가 없으면 `0700`으로 만들고, symlink가 아닌 디렉터리이면서 daemon 사용자 소유이고 mode가 `0700`인 경우가 아니면 거부합니다. 각 workspace는 root 안에 `0755`로 만들고 `--volume=<dir>:/workspace:rw,U`와 `--workdir=/workspace`로 마운트합니다. 이것이 Worker의 작업 디렉터리이며 유일하게 영구적으로 쓰기 가능한 경로입니다. daemon 자신의 작업 디렉터리는 Worker에 전달되지 않습니다. 컨테이너 root는 podman 기본 read-only tmpfs mount와 함께 `--read-only`로 실행되므로, Worker는 64 MiB `/tmp` tmpfs와 `/run`, `/var/tmp`, `/dev/shm`에도 쓸 수 있습니다. 이들은 모두 임시 경로로 컨테이너와 함께 사라지며 effect로 계산되지 않습니다. `:U` 때문에 podman은 workspace를 컨테이너 사용자에 매핑된 subuid로 chown하므로, Worker가 쓴 파일은 host에서 그 subuid 소유가 됩니다. workspace는 Worker 종료 후에도 유지되며 MAOS는 이를 삭제하지 않습니다. 절대 경로는 `cli_wrapper_loaded`와 `worker_completion` event, 그리고 `worker.completion-verdict` Transparency Log row의 `workspace` 필드에 있습니다. Worker가 실행되기 전에 spawn이 실패하면 MAOS는 아직 비어 있는 workspace를 제거하며, 제거할 수 없으면 `maos run: Worker workspace <dir> kept after a failed spawn: <error>`를 출력합니다. 확인하거나 제거하려면 rootless user namespace 안에서 실행합니다: `podman unshare ls -laR <workspace>`, `podman unshare rm -rf <workspace>`. `maos purge`는 `<MAOS_HOME>/workspaces`와 설정된 `MAOS_WORKER_WORKSPACES_ROOT`를 모두 다룹니다. Worker 소유 파일은 `podman unshare rm -rf --one-file-system`으로 제거하고, 그것이 실패하면 파일을 남긴 채 그 명령을 residue로 출력합니다.
+ 
++`maos purge --yes`는 두 MAOS identity label, 이름, 이 home의 `/workspace`
++source가 모두 일치할 때만 유지된 컨테이너를 workspace보다 먼저 제거합니다.
++다른 home이나 소유권 미확인 컨테이너는 명령만 표시하고 label이 없는 컨테이너는
++무시합니다. CID 부재가 확인된 T3 custody와 빈 dead-creator cgroup만 정리하며
++live/unknown custody 또는 populated cgroup은 제거하지 않습니다. receipt는 결과를
++각 행에 기록하며 `complete`여도 `left (<residue>)` 행이 남을 수 있습니다.
++
+ **Disk 사용:** workspace에는 크기 quota가 없습니다. 폭주하는 Worker는 workspaces root가 있는 파일시스템이 가득 찰 때까지 쓸 수 있습니다. 기본 root에서는 그것이 Transparency Log를 포함한 `MAOS_HOME`의 파일시스템이며, 유지된 workspace는 실행마다 쌓입니다. Worker 출력을 audit 저장소와 분리하려면 `MAOS_WORKER_WORKSPACES_ROOT`를 별도 파일시스템의 디렉터리로 설정하세요. 각 Worker 실행 후 MAOS는 workspace가 있는 파일시스템의 여유 공간을 확인하고, 1 GiB(1073741824 bytes) 미만이면 stderr에 `maos run: WARNING: Worker workspaces filesystem at <workspace> has <n> bytes free (below 1073741824); …`를 출력합니다. 확인 자체가 실패하면 `maos run: WARNING: cannot check free space on Worker workspaces filesystem at <workspace>: <error>`를 출력합니다. 이 경고는 실행을 거부하거나 멈추지 않으며 journal에 기록되지 않습니다. 크기 상한이 없다는 점은 claim boundary입니다(`RELEASE-HOLDS.md`, Claim boundaries 20행). MAOS는 Worker의 디스크 사용량이 제한된다고 주장하지 않습니다.
+ 
+ **Effect oracle:** Worker가 종료되면 MAOS는 workspace를 spawn 전 snapshot(새 workspace이므로 비어 있음)과 metadata만으로 비교합니다: 상대 경로, 파일 유형, 크기, `mtime_ns`. 파일 내용은 읽지 않고, symlink는 기록하되 따라가지 않으며, walk는 10 000개 항목에서 멈춥니다. 더 큰 트리나 읽을 수 없는 항목은 조용히 잘라내지 않고 typed refusal(`workspace walk refused …`)이 됩니다. 결과는 `worker_completion` event와 `worker.completion-verdict` row에 `workspace_effect`로 보고되며, `{"created":n,"modified":n,"removed":n}` 또는 `{"refused":"<reason>"}` 형식입니다. workspace는 빈 상태에서 시작하므로, 항목을 나열한 뒤 거부된 walk(상한 초과, 또는 `/workspace` 아래의 읽을 수 없는 항목)도 Worker가 무언가를 만들었다는 증명이며 effect로 계산됩니다. workspace 자체를 나열할 수 없을 때만 effect가 증명되지 않습니다. `codex`와 `claude`에서는 diff가 비었거나 workspace를 나열할 수 없으면 adapter의 `Completed` 판정이 `not_completed:no_effect_evidence`가 됩니다. `codex`는 여전히 native `file_change` evidence도 필요하고, `claude`는 여전히 빈 `permission_denials`가 필요합니다. fixture는 effect를 보고하지만 gate되지 않습니다. 비어 있지 않은 diff는 Worker가 workspace에서 무언가를 바꿨다는 증명일 뿐, 요청한 산출물을 만들었다는 증명은 아닙니다.
+diff --git a/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md b/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md
+index 0ee3c266..8d5589b1 100644
+--- a/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md
++++ b/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md
+@@ -107,6 +107,20 @@ daemon이나 offline durable operation이 store를 점유하면 거부하고, 
+ 밖에 JSON receipt를 기록합니다. purge 성공 후 Cargo 소유 binary는
+ `cargo uninstall maos`로 제거하십시오.
+ 
++Linux에서 확인된 purge는 이 home의 T3 컨테이너를 workspace보다 먼저 제거합니다.
++두 MAOS identity label, 일치하는 이름, 이 home의 workspace root 아래를 가리키는
++`/workspace` mount가 모두 일치해야 합니다. 다른 home 또는 소유권을 확인할 수 없는
++labelled 컨테이너는 제거 명령만 표시하며 label이 없는 컨테이너는 무시합니다.
++`maos.slice/spirit-*` leaf는 비어 있고 creator가 종료된 경우에만 제거하며,
++실행 중인 creator나 member를 죽이지 않습니다. private T3 custody는 CID 부재가
++확인된 경우만 제거하고 빈 process/state root를 정리합니다. CID가 없거나 실행 중인
++custody는 보존합니다. dry run의 custody 제거 표시는 부재 확인을 조건으로 하며
++읽기 전용 `ps`/`inspect`만 호출합니다. receipt는 schema 변경 없이
++`podman://<CID>`, `cgroup://<path>`, custody 디렉터리 행을 추가합니다.
++Worker workspace residue와 마찬가지로 `left (<residue>)` 행이 있어도 status는
++`complete`일 수 있으므로 모든 행을 확인하십시오. user-namespace mapping과
++podman storage/configuration은 수정하지 않습니다.
++
+ `maos purge --keep-log --yes`는 Transparency Log를 checkpoint한 뒤 보존합니다.
+ 같은 데이터베이스를 공유할 때 shared-memory row와 principal namespace index도
+ 보존되며, capability-token row와 기존 `shell.turn` 텍스트도 포함됩니다. dry run은
+diff --git a/docs/adr/ADR-067-maos-data-root-layout-and-purge.md b/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
+index 3e9fe88b..76c1250d 100644
+--- a/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
++++ b/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
+@@ -73,6 +73,12 @@ every deletion root. It records `in-progress` first and finalizes `complete`
+ after removals. Signature and externally verifiable proof fields are present but
+ remain null until the v1.0 NFR-Aud-12 signing work lands.
+ 
++Runtime rows use the same schema and convention: `podman://<CID>` for owned
++containers, `cgroup://<path>` for cgroups, and directory paths for T3 custody.
++Rows start `pending` before any removal and finish `removed` or `left (<residue>)`.
++Like 19-3 workspace residue, surviving runtime residue alone does not change
++`complete` to `partial`; an error note does. Read the rows, not only status.
++
+ ## Consequences
+ 
+ Adding a new MAOS-written durable root now requires extending one typed function
+@@ -84,10 +90,26 @@ same boundary.
+ Documentation describes the two-stage removal: purge MAOS-owned state, then run
+ `cargo uninstall maos` for the Cargo-owned executable.
+ 
+-ACP sockets have no cleanup entry because MAOS uses NDJSON over stdio and does
+-not create them. Container and cgroup residue is report-only: purge prints the
+-operator command or location but does not invoke a container runtime or remove
+-kernel-managed cgroup files.
++ACP sockets have no cleanup entry because MAOS uses NDJSON over stdio. Purge
++enumerates podman containers with `maos.spirit_id`, then checks both that label
++and `maos.boot_nonce`, the exact `maos-<spirit_id>-<boot_nonce>` name, and the
++`/workspace` mount source against this home's Worker workspace roots,
++component-wise without filesystem canonicalization of runtime text. Only owned
++64-hex CIDs reach bounded `rm --force --volumes --time=0` followed by
++`container exists`; containers precede workspace deletion. MAOS-labelled
++containers without that authority stay report-only with the exact removal
++command; label-less containers are ignored even when named `maos-*`.
++
++On Linux, purge rmdirs euid-owned `maos.slice/spirit-<id>-<creator pid>-<seq>`
++leaves only when `cgroup.events` reports `populated 0` and the creator has no
++`/proc/<pid>`, then the empty slice. It never kills members or writes
++`cgroup.kill`. Private mode-0700, euid-owned T3 custody directories under the
++runtime/temp state roots are reclaimed only after their CID is confirmed
++absent; unknown/present-CID custody stays, followed by empty process/root
++directory cleanup. Directory traversal and control-file reads do not follow
++links. A dry run invokes only `ps`/`inspect` and changes no state, including
++podman storage; spawn removal is reported as conditional on CID absence.
++Purge never edits user-namespace mappings, podman configuration or storage.
+ 
+ ## Verification
+ 
+@@ -96,6 +118,14 @@ kernel-managed cgroup files.
+ removal; operator-file preservation; lock refusal; receipt placement; and
+ `--keep-log` checkpoint behavior.
+ 
++`purge_residue_20_10` binds container authority/refusal twins, dry-run verbs,
++receipt ordering, custody, and the post-removal residue vocabulary. Unit
++`ac4_dead_empty_live_creator_populated_and_symlink_twins` binds the temp cgroup
++walk. The hosted `epic-17-exit` root-crash scene removes real retained CIDs and
++custody while preserving another home's Worker and an impostor;
++`purge_cgroup_native_binding_and_dead_creator_twins` binds kernel naming and
++real delegated empty/populated leaves.
++
+ The verb-table tests bind `purge` in network and air-gap builds. The environment
+ contract gate binds `MAOS_SECRETS_BACKEND` and `MAOS_CRL_PATH` at the composition
+ root. The kernel baseline must remain byte-identical because enumeration,
+diff --git a/docs/maos.dev/run-maos.md b/docs/maos.dev/run-maos.md
+index b0094f59..d2c9c523 100644
+--- a/docs/maos.dev/run-maos.md
++++ b/docs/maos.dev/run-maos.md
+@@ -111,6 +111,20 @@ operation holds a store, and writes a JSON receipt outside the deleted roots.
+ After a successful purge, remove the Cargo-owned binary with
+ `cargo uninstall maos`.
+ 
++On Linux, confirmed purge first removes this home's T3 containers: both MAOS
++identity labels, their matching name, and a `/workspace` mount under this
++home's workspace roots must agree. Other-home or unattributable labelled
++containers are only reported with a removal command; label-less containers
++are ignored. Empty dead-creator `maos.slice/spirit-*` leaves are removed, never
++populated or live-creator leaves and never by killing. Private T3 custody is
++removed only for confirmed-absent CIDs, then empty process/state roots;
++unknown/live custody is retained. Dry-run custody lines are conditional on
++that absence check and invoke only read-only `ps`/`inspect`. Receipts add
++`podman://<CID>`, `cgroup://<path>` and custody-directory rows, without changing
++the schema: `left (<residue>)` can coexist with status `complete`, as with
++Worker workspace residue. Read every row. User-namespace mappings and podman
++storage/configuration are never edited.
++
+ `maos purge --keep-log --yes` checkpoints and keeps the Transparency Log. This
+ also keeps shared-memory rows and the principal namespace index when they share
+ that database, including capability-token rows and legacy `shell.turn` text.
+diff --git a/tests/coverage-matrix.yaml b/tests/coverage-matrix.yaml
+index b94d0f02..5fa38eb7 100644
+--- a/tests/coverage-matrix.yaml
++++ b/tests/coverage-matrix.yaml
+@@ -410,9 +410,18 @@ coverage:
+     corpora: []
+     phase: v0.1
+     valid_until: '2027-05-12'
+-    notes: 1a.4 ships `maosctl unload` and `maosctl install` stubs (real
+-      uninstall body lands at Story 1b.5b); cargo-test verifies the help-tree
+-      surface; no behavior gate at v0.1-α
++    notes: |
++      Story 20-10: maos_uninstall_16_4 and worker_workspace_19_3 preserve purge,
++      retention, receipts and workspace cleanup. purge_residue_20_10 witnesses
++      home-scoped label/name/mount authority, refusal twins, inert dry runs,
++      absent-CID custody and receipt conventions. Unit
++      ac4_dead_empty_live_creator_populated_and_symlink_twins covers the cgroup
++      walk. Hosted epic-17-exit runs root_crash_retains_stopped_container_and_purge_reports_it
++      and purge_cgroup_native_binding_and_dead_creator_twins on ubuntu-24.04/26.04
++      for real retained CID/custody removal, other-home/impostor twins, and
++      delegated cgroup/native-naming binding. --keep-log is the documented
++      operator-selected exception to complete erasure; binaries belong to the
++      package manager (20-2), and per-Spirit erasure belongs to 20-11.
+   FR20:
+     gates: []
+     corpora: []
+diff --git a/xtask/kloc.toml b/xtask/kloc.toml
+index 81c25267..731195cd 100644
+--- a/xtask/kloc.toml
++++ b/xtask/kloc.toml
+@@ -514,7 +514,7 @@ maos-cli = 6856   # HISTORY: 20-1a-registry-publish-install-exit-path 20-1a land
+ # 17-3d-wasm-log-recall review fix, Lunarpulse-approved exact measured FW-03 raise 2026-10-19: 26339 -> 26340 (+1), ZERO HEADROOM. Driver: explicitly retain timestamp ordering when converting a WASM recall filter.
+ # ◆ 17-4 FLAG-Winston landing, Lunarpulse-approved measured request 2026-10-20, exact after `cargo fmt --all` via `kloc-check --json` (tokei 14.0.0): 26340 -> 27194 (+854), ZERO HEADROOM. Driver: `hook_pump.rs` +682 (the HookPump — one broad `scalar.tap` receiver, FIFO delivery to live Observer-class pids, lag/ineligible/failed accounting, object-keyed quarantine, `flush()` barrier, joined shutdown; the ConsolidationWatchdog; the non-blocking ActivityWriter; telemetry-subscription grant/revoke rows), `main.rs` +159 (Observer arms + `construct_observer`, `LoadedSpiritKind::ALL`/`class_name` table parity, pump construction and joins on six roots, the watchdog, host-bound scalar-port `spirit_id`, parity + identity tests), `admission.rs` +11 (registration after the grant, rollback on start failure), `lib.rs` +2.
+ # 17-4-hooks-observer-and-activity-corpus review, D-17-4-CR-02: Lunarpulse approved exact measured pins 2026-10-20 after `cargo fmt --all` and `kloc-check --json` (tokei 14.0.0), before story closure. 27194 -> 27323 (+129), ZERO HEADROOM. Driver: nonblocking hook sink and bounded output-only shutdown, finite/cancellable flush with shutdown accounting, exact-runtime dispatch views, single-source compiled-in class enumeration, shared serving shutdown ordering and backpressure-safe terminal notices. Kernel unchanged.
+-maos-bin = 33498   # HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33496 -> 33498; P1/F2 signed installed-package boot gate; ceiling34410. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33215 -> 33496; ceiling34410; installed boot admission, typed refusal routing and shared registry construction. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 33195 -> 33215 (+20; ceiling 33315); exact formatted; block_on_anywhere so WorkerBinding::drop never panics in a runtime context (D-20-7-03 A) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 33030 -> 33195 (+165); exact formatted via kloc-check --json after cargo fmt --all, ZERO HEADROOM; one-shot drain holders + typed drain error, endpoint lease/rebind/republish, delegation sender pid, tl_journal strong handle, audit query flags, FR62(b) governance writer | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 33021 -> 33030 (+9); epic envelope33021 -> 33030, exact formatted, ZERO HEADROOM; interrupted identity debris cannot block held attribution. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 32979 -> 33021 (+42); epic envelope33010 -> 33021, exact formatted, ZERO HEADROOM; unreadable-held physical attribution cannot mask unrelated orphan residue. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 32968 -> 32979 (+11); exact formatted, at w8 ceiling, ZERO HEADROOM; stable-owner uninstall discovery and signed unreadable-held gap. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32967 -> 32968 (+1; L1 32937 -> 32968, +31 within+40); exact formatted, ZERO HEADROOM. DRIVER: import MemoryManagerPort for the actual recorded-owner export call; hold/residue witnesses green. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32946 -> 32967 (+21; L1 32937 -> 32967, +30 within+40); exact formatted, ZERO HEADROOM. DRIVER: recorded-owner held-value accounting preserves held terminals without masking orphan residue. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 32937 -> 32946 (+9), exact formatted, ZERO HEADROOM, within grant+16; bind admitted storage identity before start and shell hello. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 32939 -> 32937; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: smoke-discipline-7-1-5 shrunk to its two surviving gates. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 32937 -> 32939 (+2), within w6_kloc envelope33010, ZERO HEADROOM; merged main-side supervision correction. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 32826 -> 32937 (+111), within w6_kloc envelope33010 (32860 -> 33010, operator Raise to measured + ~100), ZERO HEADROOM; founder-loop and upgrade review corrections. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 32711 -> 32826 (+115), within w5_kloc envelope32860, ZERO HEADROOM; review fixes in the founder-loop and governed-upgrade composition. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 31728 -> 32711 (+983), exact formatted via cargo fmt --all / kloc-check --json; operator ask w5_kloc (Raise to measured + ~150) extends envelope32086 -> 32860; founder-loop halt/resume/digest and governed upgrades/admission, ZERO HEADROOM. | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 31573 -> 31728 (+155: log-before-act enqueue, instruction carried across re-dispatch, pause re-check, principal validation, freeze undo deadline, pick 404/409 discrimination, purge protected-path fallback, section-1 escalation reason), inside envelope 32086 (ask w4_kloc), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition review corrections 2026-10-28, exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30847 -> 31573 (+726, combined 19-2 dev + 19-3/19-6 review), inside the Epic-19 envelope 31710 (ask w3_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30380 -> 30847 (+467, combined 19-3 + 19-6), inside the Epic-19 envelope 31353 (E19 kloc ruling 2026-10-28, ask w2_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-7-repin-consent-operator-surface 2026-10-28 re-review correction (ReReview19x7 P3-1/P3-2) exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 30366 -> 30380 (+14: sender re-pin hold capped at REPIN_REQUEST_TTL with 1 s..16 s backoff), inside the Epic-19 envelope 31166 (E19 kloc ruling 2026-10-28), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the Epic-19 envelope (D19-1 A + D-19-7-11 A + E19 kloc ruling 2026-10-28: 31166): 30286 -> 30366 (+80: 19-1 refuse-early/dispatch-stop/receipt guard +56 net after dedup, 19-7 sender hold through TLS refusal +22, +2 other), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 29497 -> 30286 (+789), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review rulings R1-R5, exact formatted 29443 -> 29497 (+54), within operator grant<=29500, ZERO HEADROOM; optional boot queue, preflight authorization/revision-only evidence summary (drafts skip report work), shared always-compiled lock, air-gap pump availability and bounded Researcher handle release. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): D-15 resumed operator grant<=29500; exact formatted29113 -> 29443 (+330), ZERO HEADROOM. Per-file tokei: skill_authoring+249, operator_door+80, spirit_session+8, researcher_root+7, lib+2, admission+1, main-17; evidence/bin-attribution.log. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted28914 -> 29113, ZERO HEADROOM. Driver: weak governed recall; root validation, quarantine-independent purge, orphan recovery, late sweep/purge, typed errors/late outcomes. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum ratifies<=28940 after STOP; exact formatted28658 -> 28914 (+256), Epic18 named budget28770 -> 28914, ZERO HEADROOM. Driver: hook_pump +157, main +49, operator_door +25, researcher_root +25; root nonce/pid dispatch, all four callers/bindings, weak result sink/lazy operation-scoped MCP adapters. STOP candidate28916 reduced2 by canonical-id decoder reuse. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26; exact28655 -> 28658 (+3), within<=28700. Driver: weak reusable context factory and session constructor migration; ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review rulings R1/R3, operator 2026-10-26; exact formatted LOWER re-pin28680 -> 28655 (-25), within<=28700. Driver: shared MCP refusal writer moved to maos-iac, context adapter constructor and actual WASM session teardown, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, D-09 A operator addendum2026-10-26 pre-ratified <=28700, exact formatted28588 -> 28680 (+92), ZERO HEADROOM. Driver: manifest-window/pid-bound context factories on boot/door/successor and WASM sessions, mediated context.report exchange, typed governed/MCP/session/CLI-wrapper refusal mapping. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (review patch pass, operator rulings D-18-4-R1…R5 2026-10-26; within the pre-ratified kloc C ≤ 28600; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; kernel 20617 / 26387 unchanged): 28558 -> 28588 (+30), ZERO HEADROOM. DRIVER: `butler_root.rs` `acceptance_binder` — the ROOT fixes the pid of each Butler's principal port and TL attestation (review TIA-1/BH-2; the factory moved out of `main.rs`) and `scene_hold` (harness-only `MAOS_SCENE_HOLD_FILE`, ruling D-18-4-R3); `main.rs` scene loop resolves the Butler loaded now per day and renders the scene digest by boot (R3, R5), `MAOS_UTC_OFFSET` validated on every boot (EC-7), the seam cleared before the audit drain; `escape_detector_consumer.rs` `tl_journal` (the production journal moved out of `main.rs`, TIA-2); `env_contract.rs` +1 row. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV exact measured re-pin 2026-10-25 (operator ruling 2026-10-25 kloc C, ≤ 28600): 28301 -> 28558 (+257), ZERO HEADROOM — `--clock`/`--acceptance` parse + refusals, scene loop, seam fill, pid-fused principal port, escape-tail journal, `MAOS_UTC_OFFSET` row. | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` CODE-REVIEW 28328 -> 28301 (−27); 18-3 DEV 28094 -> 28328; 18-2 CODE-REVIEW 28087 -> 28094; 18-2 DEV 28005 -> 28087; 18-8 CODE-REVIEW 28024 -> 28005; 18-8 DEV 27969 -> 28024; 18-1 CODE-REVIEW 27927 -> 27969; 18-1 DEV 27809 -> 27927 (each row's full note: `git log -p xtask/kloc.toml`).
++maos-bin = 34037   # HISTORY: 20-10-purge-residue-removal 20-10 landing 1, D-20-10-10 A RULED 2026-11-02: 33498 -> 34037 (+539; ceiling34548); exact after cargo fmt --all / kloc-check --json; home-scoped runtime reclamation, shared bounded client, cgroups and custody. Kernel unchanged 26841/21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33496 -> 33498; P1/F2 signed installed-package boot gate; ceiling34410. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33215 -> 33496; ceiling34410; installed boot admission, typed refusal routing and shared registry construction. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 33195 -> 33215 (+20; ceiling 33315); exact formatted; block_on_anywhere so WorkerBinding::drop never panics in a runtime context (D-20-7-03 A) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 33030 -> 33195 (+165); exact formatted via kloc-check --json after cargo fmt --all, ZERO HEADROOM; one-shot drain holders + typed drain error, endpoint lease/rebind/republish, delegation sender pid, tl_journal strong handle, audit query flags, FR62(b) governance writer | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 33021 -> 33030 (+9); epic envelope33021 -> 33030, exact formatted, ZERO HEADROOM; interrupted identity debris cannot block held attribution. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 32979 -> 33021 (+42); epic envelope33010 -> 33021, exact formatted, ZERO HEADROOM; unreadable-held physical attribution cannot mask unrelated orphan residue. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 32968 -> 32979 (+11); exact formatted, at w8 ceiling, ZERO HEADROOM; stable-owner uninstall discovery and signed unreadable-held gap. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32967 -> 32968 (+1; L1 32937 -> 32968, +31 within+40); exact formatted, ZERO HEADROOM. DRIVER: import MemoryManagerPort for the actual recorded-owner export call; hold/residue witnesses green. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32946 -> 32967 (+21; L1 32937 -> 32967, +30 within+40); exact formatted, ZERO HEADROOM. DRIVER: recorded-owner held-value accounting preserves held terminals without masking orphan residue. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 32937 -> 32946 (+9), exact formatted, ZERO HEADROOM, within grant+16; bind admitted storage identity before start and shell hello. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 32939 -> 32937; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: smoke-discipline-7-1-5 shrunk to its two surviving gates. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 32937 -> 32939 (+2), within w6_kloc envelope33010, ZERO HEADROOM; merged main-side supervision correction. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 32826 -> 32937 (+111), within w6_kloc envelope33010 (32860 -> 33010, operator Raise to measured + ~100), ZERO HEADROOM; founder-loop and upgrade review corrections. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 32711 -> 32826 (+115), within w5_kloc envelope32860, ZERO HEADROOM; review fixes in the founder-loop and governed-upgrade composition. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 31728 -> 32711 (+983), exact formatted via cargo fmt --all / kloc-check --json; operator ask w5_kloc (Raise to measured + ~150) extends envelope32086 -> 32860; founder-loop halt/resume/digest and governed upgrades/admission, ZERO HEADROOM. | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 31573 -> 31728 (+155: log-before-act enqueue, instruction carried across re-dispatch, pause re-check, principal validation, freeze undo deadline, pick 404/409 discrimination, purge protected-path fallback, section-1 escalation reason), inside envelope 32086 (ask w4_kloc), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition review corrections 2026-10-28, exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30847 -> 31573 (+726, combined 19-2 dev + 19-3/19-6 review), inside the Epic-19 envelope 31710 (ask w3_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30380 -> 30847 (+467, combined 19-3 + 19-6), inside the Epic-19 envelope 31353 (E19 kloc ruling 2026-10-28, ask w2_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-7-repin-consent-operator-surface 2026-10-28 re-review correction (ReReview19x7 P3-1/P3-2) exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 30366 -> 30380 (+14: sender re-pin hold capped at REPIN_REQUEST_TTL with 1 s..16 s backoff), inside the Epic-19 envelope 31166 (E19 kloc ruling 2026-10-28), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the Epic-19 envelope (D19-1 A + D-19-7-11 A + E19 kloc ruling 2026-10-28: 31166): 30286 -> 30366 (+80: 19-1 refuse-early/dispatch-stop/receipt guard +56 net after dedup, 19-7 sender hold through TLS refusal +22, +2 other), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 29497 -> 30286 (+789), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review rulings R1-R5, exact formatted 29443 -> 29497 (+54), within operator grant<=29500, ZERO HEADROOM; optional boot queue, preflight authorization/revision-only evidence summary (drafts skip report work), shared always-compiled lock, air-gap pump availability and bounded Researcher handle release. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): D-15 resumed operator grant<=29500; exact formatted29113 -> 29443 (+330), ZERO HEADROOM. Per-file tokei: skill_authoring+249, operator_door+80, spirit_session+8, researcher_root+7, lib+2, admission+1, main-17; evidence/bin-attribution.log. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted28914 -> 29113, ZERO HEADROOM. Driver: weak governed recall; root validation, quarantine-independent purge, orphan recovery, late sweep/purge, typed errors/late outcomes. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum ratifies<=28940 after STOP; exact formatted28658 -> 28914 (+256), Epic18 named budget28770 -> 28914, ZERO HEADROOM. Driver: hook_pump +157, main +49, operator_door +25, researcher_root +25; root nonce/pid dispatch, all four callers/bindings, weak result sink/lazy operation-scoped MCP adapters. STOP candidate28916 reduced2 by canonical-id decoder reuse. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26; exact28655 -> 28658 (+3), within<=28700. Driver: weak reusable context factory and session constructor migration; ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review rulings R1/R3, operator 2026-10-26; exact formatted LOWER re-pin28680 -> 28655 (-25), within<=28700. Driver: shared MCP refusal writer moved to maos-iac, context adapter constructor and actual WASM session teardown, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, D-09 A operator addendum2026-10-26 pre-ratified <=28700, exact formatted28588 -> 28680 (+92), ZERO HEADROOM. Driver: manifest-window/pid-bound context factories on boot/door/successor and WASM sessions, mediated context.report exchange, typed governed/MCP/session/CLI-wrapper refusal mapping. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (review patch pass, operator rulings D-18-4-R1…R5 2026-10-26; within the pre-ratified kloc C ≤ 28600; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; kernel 20617 / 26387 unchanged): 28558 -> 28588 (+30), ZERO HEADROOM. DRIVER: `butler_root.rs` `acceptance_binder` — the ROOT fixes the pid of each Butler's principal port and TL attestation (review TIA-1/BH-2; the factory moved out of `main.rs`) and `scene_hold` (harness-only `MAOS_SCENE_HOLD_FILE`, ruling D-18-4-R3); `main.rs` scene loop resolves the Butler loaded now per day and renders the scene digest by boot (R3, R5), `MAOS_UTC_OFFSET` validated on every boot (EC-7), the seam cleared before the audit drain; `escape_detector_consumer.rs` `tl_journal` (the production journal moved out of `main.rs`, TIA-2); `env_contract.rs` +1 row. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV exact measured re-pin 2026-10-25 (operator ruling 2026-10-25 kloc C, ≤ 28600): 28301 -> 28558 (+257), ZERO HEADROOM — `--clock`/`--acceptance` parse + refusals, scene loop, seam fill, pid-fused principal port, escape-tail journal, `MAOS_UTC_OFFSET` row. | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` CODE-REVIEW 28328 -> 28301 (−27); 18-3 DEV 28094 -> 28328; 18-2 CODE-REVIEW 28087 -> 28094; 18-2 DEV 28005 -> 28087; 18-8 CODE-REVIEW 28024 -> 28005; 18-8 DEV 27969 -> 28024; 18-1 CODE-REVIEW 27927 -> 27969; 18-1 DEV 27809 -> 27927 (each row's full note: `git log -p xtask/kloc.toml`).
+ # ⚠ 15-2 EPIC-15 MEASURED RE-BASE 2026-09-06 (operator-authorized; measured at 03ee0ad8 with tokei 14.0.0, the CI pin): 1631 -> 1791 (+160). Grant = 260 over measured 1531. Σupper = 200.
+ # Ledger: 19-3 real-spawn bench +80–200 — CONSUMED by 18-2 (review ruling D-18-2-R1 = K1 A, 2026-10-25: maos-bench 2018 ratified); 19-3 makes its own measured request at creation. | prior: history remains on the assignment below.
+ maos-bench = 2737   # HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 2451 -> 2737 (+286; ceiling 3051); exact formatted; budgets.rs reader of xtask/perf-budgets.toml, tier_c_harness (counting allocator); benches uncharged | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 2359 -> 2451 (+92), ZERO HEADROOM; final re-pin after review. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV exact measured re-pin 2026-10-25 (after `cargo fmt --all`, `kloc-check --json`): 2354 -> 2359 (+5), ZERO HEADROOM. DRIVER: the BH-3 witness (`deferred-work.md:1253`, operator ruling 2026-10-25): `distill_eval` counts the distinct judge tokens against the judge calls and reports `judge_calls` / `judge_tokens_minted`. | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` CODE-REVIEW exact measured re-pin 2026-10-25 (review patch pass, operator rulings D-18-3-R3/R4 2026-10-25; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): 2325 -> 2354 (+29), within the ratified +40 patch allowance, ZERO HEADROOM. DRIVER: `distill_eval.rs` — committed-cassette pass for the completion-planted controls, live pass + per-call judge mint, flush-then-parse, recorded-judge replay, sidecar (R4, BH-3, BH-4). | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` DEV exact measured re-pin 2026-10-25 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; kernel unchanged at 20608 / 26377): 2032 -> 2325 (+293), RATIFIED by the operator (Lunarpulse) 2026-10-25 as the D-18-3-11 addendum measured request (above the 2232 stop line), ZERO HEADROOM. DRIVER: `distill_eval.rs` — the `maos eval distill --class researcher` replay/record composition (per-row kernel world, journaled claims, bound Researcher, I11 distillate writer, cite recall, redaction, frozen/live judge) + `halt_eval.rs` Researcher reason string (D-18-3-09). | PRIOR: ◆ Story `18-2-eval-halt-verb-and-corpus-numbers` CODE-REVIEW exact measured re-pin 2026-10-25 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; story `18-2-eval-halt-verb-and-corpus-numbers` review patch pass, sprint key review; kernel unchanged at 20608 / 26377): 2018 -> 2032 (+14 over the operator-ratified 2018, review ruling D-18-2-R1 = K1 A; within the +30 patch allowance), ZERO HEADROOM. DRIVER: `halt_eval.rs` — `calendar_conflict_basis` in the class table (AA-1), `parse_args` honours `MAOS_REPLAY_CASSETTE` in replay (BH-5), `EvalRequest::publishes_sidecar` (D-18-2-R2). R1 consumed the 15-2 ledger reservation '19-3 real-spawn bench +80–200' (line above): `19-3` makes its own measured request at creation. | PRIOR: ⚠ Story `18-2-eval-halt-verb-and-corpus-numbers` EXACT MEASURED REQUEST 2026-10-25 (D-18-2-01 B composition; D-18-2-07 measured-at-landing contract — the creation forecast +134 fit the 1791 ceiling, the landed composition does not, so this is returned to the operator for ratification at review; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; story `18-2-eval-halt-verb-and-corpus-numbers` dev pass, sprint key review; kernel unchanged at 20608 / 26377): 1791 -> 2018 (measured 1512 -> 2018, +506), ZERO HEADROOM. DRIVER: new `src/halt_eval.rs` — the class table (CR-5: butler model-driven, researcher not), the per-row fresh kernel world with Butler bound to a counting inference port through the kernel `InferencePortAdapter` (departure 1), the Researcher `survey` -> `primary_scalar` path, replay/record completions (departure 2), args parsing, the sidecar body and signing; `src/lib.rs` +doc. | PRIOR: 2026-07-25 founder policy re-base (Winston 2%): 1550->1631 (measured 1531, reserve 100) | prior: Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
+@@ -715,7 +715,7 @@ _aggregate_alarm = 158608   # ⚠ 15-2 EPIC-15 RE-BASE 2026-09-06: pre-grant for
+ # ◆ 17-4 FLAG-Winston landing, Lunarpulse-approved measured request 2026-10-20 (measured + 1; the story is not yet done), exact after `cargo fmt --all` via `kloc-check --json` (tokei 14.0.0): measured aggregate 178496 (+887 = maos-bin +854, maos-domain +15, kernel +11 ratified D-17-4-PF-R1, maos-capability +4, maos-manifest +3); strict hardfail 177610 -> 178497. ZERO HEADROOM.
+ # 17-4-hooks-observer-and-activity-corpus review, D-17-4-CR-02: Lunarpulse approved 2026-10-20 after formatting/measurement, before story closure. Aggregate measured 178625 (+129, all maos-bin); strict hardfail 178497 -> 178626 (measured +1). Kernel unchanged; ZERO HEADROOM.
+ # ◆ Story 20-12-test-cost-budget-and-review-execution-contract re-pin 2026-10-23 (strict measured + 1 per the story's kloc_grant; the story is not yet done; after `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): 179800 -> 180813, measured 180812. Delta +1012 = xtask +1013 (two gates + budget loader + fixture builder + escape-detector split; row at the `xtask` key), rounding −1 vs the 179799 measured at 17-9; kernel 0 (`check-kernel-baseline` 26361 / 95); ZERO HEADROOM.
+-_aggregate_hardfail = 191827   # HISTORY: 20-1a-registry-publish-install-exit-path hosted incident 41424027458, operator rows201; exact after cargo fmt --all / kloc-check --json: 191811 -> 191827; measured191826 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 191381 -> 191811; measured191810 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 190591 -> 191381; measured191380 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-7 landing 1 review corrections; D11 exact measured aggregate 190590 + 1 (was 190204), within 192568. xtask +387; kernel/bench/bin unchanged. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 188817 -> 190204 (measured 190203 + 1; ceiling 192568); exact formatted; kernel +31, xtask +1050, maos-bin +20, maos-bench +286 | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals 20-3c landing 2 clippy fixes, hosted discipline run 41281999213 clippy-advisory (ceiling 189478): 188805 -> 188817; exact formatted aggregate 188816 + 1, ZERO HEADROOM; domain+12 (EndpointLease rustix flock) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 2 (20-3c landing 2), operator grants rows203c/grant203c 2026-11-01: 188785 -> 188805; exact formatted aggregate 188804 + 1, ZERO HEADROOM; kernel+19, capability+1 (ceiling 189478) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 188452 -> 188785; exact formatted aggregate 188784 + 1, ZERO HEADROOM; bin+165, domain+104, audit+14, shell+6, xtask+19 (kernel, capability, cli pin untouched) | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 188240 -> 188452; exact formatted aggregate188451 + 1, ZERO HEADROOM; kernel+103, bin+9, audit+39, xtask+61. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 188120 -> 188240; exact formatted aggregate188239 + 1, ZERO HEADROOM; kernel+55, bin+42, xtask+23, audit0. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 187906 -> 188120; exact formatted aggregate188119 + 1, ZERO HEADROOM; kernel+86, xtask+109, audit+8, bin+11. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187905 -> 187906; exact formatted aggregate187905 + 1, ZERO HEADROOM. DRIVER: bin+1 trait scope, all other crates unchanged. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187884 -> 187905; exact formatted aggregate187904 + 1, ZERO HEADROOM. DRIVER: bin+21, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 187500 -> 187884, exact formatted aggregate187883 + 1, ZERO HEADROOM. DRIVER: xtask+243, kernel+130 under d03 A, domain+2, bin+9, audit0. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing-1 DIFFICULT-review correction, RULED 2026-10-30: 187495 -> 187500; exact formatted aggregate187499 + 1, ZERO HEADROOM. DRIVER: xtask+5, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 192779 -> 187495; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: measured aggregate187494 + 1; xtask-5282, maos-bin-2, kernel0. | PRIOR: HISTORY: 19-5 cold_swap WRITER_SHAPES row (FR4 census), w7_audit, 2026-10-29: 192764 -> 192779 (measured192778 + 1; +15 entirely maos-audit), exact formatted after cargo fmt --all via kloc-check --json; within aggregate envelope~192935, ZERO HEADROOM. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 192762 -> 192764 (measured192763 + 1; +2 entirely maos-bin), within w6_kloc envelope~192935, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): aggregate +2 from maos-bin 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 192651 -> 192762 (measured192761 + 1; +111 entirely maos-bin), within w6_kloc envelope~192935 (~192685 -> ~192935, operator Raise to measured + ~100), ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 192536 -> 192651 (measured192650 + 1; +115 entirely maos-bin), within w5_kloc envelope~192685, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 191406 -> 192536 (measured192535 + 1; delta1130 = bin983 + xtask208 + control2 - CLI7 - kernel56); exact formatted via cargo fmt --all / kloc-check --json, ZERO HEADROOM; operator ask w5_kloc extends aggregate envelope~192045 -> ~192685 (Raise to measured + ~150). | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 191247 -> 191406 (measured 191405 + 1 = maos-bin +155, maos-control +3, xtask +1), endpoint 191669+376 (w4_kloc), ZERO HEADROOM. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3/19-6 review corrections 2026-10-28 exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 190357 -> 191247 (+890) (measured 191246 = maos-bin +726, maos-cli +61, maos-control +49, kernel +46 under the FR51 FLAG-Winston grant D-19-2-20 B, xtask +19, maos-shell -11), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191669 (ask w3_kloc); final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189878 -> 190357 (+479) (measured 190356 = maos-bin +467, kernel +9 under the D19-2 A FLAG-Winston grant, xtask +3), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191248 (E19 kloc ruling 2026-10-28, ask w2_kloc); final re-pin after review. | PRIOR: HISTORY: 19-1/19-7 2026-10-28 re-review correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189864 -> 189878 (+14) (measured 189877 = maos-bin +14), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189767 -> 189864 (+97) (measured 189863 = maos-bin +80, maos-a2a-core +17), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 188505 -> 189767 (+1262) (measured 189766), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 20-16-prepush-drift-gate second post-review correction, 2026-10-27 after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188503 -> 188504 (+1 = xtask prepush1013 -> 1014; 20-16 now exactly STOP+1020); strict hardfail188504 -> 188505 = measured+1, ZERO HEADROOM. Kernel 26378/20619 unchanged (comment-only hash re-pin); reserved ceilings unchanged. | PRIOR: HISTORY: 20-15-ci-build-once-nextest-archive conmon_oom_cwd FLAG-Winston, operator2026-10-27, after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188494 -> 188503 (+9 = kernel +9, security/sandbox/t3/spawn.rs only); strict hardfail188495 -> 188504 = measured+1, ZERO HEADROOM. xtask (+38/+1019 components), reserved ceilings and every other row unchanged. | PRIOR: HISTORY: 20-16-prepush-drift-gate and 20-15-ci-build-once-nextest-archive, 2026-10-27 post-review exact candidate measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 187437 -> 188494 (+1057, xtask only); strict hardfail187438 -> 188495 = measured+1, ZERO HEADROOM. Components +38 and +1019 remain within ruled STOP+38 and STOP+1020; previous candidate188490/188491 and the +37/+1020 split preceded review corrections. No kernel or reserved-ceiling change, no final review/hosted completion claim. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review exact measured aggregate 187284 -> 187437 (+153 = bin54 + skill96 + CLI1 + FKCS2); strict hardfail187285 -> 187438 = measured+1, ZERO HEADROOM; all zero-headroom and reserved-ceiling rows unchanged. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): exact formatted measured186483 -> 187284 (+801); hardfail186484 -> 187285 = measured+1, ZERO HEADROOM. Drivers: bin+330, skill+338, manifest+21, audit+10, CLI+50, control+58, kernel+4, FKCS-11, xtask+1; reserved ceilings retained. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted186041 -> 186484, ZERO HEADROOM. Driver: measured aggregate186483 +1; kernel-44,IAC+190,domain+88,audit+10,bin+199. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum and ruled measured+1; exact formatted aggregate185459 -> 186040 (+581), strict hardfail185460 -> 186041, ZERO HEADROOM. Delta: kernel+7,IAC+96,domain+39,audit+152,bin+256,journey+31. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26 ratification; measured185451 -> 185459 (+8 = IAC5 + bin3), strict hardfail185452 -> 185460 = measured+1; kernel unchanged, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review operator addenda2026-10-26; exact formatted aggregate185372 -> 185451 (+79), hardfail185373 -> 185452 = measured+1. Driver: kernel+4,IAC+91,manifest+9,bin-25; no other production crate delta, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, operator D-09 A and final host/audit addenda2026-10-26; exact formatted measured aggregate184738 -> 185372 (+634), strict hardfail184739 -> 185373 = measured+1, ZERO HEADROOM. Drivers: kernel+22, capability+85, IAC+119, domain+43, manifest+34, audit+63, bin+92, wasm-host+157, spirit-abi+4, spirit-sdk+15; spirits/* uncharged. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): aggregate = measured + 1: 184707 -> 184739, measured 184738 — maos-bin +30 (28558 -> 28588, kloc C ≤ 28600), maos-spirit-sdk +2 (1068 -> 1070, ceiling 3000), `spirits/*` uncharged; kernel 0. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV 184223 -> 184707 (measured 184706); ◆ 18-3 CODE-REVIEW 184003 -> 184223; 18-3 DEV 183248 -> 184003; 18-2 CODE-REVIEW 183181 -> 183248; 18-2 DEV 182292 -> 183181; 18-8 CODE-REVIEW 182221 -> 182292; 18-8 DEV 181727 -> 182221; 18-1 CODE-REVIEW 181685 -> 181727 (full notes: `git log -p xtask/kloc.toml`).
++_aggregate_hardfail = 192366   # HISTORY: 20-10-purge-residue-removal 20-10 landing 1, D-20-10-10 A RULED 2026-11-02: 191827 -> 192366; measured192365 + 1, ceiling192876; exact after cargo fmt --all / kloc-check --json, maos-bin+539 only. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path hosted incident 41424027458, operator rows201; exact after cargo fmt --all / kloc-check --json: 191811 -> 191827; measured191826 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 191381 -> 191811; measured191810 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 190591 -> 191381; measured191380 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-7 landing 1 review corrections; D11 exact measured aggregate 190590 + 1 (was 190204), within 192568. xtask +387; kernel/bench/bin unchanged. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 188817 -> 190204 (measured 190203 + 1; ceiling 192568); exact formatted; kernel +31, xtask +1050, maos-bin +20, maos-bench +286 | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals 20-3c landing 2 clippy fixes, hosted discipline run 41281999213 clippy-advisory (ceiling 189478): 188805 -> 188817; exact formatted aggregate 188816 + 1, ZERO HEADROOM; domain+12 (EndpointLease rustix flock) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 2 (20-3c landing 2), operator grants rows203c/grant203c 2026-11-01: 188785 -> 188805; exact formatted aggregate 188804 + 1, ZERO HEADROOM; kernel+19, capability+1 (ceiling 189478) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 188452 -> 188785; exact formatted aggregate 188784 + 1, ZERO HEADROOM; bin+165, domain+104, audit+14, shell+6, xtask+19 (kernel, capability, cli pin untouched) | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 188240 -> 188452; exact formatted aggregate188451 + 1, ZERO HEADROOM; kernel+103, bin+9, audit+39, xtask+61. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 188120 -> 188240; exact formatted aggregate188239 + 1, ZERO HEADROOM; kernel+55, bin+42, xtask+23, audit0. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 187906 -> 188120; exact formatted aggregate188119 + 1, ZERO HEADROOM; kernel+86, xtask+109, audit+8, bin+11. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187905 -> 187906; exact formatted aggregate187905 + 1, ZERO HEADROOM. DRIVER: bin+1 trait scope, all other crates unchanged. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187884 -> 187905; exact formatted aggregate187904 + 1, ZERO HEADROOM. DRIVER: bin+21, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 187500 -> 187884, exact formatted aggregate187883 + 1, ZERO HEADROOM. DRIVER: xtask+243, kernel+130 under d03 A, domain+2, bin+9, audit0. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing-1 DIFFICULT-review correction, RULED 2026-10-30: 187495 -> 187500; exact formatted aggregate187499 + 1, ZERO HEADROOM. DRIVER: xtask+5, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 192779 -> 187495; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: measured aggregate187494 + 1; xtask-5282, maos-bin-2, kernel0. | PRIOR: HISTORY: 19-5 cold_swap WRITER_SHAPES row (FR4 census), w7_audit, 2026-10-29: 192764 -> 192779 (measured192778 + 1; +15 entirely maos-audit), exact formatted after cargo fmt --all via kloc-check --json; within aggregate envelope~192935, ZERO HEADROOM. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 192762 -> 192764 (measured192763 + 1; +2 entirely maos-bin), within w6_kloc envelope~192935, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): aggregate +2 from maos-bin 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 192651 -> 192762 (measured192761 + 1; +111 entirely maos-bin), within w6_kloc envelope~192935 (~192685 -> ~192935, operator Raise to measured + ~100), ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 192536 -> 192651 (measured192650 + 1; +115 entirely maos-bin), within w5_kloc envelope~192685, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 191406 -> 192536 (measured192535 + 1; delta1130 = bin983 + xtask208 + control2 - CLI7 - kernel56); exact formatted via cargo fmt --all / kloc-check --json, ZERO HEADROOM; operator ask w5_kloc extends aggregate envelope~192045 -> ~192685 (Raise to measured + ~150). | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 191247 -> 191406 (measured 191405 + 1 = maos-bin +155, maos-control +3, xtask +1), endpoint 191669+376 (w4_kloc), ZERO HEADROOM. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3/19-6 review corrections 2026-10-28 exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 190357 -> 191247 (+890) (measured 191246 = maos-bin +726, maos-cli +61, maos-control +49, kernel +46 under the FR51 FLAG-Winston grant D-19-2-20 B, xtask +19, maos-shell -11), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191669 (ask w3_kloc); final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189878 -> 190357 (+479) (measured 190356 = maos-bin +467, kernel +9 under the D19-2 A FLAG-Winston grant, xtask +3), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191248 (E19 kloc ruling 2026-10-28, ask w2_kloc); final re-pin after review. | PRIOR: HISTORY: 19-1/19-7 2026-10-28 re-review correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189864 -> 189878 (+14) (measured 189877 = maos-bin +14), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189767 -> 189864 (+97) (measured 189863 = maos-bin +80, maos-a2a-core +17), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 188505 -> 189767 (+1262) (measured 189766), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 20-16-prepush-drift-gate second post-review correction, 2026-10-27 after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188503 -> 188504 (+1 = xtask prepush1013 -> 1014; 20-16 now exactly STOP+1020); strict hardfail188504 -> 188505 = measured+1, ZERO HEADROOM. Kernel 26378/20619 unchanged (comment-only hash re-pin); reserved ceilings unchanged. | PRIOR: HISTORY: 20-15-ci-build-once-nextest-archive conmon_oom_cwd FLAG-Winston, operator2026-10-27, after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188494 -> 188503 (+9 = kernel +9, security/sandbox/t3/spawn.rs only); strict hardfail188495 -> 188504 = measured+1, ZERO HEADROOM. xtask (+38/+1019 components), reserved ceilings and every other row unchanged. | PRIOR: HISTORY: 20-16-prepush-drift-gate and 20-15-ci-build-once-nextest-archive, 2026-10-27 post-review exact candidate measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 187437 -> 188494 (+1057, xtask only); strict hardfail187438 -> 188495 = measured+1, ZERO HEADROOM. Components +38 and +1019 remain within ruled STOP+38 and STOP+1020; previous candidate188490/188491 and the +37/+1020 split preceded review corrections. No kernel or reserved-ceiling change, no final review/hosted completion claim. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review exact measured aggregate 187284 -> 187437 (+153 = bin54 + skill96 + CLI1 + FKCS2); strict hardfail187285 -> 187438 = measured+1, ZERO HEADROOM; all zero-headroom and reserved-ceiling rows unchanged. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): exact formatted measured186483 -> 187284 (+801); hardfail186484 -> 187285 = measured+1, ZERO HEADROOM. Drivers: bin+330, skill+338, manifest+21, audit+10, CLI+50, control+58, kernel+4, FKCS-11, xtask+1; reserved ceilings retained. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted186041 -> 186484, ZERO HEADROOM. Driver: measured aggregate186483 +1; kernel-44,IAC+190,domain+88,audit+10,bin+199. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum and ruled measured+1; exact formatted aggregate185459 -> 186040 (+581), strict hardfail185460 -> 186041, ZERO HEADROOM. Delta: kernel+7,IAC+96,domain+39,audit+152,bin+256,journey+31. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26 ratification; measured185451 -> 185459 (+8 = IAC5 + bin3), strict hardfail185452 -> 185460 = measured+1; kernel unchanged, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review operator addenda2026-10-26; exact formatted aggregate185372 -> 185451 (+79), hardfail185373 -> 185452 = measured+1. Driver: kernel+4,IAC+91,manifest+9,bin-25; no other production crate delta, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, operator D-09 A and final host/audit addenda2026-10-26; exact formatted measured aggregate184738 -> 185372 (+634), strict hardfail184739 -> 185373 = measured+1, ZERO HEADROOM. Drivers: kernel+22, capability+85, IAC+119, domain+43, manifest+34, audit+63, bin+92, wasm-host+157, spirit-abi+4, spirit-sdk+15; spirits/* uncharged. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): aggregate = measured + 1: 184707 -> 184739, measured 184738 — maos-bin +30 (28558 -> 28588, kloc C ≤ 28600), maos-spirit-sdk +2 (1068 -> 1070, ceiling 3000), `spirits/*` uncharged; kernel 0. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV 184223 -> 184707 (measured 184706); ◆ 18-3 CODE-REVIEW 184003 -> 184223; 18-3 DEV 183248 -> 184003; 18-2 CODE-REVIEW 183181 -> 183248; 18-2 DEV 182292 -> 183181; 18-8 CODE-REVIEW 182221 -> 182292; 18-8 DEV 181727 -> 182221; 18-1 CODE-REVIEW 181685 -> 181727 (full notes: `git log -p xtask/kloc.toml`).
+ 
+ # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
+ # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
+diff --git a/xtask/tests/epic17_exit_workflow_17_7.rs b/xtask/tests/epic17_exit_workflow_17_7.rs
+index 7da57930..0a64f302 100644
+--- a/xtask/tests/epic17_exit_workflow_17_7.rs
++++ b/xtask/tests/epic17_exit_workflow_17_7.rs
+@@ -242,7 +242,7 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
+     assert_eq!(images, ["ubuntu-24.04", "ubuntu-26.04"]);
+     assert_eq!(job["runs-on"].as_str(), Some("${{ matrix.image }}"));
+     assert_eq!(job["env"]["MAOS_FIXTURE_TRANSPORT"].as_str(), Some("1"));
+-    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(33));
++    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(34));
+     assert!(job["env"]["MAOS_CGROUP_CANARY_ARCHIVE"].is_null());
+     for value in job["env"].as_mapping().expect("job environment").values() {
+         assert!(
+@@ -259,6 +259,7 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
+         .collect();
+     assert_eq!(required, [
+         "root_crash::root_crash_retains_stopped_container_and_purge_reports_it",
++        "root_crash::purge_cgroup_native_binding_and_dead_creator_twins",
+         "runtime_scenes::client_first_stop_snapshots_only_a_terminal_state",
+         "runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding",
+         "runtime_scenes::ownership_is_by_cid_never_by_requested_name",

@@ -1,0 +1,105 @@
+MAOS workspace automation — CI gates, linting, checks
+
+Usage: xtask <COMMAND>
+
+Commands:
+  prepush                              Mirror CI drift checks and workspace tests before pushing a story tree
+  check-unsafe                         AC2 — Zero-unsafe gate for the capability-validation path
+  kloc-check                           AC3 — KLOC budget check with alarm and hard-fail thresholds
+  abi-diff                             AC4 — ABI diff against the previous tagged baseline
+  check-empty-kernel                   AC6 — I9 structural-state lint for empty-kernel invariant
+  check-loom                           AC7 — NFR-Test-9 Loom-not-in-kernel structural grep
+  check-service-boundary               AC8 — NFR-Test-2 service-boundary P1–P4 + Spirit-ABI reflection
+  check-fr47                           AC2 — FR47 enforcement: vendor LLM SDK dependency scan
+  check-security-md                    AC9 — NFR-Ops-4 + FR61 SECURITY.md section gate
+  invariant-lock                       AC5 — Invariant lock gate for constitutional amendments
+  check-corpus                         AC1 — SHA-256-pinned JSONL corpus verification (NFR-Test-1)
+  check-judge-config                   AC2 — Pinned-judge-LLM structural contract (NFR-Test-1)
+  clippy-ratchet                       Advisory warning-debt ratchet over a successful cargo-clippy JSON stream
+  coverage-matrix                      AC4 — Coverage-matrix delivered-phase enforcement (NFR-Meta-3)
+  corpus-staleness                     AC5 — Corpus staleness `valid_until` enforcement (NFR-Meta-2)
+  calibrate                            AC6 — Calibration Wilson-CI math (NFR-Aud-8)
+  rebaseline-check                     AC3 — Quarterly rebaseline check (NFR-Test-1)
+  example-spirit-regen                 Story 2.3 — Template-to-example drift detector and regenerator. DEPRECATED: use `templates-regen` instead
+  templates-regen                      Story 7.1 — Generalized template-to-example regenerator (Rust + TS)
+  check-a2a-sender-completeness        Story 8.8 AC3 — cross-Host A2A sender-completeness gate: no reference cross-Host sender builds a frame with an unclassified `consent_envelope`
+  check-workspace-count                Story 2.5 AC3 — workspace-member-count guard (Cargo.toml vs architecture doc)
+  check-kernel-baseline                Story 8.16 §A4 + Story 16-0 — kernel-core single source of truth. Compares `crates/maos-kernel-core/src` against `xtask/kernel-core-baseline.toml` on THREE axes: the `src_lines` count, the pinned file set, and a per-file content hash (so a line-neutral kernel edit reds the gate and the failing file is NAMED). `--emit-pin` prints the paste-ready `[kernel_src]` block
+  check-epic-close-coherence           Epic-13 retro C1 — re-derive every epic's roll-up. REDs when an epic is closed over an open story, when a key never advanced, when planning prose disagrees, or when an OPEN epic cites a kernel pin that is not the baseline
+  check-exit-commands                  Story 15-3 AC5 — confidence rule 1 made mechanical: every epic's hermetic exit block is tokenised as shell and every `maos`/`maosctl`/ `xtask` verb must exist at HEAD or be owed by a named, open story that actually claims it
+  check-model-currency                 Story 17-5 — model-pin currency: every model id pinned in a manifest, the price book or a `main.rs` provider constructor must be current per `xtask/model-currency.toml`. Offline; names `file:line` for each violation
+  check-test-cost                      Story 20-12 AC2 — no test compiles the tree: every cargo/rustc/trybuild spawn under a workspace member's tests dir carries `// expensive: <reason>` (tests `#[ignore = "expensive: …"]`, registered in `xtask/test-budgets.toml [[expensive]]` under a job that runs ignored tests) or, for cargo tree/metadata/locate-project/pkgid, `// cargo-query: <reason>`
+  check-test-budget                    Story 20-12 AC1 — every test binary in a nextest junit report keeps its Σ per-test time under its `xtask/test-budgets.toml` budget, and the suite under its total; stale `[[exception]]` rows red
+  build-test-fixtures                  Story 20-12 AC2 — build every fixture binary/WASM artefact tests resolve (worker fixtures, maosctl, runners, guests, probes) and write `<target>/maos-fixtures/manifest.json` (or an absolute `$MAOS_FIXTURE_DIR`) recording each artefact's `built_at` and source inputs
+  gen-termination-corpus               Story 4.1 AC4 — deterministic 1000-scenario termination-corpus generator
+  gen-isolation-corpus                 Story 4.5 — deterministic 200-scenario cross-spirit isolation-corpus generator
+  check-mock-not-in-release            Story 4.1 A2 — check release binary for forbidden test-double symbols
+  check-pub-field-constructors         Epic 4 retro §A4 — pub fields with `Construct via ::new` doc-attr MUST have a matching `::new` impl
+  check-composition-root-completeness  Epic 4 retro §A5 — every `*Adapter` re-exported from `api.rs` MUST be constructed exactly once in `main.rs`
+  check-multi-provider-drift           Story 5.5b — multi-provider drift check across aggregated reports
+  check-serde-error-handling           Epic 5 retro §A3 (closes Epic 4 retro §A6) — flag `.unwrap_or_default()` / `.unwrap()` / `.expect(...)` after serde calls
+  check-review-findings-resolved       Epic 5 retro §A5 — open Review Findings rows MUST block sprint-status `done`; closed rows MUST reference a File List entry
+  check-dev-record-completeness        Epic 5 retro §A6 (closes Epic 4 retro §A7) — `done` stories MUST have non-TBD model + non-empty dev record + File List files in `git diff`
+  check-manifest-schema-version        Epic 6 §A4 (retro 2026-05-28) — keep MANIFEST_SCHEMA_VERSION + MIN/MAX constants self-consistent and ban hardcoded `manifest_schema_version` comparisons in `maos-manifest` production code
+  check-skill-schema                   Story 7.4 — assert the maos.skill.v1 schema posture: valid round-trip + deny_unknown_fields (UnknownField, not a silent default) + semver validation
+  check-dev-model-tier                 Epic 12 retro B3 — frontier-era (epic >= 12) stories must record an allowlisted dev model + a §A6 review artifact (Blocking; closes E11-A1)
+  check-decision-register              Story 14-0 AC1 — the Epic-14 preflight decision register gets a READER. Every row's target must resolve to a `development_status` key (`epic-*` keys and retro actions are not vehicles); an OPEN row whose mechanical deadline has passed REDS; a non-mechanical deadline must declare itself UNQUERYABLE. Fails closed on an unreadable/unparseable/empty register
+  check-j1-loopback-delegation         j1-crosshost-1a AC4 — the J1 `developer-remote` delegation must be provably FRAME-BORNE. Proven-red leg: any "route locally anyway" regression reds this. Boundary leg: loopback `frame.from.host_id` is unverified until rung 2
+  check-j1-two-host-signed-run         j1-crosshost-2c AC5.1 — the two-host signed run's judge. Holds the controls that decide what a signed two-host artifact may assert: the signing-identity repair, the host discriminator under the signature, a reconciliation that refuses one root, an enforced bundle schema, typed+bounded faults, nothing `Duplicate` until durable, pin refusals journaled both sides, and a stored-row scan. ONE binding class; the paid run is a validated capture
+  stability-matrix                     Story 7.5a — generate (or `--check`) repo-root STABILITY.md from live workspace state (ABI Stability Triple + LTS + compliance/export STUBs)
+  check-breaking-md                    Story 7.5a — enforce BREAKING.md dated-entry taxonomy (NFR-Maint-7)
+  check-dependency-closure             Story 10.4a — dependency-closure gate (kernel-core artifact excludes Postgres/pgvector)
+  check-host-surface                   Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host Port); removed items RED, added items reported but GREEN
+  check-rto-gate                       Story 10.4a — RTO ≤ 4h gate (drilled, not printed); NFR-Ops-9
+  rto-drill                            Story 10.4a — RTO ≤ 4h drill: performs cold-restore + timing, gates on threshold, and writes evidence consumed by `check-rto-gate`. NFR-Ops-2 (RTO) + NFR-Ops-1 (RPO), drilled not printed
+  nfr-onb-1-gate                       Story 7.5b — NFR-Onb-1 30-Minute First Spirit Validation Gate discipline rail: stratification + cohort evaluator + Butler-corpus seam over the committed example cohort/outcomes/self-trial; FAILs loudly on drift
+  cassette-age-gate                    Story 8.15 — cassette age gate: fail if any cassette's recorded_at exceeds 14 days
+  check-env-contract                   Story 8.15 — env-contract gate: every MAOS_* env::var read must be registered
+  error-catalog-check                  Story 9.3 FR63 — typed error catalog CI gate: bijection check between `xtask/error-catalog.toml` and AST-discovered E*-prefixed error variants
+  error-catalog-generate               Story 9.3 FR63 — generate deterministic machine-readable error catalog artifact (per-error retryability + cause-chain + version-stability)
+  check-abi-ratification               Story 9.3b FR62 — abi-diff ⊆ ratified reconciliation gate (ADR-045 §4 / R1). Asserts every abi-diff-detected ABI change is covered by a ratified AbiExtensionProposal in the manifest and backed by a TL-ancestor frame
+  bypass-scan                          Story 9.4b AC-9 — region write/read bypass scanner (R-RG3 runtime companion)
+  release-verify                       Story 9.4 AC-1 — release artifact signing and verification gate
+  release-dry-run                      Story 15-4 AC1 — build and stage release artifacts without secrets
+  check-release-precondition           Story 15-4 AC3 — require a successful discipline aggregate before publication
+  check-perf-verdict                   Story 20-7 AC1 — one honest verdict per metric from the perf-ledger (ADR-068 §5–§6): PASS, FAIL, INDETERMINATE or ABSENT; only PASS is green
+  check-perf-runner-policy             Story 20-7 AC2 — only `perf.yml` may target the `maos-perf` runner, on trusted triggers, behind the fork guard, with `contents: read` (ADR-068 §4)
+  check-perf-counts                    Story 20-7 AC5 — Tier C instruction/allocation counts against the committed baselines in `xtask/perf-budgets.toml`
+  perf-calibrate                       Story 20-7 — ADR-068 §5 calibration: a fixed CPU and a fixed fsync workload, 30 timings each; prints one ledger `calibration` line
+  perf-ledger-append                   Story 20-7 — ADR-068 §6 append (the GitHub-hosted follow-up job): bench logs + calibration line → ledger lines with their verdicts
+  check-air-gap                        Story 9.4 R-AG1 — air-gap no-network-symbols CI gate + dirty-fixture bite
+  gen-abi-docs                         Story 9.5c — generate ABI reference `.md` from maos-spirit-abi rustdoc JSON
+  check-ship-gate-completeness         Story 10.1a AC4 — assert expected gate job names present in v1.0-ship-gate needs
+  check-pentest-gate                   Story 10.1b AC1 — pen-test gate: parse summary.toml, assert p0/p1 == 0, advisory-if-absent (conditional per calibrate-per-commit)
+  check-coverage-matrix-completeness   Story 10.1b AC3 — coverage-matrix completeness: no v1.0 NFR has empty gates
+  check-third-party-trial              Story 10.2 AC1 — third-party trial N=12 gate: parse trial-results.toml, assert successes >= 10 + stratification + per-participant validation, Wilson CI advisory (conditional per calibrate-per-commit)
+  check-trial-attestation              Story 11.7 — v2.0 third-party trial attestation producer gate
+  check-wasm-form-equiv                Story 11.1b AC3 — authoritative tiered behavioral-oracle cross-form equivalence gate (binding). Reads the live `cargo test` tiered oracle results and enforces the ADR-031 equivalence-binding disposition
+  check-cross-region-consensus         Story 11.2a — cross-region convergent replication gate
+  check-multi-region-slo               Story 11.2b — multi-region SLO gate (per-leg independence)
+  check-rotation-real-timing           Story 14-2 — 10-host mTLS rotation real-timing gate (per-leg independence)
+  check-cert-rotation-trigger          Story 14-2a — the production peer-certificate rotation trigger gate (runtime control leg + method-aware AST second opinion)
+  check-scale-churn                    Story 11.3 — scale-envelope 25/30-host churn gate (per-leg independence)
+  check-cohort-mesh                    Story 12.1 — signed cohort manifest + N=3/N=8 full-pairwise mesh gate
+  check-multi-tenant-loom              Story 13.1 — physical multi-tenant Loom wall (ADR-055)
+  check-reza-production-path           Story 13.5d — Reza's mediated production collective route gate
+  check-loom-substrate-drift           Story 13.6c — three-team/three-region CI substrate drift controls (AC5)
+  check-enterprise-pdp                 Story 11.4a — enterprise PDP integration gate (per-leg independence)
+  check-enterprise-identity            Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence)
+  check-vetting-attestation            Story 13.4 (AC6) — FR37 vetting-attestation gate (7 hermetic blocking legs)
+  check-fkcs                           Story 11.5 — Frozen-Kernel Conformance Suite infrastructure gate
+  check-escape-detector                Story 11.4b — ADR-024 sandbox-escape structural detector gate (per-leg independence)
+  check-equiv-fixture-provenance       Story 11.1b (review finding #21) — WASM fixture provenance / drift guard. Verifies each committed equiv-*.wasm fixture's binary + source SHA-256 against the sidecar provenance manifest (stale-blob detection)
+  check-red-team-gate                  Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase). Per-class floor ≥9/10, aggregate ≥72/80, 0 unmitigated categories. Advisory at v1.0 with "WOULD HAVE BLOCKED SHIP" banner on failure
+  check-export-control                 Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate: ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration
+  check-fuzz-targets                   Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics)
+  check-fuzz-floor                     Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time)
+  check-migration-merkle               Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle ship gate: Merkle root + payload oracle + row count consistency across source/target backends. Advisory at v1.0, blocking at v1.5
+  check-ff-j6                          Story 10.4c AC5 (D8) — FF-J6 guard: enforces J6 cold-start latency harness revival trigger. Greps for J6 latency bindings; fails if one appears with no J6 harness present
+  check-skill-conformance              Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate: validates that ≥1 third-party skill format executes via Spirit-form adapter without kernel modification. Parses real Anthropic fixture + proven-red invalid
+  demo-j1                              Run the J1 founder-loop scene: isolated state home, frame-borne delegation, adapter-parsed completion, and the honest beat ledger — including the beats that have NOT landed
+  demo-reza                            Run the Reza Cortex scene end to end: substrate, journey, gates, verdict
+  help                                 Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

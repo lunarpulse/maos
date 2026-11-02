@@ -1,0 +1,12 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -512,9 +512,6 @@
+     let Some(cid) = parse_container_id(&cid) else {
+         return false;
+     };
+-    if exists(&cid) != Some(false) {
+-        return false;
+-    }
+     use std::os::unix::fs::MetadataExt;
+     let Ok(metadata) = dir.metadata() else {
+         return false;

@@ -1,0 +1,7 @@
+{
+  "runs": 3,
+  "before": 2,
+  "after": 2,
+  "private_root": "/tmp/maos-20-10-producer-zuwvqmpz",
+  "production_source_changed": false
+}

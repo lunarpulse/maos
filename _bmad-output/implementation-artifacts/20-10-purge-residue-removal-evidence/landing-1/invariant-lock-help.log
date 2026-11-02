@@ -1,0 +1,30 @@
+AC5 — Invariant lock gate for constitutional amendments.
+
+`--write-journal` opts the run into persisting a journal entry; without this flag the gate validates only. `--journal-output` sets the file the entry is written to (default: `docs/invariants/journal.jsonl`). For Option (c) journal persistence (DF16), the merge-queue workflow sets `--journal-output /tmp/journal-entry.jsonl` and uploads the file as a CI artifact; the in-repo journal is rebuilt offline by the operator. `--pr-body` points at a file containing the PR body for revert detection; if the body matches the GitHub revert idiom, a paired "reverted" entry is appended after the primary entry.
+
+Usage: xtask invariant-lock [OPTIONS]
+
+Options:
+      --changed-files <CHANGED_FILES>
+          
+
+      --pr-number <PR_NUMBER>
+          
+
+      --sha <SHA>
+          
+
+      --write-journal
+          
+
+      --journal-output <JOURNAL_OUTPUT>
+          [default: docs/invariants/journal.jsonl]
+
+      --pr-body <PR_BODY>
+          
+
+      --json
+          
+
+  -h, --help
+          Print help (see a summary with '-h')

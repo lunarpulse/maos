@@ -3,7 +3,7 @@ story_id: '20.10'
 story_key: 20-10-purge-residue-removal
 created: 2026-11-02
 context_commit: a8af3215
-baseline_commit: a8af3215
+baseline_commit: d3e3f586cb325c16a691cd19d1fd62588b288a0d
 security_sensitive: true
 kernel_grant: "RULED 2026-11-02 (ask s2010): kernel-Δ 0; no kernel grant. HEAD pins 26841 physical / 21042 tokei."
 kloc_grant: "RULED 2026-11-02 (ask s2010; D-20-10-10 A; D02 A ×3 unmeasured). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): maos-bin ≤ 34548; aggregate ≤ 192876; every other crate 0. The later maos-bin lander re-bases its draw on the then-current pin."
@@ -433,12 +433,138 @@ podman unavailable; 8,903 empty process roots).
 ### Agent Model Used
 
 anthropic/claude-opus-5-5 (creation).
+openai-codex/gpt-6.1-sol (20-10 landing 1 implementation; no independent review claimed).
 
 ### Debug Log References
 
+- [Exact command/exit-code ledger](20-10-purge-residue-removal-evidence/landing-1/commands.md) and [machine-readable ledger](20-10-purge-residue-removal-evidence/landing-1/commands.json).
+- [Per-AC witnesses, mutations, hashes, wall times and byte-restores](20-10-purge-residue-removal-evidence/landing-1/plants.md).
+- [Baseline reds](20-10-purge-residue-removal-evidence/landing-1/red-before-head.log), [restored focused suite](20-10-purge-residue-removal-evidence/landing-1/focused-restored-green.log), [serial workspace](20-10-purge-residue-removal-evidence/landing-1/workspace-final-serial.log), [default workspace](20-10-purge-residue-removal-evidence/landing-1/workspace-default.log).
+- [Prescribed prepush](20-10-purge-residue-removal-evidence/landing-1/prepush.log), [fresh serial budget](20-10-purge-residue-removal-evidence/landing-1/check-test-budget.log), [final clippy ratchet](20-10-purge-residue-removal-evidence/landing-1/clippy-final-ratchet.log).
+- [Unpushed hosted verification cut](20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml), [hashed AC1 mutation](20-10-purge-residue-removal-evidence/ci/ac1-removal-noop.diff), [implementation diff digest](20-10-purge-residue-removal-evidence/landing-1/implementation.diff.sha256).
+
+
 ### Completion Notes List
 
+#### 20-10 landing 1 — implementation and observed local proof
+
+Implementation baseline is `d3e3f586cb325c16a691cd19d1fd62588b288a0d`. No commit,
+push, CI-branch edit, packaging edit, kernel edit or status/tracker flip was made.
+The Cargo-owned binary hint remains unchanged. The original task checkboxes are
+not a claim that hosted execution occurred.
+
+- **AC1/AC2:** read-only label-filtered CID enumeration and inspect; require both
+  labels, their matching name and this home's `/workspace` source. Only parsed
+  CIDs reach forced removal and absence confirmation. Unattributable labelled
+  CIDs get the exact command, label-less names no authority. Store lock precedes
+  enumeration. Containers precede workspace deletion.
+- **AC3:** dry run uses only `ps`/`inspect`, keeps the storage guard and performs
+  no runtime removal or custody/cgroup mutation. Custody lines explicitly state
+  their absent-CID condition; no forbidden `exists` probe is hidden in dry run.
+- **AC4:** nofollow cgroup walk over a mount-root parameter; euid ownership,
+  `populated 0`, and positively absent creator PID before rmdir; empty slice
+  cleanup, retained member/creator diagnostics and exact commands, never kill.
+- **AC5:** private euid-owned mode-0700 custody, nofollow CID reads, absent-CID
+  spawn reclamation using the existing descriptor-relative tree remover, then
+  empty process/state roots. Missing/live/unknown CIDs remain. The process-root
+  producer diagnosed here is **test-only**: the stop-during-mint fixture held a
+  strong Arc cycle through its seam latch, so `WorkerSupervisor::drop` never
+  called `cleanup_state_root`. Three production one-shots left zero roots; the
+  HEAD fixture itself passed but changed its private root count 1 → 2. Replacing
+  the latch with Weak and asserting release made three fixed runs keep 2 → 2.
+  This does not attribute every historical host directory to that one fixture.
+- **AC6:** one maos-bin podman adapter reuses the existing capped, deadline-bound
+  kernel invocation and its four-key environment allowlist for every verb,
+  including 19-3 unshare. No new dependency or environment variable. Runtime rows
+  are all pending before removal; custody outcomes are batched to avoid N²
+  receipt rewrites. Schema 1 and the 19-3 `complete`/`left (<residue>)` convention
+  remain. `child.rs` and the entire kernel baseline remain byte-identical.
+- **AC7:** ADR-067, English and Korean run/cookbook docs, FR2 coverage notes,
+  egress custody comment, terminal-suite count 33 → 34 and its xtask reader are
+  updated. `podman://<CID>`, `cgroup://<path>` and directory receipt rows are
+  documented. No open deferred row is assigned to this story.
+
+| AC | Witness definition | HEAD red-before | Green-after / mutation |
+|---|---|---|---|
+| AC1 | `purge_residue_20_10.rs:127` `ac1_owned_cid_removed_before_workspaces_and_receipted` | observed, rc 100 | local PASS; real root-crash/no-op plant cut, not run |
+| AC2 | `purge_residue_20_10.rs:153` `ac2_other_home_missing_mount_mismatched_name_and_impostor_survive` | observed, rc 100 | PASS; name-prefix plant rc 100 |
+| AC3 | `purge_residue_20_10.rs:169` `ac3_dry_run_uses_only_readonly_verbs_and_preserves_custody` | observed, rc 100 | PASS; dry-run-removal plant rc 100 |
+| AC4 | `purge_runtime.rs:535` `ac4_dead_empty_live_creator_populated_and_symlink_twins`; `root_crash.rs:262` real delegated twin | hosted baseline witness cut, unexecuted | local PASS; dropped-creator-check plant rc 100 |
+| AC5 | `purge_residue_20_10.rs:192` `ac5_only_absent_cid_and_empty_state_are_reclaimed` | observed, rc 100 | PASS; skipped-exists plant rc 100; producer counts above |
+| AC6 | `purge_residue_20_10.rs:215` `ac6_runtime_helper_is_shared_and_receipt_convention_is_preserved` | observed, rc 100 | PASS; ambient-runner plant rc 100 |
+| AC7 | `purge_residue_20_10.rs:236` `ac7_adr_documents_home_scoped_runtime_removal` | observed, rc 100 | PASS; stale-ADR plant rc 100 |
+
+Six local plants, one per AC2–AC7, each restored by copy-back + cmp + touch
+(every restore command rc 0). Their total command wall time was 55.232 s.
+AC1's single hosted no-op plant is cut with its SHA-256, not locally claimed.
+
+| Measure | Baseline | Exact landing | Ruled ceiling |
+|---|---:|---:|---:|
+| maos-bin tokei | 33498 | **34037 (+539)** | 34548 |
+| kernel physical / tokei | 26841 / 21042 | **26841 / 21042** | unchanged |
+| xtask tokei | 44406 | **44406** | unchanged |
+| aggregate | 191826 | **192365 (+539)** | 192876 |
+| aggregate hardfail pin | 191827 | **192366 = measured + 1** | exact |
+
+Final pins were measured after `cargo fmt --all`, with `20-10 landing 1` HISTORY;
+no other crate grew and no ceiling was exceeded. Kernel gate: 95 files,
+`changed = added = removed = []`, set hash `db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59`.
+
+**Observed verification:** final all-target workspace build rc 0; restored focused
+suite 142/142 PASS; final serial workspace 5562/5562 PASS, 138 configured skips;
+default workspace 5562/5562 PASS, 138 configured skips. Fresh serial junit budget
+passed: 594 binaries, 646.231 s summed test time, no findings. Local T3 scenes
+self-skip, so none of those counts is claimed as real-podman proof.
+
+All requested structural gates exited 0: kloc-check, check-kernel-baseline,
+check-service-boundary, check-env-contract, check-serde-error-handling,
+check-composition-root-completeness, check-j1-loopback-delegation,
+check-dev-record-completeness, check-epic-close-coherence,
+check-review-findings-resolved, check-test-cost, invariant-lock, coverage-matrix
+(`--dry-run`), check-coverage-matrix-completeness, check-exit-commands,
+check-decision-register, check-ff-j6 and check-perf-runner-policy. Cargo deny rc 0.
+Non-denying clippy rc 0; final ratchet **1335 occurrences / 873 source-distinct**,
+no warning in either new file. The only introduced warning was test-only
+`format_in_format_args`, fixed before the final stream; the unchanged xtask
+reader warning is `needless_borrows_for_generic_args` at line 15. The hosted
+1383/897 baseline was not edited; same-toolchain base/final lint/file comparison
+is included in the unpushed workflow, not claimed executed.
+
+The exact prescribed prepush environment (`env -u CI -u GITHUB_ACTIONS`,
+`CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask`,
+`MAOS_17_2_CGROUP_MODE=undelegated`) exited **0**. Its loaded-run budget gate was
+advisory-red for five binaries; exact timings and same-line rule-10 citations
+are recorded in `deferred-work.md:3`, owner `20-7-stable-runner-perf-gates`.
+It was not retried-to-green. No timing baseline or exception was raised.
+
+**Earlier reds repaired, not hidden:** the first focused run timed out in
+`init_prints_an_executable_truthful_purge_instruction`; its separate default-home
+helper still inherited the shared temp state root. All purge fixture commands
+now isolate TMPDIR, and custody receipt updates are batched. The first workspace
+serial run had exactly one failure: the old xtask terminal count/required-name
+pin. Its reader was migrated to 34 and the new scene; the final serial run passed.
+
+**Unverified / externally owed:** real rootless podman and delegated cgroups are
+unavailable locally, and Docker is absent. The hosted T0 measurements (mount
+source/filter semantics/removal outcomes/Docker `--pidfile` refusal), real
+root-crash ownership/custody twins, native cgroup binding, baseline AC4 witness,
+AC1 plant/restored green, the 34-scene epic-17 matrix, hosted clippy comparison,
+macOS guard and independent difficult-tier review remain unexecuted here.
+The workflow stops if Docker contradicts D-20-10-06 A. Host loads were recorded
+before the serial run and budget check; they were not zero, so the green serial
+budget is **not an idle-host certification**. No hosted workflow was pushed.
+Routing-audit `witnessed @commit` completion remains at the eventual done boundary,
+not fabricated in this uncommitted implementation record.
+
+
 ### File List
+
+- [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [custody comment](../../crates/maos-bin/src/egress.rs).
+- [New hermetic witnesses](../../crates/maos-bin/tests/purge_residue_20_10.rs), [purge fixture isolation](../../crates/maos-bin/tests/maos_uninstall_16_4.rs), [producer harness-cycle fix](../../crates/maos-bin/tests/worker_supervision_16_3.rs), [real hosted scenes](../../crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs), [source scanner enrollment](../../crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs).
+- [Terminal job pin](../../.github/workflows/discipline.yml), [pin reader](../../xtask/tests/epic17_exit_workflow_17_7.rs), [exact KLOC pins](../../xtask/kloc.toml).
+- [ADR-067](../../docs/adr/ADR-067-maos-data-root-layout-and-purge.md), [operator guide](../../docs/maos.dev/run-maos.md), [site guide](../../docs-site/docs/run-maos.md), [Korean guide](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md), [cookbook](../../docs-site/docs/cookbook/cli-wrapper-spirit.md), [Korean cookbook](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md).
+- [FR2 coverage row](../../tests/coverage-matrix.yaml), [loaded-budget disposition](deferred-work.md), this Dev Agent Record, and [landing/hosted-cut evidence](20-10-purge-residue-removal-evidence/landing-1/plants.md).
+
 
 ## Change Log
 
@@ -447,3 +573,7 @@ anthropic/claude-opus-5-5 (creation).
   (`maos.slice/spirit-*`) and the T3 custody under the worker state root (8,903 empty process roots on the dev host) are
   outside purge. Kernel 0 recommended; KH/KR/KC/KS priced +10/+8, +2/−1, +5/+1, +3/+2.
 - 2026-11-02: Operator rulings recorded (ask s2010): D-20-10-01…10 as recommended; kernel-Δ 0 and ceilings per frontmatter. Status remains ready-for-dev.
+- 2026-11-02: 20-10 landing 1 implemented with kernel-Δ 0, exact maos-bin 34037 /
+  aggregate 192365 (hardfail 192366), six locally proven-red byte-restored plants,
+  final serial/default workspace suites and prescribed prepush rc 0. Hosted-only
+  witnesses and the AC1 mutation cut but not pushed/run; status intentionally unchanged.

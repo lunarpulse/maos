@@ -1,0 +1,10 @@
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+@@ -938,6 +938,7 @@
+             println!("maos purge: would remove credential: {label}");
+         }
+         runtime.dry_run();
++        runtime.remove(|_, _| Ok(()))?;
+         drop(locks);
+         snapshot.restore()?;
+         print_report_only_residue(&[]);

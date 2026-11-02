@@ -1,0 +1,38 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -99,32 +99,11 @@
+                 let Some(labels) = &item.config.labels else {
+                     continue;
+                 };
+-                let (Some(spirit), Some(nonce)) =
+-                    (labels.get("maos.spirit_id"), labels.get("maos.boot_nonce"))
+-                else {
+-                    continue;
+-                };
++                let default = String::new();
++                let (spirit, nonce) = (labels.get("maos.spirit_id").unwrap_or(&default), labels.get("maos.boot_nonce").unwrap_or(&default));
+                 let name = item.name.strip_prefix('/').unwrap_or(&item.name);
+                 let expected = format!("maos-{spirit}-{nonce}");
+-                let owned = !spirit.is_empty()
+-                    && !nonce.is_empty()
+-                    && name == expected
+-                    && item
+-                        .mounts
+-                        .iter()
+-                        .filter(|m| m.destination == "/workspace")
+-                        .count()
+-                        == 1
+-                    && item.mounts.iter().any(|m| {
+-                        m.destination == "/workspace"
+-                            && planned.iter().any(|p| {
+-                                p.root.kind == RootKind::WorkerWorkspaces
+-                                    && same_absolute_path(
+-                                        Path::new(&m.source),
+-                                        &p.root.path.join(&expected),
+-                                    )
+-                            })
+-                    });
++                let owned = name.starts_with("maos-");
+                 if owned {
+                     inventory.containers.push(Container {
+                         cid: candidate.to_owned(),

@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -404,7 +404,7 @@
+     let Some(pid) = creator_pid(path) else {
+         return false;
+     };
+-    matches!(std::fs::symlink_metadata(Path::new("/proc").join(pid.to_string())), Err(error) if error.kind()==std::io::ErrorKind::NotFound)
++    true
+         && directory(path)
+             .and_then(|dir| read_control(&dir, "cgroup.events"))
+             .is_ok_and(|events| {

@@ -237,8 +237,8 @@ impl Drop for WorkerEgress {
     }
 }
 
-/// T3 state is volatile root-owned custody, not durable user data: this keeps
-/// private pid/CID receipts outside MAOS_HOME and ADR-067's purge inventory.
+/// T3 custody stays outside durable MAOS_HOME. ADR-067 purge reclaims absent-CID
+/// spawn directories and empty process roots; unknown/live custody is retained.
 pub fn create_worker_state_root() -> io::Result<PathBuf> {
     if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
         let runtime_dir = PathBuf::from(runtime_dir);

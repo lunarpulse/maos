@@ -1,0 +1,13 @@
+--- a/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
++++ b/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
+@@ -91,8 +91,8 @@
+ `cargo uninstall maos` for the Cargo-owned executable.
+ 
+ ACP sockets have no cleanup entry because MAOS uses NDJSON over stdio. Purge
+-enumerates podman containers with `maos.spirit_id`, then checks both that label
+-and `maos.boot_nonce`, the exact `maos-<spirit_id>-<boot_nonce>` name, and the
++enumerates podman containers by their name prefix alone, using the
++`maos-<spirit_id>-<boot_nonce>` name, and the
+ `/workspace` mount source against this home's Worker workspace roots,
+ component-wise without filesystem canonicalization of runtime text. Only owned
+ 64-hex CIDs reach bounded `rm --force --volumes --time=0` followed by

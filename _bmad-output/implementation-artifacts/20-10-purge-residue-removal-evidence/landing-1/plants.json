@@ -1,0 +1,38 @@
+[
+  {
+    "ac": "AC2",
+    "sha256": "d93b428e19976873e6bae35515069c49870161139624e070ded7b271154fa86c",
+    "exit_code": 100,
+    "seconds": 25.205
+  },
+  {
+    "ac": "AC4",
+    "sha256": "f679a3225a974e205e35457cde429fbd5f1b73388dfcdbb367ae79882774b125",
+    "exit_code": 100,
+    "seconds": 3.42
+  },
+  {
+    "ac": "AC5",
+    "sha256": "65209845e9eb6b131504c30ee24e3c6c5f3c2c21ea61487241842ef5a04e31a4",
+    "exit_code": 100,
+    "seconds": 8.488
+  },
+  {
+    "ac": "AC6",
+    "sha256": "d6769c9236a4d042bb82e9605fbe16430bec94c7cff5ac50ab8fa1282a72fd13",
+    "exit_code": 100,
+    "seconds": 6.575
+  },
+  {
+    "ac": "AC3",
+    "sha256": "e2fb43c2f984a33c48c36c0de9f53a81fe3e87dd700adc110e6f712c4eacc059",
+    "exit_code": 100,
+    "seconds": 5.723
+  },
+  {
+    "ac": "AC7",
+    "sha256": "4f04adf35f47104b0b68c1fc854e18b57d493f4dfc9b0b572b403cc2c35ad7e0",
+    "exit_code": 100,
+    "seconds": 5.823
+  }
+]

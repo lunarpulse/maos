@@ -1,0 +1,14 @@
+AC4 — Coverage-matrix delivered-phase enforcement (NFR-Meta-3)
+
+Usage: xtask coverage-matrix [OPTIONS]
+
+Options:
+      --config <CONFIG>                [default: tests/coverage-matrix.yaml]
+      --phase-config <PHASE_CONFIG>    [default: tests/phase-config.toml]
+      --manifest <MANIFEST>            [default: tests/corpora/MANIFEST.toml]
+      --gate-registry <GATE_REGISTRY>  [default: xtask/gate-registry.toml]
+      --json                           
+      --measure-nfr-test-3             Story 7.1 — Measure NFR-Test-3 coverage floor
+      --spirit <SPIRIT>                Filter to a single Spirit name (requires --measure-nfr-test-3)
+      --dry-run                        Report without writing back to YAML
+  -h, --help                           Print help

@@ -111,6 +111,20 @@ operation holds a store, and writes a JSON receipt outside the deleted roots.
 After a successful purge, remove the Cargo-owned binary with
 `cargo uninstall maos`.
 
+On Linux, confirmed purge first removes this home's T3 containers: both MAOS
+identity labels, their matching name, and a `/workspace` mount under this
+home's workspace roots must agree. Other-home or unattributable labelled
+containers are only reported with a removal command; label-less containers
+are ignored. Empty dead-creator `maos.slice/spirit-*` leaves are removed, never
+populated or live-creator leaves and never by killing. Private T3 custody is
+removed only for confirmed-absent CIDs, then empty process/state roots;
+unknown/live custody is retained. Dry-run custody lines are conditional on
+that absence check and invoke only read-only `ps`/`inspect`. Receipts add
+`podman://<CID>`, `cgroup://<path>` and custody-directory rows, without changing
+the schema: `left (<residue>)` can coexist with status `complete`, as with
+Worker workspace residue. Read every row. User-namespace mappings and podman
+storage/configuration are never edited.
+
 `maos purge --keep-log --yes` checkpoints and keeps the Transparency Log. This
 also keeps shared-memory rows and the principal namespace index when they share
 that database, including capability-token rows and legacy `shell.turn` text.

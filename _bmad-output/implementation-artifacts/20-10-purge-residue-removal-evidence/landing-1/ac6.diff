@@ -1,0 +1,21 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -7,13 +7,11 @@
+ 
+ /// Reuse the kernel's capped, concurrently drained, deadline-bounded client runner.
+ /// Its environment allowlist is PATH, HOME, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS.
+-pub(super) fn podman(args: &[&str], seconds: u64) -> Invocation {
+-    invoke_bounded(
+-        Path::new("podman"),
+-        args,
+-        &[],
+-        Instant::now() + Duration::from_secs(seconds),
+-    )
++pub(super) fn podman(args: &[&str], _seconds: u64) -> Invocation {
++    match std::process::Command::new("podman").args(args).output() {
++        Ok(out) => Invocation::Exited {status: out.status, stdout: out.stdout, stderr: out.stderr, stdout_complete: true, stderr_complete: true},
++        Err(_) => Invocation::Failed,
++    }
+ }
+ fn text(args: &[&str]) -> Result<Vec<u8>, PurgeError> {
+     match podman(args, 2) {

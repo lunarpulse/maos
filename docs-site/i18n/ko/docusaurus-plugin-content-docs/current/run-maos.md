@@ -107,6 +107,20 @@ daemon이나 offline durable operation이 store를 점유하면 거부하고, �
 밖에 JSON receipt를 기록합니다. purge 성공 후 Cargo 소유 binary는
 `cargo uninstall maos`로 제거하십시오.
 
+Linux에서 확인된 purge는 이 home의 T3 컨테이너를 workspace보다 먼저 제거합니다.
+두 MAOS identity label, 일치하는 이름, 이 home의 workspace root 아래를 가리키는
+`/workspace` mount가 모두 일치해야 합니다. 다른 home 또는 소유권을 확인할 수 없는
+labelled 컨테이너는 제거 명령만 표시하며 label이 없는 컨테이너는 무시합니다.
+`maos.slice/spirit-*` leaf는 비어 있고 creator가 종료된 경우에만 제거하며,
+실행 중인 creator나 member를 죽이지 않습니다. private T3 custody는 CID 부재가
+확인된 경우만 제거하고 빈 process/state root를 정리합니다. CID가 없거나 실행 중인
+custody는 보존합니다. dry run의 custody 제거 표시는 부재 확인을 조건으로 하며
+읽기 전용 `ps`/`inspect`만 호출합니다. receipt는 schema 변경 없이
+`podman://<CID>`, `cgroup://<path>`, custody 디렉터리 행을 추가합니다.
+Worker workspace residue와 마찬가지로 `left (<residue>)` 행이 있어도 status는
+`complete`일 수 있으므로 모든 행을 확인하십시오. user-namespace mapping과
+podman storage/configuration은 수정하지 않습니다.
+
 `maos purge --keep-log --yes`는 Transparency Log를 checkpoint한 뒤 보존합니다.
 같은 데이터베이스를 공유할 때 shared-memory row와 principal namespace index도
 보존되며, capability-token row와 기존 `shell.turn` 텍스트도 포함됩니다. dry run은

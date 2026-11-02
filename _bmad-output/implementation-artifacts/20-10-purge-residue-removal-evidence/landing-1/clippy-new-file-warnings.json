@@ -1,0 +1,12 @@
+[
+  {
+    "lint": "clippy::format_in_format_args",
+    "message": "`format!` in `format!` args",
+    "spans": [
+      [
+        "crates/maos-bin/tests/purge_residue_20_10.rs",
+        56
+      ]
+    ]
+  }
+]

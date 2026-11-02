@@ -928,7 +928,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 19-3 — 33 → 34: `worker_workspace.rs` joins it.
     // Story 19-6 — 34 → 35: `replica_resolver.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 36] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 37] = [
         ("main.rs", include_str!("../src/main.rs")),
         (
             "skill_authoring.rs",
@@ -1029,6 +1029,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // Story 16-4 — authoritative typed MAOS-footprint enumeration and
         // offline purge. It must not seed manifest-derived policy scopes.
         ("purge.rs", include_str!("../src/purge.rs")),
+        ("purge_runtime.rs", include_str!("../src/purge_runtime.rs")),
         // Story 17-3c — governed sessions over the subprocess frame bridge.
         // The session adopts one admitted SCB and reads its declared
         // `iac.send` peer classes from that admission result, never from the

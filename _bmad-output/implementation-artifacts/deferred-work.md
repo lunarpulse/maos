@@ -1,3 +1,7 @@
+## Deferred from: Story 20-10 landing 1 loaded prepush
+
+- **Loaded-run budget timings — Owner: `20-7-stable-runner-perf-gates`.** Prescribed 20-10 prepush exited 0 with an advisory budget failure: `butler::hallucination` 32.680 s, `maos-bin::hook_pump_17_4` 32.074 s, `maos-bin::one_daemon_one_door_16_1` 30.223 s, `maos-iac::participant_recall_17_8` 50.524 s, and `xtask::bin/xtask` 33.722 s against their 30 s binary budgets. The earlier fresh serial junit passed with no findings (646.231 s sum); the loaded prepush was not retried-to-green. Same-line rule-10 evidence: `20-10-purge-residue-removal-evidence/landing-1/prepush.log:552`, `20-10-purge-residue-removal-evidence/landing-1/check-test-budget.log:1`, Story `20-10-purge-residue-removal` Dev Agent Record. Stable-runner/idle-host budget calibration, not 20-10 runtime reclamation. Status: open.
+
 ## Deferred from: Stories 20-1a and 20-7 landing 1
 
 - **Unauthenticated registry listeners.** **Owner: `20-1b-vetting-yank-policy-and-quarantine`**. The registry server and daemon listener refuse non-loopback binding but remain unauthenticated; CSRF/Host/Origin hardening landed in 20-1a and does not authenticate mutations. AC7 covers signed deprecate, not publish; proposed publish authentication requires an operator ruling at 20-1b dev start. Sources: `20-1b-vetting-yank-policy-and-quarantine.md:48-50,96`; `agent://SecReview201a` F1; `agent://BmadReview201a` P1; Story `20-1a-registry-publish-install-exit-path` AC1 and Dev Agent Record. Status: open.

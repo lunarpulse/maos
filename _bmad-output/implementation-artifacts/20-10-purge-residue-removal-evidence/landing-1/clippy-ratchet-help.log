@@ -1,0 +1,8 @@
+Advisory warning-debt ratchet over a successful cargo-clippy JSON stream
+
+Usage: xtask clippy-ratchet [OPTIONS] --input <INPUT>
+
+Options:
+      --input <INPUT>        
+      --baseline <BASELINE>  [default: xtask/clippy-baseline.toml]
+  -h, --help                 Print help
