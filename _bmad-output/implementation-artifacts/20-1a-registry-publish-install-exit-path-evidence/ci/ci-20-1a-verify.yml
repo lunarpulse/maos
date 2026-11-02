@@ -3,11 +3,13 @@ name: ci-20-1a-verify
 # Copy to .github/workflows only on an operator-owned verification branch.
 # AC5 mutation sha256: 8cdf9a4ca1acf57083cdbc03f18d065b25d9c1541b8324b8d7f2643785fb33dc
 on:
+  push:
+    branches: ['ci/20-1a-verify']
   workflow_dispatch:
     inputs:
       ref:
         description: Story tree to verify
-        required: true
+        required: false
 permissions:
   contents: read
 jobs:
