@@ -900,6 +900,194 @@ fn rows_after(frames: &[TlFrame], from: usize) -> Vec<String> {
         .collect()
 }
 
+/// Direct lifecycle writers are ordered; ADR-030's cap-audit writer is
+/// independent. Revocation itself precedes admission, its persistence need not.
+fn assert_cold_swap_trail(
+    frames: &[TlFrame],
+    rows_before: usize,
+    predecessor: i64,
+    successor: i64,
+) -> usize {
+    let trail = || rows_after(frames, rows_before);
+    let unload = first_at_or_after(frames, rows_before, |f| {
+        f.intent == "lifecycle.unload" && f.pid == predecessor
+    })
+    .unwrap_or_else(|| {
+        panic!(
+            "no lifecycle.unload at the predecessor's pid: {:?}",
+            trail()
+        )
+    });
+    let revoke = first_at_or_after(frames, rows_before, |f| {
+        f.intent == "cap.revoke" && f.pid == predecessor
+    })
+    .unwrap_or_else(|| panic!("no cap.revoke at the predecessor's pid: {:?}", trail()));
+    assert!(
+        revoke > unload,
+        "revocation must follow unload: {:?}",
+        trail()
+    );
+    let load = first_at_or_after(frames, unload + 1, |f| {
+        f.intent == "lifecycle.load" && f.pid == successor
+    })
+    .unwrap_or_else(|| {
+        panic!(
+            "no lifecycle.load at the successor's pid after the predecessor's unload: {:?}",
+            trail()
+        )
+    });
+    let granted = first_at_or_after(frames, load + 1, |f| {
+        f.pid == 0 && is_admission_granted(f, "0.3.1")
+    })
+    .unwrap_or_else(|| {
+        panic!(
+            "the successor must pass admit_spirit — no `admission granted` vetter-key row \
+                 for 0.3.1 after its load (an unadmitted successor is the defect this story \
+                 deletes): {:?}",
+            trail()
+        )
+    });
+    let start = first_at_or_after(frames, granted + 1, |f| {
+        f.intent == "lifecycle.start" && f.pid == successor
+    })
+    .unwrap_or_else(|| panic!("no successor start after admission grant: {:?}", trail()));
+    let upgrades: Vec<(usize, &TlFrame)> = frames
+        .iter()
+        .enumerate()
+        .skip(rows_before)
+        .filter(|(_, f)| f.intent == "spirit.upgrade")
+        .collect();
+    assert_eq!(
+        upgrades.len(),
+        1,
+        "exactly one spirit.upgrade row for this operation: {:?}",
+        trail()
+    );
+    let (upgraded, upgrade) = upgrades[0];
+    assert!(upgraded > start, "upgrade must follow start: {:?}", trail());
+    assert_eq!(
+        upgrade.pid,
+        predecessor,
+        "upgrade attribution: {:?}",
+        trail()
+    );
+    let payload = upgrade_payload(upgrade);
+    assert_eq!(payload["policy"], "cold-swap", "{payload}");
+    assert_eq!(payload["predecessor_version"], "0.3.0", "{payload}");
+    assert_eq!(payload["successor_version"], "0.3.1", "{payload}");
+    assert_eq!(payload["outcome"], "completed", "{payload}");
+    load
+}
+
+/// Hosted run 41521146083, job 125537220359: the independent audit
+/// writer persisted the predecessor's revocation after upgrade completion.
+fn cold_swap_recorded_trail() -> Vec<TlFrame> {
+    [
+        ("lifecycle.unload", 1),
+        ("planned_unload", 1),
+        ("planned_unload", 1),
+        ("lifecycle.admit", 2),
+        ("lifecycle.load", 2),
+        ("governance:vetter-key-admission", 0),
+        ("lifecycle.start", 2),
+        ("spirit.upgrade", 1),
+        ("operator.upgrade.op-recorded:completed", 1),
+        ("cap.revoke", 1),
+    ]
+    .into_iter()
+    .map(|(intent, pid)| TlFrame {
+        pid,
+        intent: intent.into(),
+        payload: match intent {
+            "governance:vetter-key-admission" => {
+                r#"{"note":"admission granted","version":"0.3.1"}"#.into()
+            }
+            "spirit.upgrade" => serde_json::json!({
+                "policy": "cold-swap",
+                "predecessor_version": "0.3.0",
+                "successor_version": "0.3.1",
+                "outcome": "completed",
+            })
+            .to_string(),
+            _ => String::new(),
+        },
+    })
+    .collect()
+}
+
+#[test]
+fn ac1_19_5_cold_swap_oracle_accepts_recorded_late_revocation() {
+    assert_eq!(
+        assert_cold_swap_trail(&cold_swap_recorded_trail(), 0, 1, 2),
+        4
+    );
+}
+
+#[test]
+fn ac1_19_5_cold_swap_oracle_accepts_early_revocation() {
+    let mut frames = cold_swap_recorded_trail();
+    let revoke = frames.pop().expect("recorded revocation");
+    frames.insert(3, revoke);
+    assert_eq!(assert_cold_swap_trail(&frames, 0, 1, 2), 5);
+}
+
+#[test]
+fn ac1_19_5_cold_swap_oracle_rejects_missing_or_misbound_rows() {
+    for intent in [
+        "lifecycle.unload",
+        "cap.revoke",
+        "lifecycle.load",
+        "governance:vetter-key-admission",
+        "lifecycle.start",
+        "spirit.upgrade",
+    ] {
+        for wrong_pid in [false, true] {
+            let mut frames = cold_swap_recorded_trail();
+            let index = frames.iter().position(|f| f.intent == intent).unwrap();
+            if wrong_pid {
+                frames[index].pid = 99;
+            } else {
+                frames.remove(index);
+            }
+            assert!(
+                std::panic::catch_unwind(|| assert_cold_swap_trail(&frames, 0, 1, 2)).is_err(),
+                "oracle accepted {intent} missing/misbound (wrong_pid={wrong_pid})"
+            );
+        }
+    }
+    let mut frames = cold_swap_recorded_trail();
+    frames[5].payload = r#"{"note":"admission granted","version":"0.3.0"}"#.into();
+    assert!(std::panic::catch_unwind(|| assert_cold_swap_trail(&frames, 0, 1, 2)).is_err());
+}
+
+#[test]
+fn ac1_19_5_cold_swap_oracle_rejects_causality_and_duplicate_upgrade() {
+    // Unload/load, load/grant, grant/start, start/upgrade, unload/revoke.
+    for (left, right) in [(0, 4), (4, 5), (5, 6), (6, 7), (0, 9)] {
+        let mut frames = cold_swap_recorded_trail();
+        frames.swap(left, right);
+        assert!(
+            std::panic::catch_unwind(|| assert_cold_swap_trail(&frames, 0, 1, 2)).is_err(),
+            "oracle accepted reversed rows {left}/{right}"
+        );
+    }
+    let mut frames = cold_swap_recorded_trail();
+    frames.insert(
+        0,
+        TlFrame {
+            pid: 1,
+            intent: "spirit.upgrade".into(),
+            payload: frames[7].payload.clone(),
+        },
+    );
+    assert!(std::panic::catch_unwind(|| assert_cold_swap_trail(&frames, 0, 1, 2)).is_err());
+    // Rows before the operation cannot satisfy this operation's obligations.
+    assert!(std::panic::catch_unwind(|| {
+        assert_cold_swap_trail(&cold_swap_recorded_trail(), 1, 1, 2)
+    })
+    .is_err());
+}
+
 /// AC1.1–1.2 (D-19-5-01 A) — a cold swap unloads the predecessor and admits
 /// the successor through the SAME `load → admit → start` triple `maosctl
 /// load` and `maos run` use, at a NEW pid (FR49 "cold-swap with re-init").
@@ -916,7 +1104,7 @@ fn rows_after(frames: &[TlFrame], from: usize) -> Vec<String> {
 fn ac1_19_5_cold_swap_admits_the_successor_at_a_new_pid() {
     // `MAOS_IDLE_FAST=1`, as in root E, so the successor's own halt is
     // observable inside the test budget.
-    let root = Root::butler_with("cold-swap", &[("MAOS_IDLE_FAST", "1")]);
+    let mut root = Root::butler_with("cold-swap", &[("MAOS_IDLE_FAST", "1")]);
     let predecessor = pid_of(&root, "butler");
     // FR49's example verbatim: the SHIPPED manifest with only its version
     // bumped — no appended sections.
@@ -957,59 +1145,13 @@ fn ac1_19_5_cold_swap_admits_the_successor_at_a_new_pid() {
         "the daemon resolves butler to the successor"
     );
 
-    // CR-2 — log before act, in order: the predecessor's unload and its
-    // token revocation, then the successor's load and the vetter key's GRANT,
-    // then exactly one `spirit.upgrade` row.
+    // Locate the successor's load for the live halt witness. The full oracle
+    // runs after graceful shutdown, which drains the independent audit writer.
     let frames = root.tl_frames();
-    let trail = || rows_after(&frames, rows_before);
-    let unload = first_at_or_after(&frames, rows_before, |f| {
-        f.intent == "lifecycle.unload" && f.pid == predecessor
-    })
-    .unwrap_or_else(|| {
-        panic!(
-            "no lifecycle.unload at the predecessor's pid: {:?}",
-            trail()
-        )
-    });
-    let revoke = first_at_or_after(&frames, rows_before, |f| {
-        f.intent == "cap.revoke" && f.pid == predecessor
-    })
-    .unwrap_or_else(|| panic!("no cap.revoke at the predecessor's pid: {:?}", trail()));
-    let load = first_at_or_after(&frames, unload.max(revoke), |f| {
+    let load = first_at_or_after(&frames, rows_before, |f| {
         f.intent == "lifecycle.load" && f.pid == successor
     })
-    .unwrap_or_else(|| {
-        panic!(
-            "no lifecycle.load at the successor's pid after the predecessor's unload and \
-             revocation: {:?}",
-            trail()
-        )
-    });
-    let granted = first_at_or_after(&frames, load, |f| is_admission_granted(f, "0.3.1"))
-        .unwrap_or_else(|| {
-            panic!(
-                "the successor must pass admit_spirit — no `admission granted` vetter-key row \
-                 for 0.3.1 after its load (an unadmitted successor is the defect this story \
-                 deletes): {:?}",
-                trail()
-            )
-        });
-    let upgrades: Vec<&TlFrame> = frames
-        .iter()
-        .skip(granted)
-        .filter(|f| f.intent == "spirit.upgrade")
-        .collect();
-    assert_eq!(
-        upgrades.len(),
-        1,
-        "exactly one spirit.upgrade row after the grant: {:?}",
-        trail()
-    );
-    let payload = upgrade_payload(upgrades[0]);
-    assert_eq!(payload["policy"], "cold-swap", "{payload}");
-    assert_eq!(payload["predecessor_version"], "0.3.0", "{payload}");
-    assert_eq!(payload["successor_version"], "0.3.1", "{payload}");
-    assert_eq!(payload["outcome"], "completed", "{payload}");
+    .expect("successor must have a lifecycle.load row");
     assert_eq!(
         root.journal_event_count("Upgrade"),
         1,
@@ -1050,6 +1192,8 @@ fn ac1_19_5_cold_swap_admits_the_successor_at_a_new_pid() {
         halted,
         "the cold-swapped successor must fire butler's belief_variance halt"
     );
+    root.terminate();
+    assert_cold_swap_trail(&root.tl_frames(), rows_before, predecessor, successor);
 }
 
 /// AC1.3 (D-19-5-02 A) — a successor the admission triple refuses AFTER the

@@ -489,6 +489,60 @@ The earlier serial budget check returned 1. Current budget configuration and its
 **Prepush and explicit open observations.** Prescribed undelegated prepush **0**,322.540s:83 pass,8 skip,1 advisory (default one-daemon33.575s/participant-recall40.651s versus unchanged30s budgets; separate serial budget0). Complete local multi-tenant gate **1**,1226.078s,stopped before installed tests at unrelated `hook_pump_17_4::one_budget_overrun_quarantines_the_subscriber:439` (delivered1/failed0 instead of delivered0/failed1); no retry-to-green or claimed repair. Live Postgres/operator-key legs locally absent. Actual T3 component execution remains blocked by rootless Podman clone EPERM(provisioner1/runtime125),systemd-run1(non-systemd PID1); execution-surface builds passed but no successful T3 execution claimed. Hosted rerun/no-server control remains owed. No commit,push,status flip,cargo clean,target override,or .devcontainer edit. Exact commands/exits,wire captures,diagnostic diff,junits and retained errors: [incident summary](20-1a-registry-publish-install-exit-path-evidence/landing-1/hosted-incident/summary.md),`hosted-incident/commands.jsonl`,`execution-env.json`. Historical landing/review failures remain intact.
 
 
+#### Hosted cold-swap oracle incident — 2026-11-02
+
+Run `41521146083`, job `125537220359`, reproduced the 20-7 loaded-run-50
+cold-swap oracle failure, not a registry admission failure. The journal has
+successor load, version-bound admission grant, start and upgrade, with the
+predecessor's `cap.revoke` persisted last. ADR-030's independent bounded-MPSC
+audit writer permits that persistence order: token revocation itself completes
+synchronously inside unload before the door admits the successor. ADR-020
+does not require a cross-writer journal barrier; Story 19-5 CR-2 specifies
+per-step causality, not an audit-writer acknowledgment.
+
+The shared test oracle preserves unload → load → version-bound grant → start
+→ exactly one predecessor-attributed upgrade, its full payload, and revocation
+after unload, without requiring revocation persistence before load. Graceful
+shutdown drains audit before the final snapshot. Recorded late/early
+revocation and missing/misbound/reordered-row controls keep the invariant
+falsifiable; the old oracle rejects the hosted late-revoke vector. No kernel,
+production code, KLOC pin, timing budget or timeout change.
+
+**Observed incident vectors:** baseline serial 200/200 rc 0 (161.847 s),
+baseline with four owned CPU loops 200/200 rc 0 (161.398 s), hence no local
+stochastic reproduction claimed. The extracted old oracle rejects the hosted
+recorded late-revoke journal deterministically (rc 100, 0.113 s). Fmt rc 0;
+repaired focused binary 42 passed/one configured skip rc 0 (1.493 s);
+repaired loaded stress 200/200 iterations of five matching tests rc 0
+(247.520 s). All owned busy loops were terminated and reaped. Exact commands
+and `/tmp/cold-swap-*.log` transcripts are indexed in the
+[20-10 incident record](20-10-purge-residue-removal.md#hosted-cold-swap-oracle-incident--2026-11-02).
+No hosted rerun is claimed.
+
+**Final incident verification:** serial workspace rc 0, 5566/5566 passed,
+138 configured skips, 1453.994 s. Default workspace rc 100, 5565/5566:
+the only failure is the same previously recorded
+`hook_pump_17_4::one_budget_overrun_quarantines_the_subscriber:439`
+(delivered=1/failed=0 versus delivered=0/failed=1). That observation remains
+open; no hook/kernel edit or retry-to-green. Cold-swap and all four oracle
+vectors passed in both modes. Required KLOC/kernel/doc-completeness/
+epic-coherence gates rc 0; maos-bin 34037, aggregate 192365, no production
+growth or kernel change. Non-denying clippy and ratchet rc 0 at 1335/873,
+baseline 1383/897 unchanged, no edited-test diagnostic.
+
+The saved **serial** junit budget returned 1: seven 30 s binary overruns and
+suite sum 1453.852 s versus 1100 s under shared host load. No budget/exception
+was changed or sample repeated. Prescribed undelegated prepush returned 0
+(1201.444 s; 85 pass, six skip, one advisory), including its separately
+mandated workspace/kernel-lib/doctest legs; its default timing advisory was
+one-daemon 36.355 s and participant-recall 40.575 s versus unchanged 30 s
+limits. Existing loaded-budget owner remains `20-7-stable-runner-perf-gates`
+(`deferred-work.md:3`), not a production cold-swap defect. The original
+default red is not replaced by the prepush green. Exact commands, each exit
+code, timing findings and `/tmp/cold-swap-*` evidence are in the linked
+20-10 incident matrix. No hosted rerun/real T3 proof, commit, push,
+`.devcontainer` edit, kernel edit or target override/clean is claimed.
+
 ### File List
 
 - Creation: this story file; `20-1-…-evidence/creation/*`; `sprint-status.yaml:296`.
@@ -498,6 +552,7 @@ The earlier serial budget check returned 1. Current budget configuration and its
 - Landing release/docs/evidence: `.github/workflows/{release.yml,discipline.yml}`; `examples/example-spirit-ts/{manifest.toml,README.md}`; `templates/spirit-ts/{manifest.toml,README.md}`; `tests/coverage-matrix.yaml` FR35/FR36 only; this story's Dev Agent Record; `20-1a-registry-publish-install-exit-path-evidence/{landing-1,ci}/**`.
 - Review corrections: `crates/maos-registry/src/{admission.rs,client.rs,http.rs,install.rs,server.rs,storage.rs}`; `crates/maos-bin/src/{installed_spirits.rs,main.rs}`; `xtask/src/{build_test_fixtures.rs,lib.rs,release_dry_run.rs}`, `xtask/{kloc.toml,fkcs-baseline.toml}`; `tests/harness/registry_20_1.rs`; `crates/maos-registry/tests/registry_security_20_1a.rs`; `crates/maos-cli/tests/spirit_install_20_1.rs`; `crates/maos-bin/tests/installed_spirit_dispatch_20_1.rs`; `xtask/tests/{registry_exit_20_1.rs,release_build_integrity_20_1a.rs}`; `.github/workflows/discipline.yml`; example/template READMEs; this story and its review evidence/handoff.
 - Hosted incident: `crates/maos-registry/src/{server.rs,storage.rs}`; `crates/maos-bin/src/installed_spirits.rs`; `crates/maos-registry/tests/registry_server_bin_20_1.rs`; `crates/maos-spirit-cli/tests/publish_live_20_1.rs`; `tests/harness/{registry_20_1.rs,fixtures.rs}`; `xtask/tests/registry_exit_20_1.rs`; `.github/workflows/discipline.yml`; `tests/coverage-matrix.yaml` FR35; `xtask/kloc.toml`; this record and `landing-1/{commands.md,hosted-incident/**}`.
+- Cold-swap oracle incident: `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`; `deferred-work.md`; the 20-1a and 20-10 Dev Agent Records. Previous implementation-diff digests retain their original scope.
 
 ### Change Log
 
@@ -506,3 +561,4 @@ The earlier serial budget check returned 1. Current budget configuration and its
 - 2026-11-02: 20-1a landing 1 implementation, local red controls and continued verification recorded without status flips. Final source build, 5526/5526 serial workspace, 820/820 WASM-feature serial, required static gates, serial timing budget, deny and prescribed prepush passed; registry/aggregate were re-pinned after direct serde propagation removed 20 lines. The earlier unrestricted default failures, prepush default timing advisory and unrun hosted/T3 legs remain explicitly recorded.
 - Review corrections after `850e4c00`: independent review findings patched with real failing-before vectors and byte-identically restored crypto/resolver plants; initial +417 and final +430 exact re-pins within the existing envelope; executable WASM component leg enrolled while hosted P7/T3 proof remains explicitly owed. No status flip.
 - 2026-11-02: Hosted binary publish incident reproduced at realistic component size; buffered atomic storage and bounded complete HTTP responses repaired, rejection classes and real binary publish witnessed red→green. Hosted lint/FF-J6/fixture setup causes repaired. Final5549/5549 serial/default,serial budget,static gates,clippy ratchet,deny and prescribed prepush passed; unrelated local hook timing red and unavailable T3/hosted rerun remain explicit. No status flip.
+- 2026-11-02: Diagnosed hosted/loaded cold-swap failure as an over-strict cross-writer journal oracle under ADR-030; recorded-order red-before vector, causal oracle and audit-drained snapshot added; loaded-run deferred row resolved. No kernel or production change.

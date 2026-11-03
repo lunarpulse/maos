@@ -557,6 +557,80 @@ Routing-audit `witnessed @commit` completion remains at the eventual done bounda
 not fabricated in this uncommitted implementation record.
 
 
+#### Hosted cold-swap oracle incident — 2026-11-02
+
+Hosted run `41521146083`, workspace-test-suite job `125537220359`, failed
+`ac1_19_5_cold_swap_admits_the_successor_at_a_new_pid` at the old line 982:
+the recorded trail ends with `cap.revoke @1` **after** `spirit.upgrade @1`
+and the operator completion row, while successor load, admission grant and
+start are all present (`/tmp/l9-wts.log:8944-8961`). This is the same oracle
+failure as 20-7 loaded run 50, not a purge production regression.
+
+ADR-030 defines asynchronous bounded-MPSC audit persistence, not a barrier
+against direct lifecycle writers. `scheduler_loop.rs:570` revokes before
+unload returns; `maos-capability/src/cap_tokens/mod.rs:306-317` mutates the
+token shards before enqueueing, and `cap_audit/writer_task.rs:22-25,67-81`
+persists independently. The door awaits unload before successor admission
+(`operator_door.rs:1436-1445`). ADR-020 adds no global persistence ordering.
+Story 19-5 CR-2's per-step ordering therefore does not imply that the audit
+writer must win against successor writes. The test now checks the guaranteed
+causality and every required row, draining audit before the final snapshot;
+the captured late-revoke order is a deterministic regression vector.
+Kernel and production sources, KLOC pins, deadlines and budgets are unchanged.
+
+**Local falsification and repetitions (all `env -u CI -u GITHUB_ACTIONS`,
+inherited target configuration, no target override/clean):**
+
+- `cargo nextest run -p maos-bin --test one_daemon_one_door_16_1 -E 'test(ac1_19_5_cold_swap)' --stress-count 200 --test-threads 1 --no-fail-fast` before repair: rc 0, 200/200 iterations, 161.847 s. No stochastic reproduction.
+- The same command with exact filter `test(=ac1_19_5_cold_swap_admits_the_successor_at_a_new_pid)` under four owned `bash -c 'while :; do :; done'` CPU loops: rc 0, 200/200, 161.398 s. All four loops terminated and reaped; no stochastic reproduction.
+- `cargo nextest run -p maos-bin --test one_daemon_one_door_16_1 -E 'test(=ac1_19_5_cold_swap_oracle_accepts_recorded_late_revocation)'` with the extracted **old** oracle: rc 100, intended `no lifecycle.load ... after ... revocation` panic over the hosted recorded order (0.113 s). Deterministic red, not a manufactured production race.
+- `cargo fmt --all`: rc 0. Repaired `cargo nextest run -p maos-bin --test one_daemon_one_door_16_1 --no-fail-fast`: rc 0, 42 passed, one configured skip (1.493 s), including all four oracle vectors.
+- Repaired first stress command under four owned CPU loops: rc 0, 200/200 iterations of all five matching tests, 247.520 s. All loops terminated and reaped before workspace verification.
+
+Captured transcripts: `/tmp/cold-swap-{before-serial,before-loaded,oracle-red,focused,repaired-loaded}.log`.
+Host load before the serial workspace sample was 27.56/15.36/17.53;
+no claim of an idle host or stable-runner timing certification.
+
+**Final incident matrix (commands prefixed `env -u CI -u GITHUB_ACTIONS`):**
+
+| Command | Observed result |
+|---|---|
+| `cargo nextest run --workspace --locked --profile ci --test-threads 1 --no-fail-fast` | rc 0; 5566 passed, 138 configured skips; suite 1453.994 s |
+| `cargo nextest run --workspace --locked --no-fail-fast` | rc 100; 5565 passed, one failed, 138 configured skips; 107.046 s |
+| `cargo run -q --locked -p xtask -- kloc-check --json` | rc 0; maos-bin 34037, aggregate 192365, production delta zero |
+| `cargo run -q --locked -p xtask -- check-kernel-baseline --json` | rc 0; 26841 physical lines/95 files, identical set hash, no changed/added/removed files |
+| `cargo run -q --locked -p xtask -- check-dev-record-completeness --json` | rc 0; no violations |
+| `cargo run -q --locked -p xtask -- check-epic-close-coherence --json` | rc 0; no violations |
+| `cargo run -q --locked -p xtask -- check-test-budget --json --junit /tmp/cold-swap-workspace-serial-junit.xml` | rc 1; timing findings below, no stale exception |
+| `cargo clippy --workspace --all-targets --locked --message-format=json` (stdout `/tmp/cold-swap-clippy.jsonl`, stderr separate) | rc 0 |
+| `cargo run -q --locked -p xtask -- clippy-ratchet --input /tmp/cold-swap-clippy.jsonl` | rc 0; 1335 occurrences/873 source-distinct, unchanged 1383/897 baseline; no diagnostic on the edited test |
+| `CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /home/lunarpulse/dev_ws/target/debug/xtask prepush --json` | rc 0; 1201.444 s, 85 pass/6 skip/one timing advisory; workspace, kernel lib, doctests and tracked-tree preservation pass |
+
+The default failure remains **open**, not erased by the separately mandated
+prepush's green workspace leg: `hook_pump_17_4::one_budget_overrun_quarantines_the_subscriber:439`,
+delivered=1/failed=0 instead of delivered=0/failed=1. It is the exact prior
+20-1a incident already recorded in that story's hosted-exit record; no hook
+or kernel edit/retry-to-green was taken. Cold-swap and all four oracle tests
+passed in both workspace modes (live cold-swap 1.071 s serial, 2.153 s default).
+
+The serial budget's seven unchanged 30 s binary limits were exceeded:
+`butler_scene_18_4` 38.849 s, `hook_pump_17_4` 39.135 s,
+`maos_uninstall_16_4` 30.420 s, `observer_activity_corpus_17_4` 119.653 s,
+`one_daemon_one_door_16_1` 94.881 s, `participant_recall_17_8` 60.015 s,
+`private_spill_supersession_13_5j` 31.276 s; suite sum 1453.852 s exceeds
+1100 s. The host was shared/loaded; no recalibration or second serial sample
+was taken. Prepush's independent advisory was one-daemon 36.355 s and
+participant-recall 40.575 s. Rule-10 disposition: existing loaded-budget
+owner `20-7-stable-runner-perf-gates` (`deferred-work.md:3`); all ceilings,
+budgets and exceptions stay unchanged.
+
+Full evidence is `/tmp/cold-swap-workspace-{serial,default}.log`, saved serial
+junit `/tmp/cold-swap-workspace-serial-junit.xml`, `/tmp/cold-swap-check-*.log`,
+`/tmp/cold-swap-kloc-check.log`, `/tmp/cold-swap-clippy-ratchet.log` and
+`/tmp/cold-swap-prepush.json`. Hosted rerun and real T3/delegated-cgroup
+execution remain unverified; local self-skips are not substrate proof.
+No commit, push, `.devcontainer` change, kernel edit or target override/clean.
+
 ### File List
 
 - [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [custody comment](../../crates/maos-bin/src/egress.rs).
@@ -564,6 +638,7 @@ not fabricated in this uncommitted implementation record.
 - [Terminal job pin](../../.github/workflows/discipline.yml), [pin reader](../../xtask/tests/epic17_exit_workflow_17_7.rs), [exact KLOC pins](../../xtask/kloc.toml).
 - [ADR-067](../../docs/adr/ADR-067-maos-data-root-layout-and-purge.md), [operator guide](../../docs/maos.dev/run-maos.md), [site guide](../../docs-site/docs/run-maos.md), [Korean guide](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md), [cookbook](../../docs-site/docs/cookbook/cli-wrapper-spirit.md), [Korean cookbook](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md).
 - [FR2 coverage row](../../tests/coverage-matrix.yaml), [loaded-budget disposition](deferred-work.md), this Dev Agent Record, and [landing/hosted-cut evidence](20-10-purge-residue-removal-evidence/landing-1/plants.md).
+- Cold-swap oracle incident: `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`; the resolved cold-swap row in `deferred-work.md`; this record and the 20-1a Dev Agent Record. The earlier implementation-diff digest is not regenerated or expanded.
 
 
 ## Change Log
@@ -577,3 +652,4 @@ not fabricated in this uncommitted implementation record.
   aggregate 192365 (hardfail 192366), six locally proven-red byte-restored plants,
   final serial/default workspace suites and prescribed prepush rc 0. Hosted-only
   witnesses and the AC1 mutation cut but not pushed/run; status intentionally unchanged.
+- 2026-11-02: Hosted run `41521146083` cold-swap failure diagnosed as an over-strict cross-writer journal oracle, with a deterministic recorded-order red-before vector and causal/audit-drained replacement. No purge, kernel, production or budget change.
