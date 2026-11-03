@@ -177,19 +177,22 @@ fn rate_4_8_provider_credential_fingerprint_distinct() {
         "http://test".into(),
         "claude-3".into(),
         "key-A".into(),
-    );
+    )
+    .unwrap();
     let anth_b = AnthropicProvider::with_api_key(
         Arc::new(MockTransport),
         "http://test".into(),
         "claude-3".into(),
         "key-B".into(),
-    );
+    )
+    .unwrap();
     let oai = OpenAiProvider::with_api_key(
         Arc::new(MockTransport),
         "http://test".into(),
         "gpt-4".into(),
         "key-A".into(),
-    );
+    )
+    .unwrap();
     let ollama = OllamaProvider::new(
         Arc::new(MockTransport),
         "http://localhost:11434".into(),

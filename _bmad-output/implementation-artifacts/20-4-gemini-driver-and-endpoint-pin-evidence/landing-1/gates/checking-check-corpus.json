@@ -1,0 +1,8 @@
+{
+  "text": "{\n  \"passed\": true,\n  \"violations\": [],\n  \"checked\": 16\n}\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 107.6757789850235
+  }
+}

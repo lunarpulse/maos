@@ -1,0 +1,105 @@
+name: ci-20-4-verify
+# Operator-controlled branch-only cut. Never pushed by the implementation agent.
+# Install as .github/workflows/ci-20-4-verify.yml on ci/20-4-verify only.
+# This file is an executable verification recipe, not a hosted-pass claim.
+on:
+  push:
+    branches: ['ci/20-4-verify']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact final story tree to verify
+        required: true
+      run_live_after_l2:
+        description: Paid operator leg; true ONLY after 20-4 L2 lands
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  hermetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Build and hermetic witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          git rev-parse HEAD | tee evidence/tree.txt
+          cargo build --workspace --all-targets --locked
+          cargo nextest run --locked -p maos-providers -p maos-domain -p maos-manifest -p maos-secrets -p xtask --profile ci --test-threads 1
+          cargo nextest run --locked -p maos-bin --test provider_selection_20_4 --test provider_endpoint_pin_20_4 --profile ci --test-threads 1
+          cargo test --locked -p maos-kernel-core --test spirit_boundary_invariants
+          cargo run --locked -p xtask -- check-corpus
+          for gate in check-model-currency check-env-contract kloc-check check-kernel-baseline check-service-boundary check-serde-error-handling check-composition-root-completeness check-test-cost check-dev-record-completeness check-epic-close-coherence; do
+            cargo run --locked -p xtask -- "$gate" --json | tee "evidence/$gate.json"
+          done
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: hermetic-20-4-${{ matrix.image }}
+          path: |
+            evidence
+            target/nextest/ci/junit.xml
+  live:
+    if: inputs.run_live_after_l2
+    runs-on: ubuntu-24.04
+    environment: ops-live
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Paid Gemini and Kimi record legs (not L1 proof)
+        shell: bash
+        env:
+          MAOS_GEMINI_API_KEY: ${{ secrets.MAOS_GEMINI_API_KEY }}
+          MAOS_KIMI_API_KEY: ${{ secrets.MAOS_KIMI_API_KEY }}
+          MAOS_SECRETS_BACKEND: env
+        run: |
+          set -euo pipefail
+          test -n "$MAOS_GEMINI_API_KEY"
+          test -n "$MAOS_KIMI_API_KEY"
+          # No keys printed, written to a URL, or included in command arguments.
+          grep -q '"gemini" => "gemini"' crates/maos-kernel-core/src/inference/mod.rs
+          grep -q '"kimi" => "kimi"' crates/maos-kernel-core/src/inference/mod.rs
+          cargo build --locked -p maos-bin --bin maos
+          mkdir -p evidence
+          for provider in gemini kimi; do
+            home=$(mktemp -d "$RUNNER_TEMP/maos-20-4-$provider.XXXXXX")
+            printf '@hello-spirit hello\n' | HOME="$home" MAOS_HOME="$home/maos" XDG_DATA_HOME="$home/xdg" MAOS_OLLAMA_URL=skip MAOS_DEFAULT_PROVIDER="$provider" MAOS_INFERENCE_MODE=record MAOS_REPLAY_CASSETTE="$PWD/evidence/$provider-live.json" target/debug/maos shell
+          done
+          python3 - <<'PY'
+          import json, pathlib
+          for provider in ('gemini', 'kimi'):
+              doc=json.loads(pathlib.Path(f'evidence/{provider}-live.json').read_text())
+              assert doc['provenance']=='live-record', doc.get('provenance')
+              assert doc['entries'], 'recording is empty'
+              assert all(e['response']['provider_attribution']['provider_id']==provider for e in doc['entries'])
+          PY
+          sha256sum evidence/*-live.json | tee evidence/live.sha256
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: operator-live-20-4-after-l2
+          path: evidence

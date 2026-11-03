@@ -1,0 +1,8 @@
+{
+  "text": "{\"passed\":true,\"violation_count\":0,\"violations\":[],\"adapters_found\":11,\"constructions_found\":20}\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 52.6363930106163
+  }
+}

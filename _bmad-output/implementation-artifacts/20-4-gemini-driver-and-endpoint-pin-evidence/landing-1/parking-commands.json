@@ -1,0 +1,98 @@
+[
+  {
+    "command": "tar -czf /tmp/204l1-wip/new-files.tar.gz -- _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/ci/ci-20-4-verify.yml _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/ci/ci-20-4-verify.yml.sha256 _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/admission-sites.md _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/commands.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-composition-root-completeness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-corpus.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-coverage-matrix-completeness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-decision-register.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-dev-record-completeness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-env-contract.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-epic-close-coherence.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-exit-commands.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-ff-j6.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-j1-loopback-delegation.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-perf-runner-policy.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-review-findings-resolved.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-serde-error-handling.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-service-boundary.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-test-cost.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-coverage-matrix.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-invariant-lock.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/head-currency-witness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/head-runtime-witnesses.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kimi-limits.txt _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kimi-pricing-tables.txt _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kimi-vendor-notice-2026-11-03.md _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kloc-formatted.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kloc-head.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/plants.md _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/preflight.md crates/maos-bin/tests/provider_endpoint_pin_20_4.rs crates/maos-bin/tests/provider_selection_20_4.rs crates/maos-bin/tests/support/provider204.rs crates/maos-journey-test/cassettes/providers/gemini-shell-intro.json crates/maos-journey-test/cassettes/providers/kimi-shell-intro.json crates/maos-providers/src/gemini.rs crates/maos-providers/tests/fixtures/gemini_error_429_response.json crates/maos-providers/tests/fixtures/gemini_max_tokens_response.json crates/maos-providers/tests/fixtures/gemini_multi_part_response.json crates/maos-providers/tests/fixtures/gemini_safety_response.json crates/maos-providers/tests/fixtures/gemini_success_response.json crates/maos-providers/tests/fixtures/kimi_max_tokens_response.json crates/maos-providers/tests/fixtures/kimi_success_response.json crates/maos-providers/tests/gemini_round_trip_test.rs crates/maos-providers/tests/kimi_round_trip_test.rs crates/maos-providers/tests/support/wire204.rs",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "result": {
+      "text": "(no output)",
+      "details": {
+        "wallTimeNoticeEmitted": false,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 18.18343898653984
+      }
+    }
+  },
+  {
+    "command": "mkdir -p /tmp/204l1-wip/base",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "result": {
+      "text": "(no output)",
+      "details": {
+        "wallTimeNoticeEmitted": false,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 2.9015850126743317
+      }
+    }
+  },
+  {
+    "command": "git archive HEAD | tar -x -C /tmp/204l1-wip/base",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "result": {
+      "text": "(no output)\n\nWall time: 8.42 seconds",
+      "details": {
+        "wallTimeNoticeEmitted": true,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 8423.09323501587
+      }
+    }
+  },
+  {
+    "command": "git apply --check /tmp/204l1-wip/tracked.patch",
+    "cwd": "/tmp/204l1-wip/base",
+    "result": {
+      "text": "(no output)",
+      "details": {
+        "wallTimeNoticeEmitted": false,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 10.59002098441124
+      }
+    }
+  },
+  {
+    "command": "sha256sum /tmp/204l1-wip/tracked.patch /tmp/204l1-wip/new-files.tar.gz",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "result": {
+      "text": "5ff9da583fea041f8c68a497dc92b9541ad51dbd3083e36772e26c5331b955e2  /tmp/204l1-wip/tracked.patch\nc3588b4af76da8465b21b8f41d3517e86dd8047fd415433657aafc409caf86cd  /tmp/204l1-wip/new-files.tar.gz\n",
+      "details": {
+        "wallTimeNoticeEmitted": false,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 6.918436020612717
+      }
+    }
+  },
+  {
+    "command": "git checkout -- _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin.md crates/maos-bin/src/admission.rs crates/maos-bin/src/env_contract.rs crates/maos-bin/src/main.rs crates/maos-bin/src/purge.rs crates/maos-bin/tests/hook_pump_17_4.rs crates/maos-bin/tests/j_researcher_survey_18_3.rs crates/maos-bin/tests/live_escape_anomaly_17_10.rs crates/maos-bin/tests/observer_activity_corpus_17_4.rs crates/maos-bin/tests/one_daemon_one_door_16_1.rs crates/maos-bin/tests/participant_recall_17_8.rs crates/maos-bin/tests/recall_17_3d.rs crates/maos-bin/tests/spawned_scope_17_3c.rs crates/maos-domain/src/ports/secret_store.rs crates/maos-manifest/src/manifest.rs crates/maos-providers/src/anthropic.rs crates/maos-providers/src/lib.rs crates/maos-providers/src/openai.rs crates/maos-providers/src/provider.rs crates/maos-providers/tests/openai_round_trip_test.rs crates/maos-providers/tests/rate_limit_isolation_nfr_scale_4.rs crates/maos-secrets/tests/at_rest_seal.rs docs/maos.dev/run-maos.md spirits/hello-spirit/manifest.toml tests/coverage-matrix.yaml xtask/kloc.toml xtask/model-currency.toml xtask/provider-pricing.toml xtask/src/check_model_currency.rs xtask/tests/model_currency_gate.rs",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "result": {
+      "text": "(no output)",
+      "details": {
+        "wallTimeNoticeEmitted": false,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 65.37446400523186
+      }
+    }
+  },
+  {
+    "command": "rm -- _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/ci/ci-20-4-verify.yml _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/ci/ci-20-4-verify.yml.sha256 _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/admission-sites.md _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/commands.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-composition-root-completeness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-corpus.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-coverage-matrix-completeness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-decision-register.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-dev-record-completeness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-env-contract.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-epic-close-coherence.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-exit-commands.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-ff-j6.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-j1-loopback-delegation.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-perf-runner-policy.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-review-findings-resolved.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-serde-error-handling.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-service-boundary.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-check-test-cost.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-coverage-matrix.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/gates/checking-invariant-lock.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/head-currency-witness.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/head-runtime-witnesses.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kimi-limits.txt _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kimi-pricing-tables.txt _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kimi-vendor-notice-2026-11-03.md _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kloc-formatted.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kloc-head.json _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/plants.md _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/preflight.md crates/maos-bin/tests/provider_endpoint_pin_20_4.rs crates/maos-bin/tests/provider_selection_20_4.rs crates/maos-bin/tests/support/provider204.rs crates/maos-journey-test/cassettes/providers/gemini-shell-intro.json crates/maos-journey-test/cassettes/providers/kimi-shell-intro.json crates/maos-providers/src/gemini.rs crates/maos-providers/tests/fixtures/gemini_error_429_response.json crates/maos-providers/tests/fixtures/gemini_max_tokens_response.json crates/maos-providers/tests/fixtures/gemini_multi_part_response.json crates/maos-providers/tests/fixtures/gemini_safety_response.json crates/maos-providers/tests/fixtures/gemini_success_response.json crates/maos-providers/tests/fixtures/kimi_max_tokens_response.json crates/maos-providers/tests/fixtures/kimi_success_response.json crates/maos-providers/tests/gemini_round_trip_test.rs crates/maos-providers/tests/kimi_round_trip_test.rs crates/maos-providers/tests/support/wire204.rs",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "result": {
+      "text": "(no output)",
+      "details": {
+        "wallTimeNoticeEmitted": false,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 2.6606750190258026
+      }
+    }
+  },
+  {
+    "command": "git diff --exit-code -- _bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin.md crates/maos-bin/src/admission.rs crates/maos-bin/src/env_contract.rs crates/maos-bin/src/main.rs crates/maos-bin/src/purge.rs crates/maos-bin/tests/hook_pump_17_4.rs crates/maos-bin/tests/j_researcher_survey_18_3.rs crates/maos-bin/tests/live_escape_anomaly_17_10.rs crates/maos-bin/tests/observer_activity_corpus_17_4.rs crates/maos-bin/tests/one_daemon_one_door_16_1.rs crates/maos-bin/tests/participant_recall_17_8.rs crates/maos-bin/tests/recall_17_3d.rs crates/maos-bin/tests/spawned_scope_17_3c.rs crates/maos-domain/src/ports/secret_store.rs crates/maos-manifest/src/manifest.rs crates/maos-providers/src/anthropic.rs crates/maos-providers/src/lib.rs crates/maos-providers/src/openai.rs crates/maos-providers/src/provider.rs crates/maos-providers/tests/openai_round_trip_test.rs crates/maos-providers/tests/rate_limit_isolation_nfr_scale_4.rs crates/maos-secrets/tests/at_rest_seal.rs docs/maos.dev/run-maos.md spirits/hello-spirit/manifest.toml tests/coverage-matrix.yaml xtask/kloc.toml xtask/model-currency.toml xtask/provider-pricing.toml xtask/src/check_model_currency.rs xtask/tests/model_currency_gate.rs",
+    "cwd": "/home/lunarpulse/dev_ws",
+    "result": {
+      "text": "(no output)",
+      "details": {
+        "wallTimeNoticeEmitted": false,
+        "timeoutSeconds": 120,
+        "wallTimeMs": 13.318782985210419
+      }
+    }
+  }
+]

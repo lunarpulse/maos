@@ -1,0 +1,159 @@
+{
+ "head": "8c809f9c5ce245f0bb51e94c20861e45c229d89f",
+ "instrument": "/mnt/build/cargo-maos/debug/xtask {check-kernel-baseline,kloc-check} --json, CARGO_MANIFEST_DIR=<copy>/xtask, run from a git-archive copy root under /tmp/proto2013 (deleted after)",
+ "copies": {
+  "base": {
+   "kernel_physical": 26841,
+   "kernel_files": 95,
+   "set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+   "changed": [],
+   "added": [],
+   "removed": [],
+   "aggregate": 192519,
+   "passed": true,
+   "over_budget": [],
+   "tokei_delta_vs_base": {},
+   "per_crate_selected": {
+    "maos-kernel-core": 21042,
+    "maos-bin": 34191,
+    "maos-domain": 10099,
+    "maos-secrets": 536,
+    "maos-audit": 7721,
+    "maos-compliance": 2032,
+    "maos-capability": 1433,
+    "maos-registry": 4248,
+    "maos-shell": 615,
+    "maos-cli": 6429,
+    "maos-iac": 8270,
+    "maos-spirit-cli": 755,
+    "maos-bench": 2737,
+    "xtask": 44406
+   }
+  },
+  "kt3": {
+   "kernel_physical": 26842,
+   "kernel_files": 95,
+   "set_hash": "e5404dd35e97bb95ffac05b61f4c38abec3b5aae3ecede87e040fc8f305645a0",
+   "changed": [
+    "security/mod.rs"
+   ],
+   "added": [],
+   "removed": [],
+   "aggregate": 192518,
+   "passed": true,
+   "over_budget": [],
+   "tokei_delta_vs_base": {
+    "maos-kernel-core": -1
+   }
+  },
+  "kt": {
+   "kernel_physical": 26861,
+   "kernel_files": 95,
+   "set_hash": "ba28e62cd3a1ba95bb6671fbd38e7b7e133c5754783c49267dbbed946a444071",
+   "changed": [
+    "security/mod.rs"
+   ],
+   "added": [],
+   "removed": [],
+   "aggregate": 192533,
+   "passed": false,
+   "over_budget": [
+    "aggregate 192533 >= 192520",
+    "maos-kernel-core 21056 > 21042"
+   ],
+   "tokei_delta_vs_base": {
+    "maos-kernel-core": 14
+   }
+  },
+  "ktd": {
+   "kernel_physical": 26852,
+   "kernel_files": 95,
+   "set_hash": "bc0f05433f7d9183c96b364e9f36c30249779703691ebbe8f79434bf2f1a57ac",
+   "changed": [
+    "security/mod.rs"
+   ],
+   "added": [],
+   "removed": [],
+   "aggregate": 192525,
+   "passed": false,
+   "over_budget": [
+    "aggregate 192525 >= 192520",
+    "maos-kernel-core 21048 > 21042"
+   ],
+   "tokei_delta_vs_base": {
+    "maos-kernel-core": 6
+   }
+  },
+  "ki": {
+   "kernel_physical": 26860,
+   "kernel_files": 95,
+   "set_hash": "7d4e8551db22f214e15849595001fd6fa207046881ad173892de60b651bba24b",
+   "changed": [
+    "security/crypto.rs",
+    "security/sandbox/t3/image_verify.rs"
+   ],
+   "added": [],
+   "removed": [],
+   "aggregate": 192543,
+   "passed": false,
+   "over_budget": [
+    "aggregate 192543 >= 192520",
+    "maos-domain 10105 > 10099",
+    "maos-kernel-core 21060 > 21042"
+   ],
+   "tokei_delta_vs_base": {
+    "maos-domain": 6,
+    "maos-kernel-core": 18
+   }
+  },
+  "ko": {
+   "kernel_physical": 26879,
+   "kernel_files": 95,
+   "set_hash": "94f037c991d05b040ba7591f7dd1c94a8ae3e1f248b4c5869004c30b86b1f7b4",
+   "changed": [
+    "security/crypto.rs",
+    "security/sandbox/t3/image_verify.rs"
+   ],
+   "added": [],
+   "removed": [],
+   "aggregate": 192563,
+   "passed": false,
+   "over_budget": [
+    "aggregate 192563 >= 192520",
+    "maos-domain 10106 > 10099",
+    "maos-kernel-core 21079 > 21042"
+   ],
+   "tokei_delta_vs_base": {
+    "maos-domain": 7,
+    "maos-kernel-core": 37
+   }
+  },
+  "nk": {
+   "kernel_physical": 26842,
+   "kernel_files": 95,
+   "set_hash": "e5404dd35e97bb95ffac05b61f4c38abec3b5aae3ecede87e040fc8f305645a0",
+   "changed": [
+    "security/mod.rs"
+   ],
+   "added": [],
+   "removed": [],
+   "aggregate": 192854,
+   "passed": false,
+   "over_budget": [
+    "aggregate 192854 >= 192520",
+    "maos-bin 34379 > 34191",
+    "maos-registry 4269 > 4248",
+    "maos-shell 661 > 615",
+    "xtask 44465 > 44406"
+   ],
+   "tokei_delta_vs_base": {
+    "maos-bin": 188,
+    "maos-compliance": 22,
+    "maos-kernel-core": -1,
+    "maos-registry": 21,
+    "maos-shell": 46,
+    "xtask": 59
+   }
+  }
+ }
+}

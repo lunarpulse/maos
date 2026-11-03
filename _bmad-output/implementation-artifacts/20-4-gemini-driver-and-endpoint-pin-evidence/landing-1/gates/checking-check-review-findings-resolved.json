@@ -1,0 +1,8 @@
+{
+  "text": "{\"passed\":true,\"violation_count\":0,\"violations\":[],\"stories_checked\":204}\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 75.82704201340675
+  }
+}

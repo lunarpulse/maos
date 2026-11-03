@@ -1,0 +1,8 @@
+{
+  "text": "{\"passed\":true,\"reason\":\"no J6 latency bindings found \u2014 CUT is safe\"}\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 37.44852700829506
+  }
+}

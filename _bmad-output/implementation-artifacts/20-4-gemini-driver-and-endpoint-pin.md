@@ -6,7 +6,7 @@ context_commit: a8af3215
 baseline_commit: a8af3215
 security_sensitive: true
 kernel_grant: "RULED 2026-11-02 (ask s204; D-20-4-06 A + D-20-4-07 A; R = KA + KIO1 + KIO2): measured at a8af3215 from 26841 physical / 21042 tokei, +13 / +9. Ceilings (STOP above): kernel ≤ 26867 physical / 21060 tokei; L2 kernel last. The second or later kernel landing re-bases; cumulative STOP above 21209 tokei, ADR-069 alarm 22000; expected cumulative with 20-1b +68 and 20-11 +6 is 21125."
-kloc_grant: "RULED 2026-11-02 (ask s204; D-20-4-11 A; D02 A ×2 measured / ×3 unmeasured). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): maos-providers ≤ 1898; maos-bin ≤ 33950; maos-domain ≤ 10115; maos-manifest ≤ 4610; xtask ≤ 44466; kernel ≤ 26867 / 21060 (see kernel_grant); aggregate ≤ 192851. Every other crate 0."
+kloc_grant: "RULED 2026-11-02 (ask s204; D-20-4-11 A; D02 A ×2 measured / ×3 unmeasured), L1 rebased by parent handoff 2026-11-03 at 8c809f9c. L1 ceilings (STOP above; exact pins; aggregate hardfail = measured + 1): maos-providers ≤ 1898; maos-bin ≤ 34643 = 34191 + 145×2 + 54×3; maos-domain ≤ 10115; maos-manifest ≤ 4610; xtask ≤ 44466; aggregate ≤ 193526 = 192519 + 1007. Kernel delta 0 in L1 (26841 physical / 21042 tokei); L2 retains kernel_grant and re-bases at its start. Creation-wide pricing is retained below as historical evidence. Every other crate 0."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-71`): a kernel FLAG-Winston row (D-20-4-06/07), secrets handling (two new credentials, header redaction, AC3.4, AC8.1) and a refusing control (the endpoint pin, AC6). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC1.1 (key placement), AC6 and AC8, Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -148,6 +148,8 @@ D-20-4-01…11. Each figure lands exact, with a HISTORY row citing this key with
 
 **Rulings 2026-11-02 (ask s204):** The operator ruled D06 D and every D-20-4-01…11 row exactly as recommended. 20-4 creates `MAOS_DEFAULT_PROVIDER`; the existing lane retains the three `MAOS_*_MODEL` overrides. Kernel row R and the ceilings are granted as recorded in frontmatter.
 
+**Superseding ruling 2026-11-03 (ask d204_12): D-20-4-12 B.** D-20-4-03's Kimi default is now `kimi-k3.1-pro`, not `kimi-k2.6`; Gemini remains `gemini-3.5-flash-lite` (re-checked Stable on Google's models page 2026-11-03). K2 ids are refused as vendor-deprecated. The successor's context is 1,048,576 tokens; access needs a successful $1 top-up; account-tier limits apply (Tier0: concurrency 1, RPM 3, TPM 500,000, TPD 1,500,000). Standard uncached input/output prices are $2/$10 per million tokens. Sources, fetched 2026-11-03: [guide](https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart.md), [pricing](https://platform.kimi.ai/docs/pricing/chat), [limits](https://platform.kimi.ai/docs/pricing/limits). Rendered price/limit evidence is saved under `landing-1/` because the vendor's markdown omits table cells. This supersession applies to every D-20-4-03 reference below.
+
 | ID | Question | Options | Recommendation and evidence | Status |
 |---|---|---|---|---|
 | **D06** (preflight) | Who creates `MAOS_DEFAULT_PROVIDER` (AC1's selector) | **A** author `provider-model-env-overrides` (S:224) first, then 20-4 · **B** 20-4 absorbs the whole four-variable charter (`tracker-notes-archive-2026-09-04.md:713-715`) and the lane row retires by explicit migration · **C** hard-coded/global default only · **D** *(added at creation)* 20-4 creates `MAOS_DEFAULT_PROVIDER` only (prototype `sel`, inside maos-bin +51); the lane keeps the three `MAOS_*_MODEL` overrides, its note re-scoped | **D.** The selector is the only part of that charter AC1 needs and it sits in the exact builder block this story rewrites (`main.rs:3896-4049`) — A serialises two stories over the same 60 lines with no story file yet for the lane. The model overrides are not a drive-by: an env-supplied model id is a pin the 17-5 gate cannot scan (it reads literals, `check_model_currency.rs:24-26`), which is why the lane carries "currency verified in-story" (OD3); B pulls that design in. C fails the epic's own AC1 command. | RULED 2026-11-02: **D** (ask s204) |
@@ -162,6 +164,7 @@ D-20-4-01…11. Each figure lands exact, with a HISTORY row citing this key with
 | **D-20-4-09** | Kimi live proof (PF:123 "live Kimi proof unmeasured") | **A** widen `ops-live-gemini-leg`'s note to record a Kimi cassette too (key unchanged) · **B** a new `ops-live-kimi-leg` row · **C** fixture-only, labelled | **A.** Same operator, same mode, same leg shape; renaming or adding keys touches the doc gates (20-7 incident, `20-7-…md:374`). C leaves FR3's Kimi claim fixture-only forever. | RULED 2026-11-02: **A** (ask s204) |
 | **D-20-4-10** | FR38 runtime provider-endpoint drift check is vacuous (found at creation, C23) | **A** fix here: the two production registry admission callers (`maos-registry/src/install.rs:50-59`, `maos-cli/src/subcommands.rs:1402-1410`, both in `maosctl`, where no provider is built) receive `runtime_provider_endpoint` from a provider-endpoint table shared through maos-providers · **B** route to `20-13-pluggable-crypto-provider-selection`, which owns the twin `runtime_crypto_provider` default (`maos-registry/src/admission.rs:138-145`) and names the runtime context (E20:312) · **C** ownerless, labelled | **B.** Rule 10(b): 20-13 already touches the same struct and the runtime context; this story does not touch registry admission, and A needs the daemon's endpoint table outside the daemon. Filed as a `deferred-work.md` row with PROPOSED owner 20-13 (records-owed X4); a different ruling re-points it. | RULED 2026-11-02: **B** (ask s204) |
 | **D-20-4-11** | Per-crate envelope (D02 A applied) | **A** the envelope above (×3 unmeasured / ×2 measured) · **B** exact measured grants only, every review correction re-asks · **C** allowance ×1.3 (rule 6) | **A.** 20-3b and 20-3c landed at 2–3× creation forecasts; 20-7 L1 review corrections added +387 xtask inside its ceiling (`xtask/kloc.toml:339` history). | RULED 2026-11-02: **A** (ask s204) |
+| **D-20-4-12** | T0 re-verification of the Kimi default after K2 access restriction and announced retirement | **A** retain K2 with an explicit exception · **B** use the successor | **B: `kimi-k3.1-pro`**, superseding D-20-4-03's Kimi default only. K2 ids refused as vendor-deprecated; Gemini unchanged. T0 price/context/limits re-checked above. | **RULED B 2026-11-03 (ask d204_12); implementation resumed** |
 
 ## Acceptance Criteria
 
@@ -243,12 +246,12 @@ different ruling. Every AC names a failing-before witness and a plant. **local**
 ## Tasks / Subtasks
 
 - [ ] **T0 — Preflight.** Operator rulings on D06 and D-20-4-01…11 recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" 1–7 (item 6 classifies the admission sites; item 7 the vendor ids/prices). Re-measure every cite this story touches (rule 9). A measured figure above the ruled envelope, or a T0 result contradicting a ruled option, is STOP + D-row.
-- [ ] **T1 — Gemini driver (AC1.1–1.4).** `gemini.rs`, recording transport, five fixtures, round-trip test, plant.
-- [ ] **T2 — Kimi (AC2).** `compatible`, fixtures, test, plant.
-- [ ] **T3 — Keys, registration, default, credential check (AC3, AC1.5).** `SecretKey`, env rows, purge labels, builder, replay ids, selector, hello-spirit declarations, the two seed cassettes, `provider_selection_20_4.rs`, plant.
-- [ ] **T4 — Currency (AC4).** Data, price rows, scan extension, vectors, plant.
-- [ ] **T5 — Per-Spirit selection (AC5).** `[providers]` read, declared check, fallback refusal, binding sites, `admit_spirit` argument, manifest ids/tests, witness, plant.
-- [ ] **T6 — Endpoint pin (AC6).** Endpoint table, `check_provider_pins` at each production site, refusal codes, air-gap vector, witness, plant, operator doc.
+- [x] **T1 — Gemini driver (AC1.1–1.4).** `gemini.rs`, recording transport, five fixtures, round-trip test, plant.
+- [x] **T2 — Kimi (AC2).** `compatible`, fixtures, test, plant.
+- [x] **T3 — Keys, registration, default, credential check (AC3, AC1.5).** `SecretKey`, env rows, purge labels, builder, replay ids, selector, hello-spirit declarations, the two seed cassettes, `provider_selection_20_4.rs`, plant.
+- [x] **T4 — Currency (AC4).** Data, price rows, scan extension, vectors, plant.
+- [x] **T5 — Per-Spirit selection (AC5).** `[providers]` read, declared check, fallback refusal, binding sites, `admit_spirit` argument, manifest ids/tests, witness, plant.
+- [x] **T6 — Endpoint pin (AC6).** Endpoint table, `check_provider_pins` at each production site, refusal codes, air-gap vector, witness, plant, operator doc.
 - [ ] **T7 — L1 landing (D-20-4-08 A).** Exact pins inside the ruled envelope; `check-env-contract`, `check-model-currency`, `kloc-check`, `check-kernel-baseline` (unchanged), `check-service-boundary`, `check-corpus`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; one hosted discipline run on the final tree + plants. Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
 - [ ] **T8 — Kernel id set (AC7)** under the ruled row: red-before test, KA, plant.
 - [ ] **T9 — Kernel IO (AC8)** under the ruled row: two red-before tests, KIO1, KIO2, two plants.
@@ -371,6 +374,240 @@ ADR-005 (provider drivers), ADR-064 (replay selector), ADR-069 (`:35-46`).
 
 ## Dev Agent Record
 
+### Landing 1 — resumed implementation, kernel-free (2026-11-03)
+
+Agent: `openai-codex/gpt-6.1-sol` (`Dev204L1`). Initial baseline `16c35ef0`;
+parked at the parent's request under `/tmp/204l1-wip`, with the tracked patch
+checked against a `git archive HEAD` copy (no build). Resumed at **`8c809f9c`**
+after 20-10's hosted corrections. The parked patch applied with only the stale
+`xtask/kloc.toml` hunks excluded; those pins were re-cut against the new HISTORY,
+preserving the 20-10 segments. No story/tracker status flip, commit or push.
+
+**Rebased L1 grant (parent handoff):** maos-bin ceiling **34643** =
+34191 + 145 × 2 + 54 × 3; aggregate ceiling **193526** = 192519 + 1007.
+Other granted ceilings unchanged; kernel must remain 26841 physical / 21042 tokei.
+Exact measurement after `cargo fmt --all`, via prebuilt `kloc-check --json`:
+
+| Surface | Baseline -> formatted | L1 ceiling |
+|---|---|---:|
+| maos-providers | 1425 -> 1608 | 1898 |
+| maos-bin | 34191 -> 34363 | 34643 |
+| maos-domain | 10099 -> 10107 | 10115 |
+| maos-manifest | 4604 -> 4604 | 4610 |
+| xtask | 44406 -> 44420 | 44466 |
+| aggregate | 192519 -> 192896 (hardfail 192897) | 193526 |
+| kernel tokei | 21042 -> 21042 | 21042 |
+
+Measurements: [final formatted JSON](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kloc-final-formatted.json).
+Before parking, `check-kernel-baseline --json` passed at 26841 physical lines,
+95 files, unchanged content hashes and set hash `db39bc4a…`; kernel source was
+never edited. The initial stop below is historical, superseded by D-20-4-12 B.
+The new default is `kimi-k3.1-pro`; standard vendor prices, context and limits
+were re-checked and recorded in [preflight](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/preflight.md).
+
+Admission coverage is classified in [admission-sites.md](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/admission-sites.md).
+The existing Researcher/Orchestrator resolver functions intentionally remain
+unchanged: every production binding receives the selected singleton primary
+from the root's `declared_providers` helper, or the previous declaration order.
+Hello's token and implicit requests are bound together through `BoundInference`.
+
+The hosted/live workflow is cut, **not pushed or executed**, at
+[`ci/ci-20-4-verify.yml`](20-4-gemini-driver-and-endpoint-pin-evidence/ci/ci-20-4-verify.yml),
+SHA-256 `8b6a3ab4a6e25cf0e22a81dc67ebf30ec6015b11f8da3afccb25082d360187f5`.
+Live jobs require explicit operator opt-in after L2 and paid keys; no live call
+is claimed. Local seed replay proves routing, not the vendor wire.
+
+Execution evidence is append-only in [commands-resumed.json](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/commands-resumed.json);
+earlier baseline/static-gate evidence remains in [commands.json](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/commands.json).
+
+#### L1 observed proof
+
+Per-AC `name:line`, independent before witnesses, all six mutation failures,
+wall times, copy-back + `cmp` + `touch` restoration and final focused greens:
+[plants.md](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/plants.md).
+The runtime/scanner proof surfaces are byte-identical between the initial and
+resumed HEADs (`head-rebase-diff.txt`); API compile reds were additionally
+exercised against resumed HEAD. The literal epic shell pipeline exited 0;
+its saved TL query shows `infer:gemini->replay:default` and a
+`ProviderInfer { provider: "gemini" }` issuance (`epic-shell-command.json`).
+
+| Exercised verification | Exit | Observed result |
+|---|---:|---|
+| Workspace `build --all-targets --locked`, final after affected test migrations | 0 | 5.33 s; `logs/all-target-build-final.log` |
+| Provider wire tests (Gemini, Kimi, old OpenAI) | 0 | 8 passed; `logs/focused-provider-wire.log` |
+| Selection / endpoint integration tests | 0 | 13 passed; `logs/focused-provider-selection.log` |
+| Model-currency gate vectors | 0 | 23 passed; `logs/focused-model-currency.log` |
+| Prescribed `spirit_boundary_invariants` | 0 | 1 passed; `logs/spirit-boundary-invariants.log` |
+| Widened manifest-reader binaries and Spirit packages | 0 | 517 passed, 4 skipped; `logs/widened-manifest-readers.log` |
+| Affected enterprise source-seam and purge receipt contracts | 0 | 24 passed; `logs/focused-affected-assertions.log` |
+| Final serial workspace nextest, `--profile ci --test-threads 1 --no-fail-fast` | 0 | 5594 passed, 138 skipped, 642.290 s test span; `logs/workspace-serial-final.log` |
+| Fresh serial `check-test-budget` | 0 | 598 binaries, 642.145 s sum, no findings; `workspace-serial-final-junit.xml`, `gates/final-check-test-budget.json` |
+| Default-profile/default-concurrency workspace nextest | 0 | 5594 passed, 138 skipped, 43.100 s; `logs/workspace-default.log` |
+| Non-denying all-target clippy JSON stream + advisory ratchet | 0 / 0 | 1331 occurrences / 871 source-distinct vs hosted baseline 1383 / 897; `clippy.jsonl`, `logs/clippy-ratchet.log` |
+| `cargo deny --manifest-path /home/lunarpulse/dev_ws/Cargo.toml check` | 0 | Advisories, bans, licenses and sources OK; existing allowance/skip warnings retained in `logs/cargo-deny.log` |
+| Structural/source and record gates (20 commands), plus fresh serial budget above | 0 | All requested gates and `check-corpus` passed; `gates/final-*.json` and exact commands in the audit |
+| First prescribed prepush | 1 | 82 pass (including workspace-nextest), 8 conditional/CI skips, one advisory and one blocking tracked-tree red; `logs/prepush.json` |
+| Corrective frozen-tree prescribed prepush | 1 | `tracked-tree` passed; workspace-nextest exited 100 (5584 passed, 9 failed + 1 timeout); 25 timing advisories; `logs/prepush-frozen.json`, `workspace-prepush-frozen-junit.xml` |
+
+The first serial run found two genuinely affected assertions, not flakes:
+the borrowed journal moved into `ProviderAdmissionContext<'a>`, and the purge
+receipt now covers 12 slots (four provider keys, eight MCP bearers). Those
+assertions were migrated, retaining the shared-journal/no-second-open invariant
+and checking `SecretKey::ALL.len()`. The first migration also searched for a
+function signature inside a body-only source slice; its focused failure is
+retained in the command audit and corrected to inspect the context destructure.
+No production behavior was weakened. The original 5592/5594 serial result and
+JUnit remain as `logs/workspace-serial-initial.log` and
+`workspace-serial-initial-junit.xml`; the final full serial run above is green.
+An earlier all-target job hit the tool's 3000 s deadline; no numeric process
+exit was supplied. Its unbounded continuation passed; no timeout is relabelled
+as a source failure or a green result.
+
+Observed host load: initially 110.84/112.68/88.24; before the first serial run
+5.60/11.40/38.78; before default concurrency 3.01/3.64/11.28 (`uptime`).
+No timing budget was widened. The independently prescribed default run passed;
+the later frozen-tree prepush encountered the loaded failures recorded below.
+
+The clippy stream contains 60 occurrences in assigned files, **none intersecting
+added/changed lines and none in the new provider/test files**. The scoped
+inventory and changed-line review are saved in `clippy-owned-diagnostics.json`
+and `clippy-added-line-review.json`. The requested hosted-sensitive classes
+(`result_large_err`, `collapsible_if`, `too_many_arguments`, `unused_mut`,
+`trim_split_whitespace`) have no new-line finding locally; the compatible
+constructor has six arguments and the governance context keeps its builder at
+seven. Hosted compilation itself is unexecuted, not inferred green.
+
+The first prescribed prepush took 4517.94 s. Its only blocking red was
+`tracked-tree`: my tracked Dev Record/provisioning edits occurred while it was
+running, violating the preserved-tree condition. This is retained as a failed
+aggregate, not renamed green. `cmp` found the generated lineage report still
+byte-identical to its committed baseline, so no report restoration was needed.
+The separate test-budget advisory has six binary overruns and a 1157.060 s
+suite sum against 1100 s; original JUnit is retained as
+`workspace-prepush-initial-junit.xml`. Same-line rule-10 disposition is in
+`deferred-work.md`'s 20-4 L1 section, owned by `20-7-stable-runner-perf-gates`;
+budgets are unchanged and these advisories remain open regardless of a later
+tracked-tree correction. After this run, `uptime` was 28.13/26.99/106.16.
+Signed T3 substrate, `strace` network tracing and the Python Ed25519 backend
+were unavailable for the named conditional legs; the prepush's
+`output_diagnostics` preserves every SKIP rather than claiming those legs ran.
+
+The corrective prepush was run with owned tracked writes frozen and took
+523.95 s. It **passed the tracked-tree guard**; its only blocking red was the
+workspace leg: 5594 cases, 5584 passed, nine failed and one timed out. Eight
+belong to the named hook-pump, observer, one-shot-drain and shell-clarification
+timing families; two are unattributed CLI fixture observations (503-busy saw
+two round trips; a dead-door fixture got busy exit 75 instead of 69). The latter
+are not asserted to be the older 411 family or a diagnosed production defect.
+All ten have same-line rule-10 citations in the 20-4 section of
+`deferred-work.md`, with `20-7-stable-runner-perf-gates` ownership; **no further
+retry-to-green** was performed. Its 25 timing advisories (24 binaries plus
+2909.207 s suite sum) include the 20-4 selection/pin test binaries; full values
+are in `prepush-frozen-budget-findings.json`, with budgets unchanged.
+After this run `uptime` was 114.19/107.29/97.97. The final prepush is
+**not green**, despite the independently prescribed serial/default greens and
+all focused AC witnesses passing. L1 implementation is present; the recorded
+loaded-run failures remain verification limitations, not suppressed results.
+
+#### L1 implementation file groups
+
+- `maos-providers/src/{gemini,provider,anthropic,openai,lib}.rs`: native Gemini,
+  reusable compatible attribution and shared non-echoing credential validation.
+- `maos-domain/src/ports/secret_store.rs`, `maos-bin/src/{main,admission,env_contract,purge}.rs`:
+  two logical keys, registration/default selection, immutable endpoint catalog,
+  canonical admission and exact selected-provider request/token binding.
+- `maos-manifest/src/manifest.rs`: five permitted provider ids; unsupported-id
+  vectors use `bedrock`.
+- Provider wire/regression tests, seven JSON fixtures, `tests/support/wire204.rs`;
+  bin selection/pin tests and `tests/support/provider204.rs`; eight existing
+  admission fixtures now explicitly pass no catalog, plus the enterprise seam,
+  purge receipt and sealed-secret cardinality regressions.
+- `spirits/hello-spirit/manifest.toml` and the two provider seed cassettes.
+- `xtask/{kloc.toml,model-currency.toml,provider-pricing.toml}`,
+  `xtask/src/check_model_currency.rs`, `xtask/tests/model_currency_gate.rs`.
+- `docs/maos.dev/run-maos.md`, `docs/runbooks/provisioning-checklist.md`,
+  `tests/coverage-matrix.yaml`, this L1 record and its evidence/CI recipe.
+  The provisioning row now names both real key slots while retaining `absent`
+  for paid live credentials. Kernel files and baseline pins are unchanged.
+  The shared deferral ledger receives only the new 20-4 timing-advisory section;
+  concurrent stories' rows are preserved.
+
+#### L1 intermediary cleanup — standing operator scope
+
+After all cargo work and final record gates, `/usr/bin/ps -eo comm=` (from
+`/proc`) showed no cargo/rustc/nextest/clippy/xtask process before removal.
+Pruned **2321** stale real `debug/incremental/<crate>/s-*` directories;
+**5465** sessions were kept. Newest directory/content sessions and every
+session with any entry touched within two hours were retained. Strict
+pre-removal recency rechecks found no newly recent candidate and no errors.
+No `deps`, `build` or fingerprint directories, other-agent scratch, whole-target
+clean, or target-directory override was used.
+
+| Allocated bytes (`du -s -B1`, both commands exited 0) | Before | After | Observed net freed |
+|---|---:|---:|---:|
+| `/mnt/build/cargo-maos` | 231836020736 | 213276917760 | **18559102976** (17.285 GiB) |
+| `/tmp` | 1776513024 | 1408479232 | **368033792** (0.343 GiB) |
+
+Five explicitly owned scratch paths were removed; six recorded preflight
+homes/fixture roots were already absent. The parked git-archive copy and plant
+backups were removed only after their wanted evidence was preserved here.
+`/tmp/204l1-wip/{tracked.patch,new-files.tar.gz,SHA256SUMS}` remains intact
+until the parent confirms the commit is on HEAD. A scoped `.orig`/`.rej` scan of
+owned file neighborhoods found none. New logs/JUnit are retained, referenced
+evidence; registered fixture outputs remain available. Unattributed T3 roots were not
+deleted. Full paths, cutoff and errors are in `cleanup-plan.json`,
+`cleanup-result.json` and `cleanup-proc-scan.json`; unrelated concurrent `/tmp`
+activity can also affect its observed net delta.
+
+T0's tracker/status action and T7's hosted run remain unchecked: status changes
+and pushes are forbidden in this assignment. T8–T10 and ledger closures remain
+L2 work. This is not a story-done, live-vendor, hosted-run or review-pass claim.
+
+
+### Initial T0 stop — historical, superseded by D-20-4-12 B (2026-11-03)
+
+Agent: `openai-codex/gpt-6.1-sol` (`Dev204L1`), baseline `16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de`.
+**At this initial stop, no implementation was retained.** T0 requires STOP on a result contradicting a ruled option (task T0 above).
+D-20-4-12 records the vendor notice and the unresolved policy interpretation; no replacement model, invented
+price, release claim, or vendor round-trip has been substituted. The parent was notified.
+
+**Clean boundary:** initial source edits were surgically reversed in full, including removal of the newly
+created Gemini source. The edit tool returned each tracked file's original snapshot tag after reversal.
+No kernel, CI branch, `.devcontainer` file, fixture corpus, pin, story status, or sprint status was changed.
+The checked-in story still says `ready-for-dev`; this pass made no status flip, as assigned.
+
+**Observed baseline, not final-tree proof:** the prebuilt `xtask kloc-check --json` exited 0:
+
+| Surface | Measured at HEAD | Rebased L1 ceiling |
+|---|---:|---:|
+| maos-providers | 1425 | 1898 |
+| maos-bin | 34188 | **34640** = 34188 + 145 × 2 + 54 × 3 |
+| maos-domain | 10099 | 10115 |
+| maos-manifest | 4604 | 4610 |
+| xtask | 44406 | 44466 |
+| aggregate | 192516 | **193523** = 192516 + (192833 − 191826) |
+| kernel tokei | 21042 | 21042 (no L1 delta) |
+
+Kernel physical baseline 26841 is inherited from the assigned context, **not re-measured in this pass**.
+The only cargo invocation was the before witness:
+`env -u CI -u GITHUB_ACTIONS cargo test --manifest-path /home/lunarpulse/dev_ws/Cargo.toml --locked -p maos-providers --test gemini_round_trip_test --test kimi_round_trip_test`
+exited **101**, naming the missing Gemini test target; it compiled nothing.
+This is AC1's missing-target red, **not** a Kimi attribution failure or a green-after result.
+No plants ran (count 0, no plant wall-clock); no AC is claimed complete.
+
+**Evidence:** [preflight and stop rationale](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/preflight.md),
+[all shell commands and observed exits](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/commands.json),
+[raw baseline](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/kloc-head.json),
+[plant/witness disposition](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/plants.md).
+`uptime` reported load averages 15.28 / 44.69 / 31.94.
+
+**Unverified / remaining:** AC1–AC6 implementation and green-after witnesses, all six plants, AC9 L1 records,
+live/hosted workflow diff and digest, fmt, final kloc measurement and exact repins, all-target build, focused
+tests and widened manifest readers, serial/default workspace nextest, all requested gates, clippy counts,
+cargo deny and prescribed prepush. Paid live legs and L2 remain outside this pass's delivered proof.
+No push, commit, extra target directory or worktree was used.
+
+
 ### Story context creation
 
 Created 2026-11-02 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter measured contract) at `a8af3215`,
@@ -398,11 +635,25 @@ anthropic/claude-opus-5-5 (creation).
 
 ### Debug Log References
 
+Exact commands/exits: [command-results.md](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/command-results.md).
+Per-AC red/green and restoration: [plants.md](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/plants.md).
+Full outputs and JUnit are retained under the adjacent `logs/` and landing directory.
+
 ### Completion Notes List
 
+AC1–AC6 are implemented and their focused witnesses are green. Kernel/L2,
+paid vendor calls and hosted execution are not claimed. The L1 section above
+records both green full matrices and the non-green prescribed prepush; no
+status flip, commit or push was made.
+
 ### File List
+
+[Owned paths only](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/files-changed.txt);
+concurrent stories' files are excluded and the shared-ledger hunk is identified.
 
 ## Change Log
 
 - 2026-11-02: Story created at `a8af3215` (ready-for-dev; D06 open, D-20-4-01…11 PROPOSED). Kernel-Δ 0 disproved: the kernel's provider-id set refuses Gemini/Kimi under the rate limiter and D:1297/D:1298 are kernel rows owned here — R = KA + KIO1 + KIO2 priced +13 / +9 by reverted prototype. Measured: the epic's AC1 line exits 1 and the selector is ignored (`infer:anthropic->replay:default`); the currency gate passes with unscanned Gemini/Kimi pins; `[providers]` and its pin are never read.
 - 2026-11-02: Operator rulings recorded (ask s204): D06 D and D-20-4-01…11 as recommended; kernel R = KA + KIO1 + KIO2 and ceilings per frontmatter. Status remains ready-for-dev.
+- 2026-11-03: L1 T0 STOP recorded as D-20-4-12 after the official Kimi notice restricted K2 access and announced retirement; incomplete source edits reversed, baseline envelope and missing-target witness preserved. No status flip or L1 completion claim.
+- 2026-11-03: D-20-4-12 B selected `kimi-k3.1-pro`; L1 AC1–AC6 implemented, six restored plants and final local matrices recorded, exact rebased pins landed with kernel unchanged. Hosted/live recipe cut with SHA-256 but not pushed. Loaded prepush failures and unchanged-budget advisories retained under rule 10; no story status flip or L2 closure.

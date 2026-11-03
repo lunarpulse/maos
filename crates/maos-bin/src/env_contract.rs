@@ -91,6 +91,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         purpose: "OpenAI credential; a present non-empty value marks the live provider eligible (15-6 §A6 review)",
         stability: EnvStability::UserFacing,
     },
+    EnvVar {
+        name: "MAOS_GEMINI_API_KEY",
+        purpose: "Gemini credential; a non-empty value marks the live provider eligible",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_KIMI_API_KEY",
+        purpose: "Kimi credential; a non-empty value marks the live provider eligible",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_DEFAULT_PROVIDER",
+        purpose: "Router default provider id; empty is unset; an unregistered id refuses boot",
+        stability: EnvStability::UserFacing,
+    },
     // Story 18-8 AC2 — MCP bearers, read only through the captured env
     // `SecretStore` (`SecretKey::McpBearer`); sent as `Authorization: Bearer`.
     EnvVar {

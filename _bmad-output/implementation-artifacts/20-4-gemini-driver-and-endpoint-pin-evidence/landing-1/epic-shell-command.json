@@ -1,0 +1,24 @@
+{
+  "home": "/tmp/204-epic-kpmvfsum",
+  "command": "printf '@hello-spirit hello\\n' | env -i PATH=/mnt/build/cargo-maos/debug:/usr/bin:/bin HOME=/tmp/204-epic-kpmvfsum MAOS_HOME=/tmp/204-epic-kpmvfsum/maos XDG_DATA_HOME=/tmp/204-epic-kpmvfsum/xdg MAOS_SECRETS_BACKEND=env MAOS_OLLAMA_URL=skip MAOS_DEFAULT_PROVIDER=gemini MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE=/home/lunarpulse/dev_ws/crates/maos-journey-test/cassettes/providers/gemini-shell-intro.json /mnt/build/cargo-maos/debug/maos shell",
+  "result": {
+    "text": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/204-epic-kpmvfsum/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: telemetry hook pump wired (Story 17-4)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator door disabled \u2014 no /tmp/204-epic-kpmvfsum/maos/control.json; run `maos init`\nmaos: no providers configured \u2014 all inference calls return Unconfigured\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos shell: MAOS_INFERENCE_MODE=replay\nmaos: hello-spirit admitted via canonical path (shell mode, pid 1)\nmaos shell \u2014 type @hello-spirit <msg>  (Ctrl-D to exit)\nHello from the Gemini routing seed. This is replay selection proof, not a live vendor response.\n\nPosture: assistive\nCapability scope: [\"provider.complete:anthropic.claude-haiku-4-5-20251001\"]\nHalt tags: [\"assistive\"]\nTransparency Log: /tmp/204-epic-kpmvfsum/maos/audit/transparency.sqlite\nmaos: shell exiting\n",
+    "details": {
+      "wallTimeNoticeEmitted": false,
+      "timeoutSeconds": 60,
+      "wallTimeMs": 502.3993440270424
+    }
+  },
+  "transparency_log": {
+    "text": "| intent                       | payload                                  |\n| ---------------------------- | ---------------------------------------- |\n| cap.issue.Discriminant(5)    | {\"ProviderInfer\":{\"provider\":\"gemini\"}}  |\n| infer:gemini->replay:default | Introduce yourself as the MAOS hello-Sp\u2026 |",
+    "details": {
+      "resolvedPath": "/tmp/204-epic-kpmvfsum/maos/audit/transparency.sqlite",
+      "meta": {
+        "source": {
+          "type": "path",
+          "value": "/tmp/204-epic-kpmvfsum/maos/audit/transparency.sqlite"
+        }
+      }
+    }
+  }
+}

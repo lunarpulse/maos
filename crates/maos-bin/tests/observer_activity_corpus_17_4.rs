@@ -477,6 +477,7 @@ impl World {
             .expect("harness: gate real Observer manifest");
         let admitted = load_admit_start(
             &AdmissionDeps {
+                providers: None,
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.tl,

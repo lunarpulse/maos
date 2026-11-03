@@ -7,12 +7,14 @@
 
 pub mod anthropic;
 pub mod fixture_replay;
+pub mod gemini;
 pub mod ollama;
 pub mod openai;
 pub mod provider;
 pub mod rate_limit; // Story 6.4 / NFR-Scale-4
 
 pub use anthropic::AnthropicProvider;
+pub use gemini::GeminiProvider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAiProvider;
 pub use provider::{Provider, ProviderError};
@@ -20,6 +22,9 @@ pub use rate_limit::{
     fingerprint_credential, BucketKey, BucketSnapshot, ProviderQuota, ProviderRateLimitConfig,
     ProviderRateLimiter, RetryAfter, TokenBucket,
 };
+
+/// Provider ids understood by the composition root, including keyless replay.
+pub const PROVIDER_IDS: [&str; 5] = ["anthropic", "openai", "gemini", "kimi", "ollama"];
 
 /// The epic spec refers to `ProviderDriver`; the canonical name in this crate
 /// is `Provider` (introduced at Story 1b.4). They are the same trait; the
@@ -51,11 +56,14 @@ mod tests {
 
     #[test]
     fn provider_driver_alias_resolves() {
-        let _: Box<dyn ProviderDriver> = Box::new(AnthropicProvider::with_api_key(
-            std::sync::Arc::new(MockTransport),
-            "http://test".into(),
-            "model".into(),
-            "key".into(),
-        ));
+        let _: Box<dyn ProviderDriver> = Box::new(
+            AnthropicProvider::with_api_key(
+                std::sync::Arc::new(MockTransport),
+                "http://test".into(),
+                "model".into(),
+                "key".into(),
+            )
+            .unwrap(),
+        );
     }
 }

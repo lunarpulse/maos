@@ -1,0 +1,8 @@
+{
+  "text": "{\n  \"gate\": \"check-epic-close-coherence\",\n  \"passed\": true,\n  \"epics-checked\": 21,\n  \"authoritative-src-lines\": 26841,\n  \"violations\": []\n}\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 30.552343010902405
+  }
+}

@@ -573,10 +573,19 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   FR3:
-    gates: []
+    gates: [check-model-currency]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: >-
+      20-4 L1 (kernel-free): Gemini native wire/header/status witnesses in
+      crates/maos-providers/tests/gemini_round_trip_test.rs; Kimi compatible-wire
+      attribution in kimi_round_trip_test.rs; real-root selection and per-Spirit
+      primary/fallback witnesses in crates/maos-bin/tests/provider_selection_20_4.rs;
+      endpoint assertion/hash refusal and air-gap vectors in
+      crates/maos-bin/tests/provider_endpoint_pin_20_4.rs. Seed shell cassettes
+      prove routing, not a vendor round-trip. Live Gemini/Kimi remain blocked
+      by the kernel rate-limit id set until L2; Bedrock remains deferred.
   FR30:
     gates: []
     corpora: []

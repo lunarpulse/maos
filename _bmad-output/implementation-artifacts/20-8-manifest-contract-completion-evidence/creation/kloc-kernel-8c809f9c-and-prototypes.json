@@ -1,0 +1,255 @@
+{
+ "instrument": "/mnt/build/cargo-maos/debug/xtask {check-kernel-baseline,kloc-check} --json, CARGO_MANIFEST_DIR=<copy>/xtask, env -u CI -u GITHUB_ACTIONS; copies = git archive 8c809f9c under /tmp/proto208/<name>; changed files rustfmt --edition 2021 (1.9.0); not compiled",
+ "head": "8c809f9c5ce245f0bb51e94c20861e45c229d89f",
+ "runs": {
+  "base": {
+   "kernel": {
+    "passed": true,
+    "actual-lines": 26841,
+    "pinned-lines": 26841,
+    "file-set-entries": 95,
+    "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+    "changed": [],
+    "added": [],
+    "removed": []
+   },
+   "kloc": {
+    "passed": true,
+    "aggregate": 192519,
+    "over_budget": [],
+    "per_crate": {
+     "maos-kernel-core": 21042,
+     "maos-manifest": 4604,
+     "maos-domain": 10099,
+     "maos-bin": 34191,
+     "maos-wasm-host": 2412,
+     "maos-spirit-abi": 1042,
+     "maos-registry": 4248,
+     "maos-skill": 1234,
+     "maos-iac": 8270,
+     "xtask": 44406
+    }
+   }
+  },
+  "man": {
+   "kernel": {
+    "passed": true,
+    "actual-lines": 26841,
+    "pinned-lines": 26841,
+    "file-set-entries": 95,
+    "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+    "changed": [],
+    "added": [],
+    "removed": []
+   },
+   "kloc": {
+    "passed": false,
+    "aggregate": 192626,
+    "over_budget": [
+     "aggregate 192626 >= 192520",
+     "maos-manifest 4707 > 4604",
+     "xtask 44410 > 44406"
+    ],
+    "per_crate": {
+     "maos-kernel-core": 21042,
+     "maos-manifest": 4707,
+     "maos-domain": 10099,
+     "maos-bin": 34191,
+     "maos-wasm-host": 2412,
+     "maos-spirit-abi": 1042,
+     "maos-registry": 4248,
+     "maos-skill": 1234,
+     "maos-iac": 8270,
+     "xtask": 44410
+    }
+   }
+  },
+  "gate": {
+   "kernel": {
+    "passed": true,
+    "actual-lines": 26841,
+    "pinned-lines": 26841,
+    "file-set-entries": 95,
+    "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+    "changed": [],
+    "added": [],
+    "removed": []
+   },
+   "kloc": {
+    "passed": false,
+    "aggregate": 192731,
+    "over_budget": [
+     "aggregate 192731 >= 192520",
+     "maos-bin 34286 > 34191",
+     "maos-domain 10108 > 10099",
+     "maos-manifest 4708 > 4604",
+     "xtask 44410 > 44406"
+    ],
+    "per_crate": {
+     "maos-kernel-core": 21042,
+     "maos-manifest": 4708,
+     "maos-domain": 10108,
+     "maos-bin": 34286,
+     "maos-wasm-host": 2412,
+     "maos-spirit-abi": 1042,
+     "maos-registry": 4248,
+     "maos-skill": 1234,
+     "maos-iac": 8270,
+     "xtask": 44410
+    }
+   }
+  },
+  "wit": {
+   "kernel": {
+    "passed": true,
+    "actual-lines": 26841,
+    "pinned-lines": 26841,
+    "file-set-entries": 95,
+    "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+    "changed": [],
+    "added": [],
+    "removed": []
+   },
+   "kloc": {
+    "passed": false,
+    "aggregate": 192842,
+    "over_budget": [
+     "aggregate 192842 >= 192520",
+     "maos-bin 34346 > 34191",
+     "maos-domain 10108 > 10099",
+     "maos-manifest 4708 > 4604",
+     "maos-wasm-host 2463 > 2412",
+     "xtask 44410 > 44406"
+    ],
+    "per_crate": {
+     "maos-kernel-core": 21042,
+     "maos-manifest": 4708,
+     "maos-domain": 10108,
+     "maos-bin": 34346,
+     "maos-wasm-host": 2463,
+     "maos-spirit-abi": 1042,
+     "maos-registry": 4248,
+     "maos-skill": 1234,
+     "maos-iac": 8270,
+     "xtask": 44410
+    }
+   }
+  },
+  "kb": {
+   "kernel": {
+    "passed": false,
+    "actual-lines": 26851,
+    "pinned-lines": 26841,
+    "file-set-entries": 95,
+    "set-hash": "877b3662f82506e27c79d5fba4c76f016ac99015bdadacab9b2e38333e40f8d4",
+    "changed": [
+     "lifecycle/upgrade.rs",
+     "scheduler/control_block.rs"
+    ],
+    "added": [],
+    "removed": []
+   },
+   "kloc": {
+    "passed": false,
+    "aggregate": 192635,
+    "over_budget": [
+     "aggregate 192635 >= 192520",
+     "maos-bin 34192 > 34191",
+     "maos-kernel-core 21050 > 21042",
+     "maos-manifest 4707 > 4604",
+     "xtask 44410 > 44406"
+    ],
+    "per_crate": {
+     "maos-kernel-core": 21050,
+     "maos-manifest": 4707,
+     "maos-domain": 10099,
+     "maos-bin": 34192,
+     "maos-wasm-host": 2412,
+     "maos-spirit-abi": 1042,
+     "maos-registry": 4248,
+     "maos-skill": 1234,
+     "maos-iac": 8270,
+     "xtask": 44410
+    }
+   }
+  },
+  "kb4": {
+   "kernel": {
+    "passed": false,
+    "actual-lines": 26875,
+    "pinned-lines": 26841,
+    "file-set-entries": 95,
+    "set-hash": "82d04af3698b125f77b1396cb614cd5de15483e9c88684f6d668b29bb3215789",
+    "changed": [
+     "lifecycle/upgrade.rs",
+     "scheduler/control_block.rs"
+    ],
+    "added": [],
+    "removed": []
+   },
+   "kloc": {
+    "passed": false,
+    "aggregate": 192662,
+    "over_budget": [
+     "aggregate 192662 >= 192520",
+     "maos-bin 34195 > 34191",
+     "maos-kernel-core 21074 > 21042",
+     "maos-manifest 4707 > 4604",
+     "xtask 44410 > 44406"
+    ],
+    "per_crate": {
+     "maos-kernel-core": 21074,
+     "maos-manifest": 4707,
+     "maos-domain": 10099,
+     "maos-bin": 34195,
+     "maos-wasm-host": 2412,
+     "maos-spirit-abi": 1042,
+     "maos-registry": 4248,
+     "maos-skill": 1234,
+     "maos-iac": 8270,
+     "xtask": 44410
+    }
+   }
+  },
+  "ks": {
+   "kernel": {
+    "passed": false,
+    "actual-lines": 26879,
+    "pinned-lines": 26841,
+    "file-set-entries": 95,
+    "set-hash": "408c9896517cccdc9591f5ef5fce4f1228f220b62fba075567a8c42a217e2f8d",
+    "changed": [
+     "hot_swap/coordinator.rs",
+     "lifecycle/upgrade.rs",
+     "scheduler/control_block.rs"
+    ],
+    "added": [],
+    "removed": []
+   },
+   "kloc": {
+    "passed": false,
+    "aggregate": 192662,
+    "over_budget": [
+     "aggregate 192662 >= 192520",
+     "maos-bin 34192 > 34191",
+     "maos-domain 10101 > 10099",
+     "maos-kernel-core 21075 > 21042",
+     "maos-manifest 4707 > 4604",
+     "xtask 44410 > 44406"
+    ],
+    "per_crate": {
+     "maos-kernel-core": 21075,
+     "maos-manifest": 4707,
+     "maos-domain": 10101,
+     "maos-bin": 34192,
+     "maos-wasm-host": 2412,
+     "maos-spirit-abi": 1042,
+     "maos-registry": 4248,
+     "maos-skill": 1234,
+     "maos-iac": 8270,
+     "xtask": 44410
+    }
+   }
+  }
+ }
+}

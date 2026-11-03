@@ -1,0 +1,150 @@
+diff --git a/crates/maos-iac/src/adapter/payload.rs b/crates/maos-iac/src/adapter/payload.rs
+index 23baa16..cc9f09e 100644
+--- a/crates/maos-iac/src/adapter/payload.rs
++++ b/crates/maos-iac/src/adapter/payload.rs
+@@ -30,6 +30,17 @@ pub struct ScheduleFireRecord {
+     pub principal_revocability: bool,
+ }
+ 
++/// D07 A (20-9) — a fire suppressed because a declared side-effect scope's
++/// mint was refused; journaled instead of the fire.
++#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
++pub struct ScheduleSuppressedRecord {
++    pub spirit_id: String,
++    pub schedule_id: String,
++    /// `None` when no capability registry is wired.
++    pub refused_scope: Option<maos_domain::invariants::i1::Scope>,
++    pub reason: String,
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+diff --git a/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs b/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
+index 82e1497..8d89066 100644
+--- a/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
++++ b/crates/maos-kernel-core/src/scheduler/schedule_watchdog.rs
+@@ -33,8 +33,9 @@ use crate::iac::transparency_log::{FrameKind as TlFrameKind, TransparencyLogAdap
+ use crate::scheduler::control_block::{ScbLifecycleState, SpiritControlBlock};
+ use crate::scheduler::hook_dispatch::HookDispatcher;
+ use crate::security::manifest::ScheduleEntry;
+-use maos_domain::invariants::i1::{IntentClass, TokenId};
++use maos_domain::invariants::i1::{IntentClass, Scope, TokenId};
+ use maos_domain::invariants::i3::FrameOrigin;
++use maos_domain::ports::capability::CapabilityRegistryPort;
+ 
+ /// Per-schedule rate-limit bucket. Fractional refill is encoded as
+ /// f64 token-balance; on consume we top up by elapsed_ns × refill_per_sec.
+@@ -214,11 +215,19 @@ impl ScheduleWatchdog {
+             }
+ 
+             // Step 4 — mint only after admission (one token per Scope at v0.5).
+-            // The tokens attest authority at fire time and the TL row records
+-            // the first issued token_id; the hook ABI carries no token. `None`
+-            // when side_effect_scopes is empty, the registry is not wired, or
+-            // every mint was refused — the fire proceeds either way (FW-10).
+-            let token_id = self.issue_narrowed_token(&scb, &entry);
++            // D07 A: a refused declared scope suppresses the fire; the scopes
++            // already minted for it are revoked and the suppression is journaled.
++            let token_id = match self.issue_narrowed_token(&scb, &entry) {
++                Ok(token_id) => token_id,
++                Err((refused_scope, reason)) => {
++                    self.journal_suppressed(&scb, &entry, refused_scope, reason);
++                    self.last_fire_ns.insert(
++                        (scb.pid, entry.id.clone()),
++                        crate::capability::cap_tokens::monotonic_now_ns(),
++                    );
++                    continue;
++                }
++            };
+             let fired_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
+ 
+             // Write TL row BEFORE firing the hook (I2 log-before-deliver).
+@@ -300,21 +309,24 @@ impl ScheduleWatchdog {
+         !cap.has_active_tokens_for_pid(scb.pid)
+     }
+ 
++    /// `Ok(None)` for a scope-free entry; `Err` names the refused scope
++    /// (`None` when no registry is wired) after revoking every scope minted.
+     fn issue_narrowed_token(
+         &self,
+         scb: &SpiritControlBlock,
+         entry: &ScheduleEntry,
+-    ) -> Option<TokenId> {
++    ) -> Result<Option<TokenId>, (Option<Scope>, String)> {
+         if entry.side_effect_scopes.is_empty() {
+-            return None;
++            return Ok(None);
+         }
+-        let cap = self.capability.as_ref()?;
+-        // Issue one token per scope at v0.5; record the first token_id.
+-        let mut first_id: Option<TokenId> = None;
++        let Some(cap) = self.capability.as_ref() else {
++            return Err((None, "capability registry not wired".into()));
++        };
+         // TTL = 2 × cadence_secs capped at 300s per ADR-023 Standard
+         // intent_class (Story 6.4 AC2).
+         let ttl_secs = ((entry.cadence_secs.saturating_mul(2)).min(300)).max(1);
+         let posture_hash = [0u8; 32];
++        let mut minted = Vec::with_capacity(entry.side_effect_scopes.len());
+         for scope in &entry.side_effect_scopes {
+             match cap.issue_with_mediation(
+                 scb.pid,
+@@ -323,26 +335,41 @@ impl ScheduleWatchdog {
+                 posture_hash,
+                 IntentClass::Standard,
+             ) {
+-                Ok(token) => {
+-                    if first_id.is_none() {
+-                        first_id = Some(token.token_id);
+-                    }
+-                }
++                Ok(token) => minted.push(token.token_id),
+                 Err(e) => {
+-                    // Token issue failure (policy denial or quota exhaustion):
+-                    // the fire proceeds and its TL row attests the missing
+-                    // authority (TokenId::ZERO when no scope minted). The hook
+-                    // never receives a token, so nothing downstream enforces
+-                    // it. Story 11.4a CATCH-B forbids silent org-policy denies.
+-                    eprintln!(
+-                        "schedule-watchdog: capability token issue denied for spirit {}: {e}",
+-                        scb.pid
+-                    );
+-                    continue;
++                    for token_id in minted {
++                        let _ = CapabilityRegistryPort::revoke(cap.as_ref(), token_id);
++                    }
++                    return Err((Some(scope.clone()), e.to_string()));
+                 }
+             }
+         }
+-        first_id
++        Ok(minted.first().copied())
++    }
++
++    fn journal_suppressed(
++        &self,
++        scb: &SpiritControlBlock,
++        entry: &ScheduleEntry,
++        refused_scope: Option<Scope>,
++        reason: String,
++    ) {
++        let record = crate::iac::payload::ScheduleSuppressedRecord {
++            spirit_id: scb.spirit_id.clone(),
++            schedule_id: entry.id.clone(),
++            refused_scope,
++            reason,
++        };
++        if let Ok(payload) = serde_json::to_vec(&record) {
++            let _ = self.transparency_log.insert_frame_event(
++                TlFrameKind::CapabilityInvocation,
++                scb.pid,
++                None,
++                &format!("schedule.suppressed:{}", entry.id),
++                &payload,
++                FrameOrigin::Kernel,
++            );
++        }
+     }
+ }
+ 

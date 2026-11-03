@@ -1,0 +1,20 @@
+{
+  "command": "/usr/bin/ps -eo comm= | /usr/bin/sort -u",
+  "active_build_names": [],
+  "observed_command_names": [
+    "MainThread",
+    "chrome",
+    "chrome_crashpad",
+    "docker-init",
+    "herdr",
+    "omp",
+    "omp daemon brok",
+    "ps",
+    "python3",
+    "sh",
+    "sleep",
+    "sort",
+    "zed-remote-serv"
+  ],
+  "note": "ps reads /proc; no cargo/rustc/nextest/clippy/xtask command name observed"
+}

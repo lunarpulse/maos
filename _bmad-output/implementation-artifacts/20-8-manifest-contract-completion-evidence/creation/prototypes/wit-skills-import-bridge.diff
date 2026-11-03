@@ -1,0 +1,771 @@
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -116,6 +116,52 @@
+     );
+ }
+ 
++/// Story 20-8 (FR8) — journal the granted manifest's identity, signer and
++/// declarations as a `GovernanceEvent`, before the Spirit starts.
++pub fn emit_manifest_declaration_event(
++    tl: &maos_kernel_core::iac::TransparencyLogAdapter,
++    gated: &GatedManifest,
++) -> Result<(), String> {
++    use sha2::Digest;
++    let declared = [
++        ("skills", gated.skills.is_some()),
++        ("explanation_shape", gated.explanation_shape.is_some()),
++        ("intent_promotion_set", gated.intent_promotion_set.is_some()),
++        ("swap_invariants", gated.swap_invariants.is_some()),
++    ];
++    let now = std::time::SystemTime::now()
++        .duration_since(std::time::UNIX_EPOCH)
++        .unwrap_or(std::time::Duration::ZERO)
++        .as_nanos() as u64;
++    let payload = maos_domain::governance::GovernanceEventPayload {
++        recorded_at_ns: now,
++        effective_at_ns: now,
++        event: maos_domain::governance::GovernanceEventKind::ManifestDeclaration(
++            maos_domain::governance::ManifestDeclarationPayload {
++                spirit_id: gated.spirit_id.clone(),
++                version: gated.class_section.version.clone(),
++                manifest_sha256: hex::encode(sha2::Sha256::digest(gated.manifest_toml.as_bytes())),
++                publisher: gated.publisher.map(hex::encode),
++                declared: declared
++                    .iter()
++                    .filter(|(_, present)| *present)
++                    .map(|(name, _)| (*name).to_owned())
++                    .collect(),
++            },
++        ),
++    };
++    let bytes = serde_json::to_vec(&payload).map_err(|error| error.to_string())?;
++    tl.insert_frame_event(
++        maos_kernel_core::iac::transparency_log::FrameKind::GovernanceEvent,
++        0,
++        None,
++        "governance:manifest-declaration",
++        &bytes,
++        maos_domain::invariants::i3::FrameOrigin::Kernel,
++    );
++    Ok(())
++}
++
+ /// Story 20-3c (FR62(b), D-20-3c-05 B) — journal an ABI-extension proposal or a
+ /// status change as a `GovernanceEvent` (kind 28), carrying `recorded_at` (now)
+ /// and the operator's `effective_at`. `maos_audit::load_ratification_frames`
+@@ -459,6 +505,13 @@
+     pub on_crash: Option<OnCrashSection>,
+     pub on_revocation: Option<OnRevocationSection>,
+     pub supervision: Option<SupervisionSection>,
++    /// Story 20-8 (FR8) — the four declaration sections (schema 7).
++    pub skills: Option<maos_manifest::SkillsSection>,
++    pub explanation_shape: Option<maos_manifest::ExplanationShapeSection>,
++    pub intent_promotion_set: Option<maos_manifest::IntentPromotionSetSection>,
++    pub swap_invariants: Option<maos_manifest::SwapInvariantsSection>,
++    /// The verified publisher key of a signed installed package.
++    pub publisher: Option<[u8; 32]>,
+     /// The raw text, kept for the model-provenance gate, which parses its own
+     /// section out of the whole document, and for the FR11 archive record.
+     pub manifest_toml: String,
+@@ -694,6 +747,32 @@
+     let on_revocation =
+         optional_section(&root, "on_revocation", OnRevocationSection::from_toml_str)?;
+     let supervision = optional_section(&root, "supervision", SupervisionSection::from_toml_str)?;
++    // Story 20-8 (FR8) — below schema 7 the sections degrade (WARN at admit).
++    let fr8 = class_section.manifest_schema_version >= maos_manifest::FR8_DECLARATIONS_SINCE_SCHEMA;
++    let skills = fr8_section(
++        &root,
++        fr8,
++        "skills",
++        maos_manifest::SkillsSection::from_toml_str,
++    )?;
++    let explanation_shape = fr8_section(
++        &root,
++        fr8,
++        "explanation_shape",
++        maos_manifest::ExplanationShapeSection::from_toml_str,
++    )?;
++    let intent_promotion_set = fr8_section(
++        &root,
++        fr8,
++        "intent_promotion_set",
++        maos_manifest::IntentPromotionSetSection::from_toml_str,
++    )?;
++    let swap_invariants = fr8_section(
++        &root,
++        fr8,
++        "swap_invariants",
++        maos_manifest::SwapInvariantsSection::from_toml_str,
++    )?;
+     // The component's manifest has now passed every structural gate. The
+     // refusal is feature-selected because a published binary's engine closure
+     // is an export-control property, not runtime configuration.
+@@ -720,10 +799,29 @@
+         on_crash,
+         on_revocation,
+         supervision,
++        skills,
++        explanation_shape,
++        intent_promotion_set,
++        swap_invariants,
++        publisher: None,
+         manifest_toml: manifest_toml.to_owned(),
+     })
+ }
+ 
++/// Story 20-8 — an FR8 declaration section, read only at schema 7 or later.
++fn fr8_section<T, E: std::fmt::Display>(
++    root: &toml::Value,
++    fr8: bool,
++    name: &'static str,
++    parse: fn(&str) -> Result<T, E>,
++) -> Result<Option<T>, AdmissionRefusal> {
++    if fr8 {
++        optional_section(root, name, parse)
++    } else {
++        Ok(None)
++    }
++}
++
+ /// An optional `[name]` section, serialized the way `gate_manifest` serializes
+ /// every section and parsed by its manifest type. Absent ⇒ `None`; present and
+ /// malformed ⇒ the gate-7 refusal.
+@@ -945,6 +1043,10 @@
+         &format!("{:?}", spec.tier),
+         "admission granted",
+     );
++    if let Err(detail) = emit_manifest_declaration_event(deps.transparency_log, gated) {
++        rollback(deps, pid, &spirit_id).await;
++        return Err(AdmissionRefusal::Admission { detail });
++    }
+     // Story 19-5 (D-19-5-03 A) — only a GRANTED admission leaves the FR11
+     // identity record a later cross-major load is checked against.
+     archive_admitted(&archive_root, gated);
+--- a/crates/maos-bin/src/installed_spirits.rs
++++ b/crates/maos-bin/src/installed_spirits.rs
+@@ -22,8 +22,8 @@
+     ) -> Self {
+         let mut result = Self::default();
+         for (name, path) in manifests {
+-            let text = match maos_registry::install::verify_installed(&name, &path) {
+-                Ok(text) => text,
++            let (text, publisher) = match maos_registry::install::verify_installed(&name, &path) {
++                Ok(verified) => verified,
+                 Err(error) => {
+                     crate::admission::emit_vetter_key_event(
+                         deps.transparency_log,
+@@ -46,7 +46,8 @@
+             };
+             let admission = async {
+                 // Registry installs never introduce compiled-in first-party classes.
+-                let gated = crate::admission::gate_manifest(&text, &|_| false)?;
++                let mut gated = crate::admission::gate_manifest(&text, &|_| false)?;
++                gated.publisher = Some(publisher);
+                 if gated.spirit_id != name {
+                     return Err(AdmissionRefusal::ClassBuild {
+                         detail: "installed name differs from signed manifest".into(),
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -4264,6 +4264,20 @@
+             )) as Arc<dyn maos_domain::ports::LogRecallPort>)
+         })
+     };
++    // Story 20-8 — WASM Spirits reach 18-7's port through the `skills` import.
++    #[cfg(feature = "wasm-host")]
++    let wasm_skill = skill_store.as_ref().map(|store| {
++        maos_bin::skill_authoring::binder(
++            &capability,
++            &security,
++            &transparency_log,
++            &self_telemetry,
++            &scheduler.scbs(),
++            store,
++            enterprise_runtime.as_ref(),
++            enterprise_pdp_runtime.clone(),
++        )
++    });
+     *researcher_wiring
+         .lock()
+         .unwrap_or_else(|error| error.into_inner()) =
+@@ -4357,6 +4371,7 @@
+                     pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
+                     enterprise: enterprise_runtime.clone(),
+                     pdp: enterprise_pdp_runtime.clone(),
++                    skill: wasm_skill.clone(),
+                 }),
+         )
+         .await,
+@@ -6756,6 +6771,7 @@
+                                 pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
+                                 enterprise: enterprise_runtime.clone(),
+                                 pdp: enterprise_pdp_runtime.clone(),
++                                skill: wasm_skill.clone(),
+                             },
+                             admitted,
+                             core,
+--- a/crates/maos-bin/src/recall_mediation.rs
++++ b/crates/maos-bin/src/recall_mediation.rs
+@@ -27,6 +27,8 @@
+     spirit_id: String,
+     /// Story 18-5 — the session's pid- and window-bound context reporter.
+     pub context: Option<Arc<dyn maos_domain::ports::ContextBudgetPort>>,
++    /// Story 20-8 — the session's pid-bound skill port (18-7's native port).
++    pub skill: Option<Arc<dyn researcher::SkillAuthorPort>>,
+ }
+ 
+ /// Field order is part of the operator-only refusal receipt format.
+@@ -63,6 +65,7 @@
+             pdp,
+             spirit_id,
+             context: None,
++            skill: None,
+         }
+     }
+ 
+@@ -278,6 +281,23 @@
+                 let reply = wire::context_reply(self.context.as_deref(), used_tokens);
+                 return wire::encode_reply(&reply).map_err(|_| ProtocolViolation("context reply"));
+             }
++            // Story 20-8 — the port journals its own receipts (18-7).
++            RecallRequest::SkillAuthor { document } => {
++                let reply = skill_reply(self.skill.as_deref().map(|port| port.author(document)));
++                return wire::encode_reply(&reply).map_err(|_| ProtocolViolation("skill reply"));
++            }
++            RecallRequest::SkillPropose {
++                target_id,
++                target_version,
++                diff,
++            } => {
++                let reply = skill_reply(
++                    self.skill
++                        .as_deref()
++                        .map(|port| port.propose(target_id, target_version, diff)),
++                );
++                return wire::encode_reply(&reply).map_err(|_| ProtocolViolation("skill reply"));
++            }
+             RecallRequest::Recall { filter } => {
+                 let result = wire_filter(filter).and_then(|filter| self.recall_inner(pid, filter));
+                 let result = result
+@@ -412,6 +432,24 @@
+ }
+ 
+ #[cfg(feature = "wasm-host")]
++#[cfg(feature = "wasm-host")]
++fn skill_reply(
++    result: Option<Result<maos_skill::QueueEntry, researcher::SkillPortError>>,
++) -> maos_wasm_host::recall_wire::RecallReply {
++    use maos_wasm_host::recall_wire::{RecallReply, WireError};
++    match result {
++        Some(Ok(entry)) => RecallReply::Skill {
++            target: format!("{}@{}", entry.id, entry.version),
++            entry_id: entry.entry_id,
++        },
++        Some(Err(researcher::SkillPortError::CapabilityDenied)) => {
++            RecallReply::Error(WireError::CapabilityDenied)
++        }
++        Some(Err(error)) => RecallReply::Error(WireError::Refused(error.to_string())),
++        None => RecallReply::Error(WireError::Unavailable),
++    }
++}
++
+ fn wire_error(error: &LogRecallError) -> maos_wasm_host::recall_wire::WireError {
+     use maos_wasm_host::recall_wire::WireError;
+     match refusal_code(error) {
+--- a/crates/maos-bin/src/spirit_session.rs
++++ b/crates/maos-bin/src/spirit_session.rs
+@@ -68,6 +68,8 @@
+     pub pid_by_spirit_id: Arc<RwLock<BTreeMap<String, u32>>>,
+     pub enterprise: Option<Arc<EnterpriseRuntime>>,
+     pub pdp: Option<EnterprisePdpRuntime>,
++    /// Story 20-8 — 18-7's skill-port binder; `None` ⇒ `unavailable`.
++    pub skill: Option<crate::skill_authoring::SkillBuilder>,
+ }
+ 
+ pub struct SessionLaunch {
+@@ -79,6 +81,8 @@
+     pub context_window: maos_kernel_core::capability::context_budget::ContextWindow,
+     pub once: bool,
+     pub initial_frame: Option<IacFrame>,
++    /// Story 20-8 — the admitted declared scopes the skill port checks.
++    pub scopes: Vec<maos_domain::invariants::i1::Scope>,
+ }
+ 
+ /// Resolve metadata before admission; component validation stays in the T2 child.
+@@ -145,6 +149,7 @@
+         context_window: crate::butler_root::context_window(gated.budget.as_ref()),
+         once,
+         initial_frame,
++        scopes: maos_manifest::capabilities_required_to_scopes(&gated.caps_required),
+     })
+ }
+ 
+@@ -367,6 +372,13 @@
+                 Arc::clone(deps.iac.transparency_log()),
+                 Arc::new(move || Some(spirit.clone())),
+             )));
++            let pid = admitted.pid;
++            recall.skill = deps
++                .skill
++                .as_ref()
++                .map(|bind| bind(Arc::new(move || Some(pid)), &launch.scopes))
++                .transpose()
++                .map_err(SessionError::Bridge)?;
+             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));
+             let runtime = tokio::runtime::Handle::current();
+             loop {
+--- a/crates/maos-domain/src/governance.rs
++++ b/crates/maos-domain/src/governance.rs
+@@ -144,6 +144,21 @@
+     pub version: u32,
+ }
+ 
++/// Story 20-8 (FR8) — the admitted manifest's identity and declarations:
++/// what was admitted, by whose signature, declaring which FR8 sections.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ManifestDeclarationPayload {
++    pub spirit_id: String,
++    pub version: String,
++    /// Lowercase hex SHA-256 of the exact admitted manifest bytes.
++    pub manifest_sha256: String,
++    /// Lowercase hex publisher Ed25519 key for a verified signed package;
++    /// `None` for an unsigned local manifest.
++    pub publisher: Option<String>,
++    /// FR8 declaration sections present, in schema order.
++    pub declared: Vec<String>,
++}
++
+ /// Story 17-4 (AC2.7) — the host started or stopped delivering every
+ /// `scalar.tap` write in the root to one admitted subscriber. The right comes
+ /// from operator admission of a compiled-in Observer-class Spirit.
+@@ -186,6 +201,8 @@
+     ModelProvenance(ModelProvenancePayload),
+     /// Telemetry-subscription grant/revoke (Story 17-4 AC2.7).
+     TelemetrySubscription(TelemetrySubscriptionPayload),
++    /// Story 20-8 (FR8) — signed/unsigned manifest declaration record.
++    ManifestDeclaration(ManifestDeclarationPayload),
+ }
+ 
+ /// Payload for governance TL frames (`FrameKind::GovernanceEvent` = 28).
+--- a/crates/maos-manifest/src/manifest.rs
++++ b/crates/maos-manifest/src/manifest.rs
+@@ -322,6 +322,9 @@
+ /// Story 17-3b (D-17-3b-G) — upper bound on `[class].artifact`'s byte length.
+ const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
+ 
++/// Story 20-8 (FR8) — the first schema carrying the four declaration sections.
++pub const FR8_DECLARATIONS_SINCE_SCHEMA: u32 = 7;
++
+ /// Schema sections added AFTER `manifest_schema_version = 1` (Epic 6 §A4 bump,
+ /// retro 2026-05-28): `[[cli_wrapper]]`, `[[schedule]]`, `[gateway]`; and the
+ /// schema-v3 bump (Story 9.4b AC-6): `[model_provenance]`. A manifest authored
+@@ -334,7 +337,7 @@
+ /// gate reports the constant as missing. Keep the declaration on one physical
+ /// line and out of doc comments above it.
+ #[rustfmt::skip]
+-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log", "capabilities.required.skill"];
++const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log", "capabilities.required.skill", "skills", "explanation_shape", "intent_promotion_set", "swap_invariants"];
+ 
+ /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
+ /// newer-than-declared schema section that an N-1 manifest omits (and thus
+@@ -4100,6 +4103,139 @@
+     }
+ }
+ 
++// ------------------------------------------------------------------
++// Story 20-8 (FR8) — `[skills]`, `[explanation_shape]`,
++// `[intent_promotion_set]`, `[swap_invariants]` (schema 7). Each is a
++// bounded, duplicate-free name list; absent ⇒ `None` at the gate.
++// ------------------------------------------------------------------
++
++/// `[skills]` — the admitted skill ids (ADR-027) this Spirit uses.
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct SkillsSection {
++    pub uses: Vec<String>,
++}
++
++/// `[explanation_shape]` — the "because" fields every `DecisionDispatch`
++/// frame this Spirit emits must carry (architecture §5.1).
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct ExplanationShapeSection {
++    pub required_fields: Vec<String>,
++}
++
++/// `[intent_promotion_set]` — the intents a digest this Spirit consumes may
++/// carry in its `intent_lineage` (I13, `EIntentPromotionDenied`).
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct IntentPromotionSetSection {
++    pub allowed: Vec<String>,
++}
++
++/// `[swap_invariants]` — HSIS invariant names a successor must preserve.
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct SwapInvariantsSection {
++    pub preserve: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawSkillsSection {
++    uses: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawExplanationShapeSection {
++    required_fields: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawIntentPromotionSetSection {
++    allowed: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawSwapInvariantsSection {
++    preserve: Vec<String>,
++}
++
++/// One declaration list: 1..=32 entries, each 1..=128 bytes of
++/// `[a-z0-9_.:-]`, no duplicates.
++fn declared_names(field: &str, names: Vec<String>) -> Result<Vec<String>, ManifestError> {
++    if names.is_empty() || names.len() > 32 {
++        return Err(ManifestError::Toml(validation_msg(
++            field,
++            &format!("needs 1..=32 entries, got {}", names.len()),
++        )));
++    }
++    let mut seen = std::collections::BTreeSet::new();
++    for name in &names {
++        let valid = (1..=128).contains(&name.len())
++            && name
++                .bytes()
++                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._:_-".contains(&b));
++        if !valid || !seen.insert(name.as_str()) {
++            return Err(ManifestError::Toml(validation_msg(
++                field,
++                &format!("invalid or duplicate entry '{name}'"),
++            )));
++        }
++    }
++    Ok(names)
++}
++
++fn parse_raw<T: serde::de::DeserializeOwned>(s: &str) -> Result<T, ManifestError> {
++    toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))
++}
++
++impl SkillsSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawSkillsSection = parse_raw(s)?;
++        Ok(Self {
++            uses: declared_names("skills.uses", raw.uses)?,
++        })
++    }
++}
++
++impl ExplanationShapeSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawExplanationShapeSection = parse_raw(s)?;
++        Ok(Self {
++            required_fields: declared_names(
++                "explanation_shape.required_fields",
++                raw.required_fields,
++            )?,
++        })
++    }
++}
++
++impl IntentPromotionSetSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawIntentPromotionSetSection = parse_raw(s)?;
++        Ok(Self {
++            allowed: declared_names("intent_promotion_set.allowed", raw.allowed)?,
++        })
++    }
++
++    /// The I13 consumer set the distillate admission check reads.
++    pub fn to_allowed_set(&self) -> maos_domain::invariants::i13::AllowedPromotionSet {
++        let mut set = maos_domain::invariants::i13::AllowedPromotionSet::new();
++        for intent in &self.allowed {
++            set.insert(maos_domain::invariants::i8::A2AIntent::new(intent));
++        }
++        set
++    }
++}
++
++impl SwapInvariantsSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawSwapInvariantsSection = parse_raw(s)?;
++        Ok(Self {
++            preserve: declared_names("swap_invariants.preserve", raw.preserve)?,
++        })
++    }
++}
++
+ #[cfg(test)]
+ mod hot_swap_manifest_tests {
+     use super::*;
+--- a/crates/maos-registry/src/install.rs
++++ b/crates/maos-registry/src/install.rs
+@@ -108,7 +108,7 @@
+ 
+ /// Recheck the actual installed package at each boot, not merely its inventory
+ /// entry. Only return manifest bytes whose publisher, claim and component agree.
+-pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<String, Error> {
++pub fn verify_installed(name: &str, manifest_path: &Path) -> Result<(String, [u8; 32]), Error> {
+     let directory = manifest_path.parent().ok_or("install has no directory")?;
+     let pkg: SignedPackage =
+         serde_json::from_slice(&std::fs::read(directory.join("signed_package.json"))?)?;
+@@ -146,7 +146,7 @@
+     {
+         return Err(format!("installed ComplianceClaim refused: {reason:?}").into());
+     }
+-    Ok(String::from_utf8(pkg.manifest_toml)?)
++    Ok((String::from_utf8(pkg.manifest_toml)?, pkg.publisher_pubkey))
+ }
+ 
+ /// Same [registry] keys and env precedence as the daemon, with fail-closed parsing.
+--- a/crates/maos-spirit-abi/src/lib.rs
++++ b/crates/maos-spirit-abi/src/lib.rs
+@@ -31,6 +31,7 @@
+ //! | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
+ //! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
+ //! | `MANIFEST_SCHEMA_VERSION = 6` | Story 18-7 | Runtime `[capabilities.required.skill]` |
++//! | `MANIFEST_SCHEMA_VERSION = 7` | Story 20-8 | `[skills]`, `[explanation_shape]`, `[intent_promotion_set]`, `[swap_invariants]` |
+ //!
+ //! ## Modules
+ //! | Module | Description | Introduced |
+@@ -117,9 +118,9 @@
+ /// ```rust
+ /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
+ ///
+-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 6);
++/// assert_eq!(MANIFEST_SCHEMA_VERSION, 7);
+ /// ```
+-pub const MANIFEST_SCHEMA_VERSION: u32 = 6;
++pub const MANIFEST_SCHEMA_VERSION: u32 = 7;
+ 
+ /// Lowest manifest schema version this kernel accepts at admission.
+ ///
+--- a/crates/maos-wasm-host/src/host_state.rs
++++ b/crates/maos-wasm-host/src/host_state.rs
+@@ -14,6 +14,7 @@
+ use crate::recall_wire::{self as wire, RecallReply, RecallRequest, WireBytes, WireError};
+ use crate::wit_guest::maos::spirit::context as ctx;
+ use crate::wit_guest::maos::spirit::recall as wit;
++use crate::wit_guest::maos::spirit::skills as sk;
+ use wasmtime::component::ResourceTable;
+ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+ 
+@@ -210,6 +211,38 @@
+     }
+ }
+ 
++impl HostState {
++    fn skill(&mut self, request: RecallRequest) -> Result<sk::Queued, sk::SkillError> {
++        match self.exchange(request) {
++            Ok(RecallReply::Skill { entry_id, target }) => Ok(sk::Queued { entry_id, target }),
++            Ok(RecallReply::Error(WireError::CapabilityDenied)) => {
++                Err(sk::SkillError::CapabilityDenied)
++            }
++            Ok(RecallReply::Error(WireError::Refused(code))) => Err(sk::SkillError::Refused(code)),
++            Ok(_) => Err(self.desync()).map_err(|_| sk::SkillError::Unavailable),
++            Err(_) => Err(sk::SkillError::Unavailable),
++        }
++    }
++}
++
++impl sk::Host for HostState {
++    fn author(&mut self, document: String) -> Result<sk::Queued, sk::SkillError> {
++        self.skill(RecallRequest::SkillAuthor { document })
++    }
++    fn propose(
++        &mut self,
++        target_id: String,
++        target_version: String,
++        diff: String,
++    ) -> Result<sk::Queued, sk::SkillError> {
++        self.skill(RecallRequest::SkillPropose {
++            target_id,
++            target_version,
++            diff,
++        })
++    }
++}
++
+ impl From<WireError> for wit::RecallError {
+     fn from(error: WireError) -> Self {
+         match error {
+@@ -220,7 +253,7 @@
+             WireError::CapabilityDenied => Self::CapabilityDenied,
+             WireError::ConsentWithheld => Self::ConsentWithheld,
+             WireError::ReplyTooLarge(bound) => Self::ReplyTooLarge(bound),
+-            WireError::Unavailable => Self::Unavailable,
++            WireError::Unavailable | WireError::Refused(_) => Self::Unavailable,
+         }
+     }
+ }
+--- a/crates/maos-wasm-host/src/recall_wire.rs
++++ b/crates/maos-wasm-host/src/recall_wire.rs
+@@ -77,6 +77,16 @@
+     Context {
+         used_tokens: u32,
+     },
++    /// Story 20-8 — `skills.author`; the daemon binds the author.
++    SkillAuthor {
++        document: String,
++    },
++    /// Story 20-8 — `skills.propose` against one of the caller's skills.
++    SkillPropose {
++        target_id: String,
++        target_version: String,
++        diff: String,
++    },
+ }
+ #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+ pub enum WireError {
+@@ -88,6 +98,8 @@
+     ConsentWithheld,
+     ReplyTooLarge(u64),
+     Unavailable,
++    /// Story 20-8 — a skill-port refusal code (`SkillPortError` display).
++    Refused(String),
+ }
+ impl WireError {
+     /// WIT case name, also used by the daemon's refusal receipts.
+@@ -101,6 +113,7 @@
+             Self::ConsentWithheld => "consent-withheld",
+             Self::ReplyTooLarge(_) => "reply-too-large",
+             Self::Unavailable => "unavailable",
++            Self::Refused(_) => "refused",
+         }
+     }
+ }
+@@ -127,6 +140,11 @@
+         level: u8,
+         crossed: Option<u8>,
+     },
++    /// Story 20-8 — the queued entry's id and approval target.
++    Skill {
++        entry_id: String,
++        target: String,
++    },
+     Error(WireError),
+ }
+ 
+--- a/crates/maos-wasm-host/src/runner.rs
++++ b/crates/maos-wasm-host/src/runner.rs
+@@ -252,6 +252,11 @@
+         wasmtime::component::HasSelf<HostState>,
+     >(&mut linker, |state| state)
+     .map_err(|e| RunError::Other(format!("context linker setup: {e}")))?;
++    maos_wasm_host::wit_guest::maos::spirit::skills::add_to_linker::<
++        _,
++        wasmtime::component::HasSelf<HostState>,
++    >(&mut linker, |state| state)
++    .map_err(|e| RunError::Other(format!("skills linker setup: {e}")))?;
+     // 2.0/2.1 have the same export schema, but its input enums are closed:
+     // select their bindings before instantiation rather than widening them.
+     macro_rules! run_guest {
+@@ -265,7 +270,7 @@
+                 return Err(RunError::OutOfFuel);
+             }
+             return Err(RunError::InvalidComponent(format!(
+-                "component does not conform to maos:spirit@2.2.0 (instantiate failed): {error_message}"
++                "component does not conform to maos:spirit@2.3.0 (instantiate failed): {error_message}"
+             )));
+         }
+     };
+@@ -366,7 +371,8 @@
+             let version = name
+                 .strip_prefix("maos:spirit/frames@")
+                 .or_else(|| name.strip_prefix("maos:spirit/recall@"))
+-                .or_else(|| name.strip_prefix("maos:spirit/context@"))?;
++                .or_else(|| name.strip_prefix("maos:spirit/context@"))
++                .or_else(|| name.strip_prefix("maos:spirit/skills@"))?;
+             let major = version.split('.').next()?.parse::<u64>().ok()?;
+             (major != 2).then(|| name.to_owned())
+         })
+--- a/crates/maos-wasm-host/src/wit_guest.rs
++++ b/crates/maos-wasm-host/src/wit_guest.rs
+@@ -1,4 +1,4 @@
+-//! Wasmtime-generated host bindings for the `maos:spirit@2.2.0` world.
++//! Wasmtime-generated host bindings for the `maos:spirit@2.3.0` world.
+ //!
+ //! Real component-model call path (Story 11.1a AC3) — NOT a hand-rolled
+ //! echo loop. The `bindgen!` macro reads `wit/spirit.wit` at compile time
+--- a/wit/spirit.wit
++++ b/wit/spirit.wit
+@@ -1,5 +1,5 @@
+-// `maos:spirit@2.2.0` — lossless frames, participant-scoped log recall and
+-// Spirit-self-reported context budgets.
++// `maos:spirit@2.3.0` — lossless frames, participant-scoped log recall,
++// Spirit-self-reported context budgets and governed skill authoring.
+ //
+ // Story 11.1a, ADR-031 §3: this WIT is the typed face a WASM Spirit author
+ // binds against (wit-bindgen, `jco guest-types`). The host serializes and
+@@ -17,6 +17,7 @@
+ // interface frames. The daemon binds identity and grants on the stdio channel.
+ // Story 18-5 (ADR-016, `18-5-AC3-wit-spirit-2.2.0`) adds the kernel-written
+ // `context-pressure`/`context-limit` frames and the `context` report import.
++// Story 20-8 (D-18-7-11 A, `20-8-wit-spirit-2.3.0`) adds the `skills` import.
+ //
+ // Every byte of this file feeds the four provenance-pinned components'
+ // `source_sha256` (`tests/fixtures/wasm/equiv-fixtures.provenance.toml`): an
+@@ -27,7 +28,7 @@
+ //   FramePayload / IacFrame  — crates/maos-domain/src/frame.rs
+ //   Scope                    — crates/maos-domain/src/invariants/i1.rs
+ 
+-package maos:spirit@2.2.0;
++package maos:spirit@2.3.0;
+ 
+ interface frames {
+     // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
+@@ -368,6 +369,23 @@
+     report: func(used-tokens: u32) -> result<context-status, context-error>;
+ }
+ 
++interface skills {
++    // ADR-024 / FR39 / FR57: queue a skill for operator admission. The host
++    // binds pid, class and the telemetry evidence; a guest never names an
++    // author, and admission stays operator-only. Callable only inside
++    // `handle-frame`; otherwise `unavailable`.
++    record queued { entry-id: string, target: string }
++
++    variant skill-error {
++        capability-denied,
++        refused(string),               // the port's typed refusal code
++        unavailable,
++    }
++
++    author: func(document: string) -> result<queued, skill-error>;
++    propose: func(target-id: string, target-version: string, diff: string) -> result<queued, skill-error>;
++}
++
+ // The Spirit world a WASM-component author implements. The host
+ // (maos-wasm-host's `maos-wasm-runner`) drives it: feeds inbound frames decoded
+ // from the ADR-032 stdio stream, and writes the guest's emitted frames back to
+@@ -379,6 +397,7 @@
+     use frames.{iac-frame, halt};
+     import recall;
+     import context;
++    import skills;
+ 
+     // host → guest: deliver one inbound frame, get zero-or-more emitted
+     // frames. A returned `halt` ends the session (maps to the ADR-032
+--- a/xtask/src/check_manifest_schema_version.rs
++++ b/xtask/src/check_manifest_schema_version.rs
+@@ -45,6 +45,11 @@
+     "capabilities.required.iac",
+     "capabilities.required.log",
+     "capabilities.required.skill",
++    // 20-8 FR8 declarations (ABI ratification `20-8-manifest-schema-7`), on schema 7.
++    "skills",
++    "explanation_shape",
++    "intent_promotion_set",
++    "swap_invariants",
+ ];
+ 
+ /// Parse `pub const NAME: u32 = N;` (or an alias to another such const) from a

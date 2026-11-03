@@ -1,0 +1,9 @@
+{
+  "gate": "check-test-budget",
+  "passed": true,
+  "junit": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/workspace-serial-final-junit.xml",
+  "binaries": 598,
+  "total_span_seconds": 642.2620093822479,
+  "total_sum_seconds": 642.1449999999995,
+  "findings": []
+}

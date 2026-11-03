@@ -135,3 +135,25 @@ replacement = "gpt-5.6-luna"
 # unlisted — `main.rs` constructs `OllamaProvider` with `llama3.1:8b`.
 [providers.ollama]
 allowed = ["llama3.1:8b"]
+
+# 20-4: policy D-20-4-03, superseded for Kimi by D-20-4-12 B (ask d204_12).
+# Re-verified 2026-11-03: https://ai.google.dev/gemini-api/docs/models
+# https://platform.kimi.ai/docs/guide/kimi-k3-1-pro-quickstart.md
+# https://platform.kimi.ai/docs/pricing/chat.md (K2 restricted/retiring).
+[providers.gemini]
+allowed = ["gemini-3.5-flash-lite"]
+
+[providers.kimi]
+allowed = ["kimi-k3.1-pro"]
+
+[[providers.kimi.retired]]
+id = "kimi-k2.6"
+replacement = "kimi-k3.1-pro"
+
+[[providers.kimi.retired]]
+id = "kimi-k2.7-code"
+replacement = "kimi-k3.1-pro"
+
+[[providers.kimi.retired]]
+id = "kimi-k2.7-code-highspeed"
+replacement = "kimi-k3.1-pro"

@@ -48,7 +48,8 @@ fn openai_round_trip_with_fixture_response() {
         "https://api.openai.com".into(),
         "gpt-4o-mini".into(),
         "fake-key".into(),
-    );
+    )
+    .unwrap();
     let resp = provider.complete(&sample_request()).unwrap();
     assert_eq!(resp.text, "Greetings from OpenAI!");
     assert!(matches!(resp.stop_reason, StopReason::StopSequence));
@@ -66,7 +67,8 @@ fn openai_round_trip_with_max_tokens_fixture() {
         "https://api.openai.com".into(),
         "gpt-4o-mini".into(),
         "fake-key".into(),
-    );
+    )
+    .unwrap();
     let resp = provider.complete(&sample_request()).unwrap();
     assert!(matches!(resp.stop_reason, StopReason::MaxTokens));
     assert_eq!(resp.usage.input_tokens, 2);
@@ -82,7 +84,8 @@ fn openai_round_trip_with_error_fixture() {
         "https://api.openai.com".into(),
         "gpt-4o-mini".into(),
         "fake-key".into(),
-    );
+    )
+    .unwrap();
     let result = provider.complete(&sample_request());
     assert!(
         result.is_err(),

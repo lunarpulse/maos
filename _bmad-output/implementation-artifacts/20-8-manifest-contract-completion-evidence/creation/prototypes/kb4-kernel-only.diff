@@ -1,0 +1,65 @@
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -384,6 +384,27 @@
+         .and_then(|v| toml::to_string(v).ok())
+         .map(|s| crate::security::manifest::Budget::from_toml_str(&s))
+         .transpose()?;
++    // Story 20-8 (FR8) — the successor's declarations, as at admission.
++    let skills = root
++        .get("skills")
++        .and_then(|v| toml::to_string(v).ok())
++        .map(|s| SkillsSection::from_toml_str(&s))
++        .transpose()?;
++    let explanation_shape = root
++        .get("explanation_shape")
++        .and_then(|v| toml::to_string(v).ok())
++        .map(|s| ExplanationShapeSection::from_toml_str(&s))
++        .transpose()?;
++    let intent_promotion_set = root
++        .get("intent_promotion_set")
++        .and_then(|v| toml::to_string(v).ok())
++        .map(|s| IntentPromotionSetSection::from_toml_str(&s))
++        .transpose()?;
++    let swap_invariants = root
++        .get("swap_invariants")
++        .and_then(|v| toml::to_string(v).ok())
++        .map(|s| SwapInvariantsSection::from_toml_str(&s))
++        .transpose()?;
+ 
+     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
+     // reads the array under the `schedule` key; we synthesize a doc that
+@@ -425,5 +446,9 @@
+         schedules,
+         gateways,
+         budget,
++        skills,
++        explanation_shape,
++        intent_promotion_set,
++        swap_invariants,
+     })
+ }
+--- a/crates/maos-kernel-core/src/scheduler/control_block.rs
++++ b/crates/maos-kernel-core/src/scheduler/control_block.rs
+@@ -216,6 +216,11 @@
+     /// `Some` ⇒ `budget.time_cap_seconds` is the per-Spirit hook cap. The kernel
+     /// holds the value but never learns *what* the budget bounds (no LLM types).
+     pub budget: Option<crate::security::manifest::Budget>,
++    /// Story 20-8 (FR8) — declarations a swap reads from the live SCB.
++    pub skills: Option<crate::security::manifest::SkillsSection>,
++    pub explanation_shape: Option<crate::security::manifest::ExplanationShapeSection>,
++    pub intent_promotion_set: Option<crate::security::manifest::IntentPromotionSetSection>,
++    pub swap_invariants: Option<crate::security::manifest::SwapInvariantsSection>,
+ }
+ 
+ impl Default for SpiritManifestBundle {
+@@ -233,6 +238,10 @@
+             schedules: SchedulesSection::default(),
+             gateways: GatewaysSection::default(),
+             budget: None,
++            skills: None,
++            explanation_shape: None,
++            intent_promotion_set: None,
++            swap_invariants: None,
+         }
+     }
+ }

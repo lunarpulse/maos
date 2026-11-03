@@ -40,14 +40,9 @@ impl AnthropicProvider {
             // store-level telemetry, and the composition root degrades to a
             // provider-less boot instead of exiting 78.
             .map_err(|_| ProviderError::Unconfigured)?
-            .filter(|key| !key.trim().is_empty())
+            .filter(|key| !key.is_empty())
             .ok_or(ProviderError::Unconfigured)?;
-        Ok(Self::with_api_key(
-            transport,
-            endpoint_url,
-            model_id,
-            api_key,
-        ))
+        Self::with_api_key(transport, endpoint_url, model_id, api_key)
     }
 
     /// Create from an explicit API key (for tests).
@@ -57,13 +52,14 @@ impl AnthropicProvider {
         endpoint_url: String,
         model_id: String,
         api_key: String,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, ProviderError> {
+        crate::provider::validate_api_key(SecretKey::AnthropicApiKey, &api_key)?;
+        Ok(Self {
             api_key,
             endpoint_url,
             model_id,
             transport,
-        }
+        })
     }
 }
 
@@ -345,7 +341,8 @@ mod tests {
             "https://api.anthropic.com".into(),
             "claude-3-haiku-20240307".into(),
             "fake-key".into(),
-        );
+        )
+        .unwrap();
         let req = sample_request();
         let resp = provider.complete(&req).unwrap();
         assert_eq!(resp.text, "Mock reply");
@@ -365,7 +362,8 @@ mod tests {
             "https://api.anthropic.com".into(),
             "claude-3-haiku-20240307".into(),
             "fake-key".into(),
-        );
+        )
+        .unwrap();
         let mut req = sample_request();
         req.options.model_id = Some("claude-sonnet-5-5".into());
         assert_eq!(

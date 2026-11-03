@@ -1,0 +1,677 @@
+[
+  {
+    "code": "unused_variables",
+    "message": "unused variable: `on_confidence_below`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1431,
+        "end": 1431
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 461,
+        "end": 461
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_map",
+    "message": "manual implementation of `Option::map`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1446,
+        "end": 1450
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1677,
+        "end": 1683
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1989,
+        "end": 1989
+      }
+    ]
+  },
+  {
+    "code": "clippy::chunks_exact_to_as_chunks",
+    "message": "using `chunks_exact` with a constant chunk size",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 2003,
+        "end": 2003
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 4887,
+        "end": 4891
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 4904,
+        "end": 4908
+      }
+    ]
+  },
+  {
+    "code": "unused_imports",
+    "message": "unused import: `InferenceOptions`",
+    "spans": [
+      {
+        "file": "crates/maos-providers/src/anthropic.rs",
+        "start": 10,
+        "end": 10
+      }
+    ]
+  },
+  {
+    "code": "unused_imports",
+    "message": "unused import: `InferenceOptions`",
+    "spans": [
+      {
+        "file": "crates/maos-providers/src/openai.rs",
+        "start": 11,
+        "end": 11
+      }
+    ]
+  },
+  {
+    "code": "unused_imports",
+    "message": "unused import: `maos_mcp::McpClient`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 1445,
+        "end": 1445
+      }
+    ]
+  },
+  {
+    "code": "dead_code",
+    "message": "fields `purpose` and `stability` are never read",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/env_contract.rs",
+        "start": 3,
+        "end": 3
+      },
+      {
+        "file": "crates/maos-bin/src/env_contract.rs",
+        "start": 4,
+        "end": 4
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 172,
+        "end": 172
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 728,
+        "end": 737
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 2458,
+        "end": 2462
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 7644,
+        "end": 7644
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 8225,
+        "end": 8235
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 10272,
+        "end": 10272
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_inspect",
+    "message": "using `map_err` over `inspect_err`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 10311,
+        "end": 10311
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 10583,
+        "end": 10592
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 11908,
+        "end": 11917
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (16/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 11982,
+        "end": 12019
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 12764,
+        "end": 12773
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_guards",
+    "message": "redundant guard",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 13818,
+        "end": 13818
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 14756,
+        "end": 14756
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 16495,
+        "end": 16495
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 16558,
+        "end": 16558
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 16686,
+        "end": 16686
+      }
+    ]
+  },
+  {
+    "code": "unused_imports",
+    "message": "unused import: `maos_mcp::McpClient`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 1445,
+        "end": 1445
+      }
+    ]
+  },
+  {
+    "code": "dead_code",
+    "message": "struct `EnvVar` is never constructed",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/env_contract.rs",
+        "start": 1,
+        "end": 1
+      }
+    ]
+  },
+  {
+    "code": "dead_code",
+    "message": "enum `EnvStability` is never used",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/env_contract.rs",
+        "start": 8,
+        "end": 8
+      }
+    ]
+  },
+  {
+    "code": "dead_code",
+    "message": "constant `MAOS_ENV_REGISTRY` is never used",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/env_contract.rs",
+        "start": 13,
+        "end": 13
+      }
+    ]
+  },
+  {
+    "code": "dead_code",
+    "message": "function `lookup` is never used",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/env_contract.rs",
+        "start": 658,
+        "end": 658
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrows_for_generic_args",
+    "message": "the borrowed expression implements the required traits",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 172,
+        "end": 172
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 728,
+        "end": 737
+      }
+    ]
+  },
+  {
+    "code": "clippy::type_complexity",
+    "message": "very complex type used. Consider factoring parts into `type` definitions",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 2458,
+        "end": 2462
+      }
+    ]
+  },
+  {
+    "code": "clippy::useless_format",
+    "message": "useless use of `format!`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 7644,
+        "end": 7644
+      }
+    ]
+  },
+  {
+    "code": "clippy::field_reassign_with_default",
+    "message": "field assignment outside of initializer for an instance created with Default::default()",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 8225,
+        "end": 8235
+      }
+    ]
+  },
+  {
+    "code": "clippy::needless_borrow",
+    "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 10272,
+        "end": 10272
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_inspect",
+    "message": "using `map_err` over `inspect_err`",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 10311,
+        "end": 10311
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 10583,
+        "end": 10592
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 11908,
+        "end": 11917
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (16/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 11982,
+        "end": 12019
+      }
+    ]
+  },
+  {
+    "code": "clippy::too_many_arguments",
+    "message": "this function has too many arguments (8/7)",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 12764,
+        "end": 12773
+      }
+    ]
+  },
+  {
+    "code": "clippy::redundant_guards",
+    "message": "redundant guard",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 13818,
+        "end": 13818
+      }
+    ]
+  },
+  {
+    "code": "clippy::cloned_ref_to_slice_refs",
+    "message": "unnecessary use of `clone` to create a slice from a reference",
+    "spans": [
+      {
+        "file": "crates/maos-bin/src/main.rs",
+        "start": 14756,
+        "end": 14756
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/j_researcher_survey_18_3.rs",
+        "start": 1103,
+        "end": 1103
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/hook_pump_17_4.rs",
+        "start": 1403,
+        "end": 1403
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/hook_pump_17_4.rs",
+        "start": 1683,
+        "end": 1683
+      }
+    ]
+  },
+  {
+    "code": "clippy::await_holding_lock",
+    "message": "this `MutexGuard` is held across an await point",
+    "spans": [
+      {
+        "file": "crates/maos-bin/tests/hook_pump_17_4.rs",
+        "start": 1874,
+        "end": 1874
+      }
+    ]
+  },
+  {
+    "code": "unused_imports",
+    "message": "unused import: `CryptoProvider`",
+    "spans": [
+      {
+        "file": "crates/maos-secrets/tests/at_rest_seal.rs",
+        "start": 26,
+        "end": 26
+      }
+    ]
+  },
+  {
+    "code": "unused_imports",
+    "message": "unused imports: `InferenceResponse`, `ProviderAttribution`, and `TokenUsage`",
+    "spans": [
+      {
+        "file": "crates/maos-providers/tests/openai_round_trip_test.rs",
+        "start": 9,
+        "end": 9
+      },
+      {
+        "file": "crates/maos-providers/tests/openai_round_trip_test.rs",
+        "start": 9,
+        "end": 9
+      },
+      {
+        "file": "crates/maos-providers/tests/openai_round_trip_test.rs",
+        "start": 10,
+        "end": 10
+      }
+    ]
+  },
+  {
+    "code": "unused_variables",
+    "message": "unused variable: `on_confidence_below`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1431,
+        "end": 1431
+      }
+    ]
+  },
+  {
+    "code": "clippy::unnecessary_map_or",
+    "message": "this `map_or` can be simplified",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 461,
+        "end": 461
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_map",
+    "message": "manual implementation of `Option::map`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1446,
+        "end": 1450
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1677,
+        "end": 1683
+      }
+    ]
+  },
+  {
+    "code": "clippy::manual_is_multiple_of",
+    "message": "manual implementation of `.is_multiple_of()`",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 1989,
+        "end": 1989
+      }
+    ]
+  },
+  {
+    "code": "clippy::chunks_exact_to_as_chunks",
+    "message": "using `chunks_exact` with a constant chunk size",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 2003,
+        "end": 2003
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 4887,
+        "end": 4891
+      }
+    ]
+  },
+  {
+    "code": "clippy::derivable_impls",
+    "message": "this `impl` can be derived",
+    "spans": [
+      {
+        "file": "crates/maos-manifest/src/manifest.rs",
+        "start": 4904,
+        "end": 4908
+      }
+    ]
+  }
+]

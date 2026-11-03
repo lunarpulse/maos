@@ -2277,6 +2277,7 @@ async fn admitted_class_bundle(
         .unwrap_or_else(|refusal| panic!("class manifest: {refusal}"));
     let admitted = maos_bin::admission::load_admit_start(
         &maos_bin::admission::AdmissionDeps {
+            providers: None,
             scheduler: &scheduler,
             security: &security,
             transparency_log: &tl,

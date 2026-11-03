@@ -264,7 +264,7 @@ fn environment_store_round_trips_an_mcp_bearer() {
     let key = SecretKey::McpBearer(McpServer::Calendar);
     assert_eq!(key.as_str(), "mcp-calendar-bearer");
     assert_eq!(key.environment_variable(), "MAOS_MCP_CALENDAR_BEARER");
-    assert_eq!(SecretKey::ALL.len(), 10);
+    assert_eq!(SecretKey::ALL.len(), 12);
     let store = maos_secrets::EnvSecretStore::new([(key, "mcp-bearer-canary".to_string())]);
     assert_eq!(
         store.get(key).unwrap().as_deref(),

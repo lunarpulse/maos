@@ -1,0 +1,8 @@
+{
+  "text": "{\"passed\":true,\"registered_count\":121,\"violations\":[]}\ncheck-env-contract: PASS (121 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml \u2014 D-I)\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 468.80942499637604
+  }
+}

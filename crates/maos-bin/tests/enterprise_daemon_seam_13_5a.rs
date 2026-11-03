@@ -126,8 +126,11 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
     // ── 5. Admission reuses the process-wide append-only journal owner. A
     // second independent file cursor can overwrite entries from the first.
     let admission = block_from(find("fn admit_daemon_control_spirit("));
+    let context = block_from(find("struct ProviderAdmissionContext<'a>"));
     assert!(
-        MAIN.contains("journal: &maos_kernel_core::journal::JournalAdapter")
+        context.contains("journal: &'a maos_kernel_core::journal::JournalAdapter")
+            && admission.contains("let ProviderAdmissionContext {")
+            && admission.contains("} = context;")
             && !admission.contains("JournalAdapter::open("),
         "daemon control-Spirit admission must reuse the shared lifecycle journal"
     );

@@ -1,0 +1,1 @@
+maos-bin/src/main.rs:14843: let adapter = SecurityManagerAdapter::new(policy, Arc::new(RingCryptoProvider));

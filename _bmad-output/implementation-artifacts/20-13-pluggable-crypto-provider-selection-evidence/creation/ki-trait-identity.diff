@@ -1,0 +1,72 @@
+diff --git a/crates/maos-domain/src/ports/crypto.rs b/crates/maos-domain/src/ports/crypto.rs
+index 6b0c301..05d1703 100644
+--- a/crates/maos-domain/src/ports/crypto.rs
++++ b/crates/maos-domain/src/ports/crypto.rs
+@@ -94,6 +94,19 @@ pub trait CryptoProvider: Send + Sync {
+         signing_key: &[u8],
+         token_bytes: &[u8],
+     ) -> Result<Vec<u8>, CryptoError>;
++
++    /// Class: data-movement
++    ///
++    /// Story 20-13 (FR48 AC3) — the module identity the root journals at boot
++    /// and the runtime context reports, so an auditor can see which module signed.
++    fn identity(&self) -> CryptoProviderIdentity;
++}
++
++/// Name and version of a crypto provider module (Story 20-13).
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct CryptoProviderIdentity {
++    pub name: &'static str,
++    pub version: &'static str,
+ }
+ 
+ /// Crypto-provider error taxonomy.
+diff --git a/crates/maos-kernel-core/src/security/crypto.rs b/crates/maos-kernel-core/src/security/crypto.rs
+index b5481bb..ddb6bd9 100644
+--- a/crates/maos-kernel-core/src/security/crypto.rs
++++ b/crates/maos-kernel-core/src/security/crypto.rs
+@@ -95,6 +95,13 @@ impl CryptoProvider for RingCryptoProvider {
+             .map_err(|_| CryptoError::MalformedKey("Ed25519 seed must be 32 bytes"))?;
+         Ok(keypair.sign(token_bytes).as_ref().to_vec())
+     }
++
++    fn identity(&self) -> maos_domain::ports::crypto::CryptoProviderIdentity {
++        maos_domain::ports::crypto::CryptoProviderIdentity {
++            name: "ring",
++            version: "0.17.14",
++        }
++    }
+ }
+ 
+ #[cfg(test)]
+@@ -147,6 +154,12 @@ pub mod tests {
+             }
+             Ok(sig.to_vec())
+         }
++        fn identity(&self) -> maos_domain::ports::crypto::CryptoProviderIdentity {
++            maos_domain::ports::crypto::CryptoProviderIdentity {
++                name: "mock",
++                version: "test",
++            }
++        }
+     }
+ 
+     fn known_ed25519_keypair() -> (Vec<u8>, Vec<u8>) {
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs b/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs
+index 0e1206b..f78b159 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs
+@@ -263,6 +263,12 @@ mod tests {
+                 "unused",
+             ))
+         }
++        fn identity(&self) -> maos_domain::ports::crypto::CryptoProviderIdentity {
++            maos_domain::ports::crypto::CryptoProviderIdentity {
++                name: "reject",
++                version: "test",
++            }
++        }
+     }
+ 
+     #[test]

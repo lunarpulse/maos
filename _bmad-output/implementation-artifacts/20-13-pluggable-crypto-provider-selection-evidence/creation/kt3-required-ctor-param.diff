@@ -1,0 +1,83 @@
+diff --git a/crates/maos-kernel-core/src/security/mod.rs b/crates/maos-kernel-core/src/security/mod.rs
+index f5019d2..6c38154 100644
+--- a/crates/maos-kernel-core/src/security/mod.rs
++++ b/crates/maos-kernel-core/src/security/mod.rs
+@@ -127,10 +127,13 @@ struct T3ImageVerificationConfig {
+ #[maos_attrs::i9_exempt(
+     reason = "security manager adapter; holds Arc<PolicyTable> for runtime policy enforcement — structural-state caching per I9"
+ )]
+-#[derive(Debug, Clone)]
++#[derive(Clone)]
+ pub struct SecurityManagerAdapter {
+     policy: Arc<PolicyTable>,
+     t3_image_verification: Option<T3ImageVerificationConfig>,
++    /// Story 20-13 (FR48) — the composition root's selected provider; T3
++    /// image-lock verification at admission never constructs its own.
++    crypto: Arc<dyn CryptoProvider>,
+     /// Drift-event channel sender (Story 2.1 AC4).
+     /// The runtime detector that emits events ships in Story 9.x.
+     drift_sender: Option<mpsc::Sender<DriftEvent>>,
+@@ -198,11 +201,21 @@ impl ProviderHistory {
+     }
+ }
+ 
++impl std::fmt::Debug for SecurityManagerAdapter {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("SecurityManagerAdapter")
++            .field("t3_image_verification", &self.t3_image_verification)
++            .field("crypto", &"Arc<dyn CryptoProvider>")
++            .finish_non_exhaustive()
++    }
++}
++
+ impl SecurityManagerAdapter {
+-    pub fn new(policy: Arc<PolicyTable>) -> Self {
++    pub fn new(policy: Arc<PolicyTable>, crypto: Arc<dyn CryptoProvider>) -> Self {
+         Self {
+             policy,
+             t3_image_verification: None,
++            crypto,
+             drift_sender: None,
+             provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
+         }
+@@ -347,12 +360,11 @@ impl SecurityManagerAdapter {
+         // Story 5.5a: T3 is now admissible on Linux with container isolation.
+         // T4 remains rejected (WASM tier scheduled for v2.0).
+         if effective == SandboxTier::T3 {
+-            let crypto = crate::security::crypto::RingCryptoProvider;
+             let lock = match &self.t3_image_verification {
+                 Some(config) => crate::security::sandbox::t3::image_lock::load_and_verify_lock_at(
+                     &config.lock_path,
+                     &config.trust_anchor_pub,
+-                    &crypto,
++                    self.crypto.as_ref(),
+                 ),
+                 None => {
+                     let trust_anchor =
+@@ -360,7 +372,7 @@ impl SecurityManagerAdapter {
+                             .map_err(|error| SecurityError::T3AdmissionFailed(error.to_string()))?;
+                     crate::security::sandbox::t3::image_lock::load_and_verify_lock(
+                         &trust_anchor,
+-                        &crypto,
++                        self.crypto.as_ref(),
+                     )
+                 }
+             }
+@@ -476,17 +488,6 @@ impl SecurityManagerAdapter {
+     }
+ }
+ 
+-impl Default for SecurityManagerAdapter {
+-    fn default() -> Self {
+-        Self {
+-            policy: Arc::new(PolicyTable::new()),
+-            t3_image_verification: None,
+-            drift_sender: None,
+-            provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
+-        }
+-    }
+-}
+-
+ impl SecurityManagerPort for SecurityManagerAdapter {
+     fn sandbox_tier_floor(&self, _spirit_id: &str) -> SandboxTier {
+         // v0.1-β: return the global operator floor.

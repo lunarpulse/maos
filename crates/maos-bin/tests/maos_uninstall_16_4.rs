@@ -376,8 +376,8 @@ fn purge_dry_run_is_inert_then_removes_only_maos_owned_state() {
         .collect();
     assert_eq!(
         credential_roots.len(),
-        10,
-        "receipt must cover every known credential (two provider keys, eight MCP bearers)"
+        maos_domain::ports::SecretKey::ALL.len(),
+        "receipt must cover every known credential (four provider keys, eight MCP bearers)"
     );
     for key in maos_domain::ports::SecretKey::ALL {
         let path = format!("keyring://maos/{}", key.as_str());

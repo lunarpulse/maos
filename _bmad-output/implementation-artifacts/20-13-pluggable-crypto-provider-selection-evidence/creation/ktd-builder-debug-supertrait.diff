@@ -1,0 +1,78 @@
+diff --git a/crates/maos-domain/src/ports/crypto.rs b/crates/maos-domain/src/ports/crypto.rs
+index 6b0c301..ac1807a 100644
+--- a/crates/maos-domain/src/ports/crypto.rs
++++ b/crates/maos-domain/src/ports/crypto.rs
+@@ -47,7 +47,7 @@ use thiserror::Error;
+ /// Composition root holds `Arc<dyn CryptoProvider>` (verified by
+ /// `let _: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);`
+ /// at `maos-bin/src/main.rs`).
+-pub trait CryptoProvider: Send + Sync {
++pub trait CryptoProvider: Send + Sync + std::fmt::Debug {
+     /// Class: data-movement
+     ///
+     /// Verify an Ed25519 signature over `message` using `public_key`.
+diff --git a/crates/maos-kernel-core/src/security/mod.rs b/crates/maos-kernel-core/src/security/mod.rs
+index f5019d2..9bc6372 100644
+--- a/crates/maos-kernel-core/src/security/mod.rs
++++ b/crates/maos-kernel-core/src/security/mod.rs
+@@ -131,6 +131,9 @@ struct T3ImageVerificationConfig {
+ pub struct SecurityManagerAdapter {
+     policy: Arc<PolicyTable>,
+     t3_image_verification: Option<T3ImageVerificationConfig>,
++    /// Story 20-13 (FR48) — the composition root's selected provider; T3
++    /// image-lock verification at admission never constructs its own.
++    crypto: Arc<dyn CryptoProvider>,
+     /// Drift-event channel sender (Story 2.1 AC4).
+     /// The runtime detector that emits events ships in Story 9.x.
+     drift_sender: Option<mpsc::Sender<DriftEvent>>,
+@@ -203,11 +206,19 @@ impl SecurityManagerAdapter {
+         Self {
+             policy,
+             t3_image_verification: None,
++            crypto: Arc::new(crypto::RingCryptoProvider),
+             drift_sender: None,
+             provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
+         }
+     }
+ 
++    /// Story 20-13 (FR48) — verify T3 image locks with the root's selected
++    /// crypto provider (the one instance every FR48 consumer receives).
++    pub fn with_crypto_provider(mut self, crypto: Arc<dyn CryptoProvider>) -> Self {
++        self.crypto = crypto;
++        self
++    }
++
+     /// Set the drift-event sender (Story 2.1 AC4).
+     ///
+     /// The sender is consumed by the runtime drift detector at Story 9.x.
+@@ -347,12 +358,11 @@ impl SecurityManagerAdapter {
+         // Story 5.5a: T3 is now admissible on Linux with container isolation.
+         // T4 remains rejected (WASM tier scheduled for v2.0).
+         if effective == SandboxTier::T3 {
+-            let crypto = crate::security::crypto::RingCryptoProvider;
+             let lock = match &self.t3_image_verification {
+                 Some(config) => crate::security::sandbox::t3::image_lock::load_and_verify_lock_at(
+                     &config.lock_path,
+                     &config.trust_anchor_pub,
+-                    &crypto,
++                    self.crypto.as_ref(),
+                 ),
+                 None => {
+                     let trust_anchor =
+@@ -360,7 +370,7 @@ impl SecurityManagerAdapter {
+                             .map_err(|error| SecurityError::T3AdmissionFailed(error.to_string()))?;
+                     crate::security::sandbox::t3::image_lock::load_and_verify_lock(
+                         &trust_anchor,
+-                        &crypto,
++                        self.crypto.as_ref(),
+                     )
+                 }
+             }
+@@ -481,6 +491,7 @@ impl Default for SecurityManagerAdapter {
+         Self {
+             policy: Arc::new(PolicyTable::new()),
+             t3_image_verification: None,
++            crypto: Arc::new(crypto::RingCryptoProvider),
+             drift_sender: None,
+             provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
+         }

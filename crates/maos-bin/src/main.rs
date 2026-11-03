@@ -891,9 +891,12 @@ fn first_declared_provider(gated: &maos_bin::admission::GatedManifest) -> Option
     declared_providers(gated).into_iter().next()
 }
 
-/// Story 18-3 (D-18-3-02 B) — every declared `ProviderInfer`, in order.
+/// Binding choices: explicit `[providers].primary`, otherwise declared order.
 #[cfg(feature = "network")]
 fn declared_providers(gated: &maos_bin::admission::GatedManifest) -> Vec<String> {
+    if let Some(providers) = &gated.providers {
+        return vec![providers.primary.id.clone()];
+    }
     maos_kernel_core::security::capabilities_required_to_scopes(&gated.caps_required)
         .into_iter()
         .filter_map(|scope| match scope {
@@ -901,6 +904,28 @@ fn declared_providers(gated: &maos_bin::admission::GatedManifest) -> Vec<String>
             _ => None,
         })
         .collect()
+}
+
+/// Bind hello's implicit requests to the same provider its token names.
+#[cfg(feature = "network")]
+struct BoundInference<P> {
+    inner: P,
+    provider: String,
+}
+#[cfg(feature = "network")]
+impl<P: std::borrow::Borrow<InferencePortAdapter>> maos_domain::ports::inference::InferencePort
+    for BoundInference<P>
+{
+    fn complete(
+        &self,
+        mut req: maos_domain::ports::inference::InferenceRequest,
+    ) -> Result<
+        maos_domain::ports::inference::InferenceResponse,
+        maos_domain::ports::inference::InferenceError,
+    > {
+        req.provider_id = Some(self.provider.clone());
+        maos_domain::ports::inference::InferencePort::complete(self.inner.borrow(), req)
+    }
 }
 
 /// Story 18-1 / 18-3 — the door-staged TARGET manifest, gated (its declared
@@ -3398,6 +3423,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Story 19-2 (D-19-2-08 A) — the Butler principal bound at boot, read by
     // the door's pick route (filled below, once the scene is loaded).
     let butler_principal: Arc<std::sync::OnceLock<String>> = Arc::default();
+    let provider_catalog: Arc<std::sync::OnceLock<maos_bin::admission::ProviderCatalog>> =
+        Arc::default();
     let researcher_wiring: ResearcherSlot = Arc::default();
     let factory_researcher_wiring = Arc::clone(&researcher_wiring);
     let factory_distillate_writer = Arc::clone(&distillate_writer);
@@ -3605,6 +3632,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // must work with no `maos init` (FR58 zero-config). Only the HTTP
         // BIND below stays gated on the env pair / `control.json`.
         let private_ops = Arc::new(BinPrivateOpsImpl {
+            provider_catalog: Arc::clone(&provider_catalog),
             memory: Arc::clone(&memory),
             capability: Arc::clone(&capability),
             transparency_log: Arc::clone(&transparency_log),
@@ -3897,6 +3925,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::collections::BTreeMap::new();
     let mut live_provider_available = false;
     let mut default_id: Option<String> = None;
+    // Configuration, not credentials: pins mean the same thing in keyless replay.
+    let configured_ollama_url = std::env::var("MAOS_OLLAMA_URL").ok();
+    let ollama_is_explicit = configured_ollama_url
+        .as_deref()
+        .is_some_and(|url| !url.trim().is_empty() && url != "skip");
+    let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
+    let mut configured_providers: maos_bin::admission::ProviderCatalog = [
+        (
+            "anthropic",
+            "https://api.anthropic.com",
+            "claude-haiku-4-5-20251001",
+        ),
+        ("openai", "https://api.openai.com", "gpt-4o-mini"),
+        (
+            "gemini",
+            "https://generativelanguage.googleapis.com",
+            "gemini-3.5-flash-lite",
+        ),
+        ("kimi", "https://api.moonshot.ai", "kimi-k3.1-pro"),
+        ("ollama", ollama_url.as_str(), "llama3.1:8b"),
+    ]
+    .into_iter()
+    .map(|(id, endpoint, model)| {
+        (
+            id.into(),
+            maos_bin::admission::ConfiguredProvider {
+                endpoint: endpoint.into(),
+                model,
+                registered: false,
+            },
+        )
+    })
+    .collect();
 
     match AnthropicProvider::new(
         Arc::clone(&io_arc),
@@ -3936,12 +3997,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    match maos_providers::GeminiProvider::new(
+        Arc::clone(&io_arc),
+        "https://generativelanguage.googleapis.com".into(),
+        "gemini-3.5-flash-lite".into(),
+        Some(Arc::clone(&secret_store)),
+    ) {
+        Ok(provider) => {
+            providers_map.insert("gemini".into(), Arc::new(provider));
+            live_provider_available = true;
+            default_id.get_or_insert_with(|| "gemini".into());
+            eprintln!("maos: Gemini provider registered");
+        }
+        Err(maos_providers::ProviderError::Unconfigured) => {}
+        Err(error) => {
+            eprintln!("maos: Gemini provider configuration failed: {error}");
+            std::process::exit(78);
+        }
+    }
+    match maos_providers::OpenAiProvider::compatible(
+        "kimi",
+        maos_domain::ports::SecretKey::KimiApiKey,
+        Arc::clone(&io_arc),
+        "https://api.moonshot.ai".into(),
+        "kimi-k3.1-pro".into(),
+        Some(Arc::clone(&secret_store)),
+    ) {
+        Ok(provider) => {
+            providers_map.insert("kimi".into(), Arc::new(provider));
+            live_provider_available = true;
+            default_id.get_or_insert_with(|| "kimi".into());
+            eprintln!("maos: Kimi provider registered");
+        }
+        Err(maos_providers::ProviderError::Unconfigured) => {}
+        Err(error) => {
+            eprintln!("maos: Kimi provider configuration failed: {error}");
+            std::process::exit(78);
+        }
+    }
+
     {
-        let configured_ollama_url = std::env::var("MAOS_OLLAMA_URL").ok();
-        let ollama_is_explicit = configured_ollama_url
-            .as_deref()
-            .is_some_and(|url| !url.trim().is_empty() && url != "skip");
-        let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
         if !ollama_url.is_empty() && ollama_url != "skip" {
             if let Ok(provider) = maos_providers::OllamaProvider::new(
                 Arc::clone(&io_arc),
@@ -4017,7 +4112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // driver also answers every id the kernel interns; a Spirit's
             // token and request then name its own declared provider on a
             // keyless runner. The default is unchanged.
-            for id in ["anthropic", "openai", "ollama"] {
+            for id in maos_providers::PROVIDER_IDS {
                 providers_map
                     .entry(id.to_owned())
                     .or_insert_with(|| Arc::clone(&replay));
@@ -4043,6 +4138,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             explicit: false, ..
         } => {}
     }
+
+    if let Some(selected) = std::env::var_os("MAOS_DEFAULT_PROVIDER").filter(|s| !s.is_empty()) {
+        let registered = providers_map.keys().cloned().collect::<Vec<_>>().join(", ");
+        let selected = selected
+            .to_str()
+            .ok_or("MAOS_DEFAULT_PROVIDER must be UTF-8")?;
+        if !providers_map.contains_key(selected) {
+            return Err(format!(
+                "MAOS_DEFAULT_PROVIDER '{selected}' is not registered (registered: {registered})"
+            )
+            .into());
+        }
+        default_id = Some(selected.into());
+    }
+    for (id, config) in &mut configured_providers {
+        config.registered = providers_map.contains_key(id);
+    }
+    provider_catalog
+        .set(configured_providers)
+        .map_err(|_| "provider catalog already initialized")?;
 
     let router = Arc::new(
         maos_kernel_core::inference::router::MultiProviderRouter::new(providers_map, default_id),
@@ -4332,6 +4447,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         maos_bin::installed_spirits::InstalledSpirits::boot(
             installed_manifests,
             &maos_bin::admission::AdmissionDeps {
+                providers: provider_catalog.get(),
                 scheduler: &scheduler,
                 security: &security,
                 transparency_log: &transparency_log,
@@ -4385,57 +4501,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `main`, so the door teardown in the caller runs on BOTH arms by
         // construction (Story 16-2 AC2, review obligation (n)).
         let shell_result: Result<(), Box<dyn std::error::Error>> = async {
-            let manifest_root: toml::Value = maos_spirit_hello::MANIFEST_TOML
-                .parse()
-                .map_err(|e| format!("shell: cannot parse hello-spirit manifest: {e}"))?;
-            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
-                &toml::to_string(&manifest_root["sandbox"]).unwrap_or_default(),
-            )?;
-            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
-                &toml::to_string(&manifest_root["resources"]).unwrap_or_default(),
-            )?;
-            let caps_required = maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
-                &toml::to_string(
-                    manifest_root
-                        .get("capabilities")
-                        .and_then(|c| c.get("required"))
-                        .ok_or("missing [capabilities.required]")?,
-                )
-                .map_err(|e| format!("caps: {e}"))?,
-            )?;
-            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
-                &toml::to_string(&manifest_root["output_shape"]).unwrap_or_default(),
-            )?;
-            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
-                &toml::to_string(&manifest_root["class"]).unwrap_or_default(),
-            )?;
-            let caps_required =
-                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
-            let posture_section =
-                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
-                    &toml::to_string(&manifest_root["posture"]).unwrap_or_default(),
-                )?;
-            let epistemic_policy = manifest_root
-                .get("epistemic_policy")
-                .map(|v| {
-                    let s = toml::to_string(v)
-                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
-                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
-                        .map_err(|e| format!("epistemic_policy parse: {e}"))
+            let gated =
+                maos_bin::admission::gate_manifest(maos_spirit_hello::MANIFEST_TOML, &|name| {
+                    name == "hello-spirit"
                 })
-                .transpose()?;
-            // `maos run`'s bundle shape: scheduling/lifecycle default (the
-            // reference Spirit fires no scheduled hooks), budget parsed from
-            // the manifest, class carried for the ABI-stability admission
-            // check inside `load`.
-            let budget = manifest_root
-                .get("budget")
-                .map(|v| {
-                    let s = toml::to_string(v).map_err(|e| format!("budget serialize: {e}"))?;
-                    maos_kernel_core::security::manifest::Budget::from_toml_str(&s)
-                        .map_err(|e| format!("budget parse: {e}"))
-                })
-                .transpose()?;
+                .map_err(|refusal| refusal.to_string())?;
+            if let Some(providers) = &gated.providers {
+                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
+                    .map_err(|refusal| refusal.to_string())?;
+            }
+            let maos_bin::admission::GatedManifest {
+                sandbox_cfg,
+                resource_caps,
+                caps_required,
+                output_shape,
+                class_section,
+                posture_section,
+                epistemic_policy,
+                budget,
+                providers,
+                ..
+            } = gated;
+            let default_provider = providers
+                .as_ref()
+                .map_or(default_provider, |p| p.primary.id.as_str());
             let bundle = maos_kernel_core::scheduler::SpiritManifestBundle {
                 budget,
                 class: Some(class_section.clone()),
@@ -4472,7 +4561,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     None,
                     None,
                     None,
-                    None,
+                    providers.as_ref(),
                     Some(&class_section),
                 )
                 .map_err(|e| {
@@ -4529,7 +4618,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // the reader moves to its own thread in D-16-2-D) and `stdout()`
             // unlocked (the REPL thread is the only writer).
             maos_shell::run_shell(
-                Arc::new(inference)
+                Arc::new(BoundInference {
+                    inner: inference,
+                    provider: default_provider.into(),
+                })
                     as Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync>,
                 &host,
                 std::io::BufReader::new(std::io::stdin()),
@@ -5671,6 +5763,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             child_path.display()
                         )
                     })?;
+                    if let Some(section) = &gated.providers {
+                        maos_bin::admission::check_provider_pins(section, provider_catalog.get())
+                            .map_err(|refusal| refusal.to_string())?;
+                    }
                     gated.require_in_process("topology")?;
                     let kind = classify_spirit(&gated.class_section.name)
                         .expect("gate_manifest refused every class classify_spirit does not know");
@@ -5815,6 +5911,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // the standalone arm and the door.
                     let admitted = maos_bin::admission::load_admit_start(
                         &maos_bin::admission::AdmissionDeps {
+                            providers: provider_catalog.get(),
                             scheduler: &scheduler,
                             security: &security,
                             transparency_log: &transparency_log,
@@ -6205,6 +6302,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 classify_spirit(name).is_some()
             })
             .map_err(|refusal| format!("maos run: {refusal}"))?;
+            if let Some(section) = &gated.providers {
+                maos_bin::admission::check_provider_pins(section, provider_catalog.get())
+                    .map_err(|refusal| refusal.to_string())?;
+            }
             let wasm = gated.class_section.forms == ["wasm-component"];
             if !wasm {
                 gated.require_in_process("standalone native manifest without a launch binding")?;
@@ -6699,6 +6800,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // `Loaded` SCB the way `main.rs` did until this story.
             let admitted = maos_bin::admission::load_admit_start(
                 &maos_bin::admission::AdmissionDeps {
+                    providers: provider_catalog.get(),
                     scheduler: &scheduler,
                     security: &security,
                     transparency_log: &transparency_log,
@@ -9246,8 +9348,11 @@ description = "smoke test spirit successor"
                 security.as_ref(),
                 &capability,
                 &transparency_log,
-                std::path::Path::new("spirits"),
-                shared_journal.as_ref(),
+                ProviderAdmissionContext {
+                    spirits_root: std::path::Path::new("spirits"),
+                    journal: shared_journal.as_ref(),
+                    providers: provider_catalog.get(),
+                },
                 enterprise_runtime.as_ref(),
                 enterprise_pdp_runtime.as_ref(),
                 cohort_daemon.as_ref(),
@@ -9465,6 +9570,7 @@ description = "smoke test spirit successor"
         // instead of hardcoding capability scopes. The adapter reads the
         // manifest's [capabilities.required] section and registers scopes
         // in the policy table.
+        let mut token_provider_id = router.default_id().unwrap_or("anthropic").to_string();
         {
             // Initialize monotonic counter for journal timestamps and token issuance.
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
@@ -9476,59 +9582,26 @@ description = "smoke test spirit successor"
                     manifest_path.display()
                 )
             })?;
-
-            // Parse full TOML document, then extract individual sections.
-            let manifest_root: toml::Value = toml::from_str(&manifest_toml)
-                .map_err(|e| format!("manifest TOML parse error: {e}"))?;
-
-            fn extract_section(
-                root: &toml::Value,
-                section: &str,
-            ) -> Result<String, Box<dyn std::error::Error>> {
-                let value = root
-                    .get(section)
-                    .ok_or_else(|| format!("missing manifest section [{section}]"))?;
-                let serialized = toml::to_string(value)
-                    .map_err(|e| format!("failed to serialize [{section}] section: {e}"))?;
-                Ok(serialized)
+            let gated =
+                maos_bin::admission::gate_manifest(&manifest_toml, &|name| name == "hello-spirit")
+                    .map_err(|refusal| refusal.to_string())?;
+            if let Some(providers) = &gated.providers {
+                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
+                    .map_err(|refusal| refusal.to_string())?;
+                token_provider_id = providers.primary.id.clone();
             }
 
-            // Parse each manifest section individually.
-            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
-                &extract_section(&manifest_root, "sandbox")?,
-            )?;
-            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
-                &extract_section(&manifest_root, "resources")?,
-            )?;
-            let caps_required = {
-                let caps_required_val = manifest_root
-                    .get("capabilities")
-                    .and_then(|c| c.get("required"));
-                let caps_required_toml = match caps_required_val {
-                    Some(v) => toml::to_string(v)
-                        .map_err(|e| format!("failed to serialize [capabilities.required]: {e}"))?,
-                    None => {
-                        return Err(
-                            format!("missing manifest section [capabilities.required]").into()
-                        );
-                    }
-                };
-                maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
-                    &caps_required_toml,
-                )?
-            };
-            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
-                &extract_section(&manifest_root, "output_shape")?,
-            )?;
-            // Story 7.5a — parse the `[class]` section so the ABI Stability
-            // Triple is enforced on the hello-spirit admission path. The
-            // reference manifest declares manifest_schema_version = 1 (N-1) and
-            // min_substrate_version = "0.1.0-alpha" → admits with an N-1 WARN.
-            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
-                &extract_section(&manifest_root, "class")?,
-            )?;
-            let caps_required =
-                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
+            let maos_bin::admission::GatedManifest {
+                sandbox_cfg,
+                resource_caps,
+                caps_required,
+                output_shape,
+                class_section,
+                posture_section,
+                epistemic_policy,
+                providers,
+                ..
+            } = gated;
 
             // Open the Lifecycle Journal for admission (the Load event).
             let journal_path = maos_audit::default_journal_path();
@@ -9538,24 +9611,6 @@ description = "smoke test spirit successor"
             }
             let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
                 .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
-
-            // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
-
-            // Admit hello-spirit through the canonical admission path.
-            let posture_section =
-                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
-                    &extract_section(&manifest_root, "posture")?,
-                )
-                .map_err(|e| format!("posture parse: {e}"))?;
-            let epistemic_policy = manifest_root
-                .get("epistemic_policy")
-                .map(|v| {
-                    let s = toml::to_string(v)
-                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
-                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
-                        .map_err(|e| format!("epistemic_policy parse: {e}"))
-                })
-                .transpose()?;
 
             let _spec = security.admit_spirit(
                 0,
@@ -9571,7 +9626,7 @@ description = "smoke test spirit successor"
                 None,
                 None,
                 None,
-                None,
+                providers.as_ref(),
                 Some(&class_section),
             )?;
 
@@ -9599,14 +9654,13 @@ description = "smoke test spirit successor"
         // Initialize monotonic counter for token issuance
 
         // Issue a valid capability token for the in-process hello-Spirit
-        let token_provider_id = router.default_id().unwrap_or("anthropic").to_string();
         let token = issue_enterprise_governed_capability(
             capability.as_ref(),
             enterprise_runtime.as_deref(),
             enterprise_pdp_runtime.as_ref(),
             0,
             Scope::ProviderInfer {
-                provider: token_provider_id,
+                provider: token_provider_id.clone(),
             },
             60,
             [0u8; 32],
@@ -9624,9 +9678,17 @@ description = "smoke test spirit successor"
         eprintln!("maos: issued token {token_id_hex}");
         eprintln!("maos: one-shot mode — executing hello-Spirit");
 
+        let bound_inference = BoundInference {
+            inner: &inference,
+            provider: token_provider_id,
+        };
         // Call hello-Spirit (sync call on async runtime — fine for one-shot)
-        let resp = maos_spirit_hello::run(&inference, token, &audit_db_path.display().to_string())
-            .map_err(|e| format!("hello-Spirit error: {e}"))?;
+        let resp = maos_spirit_hello::run(
+            &bound_inference,
+            token,
+            &audit_db_path.display().to_string(),
+        )
+        .map_err(|e| format!("hello-Spirit error: {e}"))?;
         if let Some(recorder) = cassette_recorder.as_ref() {
             recorder
                 .flush()
@@ -10038,6 +10100,7 @@ fn record_admitted_manifest(map: &AdmittedManifests, spirit_id: &str, text: &str
 /// `submit` a door into THIS daemon rather than a sibling simulation.
 #[cfg(feature = "network")]
 struct BinPrivateOpsImpl {
+    provider_catalog: Arc<std::sync::OnceLock<maos_bin::admission::ProviderCatalog>>,
     memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
     capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
     transparency_log: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
@@ -10209,6 +10272,9 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         let gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
             classify_spirit(name).is_some()
         })?;
+        if let Some(section) = &gated.providers {
+            maos_bin::admission::check_provider_pins(section, self.provider_catalog.get())?;
+        }
         gated.require_in_process("operator door")?;
         if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
             && classify_spirit(&gated.class_section.name) == Some(LoadedSpiritKind::Mira)
@@ -10252,6 +10318,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 })?;
         let admitted = maos_bin::admission::load_admit_start(
             &maos_bin::admission::AdmissionDeps {
+                providers: self.provider_catalog.get(),
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.transparency_log,
@@ -11657,6 +11724,13 @@ impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
     }
 }
 
+#[cfg(feature = "network")]
+struct ProviderAdmissionContext<'a> {
+    spirits_root: &'a std::path::Path,
+    journal: &'a maos_kernel_core::journal::JournalAdapter,
+    providers: Option<&'a maos_bin::admission::ProviderCatalog>,
+}
+
 /// Story 13.5a — admit the daemon's control Spirit through the CANONICAL
 /// admission path so its manifest-declared `loom.*` grants land in the policy
 /// table the kernel consults at mint time.
@@ -11670,11 +11744,15 @@ impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
 #[cfg(feature = "network")]
 fn admit_daemon_control_spirit(
     security: &maos_kernel_core::security::SecurityManagerAdapter,
-    spirits_root: &std::path::Path,
-    journal: &maos_kernel_core::journal::JournalAdapter,
+    context: ProviderAdmissionContext<'_>,
     spirit_pid: u32,
     spirit_id: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let ProviderAdmissionContext {
+        spirits_root,
+        journal,
+        providers,
+    } = context;
     let manifest_path = spirits_root.join(spirit_id).join("manifest.toml");
     let manifest_toml = std::fs::read_to_string(&manifest_path).map_err(|error| {
         format!(
@@ -11682,45 +11760,25 @@ fn admit_daemon_control_spirit(
             manifest_path.display()
         )
     })?;
-    let manifest_root: toml::Value = toml::from_str(&manifest_toml)
-        .map_err(|error| format!("control Spirit manifest TOML parse error: {error}"))?;
-    let section = |name: &str| -> Result<String, String> {
-        let value = manifest_root
-            .get(name)
-            .ok_or_else(|| format!("control Spirit manifest is missing section [{name}]"))?;
-        toml::to_string(value).map_err(|error| format!("serialize [{name}]: {error}"))
-    };
-    let sandbox_cfg =
-        maos_kernel_core::security::SandboxConfig::from_toml_str(&section("sandbox")?)?;
-    let resource_caps =
-        maos_kernel_core::security::ResourceCaps::from_toml_str(&section("resources")?)?;
-    let caps_required = {
-        let value = manifest_root
-            .get("capabilities")
-            .and_then(|caps| caps.get("required"))
-            .ok_or("control Spirit manifest is missing [capabilities.required]")?;
-        let text = toml::to_string(value)
-            .map_err(|error| format!("serialize [capabilities.required]: {error}"))?;
-        maos_kernel_core::security::CapabilitiesRequired::from_toml_str(&text)?
-    };
-    let output_shape =
-        maos_kernel_core::security::OutputShape::from_toml_str(&section("output_shape")?)?;
-    let posture_section =
-        maos_kernel_core::security::manifest::PostureSection::from_toml_str(&section("posture")?)
-            .map_err(|error| format!("posture parse: {error}"))?;
-    let epistemic_policy = manifest_root
-        .get("epistemic_policy")
-        .map(|value| {
-            let text = toml::to_string(value)
-                .map_err(|error| format!("epistemic_policy serialize: {error}"))?;
-            maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&text)
-                .map_err(|error| format!("epistemic_policy parse: {error}"))
-        })
-        .transpose()?;
-    let class_section =
-        maos_kernel_core::security::ClassSection::from_toml_str(&section("class")?)?;
-    // Story 17-3b review (g): this path admits a policy identity without
-    // `gate_manifest`, so it must not accept the third-party form.
+    let gated =
+        maos_bin::admission::gate_manifest(&manifest_toml, &|name| classify_spirit(name).is_some())
+            .map_err(|refusal| refusal.to_string())?;
+    if let Some(section) = &gated.providers {
+        maos_bin::admission::check_provider_pins(section, providers)
+            .map_err(|refusal| refusal.to_string())?;
+    }
+    let maos_bin::admission::GatedManifest {
+        sandbox_cfg,
+        resource_caps,
+        caps_required,
+        output_shape,
+        class_section,
+        posture_section,
+        epistemic_policy,
+        providers,
+        ..
+    } = gated;
+    // Control identities remain first-party even in a WASM-enabled binary.
     if class_section
         .forms
         .iter()
@@ -11728,8 +11786,6 @@ fn admit_daemon_control_spirit(
     {
         return Err("control Spirit must be a first-party class, not wasm-component".into());
     }
-    let caps_required =
-        caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
 
     security.admit_spirit(
         spirit_pid,
@@ -11745,7 +11801,7 @@ fn admit_daemon_control_spirit(
         None,
         None,
         None,
-        None,
+        providers.as_ref(),
         Some(&class_section),
     )?;
     Ok(())
@@ -11763,8 +11819,7 @@ fn build_enterprise_daemon_governance(
     security: &maos_kernel_core::security::SecurityManagerAdapter,
     capability: &Arc<CapabilityRegistryAdapter>,
     transparency_log: &Arc<maos_iac::TransparencyLogAdapter>,
-    spirits_root: &std::path::Path,
-    journal: &maos_kernel_core::journal::JournalAdapter,
+    context: ProviderAdmissionContext<'_>,
     enterprise_runtime: Option<&Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
     bootstrap: Option<&CohortDaemonBootstrap>,
@@ -11785,8 +11840,7 @@ fn build_enterprise_daemon_governance(
     let control_spirit = bootstrap.control_spirit.as_str().to_string();
     admit_daemon_control_spirit(
         security,
-        spirits_root,
-        journal,
+        context,
         DAEMON_CONTROL_SPIRIT_PID,
         &control_spirit,
     )?;
@@ -16286,8 +16340,11 @@ mod story_13_5a_enterprise_daemon_seam {
                 security.as_ref(),
                 &capability,
                 &transparency_log,
-                &workspace_root().join("spirits"),
-                &journal,
+                ProviderAdmissionContext {
+                    spirits_root: &workspace_root().join("spirits"),
+                    journal: &journal,
+                    providers: None,
+                },
                 runtime.as_ref(),
                 pdp.as_ref(),
                 Some(&bootstrap),
@@ -16565,8 +16622,11 @@ mod story_13_5a_enterprise_daemon_seam {
             security.as_ref(),
             &capability,
             &transparency_log,
-            &workspace_root().join("spirits"),
-            &journal,
+            ProviderAdmissionContext {
+                spirits_root: &workspace_root().join("spirits"),
+                journal: &journal,
+                providers: None,
+            },
             Some(&kms_down),
             None,
             Some(&bootstrap),
@@ -16702,8 +16762,11 @@ mod story_13_5a_enterprise_daemon_seam {
             security.as_ref(),
             &capability,
             &transparency_log,
-            &workspace_root().join("spirits"),
-            &journal,
+            ProviderAdmissionContext {
+                spirits_root: &workspace_root().join("spirits"),
+                journal: &journal,
+                providers: None,
+            },
             Some(&runtime),
             Some(&pdp),
             Some(&bootstrap),

@@ -23,3 +23,18 @@ provider = "anthropic"
 model = "claude-sonnet-5-5"
 input_price_micro_per_1k = 2000
 output_price_micro_per_1k = 10000
+
+# 20-4: standard, uncached text rates, verified 2026-11-03.
+# https://ai.google.dev/gemini-api/docs/pricing#gemini-3.5-flash-lite
+[[entries]]
+provider = "gemini"
+model = "gemini-3.5-flash-lite"
+input_price_micro_per_1k = 300
+output_price_micro_per_1k = 2500
+
+# https://platform.kimi.ai/docs/pricing/chat (rendered table; D-20-4-12 B)
+[[entries]]
+provider = "kimi"
+model = "kimi-k3.1-pro"
+input_price_micro_per_1k = 2000
+output_price_micro_per_1k = 10000

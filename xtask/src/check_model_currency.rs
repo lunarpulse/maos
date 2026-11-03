@@ -21,9 +21,9 @@
 //!   entries, whether written dotted or as a `[…provider]` table, and the
 //!   Story 5.5b `[providers]` `primary`/`fallback` `model_id` pins;
 //! * `xtask/provider-pricing.toml` — every `[[entries]]` `(provider, model)`;
-//! * `crates/maos-bin/src/main.rs` — the model argument (the third) of every
-//!   `AnthropicProvider`, `OpenAiProvider` and `OllamaProvider` constructor
-//!   (`::new` / `::with_api_key`); all three must be found.
+//! * `crates/maos-bin/src/main.rs` — third model argument of `AnthropicProvider`,
+//!   `OpenAiProvider`, `OllamaProvider`, `GeminiProvider` (`new` / `with_api_key`);
+//!   fifth argument of `OpenAiProvider::compatible`; all five hosts must be found.
 //!
 //! Hermetic `#[cfg(test)]` fixtures and fuzz seeds in OTHER files are NOT scanned:
 //! they pin a retired id as inert test data, and the debt is disclosed, not
@@ -229,17 +229,12 @@ fn pricing_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
         .collect()
 }
 
-/// The model of each `XProvider::new(…)` / `::with_api_key(…)` call: its THIRD
-/// argument (`transport, endpoint_url, model_id, …` in `maos-providers`), read
-/// from the call's own argument list — nesting and string literals respected,
-/// `//` comments dropped, so a commented argument is no pin — and required to be
-/// a `"…".into()`-style literal. A call after `//` on its line opens nothing.
-/// All three host providers must be found — one silently dropping out would
-/// leave its pin unscanned.
+/// Read each constructor's own argument list; compatible drivers name their
+/// provider first and their model fifth, native drivers name their model third.
 fn main_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
     // From line start, with no `//` before the call: a commented call opens nothing.
     let ctor = regex::Regex::new(
-        r"(?m)^(?:[^/\n]|/[^/\n])*?\b(Anthropic|OpenAi|Ollama)Provider::(?:new|with_api_key)\(",
+        r"(?m)^(?:[^/\n]|/[^/\n])*?\b(Anthropic|OpenAi|Ollama|Gemini)Provider::(new|with_api_key|compatible)\(",
     )
     .expect("static");
     let literal =
@@ -269,22 +264,40 @@ fn main_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
             let separator = ch == ',' && depth == 1 && !quoted;
             list.push(if separator { '\0' } else { ch });
         }
-        let Some(m) = list.split('\0').nth(2).and_then(|a| literal.captures(a)) else {
+        let index = if &c[2] == "compatible" { 4 } else { 2 };
+        let provider = if index == 4 {
+            list.split('\0')
+                .next()
+                .and_then(|a| a.trim().strip_prefix('"'))
+                .and_then(|a| a.strip_suffix('"'))
+                .filter(|a| !a.contains('"'))
+                .ok_or_else(|| {
+                    format!("line {line}: compatible constructor has no readable provider literal")
+                })?
+                .to_owned()
+        } else {
+            c[1].to_ascii_lowercase()
+        };
+        let Some(m) = list
+            .split('\0')
+            .nth(index)
+            .and_then(|a| literal.captures(a))
+        else {
             return Err(format!(
-                "line {line}: `{}Provider` constructor has no readable model literal as its third argument — the pin could rot unscanned",
-                &c[1]
+                "line {line}: `{}Provider` constructor has no readable model literal as its {} argument — the pin could rot unscanned",
+                &c[1], if index == 4 { "fifth" } else { "third" }
             ));
         };
-        let skip: usize = list.split('\0').take(2).map(|a| a.len() + 1).sum();
+        let skip: usize = list.split('\0').take(index).map(|a| a.len() + 1).sum();
         let at = skip + m.get(1).map_or(0, |g| g.start());
         pins.push(Pin {
             file: file.into(),
             line: line + list[..at].matches('\n').count(),
-            provider: c[1].to_ascii_lowercase(),
+            provider,
             model: m[1].to_string(),
         });
     }
-    for host in ["anthropic", "openai", "ollama"] {
+    for host in ["anthropic", "openai", "ollama", "gemini", "kimi"] {
         if !pins.iter().any(|p| p.provider == host) {
             return Err(format!(
                 "no `{host}` provider constructor found — its model pin would go unscanned"

@@ -1,0 +1,13 @@
+{
+  "command": "env -u CI -u GITHUB_ACTIONS /mnt/build/cargo-maos/debug/xtask check-model-currency --json",
+  "cwd": "/tmp/maos204-currency-head-poxe0q5m",
+  "main_input": "fn main() {\n AnthropicProvider::new(io, url, \"claude-haiku-4-5-20251001\".into(), None);\n OpenAiProvider::new(io, url, \"gpt-4o-mini\".into(), None);\n OllamaProvider::new(io, url, \"llama3.1:8b\".into());\n GeminiProvider::new(io, url, \"gemini-unlisted\".into(), None);\n OpenAiProvider::compatible(\"kimi\", key, io, url, \"kimi-k2.6\".into(), None);\n}\n",
+  "result": {
+    "text": "{\"gate\":\"check-model-currency\",\"passed\":true,\"files_scanned\":3,\"pins_checked\":5,\"findings\":[]}\n",
+    "details": {
+      "wallTimeNoticeEmitted": false,
+      "timeoutSeconds": 60,
+      "wallTimeMs": 264.1301249861717
+    }
+  }
+}

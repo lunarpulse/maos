@@ -1,0 +1,90 @@
+diff --git a/crates/maos-domain/src/ports/crypto.rs b/crates/maos-domain/src/ports/crypto.rs
+index 6b0c301..cf2a43a 100644
+--- a/crates/maos-domain/src/ports/crypto.rs
++++ b/crates/maos-domain/src/ports/crypto.rs
+@@ -94,6 +94,18 @@ pub trait CryptoProvider: Send + Sync {
+         signing_key: &[u8],
+         token_bytes: &[u8],
+     ) -> Result<Vec<u8>, CryptoError>;
++
++    /// Class: data-movement
++    ///
++    /// Story 20-13 — the inverse of [`CryptoProvider::seal_for_export`]: open an
++    /// AES-256-GCM ciphertext-with-tag under `sealing_key`, `nonce` and `aad`.
++    fn open_sealed(
++        &self,
++        sealing_key: &[u8],
++        nonce: &[u8],
++        aad: &[u8],
++        ciphertext: &[u8],
++    ) -> Result<Vec<u8>, CryptoError>;
+ }
+ 
+ /// Crypto-provider error taxonomy.
+diff --git a/crates/maos-kernel-core/src/security/crypto.rs b/crates/maos-kernel-core/src/security/crypto.rs
+index b5481bb..43be3ab 100644
+--- a/crates/maos-kernel-core/src/security/crypto.rs
++++ b/crates/maos-kernel-core/src/security/crypto.rs
+@@ -95,6 +95,24 @@ impl CryptoProvider for RingCryptoProvider {
+             .map_err(|_| CryptoError::MalformedKey("Ed25519 seed must be 32 bytes"))?;
+         Ok(keypair.sign(token_bytes).as_ref().to_vec())
+     }
++
++    fn open_sealed(
++        &self,
++        sealing_key: &[u8],
++        nonce: &[u8],
++        aad: &[u8],
++        ciphertext: &[u8],
++    ) -> Result<Vec<u8>, CryptoError> {
++        let unbound = aead::UnboundKey::new(&aead::AES_256_GCM, sealing_key)
++            .map_err(|_| CryptoError::MalformedKey("AES-256-GCM key rejected by ring"))?;
++        let nonce = aead::Nonce::try_assume_unique_for_key(nonce)
++            .map_err(|_| CryptoError::OperationFailed("AES-GCM nonce must be 12 bytes"))?;
++        let mut in_out = ciphertext.to_vec();
++        let plaintext = aead::LessSafeKey::new(unbound)
++            .open_in_place(nonce, aead::Aad::from(aad), &mut in_out)
++            .map_err(|_| CryptoError::OperationFailed("AES-GCM open failed"))?;
++        Ok(plaintext.to_vec())
++    }
+ }
+ 
+ #[cfg(test)]
+@@ -147,6 +165,15 @@ pub mod tests {
+             }
+             Ok(sig.to_vec())
+         }
++        fn open_sealed(
++            &self,
++            _key: &[u8],
++            _nonce: &[u8],
++            _aad: &[u8],
++            ciphertext: &[u8],
++        ) -> Result<Vec<u8>, CryptoError> {
++            Ok(ciphertext.to_vec())
++        }
+     }
+ 
+     fn known_ed25519_keypair() -> (Vec<u8>, Vec<u8>) {
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs b/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs
+index 0e1206b..fd3282f 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs
+@@ -263,6 +263,17 @@ mod tests {
+                 "unused",
+             ))
+         }
++        fn open_sealed(
++            &self,
++            _: &[u8],
++            _: &[u8],
++            _: &[u8],
++            _: &[u8],
++        ) -> Result<Vec<u8>, maos_domain::ports::crypto::CryptoError> {
++            Err(maos_domain::ports::crypto::CryptoError::OperationFailed(
++                "unused",
++            ))
++        }
+     }
+ 
+     #[test]

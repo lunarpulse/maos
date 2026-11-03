@@ -148,6 +148,7 @@ impl World {
     ) -> Result<u32, AdmissionRefusal> {
         load_admit_start(
             &AdmissionDeps {
+                providers: None,
                 scheduler: &self.scheduler,
                 security: &self.security,
                 transparency_log: &self.tl,
@@ -2072,6 +2073,7 @@ async fn admission_storage_binding_refusal_is_typed_and_unloads_the_spirit() {
         .expect("real Observer manifest");
     let refused = load_admit_start(
         &AdmissionDeps {
+            providers: None,
             scheduler: &world.scheduler,
             security: &world.security,
             transparency_log: &world.tl,

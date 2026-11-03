@@ -291,6 +291,12 @@ pub enum AdmissionRefusal {
         archived_version: String,
         successor_version: String,
     },
+    /// The selected provider is undeclared, unregistered, or its model assertion differs.
+    ProviderUnavailable { provider: String },
+    /// The root's exact configured base URL does not satisfy the manifest.
+    EndpointPinMismatch { provider: String },
+    /// Fallback would require authority the primary token does not carry.
+    FallbackUnsupported,
 }
 
 impl AdmissionRefusal {
@@ -316,6 +322,9 @@ impl AdmissionRefusal {
             Self::Admission { .. } => "admission_refused",
             Self::Start { .. } => "start_failed",
             Self::MigratorMissing { .. } => "migrator_missing",
+            Self::ProviderUnavailable { .. } => "provider_unavailable",
+            Self::EndpointPinMismatch { .. } => "endpoint_pin_mismatch",
+            Self::FallbackUnsupported => "fallback_unsupported",
         }
     }
 
@@ -388,6 +397,9 @@ impl std::fmt::Display for AdmissionRefusal {
                  [migrates_from] names no pattern matching it (ADR-020 / FR11, refused at \
                  the daemon's admission chokepoint)"
             ),
+            Self::ProviderUnavailable { provider } => write!(f, "provider_unavailable: '{provider}' is undeclared, unregistered, or its model assertion differs"),
+            Self::EndpointPinMismatch { provider } => write!(f, "endpoint_pin_mismatch: '{provider}' does not match the configured endpoint"),
+            Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
         }
     }
 }
@@ -459,6 +471,7 @@ pub struct GatedManifest {
     pub on_crash: Option<OnCrashSection>,
     pub on_revocation: Option<OnRevocationSection>,
     pub supervision: Option<SupervisionSection>,
+    pub providers: Option<maos_kernel_core::security::ProvidersSection>,
     /// The raw text, kept for the model-provenance gate, which parses its own
     /// section out of the whole document, and for the FR11 archive record.
     pub manifest_toml: String,
@@ -694,6 +707,29 @@ pub fn gate_manifest(
     let on_revocation =
         optional_section(&root, "on_revocation", OnRevocationSection::from_toml_str)?;
     let supervision = optional_section(&root, "supervision", SupervisionSection::from_toml_str)?;
+    let providers = optional_section(
+        &root,
+        "providers",
+        maos_kernel_core::security::ProvidersSection::from_toml_str,
+    )?;
+    if let Some(section) = &providers {
+        for config in std::iter::once(&section.primary).chain(&section.fallback) {
+            let prefix = format!("{}.", config.id);
+            if !caps_required
+                .provider
+                .complete
+                .iter()
+                .any(|d| *d == config.id || d.starts_with(&prefix))
+            {
+                return Err(AdmissionRefusal::ProviderUnavailable {
+                    provider: config.id.clone(),
+                });
+            }
+        }
+        if !section.fallback.is_empty() {
+            return Err(AdmissionRefusal::FallbackUnsupported);
+        }
+    }
     // The component's manifest has now passed every structural gate. The
     // refusal is feature-selected because a published binary's engine closure
     // is an export-control property, not runtime configuration.
@@ -720,8 +756,56 @@ pub fn gate_manifest(
         on_crash,
         on_revocation,
         supervision,
+        providers,
         manifest_toml: manifest_toml.to_owned(),
     })
+}
+
+/// Immutable boot configuration, captured before replay replaces the drivers.
+pub struct ConfiguredProvider {
+    pub endpoint: String,
+    pub model: &'static str,
+    pub registered: bool,
+}
+pub type ProviderCatalog = BTreeMap<String, ConfiguredProvider>;
+
+/// Check configuration assertions before admission can mint authority.
+pub fn check_provider_pins(
+    providers: &maos_kernel_core::security::ProvidersSection,
+    catalog: Option<&ProviderCatalog>,
+) -> Result<(), AdmissionRefusal> {
+    use sha2::Digest;
+    for config in std::iter::once(&providers.primary).chain(&providers.fallback) {
+        let registered = catalog
+            .and_then(|c| c.get(&config.id))
+            .filter(|p| p.registered)
+            .ok_or_else(|| AdmissionRefusal::ProviderUnavailable {
+                provider: config.id.clone(),
+            })?;
+        if config
+            .model_id
+            .as_deref()
+            .is_some_and(|m| m != registered.model)
+        {
+            return Err(AdmissionRefusal::ProviderUnavailable {
+                provider: config.id.clone(),
+            });
+        }
+        let pin_ok = config.provider_endpoint_pin.as_deref().is_none_or(|pin| {
+            hex::encode(sha2::Sha256::digest(registered.endpoint.as_bytes()))
+                .eq_ignore_ascii_case(pin)
+        });
+        let url_ok = config
+            .endpoint_url
+            .as_deref()
+            .is_none_or(|url| url == registered.endpoint);
+        if !(pin_ok && url_ok) {
+            return Err(AdmissionRefusal::EndpointPinMismatch {
+                provider: config.id.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// An optional `[name]` section, serialized the way `gate_manifest` serializes
@@ -787,6 +871,7 @@ pub struct AdmissionDeps<'a> {
     /// receives `on_consolidate`, and `on_telemetry_event` while its live
     /// class is Observer.
     pub hooks: Option<&'a crate::hook_pump::HookPump>,
+    pub providers: Option<&'a ProviderCatalog>,
 }
 
 /// Whether the triple runs its third leg.
@@ -843,6 +928,9 @@ pub async fn load_admit_start(
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
 ) -> Result<Admitted, AdmissionRefusal> {
+    if let Some(providers) = &gated.providers {
+        check_provider_pins(providers, deps.providers)?;
+    }
     let spirit_id = gated.spirit_id.clone();
     let archive_root = maos_audit::default_archive_dir();
 
@@ -914,7 +1002,7 @@ pub async fn load_admit_start(
         None,
         None,
         None,
-        None,
+        gated.providers.as_ref(),
         Some(&gated.class_section),
     ) {
         Ok(spec) => spec,

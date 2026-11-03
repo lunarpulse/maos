@@ -10,6 +10,8 @@
 pub enum SecretKey {
     AnthropicApiKey,
     OpenAiApiKey,
+    GeminiApiKey,
+    KimiApiKey,
     /// Story 18-8 AC2 — the bearer MAOS sends to one MCP server.
     McpBearer(McpServer),
 }
@@ -48,9 +50,11 @@ impl McpServer {
 }
 
 impl SecretKey {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::AnthropicApiKey,
         Self::OpenAiApiKey,
+        Self::GeminiApiKey,
+        Self::KimiApiKey,
         Self::McpBearer(McpServer::Calendar),
         Self::McpBearer(McpServer::Slack),
         Self::McpBearer(McpServer::Linear),
@@ -65,6 +69,8 @@ impl SecretKey {
         match self {
             Self::AnthropicApiKey => "anthropic-api-key",
             Self::OpenAiApiKey => "openai-api-key",
+            Self::GeminiApiKey => "gemini-api-key",
+            Self::KimiApiKey => "kimi-api-key",
             Self::McpBearer(server) => server.bearer_names().0,
         }
     }
@@ -73,6 +79,8 @@ impl SecretKey {
         match self {
             Self::AnthropicApiKey => "MAOS_ANTHROPIC_API_KEY",
             Self::OpenAiApiKey => "MAOS_OPENAI_API_KEY",
+            Self::GeminiApiKey => "MAOS_GEMINI_API_KEY",
+            Self::KimiApiKey => "MAOS_KIMI_API_KEY",
             Self::McpBearer(server) => server.bearer_names().1,
         }
     }

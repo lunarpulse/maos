@@ -46,3 +46,18 @@ pub enum ProviderError {
     #[error("unconfigured")]
     Unconfigured,
 }
+
+/// Refuse header-unsafe credentials without formatting their bytes.
+pub(crate) fn validate_api_key(
+    key: maos_domain::ports::SecretKey,
+    value: &str,
+) -> Result<(), ProviderError> {
+    if !value.is_empty() && value.bytes().all(|byte| (0x21..=0x7e).contains(&byte)) {
+        Ok(())
+    } else {
+        Err(ProviderError::Transport(format!(
+            "{}: invalid credential bytes (value withheld)",
+            key.as_str()
+        )))
+    }
+}

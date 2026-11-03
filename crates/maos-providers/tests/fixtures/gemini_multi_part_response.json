@@ -1,0 +1,27 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hello "
+          },
+          {
+            "inlineData": {
+              "mimeType": "image/png",
+              "data": ""
+            }
+          },
+          {
+            "text": "Gemini"
+          }
+        ]
+      },
+      "finishReason": "STOP"
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 5,
+    "candidatesTokenCount": 8
+  }
+}

@@ -1,0 +1,114 @@
+[
+  {
+    "ac": "AC1",
+    "path": "crates/maos-providers/src/gemini.rs",
+    "witness": "native_wire_header_usage_parts_and_stop_reasons",
+    "started": 1793697822.1070309,
+    "result": {
+      "text": "running 1 test\nfailures:\n\n---- native_wire_header_usage_parts_and_stop_reasons stdout ----\n\nthread 'native_wire_header_usage_parts_and_stop_reasons' (3941089) panicked at crates/maos-providers/tests/gemini_round_trip_test.rs:54:9:\ncredential in URL\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: native_wire_header_usage_parts_and_stop_reasons\n             at ./tests/gemini_round_trip_test.rs:54:9\n   3: gemini_round_trip_test::native_wire_header_usage_parts_and_stop_reasons::{closure#0}\n             at ./tests/gemini_round_trip_test.rs:13:57\n   4: <gemini_round_trip_test::native_wire_header_usage_parts_and_stop_reasons::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\nfailures:\n    native_wire_header_usage_parts_and_stop_reasons\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.01s\n\nerror: test failed, to rerun pass `-p maos-providers --test gemini_round_trip_test`\n[raw output: artifact://11858]\n\n\nWall time: 5.19 seconds\n\nCommand exited with code 101",
+      "details": {
+        "wallTimeNoticeEmitted": true,
+        "timeoutSeconds": 3000,
+        "wallTimeMs": 5191.3131340146065,
+        "exitCode": 101
+      },
+      "hasError": true
+    },
+    "red_exit": 101,
+    "seconds": 14.66
+  },
+  {
+    "ac": "AC2",
+    "path": "crates/maos-providers/src/openai.rs",
+    "witness": "compatible_wire_uses_kimi_key_and_attribution",
+    "started": 1793697844.205278,
+    "result": {
+      "text": "running 1 test\nfailures:\n\n---- compatible_wire_uses_kimi_key_and_attribution stdout ----\n\nthread 'compatible_wire_uses_kimi_key_and_attribution' (3941476) panicked at crates/maos-providers/tests/kimi_round_trip_test.rs:38:9:\nassertion `left == right` failed\n  left: \"openai\"\n right: \"kimi\"\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: core::panicking::assert_failed_inner\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17\n   3: core::panicking::assert_failed::<alloc::string::String, &str>\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5\n   4: compatible_wire_uses_kimi_key_and_attribution\n             at ./tests/kimi_round_trip_test.rs:38:9\n   5: kimi_round_trip_test::compatible_wire_uses_kimi_key_and_attribution::{closure#0}\n             at ./tests/kimi_round_trip_test.rs:12:55\n   6: <kimi_round_trip_test::compatible_wire_uses_kimi_key_and_attribution::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\nfailures:\n    compatible_wire_uses_kimi_key_and_attribution\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s\n\nerror: test failed, to rerun pass `-p maos-providers --test kimi_round_trip_test`\n[raw output: artifact://11864]\n\n\nWall time: 3.07 seconds\n\nCommand exited with code 101",
+      "details": {
+        "wallTimeNoticeEmitted": true,
+        "timeoutSeconds": 3000,
+        "wallTimeMs": 3070.093873023987,
+        "exitCode": 101
+      },
+      "hasError": true
+    },
+    "red_exit": 101,
+    "seconds": 11.144
+  },
+  {
+    "ac": "AC3",
+    "path": "crates/maos-bin/src/main.rs",
+    "witness": "epic_gemini_shell_command_selects_and_routes",
+    "started": 1793697890.98667,
+    "invocation_correction": {
+      "exit_code": 2,
+      "reason": "unquoted nextest expression; no test ran; restored before repeating the same named mutation"
+    },
+    "result": {
+      "text": "FAIL [   0.279s] (1/1) maos-bin::provider_selection_20_4 epic_gemini_shell_command_selects_and_routes\n  stdout \u2500\u2500\u2500\n\n    running 1 test\n    test epic_gemini_shell_command_selects_and_routes ... FAILED\n\n    failures:\n\n    failures:\n        epic_gemini_shell_command_selects_and_routes\n\n    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.28s\n\n  stderr \u2500\u2500\u2500\n\n    thread 'epic_gemini_shell_command_selects_and_routes' (3948427) panicked at crates/maos-bin/tests/provider_selection_20_4.rs:18:5:\n    assertion failed: intents(home.path())?.iter().any(|s| s.starts_with(\"infer:gemini->replay:\"))\n    stack backtrace:\n       0: __rustc::rust_begin_unwind\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n       1: core::panicking::panic_fmt\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n       2: core::panicking::panic\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5\n       3: provider_selection_20_4::epic_gemini_shell_command_selects_and_routes\n                 at ./tests/provider_selection_20_4.rs:18:5\n       4: provider_selection_20_4::epic_gemini_shell_command_selects_and_routes::{closure#0}\n                 at ./tests/provider_selection_20_4.rs:9:54\n       5: <provider_selection_20_4::epic_gemini_shell_command_selects_and_routes::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n       6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\n    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\nSummary [   0.280s] 1 test run: 0 passed, 1 failed, 8 skipped\n[raw output: artifact://11876]\n\n\nWall time: 43.86 seconds\n\nCommand exited with code 100",
+      "details": {
+        "wallTimeNoticeEmitted": true,
+        "timeoutSeconds": 3000,
+        "wallTimeMs": 43863.04327297211,
+        "exitCode": 100
+      },
+      "hasError": true
+    },
+    "red_exit": 100,
+    "seconds": 53.184
+  },
+  {
+    "ac": "AC4",
+    "path": "xtask/src/check_model_currency.rs",
+    "witness": "gemini_unknown_constructor_model_is_governed_20_4",
+    "started": 1793697944.1722097,
+    "result": {
+      "text": "running 1 test\nfailures:\n\n---- gemini_unknown_constructor_model_is_governed_20_4 stdout ----\n\nthread 'gemini_unknown_constructor_model_is_governed_20_4' (3955555) panicked at xtask/tests/model_currency_gate.rs:541:5:\n[Finding { file: \"crates/maos-bin/src/main.rs\", line: 1, detail: \"no `gemini` provider constructor found \u2014 its model pin would go unscanned\" }]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n   1: core::panicking::panic_fmt\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n   2: model_currency_gate::gemini_unknown_constructor_model_is_governed_20_4\n             at ./tests/model_currency_gate.rs:541:5\n   3: model_currency_gate::gemini_unknown_constructor_model_is_governed_20_4::{closure#0}\n             at ./tests/model_currency_gate.rs:534:55\n   4: <model_currency_gate::gemini_unknown_constructor_model_is_governed_20_4::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\nfailures:\n    gemini_unknown_constructor_model_is_governed_20_4\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.05s\n\nerror: test failed, to rerun pass `-p xtask --test model_currency_gate`\n[raw output: artifact://11883]\n\n\nWall time: 48.81 seconds\n\nCommand exited with code 101",
+      "details": {
+        "wallTimeNoticeEmitted": true,
+        "timeoutSeconds": 3000,
+        "wallTimeMs": 48814.46428698301,
+        "exitCode": 101
+      },
+      "hasError": true
+    },
+    "red_exit": 101,
+    "seconds": 58.477
+  },
+  {
+    "ac": "AC5",
+    "path": "crates/maos-bin/src/main.rs",
+    "witness": "researcher_primary_overrides_declaration_order",
+    "started": 1793698002.650165,
+    "result": {
+      "text": "FAIL [   0.421s] (1/1) maos-bin::provider_selection_20_4 researcher_primary_overrides_declaration_order\n  stdout \u2500\u2500\u2500\n\n    running 1 test\n    test researcher_primary_overrides_declaration_order ... FAILED\n\n    failures:\n\n    failures:\n        researcher_primary_overrides_declaration_order\n\n    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.42s\n\n  stderr \u2500\u2500\u2500\n\n    thread 'researcher_primary_overrides_declaration_order' (3956234) panicked at crates/maos-bin/tests/provider_selection_20_4.rs:89:5:\n    [\"lifecycle.admit\", \"lifecycle.load\", \"governance:vetter-key-admission\", \"lifecycle.start\", \"cap.issue.Discriminant(5)\", \"researcher:seed_claim\", \"researcher:seed_claim\", \"researcher:seed_claim\", \"cap.verify.ok\", \"infer:anthropic->replay:default\", \"cost:inference-attribution\", \"cap.verify.ok\", \"infer:anthropic->replay:default\", \"cost:inference-attribution\", \"cap.verify.ok\", \"infer:anthropic->replay:default\", \"cost:inference-attribution\", \"methodology_conflict\", \"epistemic.evaluated:methodology_conflict\", \"distillate.write\", \"distillate.write\", \"cap.verify.ok\", \"infer:anthropic->replay:default\", \"cost:inference-attribution\", \"cap.issue.Discriminant(16)\", \"cap.verify.ok\", \"lifecycle.unload\", \"planned_unload\", \"planned_unload\", \"cap.revoke\"]\n    stack backtrace:\n       0: __rustc::rust_begin_unwind\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n       1: core::panicking::panic_fmt\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n       2: provider_selection_20_4::researcher_primary_overrides_declaration_order\n                 at ./tests/provider_selection_20_4.rs:89:5\n       3: provider_selection_20_4::researcher_primary_overrides_declaration_order::{closure#0}\n                 at ./tests/provider_selection_20_4.rs:80:56\n       4: <provider_selection_20_4::researcher_primary_overrides_declaration_order::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\n    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\nSummary [   0.421s] 1 test run: 0 passed, 1 failed, 8 skipped\n[raw output: artifact://11888]\n\n\nWall time: 9.86 seconds\n\nCommand exited with code 100",
+      "details": {
+        "wallTimeNoticeEmitted": true,
+        "timeoutSeconds": 3000,
+        "wallTimeMs": 9864.267933011055,
+        "exitCode": 100
+      },
+      "hasError": true
+    },
+    "red_exit": 100,
+    "seconds": 31.947
+  },
+  {
+    "ac": "AC6",
+    "path": "crates/maos-bin/src/admission.rs",
+    "witness": "wrong_endpoint_pin_refuses_before_inference",
+    "started": 1793698034.5982902,
+    "result": {
+      "text": "FAIL [   0.358s] (1/1) maos-bin::provider_endpoint_pin_20_4 wrong_endpoint_pin_refuses_before_inference\n  stdout \u2500\u2500\u2500\n\n    running 1 test\n    test wrong_endpoint_pin_refuses_before_inference ... FAILED\n\n    failures:\n\n    failures:\n        wrong_endpoint_pin_refuses_before_inference\n\n    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.35s\n\n  stderr \u2500\u2500\u2500\n\n    thread 'wrong_endpoint_pin_refuses_before_inference' (3957295) panicked at crates/maos-bin/tests/provider_endpoint_pin_20_4.rs:20:5:\n    wrong pin admitted\n    stack backtrace:\n       0: __rustc::rust_begin_unwind\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5\n       1: core::panicking::panic_fmt\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14\n       2: wrong_endpoint_pin_refuses_before_inference\n                 at ./tests/provider_endpoint_pin_20_4.rs:20:5\n       3: provider_endpoint_pin_20_4::wrong_endpoint_pin_refuses_before_inference::{closure#0}\n                 at ./tests/provider_endpoint_pin_20_4.rs:10:53\n       4: <provider_endpoint_pin_20_4::wrong_endpoint_pin_refuses_before_inference::{closure#0} as core::ops::function::FnOnce<()>>::call_once\n                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5\n       5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once\n                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5\n    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\nSummary [   0.359s] 1 test run: 0 passed, 1 failed, 3 skipped\n[raw output: artifact://11893]\n\n\nWall time: 11.96 seconds\n\nCommand exited with code 100",
+      "details": {
+        "wallTimeNoticeEmitted": true,
+        "timeoutSeconds": 3000,
+        "wallTimeMs": 11957.11659103632,
+        "exitCode": 100
+      },
+      "hasError": true
+    },
+    "red_exit": 100,
+    "seconds": 21.674
+  }
+]

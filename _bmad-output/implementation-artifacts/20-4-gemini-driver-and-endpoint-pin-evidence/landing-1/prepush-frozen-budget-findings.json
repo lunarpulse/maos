@@ -1,0 +1,130 @@
+{
+  "findings_count": 25,
+  "binary_findings": [
+    {
+      "binary": "bin::provider_endpoint_pin_20_4",
+      "seconds": 41.019,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::provider_selection_20_4",
+      "seconds": 49.146,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::purge_residue_20_10",
+      "seconds": 44.097,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::worker_terminal_facts_17_7",
+      "seconds": 162.568,
+      "budget_seconds": 153.0
+    },
+    {
+      "binary": "cli::skills_door_18_7",
+      "seconds": 30.947,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "iac::participant_recall_17_8",
+      "seconds": 117.464,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "test::journey_forget_18_6",
+      "seconds": 54.849,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "test::journey_skill_authoring_18_7",
+      "seconds": 45.962,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "core::distillation_i11_audit_chain",
+      "seconds": 35.373,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "core::forget_cascade_18_6",
+      "seconds": 42.954,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "core::principal_identity_20_3b",
+      "seconds": 60.885,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "xtask",
+      "seconds": 42.709,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "butler::hallucination",
+      "seconds": 36.629,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "audit::gdpr_cascade_corpus_test",
+      "seconds": 93.864,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::butler_scene_18_4",
+      "seconds": 73.132,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::erasure_uninstall_13_5b",
+      "seconds": 91.74,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::forget_floors_18_6",
+      "seconds": 119.903,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::hook_pump_17_4",
+      "seconds": 134.698,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::maos_uninstall_16_4",
+      "seconds": 90.482,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::maosctl_load_16_6",
+      "seconds": 77.118,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::observer_activity_corpus_17_4",
+      "seconds": 129.669,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::observer_live_17_4",
+      "seconds": 33.697,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::one_daemon_one_door_16_1",
+      "seconds": 201.121,
+      "budget_seconds": 30.0
+    },
+    {
+      "binary": "bin::one_shot_drain_20_3c",
+      "seconds": 41.54,
+      "budget_seconds": 30.0
+    }
+  ],
+  "suite_sum_seconds": 2909.207,
+  "suite_budget_seconds": 1100,
+  "junit": "workspace-prepush-frozen-junit.xml",
+  "original_aggregate": "logs/prepush-frozen.json",
+  "status": "advisory; no budget changes or retry-to-green"
+}

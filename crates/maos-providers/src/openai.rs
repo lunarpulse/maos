@@ -17,6 +17,7 @@ use crate::provider::{Provider, ProviderError};
 
 /// OpenAI provider driver.
 pub struct OpenAiProvider {
+    provider_id: &'static str,
     api_key: String,
     endpoint_url: String,
     model_id: String,
@@ -31,24 +32,45 @@ impl OpenAiProvider {
         model_id: String,
         secret_store: Option<std::sync::Arc<dyn SecretStore>>,
     ) -> Result<Self, ProviderError> {
+        Self::compatible(
+            "openai",
+            SecretKey::OpenAiApiKey,
+            transport,
+            endpoint_url,
+            model_id,
+            secret_store,
+        )
+    }
+
+    /// Use the OpenAI wire protocol with another provider's identity and key.
+    pub fn compatible(
+        provider_id: &'static str,
+        secret_key: SecretKey,
+        transport: std::sync::Arc<dyn IoSubsystemPort>,
+        endpoint_url: String,
+        model_id: String,
+        secret_store: Option<std::sync::Arc<dyn SecretStore>>,
+    ) -> Result<Self, ProviderError> {
         let Some(secret_store) = secret_store else {
             return Err(ProviderError::Unconfigured);
         };
         let api_key = secret_store
-            .get(SecretKey::OpenAiApiKey)
+            .get(secret_key)
             // Story 16-4 review — a credential-store `get` failure is NOT a
             // transport failure: the fallback store has already journaled the
             // store-level telemetry, and the composition root degrades to a
             // provider-less boot instead of exiting 78.
             .map_err(|_| ProviderError::Unconfigured)?
-            .filter(|key| !key.trim().is_empty())
+            .filter(|key| !key.is_empty())
             .ok_or(ProviderError::Unconfigured)?;
-        Ok(Self::with_api_key(
-            transport,
+        crate::provider::validate_api_key(secret_key, &api_key)?;
+        Ok(Self {
+            provider_id,
+            api_key,
             endpoint_url,
             model_id,
-            api_key,
-        ))
+            transport,
+        })
     }
 
     /// Create from an explicit API key (for tests).
@@ -58,13 +80,15 @@ impl OpenAiProvider {
         endpoint_url: String,
         model_id: String,
         api_key: String,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, ProviderError> {
+        crate::provider::validate_api_key(SecretKey::OpenAiApiKey, &api_key)?;
+        Ok(Self {
+            provider_id: "openai",
             api_key,
             endpoint_url,
             model_id,
             transport,
-        }
+        })
     }
 }
 
@@ -94,7 +118,12 @@ impl Provider for OpenAiProvider {
         let response_json: serde_json::Value = serde_json::from_slice(&response_bytes)
             .map_err(|e| ProviderError::Serde(e.to_string()))?;
 
-        parse_openai_response(&response_json, &self.endpoint_url, &self.model_id)
+        parse_openai_response(
+            &response_json,
+            &self.endpoint_url,
+            &self.model_id,
+            self.provider_id,
+        )
     }
 }
 
@@ -116,6 +145,7 @@ fn parse_openai_response(
     json: &serde_json::Value,
     endpoint_url: &str,
     model_id: &str,
+    provider_id: &str,
 ) -> Result<InferenceResponse, ProviderError> {
     let content = json
         .get("choices")
@@ -157,7 +187,7 @@ fn parse_openai_response(
             output_tokens,
         },
         provider_attribution: ProviderAttribution {
-            provider_id: "openai".into(),
+            provider_id: provider_id.into(),
             endpoint_url: endpoint_url.into(),
             model_id: Some(model_id.into()),
         },
@@ -298,7 +328,8 @@ mod tests {
             "choices": [{ "message": { "content": "Greetings!" }, "finish_reason": "stop" }],
             "usage": { "prompt_tokens": 5, "completion_tokens": 10 }
         });
-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
+        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini", "openai")
+            .unwrap();
         assert_eq!(resp.text, "Greetings!");
         assert!(matches!(resp.stop_reason, StopReason::StopSequence));
         assert_eq!(resp.usage.input_tokens, 5);
@@ -312,7 +343,8 @@ mod tests {
             "choices": [{ "message": { "content": "truncated" }, "finish_reason": "length" }],
             "usage": { "prompt_tokens": 1, "completion_tokens": 2 }
         });
-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
+        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini", "openai")
+            .unwrap();
         assert!(matches!(resp.stop_reason, StopReason::MaxTokens));
     }
 
@@ -322,7 +354,8 @@ mod tests {
             "choices": [{ "message": { "content": "filtered" }, "finish_reason": "content_filter" }],
             "usage": { "prompt_tokens": 1, "completion_tokens": 1 }
         });
-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
+        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini", "openai")
+            .unwrap();
         assert!(
             matches!(resp.stop_reason, StopReason::ProviderStop(ref s) if s == "content_filter")
         );
@@ -333,7 +366,8 @@ mod tests {
         let json = serde_json::json!({
             "choices": [{ "message": { "content": "text" }, "finish_reason": "stop" }]
         });
-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini").unwrap();
+        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini", "openai")
+            .unwrap();
         assert_eq!(resp.usage.input_tokens, 0);
         assert_eq!(resp.usage.output_tokens, 0);
     }
@@ -351,7 +385,8 @@ mod tests {
             "https://api.openai.com".into(),
             "gpt-4o-mini".into(),
             "fake-key".into(),
-        );
+        )
+        .unwrap();
         let req = sample_request();
         let resp = provider.complete(&req).unwrap();
         assert_eq!(resp.text, "Mock reply");

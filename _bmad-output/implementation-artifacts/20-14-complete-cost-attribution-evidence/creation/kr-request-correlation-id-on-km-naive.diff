@@ -1,0 +1,300 @@
+diff --git a/crates/maos-domain/src/cost.rs b/crates/maos-domain/src/cost.rs
+index 7f4c70a..63333f8 100644
+--- a/crates/maos-domain/src/cost.rs
++++ b/crates/maos-domain/src/cost.rs
+@@ -57,7 +57,8 @@ pub enum AttributionSource {
+     /// Derived from `principal_ids_for_spirit_pid` (memory-write-target
+     /// reverse-lookup proxy — not the authoritative session principal).
+     WriteTargetProxy,
+-    /// Future: per-call principal binding via SCB marker.
++    /// Story 20-14 — the session principal the composition root bound to
++    /// the call's task; never supplied by the calling Spirit (anti-spoof).
+     SessionPrincipal,
+ }
+ 
+@@ -73,6 +74,14 @@ pub enum AttributionConfidence {
+     Unknown,
+ }
+ 
++/// Story 20-14 (FR64) — the attribution scope the composition root bound to a
++/// unit of work: the task it runs under and the session principal it runs for.
++#[derive(Debug, Clone, Default, PartialEq, Eq)]
++pub struct CostScope {
++    pub task_ref: Option<String>,
++    pub session_principal: Option<String>,
++}
++
+ // ---------------------------------------------------------------------------
+ // Cost attribution payload (the TL frame body)
+ // ---------------------------------------------------------------------------
+@@ -103,6 +112,13 @@ pub struct CostAttributionPayload {
+     /// Cost-dimension quantities (R6: `BTreeMap` not `HashMap` for
+     /// deterministic serialization — R6/ADR-028 byte-identity).
+     pub dimensions: BTreeMap<CostDimension, i64>,
++    /// Story 20-14 — the task the call ran under; absent on pre-20-14 frames
++    /// (R6 forward-read tolerance) and when no task was current.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub task_ref: Option<String>,
++    /// Story 20-14 — the Spirit-declared correlation id (not authoritative).
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub request_ref: Option<String>,
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -211,6 +227,8 @@ mod tests {
+             attribution_source: AttributionSource::WriteTargetProxy,
+             attribution_confidence: AttributionConfidence::Exact,
+             dimensions: dims,
++            task_ref: Some("task.assign:01J".into()),
++            request_ref: None,
+         };
+         let json = serde_json::to_string(&payload).unwrap();
+         let back: CostAttributionPayload = serde_json::from_str(&json).unwrap();
+@@ -245,26 +263,18 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn no_task_ref_in_payload() {
+-        // R3: task_ref DROPPED from v1.0 — negative assertion
+-        let payload = CostAttributionPayload {
+-            schema_version: 1,
+-            timestamp_ns: 0,
+-            spirit_pid: 0,
+-            provider: "test".into(),
+-            model: "test".into(),
+-            principal: PrincipalRef::Unattributed,
+-            attribution_source: AttributionSource::WriteTargetProxy,
+-            attribution_confidence: AttributionConfidence::Unknown,
+-            dimensions: BTreeMap::new(),
+-        };
+-        let json = serde_json::to_string(&payload).unwrap();
+-        assert!(
+-            !json.contains("task_ref")
+-                && !json.contains("correlation_id")
+-                && !json.contains("request_id"),
+-            "R3: no task_ref/correlation_id/request_id in v1.0 cost frame"
+-        );
++    fn task_ref_on_payload_and_absent_on_legacy_frames() {
++        // Story 20-14 — R3 amended: the task reference rides the frame; a
++        // pre-20-14 frame (no field) still reads, as `None`.
++        let legacy = r#"{"schema_version":1,"timestamp_ns":0,"spirit_pid":0,"provider":"p","model":"m","principal":{"kind":"Unattributed"},"attribution_source":"write_target_proxy","attribution_confidence":"unknown","dimensions":{}}"#;
++        let payload: CostAttributionPayload = serde_json::from_str(legacy).unwrap();
++        assert_eq!(payload.task_ref, None);
++        let json = serde_json::to_string(&CostAttributionPayload {
++            task_ref: Some("t-1".into()),
++            ..payload
++        })
++        .unwrap();
++        assert!(json.contains("\"task_ref\":\"t-1\""));
+     }
+ 
+     #[test]
+diff --git a/crates/maos-domain/src/ports/inference.rs b/crates/maos-domain/src/ports/inference.rs
+index 8b94ff6..1a3b74d 100644
+--- a/crates/maos-domain/src/ports/inference.rs
++++ b/crates/maos-domain/src/ports/inference.rs
+@@ -42,6 +42,9 @@ pub struct InferenceRequest {
+     /// v0.5-α fallback chain; empty = no fallback.
+     #[doc = "Construct via [`InferenceRequest::new`] to ensure all fields are populated."]
+     pub fallback_provider_ids: Vec<String>,
++    /// Story 20-14 — Spirit-declared correlation id (sub-task granularity);
++    /// journaled as `request_ref`, never as the authoritative task.
++    pub correlation_id: Option<String>,
+ }
+ 
+ impl InferenceRequest {
+@@ -60,8 +63,15 @@ impl InferenceRequest {
+             options,
+             provider_id,
+             fallback_provider_ids,
++            correlation_id: None,
+         }
+     }
++
++    /// Story 20-14 — attach a Spirit-declared correlation id.
++    pub fn with_correlation_id(mut self, id: impl Into<String>) -> Self {
++        self.correlation_id = Some(id.into());
++        self
++    }
+ }
+ 
+ /// Options controlling inference behavior.
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+index fca5221..c50c718 100644
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -47,6 +47,17 @@ pub struct InferencePortAdapter {
+     /// Story 6.4 — IacBusAdapter handle for `RateLimited` frame emission.
+     /// `None` => router returns the synchronous error but emits no frame.
+     iac: Option<Arc<crate::iac::IacBusAdapter>>,
++    /// Story 20-14 — the SCB table the FR64 cost scope is read from.
++    scbs: Option<
++        Arc<
++            std::sync::RwLock<
++                std::collections::BTreeMap<
++                    u32,
++                    Arc<crate::scheduler::control_block::SpiritControlBlock>,
++                >,
++            >,
++        >,
++    >,
+ }
+ 
+ impl InferencePortAdapter {
+@@ -64,6 +75,7 @@ impl InferencePortAdapter {
+             telemetry,
+             rate_limiter: None,
+             iac: None,
++            scbs: None,
+         }
+     }
+ 
+@@ -77,6 +89,22 @@ impl InferencePortAdapter {
+         self
+     }
+ 
++    /// Story 20-14 — install the SCB table the cost emission reads its scope from.
++    pub fn with_scbs(
++        mut self,
++        scbs: Arc<
++            std::sync::RwLock<
++                std::collections::BTreeMap<
++                    u32,
++                    Arc<crate::scheduler::control_block::SpiritControlBlock>,
++                >,
++            >,
++        >,
++    ) -> Self {
++        self.scbs = Some(scbs);
++        self
++    }
++
+     /// Story 6.4 — install the IacBusAdapter for `RateLimited` frame emission.
+     pub fn with_iac(mut self, iac: Arc<crate::iac::IacBusAdapter>) -> Self {
+         self.iac = Some(iac);
+@@ -400,28 +428,44 @@ impl InferencePort for InferencePortAdapter {
+                     .unwrap_or_default()
+                     .as_nanos() as u64;
+ 
+-                // F8 — principal attribution at emission (R2 / SR-4).
+-                let principal_ids = self
+-                    .transparency_log
+-                    .principal_ids_for_spirit_pid(req.spirit_pid)
++                // Story 20-14 — FR64: the scope the root bound on the caller's
++                // SCB; never read from the request (anti-spoof).
++                let scope = self
++                    .scbs
++                    .as_ref()
++                    .and_then(|scbs| scbs.read().ok()?.get(&req.spirit_pid)?.cost_scope())
+                     .unwrap_or_default();
+-                let (principal, confidence) = match principal_ids.as_slice() {
+-                    [] => (
+-                        maos_domain::cost::PrincipalRef::Unattributed,
+-                        maos_domain::cost::AttributionConfidence::Unknown,
+-                    ),
+-                    [one] => (
+-                        maos_domain::cost::PrincipalRef::Resolved {
+-                            principal_id: one.clone(),
+-                        },
+-                        maos_domain::cost::AttributionConfidence::Exact,
+-                    ),
+-                    many => (
+-                        maos_domain::cost::PrincipalRef::Ambiguous {
+-                            count: many.len() as u32,
+-                        },
+-                        maos_domain::cost::AttributionConfidence::Ambiguous,
++                // F8 — principal attribution at emission (R2 / SR-4): the bound
++                // session principal, else the write-target proxy as fallback.
++                use maos_domain::cost::{AttributionConfidence, AttributionSource, PrincipalRef};
++                let (principal, confidence, source) = match scope.session_principal {
++                    Some(principal_id) => (
++                        PrincipalRef::Resolved { principal_id },
++                        AttributionConfidence::Exact,
++                        AttributionSource::SessionPrincipal,
+                     ),
++                    None => {
++                        let principal_ids = self
++                            .transparency_log
++                            .principal_ids_for_spirit_pid(req.spirit_pid)
++                            .unwrap_or_default();
++                        let (principal, confidence) = match principal_ids.as_slice() {
++                            [] => (PrincipalRef::Unattributed, AttributionConfidence::Unknown),
++                            [one] => (
++                                PrincipalRef::Resolved {
++                                    principal_id: one.clone(),
++                                },
++                                AttributionConfidence::Exact,
++                            ),
++                            many => (
++                                PrincipalRef::Ambiguous {
++                                    count: many.len() as u32,
++                                },
++                                AttributionConfidence::Ambiguous,
++                            ),
++                        };
++                        (principal, confidence, AttributionSource::WriteTargetProxy)
++                    }
+                 };
+ 
+                 let mut dimensions = std::collections::BTreeMap::new();
+@@ -435,7 +479,7 @@ impl InferencePort for InferencePortAdapter {
+                 );
+ 
+                 let cost_payload = maos_domain::cost::CostAttributionPayload {
+-                    schema_version: 1,
++                    schema_version: 2,
+                     timestamp_ns: now_ns,
+                     spirit_pid: req.spirit_pid,
+                     provider: resp.provider_attribution.provider_id.clone(),
+@@ -445,9 +489,11 @@ impl InferencePort for InferencePortAdapter {
+                         .clone()
+                         .unwrap_or_default(),
+                     principal,
+-                    attribution_source: maos_domain::cost::AttributionSource::WriteTargetProxy,
++                    attribution_source: source,
+                     attribution_confidence: confidence,
+                     dimensions,
++                    task_ref: scope.task_ref,
++                    request_ref: req.correlation_id.clone(),
+                 };
+                 if let Ok(cost_bytes) = serde_json::to_vec(&cost_payload) {
+                     let _cost_token = self.transparency_log.insert_frame_event(
+diff --git a/crates/maos-kernel-core/src/scheduler/control_block.rs b/crates/maos-kernel-core/src/scheduler/control_block.rs
+index e3c083c..8336d5c 100644
+--- a/crates/maos-kernel-core/src/scheduler/control_block.rs
++++ b/crates/maos-kernel-core/src/scheduler/control_block.rs
+@@ -282,6 +282,9 @@ pub struct SpiritControlBlock {
+     /// on the stable SCB, not the swappable runtime snapshot, so a live
+     /// operator report cannot regress to fabricated defaults during a swap.
+     sandbox_report: RwLock<Option<SandboxInspectReport>>,
++    /// Story 20-14 (FR64) — the task and session principal the root bound to
++    /// this Spirit's current unit of work; `None` outside a task.
++    cost_scope: RwLock<Option<maos_domain::cost::CostScope>>,
+     /// The only hot-swappable portion of a control block.
+     runtime: Arc<RwLock<ScbRuntimeSnapshot>>,
+ }
+@@ -353,6 +356,7 @@ impl SpiritControlBlock {
+             task_assignments_in_flight: Mutex::new(Vec::new()),
+             boot_nonce,
+             sandbox_report: RwLock::new(None),
++            cost_scope: RwLock::new(None),
+             runtime: Arc::new(RwLock::new(ScbRuntimeSnapshot {
+                 manifest,
+                 spirit_obj,
+@@ -374,6 +378,16 @@ impl SpiritControlBlock {
+         self.sandbox_report.read().clone()
+     }
+ 
++    /// Story 20-14 — bind the cost scope at task dispatch; `None` clears it.
++    pub fn set_cost_scope(&self, scope: Option<maos_domain::cost::CostScope>) {
++        *self.cost_scope.write() = scope;
++    }
++
++    /// Story 20-14 — the cost scope the inference emission site reads.
++    pub fn cost_scope(&self) -> Option<maos_domain::cost::CostScope> {
++        self.cost_scope.read().clone()
++    }
++
+     /// Snapshot the current executable runtime without replacing the SCB Arc.
+     pub fn runtime_snapshot(&self) -> ScbRuntimeSnapshot {
+         self.runtime.read().clone()

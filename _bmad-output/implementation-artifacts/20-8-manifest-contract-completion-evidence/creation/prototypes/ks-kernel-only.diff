@@ -1,0 +1,78 @@
+--- a/crates/maos-kernel-core/src/hot_swap/coordinator.rs
++++ b/crates/maos-kernel-core/src/hot_swap/coordinator.rs
+@@ -187,6 +187,34 @@
+             }
+         }
+ 
++        // Story 20-8 (FR8, HSIS) — the successor preserves every invariant the
++        // predecessor declared; refused before any hook fires.
++        let kept = |name: &String| {
++            successor_manifest
++                .swap_invariants
++                .as_ref()
++                .is_some_and(|s| s.preserve.contains(name))
++        };
++        if let Some(dropped) = pre_swap_runtime
++            .manifest
++            .swap_invariants
++            .iter()
++            .flat_map(|s| s.preserve.iter())
++            .find(|name| !kept(name))
++        {
++            saga.compensate(
++                SagaCompensation::RestorePredecessor {
++                    reason: format!("swap invariant dropped: {dropped}"),
++                },
++                &self.tl,
++                &self.journal,
++            )
++            .await;
++            return Err(HotSwapError::SwapInvariantDropped {
++                invariant: dropped.clone(),
++            });
++        }
++
+         // Step 4: Fire on_swap_out hook.
+         saga.advance_to(SagaPhase::SwapOutFired);
+         let swap_out_result = self.dispatcher.fire_on_swap_out(&predecessor_scb).await;
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -384,6 +384,12 @@
+         .and_then(|v| toml::to_string(v).ok())
+         .map(|s| crate::security::manifest::Budget::from_toml_str(&s))
+         .transpose()?;
++    // Story 20-8 (FR8) — the successor's declarations, as at admission.
++    let swap_invariants = root
++        .get("swap_invariants")
++        .and_then(|v| toml::to_string(v).ok())
++        .map(|s| SwapInvariantsSection::from_toml_str(&s))
++        .transpose()?;
+ 
+     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
+     // reads the array under the `schedule` key; we synthesize a doc that
+@@ -425,5 +431,6 @@
+         schedules,
+         gateways,
+         budget,
++        swap_invariants,
+     })
+ }
+--- a/crates/maos-kernel-core/src/scheduler/control_block.rs
++++ b/crates/maos-kernel-core/src/scheduler/control_block.rs
+@@ -216,6 +216,8 @@
+     /// `Some` ⇒ `budget.time_cap_seconds` is the per-Spirit hook cap. The kernel
+     /// holds the value but never learns *what* the budget bounds (no LLM types).
+     pub budget: Option<crate::security::manifest::Budget>,
++    /// Story 20-8 (FR8) — declarations a swap reads from the live SCB.
++    pub swap_invariants: Option<crate::security::manifest::SwapInvariantsSection>,
+ }
+ 
+ impl Default for SpiritManifestBundle {
+@@ -233,6 +235,7 @@
+             schedules: SchedulesSection::default(),
+             gateways: GatewaysSection::default(),
+             budget: None,
++            swap_invariants: None,
+         }
+     }
+ }

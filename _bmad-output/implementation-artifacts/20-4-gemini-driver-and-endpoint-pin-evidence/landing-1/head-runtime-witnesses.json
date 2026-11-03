@@ -1,0 +1,130 @@
+[
+  {
+    "witness": "AC3-selector",
+    "argv": [
+      "/mnt/build/cargo-maos/debug/maos",
+      "shell"
+    ],
+    "env": {
+      "PATH": "/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "HOME": "/tmp/maos204-before-t4_09ws4",
+      "MAOS_HOME": "/tmp/maos204-before-t4_09ws4/maos",
+      "XDG_DATA_HOME": "/tmp/maos204-before-t4_09ws4/xdg",
+      "MAOS_SECRETS_BACKEND": "env",
+      "MAOS_OLLAMA_URL": "skip",
+      "MAOS_INFERENCE_MODE": "replay",
+      "MAOS_REPLAY_CASSETTE": "/home/lunarpulse/dev_ws/crates/maos-journey-test/cassettes/j0/shell-intro.json",
+      "MAOS_DEFAULT_PROVIDER": "gemini"
+    },
+    "exit": 0,
+    "stdout": "maos shell \u2014 type @hello-spirit <msg>  (Ctrl-D to exit)\nHello! I am the MAOS hello-spirit reference implementation. I can help you explore the MAOS kernel and its Spirit ecosystem.\n\nPosture: assistive\nCapability scope: [\"provider.complete:anthropic.claude-haiku-4-5-20251001\"]\nHalt tags: [\"assistive\"]\nTransparency Log: /tmp/maos204-before-t4_09ws4/maos/audit/transparency.sqlite\nmaos: shell exiting\n",
+    "stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos204-before-t4_09ws4/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: telemetry hook pump wired (Story 17-4)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator door disabled \u2014 no /tmp/maos204-before-t4_09ws4/maos/control.json; run `maos init`\nmaos: no providers configured \u2014 all inference calls return Unconfigured\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos shell: MAOS_INFERENCE_MODE=replay\nmaos: hello-spirit admitted via canonical path (shell mode, pid 1)\n",
+    "infer": [
+      "infer:anthropic->replay:default"
+    ]
+  },
+  {
+    "witness": "AC3-unknown",
+    "argv": [
+      "/mnt/build/cargo-maos/debug/maos",
+      "shell"
+    ],
+    "env": {
+      "PATH": "/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "HOME": "/tmp/maos204-before-ztb4bquh",
+      "MAOS_HOME": "/tmp/maos204-before-ztb4bquh/maos",
+      "XDG_DATA_HOME": "/tmp/maos204-before-ztb4bquh/xdg",
+      "MAOS_SECRETS_BACKEND": "env",
+      "MAOS_OLLAMA_URL": "skip",
+      "MAOS_INFERENCE_MODE": "replay",
+      "MAOS_REPLAY_CASSETTE": "/home/lunarpulse/dev_ws/crates/maos-journey-test/cassettes/j0/shell-intro.json",
+      "MAOS_DEFAULT_PROVIDER": "bedrock"
+    },
+    "exit": 0,
+    "stdout": "maos shell \u2014 type @hello-spirit <msg>  (Ctrl-D to exit)\nHello! I am the MAOS hello-spirit reference implementation. I can help you explore the MAOS kernel and its Spirit ecosystem.\n\nPosture: assistive\nCapability scope: [\"provider.complete:anthropic.claude-haiku-4-5-20251001\"]\nHalt tags: [\"assistive\"]\nTransparency Log: /tmp/maos204-before-ztb4bquh/maos/audit/transparency.sqlite\nmaos: shell exiting\n",
+    "stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos204-before-ztb4bquh/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: telemetry hook pump wired (Story 17-4)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator door disabled \u2014 no /tmp/maos204-before-ztb4bquh/maos/control.json; run `maos init`\nmaos: no providers configured \u2014 all inference calls return Unconfigured\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos shell: MAOS_INFERENCE_MODE=replay\nmaos: hello-spirit admitted via canonical path (shell mode, pid 1)\n",
+    "infer": [
+      "infer:anthropic->replay:default"
+    ]
+  },
+  {
+    "witness": "AC3-invalid-key",
+    "argv": [
+      "/mnt/build/cargo-maos/debug/maos",
+      "shell"
+    ],
+    "env": {
+      "PATH": "/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "HOME": "/tmp/maos204-before-ml9s4str",
+      "MAOS_HOME": "/tmp/maos204-before-ml9s4str/maos",
+      "XDG_DATA_HOME": "/tmp/maos204-before-ml9s4str/xdg",
+      "MAOS_SECRETS_BACKEND": "env",
+      "MAOS_OLLAMA_URL": "skip",
+      "MAOS_INFERENCE_MODE": "replay",
+      "MAOS_REPLAY_CASSETTE": "/home/lunarpulse/dev_ws/crates/maos-journey-test/cassettes/j0/shell-intro.json",
+      "MAOS_GEMINI_API_KEY": "<invalid test key, withheld>"
+    },
+    "exit": 0,
+    "stdout": "maos shell \u2014 type @hello-spirit <msg>  (Ctrl-D to exit)\nHello! I am the MAOS hello-spirit reference implementation. I can help you explore the MAOS kernel and its Spirit ecosystem.\n\nPosture: assistive\nCapability scope: [\"provider.complete:anthropic.claude-haiku-4-5-20251001\"]\nHalt tags: [\"assistive\"]\nTransparency Log: /tmp/maos204-before-ml9s4str/maos/audit/transparency.sqlite\nmaos: shell exiting\n",
+    "stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos204-before-ml9s4str/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: telemetry hook pump wired (Story 17-4)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator door disabled \u2014 no /tmp/maos204-before-ml9s4str/maos/control.json; run `maos init`\nmaos: no providers configured \u2014 all inference calls return Unconfigured\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos shell: MAOS_INFERENCE_MODE=replay\nmaos: hello-spirit admitted via canonical path (shell mode, pid 1)\n",
+    "infer": [
+      "infer:anthropic->replay:default"
+    ]
+  },
+  {
+    "witness": "AC5-primary",
+    "argv": [
+      "/mnt/build/cargo-maos/debug/maos",
+      "run",
+      "/tmp/maos204-before-m0aa445r/manifest.toml",
+      "--once"
+    ],
+    "env": {
+      "PATH": "/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "HOME": "/tmp/maos204-before-m0aa445r",
+      "MAOS_HOME": "/tmp/maos204-before-m0aa445r/maos",
+      "XDG_DATA_HOME": "/tmp/maos204-before-m0aa445r/xdg",
+      "MAOS_SECRETS_BACKEND": "env",
+      "MAOS_OLLAMA_URL": "skip",
+      "MAOS_INFERENCE_MODE": "replay",
+      "MAOS_REPLAY_CASSETTE": "/home/lunarpulse/dev_ws/crates/maos-journey-test/cassettes/j-researcher/survey-distill.json"
+    },
+    "exit": 0,
+    "stdout": "{\"event\":\"spirit_loaded\",\"spirit_id\":\"researcher\",\"pid\":1,\"live\":false,\"boot_loud_port\":true}\n{\"event\":\"on_idle_fired\",\"outcome\":\"Fired { wall_ns: 496025347 }\"}\n{\"findings\":[{\"claim_id\":\"seed-rag-helps\",\"statement\":\"Retrieval augmentation cuts hallucinated citations in literature surveys.\",\"confidence\":0.8500000238418579,\"hedges\":[],\"source_log_ref\":\"4570:2bae:526e:baad:2986:35d0:c8c6:e06b\"},{\"claim_id\":\"seed-rag-noisy\",\"statement\":\"Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.\",\"confidence\":0.800000011920929,\"hedges\":[],\"source_log_ref\":\"da92:df24:30bd:54fe:497e:371d:b847:0ac9\"},{\"claim_id\":\"seed-self-consistency\",\"statement\":\"Self-consistency voting may improve factual recall, but gains appear limited to larger models.\",\"confidence\":0.75,\"hedges\":[\"may improve\",\"appear limited\"],\"source_log_ref\":\"2f5f:10c9:993f:9d94:adb4:6154:b0ca:1583\"}],\"open_questions\":[\"methodology-strength conflict on topic 'rag-citation-accuracy' (both \u2265 0.7)\"],\"confidence_map\":{\"seed-rag-helps\":0.8500000238418579,\"seed-rag-noisy\":0.800000011920929,\"seed-self-consistency\":0.75},\"bibliography\":[{\"source_log_ref\":\"4570:2bae:526e:baad:2986:35d0:c8c6:e06b\",\"intent\":\"researcher:seed_claim\"},{\"source_log_ref\":\"da92:df24:30bd:54fe:497e:371d:b847:0ac9\",\"intent\":\"researcher:seed_claim\"},{\"source_log_ref\":\"2f5f:10c9:993f:9d94:adb4:6154:b0ca:1583\",\"intent\":\"researcher:seed_claim\"}],\"scalars\":{\"load_bearing_confidence\":0.75,\"methodology_conflict\":0.800000011920929},\"event\":\"researcher_survey\",\"completions_consumed\":3}\n{\"event\":\"halt\",\"render\":\"halted on methodology_conflict\",\"halt_id\":\"HaltId(\\\"01M6G10JQY3GWZEHJS6K12ZMNH\\\")\",\"spirit_pid\":1}\n{\"event\":\"drain\",\"spirit_id\":\"researcher\"}\n",
+    "stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos204-before-m0aa445r/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: telemetry hook pump wired (Story 17-4)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator door disabled \u2014 no /tmp/maos204-before-m0aa445r/maos/control.json; run `maos init`\nmaos: no providers configured \u2014 all inference calls return Unconfigured\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos: root supervision armed\nmaos: escape-anomaly consumer wired (Story 17-10, ADR-024)\nresearcher inference seam wired (provider `anthropic`)\nmaos run: halted on methodology_conflict\nhalt 01M6G10JQY3GWZEHJS6K12ZMNH closed by planned unload (no resolution)\nmaos: escape-anomaly consumer stopped (final scan: 0 anomaly line(s), 0 failed scan(s))\nmaos run: --once complete \u2014 exiting cleanly\n",
+    "infer": [
+      "infer:anthropic->replay:default",
+      "infer:anthropic->replay:default",
+      "infer:anthropic->replay:default",
+      "infer:anthropic->replay:default"
+    ]
+  },
+  {
+    "witness": "AC6-pin",
+    "argv": [
+      "/mnt/build/cargo-maos/debug/maos",
+      "run",
+      "/tmp/maos204-before-9azs6682/manifest.toml",
+      "--once"
+    ],
+    "env": {
+      "PATH": "/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "HOME": "/tmp/maos204-before-9azs6682",
+      "MAOS_HOME": "/tmp/maos204-before-9azs6682/maos",
+      "XDG_DATA_HOME": "/tmp/maos204-before-9azs6682/xdg",
+      "MAOS_SECRETS_BACKEND": "env",
+      "MAOS_OLLAMA_URL": "skip",
+      "MAOS_INFERENCE_MODE": "replay",
+      "MAOS_REPLAY_CASSETTE": "/home/lunarpulse/dev_ws/crates/maos-journey-test/cassettes/j-researcher/survey-distill.json"
+    },
+    "exit": 0,
+    "stdout": "{\"event\":\"spirit_loaded\",\"spirit_id\":\"researcher\",\"pid\":1,\"live\":false,\"boot_loud_port\":true}\n{\"event\":\"on_idle_fired\",\"outcome\":\"Fired { wall_ns: 158649193 }\"}\n{\"findings\":[{\"claim_id\":\"seed-rag-helps\",\"statement\":\"Retrieval augmentation cuts hallucinated citations in literature surveys.\",\"confidence\":0.8500000238418579,\"hedges\":[],\"source_log_ref\":\"4570:2bae:526e:baad:2986:35d0:c8c6:e06b\"},{\"claim_id\":\"seed-rag-noisy\",\"statement\":\"Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.\",\"confidence\":0.800000011920929,\"hedges\":[],\"source_log_ref\":\"da92:df24:30bd:54fe:497e:371d:b847:0ac9\"},{\"claim_id\":\"seed-self-consistency\",\"statement\":\"Self-consistency voting may improve factual recall, but gains appear limited to larger models.\",\"confidence\":0.75,\"hedges\":[\"may improve\",\"appear limited\"],\"source_log_ref\":\"2f5f:10c9:993f:9d94:adb4:6154:b0ca:1583\"}],\"open_questions\":[\"methodology-strength conflict on topic 'rag-citation-accuracy' (both \u2265 0.7)\"],\"confidence_map\":{\"seed-rag-helps\":0.8500000238418579,\"seed-rag-noisy\":0.800000011920929,\"seed-self-consistency\":0.75},\"bibliography\":[{\"source_log_ref\":\"4570:2bae:526e:baad:2986:35d0:c8c6:e06b\",\"intent\":\"researcher:seed_claim\"},{\"source_log_ref\":\"da92:df24:30bd:54fe:497e:371d:b847:0ac9\",\"intent\":\"researcher:seed_claim\"},{\"source_log_ref\":\"2f5f:10c9:993f:9d94:adb4:6154:b0ca:1583\",\"intent\":\"researcher:seed_claim\"}],\"scalars\":{\"load_bearing_confidence\":0.75,\"methodology_conflict\":0.800000011920929},\"event\":\"researcher_survey\",\"completions_consumed\":3}\n{\"event\":\"halt\",\"render\":\"halted on methodology_conflict\",\"halt_id\":\"HaltId(\\\"01M6G10K9Z4CSGR68J5K6H0YBM\\\")\",\"spirit_pid\":1}\n{\"event\":\"drain\",\"spirit_id\":\"researcher\"}\n",
+    "stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos204-before-9azs6682/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: telemetry hook pump wired (Story 17-4)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator door disabled \u2014 no /tmp/maos204-before-9azs6682/maos/control.json; run `maos init`\nmaos: no providers configured \u2014 all inference calls return Unconfigured\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos: root supervision armed\nmaos: escape-anomaly consumer wired (Story 17-10, ADR-024)\nresearcher inference seam wired (provider `anthropic`)\nmaos run: halted on methodology_conflict\nhalt 01M6G10K9Z4CSGR68J5K6H0YBM closed by planned unload (no resolution)\nmaos: escape-anomaly consumer stopped (final scan: 0 anomaly line(s), 0 failed scan(s))\nmaos run: --once complete \u2014 exiting cleanly\n",
+    "infer": [
+      "infer:anthropic->replay:default",
+      "infer:anthropic->replay:default",
+      "infer:anthropic->replay:default",
+      "infer:anthropic->replay:default"
+    ]
+  }
+]

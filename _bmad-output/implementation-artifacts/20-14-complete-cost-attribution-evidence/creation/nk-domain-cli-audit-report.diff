@@ -1,0 +1,270 @@
+diff --git a/crates/maos-audit/src/lib.rs b/crates/maos-audit/src/lib.rs
+index fca75a7..8f6178c 100644
+--- a/crates/maos-audit/src/lib.rs
++++ b/crates/maos-audit/src/lib.rs
+@@ -1766,6 +1766,38 @@ pub fn resolve_spirit_name(
+     Ok(resolved)
+ }
+ 
++/// Story 20-14 — every `(boot_nonce, pid) → Spirit name` the identity rows
++/// (kind 19 `SpiritAdmitted`, kind 7 `lifecycle.load`) record, latest row wins.
++pub fn spirit_names(
++    db_path: &Path,
++) -> Result<std::collections::BTreeMap<(u64, u32), String>, String> {
++    let conn = open_transparency_log_readonly(db_path)?;
++    let mut stmt = conn
++        .prepare(
++            "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted FROM transparency_log
++             WHERE kind IN (7, 19) AND intent != 'lifecycle.journal'
++             ORDER BY timestamp_ns ASC, frame_id ASC",
++        )
++        .map_err(|e| format!("prepare failed: {e}"))?;
++    let rows = stmt
++        .query_map([], |row| {
++            let (boot, pid, kind): (i64, i64, i64) = (row.get(0)?, row.get(1)?, row.get(2)?);
++            let (intent, payload): (String, Vec<u8>) = (row.get(3)?, row.get(4)?);
++            Ok((boot as u64, pid as u32, kind, intent, payload))
++        })
++        .map_err(|e| format!("query failed: {e}"))?;
++    let mut names = std::collections::BTreeMap::new();
++    for row in rows {
++        let (boot, pid, kind, intent, payload) = row.map_err(|e| format!("row error: {e}"))?;
++        let name = match kind {
++            19 => intent,
++            _ => payload_spirit_id(&payload).unwrap_or(intent),
++        };
++        names.insert((boot, pid), name);
++    }
++    Ok(names)
++}
++
+ /// The `spirit_id` field of a redacted lifecycle payload, when it parses as
+ /// JSON and carries one.
+ fn payload_spirit_id(payload: &[u8]) -> Option<String> {
+diff --git a/crates/maos-cli/src/subcommands.rs b/crates/maos-cli/src/subcommands.rs
+index df6b3dc..52602b7 100644
+--- a/crates/maos-cli/src/subcommands.rs
++++ b/crates/maos-cli/src/subcommands.rs
+@@ -4772,7 +4772,13 @@ fn default_transparency_log_path() -> PathBuf {
+ /// FR64 cost-reconcile report row.
+ #[derive(Debug, serde::Serialize)]
+ struct CostReportRow {
++    /// Story 20-14 — the task the tokens ran under; `none` for frames without one.
++    task: String,
+     principal: String,
++    /// Story 20-14 — `session_principal` or `write_target_proxy` (SR-4 honesty).
++    attribution_source: String,
++    /// Story 20-14 — the Spirit name at `(boot_nonce, spirit_pid)`, else `pid:<n>`.
++    spirit: String,
+     spirit_pid: u32,
+     provider: String,
+     model: String,
+@@ -4843,12 +4849,15 @@ fn build_cost_report(
+     month: &str,
+     entries: &[maos_audit::AuditEntry],
+     pricing: &maos_domain::cost::ProviderPricingConfig,
++    names: &std::collections::BTreeMap<(u64, u32), String>,
+ ) -> CostReport {
+-    use maos_domain::cost::{CostAttributionPayload, CostDimension, PrincipalRef};
++    use maos_domain::cost::{
++        AttributionSource, CostAttributionPayload, CostDimension, PrincipalRef,
++    };
+     use std::collections::BTreeMap;
+ 
+-    // Group key: (principal_display, spirit_pid, provider, model)
+-    type Key = (String, u32, String, String);
++    // Group key: (task, principal_display, source, spirit, spirit_pid, provider, model)
++    type Key = (String, String, String, String, u32, String, String);
+     // Accumulator: (tokens_in, tokens_out)
+     let mut groups: BTreeMap<Key, (i64, i64)> = BTreeMap::new();
+     let mut warnings: Vec<String> = Vec::new();
+@@ -4885,8 +4894,19 @@ fn build_cost_report(
+             .unwrap_or(0)
+             .max(0);
+ 
++        let source = match payload.attribution_source {
++            AttributionSource::SessionPrincipal => "session_principal",
++            AttributionSource::WriteTargetProxy => "write_target_proxy",
++        };
++        let spirit = names
++            .get(&(entry.boot_nonce, payload.spirit_pid))
++            .cloned()
++            .unwrap_or_else(|| format!("pid:{}", payload.spirit_pid));
+         let key = (
++            payload.task_ref.clone().unwrap_or_else(|| "none".into()),
+             principal_display,
++            source.to_string(),
++            spirit,
+             payload.spirit_pid,
+             payload.provider.clone(),
+             payload.model.clone(),
+@@ -4905,7 +4925,7 @@ fn build_cost_report(
+ 
+     for (key, (tokens_in, tokens_out)) in &groups {
+         let (input_price, output_price) = pricing
+-            .lookup(&key.2, &key.3)
++            .lookup(&key.5, &key.6)
+             .map(|e| (e.input_price_micro_per_1k, e.output_price_micro_per_1k))
+             .unwrap_or((0, 0));
+ 
+@@ -4913,12 +4933,12 @@ fn build_cost_report(
+             + (*tokens_out as u128) * (output_price as u128);
+ 
+         total_cost_u128 += cost_u128;
+-        if key.0 != "host-unallocated" {
++        if key.1 != "host-unallocated" {
+             attributed_cost_u128 += cost_u128;
+         }
+-        let spirit_entry = per_spirit_cost.entry(key.1).or_insert((0, 0));
++        let spirit_entry = per_spirit_cost.entry(key.4).or_insert((0, 0));
+         spirit_entry.0 += cost_u128;
+-        if key.0 != "host-unallocated" {
++        if key.1 != "host-unallocated" {
+             spirit_entry.1 += cost_u128;
+         }
+         row_precisions.push((key.clone(), (*tokens_in, *tokens_out), cost_u128));
+@@ -4955,10 +4975,13 @@ fn build_cost_report(
+         };
+         assigned_total += cost_micro;
+         rows.push(CostReportRow {
+-            principal: key.0.clone(),
+-            spirit_pid: key.1,
+-            provider: key.2.clone(),
+-            model: key.3.clone(),
++            task: key.0.clone(),
++            principal: key.1.clone(),
++            attribution_source: key.2.clone(),
++            spirit: key.3.clone(),
++            spirit_pid: key.4,
++            provider: key.5.clone(),
++            model: key.6.clone(),
+             tokens_in: *tokens_in,
+             tokens_out: *tokens_out,
+             cost_micro,
+@@ -4995,8 +5018,11 @@ fn format_cost_report_plain(report: &CostReport) -> String {
+     for row in &report.rows {
+         let _ = writeln!(
+             out,
+-            "  {:30} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
++            "  task={:28} {:30} ({}) {} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
++            row.task,
+             row.principal,
++            row.attribution_source,
++            row.spirit,
+             row.spirit_pid,
+             row.provider,
+             row.model,
+@@ -5070,7 +5096,8 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
+         }
+     };
+ 
+-    let report = build_cost_report(month, &entries, &pricing);
++    let names = maos_audit::spirit_names(&db_path).unwrap_or_default();
++    let report = build_cost_report(month, &entries, &pricing, &names);
+ 
+     let stdout = std::io::stdout();
+     let mut lock = stdout.lock();
+@@ -5883,6 +5910,7 @@ mod tests {
+             attribution_source: AttributionSource::WriteTargetProxy,
+             attribution_confidence: AttributionConfidence::Exact,
+             dimensions: dims,
++            task_ref: None,
+         };
+         let entry = maos_audit::AuditEntry {
+             frame_id_hex: "aa".repeat(16),
+@@ -5903,7 +5931,7 @@ mod tests {
+                 output_price_micro_per_1k: 15000,
+             },
+         ]);
+-        let report = build_cost_report("2026-06", &[entry], &pricing);
++        let report = build_cost_report("2026-06", &[entry], &pricing, &Default::default());
+         assert_eq!(report.warnings.len(), 0, "must not warn on valid payload");
+         assert_eq!(report.rows.len(), 1);
+         assert_eq!(report.rows[0].principal, "user:alice");
+diff --git a/crates/maos-domain/src/cost.rs b/crates/maos-domain/src/cost.rs
+index 7f4c70a..f6755c1 100644
+--- a/crates/maos-domain/src/cost.rs
++++ b/crates/maos-domain/src/cost.rs
+@@ -57,7 +57,8 @@ pub enum AttributionSource {
+     /// Derived from `principal_ids_for_spirit_pid` (memory-write-target
+     /// reverse-lookup proxy — not the authoritative session principal).
+     WriteTargetProxy,
+-    /// Future: per-call principal binding via SCB marker.
++    /// Story 20-14 — the session principal the composition root bound to
++    /// the call's task; never supplied by the calling Spirit (anti-spoof).
+     SessionPrincipal,
+ }
+ 
+@@ -73,6 +74,14 @@ pub enum AttributionConfidence {
+     Unknown,
+ }
+ 
++/// Story 20-14 (FR64) — the attribution scope the composition root bound to a
++/// unit of work: the task it runs under and the session principal it runs for.
++#[derive(Debug, Clone, Default, PartialEq, Eq)]
++pub struct CostScope {
++    pub task_ref: Option<String>,
++    pub session_principal: Option<String>,
++}
++
+ // ---------------------------------------------------------------------------
+ // Cost attribution payload (the TL frame body)
+ // ---------------------------------------------------------------------------
+@@ -103,6 +112,10 @@ pub struct CostAttributionPayload {
+     /// Cost-dimension quantities (R6: `BTreeMap` not `HashMap` for
+     /// deterministic serialization — R6/ADR-028 byte-identity).
+     pub dimensions: BTreeMap<CostDimension, i64>,
++    /// Story 20-14 — the task the call ran under; absent on pre-20-14 frames
++    /// (R6 forward-read tolerance) and when no task was current.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub task_ref: Option<String>,
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -211,6 +224,7 @@ mod tests {
+             attribution_source: AttributionSource::WriteTargetProxy,
+             attribution_confidence: AttributionConfidence::Exact,
+             dimensions: dims,
++            task_ref: Some("task.assign:01J".into()),
+         };
+         let json = serde_json::to_string(&payload).unwrap();
+         let back: CostAttributionPayload = serde_json::from_str(&json).unwrap();
+@@ -245,26 +259,18 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn no_task_ref_in_payload() {
+-        // R3: task_ref DROPPED from v1.0 — negative assertion
+-        let payload = CostAttributionPayload {
+-            schema_version: 1,
+-            timestamp_ns: 0,
+-            spirit_pid: 0,
+-            provider: "test".into(),
+-            model: "test".into(),
+-            principal: PrincipalRef::Unattributed,
+-            attribution_source: AttributionSource::WriteTargetProxy,
+-            attribution_confidence: AttributionConfidence::Unknown,
+-            dimensions: BTreeMap::new(),
+-        };
+-        let json = serde_json::to_string(&payload).unwrap();
+-        assert!(
+-            !json.contains("task_ref")
+-                && !json.contains("correlation_id")
+-                && !json.contains("request_id"),
+-            "R3: no task_ref/correlation_id/request_id in v1.0 cost frame"
+-        );
++    fn task_ref_on_payload_and_absent_on_legacy_frames() {
++        // Story 20-14 — R3 amended: the task reference rides the frame; a
++        // pre-20-14 frame (no field) still reads, as `None`.
++        let legacy = r#"{"schema_version":1,"timestamp_ns":0,"spirit_pid":0,"provider":"p","model":"m","principal":{"kind":"Unattributed"},"attribution_source":"write_target_proxy","attribution_confidence":"unknown","dimensions":{}}"#;
++        let payload: CostAttributionPayload = serde_json::from_str(legacy).unwrap();
++        assert_eq!(payload.task_ref, None);
++        let json = serde_json::to_string(&CostAttributionPayload {
++            task_ref: Some("t-1".into()),
++            ..payload
++        })
++        .unwrap();
++        assert!(json.contains("\"task_ref\":\"t-1\""));
+     }
+ 
+     #[test]

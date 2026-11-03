@@ -1,0 +1,243 @@
+{
+ "head": "8c809f9c",
+ "instrument": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=<copy>/xtask /mnt/build/cargo-maos/debug/xtask {check-kernel-baseline --json, kloc-check --json, check-service-boundary}; run from each git-archive copy root; no cargo",
+ "base": {
+  "kernel_physical": 26841,
+  "file_set_entries": 95,
+  "set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+  "kernel_tokei": 21042,
+  "per_crate": {
+   "maos-kernel-core": 21042,
+   "maos-bin": 34191,
+   "maos-wasm-host": 2412,
+   "maos-iac": 8270,
+   "maos-domain": 10099,
+   "maos-spirit-abi": 1042,
+   "maos-manifest": 4604,
+   "maos-control": 1496,
+   "xtask": 44406
+  },
+  "aggregate": 192519,
+  "kloc_passed": true,
+  "kloc_alarm": true,
+  "over_budget": [],
+  "check_service_boundary": 0
+ },
+ "prototypes": {
+  "kd07a_lean": {
+   "diff": "kd07a-lean-suppress-revoke-journal-in-iac.diff",
+   "kernel_physical": 26849,
+   "kernel_physical_delta": 8,
+   "kernel_tokei": 21056,
+   "kernel_tokei_delta": 14,
+   "set_hash_prefix": "aa2c3f86",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8302,
+   "maos_iac_delta": 32,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192565,
+   "aggregate_delta": 46,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "kd07b_lean": {
+   "diff": "kd07b-lean-suppress-no-revoke.diff",
+   "kernel_physical": 26843,
+   "kernel_physical_delta": 2,
+   "kernel_tokei": 21050,
+   "kernel_tokei_delta": 8,
+   "set_hash_prefix": "9e23bcea",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8302,
+   "maos_iac_delta": 32,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192559,
+   "aggregate_delta": 40,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "kd07a": {
+   "diff": "kd07a-inline-suppress-revoke.diff",
+   "kernel_physical": 26868,
+   "kernel_physical_delta": 27,
+   "kernel_tokei": 21074,
+   "kernel_tokei_delta": 32,
+   "set_hash_prefix": "c6266815",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8277,
+   "maos_iac_delta": 7,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192558,
+   "aggregate_delta": 39,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "kd07b": {
+   "diff": "kd07b-inline-suppress-no-revoke.diff",
+   "kernel_physical": 26862,
+   "kernel_physical_delta": 21,
+   "kernel_tokei": 21068,
+   "kernel_tokei_delta": 26,
+   "set_hash_prefix": "d748925a",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8277,
+   "maos_iac_delta": 7,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192552,
+   "aggregate_delta": 33,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "ko_poll_x": {
+   "diff": "r-kd07a-lean-plus-ko-poll-outcome-in-iac.diff",
+   "kernel_physical": 26857,
+   "kernel_physical_delta": 16,
+   "kernel_tokei": 21063,
+   "kernel_tokei_delta": 21,
+   "set_hash_prefix": "bc7a4f4c",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8309,
+   "maos_iac_delta": 39,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192579,
+   "aggregate_delta": 60,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "ko_poll": {
+   "diff": "kd07a-lean-plus-ko-poll-outcome-in-kernel.diff",
+   "kernel_physical": 26865,
+   "kernel_physical_delta": 24,
+   "kernel_tokei": 21069,
+   "kernel_tokei_delta": 27,
+   "set_hash_prefix": "75bc4ea2",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8302,
+   "maos_iac_delta": 32,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192578,
+   "aggregate_delta": 59,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "ko_count": {
+   "diff": "kd07a-lean-plus-ko-refused-counters.diff",
+   "kernel_physical": 26869,
+   "kernel_physical_delta": 28,
+   "kernel_tokei": 21072,
+   "kernel_tokei_delta": 30,
+   "set_hash_prefix": "e892137b",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8302,
+   "maos_iac_delta": 32,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192581,
+   "aggregate_delta": 62,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 1,
+   "git_apply_check_head": 0
+  },
+  "ko_row": {
+   "diff": "kd07a-lean-plus-ko-refused-poll-tl-row.diff",
+   "kernel_physical": 26861,
+   "kernel_physical_delta": 20,
+   "kernel_tokei": 21068,
+   "kernel_tokei_delta": 26,
+   "set_hash_prefix": "95b976cb",
+   "changed_kernel_files": [
+    "scheduler/schedule_watchdog.rs"
+   ],
+   "maos_iac": 8318,
+   "maos_iac_delta": 48,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192593,
+   "aggregate_delta": 74,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "kw": {
+   "diff": "kw-post-swap-window-accessor.diff",
+   "kernel_physical": 26850,
+   "kernel_physical_delta": 9,
+   "kernel_tokei": 21048,
+   "kernel_tokei_delta": 6,
+   "set_hash_prefix": "aa4f7ce8",
+   "changed_kernel_files": [
+    "hot_swap/coordinator.rs"
+   ],
+   "maos_iac": 8270,
+   "maos_iac_delta": 0,
+   "maos_bin": 34191,
+   "maos_bin_delta": 0,
+   "aggregate": 192525,
+   "aggregate_delta": 6,
+   "check_kernel_baseline_rc": 1,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  },
+  "sched": {
+   "diff": "sched-admission-carries-schedule.diff",
+   "kernel_physical": 26841,
+   "kernel_physical_delta": 0,
+   "kernel_tokei": 21042,
+   "kernel_tokei_delta": 0,
+   "set_hash_prefix": "db39bc4a",
+   "changed_kernel_files": [],
+   "maos_iac": 8270,
+   "maos_iac_delta": 0,
+   "maos_bin": 34205,
+   "maos_bin_delta": 14,
+   "aggregate": 192533,
+   "aggregate_delta": 14,
+   "check_kernel_baseline_rc": 0,
+   "kloc_check_rc": 1,
+   "check_service_boundary": 0,
+   "git_apply_check_head": 0
+  }
+ },
+ "notes": [
+  "kd07a/kd07b/ko_* kernel tokei deltas are from 21042 at 8c809f9c",
+  "ko_poll check_service_boundary=1 without the kernel-api-classes.toml row for PollOutcome; the saved diff includes the row and passes (0)",
+  "ko_count changes the ScheduleWatchdog struct signature: check-service-boundary reports removed+new symbol (docs/ci-baselines/kernel-surface-v0.1-beta.json re-issue + classes row needed)",
+  "sched conflicts with the working tree's uncommitted 20-4 L1 admission.rs edits; applies to HEAD",
+  "no prototype compiled ([INFERENCE] that they build)"
+ ]
+}

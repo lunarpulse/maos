@@ -1,0 +1,8 @@
+{
+  "text": "{\"gate\":\"check-perf-runner-policy\",\"passed\":true,\"findings\":[]}\ncheck-perf-runner-policy: PASS \u2014 structural selectors, trusted triggers, exact guards, read-only host\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 48.41890799999237
+  }
+}

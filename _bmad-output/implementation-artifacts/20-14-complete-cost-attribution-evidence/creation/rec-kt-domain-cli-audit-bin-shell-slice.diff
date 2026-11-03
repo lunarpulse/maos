@@ -1,0 +1,515 @@
+diff --git a/crates/maos-audit/src/lib.rs b/crates/maos-audit/src/lib.rs
+index fca75a7..8f6178c 100644
+--- a/crates/maos-audit/src/lib.rs
++++ b/crates/maos-audit/src/lib.rs
+@@ -1766,6 +1766,38 @@ pub fn resolve_spirit_name(
+     Ok(resolved)
+ }
+ 
++/// Story 20-14 — every `(boot_nonce, pid) → Spirit name` the identity rows
++/// (kind 19 `SpiritAdmitted`, kind 7 `lifecycle.load`) record, latest row wins.
++pub fn spirit_names(
++    db_path: &Path,
++) -> Result<std::collections::BTreeMap<(u64, u32), String>, String> {
++    let conn = open_transparency_log_readonly(db_path)?;
++    let mut stmt = conn
++        .prepare(
++            "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted FROM transparency_log
++             WHERE kind IN (7, 19) AND intent != 'lifecycle.journal'
++             ORDER BY timestamp_ns ASC, frame_id ASC",
++        )
++        .map_err(|e| format!("prepare failed: {e}"))?;
++    let rows = stmt
++        .query_map([], |row| {
++            let (boot, pid, kind): (i64, i64, i64) = (row.get(0)?, row.get(1)?, row.get(2)?);
++            let (intent, payload): (String, Vec<u8>) = (row.get(3)?, row.get(4)?);
++            Ok((boot as u64, pid as u32, kind, intent, payload))
++        })
++        .map_err(|e| format!("query failed: {e}"))?;
++    let mut names = std::collections::BTreeMap::new();
++    for row in rows {
++        let (boot, pid, kind, intent, payload) = row.map_err(|e| format!("row error: {e}"))?;
++        let name = match kind {
++            19 => intent,
++            _ => payload_spirit_id(&payload).unwrap_or(intent),
++        };
++        names.insert((boot, pid), name);
++    }
++    Ok(names)
++}
++
+ /// The `spirit_id` field of a redacted lifecycle payload, when it parses as
+ /// JSON and carries one.
+ fn payload_spirit_id(payload: &[u8]) -> Option<String> {
+diff --git a/crates/maos-bin/src/env_contract.rs b/crates/maos-bin/src/env_contract.rs
+index 0808eb6..35c19fd 100644
+--- a/crates/maos-bin/src/env_contract.rs
++++ b/crates/maos-bin/src/env_contract.rs
+@@ -218,6 +218,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+         purpose: "The director's principal id a serving root binds its Butler's acceptance record to at boot, so `maosctl spirit pick` records into that principal's namespace; unset or blank ⇒ none bound and picks answer 409 `principal_unbound`; a set value must be non-empty with no `:` and no control character (the scene header's principal rule) — a non-UTF-8 or malformed value, or a `--scene` with a different principal, refuses the boot (Story 19-2 D-19-2-08 A)",
+         stability: EnvStability::UserFacing,
+     },
++    EnvVar {
++        name: "MAOS_SESSION_PRINCIPAL",
++        purpose: "The session principal a root binds to every task it opens this boot, journaled on each cost-attribution frame as `attribution_source: session_principal` (FR64); unset or blank ⇒ none bound and the write-target proxy attributes; a set value must be non-empty with no `:` and no control character — a non-UTF-8 or malformed value refuses the boot (Story 20-14)",
++        stability: EnvStability::UserFacing,
++    },
+     EnvVar {
+         name: "MAOS_SPIRIT_ID",
+         purpose: "Spirit identifier for one-shot lifecycle verbs",
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index bb7d7ff..6a7065a 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -4523,7 +4523,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                 Arc::clone(&memory),
+                 door_port,
+             )
+-            .with_installed(Arc::clone(&installed_spirits), Arc::clone(&iac));
++            .with_installed(Arc::clone(&installed_spirits), Arc::clone(&iac))
++            .with_session_principal(session_principal_from_env()?);
+             // D-16-2-B I/O seam: production passes a fresh `BufReader` over
+             // stdin (NOT `stdin().lock()` — a MutexGuard is not `Send` and
+             // the reader moves to its own thread in D-16-2-D) and `stdout()`
+@@ -16752,3 +16753,22 @@ mod story_13_5a_enterprise_daemon_seam {
+         );
+     }
+ }
++
++/// Story 20-14 (FR64) — `MAOS_SESSION_PRINCIPAL` under the D-19-2-08 A rule:
++/// unset or blank binds none; a set value is non-empty with no `:` or control
++/// character; a non-UTF-8 or malformed value refuses the boot.
++fn session_principal_from_env() -> Result<Option<String>, String> {
++    match std::env::var("MAOS_SESSION_PRINCIPAL") {
++        Err(std::env::VarError::NotPresent) => Ok(None),
++        Err(std::env::VarError::NotUnicode(raw)) => Err(format!(
++            "maos: MAOS_SESSION_PRINCIPAL {raw:?} is not valid UTF-8"
++        )),
++        Ok(principal) if principal.trim().is_empty() => Ok(None),
++        Ok(principal) if principal.chars().any(|c| c == ':' || c.is_ascii_control()) => {
++            Err(format!(
++                "maos: MAOS_SESSION_PRINCIPAL {principal:?} must have no `:` or control character"
++            ))
++        }
++        Ok(principal) => Ok(Some(principal)),
++    }
++}
+diff --git a/crates/maos-bin/src/shell_host.rs b/crates/maos-bin/src/shell_host.rs
+index b69e4bf..cb335d1 100644
+--- a/crates/maos-bin/src/shell_host.rs
++++ b/crates/maos-bin/src/shell_host.rs
+@@ -49,6 +49,8 @@ pub struct ShellHost {
+     /// The SAME operator door `maosctl halt resolve` reaches (D-16-2-C):
+     /// one mechanism, two surfaces.
+     door: Arc<dyn OperatorCommandPort>,
++    /// Story 20-14 — the boot's session principal, bound to every turn's task.
++    session_principal: Option<String>,
+     #[cfg(feature = "network")]
+     installed: Option<(
+         Arc<crate::installed_spirits::InstalledSpirits>,
+@@ -78,11 +80,18 @@ impl ShellHost {
+             halt_registry,
+             memory,
+             door,
++            session_principal: None,
+             #[cfg(feature = "network")]
+             installed: None,
+         }
+     }
+ 
++    /// Story 20-14 — bind the boot's session principal (FR64).
++    pub fn with_session_principal(mut self, principal: Option<String>) -> Self {
++        self.session_principal = principal;
++        self
++    }
++
+     #[cfg(feature = "network")]
+     pub fn with_installed(
+         mut self,
+@@ -110,7 +119,7 @@ impl maos_shell::ShellHost for ShellHost {
+     }
+ 
+     fn issue_turn_token(&self) -> Result<CapabilityToken, CapError> {
+-        self.capability.issue_with_mediation(
++        let token = self.capability.issue_with_mediation(
+             self.spirit_pid,
+             Scope::ProviderInfer {
+                 provider: self.default_provider.clone(),
+@@ -118,7 +127,16 @@ impl maos_shell::ShellHost for ShellHost {
+             60,        // ttl_secs
+             [0u8; 32], // posture_hash (deterministic fallback)
+             IntentClass::Standard,
+-        )
++        )?;
++        // Story 20-14 — one shell turn is one task (FR64), bound at mint.
++        self.capability.bind_cost_scope(
++            token.token_id,
++            maos_domain::cost::CostScope {
++                task_ref: Some(format!("shell.turn:{}", ulid::Ulid::new())),
++                session_principal: self.session_principal.clone(),
++            },
++        );
++        Ok(token)
+     }
+ 
+     fn record_turn(&self, token: &CapabilityToken, payload: &[u8]) -> Result<(), CapError> {
+diff --git a/crates/maos-cli/src/subcommands.rs b/crates/maos-cli/src/subcommands.rs
+index df6b3dc..52602b7 100644
+--- a/crates/maos-cli/src/subcommands.rs
++++ b/crates/maos-cli/src/subcommands.rs
+@@ -4772,7 +4772,13 @@ fn default_transparency_log_path() -> PathBuf {
+ /// FR64 cost-reconcile report row.
+ #[derive(Debug, serde::Serialize)]
+ struct CostReportRow {
++    /// Story 20-14 — the task the tokens ran under; `none` for frames without one.
++    task: String,
+     principal: String,
++    /// Story 20-14 — `session_principal` or `write_target_proxy` (SR-4 honesty).
++    attribution_source: String,
++    /// Story 20-14 — the Spirit name at `(boot_nonce, spirit_pid)`, else `pid:<n>`.
++    spirit: String,
+     spirit_pid: u32,
+     provider: String,
+     model: String,
+@@ -4843,12 +4849,15 @@ fn build_cost_report(
+     month: &str,
+     entries: &[maos_audit::AuditEntry],
+     pricing: &maos_domain::cost::ProviderPricingConfig,
++    names: &std::collections::BTreeMap<(u64, u32), String>,
+ ) -> CostReport {
+-    use maos_domain::cost::{CostAttributionPayload, CostDimension, PrincipalRef};
++    use maos_domain::cost::{
++        AttributionSource, CostAttributionPayload, CostDimension, PrincipalRef,
++    };
+     use std::collections::BTreeMap;
+ 
+-    // Group key: (principal_display, spirit_pid, provider, model)
+-    type Key = (String, u32, String, String);
++    // Group key: (task, principal_display, source, spirit, spirit_pid, provider, model)
++    type Key = (String, String, String, String, u32, String, String);
+     // Accumulator: (tokens_in, tokens_out)
+     let mut groups: BTreeMap<Key, (i64, i64)> = BTreeMap::new();
+     let mut warnings: Vec<String> = Vec::new();
+@@ -4885,8 +4894,19 @@ fn build_cost_report(
+             .unwrap_or(0)
+             .max(0);
+ 
++        let source = match payload.attribution_source {
++            AttributionSource::SessionPrincipal => "session_principal",
++            AttributionSource::WriteTargetProxy => "write_target_proxy",
++        };
++        let spirit = names
++            .get(&(entry.boot_nonce, payload.spirit_pid))
++            .cloned()
++            .unwrap_or_else(|| format!("pid:{}", payload.spirit_pid));
+         let key = (
++            payload.task_ref.clone().unwrap_or_else(|| "none".into()),
+             principal_display,
++            source.to_string(),
++            spirit,
+             payload.spirit_pid,
+             payload.provider.clone(),
+             payload.model.clone(),
+@@ -4905,7 +4925,7 @@ fn build_cost_report(
+ 
+     for (key, (tokens_in, tokens_out)) in &groups {
+         let (input_price, output_price) = pricing
+-            .lookup(&key.2, &key.3)
++            .lookup(&key.5, &key.6)
+             .map(|e| (e.input_price_micro_per_1k, e.output_price_micro_per_1k))
+             .unwrap_or((0, 0));
+ 
+@@ -4913,12 +4933,12 @@ fn build_cost_report(
+             + (*tokens_out as u128) * (output_price as u128);
+ 
+         total_cost_u128 += cost_u128;
+-        if key.0 != "host-unallocated" {
++        if key.1 != "host-unallocated" {
+             attributed_cost_u128 += cost_u128;
+         }
+-        let spirit_entry = per_spirit_cost.entry(key.1).or_insert((0, 0));
++        let spirit_entry = per_spirit_cost.entry(key.4).or_insert((0, 0));
+         spirit_entry.0 += cost_u128;
+-        if key.0 != "host-unallocated" {
++        if key.1 != "host-unallocated" {
+             spirit_entry.1 += cost_u128;
+         }
+         row_precisions.push((key.clone(), (*tokens_in, *tokens_out), cost_u128));
+@@ -4955,10 +4975,13 @@ fn build_cost_report(
+         };
+         assigned_total += cost_micro;
+         rows.push(CostReportRow {
+-            principal: key.0.clone(),
+-            spirit_pid: key.1,
+-            provider: key.2.clone(),
+-            model: key.3.clone(),
++            task: key.0.clone(),
++            principal: key.1.clone(),
++            attribution_source: key.2.clone(),
++            spirit: key.3.clone(),
++            spirit_pid: key.4,
++            provider: key.5.clone(),
++            model: key.6.clone(),
+             tokens_in: *tokens_in,
+             tokens_out: *tokens_out,
+             cost_micro,
+@@ -4995,8 +5018,11 @@ fn format_cost_report_plain(report: &CostReport) -> String {
+     for row in &report.rows {
+         let _ = writeln!(
+             out,
+-            "  {:30} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
++            "  task={:28} {:30} ({}) {} pid={:<5} {:12}/{:24} in={:<10} out={:<10} cost={} µ$",
++            row.task,
+             row.principal,
++            row.attribution_source,
++            row.spirit,
+             row.spirit_pid,
+             row.provider,
+             row.model,
+@@ -5070,7 +5096,8 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
+         }
+     };
+ 
+-    let report = build_cost_report(month, &entries, &pricing);
++    let names = maos_audit::spirit_names(&db_path).unwrap_or_default();
++    let report = build_cost_report(month, &entries, &pricing, &names);
+ 
+     let stdout = std::io::stdout();
+     let mut lock = stdout.lock();
+@@ -5883,6 +5910,7 @@ mod tests {
+             attribution_source: AttributionSource::WriteTargetProxy,
+             attribution_confidence: AttributionConfidence::Exact,
+             dimensions: dims,
++            task_ref: None,
+         };
+         let entry = maos_audit::AuditEntry {
+             frame_id_hex: "aa".repeat(16),
+@@ -5903,7 +5931,7 @@ mod tests {
+                 output_price_micro_per_1k: 15000,
+             },
+         ]);
+-        let report = build_cost_report("2026-06", &[entry], &pricing);
++        let report = build_cost_report("2026-06", &[entry], &pricing, &Default::default());
+         assert_eq!(report.warnings.len(), 0, "must not warn on valid payload");
+         assert_eq!(report.rows.len(), 1);
+         assert_eq!(report.rows[0].principal, "user:alice");
+diff --git a/crates/maos-domain/src/cost.rs b/crates/maos-domain/src/cost.rs
+index 7f4c70a..f6755c1 100644
+--- a/crates/maos-domain/src/cost.rs
++++ b/crates/maos-domain/src/cost.rs
+@@ -57,7 +57,8 @@ pub enum AttributionSource {
+     /// Derived from `principal_ids_for_spirit_pid` (memory-write-target
+     /// reverse-lookup proxy — not the authoritative session principal).
+     WriteTargetProxy,
+-    /// Future: per-call principal binding via SCB marker.
++    /// Story 20-14 — the session principal the composition root bound to
++    /// the call's task; never supplied by the calling Spirit (anti-spoof).
+     SessionPrincipal,
+ }
+ 
+@@ -73,6 +74,14 @@ pub enum AttributionConfidence {
+     Unknown,
+ }
+ 
++/// Story 20-14 (FR64) — the attribution scope the composition root bound to a
++/// unit of work: the task it runs under and the session principal it runs for.
++#[derive(Debug, Clone, Default, PartialEq, Eq)]
++pub struct CostScope {
++    pub task_ref: Option<String>,
++    pub session_principal: Option<String>,
++}
++
+ // ---------------------------------------------------------------------------
+ // Cost attribution payload (the TL frame body)
+ // ---------------------------------------------------------------------------
+@@ -103,6 +112,10 @@ pub struct CostAttributionPayload {
+     /// Cost-dimension quantities (R6: `BTreeMap` not `HashMap` for
+     /// deterministic serialization — R6/ADR-028 byte-identity).
+     pub dimensions: BTreeMap<CostDimension, i64>,
++    /// Story 20-14 — the task the call ran under; absent on pre-20-14 frames
++    /// (R6 forward-read tolerance) and when no task was current.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub task_ref: Option<String>,
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -211,6 +224,7 @@ mod tests {
+             attribution_source: AttributionSource::WriteTargetProxy,
+             attribution_confidence: AttributionConfidence::Exact,
+             dimensions: dims,
++            task_ref: Some("task.assign:01J".into()),
+         };
+         let json = serde_json::to_string(&payload).unwrap();
+         let back: CostAttributionPayload = serde_json::from_str(&json).unwrap();
+@@ -245,26 +259,18 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn no_task_ref_in_payload() {
+-        // R3: task_ref DROPPED from v1.0 — negative assertion
+-        let payload = CostAttributionPayload {
+-            schema_version: 1,
+-            timestamp_ns: 0,
+-            spirit_pid: 0,
+-            provider: "test".into(),
+-            model: "test".into(),
+-            principal: PrincipalRef::Unattributed,
+-            attribution_source: AttributionSource::WriteTargetProxy,
+-            attribution_confidence: AttributionConfidence::Unknown,
+-            dimensions: BTreeMap::new(),
+-        };
+-        let json = serde_json::to_string(&payload).unwrap();
+-        assert!(
+-            !json.contains("task_ref")
+-                && !json.contains("correlation_id")
+-                && !json.contains("request_id"),
+-            "R3: no task_ref/correlation_id/request_id in v1.0 cost frame"
+-        );
++    fn task_ref_on_payload_and_absent_on_legacy_frames() {
++        // Story 20-14 — R3 amended: the task reference rides the frame; a
++        // pre-20-14 frame (no field) still reads, as `None`.
++        let legacy = r#"{"schema_version":1,"timestamp_ns":0,"spirit_pid":0,"provider":"p","model":"m","principal":{"kind":"Unattributed"},"attribution_source":"write_target_proxy","attribution_confidence":"unknown","dimensions":{}}"#;
++        let payload: CostAttributionPayload = serde_json::from_str(legacy).unwrap();
++        assert_eq!(payload.task_ref, None);
++        let json = serde_json::to_string(&CostAttributionPayload {
++            task_ref: Some("t-1".into()),
++            ..payload
++        })
++        .unwrap();
++        assert!(json.contains("\"task_ref\":\"t-1\""));
+     }
+ 
+     #[test]
+diff --git a/crates/maos-kernel-core/src/capability/mod.rs b/crates/maos-kernel-core/src/capability/mod.rs
+index 590b0be..977c9cf 100644
+--- a/crates/maos-kernel-core/src/capability/mod.rs
++++ b/crates/maos-kernel-core/src/capability/mod.rs
+@@ -135,6 +135,10 @@ pub struct CapabilityRegistryAdapter {
+     /// Story 19-2 (FR51 a) — pids the director paused: every mediated action
+     /// (issuance and verification) of a fenced pid fails closed until resume.
+     paused: std::sync::RwLock<std::collections::BTreeSet<u32>>,
++    /// Story 20-14 (FR64) — the attribution scope the root bound to a token at
++    /// mint; read by the inference emission site, pruned with the token.
++    cost_scopes:
++        std::sync::RwLock<std::collections::HashMap<TokenId, maos_domain::cost::CostScope>>,
+ }
+ 
+ impl std::fmt::Debug for CapabilityRegistryAdapter {
+@@ -177,6 +181,7 @@ impl CapabilityRegistryAdapter {
+             telemetry,
+             context: Arc::default(),
+             paused: std::sync::RwLock::default(),
++            cost_scopes: std::sync::RwLock::default(),
+         }
+     }
+ 
+@@ -275,6 +280,20 @@ impl CapabilityRegistryAdapter {
+         self.tokens.get_scope(token_id)
+     }
+ 
++    /// Story 20-14 — bind a root attribution scope to a minted token; scopes of
++    /// tokens the ring no longer holds are pruned on the way in.
++    pub fn bind_cost_scope(&self, token_id: TokenId, scope: maos_domain::cost::CostScope) {
++        let mut scopes = self.cost_scopes.write().unwrap_or_else(|e| e.into_inner());
++        scopes.retain(|id, _| self.tokens.get_scope(id).is_some());
++        scopes.insert(token_id, scope);
++    }
++
++    /// Story 20-14 — the scope bound to `token_id`, if any.
++    pub fn cost_scope(&self, token_id: &TokenId) -> Option<maos_domain::cost::CostScope> {
++        let scopes = self.cost_scopes.read().unwrap_or_else(|e| e.into_inner());
++        scopes.get(token_id).cloned()
++    }
++
+     /// Story 4.2 — write a tagged scalar to the per-Spirit slot store
+     /// and publish a `ScalarTapEvent` to the telemetry stream.
+     pub fn set_scalar(
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+index fca5221..8979dbe 100644
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -400,28 +400,43 @@ impl InferencePort for InferencePortAdapter {
+                     .unwrap_or_default()
+                     .as_nanos() as u64;
+ 
+-                // F8 — principal attribution at emission (R2 / SR-4).
+-                let principal_ids = self
+-                    .transparency_log
+-                    .principal_ids_for_spirit_pid(req.spirit_pid)
++                // Story 20-14 — FR64: the scope the root bound to the verified
++                // token at mint; never read from the request (anti-spoof).
++                let scope = self
++                    .capabilities
++                    .cost_scope(&req.capability_token.token_id)
+                     .unwrap_or_default();
+-                let (principal, confidence) = match principal_ids.as_slice() {
+-                    [] => (
+-                        maos_domain::cost::PrincipalRef::Unattributed,
+-                        maos_domain::cost::AttributionConfidence::Unknown,
+-                    ),
+-                    [one] => (
+-                        maos_domain::cost::PrincipalRef::Resolved {
+-                            principal_id: one.clone(),
+-                        },
+-                        maos_domain::cost::AttributionConfidence::Exact,
+-                    ),
+-                    many => (
+-                        maos_domain::cost::PrincipalRef::Ambiguous {
+-                            count: many.len() as u32,
+-                        },
+-                        maos_domain::cost::AttributionConfidence::Ambiguous,
++                // F8 — principal attribution at emission (R2 / SR-4): the bound
++                // session principal, else the write-target proxy as fallback.
++                use maos_domain::cost::{AttributionConfidence, AttributionSource, PrincipalRef};
++                let (principal, confidence, source) = match scope.session_principal {
++                    Some(principal_id) => (
++                        PrincipalRef::Resolved { principal_id },
++                        AttributionConfidence::Exact,
++                        AttributionSource::SessionPrincipal,
+                     ),
++                    None => {
++                        let principal_ids = self
++                            .transparency_log
++                            .principal_ids_for_spirit_pid(req.spirit_pid)
++                            .unwrap_or_default();
++                        let (principal, confidence) = match principal_ids.as_slice() {
++                            [] => (PrincipalRef::Unattributed, AttributionConfidence::Unknown),
++                            [one] => (
++                                PrincipalRef::Resolved {
++                                    principal_id: one.clone(),
++                                },
++                                AttributionConfidence::Exact,
++                            ),
++                            many => (
++                                PrincipalRef::Ambiguous {
++                                    count: many.len() as u32,
++                                },
++                                AttributionConfidence::Ambiguous,
++                            ),
++                        };
++                        (principal, confidence, AttributionSource::WriteTargetProxy)
++                    }
+                 };
+ 
+                 let mut dimensions = std::collections::BTreeMap::new();
+@@ -435,7 +450,7 @@ impl InferencePort for InferencePortAdapter {
+                 );
+ 
+                 let cost_payload = maos_domain::cost::CostAttributionPayload {
+-                    schema_version: 1,
++                    schema_version: 2,
+                     timestamp_ns: now_ns,
+                     spirit_pid: req.spirit_pid,
+                     provider: resp.provider_attribution.provider_id.clone(),
+@@ -445,9 +460,10 @@ impl InferencePort for InferencePortAdapter {
+                         .clone()
+                         .unwrap_or_default(),
+                     principal,
+-                    attribution_source: maos_domain::cost::AttributionSource::WriteTargetProxy,
++                    attribution_source: source,
+                     attribution_confidence: confidence,
+                     dimensions,
++                    task_ref: scope.task_ref,
+                 };
+                 if let Ok(cost_bytes) = serde_json::to_vec(&cost_payload) {
+                     let _cost_token = self.transparency_log.insert_frame_event(

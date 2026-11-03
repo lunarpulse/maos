@@ -1,0 +1,375 @@
+{
+  "instrument": "prebuilt /mnt/build/cargo-maos/debug/xtask {check-kernel-baseline,kloc-check} --json, env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=<copy>/xtask, run from each git-archive 8c809f9c copy root under /tmp/proto2014 (deleted after measurement); changed files rustfmt 1.9.0 --edition 2021",
+  "head": "8c809f9c5ce245f0bb51e94c20861e45c229d89f",
+  "runs": {
+    "base": {
+      "label": "untouched copy",
+      "kernel_baseline": {
+        "passed": true,
+        "actual-lines": 26841,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": true,
+        "aggregate": 192519,
+        "over_budget": [],
+        "touched": {
+          "maos-kernel-core": 21042,
+          "maos-domain": 10099,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {}
+      }
+    },
+    "dom": {
+      "label": "domain payload task_ref + CostScope + R3 test swap",
+      "kernel_baseline": {
+        "passed": true,
+        "actual-lines": 26841,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": true,
+        "aggregate": 192518,
+        "over_budget": [],
+        "touched": {
+          "maos-kernel-core": 21042,
+          "maos-domain": 10098,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-domain": -1
+        }
+      }
+    },
+    "km": {
+      "label": "KM naive (SCB marker, full map type)",
+      "kernel_baseline": {
+        "passed": false,
+        "actual-lines": 26900,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "7c0d95121ea1b96745dc0393ccbbaf808218cca7b27ce82dc4c864309cf353bc",
+        "changed": [
+          "inference/mod.rs",
+          "scheduler/control_block.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": false,
+        "aggregate": 192565,
+        "over_budget": [
+          "aggregate 192565 >= 192520",
+          "maos-kernel-core 21089 > 21042"
+        ],
+        "touched": {
+          "maos-kernel-core": 21089,
+          "maos-domain": 10098,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-domain": -1,
+          "maos-kernel-core": 47
+        }
+      }
+    },
+    "kml": {
+      "label": "KM (SCB marker, ScbTable alias)",
+      "kernel_baseline": {
+        "passed": false,
+        "actual-lines": 26885,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "1f4bf80a14dd83a3609d5752a5067f0c04d1ca2bbeed1542572443b305946889",
+        "changed": [
+          "inference/mod.rs",
+          "scheduler/control_block.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": false,
+        "aggregate": 192548,
+        "over_budget": [
+          "aggregate 192548 >= 192520",
+          "maos-kernel-core 21072 > 21042"
+        ],
+        "touched": {
+          "maos-kernel-core": 21072,
+          "maos-domain": 10098,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-domain": -1,
+          "maos-kernel-core": 30
+        }
+      }
+    },
+    "kt": {
+      "label": "KT token-bound scope in capability registry",
+      "kernel_baseline": {
+        "passed": false,
+        "actual-lines": 26876,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "24fc176f5d86b4966c017cdf98ef19b76df42b3d88dc4d140f17a3006b9713ee",
+        "changed": [
+          "capability/mod.rs",
+          "inference/mod.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": false,
+        "aggregate": 192543,
+        "over_budget": [
+          "aggregate 192543 >= 192520",
+          "maos-kernel-core 21067 > 21042"
+        ],
+        "touched": {
+          "maos-kernel-core": 21067,
+          "maos-domain": 10098,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-domain": -1,
+          "maos-kernel-core": 25
+        }
+      }
+    },
+    "kp": {
+      "label": "KP root CostScopePort",
+      "kernel_baseline": {
+        "passed": false,
+        "actual-lines": 26872,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "94aecc83dca66fc8b1b9726c96ef5de4bcb5b4ebe15a84be807f79d886dee3a5",
+        "changed": [
+          "inference/mod.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": false,
+        "aggregate": 192550,
+        "over_budget": [
+          "aggregate 192550 >= 192520",
+          "maos-domain 10105 > 10099",
+          "maos-kernel-core 21067 > 21042"
+        ],
+        "touched": {
+          "maos-kernel-core": 21067,
+          "maos-domain": 10105,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-domain": 6,
+          "maos-kernel-core": 25
+        }
+      }
+    },
+    "k0": {
+      "label": "K0 token bytes on cost row",
+      "kernel_baseline": {
+        "passed": false,
+        "actual-lines": 26841,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "32eb934209701adf7be00a76f6660e83dd71e13ef918f690d86c708f2753d866",
+        "changed": [
+          "inference/mod.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": true,
+        "aggregate": 192519,
+        "over_budget": [],
+        "touched": {
+          "maos-kernel-core": 21042,
+          "maos-domain": 10099,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {}
+      }
+    },
+    "kmr": {
+      "label": "KM naive + KR request correlation id",
+      "kernel_baseline": {
+        "passed": false,
+        "actual-lines": 26901,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "8f947c9110180d69bd6ccda5e7254dcd1e342fe1b4c6dae8f13d5fd7cf3e8bcb",
+        "changed": [
+          "inference/mod.rs",
+          "scheduler/control_block.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": false,
+        "aggregate": 192575,
+        "over_budget": [
+          "aggregate 192575 >= 192520",
+          "maos-domain 10107 > 10099",
+          "maos-kernel-core 21090 > 21042"
+        ],
+        "touched": {
+          "maos-kernel-core": 21090,
+          "maos-domain": 10107,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-domain": 8,
+          "maos-kernel-core": 48
+        }
+      }
+    },
+    "nk": {
+      "label": "domain + cli report + audit spirit_names",
+      "kernel_baseline": null,
+      "kloc": {
+        "passed": false,
+        "aggregate": 192572,
+        "over_budget": [
+          "aggregate 192572 >= 192520",
+          "maos-audit 7750 > 7721"
+        ],
+        "touched": {
+          "maos-kernel-core": 21042,
+          "maos-domain": 10098,
+          "maos-cli": 6454,
+          "maos-audit": 7750,
+          "maos-bin": 34191,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-audit": 29,
+          "maos-cli": 25,
+          "maos-domain": -1
+        }
+      }
+    },
+    "bin": {
+      "label": "KT + domain + bin shell slice",
+      "kernel_baseline": null,
+      "kloc": {
+        "passed": false,
+        "aggregate": 192578,
+        "over_budget": [
+          "aggregate 192578 >= 192520",
+          "maos-bin 34226 > 34191",
+          "maos-kernel-core 21067 > 21042"
+        ],
+        "touched": {
+          "maos-kernel-core": 21067,
+          "maos-domain": 10098,
+          "maos-cli": 6429,
+          "maos-audit": 7721,
+          "maos-bin": 34226,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-bin": 35,
+          "maos-domain": -1,
+          "maos-kernel-core": 25
+        }
+      }
+    },
+    "rec": {
+      "label": "recommended: KT + domain + cli + audit + bin shell slice",
+      "kernel_baseline": {
+        "passed": false,
+        "actual-lines": 26876,
+        "pinned-lines": 26841,
+        "file-set-entries": 95,
+        "set-hash": "24fc176f5d86b4966c017cdf98ef19b76df42b3d88dc4d140f17a3006b9713ee",
+        "changed": [
+          "capability/mod.rs",
+          "inference/mod.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc": {
+        "passed": false,
+        "aggregate": 192632,
+        "over_budget": [
+          "aggregate 192632 >= 192520",
+          "maos-audit 7750 > 7721",
+          "maos-bin 34226 > 34191",
+          "maos-kernel-core 21067 > 21042"
+        ],
+        "touched": {
+          "maos-kernel-core": 21067,
+          "maos-domain": 10098,
+          "maos-cli": 6454,
+          "maos-audit": 7750,
+          "maos-bin": 34226,
+          "maos-iac": 8270,
+          "xtask": 44406
+        },
+        "delta_vs_head": {
+          "maos-audit": 29,
+          "maos-bin": 35,
+          "maos-cli": 25,
+          "maos-domain": -1,
+          "maos-kernel-core": 25
+        }
+      }
+    }
+  }
+}

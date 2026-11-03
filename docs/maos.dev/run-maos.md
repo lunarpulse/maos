@@ -72,8 +72,9 @@ MAOS_INFERENCE_MODE=live    maos shell
 
 ### Provider keys (today)
 
-Live inference resolves `MAOS_ANTHROPIC_API_KEY` and `MAOS_OPENAI_API_KEY`
-through the OS keyring by default. If the bounded keyring attempt is unavailable
+Live inference resolves `MAOS_ANTHROPIC_API_KEY`, `MAOS_OPENAI_API_KEY`,
+`MAOS_GEMINI_API_KEY` and `MAOS_KIMI_API_KEY` through the OS keyring by default.
+If the bounded keyring attempt is unavailable
 or the named entry is absent, MAOS falls back to the composition-root-captured
 environment value and records a `secret.source.fallback` audit event without key
 material. Set `MAOS_SECRETS_BACKEND=env` for headless CI, or
@@ -90,6 +91,53 @@ entries created by this promotion.
 The keyring is safer for secrets at rest and keeps them out of process
 environment listings. It does not protect a key from another process running as
 your user on the same host.
+
+The keyring names for the new keys are `gemini-api-key` and `kimi-api-key`.
+Provider construction refuses non-visible-ASCII credential bytes (only 0x21–0x7E
+is accepted), names the key but never its value, and refuses boot with exit 78.
+Gemini sends its key only in `x-goog-api-key`, never a URL; Kimi uses Bearer auth
+through the reusable OpenAI-compatible driver at `https://api.moonshot.ai`.
+
+`MAOS_DEFAULT_PROVIDER=anthropic|openai|gemini|kimi|ollama` selects the router
+default; empty is unset. An unregistered id refuses boot and names the registered
+ids, rather than silently selecting another provider. Existing registration order
+is preserved, with Gemini and Kimi between OpenAI and Ollama, only with their keys.
+Explicit replay registers all five ids without credentials or network traffic.
+
+### Per-Spirit provider selection and endpoint pins
+
+A Spirit can select a registered provider it declares in `provider.complete`:
+
+```toml
+[providers.primary]
+id = "ollama"
+endpoint_url = "http://127.0.0.1:11434"
+# provider_endpoint_pin = "<64 hex characters: SHA-256 of the exact base URL>"
+```
+
+`primary.id` binds both token issuance and inference routing. `endpoint_url` and
+`model_id`, when present, are equality assertions against the boot configuration,
+not reconfiguration. Non-empty `fallback` is refused as `fallback_unsupported`:
+the primary token cannot authorise another provider.
+
+Compute a pin with `printf %s 'http://127.0.0.1:11434' | sha256sum` and use the
+digest as `provider_endpoint_pin`. Admission checks SHA-256 of the **exact configured
+base-URL bytes**, without normalising scheme, case, port, path or trailing slash.
+`MAOS_OLLAMA_URL` is captured once at boot; a different URL refuses admission with
+`endpoint_pin_mismatch`, before token issuance. Pins have the same meaning in
+keyless replay as live mode. This locks configuration, **not network identity**:
+DNS/TLS authentication remains the transport's responsibility.
+
+The Gemini default is `gemini-3.5-flash-lite`; Kimi is `kimi-k3.1-pro` (D-20-4-12 B).
+K2 ids are vendor-deprecated and refused by `check-model-currency`. Kimi's successor
+requires a successful $1 top-up and has account-tier limits; see the
+[vendor limits](https://platform.kimi.ai/docs/pricing/limits).
+
+**20-4 landing boundary:** L1's Gemini/Kimi shell cassettes are explicitly `seed`;
+they prove selection and routing (`infer:gemini->replay:…`, `infer:kimi->replay:…`),
+not a vendor wire exchange. Fixture tests prove the wire shape. Until L2 widens
+the kernel's rate-limit id set, live/record/deterministic Gemini/Kimi calls fail
+closed as `Unconfigured`; no release tag belongs between these landings.
 
 ### MCP server bearers
 

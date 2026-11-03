@@ -1,0 +1,6 @@
+Cost Reconcile Report — 2026-11
+  total=0 µ$  attributed=0 µ$  fraction=0.0000
+  host-unallocated               pid=1     replay      /hand-authored-seed       in=100        out=60         cost=0 µ$
+
+Per-Spirit attributable fraction:
+  pid=1: 0.0000

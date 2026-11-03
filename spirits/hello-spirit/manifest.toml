@@ -9,9 +9,8 @@ trust_tier = "local"
 description = "MAOS reference Spirit — structured acknowledgement"
 
 [capabilities.required]
-# Story 17-11 (review ruling 2026-10-24): `openai` declared so an OpenAI-only
-# box (router default `openai`) is not refused at issuance.
-provider.complete = ["anthropic.claude-haiku-4-5-20251001", "ollama.llama3.1:8b", "openai.gpt-4o-mini"]
+# Every provider the router can default to must be declared at token issuance.
+provider.complete = ["anthropic.claude-haiku-4-5-20251001", "ollama.llama3.1:8b", "openai.gpt-4o-mini", "gemini.gemini-3.5-flash-lite", "kimi.kimi-k3.1-pro"]
 
 [posture]
 default = "assistive"

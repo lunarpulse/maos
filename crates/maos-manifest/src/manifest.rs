@@ -2410,7 +2410,7 @@ fn parse_rfc3339_utc_secs(s: &str) -> Result<i64, String> {
 // [providers] section (Story 5.5b, AC2)
 // ------------------------------------------------------------------
 
-const ALLOWED_PROVIDER_IDS: &[&str] = &["anthropic", "openai", "ollama"];
+const ALLOWED_PROVIDER_IDS: &[&str] = &["anthropic", "openai", "gemini", "kimi", "ollama"];
 
 fn is_hex_sha256(s: &str) -> bool {
     s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
@@ -4325,12 +4325,12 @@ endpoint_url = "http://localhost:11434"
     fn providers_rejects_unsupported_id() {
         let toml = r#"
 [primary]
-id = "kimi"
+id = "bedrock"
 "#;
         let err = ProvidersSection::from_toml_str(toml).unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains("kimi") && msg.contains("unsupported"),
+            msg.contains("bedrock") && msg.contains("unsupported"),
             "msg={}",
             msg
         );
@@ -4388,12 +4388,12 @@ provider_endpoint_pin = "{}"
 id = "openai"
 
 [[fallback]]
-id = "kimi"
+id = "bedrock"
 "#;
         let err = ProvidersSection::from_toml_str(toml).unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains("fallback[0]") && msg.contains("kimi"),
+            msg.contains("fallback[0]") && msg.contains("bedrock"),
             "msg={}",
             msg
         );

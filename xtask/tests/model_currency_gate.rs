@@ -230,10 +230,12 @@ fn main_rs_constructors_are_read_in_every_layout_and_comments_open_no_call() {
          \x20       _ => {}\n\
          \x20   }\n\
          \x20   let _ = maos_providers::OllamaProvider::new(io, url, \"llama3.1:8b\".to_string());\n\
+         \x20   GeminiProvider::new(io, url, \"gemini-3.5-flash-lite\".into(), None);\n\
+         \x20   OpenAiProvider::compatible(\"kimi\", key, io, url, \"kimi-k3.1-pro\".into(), None);\n\
          }\n",
     );
     let report = tree.judge();
-    assert!(report.pins >= 3, "all three constructors are read");
+    assert!(report.pins >= 5, "all five constructors are read");
     assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
     let found = &report.findings[0];
     assert_eq!(
@@ -512,4 +514,72 @@ fn the_data_file_refuses_an_empty_provider_map_and_blank_or_repeated_retired_ids
             .unwrap_or_else(|| panic!("accepted: {broken}"));
         assert!(err.contains(fragment), "`{fragment}` not in: {err}");
     }
+}
+
+/// 20-4: independent constructor vectors also fail on the unextended HEAD scanner.
+fn five_host_fixture(gemini: &str, kimi: Option<&str>) -> String {
+    let mut text = format!(
+        "fn main() {{\n AnthropicProvider::new(io, url, \"claude-haiku-4-5-20251001\".into(), None);\n OpenAiProvider::new(io, url, \"gpt-4o-mini\".into(), None);\n OllamaProvider::new(io, url, \"llama3.1:8b\".into());\n GeminiProvider::new(io, url, \"{gemini}\".into(), None);\n"
+    );
+    if let Some(model) = kimi {
+        text.push_str(&format!(
+            " OpenAiProvider::compatible(\"kimi\", key, io, url, \"{model}\".into(), None);\n"
+        ));
+    }
+    text.push_str("}\n");
+    text
+}
+
+#[test]
+fn gemini_unknown_constructor_model_is_governed_20_4() {
+    let tree = Tree::real();
+    tree.write(
+        "crates/maos-bin/src/main.rs",
+        &five_host_fixture("gemini-unlisted", Some("kimi-k3.1-pro")),
+    );
+    let report = tree.judge();
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|f| f.file == "crates/maos-bin/src/main.rs"
+                && f.line == 5
+                && f.detail.contains("gemini.gemini-unlisted")),
+        "{:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn kimi_k2_constructor_is_refused_as_deprecated_20_4() {
+    let tree = Tree::real();
+    tree.write(
+        "crates/maos-bin/src/main.rs",
+        &five_host_fixture("gemini-3.5-flash-lite", Some("kimi-k2.6")),
+    );
+    let report = tree.judge();
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|f| f.file == "crates/maos-bin/src/main.rs"
+                && f.line == 6
+                && f.detail.contains("RETIRED model id `kimi.kimi-k2.6`")),
+        "{:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn missing_kimi_constructor_fails_closed_20_4() {
+    let tree = Tree::real();
+    tree.write(
+        "crates/maos-bin/src/main.rs",
+        &five_host_fixture("gemini-3.5-flash-lite", None),
+    );
+    assert!(tree
+        .judge()
+        .findings
+        .iter()
+        .any(|f| f.detail.contains("no `kimi` provider constructor found")));
 }

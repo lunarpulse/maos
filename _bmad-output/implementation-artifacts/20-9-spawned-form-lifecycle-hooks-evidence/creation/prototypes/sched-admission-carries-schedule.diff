@@ -1,0 +1,59 @@
+diff --git a/crates/maos-bin/src/admission.rs b/crates/maos-bin/src/admission.rs
+index d9c16d1..54c19e7 100644
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -56,7 +56,7 @@ use maos_kernel_core::security::manifest::{
+     Budget, CapabilitiesRequired, ClassSection, EpistemicPolicySection,
+     HaltProtocolCompatibilitySection, HotSwapManifestSection, LifecycleSection,
+     MigratesFromSection, OnCrashSection, OnRevocationSection, OutputShape, Posture, PostureSection,
+-    ResourceCaps, SandboxConfig, SchedulingSection, SupervisionSection,
++    ResourceCaps, SandboxConfig, SchedulesSection, SchedulingSection, SupervisionSection,
+ };
+ use maos_kernel_core::security::SecurityManagerAdapter;
+ 
+@@ -459,6 +459,9 @@ pub struct GatedManifest {
+     pub on_crash: Option<OnCrashSection>,
+     pub on_revocation: Option<OnRevocationSection>,
+     pub supervision: Option<SupervisionSection>,
++    /// Story 20-9 — `[[schedule]]`, carried so the ScheduleWatchdog sees an
++    /// admitted Spirit's entries (before, only a hot-swap successor's).
++    pub schedules: SchedulesSection,
+     /// The raw text, kept for the model-provenance gate, which parses its own
+     /// section out of the whole document, and for the FR11 archive record.
+     pub manifest_toml: String,
+@@ -478,6 +481,7 @@ impl GatedManifest {
+             on_crash: self.on_crash.clone(),
+             on_revocation: self.on_revocation.clone(),
+             supervision: self.supervision.clone(),
++            schedules: self.schedules.clone(),
+             ..Default::default()
+         }
+     }
+@@ -694,6 +698,19 @@ pub fn gate_manifest(
+     let on_revocation =
+         optional_section(&root, "on_revocation", OnRevocationSection::from_toml_str)?;
+     let supervision = optional_section(&root, "supervision", SupervisionSection::from_toml_str)?;
++    // Story 20-9 — the array-of-tables, wrapped as the kernel's successor
++    // parser wraps it (`lifecycle/upgrade.rs` `load_bundle_from_file`).
++    let schedules = match root.get("schedule") {
++        Some(value) => {
++            let mut wrapper = toml::value::Table::new();
++            wrapper.insert("schedule".into(), value.clone());
++            toml::to_string(&wrapper)
++                .map_err(|e| e.to_string())
++                .and_then(|text| SchedulesSection::from_toml_str(&text).map_err(|e| e.to_string()))
++                .map_err(parse_err("schedule"))?
++        }
++        None => SchedulesSection::default(),
++    };
+     // The component's manifest has now passed every structural gate. The
+     // refusal is feature-selected because a published binary's engine closure
+     // is an export-control property, not runtime configuration.
+@@ -720,6 +737,7 @@ pub fn gate_manifest(
+         on_crash,
+         on_revocation,
+         supervision,
++        schedules,
+         manifest_toml: manifest_toml.to_owned(),
+     })
+ }

@@ -1,0 +1,8 @@
+{
+  "text": "{\"passed\":true,\"violation_count\":0,\"violations\":[]}\n",
+  "details": {
+    "wallTimeNoticeEmitted": false,
+    "timeoutSeconds": 180,
+    "wallTimeMs": 283.3319910168648
+  }
+}

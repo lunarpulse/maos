@@ -1,0 +1,234 @@
+diff --git a/crates/maos-domain/src/cost.rs b/crates/maos-domain/src/cost.rs
+index 7f4c70a..f6755c1 100644
+--- a/crates/maos-domain/src/cost.rs
++++ b/crates/maos-domain/src/cost.rs
+@@ -57,7 +57,8 @@ pub enum AttributionSource {
+     /// Derived from `principal_ids_for_spirit_pid` (memory-write-target
+     /// reverse-lookup proxy — not the authoritative session principal).
+     WriteTargetProxy,
+-    /// Future: per-call principal binding via SCB marker.
++    /// Story 20-14 — the session principal the composition root bound to
++    /// the call's task; never supplied by the calling Spirit (anti-spoof).
+     SessionPrincipal,
+ }
+ 
+@@ -73,6 +74,14 @@ pub enum AttributionConfidence {
+     Unknown,
+ }
+ 
++/// Story 20-14 (FR64) — the attribution scope the composition root bound to a
++/// unit of work: the task it runs under and the session principal it runs for.
++#[derive(Debug, Clone, Default, PartialEq, Eq)]
++pub struct CostScope {
++    pub task_ref: Option<String>,
++    pub session_principal: Option<String>,
++}
++
+ // ---------------------------------------------------------------------------
+ // Cost attribution payload (the TL frame body)
+ // ---------------------------------------------------------------------------
+@@ -103,6 +112,10 @@ pub struct CostAttributionPayload {
+     /// Cost-dimension quantities (R6: `BTreeMap` not `HashMap` for
+     /// deterministic serialization — R6/ADR-028 byte-identity).
+     pub dimensions: BTreeMap<CostDimension, i64>,
++    /// Story 20-14 — the task the call ran under; absent on pre-20-14 frames
++    /// (R6 forward-read tolerance) and when no task was current.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub task_ref: Option<String>,
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -211,6 +224,7 @@ mod tests {
+             attribution_source: AttributionSource::WriteTargetProxy,
+             attribution_confidence: AttributionConfidence::Exact,
+             dimensions: dims,
++            task_ref: Some("task.assign:01J".into()),
+         };
+         let json = serde_json::to_string(&payload).unwrap();
+         let back: CostAttributionPayload = serde_json::from_str(&json).unwrap();
+@@ -245,26 +259,18 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn no_task_ref_in_payload() {
+-        // R3: task_ref DROPPED from v1.0 — negative assertion
+-        let payload = CostAttributionPayload {
+-            schema_version: 1,
+-            timestamp_ns: 0,
+-            spirit_pid: 0,
+-            provider: "test".into(),
+-            model: "test".into(),
+-            principal: PrincipalRef::Unattributed,
+-            attribution_source: AttributionSource::WriteTargetProxy,
+-            attribution_confidence: AttributionConfidence::Unknown,
+-            dimensions: BTreeMap::new(),
+-        };
+-        let json = serde_json::to_string(&payload).unwrap();
+-        assert!(
+-            !json.contains("task_ref")
+-                && !json.contains("correlation_id")
+-                && !json.contains("request_id"),
+-            "R3: no task_ref/correlation_id/request_id in v1.0 cost frame"
+-        );
++    fn task_ref_on_payload_and_absent_on_legacy_frames() {
++        // Story 20-14 — R3 amended: the task reference rides the frame; a
++        // pre-20-14 frame (no field) still reads, as `None`.
++        let legacy = r#"{"schema_version":1,"timestamp_ns":0,"spirit_pid":0,"provider":"p","model":"m","principal":{"kind":"Unattributed"},"attribution_source":"write_target_proxy","attribution_confidence":"unknown","dimensions":{}}"#;
++        let payload: CostAttributionPayload = serde_json::from_str(legacy).unwrap();
++        assert_eq!(payload.task_ref, None);
++        let json = serde_json::to_string(&CostAttributionPayload {
++            task_ref: Some("t-1".into()),
++            ..payload
++        })
++        .unwrap();
++        assert!(json.contains("\"task_ref\":\"t-1\""));
+     }
+ 
+     #[test]
+diff --git a/crates/maos-domain/src/ports/inference.rs b/crates/maos-domain/src/ports/inference.rs
+index 8b94ff6..b7f587e 100644
+--- a/crates/maos-domain/src/ports/inference.rs
++++ b/crates/maos-domain/src/ports/inference.rs
+@@ -24,6 +24,17 @@ pub trait InferencePort {
+     fn complete(&self, req: InferenceRequest) -> Result<InferenceResponse, InferenceError>;
+ }
+ 
++/// Story 20-14 (FR64) — the composition root's attribution scope for a call,
++/// keyed by the caller's pid and its kernel-verified token.
++pub trait CostScopePort: Send + Sync {
++    /// Class: supervision
++    fn cost_scope(
++        &self,
++        spirit_pid: u32,
++        token_id: &crate::invariants::i1::TokenId,
++    ) -> Option<crate::cost::CostScope>;
++}
++
+ /// Request payload for a completion inference call.
+ #[derive(Debug, Clone, PartialEq)]
+ #[non_exhaustive]
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+index fca5221..bf2e7f3 100644
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -47,6 +47,8 @@ pub struct InferencePortAdapter {
+     /// Story 6.4 — IacBusAdapter handle for `RateLimited` frame emission.
+     /// `None` => router returns the synchronous error but emits no frame.
+     iac: Option<Arc<crate::iac::IacBusAdapter>>,
++    /// Story 20-14 — the root's FR64 attribution scope; `None` = proxy only.
++    cost_scope: Option<Arc<dyn maos_domain::ports::inference::CostScopePort>>,
+ }
+ 
+ impl InferencePortAdapter {
+@@ -64,6 +66,7 @@ impl InferencePortAdapter {
+             telemetry,
+             rate_limiter: None,
+             iac: None,
++            cost_scope: None,
+         }
+     }
+ 
+@@ -77,6 +80,15 @@ impl InferencePortAdapter {
+         self
+     }
+ 
++    /// Story 20-14 — install the root's FR64 attribution scope source.
++    pub fn with_cost_scope(
++        mut self,
++        port: Arc<dyn maos_domain::ports::inference::CostScopePort>,
++    ) -> Self {
++        self.cost_scope = Some(port);
++        self
++    }
++
+     /// Story 6.4 — install the IacBusAdapter for `RateLimited` frame emission.
+     pub fn with_iac(mut self, iac: Arc<crate::iac::IacBusAdapter>) -> Self {
+         self.iac = Some(iac);
+@@ -400,28 +412,46 @@ impl InferencePort for InferencePortAdapter {
+                     .unwrap_or_default()
+                     .as_nanos() as u64;
+ 
+-                // F8 — principal attribution at emission (R2 / SR-4).
+-                let principal_ids = self
+-                    .transparency_log
+-                    .principal_ids_for_spirit_pid(req.spirit_pid)
++                // Story 20-14 — FR64: the scope the root bound to this pid and
++                // verified token; never read from the request (anti-spoof).
++                let scope = self
++                    .cost_scope
++                    .as_ref()
++                    .and_then(|port| {
++                        port.cost_scope(req.spirit_pid, &req.capability_token.token_id)
++                    })
+                     .unwrap_or_default();
+-                let (principal, confidence) = match principal_ids.as_slice() {
+-                    [] => (
+-                        maos_domain::cost::PrincipalRef::Unattributed,
+-                        maos_domain::cost::AttributionConfidence::Unknown,
+-                    ),
+-                    [one] => (
+-                        maos_domain::cost::PrincipalRef::Resolved {
+-                            principal_id: one.clone(),
+-                        },
+-                        maos_domain::cost::AttributionConfidence::Exact,
+-                    ),
+-                    many => (
+-                        maos_domain::cost::PrincipalRef::Ambiguous {
+-                            count: many.len() as u32,
+-                        },
+-                        maos_domain::cost::AttributionConfidence::Ambiguous,
++                // F8 — principal attribution at emission (R2 / SR-4): the bound
++                // session principal, else the write-target proxy as fallback.
++                use maos_domain::cost::{AttributionConfidence, AttributionSource, PrincipalRef};
++                let (principal, confidence, source) = match scope.session_principal {
++                    Some(principal_id) => (
++                        PrincipalRef::Resolved { principal_id },
++                        AttributionConfidence::Exact,
++                        AttributionSource::SessionPrincipal,
+                     ),
++                    None => {
++                        let principal_ids = self
++                            .transparency_log
++                            .principal_ids_for_spirit_pid(req.spirit_pid)
++                            .unwrap_or_default();
++                        let (principal, confidence) = match principal_ids.as_slice() {
++                            [] => (PrincipalRef::Unattributed, AttributionConfidence::Unknown),
++                            [one] => (
++                                PrincipalRef::Resolved {
++                                    principal_id: one.clone(),
++                                },
++                                AttributionConfidence::Exact,
++                            ),
++                            many => (
++                                PrincipalRef::Ambiguous {
++                                    count: many.len() as u32,
++                                },
++                                AttributionConfidence::Ambiguous,
++                            ),
++                        };
++                        (principal, confidence, AttributionSource::WriteTargetProxy)
++                    }
+                 };
+ 
+                 let mut dimensions = std::collections::BTreeMap::new();
+@@ -435,7 +465,7 @@ impl InferencePort for InferencePortAdapter {
+                 );
+ 
+                 let cost_payload = maos_domain::cost::CostAttributionPayload {
+-                    schema_version: 1,
++                    schema_version: 2,
+                     timestamp_ns: now_ns,
+                     spirit_pid: req.spirit_pid,
+                     provider: resp.provider_attribution.provider_id.clone(),
+@@ -445,9 +475,10 @@ impl InferencePort for InferencePortAdapter {
+                         .clone()
+                         .unwrap_or_default(),
+                     principal,
+-                    attribution_source: maos_domain::cost::AttributionSource::WriteTargetProxy,
++                    attribution_source: source,
+                     attribution_confidence: confidence,
+                     dimensions,
++                    task_ref: scope.task_ref,
+                 };
+                 if let Ok(cost_bytes) = serde_json::to_vec(&cost_payload) {
+                     let _cost_token = self.transparency_log.insert_frame_event(

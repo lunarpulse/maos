@@ -1,0 +1,288 @@
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -478,6 +478,7 @@
+             on_crash: self.on_crash.clone(),
+             on_revocation: self.on_revocation.clone(),
+             supervision: self.supervision.clone(),
++            swap_invariants: self.swap_invariants.clone(),
+             ..Default::default()
+         }
+     }
+--- a/crates/maos-domain/src/hot_swap.rs
++++ b/crates/maos-domain/src/hot_swap.rs
+@@ -94,6 +94,10 @@
+     #[error("halt-continuity violation: {0}")]
+     HaltContinuityViolation(#[from] HaltContinuityError),
+ 
++    /// Story 20-8 (FR8) — the successor drops a declared swap invariant.
++    #[error("swap invariant dropped by the successor: {invariant}")]
++    SwapInvariantDropped { invariant: String },
++
+     #[error(
+         "schema incompatible: predecessor {predecessor_version} vs successor {successor_version}"
+     )]
+--- a/crates/maos-kernel-core/src/hot_swap/coordinator.rs
++++ b/crates/maos-kernel-core/src/hot_swap/coordinator.rs
+@@ -187,6 +187,34 @@
+             }
+         }
+ 
++        // Story 20-8 (FR8, HSIS) — the successor preserves every invariant the
++        // predecessor declared; refused before any hook fires.
++        let kept = |name: &String| {
++            successor_manifest
++                .swap_invariants
++                .as_ref()
++                .is_some_and(|s| s.preserve.contains(name))
++        };
++        if let Some(dropped) = pre_swap_runtime
++            .manifest
++            .swap_invariants
++            .iter()
++            .flat_map(|s| s.preserve.iter())
++            .find(|name| !kept(name))
++        {
++            saga.compensate(
++                SagaCompensation::RestorePredecessor {
++                    reason: format!("swap invariant dropped: {dropped}"),
++                },
++                &self.tl,
++                &self.journal,
++            )
++            .await;
++            return Err(HotSwapError::SwapInvariantDropped {
++                invariant: dropped.clone(),
++            });
++        }
++
+         // Step 4: Fire on_swap_out hook.
+         saga.advance_to(SagaPhase::SwapOutFired);
+         let swap_out_result = self.dispatcher.fire_on_swap_out(&predecessor_scb).await;
+--- a/crates/maos-kernel-core/src/lifecycle/upgrade.rs
++++ b/crates/maos-kernel-core/src/lifecycle/upgrade.rs
+@@ -384,6 +384,12 @@
+         .and_then(|v| toml::to_string(v).ok())
+         .map(|s| crate::security::manifest::Budget::from_toml_str(&s))
+         .transpose()?;
++    // Story 20-8 (FR8) — the successor's declarations, as at admission.
++    let swap_invariants = root
++        .get("swap_invariants")
++        .and_then(|v| toml::to_string(v).ok())
++        .map(|s| SwapInvariantsSection::from_toml_str(&s))
++        .transpose()?;
+ 
+     // Story 6.4 — `[[schedule]]` array-of-tables. The raw section parser
+     // reads the array under the `schedule` key; we synthesize a doc that
+@@ -425,5 +431,6 @@
+         schedules,
+         gateways,
+         budget,
++        swap_invariants,
+     })
+ }
+--- a/crates/maos-kernel-core/src/scheduler/control_block.rs
++++ b/crates/maos-kernel-core/src/scheduler/control_block.rs
+@@ -216,6 +216,8 @@
+     /// `Some` ⇒ `budget.time_cap_seconds` is the per-Spirit hook cap. The kernel
+     /// holds the value but never learns *what* the budget bounds (no LLM types).
+     pub budget: Option<crate::security::manifest::Budget>,
++    /// Story 20-8 (FR8) — declarations a swap reads from the live SCB.
++    pub swap_invariants: Option<crate::security::manifest::SwapInvariantsSection>,
+ }
+ 
+ impl Default for SpiritManifestBundle {
+@@ -233,6 +235,7 @@
+             schedules: SchedulesSection::default(),
+             gateways: GatewaysSection::default(),
+             budget: None,
++            swap_invariants: None,
+         }
+     }
+ }
+--- a/crates/maos-manifest/src/manifest.rs
++++ b/crates/maos-manifest/src/manifest.rs
+@@ -334,7 +334,7 @@
+ /// gate reports the constant as missing. Keep the declaration on one physical
+ /// line and out of doc comments above it.
+ #[rustfmt::skip]
+-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log", "capabilities.required.skill"];
++const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log", "capabilities.required.skill", "skills", "explanation_shape", "intent_promotion_set", "swap_invariants"];
+ 
+ /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
+ /// newer-than-declared schema section that an N-1 manifest omits (and thus
+@@ -4100,6 +4100,139 @@
+     }
+ }
+ 
++// ------------------------------------------------------------------
++// Story 20-8 (FR8) — `[skills]`, `[explanation_shape]`,
++// `[intent_promotion_set]`, `[swap_invariants]` (schema 7). Each is a
++// bounded, duplicate-free name list; absent ⇒ `None` at the gate.
++// ------------------------------------------------------------------
++
++/// `[skills]` — the admitted skill ids (ADR-027) this Spirit uses.
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct SkillsSection {
++    pub uses: Vec<String>,
++}
++
++/// `[explanation_shape]` — the "because" fields every `DecisionDispatch`
++/// frame this Spirit emits must carry (architecture §5.1).
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct ExplanationShapeSection {
++    pub required_fields: Vec<String>,
++}
++
++/// `[intent_promotion_set]` — the intents a digest this Spirit consumes may
++/// carry in its `intent_lineage` (I13, `EIntentPromotionDenied`).
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct IntentPromotionSetSection {
++    pub allowed: Vec<String>,
++}
++
++/// `[swap_invariants]` — HSIS invariant names a successor must preserve.
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct SwapInvariantsSection {
++    pub preserve: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawSkillsSection {
++    uses: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawExplanationShapeSection {
++    required_fields: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawIntentPromotionSetSection {
++    allowed: Vec<String>,
++}
++
++#[derive(Debug, Clone, serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct RawSwapInvariantsSection {
++    preserve: Vec<String>,
++}
++
++/// One declaration list: 1..=32 entries, each 1..=128 bytes of
++/// `[a-z0-9_.:-]`, no duplicates.
++fn declared_names(field: &str, names: Vec<String>) -> Result<Vec<String>, ManifestError> {
++    if names.is_empty() || names.len() > 32 {
++        return Err(ManifestError::Toml(validation_msg(
++            field,
++            &format!("needs 1..=32 entries, got {}", names.len()),
++        )));
++    }
++    let mut seen = std::collections::BTreeSet::new();
++    for name in &names {
++        let valid = (1..=128).contains(&name.len())
++            && name
++                .bytes()
++                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._:_-".contains(&b));
++        if !valid || !seen.insert(name.as_str()) {
++            return Err(ManifestError::Toml(validation_msg(
++                field,
++                &format!("invalid or duplicate entry '{name}'"),
++            )));
++        }
++    }
++    Ok(names)
++}
++
++fn parse_raw<T: serde::de::DeserializeOwned>(s: &str) -> Result<T, ManifestError> {
++    toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))
++}
++
++impl SkillsSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawSkillsSection = parse_raw(s)?;
++        Ok(Self {
++            uses: declared_names("skills.uses", raw.uses)?,
++        })
++    }
++}
++
++impl ExplanationShapeSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawExplanationShapeSection = parse_raw(s)?;
++        Ok(Self {
++            required_fields: declared_names(
++                "explanation_shape.required_fields",
++                raw.required_fields,
++            )?,
++        })
++    }
++}
++
++impl IntentPromotionSetSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawIntentPromotionSetSection = parse_raw(s)?;
++        Ok(Self {
++            allowed: declared_names("intent_promotion_set.allowed", raw.allowed)?,
++        })
++    }
++
++    /// The I13 consumer set the distillate admission check reads.
++    pub fn to_allowed_set(&self) -> maos_domain::invariants::i13::AllowedPromotionSet {
++        let mut set = maos_domain::invariants::i13::AllowedPromotionSet::new();
++        for intent in &self.allowed {
++            set.insert(maos_domain::invariants::i8::A2AIntent::new(intent));
++        }
++        set
++    }
++}
++
++impl SwapInvariantsSection {
++    pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
++        let raw: RawSwapInvariantsSection = parse_raw(s)?;
++        Ok(Self {
++            preserve: declared_names("swap_invariants.preserve", raw.preserve)?,
++        })
++    }
++}
++
+ #[cfg(test)]
+ mod hot_swap_manifest_tests {
+     use super::*;
+--- a/crates/maos-spirit-abi/src/lib.rs
++++ b/crates/maos-spirit-abi/src/lib.rs
+@@ -31,6 +31,7 @@
+ //! | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
+ //! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
+ //! | `MANIFEST_SCHEMA_VERSION = 6` | Story 18-7 | Runtime `[capabilities.required.skill]` |
++//! | `MANIFEST_SCHEMA_VERSION = 7` | Story 20-8 | `[skills]`, `[explanation_shape]`, `[intent_promotion_set]`, `[swap_invariants]` |
+ //!
+ //! ## Modules
+ //! | Module | Description | Introduced |
+@@ -117,9 +118,9 @@
+ /// ```rust
+ /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
+ ///
+-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 6);
++/// assert_eq!(MANIFEST_SCHEMA_VERSION, 7);
+ /// ```
+-pub const MANIFEST_SCHEMA_VERSION: u32 = 6;
++pub const MANIFEST_SCHEMA_VERSION: u32 = 7;
+ 
+ /// Lowest manifest schema version this kernel accepts at admission.
+ ///
+--- a/xtask/src/check_manifest_schema_version.rs
++++ b/xtask/src/check_manifest_schema_version.rs
+@@ -45,6 +45,11 @@
+     "capabilities.required.iac",
+     "capabilities.required.log",
+     "capabilities.required.skill",
++    // 20-8 FR8 declarations (ABI ratification `20-8-manifest-schema-7`), on schema 7.
++    "skills",
++    "explanation_shape",
++    "intent_promotion_set",
++    "swap_invariants",
+ ];
+ 
+ /// Parse `pub const NAME: u32 = N;` (or an alias to another such const) from a

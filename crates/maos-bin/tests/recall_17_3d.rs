@@ -206,6 +206,7 @@ impl World {
 
     fn admission(&self) -> AdmissionDeps<'_> {
         AdmissionDeps {
+            providers: None,
             scheduler: &self.scheduler,
             security: &self.security,
             transparency_log: &self.tl,

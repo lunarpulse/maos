@@ -1,0 +1,13 @@
+diff --git a/crates/maos-kernel-core/src/inference/mod.rs b/crates/maos-kernel-core/src/inference/mod.rs
+index fca5221..4df7321 100644
+--- a/crates/maos-kernel-core/src/inference/mod.rs
++++ b/crates/maos-kernel-core/src/inference/mod.rs
+@@ -453,7 +453,7 @@ impl InferencePort for InferencePortAdapter {
+                     let _cost_token = self.transparency_log.insert_frame_event(
+                         FrameKind::CostAttribution,
+                         req.spirit_pid,
+-                        None,
++                        Some(&token_bytes),
+                         "cost:inference-attribution",
+                         &cost_bytes,
+                         FrameOrigin::Kernel,
