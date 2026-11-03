@@ -86,3 +86,13 @@ configured skips; substrate-gated local returns are not hosted proof.
 This correction retains live/anonymous process roots and shared parents,
 requires safe absolute HOME/legacy ancestors, and reports residue explicitly
 with a nonzero exit without changing receipt schema/status vocabulary.
+
+## Hosted incidents (additive, baseline `16c35ef0`)
+
+[`hosted-1/plants.md`](hosted-1/plants.md) records the branch-only harness-unit
+regression and the main-run AF_UNIX path-length / fixture HOME regressions.
+All three new plants fail on their intended assertions; source/fixture/cut
+restorations use copy-back + `cmp` + `touch`. Hosted branch baseline/plant
+failures in run 41584515474 are unrelated harness setup failures, **not**
+intended removal/dead-creator proven reds. Both T0 jobs passed without
+contradicting a ruled D-row. The terminal scene count remains 34.

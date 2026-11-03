@@ -743,6 +743,136 @@ Local self-skips (signed T3 substrate, Python Ed25519 backend and strace)
 are explicitly not proof of those legs. Historical anonymous-root producer
 attribution and exclusive-idle budget certification remain owner-20-7 work.
 
+#### Hosted incident — runs 41584515474 / 41584453971, 2026-11-03
+
+This incident supersedes the earlier unexecuted-hosted boundary only where
+actual evidence now exists. Logs, T0 measurements, classification and commands
+are preserved in
+[`hosted-1/hosted-findings.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/hosted-findings.md).
+
+The branch-only run's four scene jobs all stopped before tests: invalid
+`--unit maos-20-10` violated the existing `maos-17-[27]-*` harness contract.
+Head jobs 125749866755/125749866883 cite log line 4058, baseline
+125749866879 line 4061, plant 125749866891 line 4059. Baseline and plant
+are **not** intended assertion-red evidence. Corrected only the cut's unit
+names, not the harness allowlist or assertion-message guards. The new xtask
+workflow-contract witness failed before the fix (exit 100), passed afterward
+(4/4, exit 0), and rejected the byte-restored invalid-unit plant (exit 100).
+
+Both real T0 jobs passed: Podman 4.9.3 / 5.7.0 normalized mount sources,
+combined spirit/nonce filters selected only the paired-label CID, forced
+removal returned 0 and post-removal exists returned 1. Docker 28.0.4 / 29.4.2
+rejected `--pidfile`, exit 125. No ruled D-row was contradicted; D-20-10-06 A
+stands. The hosted Rust-1.99.1 warning comparison was `[]`, at 1381/896
+against the unchanged 1383/897 baseline (job 125746775456 lines 2135/2144).
+This proves that submitted tree, not any subsequent unexecuted revision.
+
+Main run 41584453971 exposed **two new 20-10 regressions**, not known teardown
+flakes. Review P1's shared root helper accidentally applied the
+`process-<pid>-<nonce>` prefix to durable egress socket roots. Hosted path
+shapes grew 94-107 bytes to 108-121 bytes, preventing Worker startup and
+inflating startup-wait budgets. The new Linux hosted-length vector confirms
+the actual bind error `path must be shorter than SUN_LEN`, before the fix
+(exit 100). The production correction confines PID-bearing names to volatile
+Worker-state/custody roots; durable socket roots keep short eight-hex nonces.
+The custody witness retains live-PID and legacy nonce-only roots, removes only
+dead-owner empty roots, and checks report/receipt rows for retained shapes.
+
+The terminal purge fixture also set `HOME == MAOS_HOME`. Its new executable
+dry-purge preflight confirms the real safety refusal before the fixture fix
+(exit 100), without requiring a provisioned T3 runtime. The fixture now gives
+user HOME the private scratch parent and MAOS_HOME its distinct child, while
+retaining the provisioned Podman storage configuration. Production HOME
+refusal remains unchanged. Root-shutdown startup failure context now captures
+stdout/stderr instead of an empty string. The terminal pin stays **34**:
+both hosted images actually ran 34 tests (28 passed / six failed); no new
+terminal test or accounting relaxation was introduced.
+
+**Lesson:** every path-shape change needs a hosted-length vector, including
+fixed-width synthetic creator/Spirit PID cases; short tempfile homes alone
+did not exercise AF_UNIX capacity. The cut now enrolls 17 socket/purge contract
+tests on both head images, alongside the unchanged 34 real delegated scenes.
+F1/F2 source plants failed on the intended bind/refusal assertions, then were
+copy-backed, compared and touched with all restoration exits 0. See
+[`hosted-1/plants.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/plants.md).
+
+##### Corrected-source verification and remaining boundaries
+
+Final anchors: hosted-length bind `egress_daemon_17_1.rs:252`; fixture
+preflight `worker_terminal_facts_17_7/root_crash.rs:268`; dual-shape custody
+`purge_residue_20_10.rs:202`; workflow contract
+`xtask/tests/epic17_exit_workflow_17_7.rs:418`; diagnostics
+`root_shutdown_unload_16_3.rs:316`. The source fix is `egress.rs:88,246-258,268`.
+Three distinct plants (unit namespace, durable PID prefix, HOME equality)
+each failed on the intended assertion, exit 100, then were byte-restored.
+
+| Surface | Exact measured | Ceiling / current pin |
+|---|---:|---:|
+| maos-bin code | 34,191 | ceiling 34,548; pin 34,191 |
+| Aggregate code | 192,519 | ceiling 192,876; hardfail 192,520 |
+| Kernel physical / code | 26,841 / 21,042 | unchanged |
+| xtask code | 44,406 | unchanged |
+
+Final `cargo fmt --all`, exact re-pin, all-target workspace build and focused
+suite passed (exit 0); focused **164/164**. All 16 registered fixture
+artefacts were provisioned. Fully provisioned serial workspace nextest
+(`--profile ci --test-threads 1`) passed **5573/5573**, 138 configured skips,
+exit 0. Saved fresh serial junit passed the budget gate, exit 0:
+594 binaries, 644.512 s sum, no findings. Host readings were recorded:
+3.58 / 4.39 / 16.52 before the final serial run and 5.42 / 4.05 / 10.01
+before the budget gate. This is not an exclusive-idle-host certification.
+
+Default-concurrency nextest ran **5573**, **5572 passed / one failed**,
+138 configured skips, exit **100**. The sole failure was the explicitly known
+`t3_terminal_helpers_17_7::teardown_waits_for_a_stalled_snapshot_owner_then_removes_the_container_20_7`:
+`instance 16: observer never entered inspect` (10.078 s). It was **not retried**;
+owner `20-7-stable-runner-perf-gates`, same-line rule-10 evidence in
+`deferred-work.md:5` and `hosted-1/workspace-default-final.log:7335-7377`.
+All 20-10 witnesses passed. No kernel edit or timing/assertion relaxation.
+
+All requested structural gates exited 0: kloc/kernel/service/env/serde,
+composition roots, J1 loopback delegation, dev-record completeness,
+epic coherence, review resolution, test cost, invariant lock, coverage matrix
+(dry run) and completeness, exit commands, decision register, ff-j6 and
+performance-runner policy. Non-denying clippy exited 0 on local Rust 1.98.1;
+complete-stream ratchet **1335 / 873**, exit 0, unchanged baseline **1383 / 897**.
+Lint/file/message comparison against the prior local stream has **no new
+warnings**, including the result-large-err/collapsible-if/too-many-arguments
+families; existing warnings in touched tests were not hidden or baselined away.
+`cargo deny check` exited 0.
+
+Prescribed undelegated prepush independently exited **0**. Workspace/default
+profile tests, kernel lib tests and workspace doctests passed. This does not
+erase the separate default-concurrency failure. Its budget leg was advisory,
+exit 1: hook-pump 30.317 s, one-daemon 34.159 s, participant-recall 44.337 s,
+all against unchanged 30 s binary budgets. Owner 20-7 and same-line evidence:
+`deferred-work.md:3`, `hosted-1/prepush-final.log:536-540`, adjacent saved junit.
+No advisory retry or budget change. Site-doc build gates were skipped because
+this incident changed ADR-067, not docs-site inputs; the earlier English/Korean
+verification remains in its historical record. Intent-lineage output matched
+the saved original (cmp 0).
+
+Earlier deterministic prerequisite failures remain visible: a focused run
+had 18 stale debug-fixture failures after the separate 20-4 source park; after
+debug-fixture provisioning the focused run passed. The first full serial run
+had exactly 19 stale release-fixture failures (four equiv-native-twin, 15
+maos-wasm-runner), classified in `hosted-1/serial-failure-classification.json`.
+All registered fixtures were then rebuilt before the final serial/default
+runs. Freshness guards were never suppressed. An earlier combined eval timed
+out during compilation; no exit code was observed for that interrupted command.
+The first clippy-ratchet input was a truncated artifact view (missing
+build-finished, exit 1); paging the **same** successful stream, without rerunning
+clippy, restored complete evidence and ratchet exit 0.
+
+Exact commands, exits, overrides and logs:
+[`hosted-1/commands.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/commands.md)
+and adjacent JSON. Source/cut diff digests are adjacent; prior snapshots remain
+unchanged. Per-AC corrected-hosted proof routes and explicitly unverified legs:
+[`hosted-1/ac-hosted-map.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/ac-hosted-map.md).
+Corrected real delegated baseline/head/plant scenes and post-fix hosted-toolchain
+lint require an operator rerun; local self-skips are not that proof. No commit,
+push, CI-branch edit, story/status flip or kernel modification was made.
+
 ### File List
 
 - [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [creator-PID custody roots](../../crates/maos-bin/src/egress.rs).
@@ -751,6 +881,7 @@ attribution and exclusive-idle budget certification remain owner-20-7 work.
 - [ADR-067](../../docs/adr/ADR-067-maos-data-root-layout-and-purge.md), [operator guide](../../docs/maos.dev/run-maos.md), [site guide](../../docs-site/docs/run-maos.md), [Korean guide](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md), [cookbook](../../docs-site/docs/cookbook/cli-wrapper-spirit.md), [Korean cookbook](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md).
 - [FR2 coverage row](../../tests/coverage-matrix.yaml), [loaded-budget disposition](deferred-work.md), this Dev Agent Record, and [landing/hosted-cut evidence](20-10-purge-residue-removal-evidence/landing-1/plants.md).
 - Cold-swap oracle incident: `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`; the resolved cold-swap row in `deferred-work.md`; this record and the 20-1a Dev Agent Record. The earlier implementation-diff digest is not regenerated or expanded.
+- Hosted incident: [AF_UNIX hosted-length witness](../../crates/maos-bin/tests/egress_daemon_17_1.rs), [startup failure context](../../crates/maos-bin/tests/root_shutdown_unload_16_3.rs), the existing terminal/custody witnesses, [workflow contract](../../xtask/tests/epic17_exit_workflow_17_7.rs), [corrected branch-only cut](20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml), ADR-067, exact pins and [hosted incident evidence](20-10-purge-residue-removal-evidence/landing-1/hosted-1/hosted-findings.md).
 
 
 ## Change Log
@@ -766,3 +897,4 @@ attribution and exclusive-idle budget certification remain owner-20-7 work.
   witnesses and the AC1 mutation cut but not pushed/run; status intentionally unchanged.
 - 2026-11-02: Hosted run `41521146083` cold-swap failure diagnosed as an over-strict cross-writer journal oracle, with a deterministic recorded-order red-before vector and causal/audit-drained replacement. No purge, kernel, production or budget change.
 - 2026-11-03: Review corrections retain live/anonymous T3 roots and shared parents, validate HOME/legacy ancestry/protected paths, make residue an explicit nonzero outcome, document the same-UID attribution boundary, and strengthen all identified witnesses. Exact maos-bin 34188 / aggregate 192516 (hardfail 192517), kernel unchanged; five baseline-red vectors and nine byte-restored assertion-red plants; focused, serial/default, gates, clippy, deny and prepush observed green except separately recorded prepush budget advisories. No status flip or push.
+- 2026-11-03: Hosted incidents 41584515474 / 41584453971 corrected at cause: use the existing delegated-unit namespace; confine creator-PID naming to volatile custody so durable AF_UNIX socket paths stay short; separate terminal fixture HOME/MAOS_HOME and expose startup stderr. Three byte-restored assertion-red plants, focused164/164, serial5573/5573 and prepush0; default's known snapshot-owner failure remains recorded/unretried under owner20-7. Exact bin34191 / aggregate192519 (hardfail192520), kernel unchanged; corrected hosted cut remains unpushed.

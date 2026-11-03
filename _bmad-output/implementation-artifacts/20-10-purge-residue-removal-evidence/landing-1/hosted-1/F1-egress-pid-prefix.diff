@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/egress.rs
++++ b/crates/maos-bin/src/egress.rs
+@@ -85,7 +85,7 @@
+         log: Arc<TransparencyLogAdapter>,
+         cancel: CancellationToken,
+     ) -> io::Result<(Self, tokio::task::JoinHandle<io::Result<()>>)> {
+-        let run_dir = create_root_dir(&home.join("egress"), false)?;
++        let run_dir = create_root_dir(&home.join("egress"), true)?;
+         let shared = Arc::new(Shared {
+             run_dir,
+             table: Arc::new(BearerTable::default()),

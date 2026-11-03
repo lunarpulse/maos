@@ -1,0 +1,192 @@
+[
+  {
+    "binary": "maos-wasm-host::equiv_harness",
+    "test": "cosmetic_only_stays_green",
+    "details": [
+      "            thread 'cosmetic_only_stays_green' (3598828) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'cosmetic_only_stays_green' (3598828) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::equiv_harness",
+    "test": "divergent_spirit_causes_invariant_red",
+    "details": [
+      "            thread 'divergent_spirit_causes_invariant_red' (3598832) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'divergent_spirit_causes_invariant_red' (3598832) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::equiv_harness",
+    "test": "forged_consent_survives_both_forms_and_claim_mutation_is_red",
+    "details": [
+      "            thread 'forged_consent_survives_both_forms_and_claim_mutation_is_red' (3598836) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'forged_consent_survives_both_forms_and_claim_mutation_is_red' (3598836) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::equiv_harness",
+    "test": "identity_spirit_both_forms_100pct_invariant",
+    "details": [
+      "            thread 'identity_spirit_both_forms_100pct_invariant' (3598861) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'identity_spirit_both_forms_100pct_invariant' (3598861) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `equiv-native-twin`: /home/lunarpulse/dev_ws/target/release/equiv-native-twin is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only equiv-native-twin`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "context_report_not_admitted_is_typed_and_next_call_recovers",
+    "details": [
+      "            thread 'context_report_not_admitted_is_typed_and_next_call_recovers' (3599131) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'context_report_not_admitted_is_typed_and_next_call_recovers' (3599131) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "context_report_returns_typed_status_and_context_frames_reach_handle_frame",
+    "details": [
+      "            thread 'context_report_returns_typed_status_and_context_frames_reach_handle_frame' (3599134) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'context_report_returns_typed_status_and_context_frames_reach_handle_frame' (3599134) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "eof_outstanding_closes_client_but_finishes_export_and_exits_zero",
+    "details": [
+      "            thread 'eof_outstanding_closes_client_but_finishes_export_and_exits_zero' (3599136) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'eof_outstanding_closes_client_but_finishes_export_and_exits_zero' (3599136) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically",
+    "details": [
+      "            thread 'frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically' (3599138) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'frozen_2_0_echo_runs_under_t2_on_2_2_runner_byte_identically' (3599138) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit",
+    "details": [
+      "            thread 'legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit' (3599140) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'legacy_2_0_and_2_1_reject_new_context_frames_with_typed_unrepresentable_exit' (3599140) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "legacy_2_1_export_schema_echoes_byte_identically",
+    "details": [
+      "            thread 'legacy_2_1_export_schema_echoes_byte_identically' (3599142) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'legacy_2_1_export_schema_echoes_byte_identically' (3599142) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "oversized_reply_latches_broken_after_export",
+    "details": [
+      "            thread 'oversized_reply_latches_broken_after_export' (3599144) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'oversized_reply_latches_broken_after_export' (3599144) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "partial_reply_header_latches_broken_after_export",
+    "details": [
+      "            thread 'partial_reply_header_latches_broken_after_export' (3599146) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'partial_reply_header_latches_broken_after_export' (3599146) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "recall_outside_handle_frame_is_unavailable_without_records",
+    "details": [
+      "            thread 'recall_outside_handle_frame_is_unavailable_without_records' (3599148) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'recall_outside_handle_frame_is_unavailable_without_records' (3599148) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "recall_probe_maps_filter_page_fetch_and_open_labels",
+    "details": [
+      "            thread 'recall_probe_maps_filter_page_fetch_and_open_labels' (3599150) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'recall_probe_maps_filter_page_fetch_and_open_labels' (3599150) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "reply_too_large_is_typed_and_does_not_break_following_call",
+    "details": [
+      "            thread 'reply_too_large_is_typed_and_does_not_break_following_call' (3599152) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'reply_too_large_is_typed_and_does_not_break_following_call' (3599152) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "undecodable_reply_latches_broken_after_export",
+    "details": [
+      "            thread 'undecodable_reply_latches_broken_after_export' (3599154) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'undecodable_reply_latches_broken_after_export' (3599154) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "unknown_tag_reply_latches_broken_after_export",
+    "details": [
+      "            thread 'unknown_tag_reply_latches_broken_after_export' (3599156) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'unknown_tag_reply_latches_broken_after_export' (3599156) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "untagged_reply_latches_broken_after_export",
+    "details": [
+      "            thread 'untagged_reply_latches_broken_after_export' (3599158) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'untagged_reply_latches_broken_after_export' (3599158) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  },
+  {
+    "binary": "maos-wasm-host::recall_runner_17_3d",
+    "test": "wrong_reply_variant_is_protocol_desync",
+    "details": [
+      "            thread 'wrong_reply_variant_is_protocol_desync' (3599160) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`",
+      "thread 'wrong_reply_variant_is_protocol_desync' (3599160) panicked at crates/maos-wasm-host/tests/../../../tests/harness/fixtures.rs:61:5:",
+      "test fixture stale \u2014 `maos-wasm-runner`: /home/lunarpulse/dev_ws/target/release/maos-wasm-runner is older than its input /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/secret_store.rs; provision with `cargo run -p xtask -- build-test-fixtures --only maos-wasm-runner`; rebuild fixtures: `cargo run -p xtask -- build-test-fixtures`"
+    ]
+  }
+]

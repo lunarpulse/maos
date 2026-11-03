@@ -202,6 +202,8 @@ fn ac3_dry_run_uses_only_readonly_verbs_and_preserves_custody() {
 fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
     let f = Fixture::new();
     let empty = f.private("process-2147483647-00000000");
+    let legacy_short = f.private("00000001");
+    let live_process = f.private(&format!("process-{}-00000002", std::process::id()));
     let absent = f.private("process/absent");
     let present = f.private("process/present");
     let unknown = f.private("process/unknown");
@@ -212,6 +214,14 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
     assert!(!absent.exists(), "absent CID custody leaked");
     assert!(present.exists(), "live home's custody removed");
     assert!(unknown.exists(), "unknown custody removed");
+    assert!(
+        legacy_short.exists(),
+        "nonce-only custody has no creator-absence proof"
+    );
+    assert!(
+        live_process.exists(),
+        "empty live creator root must remain usable"
+    );
     let report = String::from_utf8_lossy(&out.stdout);
     let bytes = std::fs::read(f.root().join("receipt.json")).expect("receipt");
     let receipt: serde_json::Value =
@@ -219,7 +229,7 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
     let rows = receipt["roots"]
         .as_array()
         .unwrap_or_else(|| panic!("receipt rows"));
-    for path in [&present, &unknown] {
+    for path in [&present, &unknown, &legacy_short, &live_process] {
         assert!(
             report.contains(&format!(
                 "left (T3 custody residue): T3 state {}",

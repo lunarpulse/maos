@@ -1,0 +1,1201 @@
+[
+  {
+    "name": "job-125746775456",
+    "command": "gh api repos/lunarpulse/maos/actions/jobs/125746775456/logs --allow-escape-sequences",
+    "exit_code": 0,
+    "seconds": 2.067,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "job-125746775593",
+    "command": "gh api repos/lunarpulse/maos/actions/jobs/125746775593/logs --allow-escape-sequences",
+    "exit_code": 0,
+    "seconds": 1.516,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "job-125746775660",
+    "command": "gh api repos/lunarpulse/maos/actions/jobs/125746775660/logs --allow-escape-sequences",
+    "exit_code": 0,
+    "seconds": 1.616,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "job-125749866755",
+    "command": "gh api repos/lunarpulse/maos/actions/jobs/125749866755/logs --allow-escape-sequences",
+    "exit_code": 0,
+    "seconds": 2.017,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "job-125749866879",
+    "command": "gh api repos/lunarpulse/maos/actions/jobs/125749866879/logs --allow-escape-sequences",
+    "exit_code": 0,
+    "seconds": 2.067,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "job-125749866883",
+    "command": "gh api repos/lunarpulse/maos/actions/jobs/125749866883/logs --allow-escape-sequences",
+    "exit_code": 0,
+    "seconds": 2.417,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "job-125749866891",
+    "command": "gh api repos/lunarpulse/maos/actions/jobs/125749866891/logs --allow-escape-sequences",
+    "exit_code": 0,
+    "seconds": 1.967,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "local-baseline",
+    "command": "git rev-parse HEAD",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workflow-contract-red",
+    "command": "cargo nextest run --locked -p xtask --test epic17_exit_workflow_17_7 --profile ci --test-threads 1 -E 'test(purge_cut_units_pass_the_real_harness_unit_validation)'",
+    "exit_code": 100,
+    "seconds": 48.803,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-hosted-contract",
+    "command": "cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.718,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "measure-hosted-contract",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "workflow-contract-green",
+    "command": "cargo nextest run --locked -p xtask --test epic17_exit_workflow_17_7 --profile ci --test-threads 1",
+    "exit_code": 0,
+    "seconds": 2.217,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-workflow-plant-original",
+    "command": "cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workflow.restore",
+    "exit_code": 0,
+    "seconds": 0.008,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workflow-contract-plant",
+    "command": "cargo nextest run --locked -p xtask --test epic17_exit_workflow_17_7 --profile ci --test-threads 1 -E 'test(purge_cut_units_pass_the_real_harness_unit_validation)'",
+    "exit_code": 100,
+    "seconds": 0.514,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workflow-copy-back",
+    "command": "cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workflow.restore /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workflow-cmp",
+    "command": "cmp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workflow.restore /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workflow-touch",
+    "command": "touch /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workflow-contract-restored",
+    "command": "cargo nextest run --locked -p xtask --test epic17_exit_workflow_17_7 --profile ci --test-threads 1",
+    "exit_code": 0,
+    "seconds": 0.665,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-final",
+    "command": "cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.567,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "kloc-exact-final",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "build-all-targets",
+    "command": "cargo build --workspace --all-targets --locked",
+    "exit_code": 0,
+    "seconds": 2804.9,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "registered-fixtures",
+    "command": "/mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit",
+    "exit_code": 0,
+    "seconds": 563.614,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "save-main-nfr-rel-11",
+    "command": "cp /tmp/l10-nfr-rel-11.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/main-nfr-rel-11.log",
+    "exit_code": 0,
+    "seconds": 0.127,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-main-workspace",
+    "command": "cp /tmp/l10-workspace.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/main-workspace.log",
+    "exit_code": 0,
+    "seconds": 0.464,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-main-loom",
+    "command": "cp /tmp/l10-loom.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/main-loom.log",
+    "exit_code": 0,
+    "seconds": 0.164,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-main-epic17-24",
+    "command": "cp /tmp/l10-epic17-24.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/main-epic17-24.log",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-main-epic17-26",
+    "command": "cp /tmp/l10-epic17-26.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/main-epic17-26.log",
+    "exit_code": 0,
+    "seconds": 0.003,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-main-budget",
+    "command": "cp /tmp/l10-budget.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/main-budget.log",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "focused-purge-interrupted",
+    "command": "cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --test maos_uninstall_16_4 --test worker_supervision_16_3 --test worker_terminal_facts_17_7 --test worker_workspace_19_3 --lib --profile ci --test-threads 1 --no-fail-fast",
+    "exit_code": null,
+    "seconds": null,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {},
+    "outcome": "Outer eval cell hit 3600 seconds during compilation after the recorded build and fixture commands. No test result or exit code observed. Orphan build PIDs3359843/3366449 were observed; TERM returned1 (failed to send signal), so no successful termination is claimed."
+  },
+  {
+    "name": "hosted-regressions-red",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --test egress_daemon_17_1 --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-fail-fast -E 'test(hosted_length_home_keeps_egress_socket_below_sun_path_limit) | test(purge_cgroup_native_binding_and_dead_creator_twins)'",
+    "exit_code": 100,
+    "seconds": 506.78,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-regressions",
+    "command": "cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 3.273,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "measure-regressions",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 1,
+    "seconds": 0.174,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "focused-prerequisite-stale",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --lib --test egress_daemon_17_1 --test purge_residue_20_10 --test maos_uninstall_16_4 --test worker_supervision_16_3 --test worker_terminal_facts_17_7 --test worker_workspace_19_3 --test root_shutdown_unload_16_3 --profile ci --test-threads 1 --no-fail-fast",
+    "exit_code": 100,
+    "seconds": 540.81,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {},
+    "outcome": "146 passed / 18 failed; stale registered fixture after 20-4 source parking, not a flake. Reprovisioning required before final matrix."
+  },
+  {
+    "name": "fmt-before-source-plants",
+    "command": "cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 3.027,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-egress-original",
+    "command": "cp /home/lunarpulse/dev_ws/crates/maos-bin/src/egress.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/egress.restore",
+    "exit_code": 0,
+    "seconds": 0.004,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-scene-original",
+    "command": "cp /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/scene.restore",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "plant-F1-egress",
+    "command": "cargo nextest run --locked -p maos-bin --test egress_daemon_17_1 --profile ci --test-threads 1 -E 'test(hosted_length_home_keeps_egress_socket_below_sun_path_limit)'",
+    "exit_code": 100,
+    "seconds": 479.676,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "F1-copy-back",
+    "command": "cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/egress.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/egress.rs",
+    "exit_code": 0,
+    "seconds": 0.006,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "F1-cmp",
+    "command": "cmp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/egress.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/egress.rs",
+    "exit_code": 0,
+    "seconds": 0.004,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "F1-touch",
+    "command": "touch /home/lunarpulse/dev_ws/crates/maos-bin/src/egress.rs",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "plant-F2-home",
+    "command": "cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 -E 'test(purge_cgroup_native_binding_and_dead_creator_twins)'",
+    "exit_code": 100,
+    "seconds": 190.06,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "F2-copy-back",
+    "command": "cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/scene.restore /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs",
+    "exit_code": 0,
+    "seconds": 0.004,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "F2-cmp",
+    "command": "cmp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/scene.restore /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "F2-touch",
+    "command": "touch /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-final-restored",
+    "command": "cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.868,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "kloc-repinned",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0,
+    "seconds": 0.165,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "fixtures-after-park",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit",
+    "exit_code": 0,
+    "seconds": 283.69,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "remove-plant-restore-scaffolds",
+    "command": "rm -f /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workflow.restore /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/egress.restore /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/scene.restore",
+    "exit_code": 0,
+    "seconds": 0.008,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-intent-lineage-original",
+    "command": "cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/intent-lineage-coverage-report.md /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/intent-lineage.restore",
+    "exit_code": 0,
+    "seconds": 0.009,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "build-all-targets-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo build --workspace --all-targets --locked",
+    "exit_code": 0,
+    "seconds": 597.74,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "resolve-workflow",
+    "command": "python3 /home/lunarpulse/dev_ws/_bmad/scripts/resolve_customization.py --skill /home/lunarpulse/dev_ws/.claude/skills/bmad-quick-dev --key workflow",
+    "exit_code": 0,
+    "seconds": null,
+    "unset_environment": [],
+    "environment_overrides": {},
+    "outcome": ""
+  },
+  {
+    "name": "hosted-job-roster",
+    "command": "gh run view 41584515474 --json jobs",
+    "exit_code": 0,
+    "seconds": null,
+    "unset_environment": [],
+    "environment_overrides": {},
+    "outcome": "Full JSON preserved in jobs.json."
+  },
+  {
+    "name": "process-guard-portable",
+    "command": "ps -C cargo,rustc,cargo-nextest -o pid,ppid,args",
+    "exit_code": 1,
+    "seconds": null,
+    "unset_environment": [],
+    "environment_overrides": {},
+    "outcome": "Harness ps does not support -C."
+  },
+  {
+    "name": "process-guard-system",
+    "command": "/usr/bin/ps -C cargo,rustc,cargo-nextest -o pid,ppid,args",
+    "exit_code": 0,
+    "seconds": null,
+    "unset_environment": [],
+    "environment_overrides": {},
+    "outcome": "Observed orphaned own focused cargo compile."
+  },
+  {
+    "name": "process-guard-arguments",
+    "command": "/usr/bin/ps -ww -p 3359843,3366449 -o pid,ppid,args",
+    "exit_code": 0,
+    "seconds": null,
+    "unset_environment": [],
+    "environment_overrides": {},
+    "outcome": "Exact --test target list matched the interrupted focused command."
+  },
+  {
+    "name": "stop-interrupted-build",
+    "command": "kill -TERM 3359843 3366449",
+    "exit_code": 1,
+    "seconds": null,
+    "unset_environment": [],
+    "environment_overrides": {},
+    "outcome": "Failed to send signal to either PID; no successful termination claimed."
+  },
+  {
+    "name": "focused-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --locked -p maos-bin --lib --test egress_daemon_17_1 --test purge_residue_20_10 --test maos_uninstall_16_4 --test worker_supervision_16_3 --test worker_terminal_facts_17_7 --test worker_workspace_19_3 --test root_shutdown_unload_16_3 --profile ci --test-threads 1 --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 134.72,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "host-before-final-serial",
+    "command": "uptime",
+    "exit_code": 0,
+    "seconds": 0.011,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workspace-serial-prerequisite-stale",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --no-fail-fast --profile ci --test-threads 1",
+    "exit_code": 100,
+    "seconds": 1089.87,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-stale-serial-junit",
+    "command": "cp /mnt/build/cargo-maos/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workspace-serial-prerequisite-stale-junit.xml",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "all-registered-fixtures",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask build-test-fixtures",
+    "exit_code": 0,
+    "seconds": 23.09,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "host-before-refreshed-serial",
+    "command": "uptime",
+    "exit_code": 0,
+    "seconds": 0.004,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workspace-serial-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --no-fail-fast --profile ci --test-threads 1",
+    "exit_code": 0,
+    "seconds": 647.09,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-final-serial-junit",
+    "command": "cp /mnt/build/cargo-maos/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workspace-serial-final-junit.xml",
+    "exit_code": 0,
+    "seconds": 0.003,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "host-before-final-budget",
+    "command": "uptime",
+    "exit_code": 0,
+    "seconds": 0.004,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "check-test-budget-final",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-test-budget --junit /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workspace-serial-final-junit.xml --json",
+    "exit_code": 0,
+    "seconds": 0.032,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "workspace-default-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo nextest run --workspace --locked --no-fail-fast --profile ci",
+    "exit_code": 100,
+    "seconds": 46.37,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-final-default-junit",
+    "command": "cp /mnt/build/cargo-maos/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/workspace-default-final-junit.xml",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "kloc-check",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-kernel-baseline",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json",
+    "exit_code": 0,
+    "seconds": 0.015,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-service-boundary",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-service-boundary --json",
+    "exit_code": 0,
+    "seconds": 1.165,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-env-contract",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-env-contract --json",
+    "exit_code": 0,
+    "seconds": 0.464,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-serde-error-handling",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-serde-error-handling --json",
+    "exit_code": 0,
+    "seconds": 0.264,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-composition-root-completeness",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-composition-root-completeness --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-j1-loopback-delegation",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-j1-loopback-delegation --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-dev-record-completeness",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json",
+    "exit_code": 0,
+    "seconds": 0.114,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-epic-close-coherence",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json",
+    "exit_code": 0,
+    "seconds": 0.032,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-review-findings-resolved",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-review-findings-resolved --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-test-cost",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-test-cost --json",
+    "exit_code": 0,
+    "seconds": 0.264,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "invariant-lock",
+    "command": "/mnt/build/cargo-maos/debug/xtask invariant-lock --json",
+    "exit_code": 0,
+    "seconds": 0.032,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "coverage-matrix",
+    "command": "/mnt/build/cargo-maos/debug/xtask coverage-matrix --json --dry-run",
+    "exit_code": 0,
+    "seconds": 0.015,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-coverage-matrix-completeness",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-coverage-matrix-completeness --json",
+    "exit_code": 0,
+    "seconds": 0.016,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-exit-commands",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-exit-commands --json",
+    "exit_code": 0,
+    "seconds": 0.214,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-decision-register",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-decision-register --json",
+    "exit_code": 0,
+    "seconds": 0.008,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-ff-j6",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-ff-j6 --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-perf-runner-policy",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-perf-runner-policy --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "local-toolchain",
+    "command": "rustc -Vv",
+    "exit_code": 0,
+    "seconds": 0.032,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "incident-record-date",
+    "command": "date --iso-8601=seconds",
+    "exit_code": 0,
+    "seconds": 0.006,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "clippy-stream-final",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json",
+    "exit_code": 0,
+    "seconds": 446.13,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "clippy-ratchet-final",
+    "command": "/mnt/build/cargo-maos/debug/xtask clippy-ratchet --input /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/clippy-final.jsonl",
+    "exit_code": 1,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "cargo-deny-final",
+    "command": "cargo deny check",
+    "exit_code": 0,
+    "seconds": 0.765,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "clippy-ratchet-complete-stream",
+    "command": "/mnt/build/cargo-maos/debug/xtask clippy-ratchet --input /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/clippy-final.jsonl",
+    "exit_code": 0,
+    "seconds": 0.164,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "prepush-final",
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /mnt/build/cargo-maos/debug/xtask prepush --json",
+    "exit_code": 0,
+    "seconds": 960.91,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask",
+      "MAOS_17_2_CGROUP_MODE": "undelegated"
+    }
+  },
+  {
+    "name": "save-prepush-final-junit",
+    "command": "cp /mnt/build/cargo-maos/nextest/default/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/prepush-final-junit.xml",
+    "exit_code": 0,
+    "seconds": 0.005,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "compare-intent-lineage",
+    "command": "cmp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/intent-lineage.restore /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/intent-lineage-coverage-report.md",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "remove-final-restore-scaffold",
+    "command": "rm -f /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/intent-lineage.restore",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "check-dev-record-completeness-final-record",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json",
+    "exit_code": 0,
+    "seconds": 0.165,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-epic-close-coherence-final-record",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json",
+    "exit_code": 0,
+    "seconds": 0.033,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "check-review-findings-resolved-final-record",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-review-findings-resolved --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "implementation-tracked-diff",
+    "command": "git diff 16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de -- /home/lunarpulse/dev_ws/crates/maos-bin/src/egress.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/egress_daemon_17_1.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/purge_residue_20_10.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/root_shutdown_unload_16_3.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs /home/lunarpulse/dev_ws/xtask/tests/epic17_exit_workflow_17_7.rs /home/lunarpulse/dev_ws/xtask/kloc.toml /home/lunarpulse/dev_ws/docs/adr/ADR-067-maos-data-root-layout-and-purge.md /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/deferred-work.md /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/plants.md /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml",
+    "exit_code": 0,
+    "seconds": 0.016,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-implementation-diff",
+    "command": "cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/implementation-tracked-diff.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/implementation.diff",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "ci-cut-diff",
+    "command": "git diff 16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de -- /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml",
+    "exit_code": 0,
+    "seconds": 0.003,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-ci-cut-diff",
+    "command": "cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/ci-cut-diff.log /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/ci-cut.diff",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "final-diff-sha256",
+    "command": "sha256sum /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/implementation.diff /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-1/ci-cut.diff",
+    "exit_code": 0,
+    "seconds": 0.009,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  }
+]

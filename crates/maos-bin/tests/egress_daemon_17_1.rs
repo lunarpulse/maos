@@ -246,3 +246,57 @@ fn state_fallback_ignores_another_users_shared_parent() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[cfg(target_os = "linux")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hosted_length_home_keeps_egress_socket_below_sun_path_limit() {
+    use std::os::unix::ffi::OsStrExt as _;
+    // Match the longest hosted fixture home, independently of TMPDIR and PID width.
+    let scratch = tempfile::Builder::new()
+        .prefix("maos-egress-20-10-")
+        .tempdir_in("/tmp")
+        .expect("scratch");
+    let parent_len = scratch.path().as_os_str().as_bytes().len();
+    let home = scratch.path().join("h".repeat(70 - parent_len - 1));
+    let regressed = home.join("egress/process-12345-00000000/7654321/egress.sock");
+    assert!(
+        regressed.as_os_str().as_bytes().len() >= 108,
+        "five-digit creator PID must exercise the hosted overflow"
+    );
+    let cancel = CancellationToken::new();
+    let (handle, task) = EgressHandle::start(
+        home,
+        Arc::new(TransparencyLogAdapter::open_in_memory(0x20_10)),
+        cancel.clone(),
+    )
+    .expect("egress owner");
+    let mut lease = handle
+        .spawn(
+            7_654_321,
+            "hosted-worker",
+            &[],
+            &[],
+            Credential::None,
+            Duration::from_secs(60),
+        )
+        .unwrap_or_else(|error| panic!("hosted-length egress socket must bind: {error}"));
+    let path = lease.socket_path();
+    assert!(
+        path.as_os_str().as_bytes().len() < 108,
+        "AF_UNIX sun_path overflow: {}",
+        path.display()
+    );
+    let nonce = path
+        .parent()
+        .and_then(std::path::Path::parent)
+        .and_then(std::path::Path::file_name)
+        .expect("egress run nonce")
+        .as_bytes();
+    assert!(
+        nonce.len() == 8 && nonce.iter().all(u8::is_ascii_hexdigit),
+        "durable egress roots must keep short nonce-only names"
+    );
+    lease.finish(true).expect("finish proxy");
+    cancel.cancel();
+    task.await.expect("join cleanup").expect("cleanup");
+}

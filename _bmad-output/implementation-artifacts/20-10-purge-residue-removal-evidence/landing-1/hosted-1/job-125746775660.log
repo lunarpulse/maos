@@ -1,0 +1,256 @@
+﻿2026-11-03T05:42:22.7146641Z Current runner version: '2.338.2'
+2026-11-03T05:42:22.7163379Z ##[group]Runner Image Provisioner
+2026-11-03T05:42:22.7163952Z Hosted Compute Agent
+2026-11-03T05:42:22.7164300Z Version: 20261021.618
+2026-11-03T05:42:22.7164664Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-11-03T05:42:22.7165134Z Build Date: 2026-10-21T00:45:21Z
+2026-11-03T05:42:22.7165573Z Worker ID: {1795f2bd-77f4-48b4-bbe3-09cd0b0ba19d}
+2026-11-03T05:42:22.7166007Z Region: centralus
+2026-11-03T05:42:22.7166352Z Cloud: Azure
+2026-11-03T05:42:22.7166674Z ##[endgroup]
+2026-11-03T05:42:22.7167690Z ##[group]Operating System
+2026-11-03T05:42:22.7168081Z Ubuntu
+2026-11-03T05:42:22.7168422Z 24.04.5
+2026-11-03T05:42:22.7168864Z LTS
+2026-11-03T05:42:22.7169239Z ##[endgroup]
+2026-11-03T05:42:22.7169601Z ##[group]Runner Image
+2026-11-03T05:42:22.7169976Z Image: ubuntu-24.04
+2026-11-03T05:42:22.7170304Z Version: 20261025.353.1
+2026-11-03T05:42:22.7171077Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261025.353/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-03T05:42:22.7172204Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261025.353
+2026-11-03T05:42:22.7172750Z ##[endgroup]
+2026-11-03T05:42:22.7173431Z ##[group]GITHUB_TOKEN Permissions
+2026-11-03T05:42:22.7174670Z Contents: read
+2026-11-03T05:42:22.7175002Z Metadata: read
+2026-11-03T05:42:22.7175453Z ##[endgroup]
+2026-11-03T05:42:22.7176669Z Secret source: Actions
+2026-11-03T05:42:22.7177245Z Cache mode: write
+2026-11-03T05:42:22.7177777Z Prepare workflow directory
+2026-11-03T05:42:22.7402844Z Prepare all required actions
+2026-11-03T05:42:22.7431945Z Getting action download info
+2026-11-03T05:42:22.9838265Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-03T05:42:23.0649785Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-03T05:42:23.2534398Z Complete job name: t0 (ubuntu-24.04)
+2026-11-03T05:42:23.3014158Z ##[group]Run actions/checkout@v5
+2026-11-03T05:42:23.3014569Z with:
+2026-11-03T05:42:23.3014827Z   ref: 5ba752af8395507731f5f342d3d94bc8f805e1df
+2026-11-03T05:42:23.3015149Z   repository: lunarpulse/maos
+2026-11-03T05:42:23.3017007Z   token: ***
+2026-11-03T05:42:23.3017233Z   ssh-strict: true
+2026-11-03T05:42:23.3017461Z   ssh-user: git
+2026-11-03T05:42:23.3017695Z   persist-credentials: true
+2026-11-03T05:42:23.3017952Z   clean: true
+2026-11-03T05:42:23.3018189Z   sparse-checkout-cone-mode: true
+2026-11-03T05:42:23.3018462Z   fetch-depth: 1
+2026-11-03T05:42:23.3018820Z   fetch-tags: false
+2026-11-03T05:42:23.3019053Z   show-progress: true
+2026-11-03T05:42:23.3019287Z   lfs: false
+2026-11-03T05:42:23.3019504Z   submodules: false
+2026-11-03T05:42:23.3019739Z   set-safe-directory: true
+2026-11-03T05:42:23.3020006Z   allow-unsafe-pr-checkout: false
+2026-11-03T05:42:23.3020341Z env:
+2026-11-03T05:42:23.3020551Z   CARGO_TERM_COLOR: never
+2026-11-03T05:42:23.3020792Z ##[endgroup]
+2026-11-03T05:42:23.5090071Z Syncing repository: lunarpulse/maos
+2026-11-03T05:42:23.5091268Z ##[group]Getting Git version info
+2026-11-03T05:42:23.5091615Z Working directory is '/home/runner/work/maos/maos'
+2026-11-03T05:42:23.5092141Z [command]/usr/bin/git version
+2026-11-03T05:42:23.5168961Z git version 2.56.0
+2026-11-03T05:42:23.5185136Z ##[endgroup]
+2026-11-03T05:42:23.5192977Z Temporarily overriding HOME='/home/runner/work/_temp/e701ce3e-f27f-4ac2-8e65-8355ade331f8' before making global git config changes
+2026-11-03T05:42:23.5201128Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-03T05:42:23.5202267Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-03T05:42:23.5238077Z Deleting the contents of '/home/runner/work/maos/maos'
+2026-11-03T05:42:23.5242159Z ##[group]Initializing the repository
+2026-11-03T05:42:23.5244941Z [command]/usr/bin/git init /home/runner/work/maos/maos
+2026-11-03T05:42:23.5337830Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-03T05:42:23.5338530Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-03T05:42:23.5339334Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-03T05:42:23.5339944Z hint: call:
+2026-11-03T05:42:23.5340191Z hint:
+2026-11-03T05:42:23.5340474Z hint: 	git config --global init.defaultBranch <name>
+2026-11-03T05:42:23.5340801Z hint:
+2026-11-03T05:42:23.5341104Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-03T05:42:23.5341585Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-03T05:42:23.5341966Z hint:
+2026-11-03T05:42:23.5342188Z hint: 	git branch -m <name>
+2026-11-03T05:42:23.5342435Z hint:
+2026-11-03T05:42:23.5342762Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-03T05:42:23.5350450Z Initialized empty Git repository in /home/runner/work/maos/maos/.git/
+2026-11-03T05:42:23.5358361Z [command]/usr/bin/git remote add origin https://github.com/lunarpulse/maos
+2026-11-03T05:42:23.5397485Z ##[endgroup]
+2026-11-03T05:42:23.5398171Z ##[group]Disabling automatic garbage collection
+2026-11-03T05:42:23.5400384Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-03T05:42:23.5427239Z ##[endgroup]
+2026-11-03T05:42:23.5427620Z ##[group]Setting up auth
+2026-11-03T05:42:23.5432674Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-03T05:42:23.5465546Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-03T05:42:23.5805248Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-03T05:42:23.5840486Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-03T05:42:23.6020225Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-03T05:42:23.6054971Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-03T05:42:23.6233600Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-03T05:42:23.6272351Z ##[endgroup]
+2026-11-03T05:42:23.6272763Z ##[group]Fetching the repository
+2026-11-03T05:42:23.6280441Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 5ba752af8395507731f5f342d3d94bc8f805e1df
+2026-11-03T05:42:29.7738728Z From https://github.com/lunarpulse/maos
+2026-11-03T05:42:29.7740136Z  * branch            5ba752af8395507731f5f342d3d94bc8f805e1df -> FETCH_HEAD
+2026-11-03T05:42:29.7743401Z ##[endgroup]
+2026-11-03T05:42:29.7744665Z ##[group]Determining the checkout info
+2026-11-03T05:42:29.7746008Z ##[endgroup]
+2026-11-03T05:42:29.7748948Z [command]/usr/bin/git sparse-checkout disable
+2026-11-03T05:42:29.7801152Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-03T05:42:29.7833295Z ##[group]Checking out the ref
+2026-11-03T05:42:29.7841788Z [command]/usr/bin/git checkout --progress --force 5ba752af8395507731f5f342d3d94bc8f805e1df
+2026-11-03T05:42:30.4680412Z Note: switching to '5ba752af8395507731f5f342d3d94bc8f805e1df'.
+2026-11-03T05:42:30.4681772Z 
+2026-11-03T05:42:30.4684172Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-03T05:42:30.4684693Z changes and commit them, and you can discard any commits you make in this
+2026-11-03T05:42:30.4685143Z state without impacting any branches by switching back to a branch.
+2026-11-03T05:42:30.4685387Z 
+2026-11-03T05:42:30.4685533Z If you want to create a new branch to retain commits you create, you may
+2026-11-03T05:42:30.4685894Z do so (now or later) by using -c with the switch command. Example:
+2026-11-03T05:42:30.4686260Z 
+2026-11-03T05:42:30.4686346Z   git switch -c <new-branch-name>
+2026-11-03T05:42:30.4686460Z 
+2026-11-03T05:42:30.4686549Z Or undo this operation with:
+2026-11-03T05:42:30.4686657Z 
+2026-11-03T05:42:30.4686721Z   git switch -
+2026-11-03T05:42:30.4686830Z 
+2026-11-03T05:42:30.4687000Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-03T05:42:30.4687175Z 
+2026-11-03T05:42:30.4687301Z HEAD is now at 5ba752a ci: branch-only 20-10 verify legs (never merge)
+2026-11-03T05:42:30.4754764Z ##[endgroup]
+2026-11-03T05:42:30.4800329Z [command]/usr/bin/git log -1 --format=%H
+2026-11-03T05:42:30.4829277Z 5ba752af8395507731f5f342d3d94bc8f805e1df
+2026-11-03T05:42:30.5031744Z Prepare all required actions
+2026-11-03T05:42:30.5058080Z ##[group]Run ./.github/actions/provision-t3-test-substrate
+2026-11-03T05:42:30.5058294Z env:
+2026-11-03T05:42:30.5058430Z   CARGO_TERM_COLOR: never
+2026-11-03T05:42:30.5058776Z ##[endgroup]
+2026-11-03T05:42:30.5092885Z ##[start-action display=Provision signed immutable T3 test substrate;id=__self.__run]
+2026-11-03T05:42:30.5117175Z ##[group]Run set -euo pipefail
+2026-11-03T05:42:30.5117428Z [36;1mset -euo pipefail[0m
+2026-11-03T05:42:30.5117679Z [36;1mcommand -v podman || { sudo apt-get update && sudo apt-get install -y podman; }[0m
+2026-11-03T05:42:30.5118002Z [36;1mpython3 scripts/provision_t3_tests.py "$RUNNER_TEMP/maos-t3-tests"[0m
+2026-11-03T05:42:30.5137291Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-03T05:42:30.5137505Z env:
+2026-11-03T05:42:30.5137644Z   CARGO_TERM_COLOR: never
+2026-11-03T05:42:30.5137798Z ##[endgroup]
+2026-11-03T05:42:30.5181359Z /usr/bin/podman
+2026-11-03T05:42:32.6679819Z Trying to pull docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794...
+2026-11-03T05:42:33.1835096Z Getting image source signatures
+2026-11-03T05:42:33.1835694Z Copying blob sha256:06ad70e463aa4a17833d00d6d5d346c895ebb66fee637eefd67024dc6cdc2f1c
+2026-11-03T05:42:33.1836847Z Copying blob sha256:4e07a0f12b2c009f98326fa391e869bd52fc63728c482400af6cb752bc16744b
+2026-11-03T05:42:34.4206968Z Copying config sha256:6e92c4fd8dfdf7276d56743a65002a91c9eb35dbe7af327e6c85bd204b646156
+2026-11-03T05:42:34.4222731Z Writing manifest to image destination
+2026-11-03T05:42:34.4331493Z 6e92c4fd8dfdf7276d56743a65002a91c9eb35dbe7af327e6c85bd204b646156
+2026-11-03T05:42:34.6270798Z T3 image glibc and shell available
+2026-11-03T05:42:37.3325445Z ##[notice]immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+2026-11-03T05:42:37.3326281Z Source /home/runner/work/_temp/maos-t3-tests/t3.env for the test runtime, lock and public trust anchor; private key removed.
+2026-11-03T05:42:37.3374797Z ##[end-action id=__self.__run;outcome=success;conclusion=success;duration_ms=6828]
+2026-11-03T05:42:37.3476849Z ##[group]Run set -euo pipefail
+2026-11-03T05:42:37.3477070Z [36;1mset -euo pipefail[0m
+2026-11-03T05:42:37.3477207Z [36;1mmkdir -p evidence[0m
+2026-11-03T05:42:37.3477382Z [36;1mpython3 - <<'PY' 2>&1 | tee evidence/t0.log[0m
+2026-11-03T05:42:37.3477626Z [36;1mimport importlib.util, json, os, pathlib, subprocess, tempfile[0m
+2026-11-03T05:42:37.3477927Z [36;1mspec=importlib.util.spec_from_file_location('provision','scripts/provision_t3_tests.py')[0m
+2026-11-03T05:42:37.3478251Z [36;1mmodule=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)[0m
+2026-11-03T05:42:37.3478474Z [36;1mdef call(args):[0m
+2026-11-03T05:42:37.3478890Z [36;1m    p=subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)[0m
+2026-11-03T05:42:37.3479240Z [36;1m    print(json.dumps(dict(argv=args,rc=p.returncode,stdout=p.stdout,stderr=p.stderr)),flush=True)[0m
+2026-11-03T05:42:37.3479489Z [36;1m    return p[0m
+2026-11-03T05:42:37.3479667Z [36;1massert call(['podman','version']).returncode==0[0m
+2026-11-03T05:42:37.3480086Z [36;1massert call(['docker','version','--format','{{.Client.Version}}']).returncode==0[0m
+2026-11-03T05:42:37.3480470Z [36;1mdocker=call(['docker','create','--pidfile=/tmp/maos-20-10-docker-pid','--cidfile=/tmp/maos-20-10-docker-cid',module.IMAGE,'true'])[0m
+2026-11-03T05:42:37.3480969Z [36;1massert docker.returncode!=0 and 'unknown flag' in docker.stderr and 'pidfile' in docker.stderr, 'STOP: D-20-10-06 A contradicted; re-ask before landing'[0m
+2026-11-03T05:42:37.3481377Z [36;1mwith tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as scratch:[0m
+2026-11-03T05:42:37.3481680Z [36;1m    root=pathlib.Path(scratch); workspace=root/'workspace'; workspace.mkdir()[0m
+2026-11-03T05:42:37.3481888Z [36;1m    cids=[][0m
+2026-11-03T05:42:37.3482014Z [36;1m    try:[0m
+2026-11-03T05:42:37.3482402Z [36;1m        for suffix,labels,command in [('pair',['maos.spirit_id=t0','maos.boot_nonce=1'],['sleep','60']),('spirit',['maos.spirit_id=t0'],['true']),('nonce',['maos.boot_nonce=1'],['true'])]:[0m
+2026-11-03T05:42:37.3482822Z [36;1m            args=['podman','create','--name','maos-t0-'+suffix,'--network=none'][0m
+2026-11-03T05:42:37.3483059Z [36;1m            for label in labels: args += ['--label',label][0m
+2026-11-03T05:42:37.3483307Z [36;1m            args += ['--volume',str(workspace)+'/./:/workspace:rw',module.IMAGE,*command][0m
+2026-11-03T05:42:37.3483584Z [36;1m            p=call(args); assert p.returncode==0; cids.append(p.stdout.strip())[0m
+2026-11-03T05:42:37.3483877Z [36;1m        inspected=call(['podman','inspect',cids[0]]); assert inspected.returncode==0[0m
+2026-11-03T05:42:37.3484114Z [36;1m        row=json.loads(inspected.stdout)[0][0m
+2026-11-03T05:42:37.3484345Z [36;1m        source=next(m['Source'] for m in row['Mounts'] if m['Destination']=='/workspace')[0m
+2026-11-03T05:42:37.3484716Z [36;1m        assert pathlib.Path(source).parts==workspace.resolve().parts, 'STOP: establish mount-source comparison form before landing'[0m
+2026-11-03T05:42:37.3485141Z [36;1m        call(['podman','ps','-a','--filter','label=maos.spirit_id','--filter','label=maos.boot_nonce','--format','{{.ID}}'])[0m
+2026-11-03T05:42:37.3485440Z [36;1m        assert call(['podman','start',cids[0]]).returncode==0[0m
+2026-11-03T05:42:37.3485625Z [36;1m        for cid in cids:[0m
+2026-11-03T05:42:37.3485837Z [36;1m            assert call(['podman','rm','--force','--volumes','--time=0',cid]).returncode==0[0m
+2026-11-03T05:42:37.3486098Z [36;1m            assert call(['podman','container','exists',cid]).returncode==1[0m
+2026-11-03T05:42:37.3486291Z [36;1m    finally:[0m
+2026-11-03T05:42:37.3486474Z [36;1m        for cid in cids: call(['podman','rm','--force','--volumes','--time=0',cid])[0m
+2026-11-03T05:42:37.3486677Z [36;1mPY[0m
+2026-11-03T05:42:37.3503052Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-03T05:42:37.3503237Z env:
+2026-11-03T05:42:37.3503355Z   CARGO_TERM_COLOR: never
+2026-11-03T05:42:37.3503611Z   MAOS_T3_RUNTIME: podman
+2026-11-03T05:42:37.3503805Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T05:42:37.3504111Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: 610c853e79a3bd16fdf4723785bc3339bc551bb5b78821f90dddc3bcedd59e35
+2026-11-03T05:42:37.3504357Z ##[endgroup]
+2026-11-03T05:42:37.3924800Z {"argv": ["podman", "version"], "rc": 0, "stdout": "Client:       Podman Engine\nVersion:      4.9.3\nAPI Version:  4.9.3\nGo Version:   go1.22.2\nBuilt:        Thu Jan  1 00:00:00 1970\nOS/Arch:      linux/amd64\n", "stderr": ""}
+2026-11-03T05:42:37.4742174Z {"argv": ["docker", "version", "--format", "{{.Client.Version}}"], "rc": 0, "stdout": "28.0.4\n", "stderr": ""}
+2026-11-03T05:42:37.6400595Z {"argv": ["docker", "create", "--pidfile=/tmp/maos-20-10-docker-pid", "--cidfile=/tmp/maos-20-10-docker-cid", "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794", "true"], "rc": 125, "stdout": "", "stderr": "unknown flag: --pidfile\n\nUsage:  docker create [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nRun 'docker create --help' for more information\n"}
+2026-11-03T05:42:37.6831166Z {"argv": ["podman", "create", "--name", "maos-t0-pair", "--network=none", "--label", "maos.spirit_id=t0", "--label", "maos.boot_nonce=1", "--volume", "/home/runner/work/_temp/tmpgqlv9qod/workspace/./:/workspace:rw", "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794", "sleep", "60"], "rc": 0, "stdout": "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0\n", "stderr": ""}
+2026-11-03T05:42:37.7166210Z {"argv": ["podman", "create", "--name", "maos-t0-spirit", "--network=none", "--label", "maos.spirit_id=t0", "--volume", "/home/runner/work/_temp/tmpgqlv9qod/workspace/./:/workspace:rw", "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794", "true"], "rc": 0, "stdout": "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba\n", "stderr": ""}
+2026-11-03T05:42:37.7538290Z {"argv": ["podman", "create", "--name", "maos-t0-nonce", "--network=none", "--label", "maos.boot_nonce=1", "--volume", "/home/runner/work/_temp/tmpgqlv9qod/workspace/./:/workspace:rw", "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794", "true"], "rc": 0, "stdout": "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285\n", "stderr": ""}
+2026-11-03T05:42:37.7877766Z {"argv": ["podman", "inspect", "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"], "rc": 0, "stdout": "[\n     {\n          \"Id\": \"b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0\",\n          \"Created\": \"2026-11-03T05:42:37.665300013Z\",\n          \"Path\": \"sleep\",\n          \"Args\": [\n               \"60\"\n          ],\n          \"State\": {\n               \"OciVersion\": \"1.1.0\",\n               \"Status\": \"created\",\n               \"Running\": false,\n               \"Paused\": false,\n               \"Restarting\": false,\n               \"OOMKilled\": false,\n               \"Dead\": false,\n               \"Pid\": 0,\n               \"ExitCode\": 0,\n               \"Error\": \"\",\n               \"StartedAt\": \"0001-01-01T00:00:00Z\",\n               \"FinishedAt\": \"0001-01-01T00:00:00Z\",\n               \"Health\": {\n                    \"Status\": \"\",\n                    \"FailingStreak\": 0,\n                    \"Log\": null\n               },\n               \"CheckpointedAt\": \"0001-01-01T00:00:00Z\",\n               \"RestoredAt\": \"0001-01-01T00:00:00Z\"\n          },\n          \"Image\": \"6e92c4fd8dfdf7276d56743a65002a91c9eb35dbe7af327e6c85bd204b646156\",\n          \"ImageDigest\": \"sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794\",\n          \"ImageName\": \"docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794\",\n          \"Rootfs\": \"\",\n          \"Pod\": \"\",\n          \"ResolvConfPath\": \"\",\n          \"HostnamePath\": \"\",\n          \"HostsPath\": \"\",\n          \"StaticDir\": \"/home/runner/.local/share/containers/storage/overlay-containers/b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0/userdata\",\n          \"OCIRuntime\": \"crun\",\n          \"ConmonPidFile\": \"/run/user/1001/containers/overlay-containers/b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0/userdata/conmon.pid\",\n          \"PidFile\": \"/run/user/1001/containers/overlay-containers/b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0/userdata/pidfile\",\n          \"Name\": \"maos-t0-pair\",\n          \"RestartCount\": 0,\n          \"Driver\": \"overlay\",\n          \"MountLabel\": \"\",\n          \"ProcessLabel\": \"\",\n          \"AppArmorProfile\": \"\",\n          \"EffectiveCaps\": [\n               \"CAP_CHOWN\",\n               \"CAP_DAC_OVERRIDE\",\n               \"CAP_FOWNER\",\n               \"CAP_FSETID\",\n               \"CAP_KILL\",\n               \"CAP_NET_BIND_SERVICE\",\n               \"CAP_SETFCAP\",\n               \"CAP_SETGID\",\n               \"CAP_SETPCAP\",\n               \"CAP_SETUID\",\n               \"CAP_SYS_CHROOT\"\n          ],\n          \"BoundingCaps\": [\n               \"CAP_CHOWN\",\n               \"CAP_DAC_OVERRIDE\",\n               \"CAP_FOWNER\",\n               \"CAP_FSETID\",\n               \"CAP_KILL\",\n               \"CAP_NET_BIND_SERVICE\",\n               \"CAP_SETFCAP\",\n               \"CAP_SETGID\",\n               \"CAP_SETPCAP\",\n               \"CAP_SETUID\",\n               \"CAP_SYS_CHROOT\"\n          ],\n          \"ExecIDs\": [],\n          \"GraphDriver\": {\n               \"Name\": \"overlay\",\n               \"Data\": {\n                    \"LowerDir\": \"/home/runner/.local/share/containers/storage/overlay/a0de9fbce58610ae665fae7a71a75db826d98d8f09fa7d2903f111bb89d83088/diff:/home/runner/.local/share/containers/storage/overlay/f6e0e88dd8e11c81dba77d657b271e1ed7c33882e8f4dfaa7768cbaee94d94fc/diff\",\n                    \"UpperDir\": \"/home/runner/.local/share/containers/storage/overlay/60a4f8c16a5c470e873ae68b7b36b4ed2af663884379f09c11ecbd768a5da500/diff\",\n                    \"WorkDir\": \"/home/runner/.local/share/containers/storage/overlay/60a4f8c16a5c470e873ae68b7b36b4ed2af663884379f09c11ecbd768a5da500/work\"\n               }\n          },\n          \"Mounts\": [\n               {\n                    \"Type\": \"bind\",\n                    \"Source\": \"/home/runner/work/_temp/tmpgqlv9qod/workspace\",\n                    \"Destination\": \"/workspace\",\n                    \"Driver\": \"\",\n                    \"Mode\": \"\",\n                    \"Options\": [\n                         \"rbind\"\n                    ],\n                    \"RW\": true,\n                    \"Propagation\": \"rprivate\"\n               }\n          ],\n          \"Dependencies\": [],\n          \"NetworkSettings\": {\n               \"EndpointID\": \"\",\n               \"Gateway\": \"\",\n               \"IPAddress\": \"\",\n               \"IPPrefixLen\": 0,\n               \"IPv6Gateway\": \"\",\n               \"GlobalIPv6Address\": \"\",\n               \"GlobalIPv6PrefixLen\": 0,\n               \"MacAddress\": \"\",\n               \"Bridge\": \"\",\n               \"SandboxID\": \"\",\n               \"HairpinMode\": false,\n               \"LinkLocalIPv6Address\": \"\",\n               \"LinkLocalIPv6PrefixLen\": 0,\n               \"Ports\": {},\n               \"SandboxKey\": \"\",\n               \"Networks\": {\n                    \"none\": {\n                         \"EndpointID\": \"\",\n                         \"Gateway\": \"\",\n                         \"IPAddress\": \"\",\n                         \"IPPrefixLen\": 0,\n                         \"IPv6Gateway\": \"\",\n                         \"GlobalIPv6Address\": \"\",\n                         \"GlobalIPv6PrefixLen\": 0,\n                         \"MacAddress\": \"\",\n                         \"NetworkID\": \"none\",\n                         \"DriverOpts\": null,\n                         \"IPAMConfig\": null,\n                         \"Links\": null\n                    }\n               }\n          },\n          \"Namespace\": \"\",\n          \"IsInfra\": false,\n          \"IsService\": false,\n          \"KubeExitCodePropagation\": \"invalid\",\n          \"lockNumber\": 0,\n          \"Config\": {\n               \"Hostname\": \"b7c3f3fec002\",\n               \"Domainname\": \"\",\n               \"User\": \"\",\n               \"AttachStdin\": false,\n               \"AttachStdout\": false,\n               \"AttachStderr\": false,\n               \"Tty\": false,\n               \"OpenStdin\": false,\n               \"StdinOnce\": false,\n               \"Env\": [\n                    \"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\n                    \"container=podman\"\n               ],\n               \"Cmd\": [\n                    \"sleep\",\n                    \"60\"\n               ],\n               \"Image\": \"docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794\",\n               \"Volumes\": null,\n               \"WorkingDir\": \"/\",\n               \"Entrypoint\": \"\",\n               \"OnBuild\": null,\n               \"Labels\": {\n                    \"maos.boot_nonce\": \"1\",\n                    \"maos.spirit_id\": \"t0\",\n                    \"org.opencontainers.image.created\": \"2026-09-27T10:25:52.887617+00:00\",\n                    \"org.opencontainers.image.description\": \"The Ubuntu container image maintained by Canonical\\n\\nUbuntu is a Debian-based Linux operating system that runs from the desktop to the cloud, to all your internet connected things.\\nIt is the world's most popular operating system across public clouds and OpenStack clouds.\\nIt is the number one platform for containers; from Docker to Kubernetes to LXD, Ubuntu can run your containers at scale.\\nFast, secure and simple, Ubuntu powers millions of PCs worldwide.\\n\",\n                    \"org.opencontainers.image.title\": \"ubuntu\",\n                    \"org.opencontainers.image.version\": \"26.04\"\n               },\n               \"Annotations\": null,\n               \"StopSignal\": 15,\n               \"HealthcheckOnFailureAction\": \"none\",\n               \"CreateCommand\": [\n                    \"podman\",\n                    \"create\",\n                    \"--name\",\n                    \"maos-t0-pair\",\n                    \"--network=none\",\n                    \"--label\",\n                    \"maos.spirit_id=t0\",\n                    \"--label\",\n                    \"maos.boot_nonce=1\",\n                    \"--volume\",\n                    \"/home/runner/work/_temp/tmpgqlv9qod/workspace/./:/workspace:rw\",\n                    \"docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794\",\n                    \"sleep\",\n                    \"60\"\n               ],\n               \"Umask\": \"0022\",\n               \"Timeout\": 0,\n               \"StopTimeout\": 10,\n               \"Passwd\": true,\n               \"sdNotifyMode\": \"container\"\n          },\n          \"HostConfig\": {\n               \"Binds\": [\n                    \"/home/runner/work/_temp/tmpgqlv9qod/workspace:/workspace:rw,rprivate,rbind\"\n               ],\n               \"CgroupManager\": \"systemd\",\n               \"CgroupMode\": \"private\",\n               \"ContainerIDFile\": \"\",\n               \"LogConfig\": {\n                    \"Type\": \"journald\",\n                    \"Config\": null,\n                    \"Path\": \"\",\n                    \"Tag\": \"\",\n                    \"Size\": \"0B\"\n               },\n               \"NetworkMode\": \"none\",\n               \"PortBindings\": {},\n               \"RestartPolicy\": {\n                    \"Name\": \"\",\n                    \"MaximumRetryCount\": 0\n               },\n               \"AutoRemove\": false,\n               \"VolumeDriver\": \"\",\n               \"VolumesFrom\": null,\n               \"CapAdd\": [],\n               \"CapDrop\": [],\n               \"Dns\": [],\n               \"DnsOptions\": [],\n               \"DnsSearch\": [],\n               \"ExtraHosts\": [],\n               \"GroupAdd\": [],\n               \"IpcMode\": \"shareable\",\n               \"Cgroup\": \"\",\n               \"Cgroups\": \"default\",\n               \"Links\": null,\n               \"OomScoreAdj\": 0,\n               \"PidMode\": \"private\",\n               \"Privileged\": false,\n               \"PublishAllPorts\": false,\n               \"ReadonlyRootfs\": false,\n               \"SecurityOpt\": [],\n               \"Tmpfs\": {},\n               \"UTSMode\": \"private\",\n               \"UsernsMode\": \"\",\n               \"ShmSize\": 65536000,\n               \"Runtime\": \"oci\",\n               \"ConsoleSize\": [\n                    0,\n                    0\n               ],\n               \"Isolation\": \"\",\n               \"CpuShares\": 0,\n               \"Memory\": 0,\n               \"NanoCpus\": 0,\n               \"CgroupParent\": \"user.slice\",\n               \"BlkioWeight\": 0,\n               \"BlkioWeightDevice\": null,\n               \"BlkioDeviceReadBps\": null,\n               \"BlkioDeviceWriteBps\": null,\n               \"BlkioDeviceReadIOps\": null,\n               \"BlkioDeviceWriteIOps\": null,\n               \"CpuPeriod\": 0,\n               \"CpuQuota\": 0,\n               \"CpuRealtimePeriod\": 0,\n               \"CpuRealtimeRuntime\": 0,\n               \"CpusetCpus\": \"\",\n               \"CpusetMems\": \"\",\n               \"Devices\": [],\n               \"DiskQuota\": 0,\n               \"KernelMemory\": 0,\n               \"MemoryReservation\": 0,\n               \"MemorySwap\": 0,\n               \"MemorySwappiness\": 0,\n               \"OomKillDisable\": false,\n               \"PidsLimit\": 2048,\n               \"Ulimits\": [],\n               \"CpuCount\": 0,\n               \"CpuPercent\": 0,\n               \"IOMaximumIOps\": 0,\n               \"IOMaximumBandwidth\": 0,\n               \"CgroupConf\": null\n          }\n     }\n]\n", "stderr": ""}
+2026-11-03T05:42:37.8120172Z {"argv": ["podman", "ps", "-a", "--filter", "label=maos.spirit_id", "--filter", "label=maos.boot_nonce", "--format", "{{.ID}}"], "rc": 0, "stdout": "b7c3f3fec002\n", "stderr": ""}
+2026-11-03T05:42:37.8609492Z {"argv": ["podman", "start", "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"], "rc": 0, "stdout": "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0\n", "stderr": ""}
+2026-11-03T05:42:38.5843610Z {"argv": ["podman", "rm", "--force", "--volumes", "--time=0", "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"], "rc": 0, "stdout": "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0\n", "stderr": ""}
+2026-11-03T05:42:38.6107232Z {"argv": ["podman", "container", "exists", "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"], "rc": 1, "stdout": "", "stderr": ""}
+2026-11-03T05:42:38.6433546Z {"argv": ["podman", "rm", "--force", "--volumes", "--time=0", "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba"], "rc": 0, "stdout": "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba\n", "stderr": ""}
+2026-11-03T05:42:38.6675932Z {"argv": ["podman", "container", "exists", "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba"], "rc": 1, "stdout": "", "stderr": ""}
+2026-11-03T05:42:38.7012353Z {"argv": ["podman", "rm", "--force", "--volumes", "--time=0", "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285"], "rc": 0, "stdout": "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285\n", "stderr": ""}
+2026-11-03T05:42:38.7265996Z {"argv": ["podman", "container", "exists", "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285"], "rc": 1, "stdout": "", "stderr": ""}
+2026-11-03T05:42:38.7497051Z {"argv": ["podman", "rm", "--force", "--volumes", "--time=0", "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"], "rc": 0, "stdout": "", "stderr": ""}
+2026-11-03T05:42:38.7756261Z {"argv": ["podman", "rm", "--force", "--volumes", "--time=0", "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba"], "rc": 0, "stdout": "", "stderr": ""}
+2026-11-03T05:42:38.8016665Z {"argv": ["podman", "rm", "--force", "--volumes", "--time=0", "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285"], "rc": 0, "stdout": "", "stderr": ""}
+2026-11-03T05:42:38.8150155Z ##[group]Run actions/upload-artifact@v4
+2026-11-03T05:42:38.8150317Z with:
+2026-11-03T05:42:38.8150433Z   name: t0-20-10-ubuntu-24.04
+2026-11-03T05:42:38.8150562Z   path: evidence
+2026-11-03T05:42:38.8150680Z   if-no-files-found: warn
+2026-11-03T05:42:38.8150804Z   compression-level: 6
+2026-11-03T05:42:38.8150919Z   overwrite: false
+2026-11-03T05:42:38.8151036Z   include-hidden-files: false
+2026-11-03T05:42:38.8151160Z env:
+2026-11-03T05:42:38.8151261Z   CARGO_TERM_COLOR: never
+2026-11-03T05:42:38.8151382Z   MAOS_T3_RUNTIME: podman
+2026-11-03T05:42:38.8151562Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T05:42:38.8152067Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: 610c853e79a3bd16fdf4723785bc3339bc551bb5b78821f90dddc3bcedd59e35
+2026-11-03T05:42:38.8152310Z ##[endgroup]
+2026-11-03T05:42:38.9183048Z (node:2560) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T05:42:38.9183715Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T05:42:38.9214757Z With the provided path, there will be 1 file uploaded
+2026-11-03T05:42:38.9225109Z Artifact name is valid!
+2026-11-03T05:42:38.9225348Z Root directory input is valid!
+2026-11-03T05:42:39.2213185Z Beginning upload of artifact content to blob storage
+2026-11-03T05:42:39.2465679Z (node:2560) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-03T05:42:39.3896087Z Uploaded bytes 3522
+2026-11-03T05:42:39.4302392Z Finished uploading artifact content to blob storage!
+2026-11-03T05:42:39.4302866Z SHA256 digest of uploaded artifact zip is d221a658154a272340a8534186e68bde6972af2a39aa29b4011c737830849e81
+2026-11-03T05:42:39.4304063Z Finalizing artifact upload
+2026-11-03T05:42:39.8677796Z Artifact t0-20-10-ubuntu-24.04.zip successfully finalized. Artifact ID 13207668136
+2026-11-03T05:42:39.8678398Z Artifact t0-20-10-ubuntu-24.04 has been successfully uploaded! Final size is 3522 bytes. Artifact ID is 13207668136
+2026-11-03T05:42:39.8682733Z Artifact download URL: https://github.com/lunarpulse/maos/actions/runs/41584515474/artifacts/13207668136
+2026-11-03T05:42:39.8836672Z Post job cleanup.
+2026-11-03T05:42:39.9361520Z [command]/usr/bin/git version
+2026-11-03T05:42:39.9424327Z git version 2.56.0
+2026-11-03T05:42:39.9447191Z Temporarily overriding HOME='/home/runner/work/_temp/b8035546-8cae-48ee-bbd3-5367d5746641' before making global git config changes
+2026-11-03T05:42:39.9447887Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-03T05:42:39.9450594Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-03T05:42:39.9483335Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-03T05:42:39.9511083Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-03T05:42:39.9732176Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-03T05:42:39.9760707Z http.https://github.com/.extraheader
+2026-11-03T05:42:39.9768901Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-03T05:42:39.9800336Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-03T05:42:40.0013680Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-03T05:42:40.0049952Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-03T05:42:40.0352019Z Cleaning up orphan processes
+2026-11-03T05:42:40.0617949Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

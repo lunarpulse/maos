@@ -1,0 +1,553 @@
+diff --git a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
+index 56460948..a98cff6c 100644
+--- a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
++++ b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
+@@ -129,6 +129,18 @@ jobs:
+           cargo build --locked -p maos-bin --bin maos
+           cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit
+           cargo nextest list --locked -p maos-bin --test worker_terminal_facts_17_7 --message-format json > evidence/binaries.json
++      - name: Hosted-length socket and hermetic purge contracts (AC1-AC3, AC5-AC7)
++        if: matrix.tree == 'head'
++        shell: bash
++        run: |
++          set -euo pipefail
++          cargo nextest run --locked -p maos-bin --test egress_daemon_17_1 --test purge_residue_20_10 \
++            --profile ci --test-threads 1 --no-fail-fast --no-capture 2>&1 | tee evidence/contracts.log
++          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 17 \
++            --required-test hosted_length_home_keeps_egress_socket_below_sun_path_limit \
++            --required-test ac5_only_absent_cid_and_empty_state_are_reclaimed \
++            --required-test ac7_adr_documents_home_scoped_runtime_removal evidence/contracts.log
++          ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/contracts.log
+       - name: Delegated runtime witnesses (AC1, AC2, AC4, AC5, AC6)
+         shell: bash
+         run: |
+@@ -141,7 +153,7 @@ jobs:
+             filter='test(root_crash::)'
+           fi
+           set +e
+-          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-20-10 --timeout 1800 --rootless-canary -- \
++          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10 --timeout 1800 --rootless-canary -- \
+             cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-fail-fast --no-capture -E "$filter" 2>&1 | tee evidence/scenes.log
+           statuses=("${PIPESTATUS[@]}")
+           set -e
+@@ -171,7 +183,7 @@ jobs:
+           cp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+           cmp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+           touch crates/maos-bin/src/purge_runtime.rs
+-          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-20-10-restored --timeout 1800 --rootless-canary -- \
++          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10-restored --timeout 1800 --rootless-canary -- \
+             cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-capture \
+               -E 'test(root_crash_retains_stopped_container_and_purge_reports_it)' 2>&1 | tee evidence/restored.log
+           ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/restored.log
+diff --git a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/plants.md b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/plants.md
+index b4ea5679..9958373f 100644
+--- a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/plants.md
++++ b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/plants.md
+@@ -86,3 +86,13 @@ configured skips; substrate-gated local returns are not hosted proof.
+ This correction retains live/anonymous process roots and shared parents,
+ requires safe absolute HOME/legacy ancestors, and reports residue explicitly
+ with a nonzero exit without changing receipt schema/status vocabulary.
++
++## Hosted incidents (additive, baseline `16c35ef0`)
++
++[`hosted-1/plants.md`](hosted-1/plants.md) records the branch-only harness-unit
++regression and the main-run AF_UNIX path-length / fixture HOME regressions.
++All three new plants fail on their intended assertions; source/fixture/cut
++restorations use copy-back + `cmp` + `touch`. Hosted branch baseline/plant
++failures in run 41584515474 are unrelated harness setup failures, **not**
++intended removal/dead-creator proven reds. Both T0 jobs passed without
++contradicting a ruled D-row. The terminal scene count remains 34.
+diff --git a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md
+index 73b06813..1049b2e7 100644
+--- a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md
++++ b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal.md
+@@ -743,6 +743,136 @@ Local self-skips (signed T3 substrate, Python Ed25519 backend and strace)
+ are explicitly not proof of those legs. Historical anonymous-root producer
+ attribution and exclusive-idle budget certification remain owner-20-7 work.
+ 
++#### Hosted incident — runs 41584515474 / 41584453971, 2026-11-03
++
++This incident supersedes the earlier unexecuted-hosted boundary only where
++actual evidence now exists. Logs, T0 measurements, classification and commands
++are preserved in
++[`hosted-1/hosted-findings.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/hosted-findings.md).
++
++The branch-only run's four scene jobs all stopped before tests: invalid
++`--unit maos-20-10` violated the existing `maos-17-[27]-*` harness contract.
++Head jobs 125749866755/125749866883 cite log line 4058, baseline
++125749866879 line 4061, plant 125749866891 line 4059. Baseline and plant
++are **not** intended assertion-red evidence. Corrected only the cut's unit
++names, not the harness allowlist or assertion-message guards. The new xtask
++workflow-contract witness failed before the fix (exit 100), passed afterward
++(4/4, exit 0), and rejected the byte-restored invalid-unit plant (exit 100).
++
++Both real T0 jobs passed: Podman 4.9.3 / 5.7.0 normalized mount sources,
++combined spirit/nonce filters selected only the paired-label CID, forced
++removal returned 0 and post-removal exists returned 1. Docker 28.0.4 / 29.4.2
++rejected `--pidfile`, exit 125. No ruled D-row was contradicted; D-20-10-06 A
++stands. The hosted Rust-1.99.1 warning comparison was `[]`, at 1381/896
++against the unchanged 1383/897 baseline (job 125746775456 lines 2135/2144).
++This proves that submitted tree, not any subsequent unexecuted revision.
++
++Main run 41584453971 exposed **two new 20-10 regressions**, not known teardown
++flakes. Review P1's shared root helper accidentally applied the
++`process-<pid>-<nonce>` prefix to durable egress socket roots. Hosted path
++shapes grew 94-107 bytes to 108-121 bytes, preventing Worker startup and
++inflating startup-wait budgets. The new Linux hosted-length vector confirms
++the actual bind error `path must be shorter than SUN_LEN`, before the fix
++(exit 100). The production correction confines PID-bearing names to volatile
++Worker-state/custody roots; durable socket roots keep short eight-hex nonces.
++The custody witness retains live-PID and legacy nonce-only roots, removes only
++dead-owner empty roots, and checks report/receipt rows for retained shapes.
++
++The terminal purge fixture also set `HOME == MAOS_HOME`. Its new executable
++dry-purge preflight confirms the real safety refusal before the fixture fix
++(exit 100), without requiring a provisioned T3 runtime. The fixture now gives
++user HOME the private scratch parent and MAOS_HOME its distinct child, while
++retaining the provisioned Podman storage configuration. Production HOME
++refusal remains unchanged. Root-shutdown startup failure context now captures
++stdout/stderr instead of an empty string. The terminal pin stays **34**:
++both hosted images actually ran 34 tests (28 passed / six failed); no new
++terminal test or accounting relaxation was introduced.
++
++**Lesson:** every path-shape change needs a hosted-length vector, including
++fixed-width synthetic creator/Spirit PID cases; short tempfile homes alone
++did not exercise AF_UNIX capacity. The cut now enrolls 17 socket/purge contract
++tests on both head images, alongside the unchanged 34 real delegated scenes.
++F1/F2 source plants failed on the intended bind/refusal assertions, then were
++copy-backed, compared and touched with all restoration exits 0. See
++[`hosted-1/plants.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/plants.md).
++
++##### Corrected-source verification and remaining boundaries
++
++Final anchors: hosted-length bind `egress_daemon_17_1.rs:252`; fixture
++preflight `worker_terminal_facts_17_7/root_crash.rs:268`; dual-shape custody
++`purge_residue_20_10.rs:202`; workflow contract
++`xtask/tests/epic17_exit_workflow_17_7.rs:418`; diagnostics
++`root_shutdown_unload_16_3.rs:316`. The source fix is `egress.rs:88,246-258,268`.
++Three distinct plants (unit namespace, durable PID prefix, HOME equality)
++each failed on the intended assertion, exit 100, then were byte-restored.
++
++| Surface | Exact measured | Ceiling / current pin |
++|---|---:|---:|
++| maos-bin code | 34,191 | ceiling 34,548; pin 34,191 |
++| Aggregate code | 192,519 | ceiling 192,876; hardfail 192,520 |
++| Kernel physical / code | 26,841 / 21,042 | unchanged |
++| xtask code | 44,406 | unchanged |
++
++Final `cargo fmt --all`, exact re-pin, all-target workspace build and focused
++suite passed (exit 0); focused **164/164**. All 16 registered fixture
++artefacts were provisioned. Fully provisioned serial workspace nextest
++(`--profile ci --test-threads 1`) passed **5573/5573**, 138 configured skips,
++exit 0. Saved fresh serial junit passed the budget gate, exit 0:
++594 binaries, 644.512 s sum, no findings. Host readings were recorded:
++3.58 / 4.39 / 16.52 before the final serial run and 5.42 / 4.05 / 10.01
++before the budget gate. This is not an exclusive-idle-host certification.
++
++Default-concurrency nextest ran **5573**, **5572 passed / one failed**,
++138 configured skips, exit **100**. The sole failure was the explicitly known
++`t3_terminal_helpers_17_7::teardown_waits_for_a_stalled_snapshot_owner_then_removes_the_container_20_7`:
++`instance 16: observer never entered inspect` (10.078 s). It was **not retried**;
++owner `20-7-stable-runner-perf-gates`, same-line rule-10 evidence in
++`deferred-work.md:5` and `hosted-1/workspace-default-final.log:7335-7377`.
++All 20-10 witnesses passed. No kernel edit or timing/assertion relaxation.
++
++All requested structural gates exited 0: kloc/kernel/service/env/serde,
++composition roots, J1 loopback delegation, dev-record completeness,
++epic coherence, review resolution, test cost, invariant lock, coverage matrix
++(dry run) and completeness, exit commands, decision register, ff-j6 and
++performance-runner policy. Non-denying clippy exited 0 on local Rust 1.98.1;
++complete-stream ratchet **1335 / 873**, exit 0, unchanged baseline **1383 / 897**.
++Lint/file/message comparison against the prior local stream has **no new
++warnings**, including the result-large-err/collapsible-if/too-many-arguments
++families; existing warnings in touched tests were not hidden or baselined away.
++`cargo deny check` exited 0.
++
++Prescribed undelegated prepush independently exited **0**. Workspace/default
++profile tests, kernel lib tests and workspace doctests passed. This does not
++erase the separate default-concurrency failure. Its budget leg was advisory,
++exit 1: hook-pump 30.317 s, one-daemon 34.159 s, participant-recall 44.337 s,
++all against unchanged 30 s binary budgets. Owner 20-7 and same-line evidence:
++`deferred-work.md:3`, `hosted-1/prepush-final.log:536-540`, adjacent saved junit.
++No advisory retry or budget change. Site-doc build gates were skipped because
++this incident changed ADR-067, not docs-site inputs; the earlier English/Korean
++verification remains in its historical record. Intent-lineage output matched
++the saved original (cmp 0).
++
++Earlier deterministic prerequisite failures remain visible: a focused run
++had 18 stale debug-fixture failures after the separate 20-4 source park; after
++debug-fixture provisioning the focused run passed. The first full serial run
++had exactly 19 stale release-fixture failures (four equiv-native-twin, 15
++maos-wasm-runner), classified in `hosted-1/serial-failure-classification.json`.
++All registered fixtures were then rebuilt before the final serial/default
++runs. Freshness guards were never suppressed. An earlier combined eval timed
++out during compilation; no exit code was observed for that interrupted command.
++The first clippy-ratchet input was a truncated artifact view (missing
++build-finished, exit 1); paging the **same** successful stream, without rerunning
++clippy, restored complete evidence and ratchet exit 0.
++
++Exact commands, exits, overrides and logs:
++[`hosted-1/commands.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/commands.md)
++and adjacent JSON. Source/cut diff digests are adjacent; prior snapshots remain
++unchanged. Per-AC corrected-hosted proof routes and explicitly unverified legs:
++[`hosted-1/ac-hosted-map.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-1/ac-hosted-map.md).
++Corrected real delegated baseline/head/plant scenes and post-fix hosted-toolchain
++lint require an operator rerun; local self-skips are not that proof. No commit,
++push, CI-branch edit, story/status flip or kernel modification was made.
++
+ ### File List
+ 
+ - [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [creator-PID custody roots](../../crates/maos-bin/src/egress.rs).
+@@ -751,6 +881,7 @@ attribution and exclusive-idle budget certification remain owner-20-7 work.
+ - [ADR-067](../../docs/adr/ADR-067-maos-data-root-layout-and-purge.md), [operator guide](../../docs/maos.dev/run-maos.md), [site guide](../../docs-site/docs/run-maos.md), [Korean guide](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md), [cookbook](../../docs-site/docs/cookbook/cli-wrapper-spirit.md), [Korean cookbook](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md).
+ - [FR2 coverage row](../../tests/coverage-matrix.yaml), [loaded-budget disposition](deferred-work.md), this Dev Agent Record, and [landing/hosted-cut evidence](20-10-purge-residue-removal-evidence/landing-1/plants.md).
+ - Cold-swap oracle incident: `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`; the resolved cold-swap row in `deferred-work.md`; this record and the 20-1a Dev Agent Record. The earlier implementation-diff digest is not regenerated or expanded.
++- Hosted incident: [AF_UNIX hosted-length witness](../../crates/maos-bin/tests/egress_daemon_17_1.rs), [startup failure context](../../crates/maos-bin/tests/root_shutdown_unload_16_3.rs), the existing terminal/custody witnesses, [workflow contract](../../xtask/tests/epic17_exit_workflow_17_7.rs), [corrected branch-only cut](20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml), ADR-067, exact pins and [hosted incident evidence](20-10-purge-residue-removal-evidence/landing-1/hosted-1/hosted-findings.md).
+ 
+ 
+ ## Change Log
+@@ -766,3 +897,4 @@ attribution and exclusive-idle budget certification remain owner-20-7 work.
+   witnesses and the AC1 mutation cut but not pushed/run; status intentionally unchanged.
+ - 2026-11-02: Hosted run `41521146083` cold-swap failure diagnosed as an over-strict cross-writer journal oracle, with a deterministic recorded-order red-before vector and causal/audit-drained replacement. No purge, kernel, production or budget change.
+ - 2026-11-03: Review corrections retain live/anonymous T3 roots and shared parents, validate HOME/legacy ancestry/protected paths, make residue an explicit nonzero outcome, document the same-UID attribution boundary, and strengthen all identified witnesses. Exact maos-bin 34188 / aggregate 192516 (hardfail 192517), kernel unchanged; five baseline-red vectors and nine byte-restored assertion-red plants; focused, serial/default, gates, clippy, deny and prepush observed green except separately recorded prepush budget advisories. No status flip or push.
++- 2026-11-03: Hosted incidents 41584515474 / 41584453971 corrected at cause: use the existing delegated-unit namespace; confine creator-PID naming to volatile custody so durable AF_UNIX socket paths stay short; separate terminal fixture HOME/MAOS_HOME and expose startup stderr. Three byte-restored assertion-red plants, focused164/164, serial5573/5573 and prepush0; default's known snapshot-owner failure remains recorded/unretried under owner20-7. Exact bin34191 / aggregate192519 (hardfail192520), kernel unchanged; corrected hosted cut remains unpushed.
+diff --git a/_bmad-output/implementation-artifacts/deferred-work.md b/_bmad-output/implementation-artifacts/deferred-work.md
+index 308fdc5e..0e69a8c4 100644
+--- a/_bmad-output/implementation-artifacts/deferred-work.md
++++ b/_bmad-output/implementation-artifacts/deferred-work.md
+@@ -1,7 +1,8 @@
+ ## Deferred from: Story 20-10 landing 1 loaded prepush
+ 
+-- **Loaded-run budget timings — Owner: `20-7-stable-runner-perf-gates`.** Prescribed 20-10 prepush exited 0 with an advisory budget failure: `butler::hallucination` 32.680 s, `maos-bin::hook_pump_17_4` 32.074 s, `maos-bin::one_daemon_one_door_16_1` 30.223 s, `maos-iac::participant_recall_17_8` 50.524 s, and `xtask::bin/xtask` 33.722 s against their 30 s binary budgets. The earlier fresh serial junit passed with no findings (646.231 s sum); the loaded prepush was not retried-to-green. Review-correction prepush also exited 0 with advisory findings for one-daemon 30.543 s and participant-recall 41.594 s; its independently prescribed fresh serial junit passed with no findings (678.553 s sum). No budget was widened and neither advisory run was retried. Same-line rule-10 evidence: `20-10-purge-residue-removal-evidence/landing-1/prepush.log:552`, `20-10-purge-residue-removal-evidence/landing-1/check-test-budget.log:1`, `20-10-purge-residue-removal-evidence/landing-1/review-1/prepush-review.log:660-664`, `20-10-purge-residue-removal-evidence/landing-1/review-1/check-test-budget.log:1`, Story `20-10-purge-residue-removal` Dev Agent Record. Stable-runner/idle-host budget calibration, not 20-10 runtime reclamation. Status: open.
++- **Loaded-run budget timings — Owner: `20-7-stable-runner-perf-gates`.** Prescribed 20-10 prepush exited 0 with an advisory budget failure: `butler::hallucination` 32.680 s, `maos-bin::hook_pump_17_4` 32.074 s, `maos-bin::one_daemon_one_door_16_1` 30.223 s, `maos-iac::participant_recall_17_8` 50.524 s, and `xtask::bin/xtask` 33.722 s against their 30 s binary budgets. The earlier fresh serial junit passed with no findings (646.231 s sum); the loaded prepush was not retried-to-green. Review-correction prepush also exited 0 with advisory findings for one-daemon 30.543 s and participant-recall 41.594 s; its independently prescribed fresh serial junit passed with no findings (678.553 s sum). No budget was widened and neither advisory run was retried. Same-line rule-10 evidence: `20-10-purge-residue-removal-evidence/landing-1/prepush.log:552`, `20-10-purge-residue-removal-evidence/landing-1/check-test-budget.log:1`, `20-10-purge-residue-removal-evidence/landing-1/review-1/prepush-review.log:660-664`, `20-10-purge-residue-removal-evidence/landing-1/review-1/check-test-budget.log:1`, Story `20-10-purge-residue-removal` Dev Agent Record. Stable-runner/idle-host budget calibration, not 20-10 runtime reclamation. Hosted-incident correction prepush exited 0 with three unchanged-budget advisories: hook-pump 30.317 s, one-daemon 34.159 s, participant-recall 44.337 s; its fresh serial junit passed with no findings (644.512 s sum). No advisory retry or calibration change. Same-line evidence: `20-10-purge-residue-removal-evidence/landing-1/hosted-1/prepush-final.log:536-540`, adjacent `prepush-final-junit.xml`, and `20-10-purge-residue-removal-evidence/landing-1/hosted-1/check-test-budget-final.log:1`. Status: open.
+ - **Unattributed historical T3 process roots — Owner: `20-7-stable-runner-perf-gates`.** Operator-delegated 20-10 review adjudication accepts the demonstrated test-only Arc-cycle repair, not an invented production diagnosis. The 8,903 historical anonymous roots have no creator-liveness proof and are retained; identify any remaining production/test producers before authorizing historical cleanup. Rule-10 evidence: `20-10-purge-residue-removal-evidence/creation/measurements.md:63-71`, `20-10-purge-residue-removal-evidence/landing-1/t0-mint-stop-root-count.json`, `20-10-purge-residue-removal-evidence/landing-1/producer-fixed-counts.json`, `agent://BmadReview2010` D2 and `20-10-purge-residue-removal.md` D-20-10-07 review disposition. Status: open.
++- **Default-concurrency snapshot-owner teardown flake — Owner: `20-7-stable-runner-perf-gates`.** The final 20-10 hosted-incident default workspace run exited 100: 5572/5573 passed, with `t3_terminal_helpers_17_7::teardown_waits_for_a_stalled_snapshot_owner_then_removes_the_container_20_7` reporting `instance 16: observer never entered inspect` (1/20 instances, 10.078 s). This is the explicitly known snapshot-owner timing family, not the repaired AF_UNIX/HOME startup regressions. No retry-to-green, kernel edit, timeout/budget increase or assertion weakening. Same-line rule-10 evidence: `20-10-purge-residue-removal-evidence/landing-1/hosted-1/workspace-default-final.log:7335-7377`, adjacent `workspace-default-final-junit.xml`, and `20-10-purge-residue-removal.md` hosted incident record; the independently prescribed serial run passed all 5573 tests. Status: open.
+ 
+ ## Deferred from: Stories 20-1a and 20-7 landing 1
+ 
+diff --git a/crates/maos-bin/src/egress.rs b/crates/maos-bin/src/egress.rs
+index f0a5b702..fa019ef0 100644
+--- a/crates/maos-bin/src/egress.rs
++++ b/crates/maos-bin/src/egress.rs
+@@ -85,7 +85,7 @@ impl EgressHandle {
+         log: Arc<TransparencyLogAdapter>,
+         cancel: CancellationToken,
+     ) -> io::Result<(Self, tokio::task::JoinHandle<io::Result<()>>)> {
+-        let run_dir = create_root_dir(&home.join("egress"))?;
++        let run_dir = create_root_dir(&home.join("egress"), false)?;
+         let shared = Arc::new(Shared {
+             run_dir,
+             table: Arc::new(BearerTable::default()),
+@@ -243,15 +243,18 @@ pub fn create_worker_state_root() -> io::Result<PathBuf> {
+     if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
+         let runtime_dir = PathBuf::from(runtime_dir);
+         if !runtime_dir.as_os_str().is_empty() && validate_private_dir(&runtime_dir).is_ok() {
+-            if let Ok(root) = create_root_dir(&runtime_dir.join("maos-worker-state")) {
++            if let Ok(root) = create_root_dir(&runtime_dir.join("maos-worker-state"), true) {
+                 return Ok(root);
+             }
+         }
+     }
+-    create_root_dir(&std::env::temp_dir().join(format!(
+-        "maos-worker-state-{}",
+-        rustix::process::geteuid().as_raw()
+-    )))
++    create_root_dir(
++        &std::env::temp_dir().join(format!(
++            "maos-worker-state-{}",
++            rustix::process::geteuid().as_raw()
++        )),
++        true,
++    )
+ }
+ /// Allocate one fresh state directory beneath this process root.
+ pub fn create_worker_state_dir(root: &Path) -> io::Result<PathBuf> {
+@@ -261,13 +264,14 @@ pub fn create_worker_state_dir(root: &Path) -> io::Result<PathBuf> {
+ 
+ /// Create a private root below `parent`, then allocate its fresh process-owned
+ /// child. Non-empty children are retained as evidence during cleanup.
+-fn create_root_dir(parent: &Path) -> io::Result<PathBuf> {
++/// Only volatile custody roots encode a creator PID; socket roots stay compact.
++fn create_root_dir(parent: &Path, process_root: bool) -> io::Result<PathBuf> {
+     std::fs::DirBuilder::new()
+         .recursive(true)
+         .mode(0o700)
+         .create(parent)?;
+     validate_private_dir(parent)?;
+-    create_private_child_dir(parent, true)
++    create_private_child_dir(parent, process_root)
+ }
+ 
+ fn validate_private_dir(path: &Path) -> io::Result<()> {
+diff --git a/crates/maos-bin/tests/egress_daemon_17_1.rs b/crates/maos-bin/tests/egress_daemon_17_1.rs
+index 716a8868..3432f95f 100644
+--- a/crates/maos-bin/tests/egress_daemon_17_1.rs
++++ b/crates/maos-bin/tests/egress_daemon_17_1.rs
+@@ -246,3 +246,57 @@ fn state_fallback_ignores_another_users_shared_parent() {
+         String::from_utf8_lossy(&output.stderr)
+     );
+ }
++
++#[cfg(target_os = "linux")]
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn hosted_length_home_keeps_egress_socket_below_sun_path_limit() {
++    use std::os::unix::ffi::OsStrExt as _;
++    // Match the longest hosted fixture home, independently of TMPDIR and PID width.
++    let scratch = tempfile::Builder::new()
++        .prefix("maos-egress-20-10-")
++        .tempdir_in("/tmp")
++        .expect("scratch");
++    let parent_len = scratch.path().as_os_str().as_bytes().len();
++    let home = scratch.path().join("h".repeat(70 - parent_len - 1));
++    let regressed = home.join("egress/process-12345-00000000/7654321/egress.sock");
++    assert!(
++        regressed.as_os_str().as_bytes().len() >= 108,
++        "five-digit creator PID must exercise the hosted overflow"
++    );
++    let cancel = CancellationToken::new();
++    let (handle, task) = EgressHandle::start(
++        home,
++        Arc::new(TransparencyLogAdapter::open_in_memory(0x20_10)),
++        cancel.clone(),
++    )
++    .expect("egress owner");
++    let mut lease = handle
++        .spawn(
++            7_654_321,
++            "hosted-worker",
++            &[],
++            &[],
++            Credential::None,
++            Duration::from_secs(60),
++        )
++        .unwrap_or_else(|error| panic!("hosted-length egress socket must bind: {error}"));
++    let path = lease.socket_path();
++    assert!(
++        path.as_os_str().as_bytes().len() < 108,
++        "AF_UNIX sun_path overflow: {}",
++        path.display()
++    );
++    let nonce = path
++        .parent()
++        .and_then(std::path::Path::parent)
++        .and_then(std::path::Path::file_name)
++        .expect("egress run nonce")
++        .as_bytes();
++    assert!(
++        nonce.len() == 8 && nonce.iter().all(u8::is_ascii_hexdigit),
++        "durable egress roots must keep short nonce-only names"
++    );
++    lease.finish(true).expect("finish proxy");
++    cancel.cancel();
++    task.await.expect("join cleanup").expect("cleanup");
++}
+diff --git a/crates/maos-bin/tests/purge_residue_20_10.rs b/crates/maos-bin/tests/purge_residue_20_10.rs
+index 9e29855f..a9968d84 100644
+--- a/crates/maos-bin/tests/purge_residue_20_10.rs
++++ b/crates/maos-bin/tests/purge_residue_20_10.rs
+@@ -202,6 +202,8 @@ fn ac3_dry_run_uses_only_readonly_verbs_and_preserves_custody() {
+ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
+     let f = Fixture::new();
+     let empty = f.private("process-2147483647-00000000");
++    let legacy_short = f.private("00000001");
++    let live_process = f.private(&format!("process-{}-00000002", std::process::id()));
+     let absent = f.private("process/absent");
+     let present = f.private("process/present");
+     let unknown = f.private("process/unknown");
+@@ -212,6 +214,14 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
+     assert!(!absent.exists(), "absent CID custody leaked");
+     assert!(present.exists(), "live home's custody removed");
+     assert!(unknown.exists(), "unknown custody removed");
++    assert!(
++        legacy_short.exists(),
++        "nonce-only custody has no creator-absence proof"
++    );
++    assert!(
++        live_process.exists(),
++        "empty live creator root must remain usable"
++    );
+     let report = String::from_utf8_lossy(&out.stdout);
+     let bytes = std::fs::read(f.root().join("receipt.json")).expect("receipt");
+     let receipt: serde_json::Value =
+@@ -219,7 +229,7 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
+     let rows = receipt["roots"]
+         .as_array()
+         .unwrap_or_else(|| panic!("receipt rows"));
+-    for path in [&present, &unknown] {
++    for path in [&present, &unknown, &legacy_short, &live_process] {
+         assert!(
+             report.contains(&format!(
+                 "left (T3 custody residue): T3 state {}",
+diff --git a/crates/maos-bin/tests/root_shutdown_unload_16_3.rs b/crates/maos-bin/tests/root_shutdown_unload_16_3.rs
+index d41e1628..06154798 100644
+--- a/crates/maos-bin/tests/root_shutdown_unload_16_3.rs
++++ b/crates/maos-bin/tests/root_shutdown_unload_16_3.rs
+@@ -314,7 +314,12 @@ fn fixture_children_of(stdout: &str) -> Vec<FixtureContainer> {
+ }
+ 
+ fn wait_for_fixture_child(root: &RunRoot, mode: &str, timeout: Duration) -> FixtureContainer {
+-    wait_for_fixture_child_with(|| root.stdout(), mode, timeout, String::new)
++    wait_for_fixture_child_with(
++        || root.stdout(),
++        mode,
++        timeout,
++        || format!("stdout:\n{}\nstderr:\n{}", root.stdout(), root.stderr()),
++    )
+ }
+ 
+ /// Wait for `cli_wrapper_loaded`, whose published CID is the identity oracle.
+diff --git a/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs b/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
+index 60965a26..48e98e34 100644
+--- a/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
++++ b/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
+@@ -15,6 +15,7 @@ const MANIFEST: &str = "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
+     shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n[author]\nname = \"MAOS Project\"\n";
+ 
+ fn maos(home: &Path, args: &[&str]) -> Command {
++    let user_home = home.parent().expect("scratch user HOME contains MAOS_HOME");
+     let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+     let mut paths = vec![root.join("target/debug"), root.join("target/debug/deps")];
+     paths.extend(
+@@ -26,7 +27,10 @@ fn maos(home: &Path, args: &[&str]) -> Command {
+     command
+         .args(args)
+         .current_dir(&root)
+-        .env("HOME", super::t3_substrate::isolated_runtime_home(home))
++        .env(
++            "HOME",
++            super::t3_substrate::isolated_runtime_home(user_home),
++        )
+         .env("MAOS_HOME", home)
+         .env("XDG_DATA_HOME", home)
+         .env("MAOS_OLLAMA_URL", "skip")
+@@ -262,6 +266,18 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
+ 
+ #[test]
+ fn purge_cgroup_native_binding_and_dead_creator_twins() {
++    // Exercise the real fixture HOME boundary even without a T3 substrate.
++    let dir = tempfile::tempdir().expect("purge home");
++    let home = dir.path().join("home");
++    std::fs::create_dir(&home).expect("home");
++    let preflight = maos(&home, &["purge", "--dry-run"])
++        .output()
++        .expect("dry purge preflight");
++    assert!(
++        preflight.status.success(),
++        "fixture HOME must not be a purge root: {}",
++        String::from_utf8_lossy(&preflight.stderr)
++    );
+     if !super::scene("purge-cgroups") {
+         return;
+     }
+@@ -302,9 +318,6 @@ fn purge_cgroup_native_binding_and_dead_creator_twins() {
+     );
+     std::fs::write(populated.join("cgroup.procs"), member.0.id().to_string())
+         .expect("populate twin");
+-    let dir = tempfile::tempdir().expect("purge home");
+-    let home = dir.path().join("home");
+-    std::fs::create_dir(&home).expect("home");
+     let receipt = dir.path().join("receipt.json");
+     let purge = maos(
+         &home,
+diff --git a/docs/adr/ADR-067-maos-data-root-layout-and-purge.md b/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
+index d9fbf432..edbe657d 100644
+--- a/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
++++ b/docs/adr/ADR-067-maos-data-root-layout-and-purge.md
+@@ -117,9 +117,11 @@ leaves only when `cgroup.events` reports `populated 0` and the creator has no
+ `/proc/<pid>`. The shared `maos.slice` parent is never removed: empty does not
+ exclude a live creator between parent allocation and leaf creation. Purge never
+ kills members or writes `cgroup.kill`. Private mode-0700, euid-owned T3 spawn
+-custody is reclaimed only after its CID is confirmed absent. Process roots now
+-encode `process-<creator pid>-<nonce>` and are rmdired only when empty and the
+-creator PID is positively absent. Live-owner and historical anonymous roots
++custody is reclaimed only after its CID is confirmed absent. Only volatile
++Worker-state process roots encode `process-<creator pid>-<nonce>` and are rmdired
++when empty and the creator PID is positively absent. Durable egress socket
++roots retain short eight-hex nonce names: the PID prefix must not lengthen
++AF_UNIX paths beyond `sun_path` capacity. Live-owner and historical anonymous roots
+ are retained; shared state parents are never removed. Unknown/present-CID spawn
+ custody stays. Directory traversal and control-file reads do not follow
+ links. A dry run invokes only `ps`/`inspect` and changes no state, including
+diff --git a/xtask/kloc.toml b/xtask/kloc.toml
+index 781f1011..84cc78be 100644
+--- a/xtask/kloc.toml
++++ b/xtask/kloc.toml
+@@ -514,7 +514,7 @@ maos-cli = 6856   # HISTORY: 20-1a-registry-publish-install-exit-path 20-1a land
+ # 17-3d-wasm-log-recall review fix, Lunarpulse-approved exact measured FW-03 raise 2026-10-19: 26339 -> 26340 (+1), ZERO HEADROOM. Driver: explicitly retain timestamp ordering when converting a WASM recall filter.
+ # ◆ 17-4 FLAG-Winston landing, Lunarpulse-approved measured request 2026-10-20, exact after `cargo fmt --all` via `kloc-check --json` (tokei 14.0.0): 26340 -> 27194 (+854), ZERO HEADROOM. Driver: `hook_pump.rs` +682 (the HookPump — one broad `scalar.tap` receiver, FIFO delivery to live Observer-class pids, lag/ineligible/failed accounting, object-keyed quarantine, `flush()` barrier, joined shutdown; the ConsolidationWatchdog; the non-blocking ActivityWriter; telemetry-subscription grant/revoke rows), `main.rs` +159 (Observer arms + `construct_observer`, `LoadedSpiritKind::ALL`/`class_name` table parity, pump construction and joins on six roots, the watchdog, host-bound scalar-port `spirit_id`, parity + identity tests), `admission.rs` +11 (registration after the grant, rollback on start failure), `lib.rs` +2.
+ # 17-4-hooks-observer-and-activity-corpus review, D-17-4-CR-02: Lunarpulse approved exact measured pins 2026-10-20 after `cargo fmt --all` and `kloc-check --json` (tokei 14.0.0), before story closure. 27194 -> 27323 (+129), ZERO HEADROOM. Driver: nonblocking hook sink and bounded output-only shutdown, finite/cancellable flush with shutdown accounting, exact-runtime dispatch views, single-source compiled-in class enumeration, shared serving shutdown ordering and backpressure-safe terminal notices. Kernel unchanged.
+-maos-bin = 34188   # HISTORY: 20-10-purge-residue-removal 20-10 landing 1 review corrections, operator-delegated adjudication: 34037 -> 34188 (+151; ceiling34548); exact after cargo fmt --all / kloc-check --json; dead-owner custody, shared-parent preservation, explicit residue exit/summary, HOME and legacy/protected-path safety. Kernel unchanged26841/21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-10-purge-residue-removal 20-10 landing 1, D-20-10-10 A RULED 2026-11-02: 33498 -> 34037 (+539; ceiling34548); exact after cargo fmt --all / kloc-check --json; home-scoped runtime reclamation, shared bounded client, cgroups and custody. Kernel unchanged 26841/21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33496 -> 33498; P1/F2 signed installed-package boot gate; ceiling34410. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33215 -> 33496; ceiling34410; installed boot admission, typed refusal routing and shared registry construction. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 33195 -> 33215 (+20; ceiling 33315); exact formatted; block_on_anywhere so WorkerBinding::drop never panics in a runtime context (D-20-7-03 A) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 33030 -> 33195 (+165); exact formatted via kloc-check --json after cargo fmt --all, ZERO HEADROOM; one-shot drain holders + typed drain error, endpoint lease/rebind/republish, delegation sender pid, tl_journal strong handle, audit query flags, FR62(b) governance writer | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 33021 -> 33030 (+9); epic envelope33021 -> 33030, exact formatted, ZERO HEADROOM; interrupted identity debris cannot block held attribution. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 32979 -> 33021 (+42); epic envelope33010 -> 33021, exact formatted, ZERO HEADROOM; unreadable-held physical attribution cannot mask unrelated orphan residue. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 32968 -> 32979 (+11); exact formatted, at w8 ceiling, ZERO HEADROOM; stable-owner uninstall discovery and signed unreadable-held gap. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32967 -> 32968 (+1; L1 32937 -> 32968, +31 within+40); exact formatted, ZERO HEADROOM. DRIVER: import MemoryManagerPort for the actual recorded-owner export call; hold/residue witnesses green. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32946 -> 32967 (+21; L1 32937 -> 32967, +30 within+40); exact formatted, ZERO HEADROOM. DRIVER: recorded-owner held-value accounting preserves held terminals without masking orphan residue. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 32937 -> 32946 (+9), exact formatted, ZERO HEADROOM, within grant+16; bind admitted storage identity before start and shell hello. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 32939 -> 32937; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: smoke-discipline-7-1-5 shrunk to its two surviving gates. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 32937 -> 32939 (+2), within w6_kloc envelope33010, ZERO HEADROOM; merged main-side supervision correction. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 32826 -> 32937 (+111), within w6_kloc envelope33010 (32860 -> 33010, operator Raise to measured + ~100), ZERO HEADROOM; founder-loop and upgrade review corrections. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 32711 -> 32826 (+115), within w5_kloc envelope32860, ZERO HEADROOM; review fixes in the founder-loop and governed-upgrade composition. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 31728 -> 32711 (+983), exact formatted via cargo fmt --all / kloc-check --json; operator ask w5_kloc (Raise to measured + ~150) extends envelope32086 -> 32860; founder-loop halt/resume/digest and governed upgrades/admission, ZERO HEADROOM. | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 31573 -> 31728 (+155: log-before-act enqueue, instruction carried across re-dispatch, pause re-check, principal validation, freeze undo deadline, pick 404/409 discrimination, purge protected-path fallback, section-1 escalation reason), inside envelope 32086 (ask w4_kloc), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition review corrections 2026-10-28, exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30847 -> 31573 (+726, combined 19-2 dev + 19-3/19-6 review), inside the Epic-19 envelope 31710 (ask w3_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30380 -> 30847 (+467, combined 19-3 + 19-6), inside the Epic-19 envelope 31353 (E19 kloc ruling 2026-10-28, ask w2_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-7-repin-consent-operator-surface 2026-10-28 re-review correction (ReReview19x7 P3-1/P3-2) exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 30366 -> 30380 (+14: sender re-pin hold capped at REPIN_REQUEST_TTL with 1 s..16 s backoff), inside the Epic-19 envelope 31166 (E19 kloc ruling 2026-10-28), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the Epic-19 envelope (D19-1 A + D-19-7-11 A + E19 kloc ruling 2026-10-28: 31166): 30286 -> 30366 (+80: 19-1 refuse-early/dispatch-stop/receipt guard +56 net after dedup, 19-7 sender hold through TLS refusal +22, +2 other), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 29497 -> 30286 (+789), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review rulings R1-R5, exact formatted 29443 -> 29497 (+54), within operator grant<=29500, ZERO HEADROOM; optional boot queue, preflight authorization/revision-only evidence summary (drafts skip report work), shared always-compiled lock, air-gap pump availability and bounded Researcher handle release. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): D-15 resumed operator grant<=29500; exact formatted29113 -> 29443 (+330), ZERO HEADROOM. Per-file tokei: skill_authoring+249, operator_door+80, spirit_session+8, researcher_root+7, lib+2, admission+1, main-17; evidence/bin-attribution.log. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted28914 -> 29113, ZERO HEADROOM. Driver: weak governed recall; root validation, quarantine-independent purge, orphan recovery, late sweep/purge, typed errors/late outcomes. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum ratifies<=28940 after STOP; exact formatted28658 -> 28914 (+256), Epic18 named budget28770 -> 28914, ZERO HEADROOM. Driver: hook_pump +157, main +49, operator_door +25, researcher_root +25; root nonce/pid dispatch, all four callers/bindings, weak result sink/lazy operation-scoped MCP adapters. STOP candidate28916 reduced2 by canonical-id decoder reuse. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26; exact28655 -> 28658 (+3), within<=28700. Driver: weak reusable context factory and session constructor migration; ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review rulings R1/R3, operator 2026-10-26; exact formatted LOWER re-pin28680 -> 28655 (-25), within<=28700. Driver: shared MCP refusal writer moved to maos-iac, context adapter constructor and actual WASM session teardown, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, D-09 A operator addendum2026-10-26 pre-ratified <=28700, exact formatted28588 -> 28680 (+92), ZERO HEADROOM. Driver: manifest-window/pid-bound context factories on boot/door/successor and WASM sessions, mediated context.report exchange, typed governed/MCP/session/CLI-wrapper refusal mapping. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (review patch pass, operator rulings D-18-4-R1…R5 2026-10-26; within the pre-ratified kloc C ≤ 28600; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; kernel 20617 / 26387 unchanged): 28558 -> 28588 (+30), ZERO HEADROOM. DRIVER: `butler_root.rs` `acceptance_binder` — the ROOT fixes the pid of each Butler's principal port and TL attestation (review TIA-1/BH-2; the factory moved out of `main.rs`) and `scene_hold` (harness-only `MAOS_SCENE_HOLD_FILE`, ruling D-18-4-R3); `main.rs` scene loop resolves the Butler loaded now per day and renders the scene digest by boot (R3, R5), `MAOS_UTC_OFFSET` validated on every boot (EC-7), the seam cleared before the audit drain; `escape_detector_consumer.rs` `tl_journal` (the production journal moved out of `main.rs`, TIA-2); `env_contract.rs` +1 row. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV exact measured re-pin 2026-10-25 (operator ruling 2026-10-25 kloc C, ≤ 28600): 28301 -> 28558 (+257), ZERO HEADROOM — `--clock`/`--acceptance` parse + refusals, scene loop, seam fill, pid-fused principal port, escape-tail journal, `MAOS_UTC_OFFSET` row. | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` CODE-REVIEW 28328 -> 28301 (−27); 18-3 DEV 28094 -> 28328; 18-2 CODE-REVIEW 28087 -> 28094; 18-2 DEV 28005 -> 28087; 18-8 CODE-REVIEW 28024 -> 28005; 18-8 DEV 27969 -> 28024; 18-1 CODE-REVIEW 27927 -> 27969; 18-1 DEV 27809 -> 27927 (each row's full note: `git log -p xtask/kloc.toml`).
++maos-bin = 34191   # HISTORY: 20-10-purge-residue-removal 20-10 landing 1 hosted incident 41584453971, 2026-11-03: 34188 -> 34191 (+3; ceiling34548); exact after cargo fmt --all / kloc-check --json; restrict creator-PID naming to volatile custody, keep durable AF_UNIX egress roots compact. Kernel unchanged26841/21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-10-purge-residue-removal 20-10 landing 1 review corrections, operator-delegated adjudication: 34037 -> 34188 (+151; ceiling34548); exact after cargo fmt --all / kloc-check --json; dead-owner custody, shared-parent preservation, explicit residue exit/summary, HOME and legacy/protected-path safety. Kernel unchanged26841/21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-10-purge-residue-removal 20-10 landing 1, D-20-10-10 A RULED 2026-11-02: 33498 -> 34037 (+539; ceiling34548); exact after cargo fmt --all / kloc-check --json; home-scoped runtime reclamation, shared bounded client, cgroups and custody. Kernel unchanged 26841/21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33496 -> 33498; P1/F2 signed installed-package boot gate; ceiling34410. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 33215 -> 33496; ceiling34410; installed boot admission, typed refusal routing and shared registry construction. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 33195 -> 33215 (+20; ceiling 33315); exact formatted; block_on_anywhere so WorkerBinding::drop never panics in a runtime context (D-20-7-03 A) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 33030 -> 33195 (+165); exact formatted via kloc-check --json after cargo fmt --all, ZERO HEADROOM; one-shot drain holders + typed drain error, endpoint lease/rebind/republish, delegation sender pid, tl_journal strong handle, audit query flags, FR62(b) governance writer | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 33021 -> 33030 (+9); epic envelope33021 -> 33030, exact formatted, ZERO HEADROOM; interrupted identity debris cannot block held attribution. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 32979 -> 33021 (+42); epic envelope33010 -> 33021, exact formatted, ZERO HEADROOM; unreadable-held physical attribution cannot mask unrelated orphan residue. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 32968 -> 32979 (+11); exact formatted, at w8 ceiling, ZERO HEADROOM; stable-owner uninstall discovery and signed unreadable-held gap. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32967 -> 32968 (+1; L1 32937 -> 32968, +31 within+40); exact formatted, ZERO HEADROOM. DRIVER: import MemoryManagerPort for the actual recorded-owner export call; hold/residue witnesses green. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 32946 -> 32967 (+21; L1 32937 -> 32967, +30 within+40); exact formatted, ZERO HEADROOM. DRIVER: recorded-owner held-value accounting preserves held terminals without masking orphan residue. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 32937 -> 32946 (+9), exact formatted, ZERO HEADROOM, within grant+16; bind admitted storage identity before start and shell hello. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 32939 -> 32937; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: smoke-discipline-7-1-5 shrunk to its two surviving gates. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 32937 -> 32939 (+2), within w6_kloc envelope33010, ZERO HEADROOM; merged main-side supervision correction. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 32826 -> 32937 (+111), within w6_kloc envelope33010 (32860 -> 33010, operator Raise to measured + ~100), ZERO HEADROOM; founder-loop and upgrade review corrections. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 32711 -> 32826 (+115), within w5_kloc envelope32860, ZERO HEADROOM; review fixes in the founder-loop and governed-upgrade composition. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 31728 -> 32711 (+983), exact formatted via cargo fmt --all / kloc-check --json; operator ask w5_kloc (Raise to measured + ~150) extends envelope32086 -> 32860; founder-loop halt/resume/digest and governed upgrades/admission, ZERO HEADROOM. | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 31573 -> 31728 (+155: log-before-act enqueue, instruction carried across re-dispatch, pause re-check, principal validation, freeze undo deadline, pick 404/409 discrimination, purge protected-path fallback, section-1 escalation reason), inside envelope 32086 (ask w4_kloc), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition review corrections 2026-10-28, exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30847 -> 31573 (+726, combined 19-2 dev + 19-3/19-6 review), inside the Epic-19 envelope 31710 (ask w3_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories not done: 30380 -> 30847 (+467, combined 19-3 + 19-6), inside the Epic-19 envelope 31353 (E19 kloc ruling 2026-10-28, ask w2_kloc), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 19-7-repin-consent-operator-surface 2026-10-28 re-review correction (ReReview19x7 P3-1/P3-2) exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 30366 -> 30380 (+14: sender re-pin hold capped at REPIN_REQUEST_TTL with 1 s..16 s backoff), inside the Epic-19 envelope 31166 (E19 kloc ruling 2026-10-28), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the Epic-19 envelope (D19-1 A + D-19-7-11 A + E19 kloc ruling 2026-10-28: 31166): 30286 -> 30366 (+80: 19-1 refuse-early/dispatch-stop/receipt guard +56 net after dedup, 19-7 sender hold through TLS refusal +22, +2 other), ZERO HEADROOM; final re-pin after hosted proof. | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 29497 -> 30286 (+789), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review rulings R1-R5, exact formatted 29443 -> 29497 (+54), within operator grant<=29500, ZERO HEADROOM; optional boot queue, preflight authorization/revision-only evidence summary (drafts skip report work), shared always-compiled lock, air-gap pump availability and bounded Researcher handle release. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): D-15 resumed operator grant<=29500; exact formatted29113 -> 29443 (+330), ZERO HEADROOM. Per-file tokei: skill_authoring+249, operator_door+80, spirit_session+8, researcher_root+7, lib+2, admission+1, main-17; evidence/bin-attribution.log. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted28914 -> 29113, ZERO HEADROOM. Driver: weak governed recall; root validation, quarantine-independent purge, orphan recovery, late sweep/purge, typed errors/late outcomes. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum ratifies<=28940 after STOP; exact formatted28658 -> 28914 (+256), Epic18 named budget28770 -> 28914, ZERO HEADROOM. Driver: hook_pump +157, main +49, operator_door +25, researcher_root +25; root nonce/pid dispatch, all four callers/bindings, weak result sink/lazy operation-scoped MCP adapters. STOP candidate28916 reduced2 by canonical-id decoder reuse. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26; exact28655 -> 28658 (+3), within<=28700. Driver: weak reusable context factory and session constructor migration; ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review rulings R1/R3, operator 2026-10-26; exact formatted LOWER re-pin28680 -> 28655 (-25), within<=28700. Driver: shared MCP refusal writer moved to maos-iac, context adapter constructor and actual WASM session teardown, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, D-09 A operator addendum2026-10-26 pre-ratified <=28700, exact formatted28588 -> 28680 (+92), ZERO HEADROOM. Driver: manifest-window/pid-bound context factories on boot/door/successor and WASM sessions, mediated context.report exchange, typed governed/MCP/session/CLI-wrapper refusal mapping. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (review patch pass, operator rulings D-18-4-R1…R5 2026-10-26; within the pre-ratified kloc C ≤ 28600; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; kernel 20617 / 26387 unchanged): 28558 -> 28588 (+30), ZERO HEADROOM. DRIVER: `butler_root.rs` `acceptance_binder` — the ROOT fixes the pid of each Butler's principal port and TL attestation (review TIA-1/BH-2; the factory moved out of `main.rs`) and `scene_hold` (harness-only `MAOS_SCENE_HOLD_FILE`, ruling D-18-4-R3); `main.rs` scene loop resolves the Butler loaded now per day and renders the scene digest by boot (R3, R5), `MAOS_UTC_OFFSET` validated on every boot (EC-7), the seam cleared before the audit drain; `escape_detector_consumer.rs` `tl_journal` (the production journal moved out of `main.rs`, TIA-2); `env_contract.rs` +1 row. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV exact measured re-pin 2026-10-25 (operator ruling 2026-10-25 kloc C, ≤ 28600): 28301 -> 28558 (+257), ZERO HEADROOM — `--clock`/`--acceptance` parse + refusals, scene loop, seam fill, pid-fused principal port, escape-tail journal, `MAOS_UTC_OFFSET` row. | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` CODE-REVIEW 28328 -> 28301 (−27); 18-3 DEV 28094 -> 28328; 18-2 CODE-REVIEW 28087 -> 28094; 18-2 DEV 28005 -> 28087; 18-8 CODE-REVIEW 28024 -> 28005; 18-8 DEV 27969 -> 28024; 18-1 CODE-REVIEW 27927 -> 27969; 18-1 DEV 27809 -> 27927 (each row's full note: `git log -p xtask/kloc.toml`).
+ # ⚠ 15-2 EPIC-15 MEASURED RE-BASE 2026-09-06 (operator-authorized; measured at 03ee0ad8 with tokei 14.0.0, the CI pin): 1631 -> 1791 (+160). Grant = 260 over measured 1531. Σupper = 200.
+ # Ledger: 19-3 real-spawn bench +80–200 — CONSUMED by 18-2 (review ruling D-18-2-R1 = K1 A, 2026-10-25: maos-bench 2018 ratified); 19-3 makes its own measured request at creation. | prior: history remains on the assignment below.
+ maos-bench = 2737   # HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 2451 -> 2737 (+286; ceiling 3051); exact formatted; budgets.rs reader of xtask/perf-budgets.toml, tier_c_harness (counting allocator); benches uncharged | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 2359 -> 2451 (+92), ZERO HEADROOM; final re-pin after review. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV exact measured re-pin 2026-10-25 (after `cargo fmt --all`, `kloc-check --json`): 2354 -> 2359 (+5), ZERO HEADROOM. DRIVER: the BH-3 witness (`deferred-work.md:1253`, operator ruling 2026-10-25): `distill_eval` counts the distinct judge tokens against the judge calls and reports `judge_calls` / `judge_tokens_minted`. | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` CODE-REVIEW exact measured re-pin 2026-10-25 (review patch pass, operator rulings D-18-3-R3/R4 2026-10-25; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): 2325 -> 2354 (+29), within the ratified +40 patch allowance, ZERO HEADROOM. DRIVER: `distill_eval.rs` — committed-cassette pass for the completion-planted controls, live pass + per-call judge mint, flush-then-parse, recorded-judge replay, sidecar (R4, BH-3, BH-4). | PRIOR: ◆ Story `18-3-researcher-replay-live-and-judged-five-metric` DEV exact measured re-pin 2026-10-25 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; kernel unchanged at 20608 / 26377): 2032 -> 2325 (+293), RATIFIED by the operator (Lunarpulse) 2026-10-25 as the D-18-3-11 addendum measured request (above the 2232 stop line), ZERO HEADROOM. DRIVER: `distill_eval.rs` — the `maos eval distill --class researcher` replay/record composition (per-row kernel world, journaled claims, bound Researcher, I11 distillate writer, cite recall, redaction, frozen/live judge) + `halt_eval.rs` Researcher reason string (D-18-3-09). | PRIOR: ◆ Story `18-2-eval-halt-verb-and-corpus-numbers` CODE-REVIEW exact measured re-pin 2026-10-25 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; story `18-2-eval-halt-verb-and-corpus-numbers` review patch pass, sprint key review; kernel unchanged at 20608 / 26377): 2018 -> 2032 (+14 over the operator-ratified 2018, review ruling D-18-2-R1 = K1 A; within the +30 patch allowance), ZERO HEADROOM. DRIVER: `halt_eval.rs` — `calendar_conflict_basis` in the class table (AA-1), `parse_args` honours `MAOS_REPLAY_CASSETTE` in replay (BH-5), `EvalRequest::publishes_sidecar` (D-18-2-R2). R1 consumed the 15-2 ledger reservation '19-3 real-spawn bench +80–200' (line above): `19-3` makes its own measured request at creation. | PRIOR: ⚠ Story `18-2-eval-halt-verb-and-corpus-numbers` EXACT MEASURED REQUEST 2026-10-25 (D-18-2-01 B composition; D-18-2-07 measured-at-landing contract — the creation forecast +134 fit the 1791 ceiling, the landed composition does not, so this is returned to the operator for ratification at review; measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0; story `18-2-eval-halt-verb-and-corpus-numbers` dev pass, sprint key review; kernel unchanged at 20608 / 26377): 1791 -> 2018 (measured 1512 -> 2018, +506), ZERO HEADROOM. DRIVER: new `src/halt_eval.rs` — the class table (CR-5: butler model-driven, researcher not), the per-row fresh kernel world with Butler bound to a counting inference port through the kernel `InferencePortAdapter` (departure 1), the Researcher `survey` -> `primary_scalar` path, replay/record completions (departure 2), args parsing, the sidecar body and signing; `src/lib.rs` +doc. | PRIOR: 2026-07-25 founder policy re-base (Winston 2%): 1550->1631 (measured 1531, reserve 100) | prior: Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
+@@ -715,7 +715,7 @@ _aggregate_alarm = 158608   # ⚠ 15-2 EPIC-15 RE-BASE 2026-09-06: pre-grant for
+ # ◆ 17-4 FLAG-Winston landing, Lunarpulse-approved measured request 2026-10-20 (measured + 1; the story is not yet done), exact after `cargo fmt --all` via `kloc-check --json` (tokei 14.0.0): measured aggregate 178496 (+887 = maos-bin +854, maos-domain +15, kernel +11 ratified D-17-4-PF-R1, maos-capability +4, maos-manifest +3); strict hardfail 177610 -> 178497. ZERO HEADROOM.
+ # 17-4-hooks-observer-and-activity-corpus review, D-17-4-CR-02: Lunarpulse approved 2026-10-20 after formatting/measurement, before story closure. Aggregate measured 178625 (+129, all maos-bin); strict hardfail 178497 -> 178626 (measured +1). Kernel unchanged; ZERO HEADROOM.
+ # ◆ Story 20-12-test-cost-budget-and-review-execution-contract re-pin 2026-10-23 (strict measured + 1 per the story's kloc_grant; the story is not yet done; after `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): 179800 -> 180813, measured 180812. Delta +1012 = xtask +1013 (two gates + budget loader + fixture builder + escape-detector split; row at the `xtask` key), rounding −1 vs the 179799 measured at 17-9; kernel 0 (`check-kernel-baseline` 26361 / 95); ZERO HEADROOM.
+-_aggregate_hardfail = 192517   # HISTORY: 20-10-purge-residue-removal 20-10 landing 1 review corrections: 192366 -> 192517; measured192516 + 1, ceiling192876; exact after cargo fmt --all / kloc-check --json, maos-bin+151 only; kernel unchanged. ZERO HEADROOM. | PRIOR: HISTORY: 20-10-purge-residue-removal 20-10 landing 1, D-20-10-10 A RULED 2026-11-02: 191827 -> 192366; measured192365 + 1, ceiling192876; exact after cargo fmt --all / kloc-check --json, maos-bin+539 only. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path hosted incident 41424027458, operator rows201; exact after cargo fmt --all / kloc-check --json: 191811 -> 191827; measured191826 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 191381 -> 191811; measured191810 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 190591 -> 191381; measured191380 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-7 landing 1 review corrections; D11 exact measured aggregate 190590 + 1 (was 190204), within 192568. xtask +387; kernel/bench/bin unchanged. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 188817 -> 190204 (measured 190203 + 1; ceiling 192568); exact formatted; kernel +31, xtask +1050, maos-bin +20, maos-bench +286 | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals 20-3c landing 2 clippy fixes, hosted discipline run 41281999213 clippy-advisory (ceiling 189478): 188805 -> 188817; exact formatted aggregate 188816 + 1, ZERO HEADROOM; domain+12 (EndpointLease rustix flock) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 2 (20-3c landing 2), operator grants rows203c/grant203c 2026-11-01: 188785 -> 188805; exact formatted aggregate 188804 + 1, ZERO HEADROOM; kernel+19, capability+1 (ceiling 189478) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 188452 -> 188785; exact formatted aggregate 188784 + 1, ZERO HEADROOM; bin+165, domain+104, audit+14, shell+6, xtask+19 (kernel, capability, cli pin untouched) | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 188240 -> 188452; exact formatted aggregate188451 + 1, ZERO HEADROOM; kernel+103, bin+9, audit+39, xtask+61. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 188120 -> 188240; exact formatted aggregate188239 + 1, ZERO HEADROOM; kernel+55, bin+42, xtask+23, audit0. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 187906 -> 188120; exact formatted aggregate188119 + 1, ZERO HEADROOM; kernel+86, xtask+109, audit+8, bin+11. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187905 -> 187906; exact formatted aggregate187905 + 1, ZERO HEADROOM. DRIVER: bin+1 trait scope, all other crates unchanged. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187884 -> 187905; exact formatted aggregate187904 + 1, ZERO HEADROOM. DRIVER: bin+21, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 187500 -> 187884, exact formatted aggregate187883 + 1, ZERO HEADROOM. DRIVER: xtask+243, kernel+130 under d03 A, domain+2, bin+9, audit0. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing-1 DIFFICULT-review correction, RULED 2026-10-30: 187495 -> 187500; exact formatted aggregate187499 + 1, ZERO HEADROOM. DRIVER: xtask+5, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 192779 -> 187495; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: measured aggregate187494 + 1; xtask-5282, maos-bin-2, kernel0. | PRIOR: HISTORY: 19-5 cold_swap WRITER_SHAPES row (FR4 census), w7_audit, 2026-10-29: 192764 -> 192779 (measured192778 + 1; +15 entirely maos-audit), exact formatted after cargo fmt --all via kloc-check --json; within aggregate envelope~192935, ZERO HEADROOM. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 192762 -> 192764 (measured192763 + 1; +2 entirely maos-bin), within w6_kloc envelope~192935, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): aggregate +2 from maos-bin 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 192651 -> 192762 (measured192761 + 1; +111 entirely maos-bin), within w6_kloc envelope~192935 (~192685 -> ~192935, operator Raise to measured + ~100), ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 192536 -> 192651 (measured192650 + 1; +115 entirely maos-bin), within w5_kloc envelope~192685, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 191406 -> 192536 (measured192535 + 1; delta1130 = bin983 + xtask208 + control2 - CLI7 - kernel56); exact formatted via cargo fmt --all / kloc-check --json, ZERO HEADROOM; operator ask w5_kloc extends aggregate envelope~192045 -> ~192685 (Raise to measured + ~150). | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 191247 -> 191406 (measured 191405 + 1 = maos-bin +155, maos-control +3, xtask +1), endpoint 191669+376 (w4_kloc), ZERO HEADROOM. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3/19-6 review corrections 2026-10-28 exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 190357 -> 191247 (+890) (measured 191246 = maos-bin +726, maos-cli +61, maos-control +49, kernel +46 under the FR51 FLAG-Winston grant D-19-2-20 B, xtask +19, maos-shell -11), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191669 (ask w3_kloc); final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189878 -> 190357 (+479) (measured 190356 = maos-bin +467, kernel +9 under the D19-2 A FLAG-Winston grant, xtask +3), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191248 (E19 kloc ruling 2026-10-28, ask w2_kloc); final re-pin after review. | PRIOR: HISTORY: 19-1/19-7 2026-10-28 re-review correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189864 -> 189878 (+14) (measured 189877 = maos-bin +14), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189767 -> 189864 (+97) (measured 189863 = maos-bin +80, maos-a2a-core +17), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 188505 -> 189767 (+1262) (measured 189766), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 20-16-prepush-drift-gate second post-review correction, 2026-10-27 after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188503 -> 188504 (+1 = xtask prepush1013 -> 1014; 20-16 now exactly STOP+1020); strict hardfail188504 -> 188505 = measured+1, ZERO HEADROOM. Kernel 26378/20619 unchanged (comment-only hash re-pin); reserved ceilings unchanged. | PRIOR: HISTORY: 20-15-ci-build-once-nextest-archive conmon_oom_cwd FLAG-Winston, operator2026-10-27, after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188494 -> 188503 (+9 = kernel +9, security/sandbox/t3/spawn.rs only); strict hardfail188495 -> 188504 = measured+1, ZERO HEADROOM. xtask (+38/+1019 components), reserved ceilings and every other row unchanged. | PRIOR: HISTORY: 20-16-prepush-drift-gate and 20-15-ci-build-once-nextest-archive, 2026-10-27 post-review exact candidate measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 187437 -> 188494 (+1057, xtask only); strict hardfail187438 -> 188495 = measured+1, ZERO HEADROOM. Components +38 and +1019 remain within ruled STOP+38 and STOP+1020; previous candidate188490/188491 and the +37/+1020 split preceded review corrections. No kernel or reserved-ceiling change, no final review/hosted completion claim. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review exact measured aggregate 187284 -> 187437 (+153 = bin54 + skill96 + CLI1 + FKCS2); strict hardfail187285 -> 187438 = measured+1, ZERO HEADROOM; all zero-headroom and reserved-ceiling rows unchanged. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): exact formatted measured186483 -> 187284 (+801); hardfail186484 -> 187285 = measured+1, ZERO HEADROOM. Drivers: bin+330, skill+338, manifest+21, audit+10, CLI+50, control+58, kernel+4, FKCS-11, xtask+1; reserved ceilings retained. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted186041 -> 186484, ZERO HEADROOM. Driver: measured aggregate186483 +1; kernel-44,IAC+190,domain+88,audit+10,bin+199. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum and ruled measured+1; exact formatted aggregate185459 -> 186040 (+581), strict hardfail185460 -> 186041, ZERO HEADROOM. Delta: kernel+7,IAC+96,domain+39,audit+152,bin+256,journey+31. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26 ratification; measured185451 -> 185459 (+8 = IAC5 + bin3), strict hardfail185452 -> 185460 = measured+1; kernel unchanged, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review operator addenda2026-10-26; exact formatted aggregate185372 -> 185451 (+79), hardfail185373 -> 185452 = measured+1. Driver: kernel+4,IAC+91,manifest+9,bin-25; no other production crate delta, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, operator D-09 A and final host/audit addenda2026-10-26; exact formatted measured aggregate184738 -> 185372 (+634), strict hardfail184739 -> 185373 = measured+1, ZERO HEADROOM. Drivers: kernel+22, capability+85, IAC+119, domain+43, manifest+34, audit+63, bin+92, wasm-host+157, spirit-abi+4, spirit-sdk+15; spirits/* uncharged. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): aggregate = measured + 1: 184707 -> 184739, measured 184738 — maos-bin +30 (28558 -> 28588, kloc C ≤ 28600), maos-spirit-sdk +2 (1068 -> 1070, ceiling 3000), `spirits/*` uncharged; kernel 0. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV 184223 -> 184707 (measured 184706); ◆ 18-3 CODE-REVIEW 184003 -> 184223; 18-3 DEV 183248 -> 184003; 18-2 CODE-REVIEW 183181 -> 183248; 18-2 DEV 182292 -> 183181; 18-8 CODE-REVIEW 182221 -> 182292; 18-8 DEV 181727 -> 182221; 18-1 CODE-REVIEW 181685 -> 181727 (full notes: `git log -p xtask/kloc.toml`).
++_aggregate_hardfail = 192520   # HISTORY: 20-10-purge-residue-removal 20-10 landing 1 hosted incident 41584453971: 192517 -> 192520; measured192519 + 1, ceiling192876; exact after cargo fmt --all / kloc-check --json, maos-bin+3 only, xtask44406 unchanged. ZERO HEADROOM. | PRIOR: HISTORY: 20-10-purge-residue-removal 20-10 landing 1 review corrections: 192366 -> 192517; measured192516 + 1, ceiling192876; exact after cargo fmt --all / kloc-check --json, maos-bin+151 only; kernel unchanged. ZERO HEADROOM. | PRIOR: HISTORY: 20-10-purge-residue-removal 20-10 landing 1, D-20-10-10 A RULED 2026-11-02: 191827 -> 192366; measured192365 + 1, ceiling192876; exact after cargo fmt --all / kloc-check --json, maos-bin+539 only. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path hosted incident 41424027458, operator rows201; exact after cargo fmt --all / kloc-check --json: 191811 -> 191827; measured191826 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1 review corrections, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 191381 -> 191811; measured191810 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-1a-registry-publish-install-exit-path 20-1a landing 1, operator rows201 2026-11-01/02; exact after cargo fmt --all / kloc-check --json: 190591 -> 191381; measured191380 + 1; ceiling193768; kernel unchanged21042. ZERO HEADROOM. | PRIOR: HISTORY: 20-7 landing 1 review corrections; D11 exact measured aggregate 190590 + 1 (was 190204), within 192568. xtask +387; kernel/bench/bin unchanged. ZERO HEADROOM. | PRIOR: HISTORY: 20-7-stable-runner-perf-gates 20-7 landing 1 (machine-free landing), operator rulings rows207 2026-11-01/02: 188817 -> 190204 (measured 190203 + 1; ceiling 192568); exact formatted; kernel +31, xtask +1050, maos-bin +20, maos-bench +286 | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals 20-3c landing 2 clippy fixes, hosted discipline run 41281999213 clippy-advisory (ceiling 189478): 188805 -> 188817; exact formatted aggregate 188816 + 1, ZERO HEADROOM; domain+12 (EndpointLease rustix flock) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 2 (20-3c landing 2), operator grants rows203c/grant203c 2026-11-01: 188785 -> 188805; exact formatted aggregate 188804 + 1, ZERO HEADROOM; kernel+19, capability+1 (ceiling 189478) | PRIOR: HISTORY: 20-3c-audit-truth-and-halt-receipt-residuals landing 1 (20-3c landing 1), operator grants rows203c/grant203c 2026-11-01: 188452 -> 188785; exact formatted aggregate 188784 + 1, ZERO HEADROOM; bin+165, domain+104, audit+14, shell+6, xtask+19 (kernel, capability, cli pin untouched) | PRIOR: HISTORY: 20-3b landing 2 round-3 corrections, operator ruling w10, 2026-10-31: 188240 -> 188452; exact formatted aggregate188451 + 1, ZERO HEADROOM; kernel+103, bin+9, audit+39, xtask+61. | PRIOR: HISTORY: 20-3b landing 2 round-2 corrections, operator ruling w9, 2026-10-31: 188120 -> 188240; exact formatted aggregate188239 + 1, ZERO HEADROOM; kernel+55, bin+42, xtask+23, audit0. | PRIOR: HISTORY: 20-3b landing 2 review corrections, operator ruling w8, 2026-10-31: 187906 -> 188120; exact formatted aggregate188119 + 1, ZERO HEADROOM; kernel+86, xtask+109, audit+8, bin+11. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187905 -> 187906; exact formatted aggregate187905 + 1, ZERO HEADROOM. DRIVER: bin+1 trait scope, all other crates unchanged. | PRIOR: HISTORY: 20-3b landing 2 held-durable-value correction, operator ruling bin40, 2026-10-30: 187884 -> 187905; exact formatted aggregate187904 + 1, ZERO HEADROOM. DRIVER: bin+21, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 2, RULED 2026-10-30: 187500 -> 187884, exact formatted aggregate187883 + 1, ZERO HEADROOM. DRIVER: xtask+243, kernel+130 under d03 A, domain+2, bin+9, audit0. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing-1 DIFFICULT-review correction, RULED 2026-10-30: 187495 -> 187500; exact formatted aggregate187499 + 1, ZERO HEADROOM. DRIVER: xtask+5, all other crates unchanged. | PRIOR: HISTORY: 20-3b-gate-retirement-and-coverage-generator landing 1, RULED 2026-10-30: 192779 -> 187495; exact after cargo fmt --all / kloc-check --json (tokei14.0.0), ZERO HEADROOM. DRIVER: measured aggregate187494 + 1; xtask-5282, maos-bin-2, kernel0. | PRIOR: HISTORY: 19-5 cold_swap WRITER_SHAPES row (FR4 census), w7_audit, 2026-10-29: 192764 -> 192779 (measured192778 + 1; +15 entirely maos-audit), exact formatted after cargo fmt --all via kloc-check --json; within aggregate envelope~192935, ZERO HEADROOM. | PRIOR: HISTORY: 19-4/19-5 merge with wave-2 hosted-run corrections, 2026-10-29: 192762 -> 192764 (measured192763 + 1; +2 entirely maos-bin), within w6_kloc envelope~192935, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-2/19-3/19-6 hosted-run corrections (main side): aggregate +2 from maos-bin 31728 -> 31730 (+2), carried into wave-3 by the merge. | PRIOR: HISTORY: 19-4/19-5 review corrections rounds 4-5 (w6_kloc), 2026-10-29: 192651 -> 192762 (measured192761 + 1; +111 entirely maos-bin), within w6_kloc envelope~192935 (~192685 -> ~192935, operator Raise to measured + ~100), ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 review corrections round 3, 2026-10-29: 192536 -> 192651 (measured192650 + 1; +115 entirely maos-bin), within w5_kloc envelope~192685, ZERO HEADROOM. Measured after cargo fmt --all via kloc-check --json. | PRIOR: HISTORY: 19-4/19-5 implementation (w3_kloc/w4_kloc envelope), 2026-10-29: 191406 -> 192536 (measured192535 + 1; delta1130 = bin983 + xtask208 + control2 - CLI7 - kernel56); exact formatted via cargo fmt --all / kloc-check --json, ZERO HEADROOM; operator ask w5_kloc extends aggregate envelope~192045 -> ~192685 (Raise to measured + ~150). | PRIOR: HISTORY: 19-2/19-3/19-6 review correction round 2, 2026-10-29: 191247 -> 191406 (measured 191405 + 1 = maos-bin +155, maos-control +3, xtask +1), endpoint 191669+376 (w4_kloc), ZERO HEADROOM. | PRIOR: HISTORY: 19-2-fr20-enqueue-door-and-safe-point dev pass plus 19-3/19-6 review corrections 2026-10-28 exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 190357 -> 191247 (+890) (measured 191246 = maos-bin +726, maos-cli +61, maos-control +49, kernel +46 under the FR51 FLAG-Winston grant D-19-2-20 B, xtask +19, maos-shell -11), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191669 (ask w3_kloc); final re-pin after review. | PRIOR: HISTORY: 19-3-real-worker-default-with-effect-oracle and 19-6-crash-originator-delivery-and-disposition 2026-10-28 dev-pass exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189878 -> 190357 (+479) (measured 190356 = maos-bin +467, kernel +9 under the D19-2 A FLAG-Winston grant, xtask +3), strict hardfail = measured+1, ZERO HEADROOM; endpoint 191248 (E19 kloc ruling 2026-10-28, ask w2_kloc); final re-pin after review. | PRIOR: HISTORY: 19-1/19-7 2026-10-28 re-review correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189864 -> 189878 (+14) (measured 189877 = maos-bin +14), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 review-correction exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): 189767 -> 189864 (+97) (measured 189863 = maos-bin +80, maos-a2a-core +17), ZERO HEADROOM; endpoint 191061 (E19 kloc ruling 2026-10-28). | PRIOR: HISTORY: 19-1-orchestrator-dispatch-loop-and-epic-input and 19-7-repin-consent-operator-surface 2026-10-28 candidate exact measurement after cargo fmt --all / kloc-check --json (tokei14.0.0), stories in-progress inside the ratified Epic-19 envelope (D19-1 A + D-19-7-11 A): 188505 -> 189767 (+1262) (measured 189766), ZERO HEADROOM; final re-pin after review. | PRIOR: HISTORY: 20-16-prepush-drift-gate second post-review correction, 2026-10-27 after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188503 -> 188504 (+1 = xtask prepush1013 -> 1014; 20-16 now exactly STOP+1020); strict hardfail188504 -> 188505 = measured+1, ZERO HEADROOM. Kernel 26378/20619 unchanged (comment-only hash re-pin); reserved ceilings unchanged. | PRIOR: HISTORY: 20-15-ci-build-once-nextest-archive conmon_oom_cwd FLAG-Winston, operator2026-10-27, after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 188494 -> 188503 (+9 = kernel +9, security/sandbox/t3/spawn.rs only); strict hardfail188495 -> 188504 = measured+1, ZERO HEADROOM. xtask (+38/+1019 components), reserved ceilings and every other row unchanged. | PRIOR: HISTORY: 20-16-prepush-drift-gate and 20-15-ci-build-once-nextest-archive, 2026-10-27 post-review exact candidate measurement after cargo fmt --all / kloc-check --json (tokei14.0.0): measured 187437 -> 188494 (+1057, xtask only); strict hardfail187438 -> 188495 = measured+1, ZERO HEADROOM. Components +38 and +1019 remain within ruled STOP+38 and STOP+1020; previous candidate188490/188491 and the +37/+1020 split preceded review corrections. No kernel or reserved-ceiling change, no final review/hosted completion claim. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): review exact measured aggregate 187284 -> 187437 (+153 = bin54 + skill96 + CLI1 + FKCS2); strict hardfail187285 -> 187438 = measured+1, ZERO HEADROOM; all zero-headroom and reserved-ceiling rows unchanged. | PRIOR: HISTORY: 18-7-live-skill-authoring-and-revisions, 2026-10-26 after cargo fmt --all / kloc-check --json (tokei14.0.0): exact formatted measured186483 -> 187284 (+801); hardfail186484 -> 187285 = measured+1, ZERO HEADROOM. Drivers: bin+330, skill+338, manifest+21, audit+10, CLI+50, control+58, kernel+4, FKCS-11, xtask+1; reserved ceilings retained. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure review, operator2026-10-26 ruling bin<=29110/domain<=10000/IAC<=8270; integrator correctness addendum bin29113 (+3). Exact formatted186041 -> 186484, ZERO HEADROOM. Driver: measured aggregate186483 +1; kernel-44,IAC+190,domain+88,audit+10,bin+199. | PRIOR: HISTORY: 18-6-fr45-forget-redistillation-and-cascade-closure, operator2026-10-26 measured A addendum and ruled measured+1; exact formatted aggregate185459 -> 186040 (+581), strict hardfail185460 -> 186041, ZERO HEADROOM. Delta: kernel+7,IAC+96,domain+39,audit+152,bin+256,journey+31. | PRIOR: HISTORY: 18-5-context-token-budget-accounting landing fix, run40267102242, operator2026-10-26 ratification; measured185451 -> 185459 (+8 = IAC5 + bin3), strict hardfail185452 -> 185460 = measured+1; kernel unchanged, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, review operator addenda2026-10-26; exact formatted aggregate185372 -> 185451 (+79), hardfail185373 -> 185452 = measured+1. Driver: kernel+4,IAC+91,manifest+9,bin-25; no other production crate delta, ZERO HEADROOM. | PRIOR: HISTORY: 18-5-context-token-budget-accounting, operator D-09 A and final host/audit addenda2026-10-26; exact formatted measured aggregate184738 -> 185372 (+634), strict hardfail184739 -> 185373 = measured+1, ZERO HEADROOM. Drivers: kernel+22, capability+85, IAC+119, domain+43, manifest+34, audit+63, bin+92, wasm-host+157, spirit-abi+4, spirit-sdk+15; spirits/* uncharged. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` CODE-REVIEW exact measured re-pin 2026-10-26 (measured AFTER `cargo fmt --all` via `kloc-check --json`, tokei 14.0.0): aggregate = measured + 1: 184707 -> 184739, measured 184738 — maos-bin +30 (28558 -> 28588, kloc C ≤ 28600), maos-spirit-sdk +2 (1068 -> 1070, ceiling 3000), `spirits/*` uncharged; kernel 0. | PRIOR: ◆ Story `18-4-self-tuning-halt-with-injectable-clock` DEV 184223 -> 184707 (measured 184706); ◆ 18-3 CODE-REVIEW 184003 -> 184223; 18-3 DEV 183248 -> 184003; 18-2 CODE-REVIEW 183181 -> 183248; 18-2 DEV 182292 -> 183181; 18-8 CODE-REVIEW 182221 -> 182292; 18-8 DEV 181727 -> 182221; 18-1 CODE-REVIEW 181685 -> 181727 (full notes: `git log -p xtask/kloc.toml`).
+ 
+ # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
+ # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
+diff --git a/xtask/tests/epic17_exit_workflow_17_7.rs b/xtask/tests/epic17_exit_workflow_17_7.rs
+index 0a64f302..40a38cc9 100644
+--- a/xtask/tests/epic17_exit_workflow_17_7.rs
++++ b/xtask/tests/epic17_exit_workflow_17_7.rs
+@@ -413,3 +413,56 @@ fn epic17_archive_keeps_observer_counts_oracle_and_delegated_launch() {
+         assert!(run.contains(witness), "launch proof lost {witness}");
+     }
+ }
++
++#[test]
++fn purge_cut_units_pass_the_real_harness_unit_validation() {
++    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
++    let cut = fs::read_to_string(root.join("_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml"))
++        .expect("20-10 branch-only workflow cut");
++    let workflow: Value = match serde_yaml::from_str(&cut) {
++        Ok(value) => value,
++        Err(error) => panic!("20-10 workflow YAML: {error}"),
++    };
++    let mut checked = 0;
++    for step in steps(&workflow["jobs"]["scenes"]) {
++        let Some(script) = step["run"].as_str() else {
++            continue;
++        };
++        for line in script
++            .lines()
++            .filter(|line| line.contains("scripts/run_cgroup_ceiling_17_2.py run "))
++        {
++            let words: Vec<_> = line.split_whitespace().collect();
++            let unit = words
++                .windows(2)
++                .find(|pair| pair[0] == "--unit")
++                .expect("delegated scene unit")[1];
++            // Zero timeout rejects before setup; the real unit allowlist runs first.
++            let output = std::process::Command::new("python3")
++                .arg(root.join("scripts/run_cgroup_ceiling_17_2.py"))
++                .args([
++                    "run",
++                    "--mode",
++                    "delegated",
++                    "--unit",
++                    unit,
++                    "--timeout",
++                    "0",
++                    "--",
++                    "true",
++                ])
++                .output()
++                .expect("harness validation");
++            let error = String::from_utf8_lossy(&output.stderr);
++            assert!(
++                !output.status.success() && error.contains("timeout must be positive seconds"),
++                "{unit} did not pass the real unit-name validation: {error}"
++            );
++            checked += 1;
++        }
++    }
++    assert_eq!(
++        checked, 2,
++        "initial and byte-restored scene commands must both be checked"
++    );
++}

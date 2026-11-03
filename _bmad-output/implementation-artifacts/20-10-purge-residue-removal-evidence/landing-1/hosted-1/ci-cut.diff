@@ -1,0 +1,41 @@
+diff --git a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
+index 56460948..a98cff6c 100644
+--- a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
++++ b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
+@@ -129,6 +129,18 @@ jobs:
+           cargo build --locked -p maos-bin --bin maos
+           cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit
+           cargo nextest list --locked -p maos-bin --test worker_terminal_facts_17_7 --message-format json > evidence/binaries.json
++      - name: Hosted-length socket and hermetic purge contracts (AC1-AC3, AC5-AC7)
++        if: matrix.tree == 'head'
++        shell: bash
++        run: |
++          set -euo pipefail
++          cargo nextest run --locked -p maos-bin --test egress_daemon_17_1 --test purge_residue_20_10 \
++            --profile ci --test-threads 1 --no-fail-fast --no-capture 2>&1 | tee evidence/contracts.log
++          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 17 \
++            --required-test hosted_length_home_keeps_egress_socket_below_sun_path_limit \
++            --required-test ac5_only_absent_cid_and_empty_state_are_reclaimed \
++            --required-test ac7_adr_documents_home_scoped_runtime_removal evidence/contracts.log
++          ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/contracts.log
+       - name: Delegated runtime witnesses (AC1, AC2, AC4, AC5, AC6)
+         shell: bash
+         run: |
+@@ -141,7 +153,7 @@ jobs:
+             filter='test(root_crash::)'
+           fi
+           set +e
+-          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-20-10 --timeout 1800 --rootless-canary -- \
++          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10 --timeout 1800 --rootless-canary -- \
+             cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-fail-fast --no-capture -E "$filter" 2>&1 | tee evidence/scenes.log
+           statuses=("${PIPESTATUS[@]}")
+           set -e
+@@ -171,7 +183,7 @@ jobs:
+           cp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+           cmp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+           touch crates/maos-bin/src/purge_runtime.rs
+-          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-20-10-restored --timeout 1800 --rootless-canary -- \
++          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10-restored --timeout 1800 --rootless-canary -- \
+             cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-capture \
+               -E 'test(root_crash_retains_stopped_container_and_purge_reports_it)' 2>&1 | tee evidence/restored.log
+           ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/restored.log

@@ -1,0 +1,288 @@
+{
+  "125746775593": {
+    "version": "Client:        Podman Engine\nVersion:       5.7.0\nAPI Version:   5.7.0\nGo Version:    go1.25.0\nBuilt:         Mon Feb 23 15:35:32 2026\nBuild Origin:  Ubuntu\nOS/Arch:       linux/amd64\n",
+    "docker": {
+      "argv": [
+        "docker",
+        "create",
+        "--pidfile=/tmp/maos-20-10-docker-pid",
+        "--cidfile=/tmp/maos-20-10-docker-cid",
+        "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
+        "true"
+      ],
+      "rc": 125,
+      "stdout": "",
+      "stderr": "unknown flag: --pidfile\n\nUsage:  docker create [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nRun 'docker create --help' for more information\n",
+      "log_line": 197
+    },
+    "mounts": [
+      {
+        "Type": "bind",
+        "Source": "/home/runner/work/_temp/tmpbbwbut2s/workspace",
+        "Destination": "/workspace",
+        "Driver": "",
+        "Mode": "",
+        "Options": [
+          "rbind"
+        ],
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "label_filter": {
+      "argv": [
+        "podman",
+        "ps",
+        "-a",
+        "--filter",
+        "label=maos.spirit_id",
+        "--filter",
+        "label=maos.boot_nonce",
+        "--format",
+        "{{.ID}}"
+      ],
+      "rc": 0,
+      "stdout": "5cea382b4bdf\n",
+      "stderr": "",
+      "log_line": 202
+    },
+    "removal": [
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "5cea382b4bdfdcd1db41791e276492075a1bf0a7f6130297ac02972a64ca7b5b"
+        ],
+        0,
+        204
+      ],
+      [
+        [
+          "container",
+          "exists",
+          "5cea382b4bdfdcd1db41791e276492075a1bf0a7f6130297ac02972a64ca7b5b"
+        ],
+        1,
+        205
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "f302373352358997a65a1b14e053f59a9f2f381719fbec2e88d85a6127ea5135"
+        ],
+        0,
+        206
+      ],
+      [
+        [
+          "container",
+          "exists",
+          "f302373352358997a65a1b14e053f59a9f2f381719fbec2e88d85a6127ea5135"
+        ],
+        1,
+        207
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "990b5b3fb1f614a7498706576d463be257220044516dba567e1c125bfb633e2f"
+        ],
+        0,
+        208
+      ],
+      [
+        [
+          "container",
+          "exists",
+          "990b5b3fb1f614a7498706576d463be257220044516dba567e1c125bfb633e2f"
+        ],
+        1,
+        209
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "5cea382b4bdfdcd1db41791e276492075a1bf0a7f6130297ac02972a64ca7b5b"
+        ],
+        0,
+        210
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "f302373352358997a65a1b14e053f59a9f2f381719fbec2e88d85a6127ea5135"
+        ],
+        0,
+        211
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "990b5b3fb1f614a7498706576d463be257220044516dba567e1c125bfb633e2f"
+        ],
+        0,
+        212
+      ]
+    ]
+  },
+  "125746775660": {
+    "version": "Client:       Podman Engine\nVersion:      4.9.3\nAPI Version:  4.9.3\nGo Version:   go1.22.2\nBuilt:        Thu Jan  1 00:00:00 1970\nOS/Arch:      linux/amd64\n",
+    "docker": {
+      "argv": [
+        "docker",
+        "create",
+        "--pidfile=/tmp/maos-20-10-docker-pid",
+        "--cidfile=/tmp/maos-20-10-docker-cid",
+        "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
+        "true"
+      ],
+      "rc": 125,
+      "stdout": "",
+      "stderr": "unknown flag: --pidfile\n\nUsage:  docker create [OPTIONS] IMAGE [COMMAND] [ARG...]\n\nRun 'docker create --help' for more information\n",
+      "log_line": 197
+    },
+    "mounts": [
+      {
+        "Type": "bind",
+        "Source": "/home/runner/work/_temp/tmpgqlv9qod/workspace",
+        "Destination": "/workspace",
+        "Driver": "",
+        "Mode": "",
+        "Options": [
+          "rbind"
+        ],
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "label_filter": {
+      "argv": [
+        "podman",
+        "ps",
+        "-a",
+        "--filter",
+        "label=maos.spirit_id",
+        "--filter",
+        "label=maos.boot_nonce",
+        "--format",
+        "{{.ID}}"
+      ],
+      "rc": 0,
+      "stdout": "b7c3f3fec002\n",
+      "stderr": "",
+      "log_line": 202
+    },
+    "removal": [
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"
+        ],
+        0,
+        204
+      ],
+      [
+        [
+          "container",
+          "exists",
+          "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"
+        ],
+        1,
+        205
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba"
+        ],
+        0,
+        206
+      ],
+      [
+        [
+          "container",
+          "exists",
+          "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba"
+        ],
+        1,
+        207
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285"
+        ],
+        0,
+        208
+      ],
+      [
+        [
+          "container",
+          "exists",
+          "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285"
+        ],
+        1,
+        209
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "b7c3f3fec00240d9abbb2a280bbdd33340efd302ff442771927536774ff902c0"
+        ],
+        0,
+        210
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "fdae0c3c82724a608b1e54044d9df3ee303c3254ecf907d978a9e0eef1ba06ba"
+        ],
+        0,
+        211
+      ],
+      [
+        [
+          "rm",
+          "--force",
+          "--volumes",
+          "--time=0",
+          "569c29692caae4dd3841ef8271487f0487c2118faebed3e9b9493e9e47017285"
+        ],
+        0,
+        212
+      ]
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+--- a/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
++++ b/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml
+@@ -141,7 +141,7 @@
+             filter='test(root_crash::)'
+           fi
+           set +e
+-          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10 --timeout 1800 --rootless-canary -- \
++          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-20-10 --timeout 1800 --rootless-canary -- \
+             cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-fail-fast --no-capture -E "$filter" 2>&1 | tee evidence/scenes.log
+           statuses=("${PIPESTATUS[@]}")
+           set -e

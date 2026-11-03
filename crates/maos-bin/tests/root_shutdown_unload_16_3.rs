@@ -314,7 +314,12 @@ fn fixture_children_of(stdout: &str) -> Vec<FixtureContainer> {
 }
 
 fn wait_for_fixture_child(root: &RunRoot, mode: &str, timeout: Duration) -> FixtureContainer {
-    wait_for_fixture_child_with(|| root.stdout(), mode, timeout, String::new)
+    wait_for_fixture_child_with(
+        || root.stdout(),
+        mode,
+        timeout,
+        || format!("stdout:\n{}\nstderr:\n{}", root.stdout(), root.stderr()),
+    )
 }
 
 /// Wait for `cli_wrapper_loaded`, whose published CID is the identity oracle.

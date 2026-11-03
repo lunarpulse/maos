@@ -413,3 +413,56 @@ fn epic17_archive_keeps_observer_counts_oracle_and_delegated_launch() {
         assert!(run.contains(witness), "launch proof lost {witness}");
     }
 }
+
+#[test]
+fn purge_cut_units_pass_the_real_harness_unit_validation() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let cut = fs::read_to_string(root.join("_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml"))
+        .expect("20-10 branch-only workflow cut");
+    let workflow: Value = match serde_yaml::from_str(&cut) {
+        Ok(value) => value,
+        Err(error) => panic!("20-10 workflow YAML: {error}"),
+    };
+    let mut checked = 0;
+    for step in steps(&workflow["jobs"]["scenes"]) {
+        let Some(script) = step["run"].as_str() else {
+            continue;
+        };
+        for line in script
+            .lines()
+            .filter(|line| line.contains("scripts/run_cgroup_ceiling_17_2.py run "))
+        {
+            let words: Vec<_> = line.split_whitespace().collect();
+            let unit = words
+                .windows(2)
+                .find(|pair| pair[0] == "--unit")
+                .expect("delegated scene unit")[1];
+            // Zero timeout rejects before setup; the real unit allowlist runs first.
+            let output = std::process::Command::new("python3")
+                .arg(root.join("scripts/run_cgroup_ceiling_17_2.py"))
+                .args([
+                    "run",
+                    "--mode",
+                    "delegated",
+                    "--unit",
+                    unit,
+                    "--timeout",
+                    "0",
+                    "--",
+                    "true",
+                ])
+                .output()
+                .expect("harness validation");
+            let error = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                !output.status.success() && error.contains("timeout must be positive seconds"),
+                "{unit} did not pass the real unit-name validation: {error}"
+            );
+            checked += 1;
+        }
+    }
+    assert_eq!(
+        checked, 2,
+        "initial and byte-restored scene commands must both be checked"
+    );
+}

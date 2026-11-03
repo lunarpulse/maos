@@ -1,0 +1,43 @@
+{
+  "toolchain": "rustc 1.98.1",
+  "comparison_baseline": "../review-1/clippy-review.jsonl",
+  "current": [
+    {
+      "file": "crates/maos-bin/tests/egress_daemon_17_1.rs",
+      "lint": "clippy::unusual_byte_groupings",
+      "message": "digits of hex, binary or octal literal not in groups of equal size",
+      "occurrences": 3
+    },
+    {
+      "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "lint": "clippy::manual_contains",
+      "message": "using `contains()` instead of `iter().any()` is more efficient",
+      "occurrences": 1
+    },
+    {
+      "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "lint": "clippy::obfuscated_if_else",
+      "message": "this method chain can be written more clearly with `if .. else ..`",
+      "occurrences": 1
+    },
+    {
+      "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "lint": "clippy::too_many_arguments",
+      "message": "this function has too many arguments (9/7)",
+      "occurrences": 1
+    },
+    {
+      "file": "crates/maos-bin/tests/root_shutdown_unload_16_3.rs",
+      "lint": "clippy::unusual_byte_groupings",
+      "message": "digits of hex, binary or octal literal not in groups of equal size",
+      "occurrences": 2
+    },
+    {
+      "file": "xtask/tests/epic17_exit_workflow_17_7.rs",
+      "lint": "clippy::needless_borrows_for_generic_args",
+      "message": "the borrowed expression implements the required traits",
+      "occurrences": 1
+    }
+  ],
+  "new": []
+}

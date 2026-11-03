@@ -117,9 +117,11 @@ leaves only when `cgroup.events` reports `populated 0` and the creator has no
 `/proc/<pid>`. The shared `maos.slice` parent is never removed: empty does not
 exclude a live creator between parent allocation and leaf creation. Purge never
 kills members or writes `cgroup.kill`. Private mode-0700, euid-owned T3 spawn
-custody is reclaimed only after its CID is confirmed absent. Process roots now
-encode `process-<creator pid>-<nonce>` and are rmdired only when empty and the
-creator PID is positively absent. Live-owner and historical anonymous roots
+custody is reclaimed only after its CID is confirmed absent. Only volatile
+Worker-state process roots encode `process-<creator pid>-<nonce>` and are rmdired
+when empty and the creator PID is positively absent. Durable egress socket
+roots retain short eight-hex nonce names: the PID prefix must not lengthen
+AF_UNIX paths beyond `sun_path` capacity. Live-owner and historical anonymous roots
 are retained; shared state parents are never removed. Unknown/present-CID spawn
 custody stays. Directory traversal and control-file reads do not follow
 links. A dry run invokes only `ps`/`inspect` and changes no state, including

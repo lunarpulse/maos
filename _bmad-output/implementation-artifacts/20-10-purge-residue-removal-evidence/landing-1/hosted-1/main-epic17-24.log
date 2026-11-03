@@ -1,0 +1,1532 @@
+﻿2026-11-03T06:09:42.6467938Z Current runner version: '2.338.2'
+2026-11-03T06:09:42.6518281Z ##[group]Runner Image Provisioner
+2026-11-03T06:09:42.6519183Z Hosted Compute Agent
+2026-11-03T06:09:42.6519904Z Version: 20261021.618
+2026-11-03T06:09:42.6520546Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-11-03T06:09:42.6521363Z Build Date: 2026-10-21T00:45:21Z
+2026-11-03T06:09:42.6522060Z Worker ID: {698b46a0-bfca-44f5-b682-0f3bd136dd38}
+2026-11-03T06:09:42.6522812Z Region: westcentralus
+2026-11-03T06:09:42.6523448Z Cloud: Azure
+2026-11-03T06:09:42.6523988Z ##[endgroup]
+2026-11-03T06:09:42.6525835Z ##[group]Operating System
+2026-11-03T06:09:42.6526523Z Ubuntu
+2026-11-03T06:09:42.6527095Z 24.04.5
+2026-11-03T06:09:42.6527654Z LTS
+2026-11-03T06:09:42.6528171Z ##[endgroup]
+2026-11-03T06:09:42.6528797Z ##[group]Runner Image
+2026-11-03T06:09:42.6529409Z Image: ubuntu-24.04
+2026-11-03T06:09:42.6530016Z Version: 20261025.353.1
+2026-11-03T06:09:42.6531439Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261025.353/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-03T06:09:42.6534279Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261025.353
+2026-11-03T06:09:42.6536464Z ##[endgroup]
+2026-11-03T06:09:42.6538547Z ##[group]GITHUB_TOKEN Permissions
+2026-11-03T06:09:42.6541672Z Contents: read
+2026-11-03T06:09:42.6542787Z Metadata: read
+2026-11-03T06:09:42.6543999Z Packages: read
+2026-11-03T06:09:42.6545345Z ##[endgroup]
+2026-11-03T06:09:42.6549121Z Secret source: Actions
+2026-11-03T06:09:42.6550889Z Cache mode: write
+2026-11-03T06:09:42.6552373Z Prepare workflow directory
+2026-11-03T06:09:42.7198207Z Prepare all required actions
+2026-11-03T06:09:42.7273930Z Getting action download info
+2026-11-03T06:09:43.0165148Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-03T06:09:43.1906079Z Download action repository 'actions/setup-node@v5' (SHA:a0853c24544627f65ddf259abe73b1d18a591444)
+2026-11-03T06:09:43.3189571Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+2026-11-03T06:09:43.8942809Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-03T06:09:44.1216628Z Complete job name: epic-17-exit (ubuntu-24.04)
+2026-11-03T06:09:44.2222322Z ##[group]Run actions/checkout@v5
+2026-11-03T06:09:44.2223295Z with:
+2026-11-03T06:09:44.2223802Z   repository: lunarpulse/maos
+2026-11-03T06:09:44.2228237Z   token: ***
+2026-11-03T06:09:44.2228726Z   ssh-strict: true
+2026-11-03T06:09:44.2229232Z   ssh-user: git
+2026-11-03T06:09:44.2229732Z   persist-credentials: true
+2026-11-03T06:09:44.2230273Z   clean: true
+2026-11-03T06:09:44.2230764Z   sparse-checkout-cone-mode: true
+2026-11-03T06:09:44.2231333Z   fetch-depth: 1
+2026-11-03T06:09:44.2231827Z   fetch-tags: false
+2026-11-03T06:09:44.2232327Z   show-progress: true
+2026-11-03T06:09:44.2232840Z   lfs: false
+2026-11-03T06:09:44.2233306Z   submodules: false
+2026-11-03T06:09:44.2233809Z   set-safe-directory: true
+2026-11-03T06:09:44.2234413Z   allow-unsafe-pr-checkout: false
+2026-11-03T06:09:44.2235414Z env:
+2026-11-03T06:09:44.2235905Z   CARGO_TERM_COLOR: never
+2026-11-03T06:09:44.2236444Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:09:44.2236965Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:09:44.2237567Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:09:44.2238148Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:09:44.2238687Z   CARGO_NET_RETRY: 10
+2026-11-03T06:09:44.2239191Z   RUSTC: /bin/false
+2026-11-03T06:09:44.2239692Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:09:44.2240232Z   CARGO: /bin/false
+2026-11-03T06:09:44.2240880Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:09:44.2241667Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:09:44.2242259Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:09:44.2256700Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:09:44.2271412Z ##[endgroup]
+2026-11-03T06:09:44.4959248Z Syncing repository: lunarpulse/maos
+2026-11-03T06:09:44.4961950Z ##[group]Getting Git version info
+2026-11-03T06:09:44.4963284Z Working directory is '/home/runner/work/maos/maos'
+2026-11-03T06:09:44.4965528Z [command]/usr/bin/git version
+2026-11-03T06:09:44.5043560Z git version 2.56.0
+2026-11-03T06:09:44.5079292Z ##[endgroup]
+2026-11-03T06:09:44.5103060Z Temporarily overriding HOME='/home/runner/work/_temp/d5370239-bef1-4373-8cdf-c27dcba21239' before making global git config changes
+2026-11-03T06:09:44.5106811Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-03T06:09:44.5110479Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-03T06:09:44.5171300Z Deleting the contents of '/home/runner/work/maos/maos'
+2026-11-03T06:09:44.5179917Z ##[group]Initializing the repository
+2026-11-03T06:09:44.5185924Z [command]/usr/bin/git init /home/runner/work/maos/maos
+2026-11-03T06:09:44.5290606Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-03T06:09:44.5292565Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-03T06:09:44.5294389Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-03T06:09:44.5296726Z hint: call:
+2026-11-03T06:09:44.5297807Z hint:
+2026-11-03T06:09:44.5299121Z hint: 	git config --global init.defaultBranch <name>
+2026-11-03T06:09:44.5300779Z hint:
+2026-11-03T06:09:44.5302548Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-03T06:09:44.5305239Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-03T06:09:44.5308844Z hint:
+2026-11-03T06:09:44.5310110Z hint: 	git branch -m <name>
+2026-11-03T06:09:44.5311485Z hint:
+2026-11-03T06:09:44.5313025Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-03T06:09:44.5317198Z Initialized empty Git repository in /home/runner/work/maos/maos/.git/
+2026-11-03T06:09:44.5321769Z [command]/usr/bin/git remote add origin https://github.com/lunarpulse/maos
+2026-11-03T06:09:44.5370608Z ##[endgroup]
+2026-11-03T06:09:44.5372015Z ##[group]Disabling automatic garbage collection
+2026-11-03T06:09:44.5376792Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-03T06:09:44.5416017Z ##[endgroup]
+2026-11-03T06:09:44.5417625Z ##[group]Setting up auth
+2026-11-03T06:09:44.5424930Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-03T06:09:44.5466212Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-03T06:09:44.5882433Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-03T06:09:44.5932456Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-03T06:09:44.6196758Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-03T06:09:44.6255856Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-03T06:09:44.6513139Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-03T06:09:44.6564935Z ##[endgroup]
+2026-11-03T06:09:44.6565973Z ##[group]Fetching the repository
+2026-11-03T06:09:44.6579941Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de:refs/remotes/origin/main
+2026-11-03T06:09:50.9786531Z From https://github.com/lunarpulse/maos
+2026-11-03T06:09:50.9788820Z  * [new ref]         16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de -> origin/main
+2026-11-03T06:09:50.9794291Z ##[endgroup]
+2026-11-03T06:09:50.9796564Z ##[group]Determining the checkout info
+2026-11-03T06:09:50.9798762Z ##[endgroup]
+2026-11-03T06:09:50.9801949Z [command]/usr/bin/git sparse-checkout disable
+2026-11-03T06:09:50.9882045Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-03T06:09:50.9927205Z ##[group]Checking out the ref
+2026-11-03T06:09:50.9931227Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-11-03T06:09:52.0126467Z Switched to a new branch 'main'
+2026-11-03T06:09:52.0131733Z branch 'main' set up to track 'origin/main'.
+2026-11-03T06:09:52.0246401Z ##[endgroup]
+2026-11-03T06:09:52.0306613Z [command]/usr/bin/git log -1 --format=%H
+2026-11-03T06:09:52.0345057Z 16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de
+2026-11-03T06:09:52.0653595Z ##[group]Run actions/setup-node@v5
+2026-11-03T06:09:52.0653947Z with:
+2026-11-03T06:09:52.0654155Z   node-version: 24
+2026-11-03T06:09:52.0654372Z   always-auth: false
+2026-11-03T06:09:52.0654922Z   check-latest: false
+2026-11-03T06:09:52.0657526Z   token: ***
+2026-11-03T06:09:52.0657798Z   package-manager-cache: true
+2026-11-03T06:09:52.0658054Z env:
+2026-11-03T06:09:52.0658252Z   CARGO_TERM_COLOR: never
+2026-11-03T06:09:52.0658489Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:09:52.0658717Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:09:52.0658972Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:09:52.0659244Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:09:52.0659488Z   CARGO_NET_RETRY: 10
+2026-11-03T06:09:52.0659713Z   RUSTC: /bin/false
+2026-11-03T06:09:52.0659955Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:09:52.0660219Z   CARGO: /bin/false
+2026-11-03T06:09:52.0660527Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:09:52.0660956Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:09:52.0661217Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:09:52.0668965Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:09:52.0677255Z ##[endgroup]
+2026-11-03T06:09:52.2589122Z (node:2397) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T06:09:52.2590134Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T06:09:52.2594186Z Found in cache @ /opt/hostedtoolcache/node/24.22.1/x64
+2026-11-03T06:09:52.2595306Z ##[group]Environment details
+2026-11-03T06:09:54.6697666Z node: v24.22.1
+2026-11-03T06:09:54.6698127Z npm: 11.19.1
+2026-11-03T06:09:54.6698453Z yarn: 1.22.22
+2026-11-03T06:09:54.6699712Z ##[endgroup]
+2026-11-03T06:09:54.6867443Z ##[group]Run actions/download-artifact@v4
+2026-11-03T06:09:54.6867780Z with:
+2026-11-03T06:09:54.6868101Z   name: ci-test-archives-x64-16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de
+2026-11-03T06:09:54.6868532Z   path: /home/runner/work/_temp/ci-test-archives
+2026-11-03T06:09:54.6868847Z   merge-multiple: false
+2026-11-03T06:09:54.6869090Z   repository: lunarpulse/maos
+2026-11-03T06:09:54.6869326Z   run-id: 41584453971
+2026-11-03T06:09:54.6869548Z env:
+2026-11-03T06:09:54.6869734Z   CARGO_TERM_COLOR: never
+2026-11-03T06:09:54.6869962Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:09:54.6870248Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:09:54.6870495Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:09:54.6870754Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:09:54.6870980Z   CARGO_NET_RETRY: 10
+2026-11-03T06:09:54.6871189Z   RUSTC: /bin/false
+2026-11-03T06:09:54.6871400Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:09:54.6871660Z   CARGO: /bin/false
+2026-11-03T06:09:54.6871981Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:09:54.6872350Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:09:54.6872606Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:09:54.6880221Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:09:54.6888105Z ##[endgroup]
+2026-11-03T06:09:54.8474917Z Downloading single artifact
+2026-11-03T06:09:54.8669524Z (node:2428) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T06:09:54.8670488Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T06:09:55.0550621Z Preparing to download the following artifacts:
+2026-11-03T06:09:55.0552751Z - ci-test-archives-x64-16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de (ID: 13209435083, Size: 679822103, Expected Digest: sha256:176293dabb6144aa23ec43456e670f7eac56ccae0a6b969b6a1ba6db205dc760)
+2026-11-03T06:09:55.2535459Z Redirecting to blob download url: https://productionresultssa32.blob.core.windows.net/actions-results/d7d919fb-6b93-8ecc-955d-4e05547bfa26/workflow-job-run-142bc0c9-b74b-5bdf-bc25-42ccddeea245/artifacts/d6f846a45476d7f0eb0e4ac0436a9f602d348ca130a76afecb748adac5f67af4.zip
+2026-11-03T06:09:55.2538171Z Starting download of artifact to: /home/runner/work/_temp/ci-test-archives
+2026-11-03T06:09:55.5029693Z (node:2428) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-11-03T06:10:06.9047231Z SHA256 digest of downloaded artifact is 176293dabb6144aa23ec43456e670f7eac56ccae0a6b969b6a1ba6db205dc760
+2026-11-03T06:10:06.9048544Z Artifact download completed successfully.
+2026-11-03T06:10:06.9049269Z Total of 1 artifact(s) downloaded
+2026-11-03T06:10:06.9055688Z Download artifact has finished successfully
+2026-11-03T06:10:06.9254025Z ##[group]Run actions/download-artifact@v4
+2026-11-03T06:10:06.9254351Z with:
+2026-11-03T06:10:06.9254966Z   name: ci-test-files-x64-16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de
+2026-11-03T06:10:06.9255380Z   path: /home/runner/work/_temp/ci-test-files
+2026-11-03T06:10:06.9255699Z   merge-multiple: false
+2026-11-03T06:10:06.9255942Z   repository: lunarpulse/maos
+2026-11-03T06:10:06.9256193Z   run-id: 41584453971
+2026-11-03T06:10:06.9256400Z env:
+2026-11-03T06:10:06.9256593Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:06.9257012Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:06.9257249Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:06.9257508Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:06.9257774Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:06.9258015Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:06.9258231Z   RUSTC: /bin/false
+2026-11-03T06:10:06.9258449Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:06.9258687Z   CARGO: /bin/false
+2026-11-03T06:10:06.9259026Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:06.9259406Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:06.9259655Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:06.9267285Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:06.9275020Z ##[endgroup]
+2026-11-03T06:10:07.0858537Z Downloading single artifact
+2026-11-03T06:10:07.1008441Z (node:2445) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T06:10:07.1009893Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T06:10:07.3064682Z Preparing to download the following artifacts:
+2026-11-03T06:10:07.3067143Z - ci-test-files-x64-16c35ef0d4b4de0f3969db15c9d7666fcdf9f2de (ID: 13208612876, Size: 796816247, Expected Digest: sha256:51d5ffda2b0cccea17c1a618e3f3816acfd15ba2b92d43128c633a41990a66d8)
+2026-11-03T06:10:07.5104170Z Redirecting to blob download url: https://productionresultssa32.blob.core.windows.net/actions-results/d7d919fb-6b93-8ecc-955d-4e05547bfa26/workflow-job-run-142bc0c9-b74b-5bdf-bc25-42ccddeea245/artifacts/e7e2fa31e99912af1decefc268f6849224ed58a46b148fa6f0f58edcf5e605f0.zip
+2026-11-03T06:10:07.5107052Z Starting download of artifact to: /home/runner/work/_temp/ci-test-files
+2026-11-03T06:10:07.7474140Z (node:2445) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-11-03T06:10:20.7081262Z SHA256 digest of downloaded artifact is 51d5ffda2b0cccea17c1a618e3f3816acfd15ba2b92d43128c633a41990a66d8
+2026-11-03T06:10:20.7082852Z Artifact download completed successfully.
+2026-11-03T06:10:20.7083267Z Total of 1 artifact(s) downloaded
+2026-11-03T06:10:20.7089967Z Download artifact has finished successfully
+2026-11-03T06:10:20.7285166Z ##[group]Run set -euo pipefail
+2026-11-03T06:10:20.7285644Z [36;1mset -euo pipefail[0m
+2026-11-03T06:10:20.7285981Z [36;1mmkdir -p "$RUNNER_TEMP/ci-test-tools"[0m
+2026-11-03T06:10:20.7286482Z [36;1mtar -C "$RUNNER_TEMP/ci-test-tools" -xf "$RUNNER_TEMP/ci-test-files/tools.tar"[0m
+2026-11-03T06:10:20.7286946Z [36;1mpython3 - <<'PY'[0m
+2026-11-03T06:10:20.7287231Z [36;1mimport json, os, pathlib, subprocess[0m
+2026-11-03T06:10:20.7287804Z [36;1mproducer = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-test-files/producer.json').read_text())[0m
+2026-11-03T06:10:20.7288722Z [36;1mnextest = subprocess.check_output([os.environ['RUNNER_TEMP'] + '/ci-test-tools/cargo-nextest', 'nextest', '--version'], text=True).splitlines()[0][0m
+2026-11-03T06:10:20.7289551Z [36;1mexpected = dict(sha=os.environ['GITHUB_SHA'], run_id=os.environ['GITHUB_RUN_ID'],[0m
+2026-11-03T06:10:20.7290223Z [36;1m                arch='x64', workspace=str(pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()),[0m
+2026-11-03T06:10:20.7290878Z [36;1m                tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),[0m
+2026-11-03T06:10:20.7291367Z [36;1m                nextest=nextest)[0m
+2026-11-03T06:10:20.7291729Z [36;1massert producer == expected, (producer, expected)[0m
+2026-11-03T06:10:20.7292058Z [36;1mPY[0m
+2026-11-03T06:10:20.7292343Z [36;1mecho "$RUNNER_TEMP/ci-test-tools" >> "$GITHUB_PATH"[0m
+2026-11-03T06:10:20.7292771Z [36;1mtar -C / -xf "$RUNNER_TEMP/ci-test-files/fixtures-debug.tar"[0m
+2026-11-03T06:10:20.7293220Z [36;1mtar -C / -xf "$RUNNER_TEMP/ci-test-files/release-epic17.tar"[0m
+2026-11-03T06:10:20.7366544Z shell: /usr/bin/bash -e {0}
+2026-11-03T06:10:20.7366835Z env:
+2026-11-03T06:10:20.7367050Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:20.7367314Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:20.7367563Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:20.7367821Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:20.7368115Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:20.7368356Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:20.7368582Z   RUSTC: /bin/false
+2026-11-03T06:10:20.7368824Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:20.7369079Z   CARGO: /bin/false
+2026-11-03T06:10:20.7369399Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:20.7369797Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:20.7370053Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:20.7378062Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:20.7386066Z ##[endgroup]
+2026-11-03T06:10:21.5419771Z ##[group]Run echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+2026-11-03T06:10:21.5420255Z [36;1mecho "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"[0m
+2026-11-03T06:10:21.5440706Z shell: /usr/bin/bash -e {0}
+2026-11-03T06:10:21.5440982Z env:
+2026-11-03T06:10:21.5441190Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:21.5441447Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:21.5441685Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:21.5441947Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:21.5442226Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:21.5442469Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:21.5442692Z   RUSTC: /bin/false
+2026-11-03T06:10:21.5442928Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:21.5443184Z   CARGO: /bin/false
+2026-11-03T06:10:21.5443507Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:21.5443898Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:21.5444161Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:21.5451865Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:21.5459858Z ##[endgroup]
+2026-11-03T06:10:21.5607167Z Prepare all required actions
+2026-11-03T06:10:21.6389840Z ##[group]Run ./.github/actions/provision-t3-test-substrate
+2026-11-03T06:10:21.6390267Z env:
+2026-11-03T06:10:21.6390480Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:21.6390733Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:21.6390979Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:21.6391243Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:21.6391527Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:21.6391773Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:21.6391995Z   RUSTC: /bin/false
+2026-11-03T06:10:21.6392228Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:21.6392482Z   CARGO: /bin/false
+2026-11-03T06:10:21.6392805Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:21.6393195Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:21.6393470Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:21.6401576Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:21.6409590Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:10:21.6409860Z ##[endgroup]
+2026-11-03T06:10:21.6469988Z ##[start-action display=Provision signed immutable T3 test substrate;id=__self.__run]
+2026-11-03T06:10:21.6858743Z ##[group]Run set -euo pipefail
+2026-11-03T06:10:21.6859243Z [36;1mset -euo pipefail[0m
+2026-11-03T06:10:21.6859901Z [36;1mcommand -v podman || { sudo apt-get update && sudo apt-get install -y podman; }[0m
+2026-11-03T06:10:21.6860833Z [36;1mpython3 scripts/provision_t3_tests.py "$RUNNER_TEMP/maos-t3-tests"[0m
+2026-11-03T06:10:21.6884936Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-03T06:10:21.6885313Z env:
+2026-11-03T06:10:21.6885553Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:21.6885816Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:21.6886269Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:21.6886542Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:21.6886822Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:21.6887292Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:21.6887534Z   RUSTC: /bin/false
+2026-11-03T06:10:21.6887761Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:21.6888008Z   CARGO: /bin/false
+2026-11-03T06:10:21.6888331Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:21.6888723Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:21.6888988Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:21.6896808Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:21.6904820Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:10:21.6905104Z ##[endgroup]
+2026-11-03T06:10:21.6951077Z /usr/bin/podman
+2026-11-03T06:10:25.7432630Z Trying to pull docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794...
+2026-11-03T06:10:26.4499372Z Getting image source signatures
+2026-11-03T06:10:26.4504176Z Copying blob sha256:06ad70e463aa4a17833d00d6d5d346c895ebb66fee637eefd67024dc6cdc2f1c
+2026-11-03T06:10:26.4505874Z Copying blob sha256:4e07a0f12b2c009f98326fa391e869bd52fc63728c482400af6cb752bc16744b
+2026-11-03T06:10:28.4381307Z Copying config sha256:6e92c4fd8dfdf7276d56743a65002a91c9eb35dbe7af327e6c85bd204b646156
+2026-11-03T06:10:28.4399613Z Writing manifest to image destination
+2026-11-03T06:10:28.4527563Z 6e92c4fd8dfdf7276d56743a65002a91c9eb35dbe7af327e6c85bd204b646156
+2026-11-03T06:10:28.6719174Z T3 image glibc and shell available
+2026-11-03T06:10:32.8604361Z ##[notice]immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified
+2026-11-03T06:10:32.8607403Z Source /home/runner/work/_temp/maos-t3-tests/t3.env for the test runtime, lock and public trust anchor; private key removed.
+2026-11-03T06:10:32.8661768Z ##[end-action id=__self.__run;outcome=success;conclusion=success;duration_ms=11219]
+2026-11-03T06:10:32.8735413Z ##[group]Run test -x target/debug/maos
+2026-11-03T06:10:32.8735792Z [36;1mtest -x target/debug/maos[0m
+2026-11-03T06:10:32.8736098Z [36;1mtest -x target/debug/maosctl[0m
+2026-11-03T06:10:32.8736518Z [36;1mtest -x target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture[0m
+2026-11-03T06:10:32.8756805Z shell: /usr/bin/bash -e {0}
+2026-11-03T06:10:32.8757074Z env:
+2026-11-03T06:10:32.8757286Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:32.8757547Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:32.8757787Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:32.8758046Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:32.8758327Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:32.8758568Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:32.8758790Z   RUSTC: /bin/false
+2026-11-03T06:10:32.8759017Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:32.8759272Z   CARGO: /bin/false
+2026-11-03T06:10:32.8759586Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:32.8759995Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:32.8760252Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:32.8768091Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:32.8776069Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:10:32.8776355Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:10:32.8776723Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:10:32.8777326Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:10:32.8777811Z ##[endgroup]
+2026-11-03T06:10:32.8850085Z ##[group]Run podman version
+2026-11-03T06:10:32.8850406Z [36;1mpodman version[0m
+2026-11-03T06:10:32.8850662Z [36;1mconmon --version[0m
+2026-11-03T06:10:32.8851266Z [36;1mpodman info --format '{{.Host.OCIRuntime.Name}} {{.Host.OCIRuntime.Version}}'[0m
+2026-11-03T06:10:32.8851772Z [36;1mpodman info --format '{{.Host.CgroupManager}}'[0m
+2026-11-03T06:10:32.8852095Z [36;1muname -r[0m
+2026-11-03T06:10:32.8870798Z shell: /usr/bin/bash -e {0}
+2026-11-03T06:10:32.8871062Z env:
+2026-11-03T06:10:32.8871273Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:32.8871520Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:32.8871770Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:32.8872026Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:32.8872300Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:32.8872536Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:32.8872759Z   RUSTC: /bin/false
+2026-11-03T06:10:32.8872992Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:32.8873241Z   CARGO: /bin/false
+2026-11-03T06:10:32.8873587Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:32.8873981Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:32.8874241Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:32.8881950Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:32.8889913Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:10:32.8890194Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:10:32.8890560Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:10:32.8891173Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:10:32.8891651Z ##[endgroup]
+2026-11-03T06:10:32.9135138Z Client:       Podman Engine
+2026-11-03T06:10:32.9135846Z Version:      4.9.3
+2026-11-03T06:10:32.9136319Z API Version:  4.9.3
+2026-11-03T06:10:32.9136749Z Go Version:   go1.22.2
+2026-11-03T06:10:32.9137747Z Built:        Thu Jan  1 00:00:00 1970
+2026-11-03T06:10:32.9138290Z OS/Arch:      linux/amd64
+2026-11-03T06:10:32.9175185Z conmon version 2.1.10
+2026-11-03T06:10:32.9175650Z commit: unknown
+2026-11-03T06:10:33.6596836Z crun crun version 1.14.1
+2026-11-03T06:10:33.6597567Z commit: de537a7965bfbe9992e2cfae0baeb56a08128171
+2026-11-03T06:10:33.6598202Z rundir: /run/user/1001/crun
+2026-11-03T06:10:33.6598658Z spec: 1.0.0
+2026-11-03T06:10:33.6599184Z +SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +WASM:wasmedge +YAJL
+2026-11-03T06:10:34.4008339Z systemd
+2026-11-03T06:10:34.4043430Z 7.0.0-1017-azure
+2026-11-03T06:10:34.4078358Z ##[group]Run test -x target/debug/worker-cli-fixture
+2026-11-03T06:10:34.4078811Z [36;1mtest -x target/debug/worker-cli-fixture[0m
+2026-11-03T06:10:34.4099004Z shell: /usr/bin/bash -e {0}
+2026-11-03T06:10:34.4099282Z env:
+2026-11-03T06:10:34.4099495Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:34.4099754Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:34.4100001Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:34.4100269Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:34.4100555Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:34.4100793Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:34.4101026Z   RUSTC: /bin/false
+2026-11-03T06:10:34.4101254Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:34.4101509Z   CARGO: /bin/false
+2026-11-03T06:10:34.4101839Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:34.4102235Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:34.4102494Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:34.4110376Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:34.4118461Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:10:34.4118756Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:10:34.4119120Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:10:34.4119732Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:10:34.4120223Z ##[endgroup]
+2026-11-03T06:10:34.4193568Z ##[group]Run set +e
+2026-11-03T06:10:34.4193847Z [36;1mset +e[0m
+2026-11-03T06:10:34.4195110Z [36;1mpython3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-terminal --timeout 1800 --rootless-canary -- \[0m
+2026-11-03T06:10:34.4197080Z [36;1m  bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::worker_terminal_facts_17_7)" 2>&1 | tee "$RUNNER_TEMP/worker-terminal-facts.log"; test ${PIPESTATUS[0]} -eq 0'[0m
+2026-11-03T06:10:34.4198672Z [36;1mrc=$?[0m
+2026-11-03T06:10:34.4198900Z [36;1mrequired_tests=()[0m
+2026-11-03T06:10:34.4199182Z [36;1mwhile IFS= read -r test_name; do[0m
+2026-11-03T06:10:34.4199620Z [36;1m  if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi[0m
+2026-11-03T06:10:34.4200128Z [36;1mdone <<< "${EPIC17_TERMINAL_REQUIRED_TESTS}"[0m
+2026-11-03T06:10:34.4200963Z [36;1mpython3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count "${EPIC17_TERMINAL_SUITE_TESTS}" "${required_tests[@]}" "$RUNNER_TEMP/worker-terminal-facts.log" || rc=1[0m
+2026-11-03T06:10:34.4202026Z [36;1mif grep -Eq 'SKIP|(^|[[:space:]])0 tests run:|tests? run: .*, [1-9][0-9]* skipped' "$RUNNER_TEMP/worker-terminal-facts.log"; then[0m
+2026-11-03T06:10:34.4202573Z [36;1m  rc=1[0m
+2026-11-03T06:10:34.4202953Z [36;1m  echo "::error title=Epic-17 exit line 4 (ubuntu-24.04)::SKIP, ignored, or zero tests"[0m
+2026-11-03T06:10:34.4203393Z [36;1mfi[0m
+2026-11-03T06:10:34.4203590Z [36;1mexit "$rc"[0m
+2026-11-03T06:10:34.4222065Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-03T06:10:34.4222428Z env:
+2026-11-03T06:10:34.4222644Z   CARGO_TERM_COLOR: never
+2026-11-03T06:10:34.4222894Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:10:34.4223140Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:10:34.4223407Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:10:34.4223681Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:10:34.4223928Z   CARGO_NET_RETRY: 10
+2026-11-03T06:10:34.4224148Z   RUSTC: /bin/false
+2026-11-03T06:10:34.4224369Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:10:34.4224921Z   CARGO: /bin/false
+2026-11-03T06:10:34.4225251Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:10:34.4225630Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:10:34.4225888Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:10:34.4233536Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:10:34.4241713Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:10:34.4241993Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:10:34.4242367Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:10:34.4242981Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:10:34.4243480Z   NEXTEST_ARCHIVE_PACKAGES: maos-bin
+2026-11-03T06:10:34.4243774Z   NEXTEST_ARCHIVE_FEATURES: network
+2026-11-03T06:10:34.4244081Z   NEXTEST_ARCHIVE_TESTS: worker_terminal_facts_17_7
+2026-11-03T06:10:34.4244727Z   MAOS_CGROUP_CANARY_ARCHIVE: /home/runner/work/_temp/ci-test-archives/maos-bin-network-wasm.tar.zst
+2026-11-03T06:10:34.4245219Z ##[endgroup]
+2026-11-03T06:10:34.5015723Z Running as unit: maos-17-7-terminal-df88ef21c118.service
+2026-11-03T06:10:34.5721887Z CGROUP-17-2 delegated membership=/system.slice/maos-17-7-terminal-df88ef21c118.service/daemon controllers=cpu,memory,pids
+2026-11-03T06:10:34.5723405Z CGROUP-17-2 mode=delegated uid=1001 unit=maos-17-7-terminal-df88ef21c118 membership=/system.slice/maos-17-7-terminal-df88ef21c118.service/daemon Delegate=yes
+2026-11-03T06:10:35.3395654Z T3-ROOTLESS-CANARY uid=1001 user-manager=reachable runtime=podman locked-image=present store=provisioned
+2026-11-03T06:10:39.8429922Z   Extracting 7 binaries (including 1 non-test binary) and 6 linked paths to /home/runner/work/maos/maos
+2026-11-03T06:10:39.8431120Z    Extracted 54 files to /home/runner/work/maos/maos in 1.37s
+2026-11-03T06:10:39.8432048Z ────────────
+2026-11-03T06:10:39.8432886Z  Nextest run ID 1cafae66-1bf8-45c8-8979-d47cee9d2d36 with nextest profile: archive-consumer
+2026-11-03T06:10:39.8434009Z     Starting 1 test across 1 binary (3 tests and 5 binaries skipped)
+2026-11-03T06:10:39.8435469Z        START [         ] (1/1) maos-bin::smoke_cli_wrapper_8_12 maos_run_cli_wrapper_worker_spawns_real_subprocess
+2026-11-03T06:10:39.8436178Z 
+2026-11-03T06:10:39.8436365Z running 1 test
+2026-11-03T06:10:39.8436851Z test maos_run_cli_wrapper_worker_spawns_real_subprocess ... ok
+2026-11-03T06:10:39.8437138Z 
+2026-11-03T06:10:39.8437503Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 3.11s
+2026-11-03T06:10:39.8437868Z 
+2026-11-03T06:10:39.8440333Z         PASS [   3.116s] (1/1) maos-bin::smoke_cli_wrapper_8_12 maos_run_cli_wrapper_worker_spawns_real_subprocess
+2026-11-03T06:10:39.8441342Z ────────────
+2026-11-03T06:10:39.8441866Z      Summary [   3.117s] 1 test run: 1 passed, 3 skipped
+2026-11-03T06:10:39.8444211Z ##[notice]uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored
+2026-11-03T06:10:39.8514818Z   Extracting 5 binaries (including 1 non-test binary) and 3 linked paths to /home/runner/work/maos/maos
+2026-11-03T06:10:40.6775163Z    Extracted 45 files to /home/runner/work/maos/maos in 0.83s
+2026-11-03T06:10:40.6804395Z warning: ignoring --test-threads because --no-capture is specified
+2026-11-03T06:10:40.6867004Z ────────────
+2026-11-03T06:10:40.6867860Z  Nextest run ID 63b19dc1-1a70-4e46-9a4f-9e059af9dc14 with nextest profile: archive-consumer
+2026-11-03T06:10:40.6868747Z     Starting 34 tests across 1 binary (3 binaries skipped)
+2026-11-03T06:10:40.6869904Z        START [         ] ( 1/34) maos-bin::worker_terminal_facts_17_7 root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+2026-11-03T06:10:40.6914922Z 
+2026-11-03T06:10:40.6915251Z running 1 test
+2026-11-03T06:10:40.7088354Z 
+2026-11-03T06:10:40.7089828Z thread 'root_crash::purge_cgroup_native_binding_and_dead_creator_twins' (2982) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs:320:5:
+2026-11-03T06:10:40.7091000Z maos: purge configuration invalid: refusing unsafe purge root /tmp/.tmpmEfPSe/home (equal to HOME or an ancestor)
+2026-11-03T06:10:40.7091470Z 
+2026-11-03T06:10:40.7091788Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-03T06:10:40.7097297Z test root_crash::purge_cgroup_native_binding_and_dead_creator_twins ... FAILED
+2026-11-03T06:10:40.7097980Z 
+2026-11-03T06:10:40.7098106Z failures:
+2026-11-03T06:10:40.7098266Z 
+2026-11-03T06:10:40.7098378Z failures:
+2026-11-03T06:10:40.7098834Z     root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+2026-11-03T06:10:40.7099213Z 
+2026-11-03T06:10:40.7099750Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.02s
+2026-11-03T06:10:40.7100273Z 
+2026-11-03T06:10:40.7104951Z         FAIL [   0.023s] ( 1/34) maos-bin::worker_terminal_facts_17_7 root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+2026-11-03T06:10:40.7105965Z        START [         ] ( 2/34) maos-bin::worker_terminal_facts_17_7 root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+2026-11-03T06:10:40.7151811Z 
+2026-11-03T06:10:40.7152045Z running 1 test
+2026-11-03T06:10:48.1222679Z 
+2026-11-03T06:10:48.1224800Z thread 'root_crash::root_crash_retains_stopped_container_and_purge_reports_it' (2991) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs:226:5:
+2026-11-03T06:10:48.1226685Z dry purge failed: maos: purge configuration invalid: refusing unsafe purge root /tmp/.tmpvgVtw2/home (equal to HOME or an ancestor)
+2026-11-03T06:10:48.1227347Z 
+2026-11-03T06:10:48.1227755Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-03T06:10:48.3242044Z test root_crash::root_crash_retains_stopped_container_and_purge_reports_it ... FAILED
+2026-11-03T06:10:48.3242568Z 
+2026-11-03T06:10:48.3242678Z failures:
+2026-11-03T06:10:48.3242807Z 
+2026-11-03T06:10:48.3242901Z failures:
+2026-11-03T06:10:48.3243278Z     root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+2026-11-03T06:10:48.3243586Z 
+2026-11-03T06:10:48.3243980Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 7.61s
+2026-11-03T06:10:48.3244356Z 
+2026-11-03T06:10:48.3249014Z         FAIL [   7.614s] ( 2/34) maos-bin::worker_terminal_facts_17_7 root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+2026-11-03T06:10:48.3250157Z        START [         ] ( 3/34) maos-bin::worker_terminal_facts_17_7 runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+2026-11-03T06:10:48.3299111Z 
+2026-11-03T06:10:48.3299318Z running 1 test
+2026-11-03T06:10:49.4480759Z maos: T3 container 797ad5995c6a74e617617101bd7e0d7b4673c10246374ee088653e94132d8bfe CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:10:49.4483178Z test runtime_scenes::client_first_stop_snapshots_only_a_terminal_state ... ok
+2026-11-03T06:10:49.4484044Z 
+2026-11-03T06:10:49.4485259Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 1.12s
+2026-11-03T06:10:49.4486194Z 
+2026-11-03T06:10:49.4491626Z         PASS [   1.124s] ( 3/34) maos-bin::worker_terminal_facts_17_7 runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+2026-11-03T06:10:49.4493471Z        START [         ] ( 4/34) maos-bin::worker_terminal_facts_17_7 runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+2026-11-03T06:10:49.4539156Z 
+2026-11-03T06:10:49.4539546Z running 1 test
+2026-11-03T06:10:51.3486064Z test runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding ... ok
+2026-11-03T06:10:51.3486550Z 
+2026-11-03T06:10:51.3487389Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 1.89s
+2026-11-03T06:10:51.3488036Z 
+2026-11-03T06:10:51.3495622Z         PASS [   1.900s] ( 4/34) maos-bin::worker_terminal_facts_17_7 runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+2026-11-03T06:10:51.3497250Z        START [         ] ( 5/34) maos-bin::worker_terminal_facts_17_7 runtime_scenes::ownership_is_by_cid_never_by_requested_name
+2026-11-03T06:10:51.3544029Z 
+2026-11-03T06:10:51.3544296Z running 1 test
+2026-11-03T06:10:53.9919788Z maos: T3 container 3ed915f51c4a2ddb9623b128e91ad8a05141dbddd5a469cea5e9a4ba59dae7b4 CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:10:54.2048744Z maos: T3 container 105c64ca14448461fd31d14f4c8ceaed9f8173996f4d2f12bb31a40af45b9e63 CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:10:54.2295985Z test runtime_scenes::ownership_is_by_cid_never_by_requested_name ... ok
+2026-11-03T06:10:54.2296736Z 
+2026-11-03T06:10:54.2297428Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 2.88s
+2026-11-03T06:10:54.2298017Z 
+2026-11-03T06:10:54.2303585Z         PASS [   2.881s] ( 5/34) maos-bin::worker_terminal_facts_17_7 runtime_scenes::ownership_is_by_cid_never_by_requested_name
+2026-11-03T06:10:54.2304885Z        START [         ] ( 6/34) maos-bin::worker_terminal_facts_17_7 s1_immediate_exit_terminal_facts
+2026-11-03T06:10:54.2351332Z 
+2026-11-03T06:10:54.2351530Z running 1 test
+2026-11-03T06:10:54.3801623Z 
+2026-11-03T06:10:54.3803163Z thread 's1_immediate_exit_terminal_facts' (4410) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7.rs:337:5:
+2026-11-03T06:10:54.3803932Z S1 must complete: 
+2026-11-03T06:10:54.3804770Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-03T06:10:54.3805953Z test s1_immediate_exit_terminal_facts ... FAILED
+2026-11-03T06:10:54.3806394Z 
+2026-11-03T06:10:54.3806551Z failures:
+2026-11-03T06:10:54.3806778Z 
+2026-11-03T06:10:54.3806931Z failures:
+2026-11-03T06:10:54.3807329Z     s1_immediate_exit_terminal_facts
+2026-11-03T06:10:54.3807657Z 
+2026-11-03T06:10:54.3808343Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.15s
+2026-11-03T06:10:54.3809015Z 
+2026-11-03T06:10:54.3812849Z         FAIL [   0.151s] ( 6/34) maos-bin::worker_terminal_facts_17_7 s1_immediate_exit_terminal_facts
+2026-11-03T06:10:54.3813897Z        START [         ] ( 7/34) maos-bin::worker_terminal_facts_17_7 s2_intentional_exit_137_is_not_a_signal
+2026-11-03T06:10:54.3863087Z 
+2026-11-03T06:10:54.3863410Z running 1 test
+2026-11-03T06:10:54.5303888Z 
+2026-11-03T06:10:54.5305640Z thread 's2_intentional_exit_137_is_not_a_signal' (4422) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7.rs:128:5:
+2026-11-03T06:10:54.5315956Z assertion `left == right` failed: one Worker exit row: [(1, "lifecycle.admit", Object {"spirit_id": String("worker")}), (1, "lifecycle.load", Object {"lifecycle_event": String("Load"), "spirit_id": String("worker"), "spirit_pid": Number(1)}), (1, "lifecycle.start", Object {"lifecycle_event": String("Start"), "spirit_pid": Number(1)}), (0, "task.nacked", Object {"task_id": String("run:worker"), "originator_spirit_id": String("operator"), "capability_token": Null}), (1, "lifecycle.unload", Object {"lifecycle_event": String("Unload"), "spirit_pid": Number(1)}), (1, "planned_unload", Null), (1, "planned_unload", Object {"halt_id": String("term-worker-1-1793686254516106143"), "timestamp_ns": Number(1793686254516106143), "spirit_pid": Number(1), "boot_nonce": Number(5895), "frame_id": Array [Number(1), Number(161), Number(160), Number(8), Number(51), Number(180), Number(216), Number(117), Number(99), Number(30), Number(171), Number(138), Number(53), Number(163), Number(205), Number(217)], "terminal_state": String("Terminated"), "resolution_kind": String("planned_unload"), "resolution_timestamp_ns": Number(1793686254516106143)}), (1, "cap.revoke", Null)]
+2026-11-03T06:10:54.5321115Z   left: 0
+2026-11-03T06:10:54.5321352Z  right: 1
+2026-11-03T06:10:54.5321813Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-03T06:10:54.5322580Z test s2_intentional_exit_137_is_not_a_signal ... FAILED
+2026-11-03T06:10:54.5322840Z 
+2026-11-03T06:10:54.5322932Z failures:
+2026-11-03T06:10:54.5323065Z 
+2026-11-03T06:10:54.5323156Z failures:
+2026-11-03T06:10:54.5323419Z     s2_intentional_exit_137_is_not_a_signal
+2026-11-03T06:10:54.5323633Z 
+2026-11-03T06:10:54.5324035Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.14s
+2026-11-03T06:10:54.5324424Z 
+2026-11-03T06:10:54.5325233Z         FAIL [   0.150s] ( 7/34) maos-bin::worker_terminal_facts_17_7 s2_intentional_exit_137_is_not_a_signal
+2026-11-03T06:10:54.5326000Z        START [         ] ( 8/34) maos-bin::worker_terminal_facts_17_7 s3_external_sigkill_requires_pidfd_fact
+2026-11-03T06:10:54.5364889Z 
+2026-11-03T06:10:54.5365072Z running 1 test
+2026-11-03T06:11:24.5514376Z 
+2026-11-03T06:11:24.5516279Z thread 's3_external_sigkill_requires_pidfd_fact' (4435) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7.rs:261:9:
+2026-11-03T06:11:24.5517957Z worker did not publish cli_wrapper_loaded CID
+2026-11-03T06:11:24.5519216Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-03T06:11:24.5520092Z test s3_external_sigkill_requires_pidfd_fact ... FAILED
+2026-11-03T06:11:24.5520495Z 
+2026-11-03T06:11:24.5520678Z failures:
+2026-11-03T06:11:24.5520867Z 
+2026-11-03T06:11:24.5521180Z failures:
+2026-11-03T06:11:24.5521593Z     s3_external_sigkill_requires_pidfd_fact
+2026-11-03T06:11:24.5521934Z 
+2026-11-03T06:11:24.5522775Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 30.02s
+2026-11-03T06:11:24.5523637Z 
+2026-11-03T06:11:24.5525539Z         FAIL [  30.021s] ( 8/34) maos-bin::worker_terminal_facts_17_7 s3_external_sigkill_requires_pidfd_fact
+2026-11-03T06:11:24.5526776Z        START [         ] ( 9/34) maos-bin::worker_terminal_facts_17_7 s4_oom_marker_is_not_payload_evidence_alone
+2026-11-03T06:11:24.5573970Z 
+2026-11-03T06:11:24.5574144Z running 1 test
+2026-11-03T06:11:25.6592814Z 
+2026-11-03T06:11:25.6594366Z thread 's4_oom_marker_is_not_payload_evidence_alone' (4452) panicked at crates/maos-bin/tests/worker_terminal_facts_17_7.rs:128:5:
+2026-11-03T06:11:25.6600227Z assertion `left == right` failed: one Worker exit row: [(1, "lifecycle.admit", Object {"spirit_id": String("worker")}), (1, "lifecycle.load", Object {"lifecycle_event": String("Load"), "spirit_id": String("worker"), "spirit_pid": Number(1)}), (1, "lifecycle.start", Object {"lifecycle_event": String("Start"), "spirit_pid": Number(1)}), (0, "task.nacked", Object {"task_id": String("run:worker"), "originator_spirit_id": String("operator"), "capability_token": Null}), (1, "lifecycle.unload", Object {"lifecycle_event": String("Unload"), "spirit_pid": Number(1)}), (1, "planned_unload", Null), (1, "planned_unload", Object {"halt_id": String("term-worker-1-1793686285644132477"), "timestamp_ns": Number(1793686285644132477), "spirit_pid": Number(1), "boot_nonce": Number(5895), "frame_id": Array [Number(1), Number(161), Number(160), Number(8), Number(173), Number(76), Number(67), Number(200), Number(62), Number(2), Number(20), Number(214), Number(228), Number(125), Number(162), Number(91)], "terminal_state": String("Terminated"), "resolution_kind": String("planned_unload"), "resolution_timestamp_ns": Number(1793686285644132477)}), (1, "cap.revoke", Null)]
+2026-11-03T06:11:25.6605716Z   left: 0
+2026-11-03T06:11:25.6606035Z  right: 1
+2026-11-03T06:11:25.6606804Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-03T06:11:25.6607853Z test s4_oom_marker_is_not_payload_evidence_alone ... FAILED
+2026-11-03T06:11:25.6608339Z 
+2026-11-03T06:11:25.6608504Z failures:
+2026-11-03T06:11:25.6608708Z 
+2026-11-03T06:11:25.6608860Z failures:
+2026-11-03T06:11:25.6609309Z     s4_oom_marker_is_not_payload_evidence_alone
+2026-11-03T06:11:25.6610028Z 
+2026-11-03T06:11:25.6610749Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 1.10s
+2026-11-03T06:11:25.6611655Z 
+2026-11-03T06:11:25.6612351Z         FAIL [   1.108s] ( 9/34) maos-bin::worker_terminal_facts_17_7 s4_oom_marker_is_not_payload_evidence_alone
+2026-11-03T06:11:25.6615771Z        START [         ] (10/34) maos-bin::worker_terminal_facts_17_7 startup_scenes::crash_plant_waits_for_launch_after_a_previous_worker_teardown
+2026-11-03T06:11:25.6653468Z 
+2026-11-03T06:11:25.6653796Z running 1 test
+2026-11-03T06:11:25.7210947Z test startup_scenes::crash_plant_waits_for_launch_after_a_previous_worker_teardown ... ok
+2026-11-03T06:11:25.7211358Z 
+2026-11-03T06:11:25.7211755Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.06s
+2026-11-03T06:11:25.7212130Z 
+2026-11-03T06:11:25.7220072Z         PASS [   0.061s] (10/34) maos-bin::worker_terminal_facts_17_7 startup_scenes::crash_plant_waits_for_launch_after_a_previous_worker_teardown
+2026-11-03T06:11:25.7221782Z        START [         ] (11/34) maos-bin::worker_terminal_facts_17_7 startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+2026-11-03T06:11:25.7263966Z 
+2026-11-03T06:11:25.7264180Z running 1 test
+2026-11-03T06:11:32.7491882Z test startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit ... ok
+2026-11-03T06:11:32.7492344Z 
+2026-11-03T06:11:32.7492767Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 7.02s
+2026-11-03T06:11:32.7493191Z 
+2026-11-03T06:11:32.7498301Z         PASS [   7.028s] (11/34) maos-bin::worker_terminal_facts_17_7 startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+2026-11-03T06:11:32.7499841Z        START [         ] (12/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+2026-11-03T06:11:32.7542783Z 
+2026-11-03T06:11:32.7543005Z running 1 test
+2026-11-03T06:11:32.7760227Z test stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret ... ok
+2026-11-03T06:11:32.7760950Z 
+2026-11-03T06:11:32.7761614Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.02s
+2026-11-03T06:11:32.7762293Z 
+2026-11-03T06:11:32.7765789Z         PASS [   0.027s] (12/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+2026-11-03T06:11:32.7767667Z        START [         ] (13/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+2026-11-03T06:11:32.7811621Z 
+2026-11-03T06:11:32.7811903Z running 1 test
+2026-11-03T06:11:32.7877354Z test stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict ... ok
+2026-11-03T06:11:32.7877780Z 
+2026-11-03T06:11:32.7878212Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.01s
+2026-11-03T06:11:32.7878638Z 
+2026-11-03T06:11:32.7883543Z         PASS [   0.012s] (13/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+2026-11-03T06:11:32.7885507Z        START [         ] (14/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+2026-11-03T06:11:32.7925013Z 
+2026-11-03T06:11:32.7925471Z running 1 test
+2026-11-03T06:11:42.7991690Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef residue ExistsFailed; state retained at /tmp/maos-terminal-facts-17-7-exists-timeout-4679-1793686292792613060/state
+2026-11-03T06:11:42.8011085Z test stub_scenes::deadlines_hung_exists_is_typed_and_bounded ... ok
+2026-11-03T06:11:42.8011450Z 
+2026-11-03T06:11:42.8012142Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 10.01s
+2026-11-03T06:11:42.8012764Z 
+2026-11-03T06:11:42.8013833Z         PASS [  10.011s] (14/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+2026-11-03T06:11:42.8015416Z        START [         ] (15/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_hung_rm_is_bounded
+2026-11-03T06:11:42.8053096Z 
+2026-11-03T06:11:42.8053250Z running 1 test
+2026-11-03T06:11:52.8223365Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef residue RemoveTimeout; state retained at /tmp/maos-terminal-facts-17-7-rm-timeout-4705-1793686302805410236/state
+2026-11-03T06:11:52.8225492Z test stub_scenes::deadlines_hung_rm_is_bounded ... ok
+2026-11-03T06:11:52.8225789Z 
+2026-11-03T06:11:52.8226222Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 10.02s
+2026-11-03T06:11:52.8226655Z 
+2026-11-03T06:11:52.8230271Z         PASS [  10.023s] (15/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_hung_rm_is_bounded
+2026-11-03T06:11:52.8231280Z        START [         ] (16/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+2026-11-03T06:11:52.8278219Z 
+2026-11-03T06:11:52.8278436Z running 1 test
+2026-11-03T06:11:57.8348822Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:11:57.8352943Z test stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared ... ok
+2026-11-03T06:11:57.8353456Z 
+2026-11-03T06:11:57.8353979Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 5.01s
+2026-11-03T06:11:57.8354837Z 
+2026-11-03T06:11:57.8355705Z         PASS [   5.012s] (16/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+2026-11-03T06:11:57.8356848Z        START [         ] (17/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_remove_failure_is_typed
+2026-11-03T06:11:57.8400087Z 
+2026-11-03T06:11:57.8400268Z running 1 test
+2026-11-03T06:11:57.8504230Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef residue RemoveFailed; state retained at /tmp/maos-terminal-facts-17-7-rm-failure-4748-1793686317840162061/state
+2026-11-03T06:11:57.8505840Z test stub_scenes::deadlines_remove_failure_is_typed ... ok
+2026-11-03T06:11:57.8506178Z 
+2026-11-03T06:11:57.8507046Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.01s
+2026-11-03T06:11:57.8507707Z 
+2026-11-03T06:11:57.8510150Z         PASS [   0.015s] (17/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::deadlines_remove_failure_is_typed
+2026-11-03T06:11:57.8511477Z        START [         ] (18/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+2026-11-03T06:11:57.8556093Z 
+2026-11-03T06:11:57.8556316Z running 1 test
+2026-11-03T06:11:57.9138664Z test stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid ... ok
+2026-11-03T06:11:57.9139341Z 
+2026-11-03T06:11:57.9140021Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.06s
+2026-11-03T06:11:57.9140652Z 
+2026-11-03T06:11:57.9146488Z         PASS [   0.063s] (18/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+2026-11-03T06:11:57.9149121Z        START [         ] (19/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+2026-11-03T06:11:57.9191884Z 
+2026-11-03T06:11:57.9192189Z running 1 test
+2026-11-03T06:11:57.9223883Z test stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime ... ok
+2026-11-03T06:11:57.9224633Z 
+2026-11-03T06:11:57.9225106Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.00s
+2026-11-03T06:11:57.9225523Z 
+2026-11-03T06:11:57.9230330Z         PASS [   0.008s] (19/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+2026-11-03T06:11:57.9232190Z        START [         ] (20/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+2026-11-03T06:11:57.9275942Z 
+2026-11-03T06:11:57.9276184Z running 1 test
+2026-11-03T06:12:07.9342220Z test stub_scenes::ownership_create_timeout_cleans_the_receipt_cid ... ok
+2026-11-03T06:12:07.9342817Z 
+2026-11-03T06:12:07.9343477Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 10.01s
+2026-11-03T06:12:07.9344093Z 
+2026-11-03T06:12:07.9349562Z         PASS [  10.012s] (20/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+2026-11-03T06:12:07.9351152Z        START [         ] (21/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+2026-11-03T06:12:07.9396946Z 
+2026-11-03T06:12:07.9397305Z running 1 test
+2026-11-03T06:12:07.9545890Z test stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement ... ok
+2026-11-03T06:12:07.9546302Z 
+2026-11-03T06:12:07.9546708Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.01s
+2026-11-03T06:12:07.9547094Z 
+2026-11-03T06:12:07.9552350Z         PASS [   0.020s] (21/34) maos-bin::worker_terminal_facts_17_7 stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+2026-11-03T06:12:07.9553745Z        START [         ] (22/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::barrier_failure_unwinds_with_exactly_one_panic_20_7
+2026-11-03T06:12:07.9599093Z 
+2026-11-03T06:12:07.9599422Z running 1 test
+2026-11-03T06:12:12.9887181Z test supervisor_scenes::barrier_failure_unwinds_with_exactly_one_panic_20_7 ... ok
+2026-11-03T06:12:12.9888042Z 
+2026-11-03T06:12:12.9888891Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 5.03s
+2026-11-03T06:12:12.9889681Z 
+2026-11-03T06:12:12.9893345Z         PASS [   5.034s] (22/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::barrier_failure_unwinds_with_exactly_one_panic_20_7
+2026-11-03T06:12:12.9895148Z        START [         ] (23/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+2026-11-03T06:12:12.9941590Z 
+2026-11-03T06:12:12.9941912Z running 1 test
+2026-11-03T06:12:18.0322687Z test supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease ... ok
+2026-11-03T06:12:18.0323449Z 
+2026-11-03T06:12:18.0324093Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 5.04s
+2026-11-03T06:12:18.0324951Z 
+2026-11-03T06:12:18.0329768Z         PASS [   5.044s] (23/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+2026-11-03T06:12:18.0331734Z        START [         ] (24/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+2026-11-03T06:12:18.0376715Z 
+2026-11-03T06:12:18.0377322Z running 1 test
+2026-11-03T06:12:23.1249095Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef residue RemoveFailed; state retained at /tmp/.tmpoiPuwF/residue/state
+2026-11-03T06:12:23.1316633Z maos: FR4 feed omitted 4 non-call kernel row(s): capability.invocation×4
+2026-11-03T06:12:23.1371030Z test supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query ... ok
+2026-11-03T06:12:23.1371474Z 
+2026-11-03T06:12:23.1371853Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 5.10s
+2026-11-03T06:12:23.1372238Z 
+2026-11-03T06:12:23.1381401Z         PASS [   5.105s] (24/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+2026-11-03T06:12:23.1428761Z        START [         ] (25/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+2026-11-03T06:12:23.1429392Z 
+2026-11-03T06:12:23.1429498Z running 1 test
+2026-11-03T06:12:23.1678424Z test supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output ... ok
+2026-11-03T06:12:23.1679350Z 
+2026-11-03T06:12:23.1680016Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.02s
+2026-11-03T06:12:23.1680651Z 
+2026-11-03T06:12:23.1687956Z         PASS [   0.031s] (25/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+2026-11-03T06:12:23.1689085Z        START [         ] (26/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+2026-11-03T06:12:23.1735510Z 
+2026-11-03T06:12:23.1735866Z running 1 test
+2026-11-03T06:12:28.1915099Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:12:28.1916439Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:12:28.2011770Z maos: T3 container 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:12:28.2051180Z test supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline ... ok
+2026-11-03T06:12:28.2051651Z 
+2026-11-03T06:12:28.2052058Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 5.03s
+2026-11-03T06:12:28.2052461Z 
+2026-11-03T06:12:28.2061289Z         PASS [   5.037s] (26/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+2026-11-03T06:12:28.2062617Z        START [         ] (27/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+2026-11-03T06:12:28.2110683Z 
+2026-11-03T06:12:28.2111038Z running 1 test
+2026-11-03T06:12:28.2614012Z test supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer ... ok
+2026-11-03T06:12:28.2614705Z 
+2026-11-03T06:12:28.2615163Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.05s
+2026-11-03T06:12:28.2615586Z 
+2026-11-03T06:12:28.2619802Z         PASS [   0.056s] (27/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+2026-11-03T06:12:28.2621134Z        START [         ] (28/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+2026-11-03T06:12:28.2668572Z 
+2026-11-03T06:12:28.2668860Z running 1 test
+2026-11-03T06:12:28.3033952Z test supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier ... ok
+2026-11-03T06:12:28.3034844Z 
+2026-11-03T06:12:28.3035343Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.04s
+2026-11-03T06:12:28.3035842Z 
+2026-11-03T06:12:28.3042806Z         PASS [   0.042s] (28/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+2026-11-03T06:12:28.3044282Z        START [         ] (29/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::late_attachment_after_stop_tears_down_once
+2026-11-03T06:12:28.3091290Z 
+2026-11-03T06:12:28.3091518Z running 1 test
+2026-11-03T06:12:28.3309408Z test supervisor_scenes::late_attachment_after_stop_tears_down_once ... ok
+2026-11-03T06:12:28.3309889Z 
+2026-11-03T06:12:28.3310326Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.02s
+2026-11-03T06:12:28.3310754Z 
+2026-11-03T06:12:28.3319425Z         PASS [   0.028s] (29/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::late_attachment_after_stop_tears_down_once
+2026-11-03T06:12:28.3320654Z        START [         ] (30/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+2026-11-03T06:12:28.3367787Z 
+2026-11-03T06:12:28.3368425Z running 1 test
+2026-11-03T06:12:28.3611301Z test supervisor_scenes::sandbox_applied_report_survives_journal_reopen ... ok
+2026-11-03T06:12:28.3612045Z 
+2026-11-03T06:12:28.3612487Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.02s
+2026-11-03T06:12:28.3612908Z 
+2026-11-03T06:12:28.3621468Z         PASS [   0.030s] (30/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+2026-11-03T06:12:28.3623433Z        START [         ] (31/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+2026-11-03T06:12:28.3670703Z 
+2026-11-03T06:12:28.3670933Z running 1 test
+2026-11-03T06:12:33.3951557Z test supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault ... ok
+2026-11-03T06:12:33.3952110Z 
+2026-11-03T06:12:33.3952574Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 5.03s
+2026-11-03T06:12:33.3953067Z 
+2026-11-03T06:12:33.3961280Z         PASS [   5.034s] (31/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+2026-11-03T06:12:33.3962457Z        START [         ] (32/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+2026-11-03T06:12:33.4008718Z 
+2026-11-03T06:12:33.4008997Z running 1 test
+2026-11-03T06:12:48.4259132Z test supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault ... ok
+2026-11-03T06:12:48.4259589Z 
+2026-11-03T06:12:48.4260001Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 15.02s
+2026-11-03T06:12:48.4260406Z 
+2026-11-03T06:12:48.4269425Z         PASS [  15.031s] (32/34) maos-bin::worker_terminal_facts_17_7 supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+2026-11-03T06:12:48.4270646Z        START [         ] (33/34) maos-bin::worker_terminal_facts_17_7 unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+2026-11-03T06:12:48.4316008Z 
+2026-11-03T06:12:48.4316273Z running 1 test
+2026-11-03T06:12:48.5431285Z maos run: cli_wrapper cap-token mediation not granted (kernel policy denied capability issuance); proceeding under AC5 host-grant authority (operator policy `proc.exec` grant is Epic 9 surface). The CapabilityInvocation exit row is still journaled.
+2026-11-03T06:12:49.4415092Z {"event":"host_grant_disposition","attested_image":"worker-cli-fixture","signing_key_id":"MAOS Project","granted_tier":"SandboxTier(3)","egress":"enforced","egress_enforced":true,"permitted_egress":[]}
+2026-11-03T06:12:49.4420068Z {"event":"cli_wrapper_loaded","spirit_id":"worker","spirit_pid":1,"granted_tier":"SandboxTier(3)","child_pid":7457,"container_id":"5f2d19255792d29bdcd216a7352eb19ec38b624a4a19be23e0bc877bea9df578","live":false,"workspace":"/tmp/maos-terminal-s5-7356-1793686368432879999/runtime-home/workspaces/maos-worker-1793686368542855205"}
+2026-11-03T06:12:50.5758217Z maos: T3 container 5f2d19255792d29bdcd216a7352eb19ec38b624a4a19be23e0bc877bea9df578 CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:12:50.5764112Z {"event":"cli_wrapper_exit","child_pid":7457,"stdout_lines":0,"stderr_lines":0,"exit_cause":"Signaled { signal: 9 }","is_crash":true}
+2026-11-03T06:12:50.5766859Z maos run: cli_wrapper '/home/runner/work/maos/maos/target/debug/worker-cli-fixture' exited (Signaled { signal: 9 }); 0 CliSubprocessOutput row(s) journaled to the Transparency Log
+2026-11-03T06:12:50.5770751Z {"event":"worker_completion","worker_cli":"worker-cli-fixture","completion":"not_completed:process_crash","completed":false,"workspace":"/tmp/maos-terminal-s5-7356-1793686368432879999/runtime-home/workspaces/maos-worker-1793686368542855205","workspace_effect":{"created":0,"modified":0,"removed":0},"last_stdout_tl_ref":null}
+2026-11-03T06:12:52.4616986Z test unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership ... ok
+2026-11-03T06:12:52.4617446Z 
+2026-11-03T06:12:52.4617874Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 4.03s
+2026-11-03T06:12:52.4618458Z 
+2026-11-03T06:12:52.4626246Z         PASS [   4.036s] (33/34) maos-bin::worker_terminal_facts_17_7 unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+2026-11-03T06:12:52.4627602Z        START [         ] (34/34) maos-bin::worker_terminal_facts_17_7 unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+2026-11-03T06:12:52.4673752Z 
+2026-11-03T06:12:52.4673987Z running 1 test
+2026-11-03T06:12:52.5783962Z maos run: cli_wrapper cap-token mediation not granted (kernel policy denied capability issuance); proceeding under AC5 host-grant authority (operator policy `proc.exec` grant is Epic 9 surface). The CapabilityInvocation exit row is still journaled.
+2026-11-03T06:12:53.4767051Z {"event":"host_grant_disposition","attested_image":"worker-cli-fixture","signing_key_id":"MAOS Project","granted_tier":"SandboxTier(3)","egress":"enforced","egress_enforced":true,"permitted_egress":[]}
+2026-11-03T06:12:53.4769274Z {"event":"cli_wrapper_loaded","spirit_id":"worker","spirit_pid":1,"granted_tier":"SandboxTier(3)","child_pid":7642,"container_id":"90f748d9b246b2c37e136658f5d2e07d12073a058be82fa2900e6154dd1ad843","live":false,"workspace":"/tmp/maos-terminal-s5-7540-1793686372468704873/runtime-home/workspaces/maos-worker-1793686372578054660"}
+2026-11-03T06:12:53.5006484Z 
+2026-11-03T06:12:53.5007591Z thread 'tokio-rt-worker' (7549) panicked at crates/maos-bin/src/supervision.rs:2627:47:
+2026-11-03T06:12:53.5008581Z injected Worker on_unload panic
+2026-11-03T06:12:53.5009453Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-03T06:13:03.5656187Z maos: T3 container 90f748d9b246b2c37e136658f5d2e07d12073a058be82fa2900e6154dd1ad843 CID kill failed; later cleanup outcome is reported separately
+2026-11-03T06:13:03.5661542Z {"event":"cli_wrapper_exit","child_pid":7642,"stdout_lines":0,"stderr_lines":0,"exit_cause":"Signaled { signal: 9 }","is_crash":true}
+2026-11-03T06:13:03.5663580Z maos run: cli_wrapper '/home/runner/work/maos/maos/target/debug/worker-cli-fixture' exited (Signaled { signal: 9 }); 0 CliSubprocessOutput row(s) journaled to the Transparency Log
+2026-11-03T06:13:03.5669891Z {"event":"worker_completion","worker_cli":"worker-cli-fixture","completion":"not_completed:process_crash","completed":false,"workspace":"/tmp/maos-terminal-s5-7540-1793686372468704873/runtime-home/workspaces/maos-worker-1793686372578054660","workspace_effect":{"created":0,"modified":0,"removed":0},"last_stdout_tl_ref":null}
+2026-11-03T06:13:03.6231253Z test unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership ... ok
+2026-11-03T06:13:03.6231725Z 
+2026-11-03T06:13:03.6232129Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 11.16s
+2026-11-03T06:13:03.6232529Z 
+2026-11-03T06:13:03.6241319Z         PASS [  11.161s] (34/34) maos-bin::worker_terminal_facts_17_7 unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+2026-11-03T06:13:03.6242624Z ────────────
+2026-11-03T06:13:03.6243234Z      Summary [ 142.937s] 34 tests run: 28 passed, 6 failed, 0 skipped
+2026-11-03T06:13:03.6244740Z         FAIL [   0.023s] ( 1/34) maos-bin::worker_terminal_facts_17_7 root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+2026-11-03T06:13:03.6246374Z         FAIL [   7.614s] ( 2/34) maos-bin::worker_terminal_facts_17_7 root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+2026-11-03T06:13:03.6247549Z         FAIL [   0.151s] ( 6/34) maos-bin::worker_terminal_facts_17_7 s1_immediate_exit_terminal_facts
+2026-11-03T06:13:03.6248320Z         FAIL [   0.150s] ( 7/34) maos-bin::worker_terminal_facts_17_7 s2_intentional_exit_137_is_not_a_signal
+2026-11-03T06:13:03.6249119Z         FAIL [  30.021s] ( 8/34) maos-bin::worker_terminal_facts_17_7 s3_external_sigkill_requires_pidfd_fact
+2026-11-03T06:13:03.6250704Z         FAIL [   1.108s] ( 9/34) maos-bin::worker_terminal_facts_17_7 s4_oom_marker_is_not_payload_evidence_alone
+2026-11-03T06:13:03.6302228Z error: test run failed
+2026-11-03T06:13:03.6446629Z Finished with result: exit-code
+2026-11-03T06:13:03.6447471Z Main processes terminated with: code=exited/status=100
+2026-11-03T06:13:03.6448146Z Service runtime: 2min 29.130s
+2026-11-03T06:13:03.6448564Z CPU time consumed: 39.627s
+2026-11-03T06:13:03.6448849Z Memory peak: 10.1M
+2026-11-03T06:13:03.6449185Z Memory swap peak: 0B
+2026-11-03T06:13:03.7364384Z cgroup-ceiling check-log: suite 1 expected 34 tests run and passed; got 34 tests run: 28 passed, 6 failed, 0 skipped
+2026-11-03T06:13:03.7457099Z ##[error]Process completed with exit code 1.
+2026-11-03T06:13:03.7511643Z ##[group]Run actions/upload-artifact@v4
+2026-11-03T06:13:03.7511970Z with:
+2026-11-03T06:13:03.7512209Z   name: epic-17-terminal-ubuntu-24.04
+2026-11-03T06:13:03.7512574Z   path: /home/runner/work/_temp/worker-terminal-facts.log
+2026-11-03T06:13:03.7512929Z   if-no-files-found: warn
+2026-11-03T06:13:03.7513172Z   compression-level: 6
+2026-11-03T06:13:03.7513421Z   overwrite: false
+2026-11-03T06:13:03.7513651Z   include-hidden-files: false
+2026-11-03T06:13:03.7513895Z env:
+2026-11-03T06:13:03.7514098Z   CARGO_TERM_COLOR: never
+2026-11-03T06:13:03.7514331Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:13:03.7515004Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:13:03.7515286Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:13:03.7515559Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:13:03.7515806Z   CARGO_NET_RETRY: 10
+2026-11-03T06:13:03.7516041Z   RUSTC: /bin/false
+2026-11-03T06:13:03.7516273Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:13:03.7516519Z   CARGO: /bin/false
+2026-11-03T06:13:03.7516863Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:13:03.7517251Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:13:03.7517514Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:13:03.7525227Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:13:03.7533143Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:13:03.7533423Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:13:03.7533786Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:13:03.7534395Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:13:03.7535102Z ##[endgroup]
+2026-11-03T06:13:03.9286841Z (node:9924) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T06:13:03.9288408Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T06:13:03.9337055Z With the provided path, there will be 1 file uploaded
+2026-11-03T06:13:03.9343697Z Artifact name is valid!
+2026-11-03T06:13:03.9344876Z Root directory input is valid!
+2026-11-03T06:13:04.2643549Z Beginning upload of artifact content to blob storage
+2026-11-03T06:13:04.2850522Z (node:9924) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-03T06:13:04.4890492Z Uploaded bytes 4353
+2026-11-03T06:13:04.5472259Z Finished uploading artifact content to blob storage!
+2026-11-03T06:13:04.5474043Z SHA256 digest of uploaded artifact zip is 54365eb9326e71e0114e7ef7de8c3949ec7b2704ee5e46f7994274773ad30d92
+2026-11-03T06:13:04.5475734Z Finalizing artifact upload
+2026-11-03T06:13:04.9935555Z Artifact epic-17-terminal-ubuntu-24.04.zip successfully finalized. Artifact ID 13208748271
+2026-11-03T06:13:04.9937010Z Artifact epic-17-terminal-ubuntu-24.04 has been successfully uploaded! Final size is 4353 bytes. Artifact ID is 13208748271
+2026-11-03T06:13:04.9943582Z Artifact download URL: https://github.com/lunarpulse/maos/actions/runs/41584453971/artifacts/13208748271
+2026-11-03T06:13:05.0120091Z ##[group]Run actions/upload-artifact@v4
+2026-11-03T06:13:05.0120449Z with:
+2026-11-03T06:13:05.0120680Z   name: epic-17-cli-quota-ubuntu-24.04
+2026-11-03T06:13:05.0121069Z   path: /home/runner/work/_temp/cli-wrapper-exhaustion.log
+2026-11-03T06:13:05.0121442Z   if-no-files-found: warn
+2026-11-03T06:13:05.0121705Z   compression-level: 6
+2026-11-03T06:13:05.0121940Z   overwrite: false
+2026-11-03T06:13:05.0122181Z   include-hidden-files: false
+2026-11-03T06:13:05.0122433Z env:
+2026-11-03T06:13:05.0122645Z   CARGO_TERM_COLOR: never
+2026-11-03T06:13:05.0122889Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:13:05.0123134Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:13:05.0123411Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:13:05.0123686Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:13:05.0123934Z   CARGO_NET_RETRY: 10
+2026-11-03T06:13:05.0124156Z   RUSTC: /bin/false
+2026-11-03T06:13:05.0124385Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:13:05.0124941Z   CARGO: /bin/false
+2026-11-03T06:13:05.0125292Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:13:05.0125693Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:13:05.0125960Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:13:05.0133483Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:13:05.0141703Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:13:05.0141986Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:13:05.0142376Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:13:05.0143003Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:13:05.0143506Z ##[endgroup]
+2026-11-03T06:13:05.1932506Z (node:9936) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T06:13:05.1934113Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T06:13:05.1955947Z ##[warning]No files were found with the provided path: /home/runner/work/_temp/cli-wrapper-exhaustion.log. No artifacts will be uploaded.
+2026-11-03T06:13:05.2174359Z ##[group]Run actions/upload-artifact@v4
+2026-11-03T06:13:05.2175585Z with:
+2026-11-03T06:13:05.2196217Z   name: epic-17-observer-ubuntu-24.04
+2026-11-03T06:13:05.2196815Z   path: /home/runner/work/_temp/observer-17-4.log
+/home/runner/work/_temp/observer-activity-17-4/
+
+2026-11-03T06:13:05.2197355Z   if-no-files-found: warn
+2026-11-03T06:13:05.2197627Z   compression-level: 6
+2026-11-03T06:13:05.2197871Z   overwrite: false
+2026-11-03T06:13:05.2198114Z   include-hidden-files: false
+2026-11-03T06:13:05.2198371Z env:
+2026-11-03T06:13:05.2198581Z   CARGO_TERM_COLOR: never
+2026-11-03T06:13:05.2198829Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:13:05.2199081Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:13:05.2199350Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:13:05.2199637Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:13:05.2199886Z   CARGO_NET_RETRY: 10
+2026-11-03T06:13:05.2200122Z   RUSTC: /bin/false
+2026-11-03T06:13:05.2200353Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:13:05.2200663Z   CARGO: /bin/false
+2026-11-03T06:13:05.2200990Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:13:05.2201398Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:13:05.2201662Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:13:05.2209469Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:13:05.2217758Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:13:05.2218042Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:13:05.2218425Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:13:05.2219046Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:13:05.2219548Z ##[endgroup]
+2026-11-03T06:13:05.4065009Z (node:9948) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T06:13:05.4067045Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T06:13:05.4116380Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-11-03T06:13:05.4156008Z The least common ancestor is /home/runner/work/_temp. This will be the root directory of the artifact
+2026-11-03T06:13:05.4178431Z ##[warning]No files were found with the provided path: /home/runner/work/_temp/observer-17-4.log
+/home/runner/work/_temp/observer-activity-17-4/. No artifacts will be uploaded.
+2026-11-03T06:13:05.4407063Z ##[group]Run actions/upload-artifact@v4
+2026-11-03T06:13:05.4407643Z with:
+2026-11-03T06:13:05.4408041Z   name: epic-17-exit-ubuntu-24.04
+2026-11-03T06:13:05.4409619Z   path: /home/runner/work/_temp/epic-17-exit-line1/
+/home/runner/work/_temp/line1.out
+/home/runner/work/_temp/t2.log
+/home/runner/work/_temp/line2.log
+/home/runner/work/_temp/line2b.log
+/home/runner/work/_temp/line2b.err
+
+2026-11-03T06:13:05.4411228Z   if-no-files-found: warn
+2026-11-03T06:13:05.4411698Z   compression-level: 6
+2026-11-03T06:13:05.4412149Z   overwrite: false
+2026-11-03T06:13:05.4412570Z   include-hidden-files: false
+2026-11-03T06:13:05.4413025Z env:
+2026-11-03T06:13:05.4413396Z   CARGO_TERM_COLOR: never
+2026-11-03T06:13:05.4413825Z   TOKEI_VERSION: 14.0.0
+2026-11-03T06:13:05.4414257Z   CARGO_DENY_VERSION: 0.19.4
+2026-11-03T06:13:05.4415029Z   CARGO_PUBLIC_API_VERSION: 0.51.0
+2026-11-03T06:13:05.4415556Z   MAOS_SECRETS_BACKEND: env
+2026-11-03T06:13:05.4416000Z   CARGO_NET_RETRY: 10
+2026-11-03T06:13:05.4416468Z   RUSTC: /bin/false
+2026-11-03T06:13:05.4416874Z   CARGO_BUILD_RUSTC: /bin/false
+2026-11-03T06:13:05.4417332Z   CARGO: /bin/false
+2026-11-03T06:13:05.4417902Z   MAOS_FIXTURE_DIR: /home/runner/work/maos/maos/target/maos-fixtures
+2026-11-03T06:13:05.4418606Z   MAOS_FIXTURE_TRANSPORT: 1
+2026-11-03T06:13:05.4419071Z   EPIC17_TERMINAL_SUITE_TESTS: 34
+2026-11-03T06:13:05.4433299Z   EPIC17_TERMINAL_REQUIRED_TESTS: root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+root_crash::purge_cgroup_native_binding_and_dead_creator_twins
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+runtime_scenes::ownership_is_by_cid_never_by_requested_name
+s1_immediate_exit_terminal_facts
+s2_intentional_exit_137_is_not_a_signal
+s3_external_sigkill_requires_pidfd_fact
+s4_oom_marker_is_not_payload_evidence_alone
+startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+stub_scenes::deadlines_hung_rm_is_bounded
+stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+stub_scenes::deadlines_remove_failure_is_typed
+stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+supervisor_scenes::late_attachment_after_stop_tears_down_once
+supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+
+2026-11-03T06:13:05.4448821Z   TMPDIR: /home/runner/work/_temp
+2026-11-03T06:13:05.4449353Z   MAOS_T3_RUNTIME: podman
+2026-11-03T06:13:05.4450028Z   MAOS_T3_IMAGE_LOCK_PATH: /home/runner/work/_temp/maos-t3-tests/t3-image.lock
+2026-11-03T06:13:05.4451164Z   MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX: c5c7bda99661b09b6a0e95abd346c894a4d600f15772118d0f4ff19fa8b1a2c1
+2026-11-03T06:13:05.4452085Z ##[endgroup]
+2026-11-03T06:13:05.6409478Z (node:9960) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-03T06:13:05.6410392Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-03T06:13:05.6474550Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-11-03T06:13:05.6476758Z The least common ancestor is /home/runner/work/_temp. This will be the root directory of the artifact
+2026-11-03T06:13:05.6481214Z ##[warning]No files were found with the provided path: /home/runner/work/_temp/epic-17-exit-line1/
+/home/runner/work/_temp/line1.out
+/home/runner/work/_temp/t2.log
+/home/runner/work/_temp/line2.log
+/home/runner/work/_temp/line2b.log
+/home/runner/work/_temp/line2b.err. No artifacts will be uploaded.
+2026-11-03T06:13:05.6699863Z Post job cleanup.
+2026-11-03T06:13:05.7678968Z [command]/usr/bin/git version
+2026-11-03T06:13:05.7725334Z git version 2.56.0
+2026-11-03T06:13:05.7769671Z Temporarily overriding HOME='/home/runner/work/_temp/0b7d9bb1-47d8-40da-9e94-f89c348815fe' before making global git config changes
+2026-11-03T06:13:05.7771413Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-03T06:13:05.7776649Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-03T06:13:05.7829068Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-03T06:13:05.7897705Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-03T06:13:05.8194980Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-03T06:13:05.8235832Z http.https://github.com/.extraheader
+2026-11-03T06:13:05.8241142Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-03T06:13:05.8285482Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-03T06:13:05.8601648Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-03T06:13:05.8657226Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-03T06:13:05.9084075Z Cleaning up orphan processes
+2026-11-03T06:13:05.9617747Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -85,7 +85,7 @@ impl EgressHandle {
         log: Arc<TransparencyLogAdapter>,
         cancel: CancellationToken,
     ) -> io::Result<(Self, tokio::task::JoinHandle<io::Result<()>>)> {
-        let run_dir = create_root_dir(&home.join("egress"))?;
+        let run_dir = create_root_dir(&home.join("egress"), false)?;
         let shared = Arc::new(Shared {
             run_dir,
             table: Arc::new(BearerTable::default()),
@@ -243,15 +243,18 @@ pub fn create_worker_state_root() -> io::Result<PathBuf> {
     if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
         let runtime_dir = PathBuf::from(runtime_dir);
         if !runtime_dir.as_os_str().is_empty() && validate_private_dir(&runtime_dir).is_ok() {
-            if let Ok(root) = create_root_dir(&runtime_dir.join("maos-worker-state")) {
+            if let Ok(root) = create_root_dir(&runtime_dir.join("maos-worker-state"), true) {
                 return Ok(root);
             }
         }
     }
-    create_root_dir(&std::env::temp_dir().join(format!(
-        "maos-worker-state-{}",
-        rustix::process::geteuid().as_raw()
-    )))
+    create_root_dir(
+        &std::env::temp_dir().join(format!(
+            "maos-worker-state-{}",
+            rustix::process::geteuid().as_raw()
+        )),
+        true,
+    )
 }
 /// Allocate one fresh state directory beneath this process root.
 pub fn create_worker_state_dir(root: &Path) -> io::Result<PathBuf> {
@@ -261,13 +264,14 @@ pub fn create_worker_state_dir(root: &Path) -> io::Result<PathBuf> {
 
 /// Create a private root below `parent`, then allocate its fresh process-owned
 /// child. Non-empty children are retained as evidence during cleanup.
-fn create_root_dir(parent: &Path) -> io::Result<PathBuf> {
+/// Only volatile custody roots encode a creator PID; socket roots stay compact.
+fn create_root_dir(parent: &Path, process_root: bool) -> io::Result<PathBuf> {
     std::fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
         .create(parent)?;
     validate_private_dir(parent)?;
-    create_private_child_dir(parent, true)
+    create_private_child_dir(parent, process_root)
 }
 
 fn validate_private_dir(path: &Path) -> io::Result<()> {

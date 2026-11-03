@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
++++ b/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
+@@ -29,7 +29,7 @@
+         .current_dir(&root)
+         .env(
+             "HOME",
+-            super::t3_substrate::isolated_runtime_home(user_home),
++            super::t3_substrate::isolated_runtime_home(home),
+         )
+         .env("MAOS_HOME", home)
+         .env("XDG_DATA_HOME", home)

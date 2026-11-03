@@ -15,6 +15,7 @@ const MANIFEST: &str = "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
     shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n[author]\nname = \"MAOS Project\"\n";
 
 fn maos(home: &Path, args: &[&str]) -> Command {
+    let user_home = home.parent().expect("scratch user HOME contains MAOS_HOME");
     let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     let mut paths = vec![root.join("target/debug"), root.join("target/debug/deps")];
     paths.extend(
@@ -26,7 +27,10 @@ fn maos(home: &Path, args: &[&str]) -> Command {
     command
         .args(args)
         .current_dir(&root)
-        .env("HOME", super::t3_substrate::isolated_runtime_home(home))
+        .env(
+            "HOME",
+            super::t3_substrate::isolated_runtime_home(user_home),
+        )
         .env("MAOS_HOME", home)
         .env("XDG_DATA_HOME", home)
         .env("MAOS_OLLAMA_URL", "skip")
@@ -262,6 +266,18 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
 
 #[test]
 fn purge_cgroup_native_binding_and_dead_creator_twins() {
+    // Exercise the real fixture HOME boundary even without a T3 substrate.
+    let dir = tempfile::tempdir().expect("purge home");
+    let home = dir.path().join("home");
+    std::fs::create_dir(&home).expect("home");
+    let preflight = maos(&home, &["purge", "--dry-run"])
+        .output()
+        .expect("dry purge preflight");
+    assert!(
+        preflight.status.success(),
+        "fixture HOME must not be a purge root: {}",
+        String::from_utf8_lossy(&preflight.stderr)
+    );
     if !super::scene("purge-cgroups") {
         return;
     }
@@ -302,9 +318,6 @@ fn purge_cgroup_native_binding_and_dead_creator_twins() {
     );
     std::fs::write(populated.join("cgroup.procs"), member.0.id().to_string())
         .expect("populate twin");
-    let dir = tempfile::tempdir().expect("purge home");
-    let home = dir.path().join("home");
-    std::fs::create_dir(&home).expect("home");
     let receipt = dir.path().join("receipt.json");
     let purge = maos(
         &home,
