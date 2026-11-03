@@ -78,6 +78,10 @@ containers, `cgroup://<path>` for cgroups, and directory paths for T3 custody.
 Rows start `pending` before any removal and finish `removed` or `left (<residue>)`.
 Like 19-3 workspace residue, surviving runtime residue alone does not change
 `complete` to `partial`; an error note does. Read the rows, not only status.
+The existing `next_step` string and final CLI summary explicitly say
+`complete with residue: N left` when MAOS-written rows survive, including
+unavailable credential backends. Such a completed pass exits 1, not 0.
+`status` remains `complete`/`partial`; schema version and field types do not change.
 
 ## Consequences
 
@@ -100,16 +104,34 @@ component-wise without filesystem canonicalization of runtime text. Only owned
 containers without that authority stay report-only with the exact removal
 command; label-less containers are ignored even when named `maos-*`.
 
+This is attribution within a **same-UID trust boundary**, not unforgeable
+provenance. Another container creator with the same rootless user's control can
+forge matching labels, name and mount. Same-UID runtime control is not a
+privilege boundary; the ruled metadata predicate is retained, not strengthened.
+The bounded client clears ambient credentials but deliberately resolves bare
+`podman` on the inherited `PATH` (including test stubs); PATH integrity is an
+operator hygiene requirement, not a protection this purge adds.
+
 On Linux, purge rmdirs euid-owned `maos.slice/spirit-<id>-<creator pid>-<seq>`
 leaves only when `cgroup.events` reports `populated 0` and the creator has no
-`/proc/<pid>`, then the empty slice. It never kills members or writes
-`cgroup.kill`. Private mode-0700, euid-owned T3 custody directories under the
-runtime/temp state roots are reclaimed only after their CID is confirmed
-absent; unknown/present-CID custody stays, followed by empty process/root
-directory cleanup. Directory traversal and control-file reads do not follow
+`/proc/<pid>`. The shared `maos.slice` parent is never removed: empty does not
+exclude a live creator between parent allocation and leaf creation. Purge never
+kills members or writes `cgroup.kill`. Private mode-0700, euid-owned T3 spawn
+custody is reclaimed only after its CID is confirmed absent. Process roots now
+encode `process-<creator pid>-<nonce>` and are rmdired only when empty and the
+creator PID is positively absent. Live-owner and historical anonymous roots
+are retained; shared state parents are never removed. Unknown/present-CID spawn
+custody stays. Directory traversal and control-file reads do not follow
 links. A dry run invokes only `ps`/`inspect` and changes no state, including
 podman storage; spawn removal is reported as conditional on CID absence.
 Purge never edits user-namespace mappings, podman configuration or storage.
+
+Purge refuses before any removal when HOME is unset, non-absolute or contains
+parent traversal. Every purge/protected root is normalized without `..`, and
+MAOS-owned roots equal to HOME or an ancestor (including resolved aliases)
+are refused. Legacy-root ancestors are walked descriptor-relative without
+following links and must have trusted ownership/permissions; the producers'
+shared `/tmp` fallback is not a purge authority.
 
 ## Verification
 

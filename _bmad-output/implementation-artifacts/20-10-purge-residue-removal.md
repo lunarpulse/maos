@@ -48,6 +48,12 @@ behind — proving each one is this home's first — and a dry run that lists ex
 so that **an uninstall leaves no orphaned runtime state, and never kills or deletes what MAOS did not create or what
 another MAOS home is still using.**
 
+**Accepted review boundary (Main's operator-delegated adjudication):** matching
+labels/name/mount is same-UID attribution, not unforgeable provenance. A
+same-user rootless container creator can forge that metadata; rootless same-UID
+control is not a privilege boundary. Bare `podman` intentionally uses operator
+PATH; credential scrubbing does not make PATH trustworthy.
+
 **Contract:**
 - Epic §20-10 (E20@HEAD:272-277) as amended 2026-10-30 (D01 A; PF:128,247) — create-story tightens, does not add
   uncited scope: AC4's real cgroup set and AC5's retained T3 state are what "owned … cgroups" and the 17-7/20-7
@@ -168,10 +174,19 @@ Preflight rows that bear on this story: D09 RULED A (rows201; scope above), D02 
 | **D-20-10-04** | Owned cgroup leaves | **A** rmdir a `maos.slice/spirit-*` leaf owned by this euid iff `cgroup.events` says `populated 0` **and** its creator pid (from the name) has no `/proc/<pid>`; then `maos.slice` iff empty; populated or live-creator leaves reported with member pids and the exact commands; never `cgroup.kill` · **B** A + `cgroup.kill` populated dead-creator leaves (orphaned native Spirits) · **C** report-only with the corrected paths · **D** A + KS (+3/+2) so a normal exit stops leaking `maos.slice` | **A.** Leaves carry no home identity, so killing (B) can hit another home's live Spirit after pid reuse; the creator-alive check keeps purge from racing a live creator's empty-leaf window (`linux.rs:440-445`). D fixes a leak at source that A already cleans at uninstall, for a kernel grant. | RULED 2026-11-02: **A** (ask s2010) |
 | **D-20-10-05** | Where the cgroup naming lives | **A** the two literals in maos-bin, bound by a test that spawns a native child through the kernel and asserts purge's matcher accepts `SandboxedChild::cgroup_path()` (`sandbox/mod.rs:139-145`) · **B** KC: kernel exports the constants (+5/+1) | **A.** The binding test reds on drift without a kernel line; B is the single-source answer at a FLAG-Winston grant. | RULED 2026-11-02: **A** (ask s2010) |
 | **D-20-10-06** | The docker probe (`purge.rs:1969`) | **A** delete it once T0 measurement 4 confirms `MAOS_T3_RUNTIME=docker` cannot create a T3 container (`--pidfile`, `argv.rs:75`; docs.docker.com `container create`) · **B** keep docker report-only · **C** extend removal to docker | **A.** Dead weight that prints residue MAOS cannot have created; a podman-docker shim is podman and is covered by the podman leg. If measurement 4 shows docker T3 works, STOP + re-ask (C). | RULED 2026-11-02: **A** (ask s2010) |
-| **D-20-10-07** | The process-root leak at its producer (8,903 measured) | **A** diagnose (measurement 5) and repair in maos-bin within this story: every exit path that ends a `WorkerSupervisor`'s process removes its empty process root · **B** a `deferred-work.md` row with an owner the operator names; 20-10 reclaims at purge only · **C** purge-time reclaim only, no row | **A.** Same crate, same residue class, small forecast (+5…+30); without it the root regrows by up to 3,185 dirs/day between purges. B if T0 shows the leak lives in test harnesses only (then it is a test-hygiene row, not FR2). | RULED 2026-11-02: **A** (ask s2010) |
+| **D-20-10-07** | The process-root leak at its producer (8,903 measured) | **A** diagnose and repair a demonstrated producer · **B** operator-owned historical investigation when the reproducer is harness-only · **C** purge-only cleanup without a row | **Review disposition:** accept the measured test-only strong-Arc-cycle diagnosis and Weak-latch repair; do not invent a production leak repair. Three production one-shots left zero roots; the fixture leaked one before and none across three repaired runs. The 8,903 historical roots remain unattributed and anonymous roots lack abandonment proof. | RULED A originally; Main's operator-delegated review adjudication accepts the harness repair plus **B** historical investigation, owner `20-7-stable-runner-perf-gates`, `deferred-work.md:4` (rule 10). |
 | **D-20-10-08** | Receipt status when owned runtime residue survives | **A** the 19-3 convention: rows `left (<residue>)`, status `complete` unless an error note fired (`purge.rs:986-1012`, `:1237-1240`) · **B** status `partial` whenever an owned container, leaf or custody dir survives (and the 19-3 workspace residue re-labelled the same way) | **A.** One convention in one receipt; the rows carry the residue. B is more conspicuous but changes 19-3's shipped meaning. | RULED 2026-11-02: **A** (ask s2010) |
 | **D-20-10-09** | Start before 20-2 | **A** wait for 20-2 `done` (E20:274) · **B** start when picked: no `packaging/` file, `purge.rs:1042` and the binary-removal sentence of the run-maos docs left to 20-2; the later lander rebases the shared docs paragraph | **B.** The ordering existed for D09, now ruled; the overlap is one docs paragraph. | RULED 2026-11-02: **B** (ask s2010) |
 | **D-20-10-10** | Per-crate envelope (D02 A applied) | **A** the envelope above (×3 unmeasured / ×2 measured) · **B** exact measured grants only, every review correction re-asks · **C** allowance ×1.3 (rule 6) | **A.** Precedent: 20-3b/20-3c landed at 2–3× creation forecasts (`20-7-…md:148`); all of this story's figures are unmeasured. | RULED 2026-11-02: **A** (ask s2010) |
+
+**Review safety amendments (operator-delegated to Main):** D-03 removes an empty
+process root only with positively absent creator PID evidence encoded in its
+`process-<pid>-<nonce>` name. Live/anonymous roots and shared state parents stay.
+D-04 removes eligible leaves only, never shared `maos.slice`. D-08 A retains
+schema 1/status vocabulary but the existing `next_step` and final CLI summary
+say `complete with residue: N left`; surviving MAOS-written rows mean exit 1.
+Purge refuses unset/non-absolute HOME, HOME/ancestor deletion roots, parent
+components in purge/protected paths, and unsafe legacy ancestors before removal.
 
 ## Acceptance Criteria
 
@@ -229,7 +244,7 @@ unit — `epic-17-exit`, `ubuntu-24.04` and `ubuntu-26.04`.)*
 1. The `/sys/fs/cgroup/maos` report (`purge.rs:1952-1957`) is deleted: nothing creates that path (C6).
 2. Purge walks the cgroup v2 mount without following links, finds `maos.slice` directories and their
    `spirit-<id>-<pid>-<seq>` leaves owned by this euid (`linux.rs:492,511-514`), rmdirs a leaf iff `populated 0` and no
-   `/proc/<creator pid>`, then `maos.slice` iff empty; populated or live-creator leaves are reported with member pids
+   `/proc/<creator pid>`; shared `maos.slice` is never removed because emptiness does not exclude a creator's allocation window. Populated or live-creator leaves are reported with member pids
    (`cgroup.procs`) and the exact commands; nothing is ever written to `cgroup.kill`. Receipt rows `cgroup://<path>`.
    The walk takes the mount root as a parameter, so the logic is testable over a temp-dir tree (no environment knob).
 3. **Failing-before (local):** over a temp-dir cgroup tree, a dead-creator empty leaf survives purge's removal pass at
@@ -248,16 +263,16 @@ unit — `epic-17-exit`, `ubuntu-24.04` and `ubuntu-26.04`.)*
    `crates/maos-kernel-core/src/security/sandbox/t3/child.rs` is byte-identical at landing.
 2. Under `$XDG_RUNTIME_DIR/maos-worker-state` and `/tmp/maos-worker-state-<euid>` (`egress.rs:242-255`), each validated
    as `egress.rs:273-288` validates (directory, owner euid, mode 0700, not a symlink): remove each spawn dir whose `cid`
-   names a CID `container exists` reports absent after AC1's pass, then empty process roots, then the empty state root;
-   keep and report spawn dirs without `cid` and dirs naming a CID that still exists. Receipt rows with the directory
+   names a CID `container exists` reports absent after AC1's pass, then empty `process-<creator pid>-<nonce>` roots only if that PID is positively absent; shared state parents are never removed;
+   keep and report live/anonymous process roots, spawn dirs without `cid`, and dirs naming a CID that still exists. Receipt rows with the directory
    path. The `egress.rs:240-241` comment says so.
-3. **Failing-before (local):** a fixture state root (an empty process root; a spawn dir whose `cid` the stub reports
-   absent; one whose CID the stub reports present; one without `cid`) — at `a8af3215` all survive `purge --yes`; after,
-   only the last two survive and are reported.
+3. **Failing-before (local):** a fixture state root (an empty dead-creator process root; a spawn dir whose CID
+   the stub reports absent; one whose CID is present; one without CID) — at the baseline all survive;
+   after, the dead-creator empty root and absent-CID spawn are reclaimed, retained rows/reports are asserted.
 4. **Hosted:** after the extended root-crash scene's `purge --yes`, the killed root's spawn dirs are gone.
-5. **Producer (D-07 A):** measurement 5 names the exit path(s) that skip `cleanup_state_root` (`supervision.rs:2029-2041`);
-   after the repair, N runs of that path leave the process-root count unchanged (vector over a private `TMPDIR`), red at
-   `a8af3215`.
+5. **Producer review disposition (D-07):** the demonstrated stop-during-mint test seam retained its supervisor
+   through an Arc cycle, bypassing Drop/`cleanup_state_root`. Its Weak-latch repair leaves the private root
+   count unchanged across N runs; historical anonymous roots remain under the operator-owned deferred investigation.
 6. **Plant (local):** skip the `container exists` check before removing a spawn dir ⇒ the present-CID twin reds.
 
 ### AC6 — preserve 19-3, the receipt and the user-namespace mapping; one implementation (epic AC2)
@@ -631,9 +646,106 @@ junit `/tmp/cold-swap-workspace-serial-junit.xml`, `/tmp/cold-swap-check-*.log`,
 execution remain unverified; local self-skips are not substrate proof.
 No commit, push, `.devcontainer` change, kernel edit or target override/clean.
 
+#### Review correction record — 2026-11-03
+
+Baseline `ac1fc12a7f95c4ab003f35d5ca479c181c0f22d2`; this additive record
+preserves the original landing and cold-swap incident evidence above. No
+story/status flip, commit, push, CI-branch change, target override/clean,
+`.devcontainer` edit or kernel edit was performed.
+
+**Adjudicated scope and fixes.** D1 retains the ruled label/name/mount
+predicate, now explicitly documented as forgeable by a same-rootless-UID
+creator, with trusted PATH/runtime storage as operator responsibilities:
+attribution is not unforgeable provenance. D2 accepts only the measured
+test-harness Arc-cycle diagnosis; the 8,903 historical anonymous roots remain
+an owner-20-7 investigation (`deferred-work.md:4`), not a fabricated production
+leak diagnosis. P1 names newly allocated process roots
+`process-<creator-pid>-<nonce>` and requires positive creator absence before
+empty-root reclamation; live/anonymous process roots and shared state parents
+remain. P2 never inventories/removes shared `maos.slice` parents. P3 tests a
+valid-name symlink leaf plus linked ancestor; P4 checks a workspace sentinel
+inside the runtime's `rm` stub; P5 asserts retained report and receipt rows.
+AC6 scans every purge source module for ambient runner spellings.
+
+Security F1 retains receipt schema 1 and `complete`/`partial` status vocabulary:
+the existing `next_step` string and final CLI line explicitly say
+`complete with residue: N left`, and residue returns exit 1. F2 refuses unset
+or relative HOME before any mutation and validates legacy ancestors via
+nofollow directory walks plus owner/mode checks. F3 normalizes protected
+paths, rejects parent traversal, and refuses purge roots equal to HOME or an
+ancestor, including canonical aliases. English/Korean operator and cookbook
+guidance plus ADR-067 state these boundaries.
+
+**Witnesses.** `review-1/review-red-before.log` records five new tests failing
+at the baseline (P1, P2, F1, F2, F3), exit 100. Nine distinct plants then each
+failed an assertion, exit 100; every source was copied back, `cmp` returned
+0 and `touch` returned 0. P3/P4/P5/AC6 are strengthened regression witnesses,
+not claims that those already-correct production behaviors failed at HEAD.
+Full table, exact names/lines, mutations and digests:
+[`review-1/plants.md`](20-10-purge-residue-removal-evidence/landing-1/review-1/plants.md).
+Final AC anchors are `purge_residue_20_10.rs:137` (AC1), `:163` plus `:311`
+(AC2), `:179` plus `:362` (AC3), `purge_runtime.rs:547` plus `:633`
+(AC4), `purge_residue_20_10.rs:202` plus `worker_supervision_16_3.rs:2857`
+(AC5), `purge_residue_20_10.rs:247` (AC6), and `:300` (AC7).
+All passed in the final focused suite; original HEAD red-before/hosted-only
+AC4 evidence stays in the historical landing table.
+
+**Exact post-fmt measurements.**
+
+| Surface | Measured | Ceiling / exact pin |
+|---|---:|---:|
+| maos-bin tokei code | 34,188 | ceiling 34,548; exact pin 34,188 |
+| Aggregate tokei code | 192,516 | ceiling 192,876; hardfail 192,517 |
+| Kernel physical / tokei | 26,841 / 21,042 | unchanged |
+| xtask tokei code | 44,406 | unchanged |
+
+`cargo fmt --all` exited 0, then measurement and exact re-pin retained the
+`20-10 landing 1` HISTORY segment. All-target workspace build exited 0.
+Registered whole-package fixtures were provisioned (exit 0). Focused tests:
+147/147 passed, exit 0. Full serial (`--profile ci --test-threads 1`) and
+default-concurrency (`--profile ci`) workspace nextest each passed 5,571 tests,
+138 configured skips, exit 0. Fresh saved serial junit budget passed, exit 0,
+594 binaries, 678.553 s sum and no findings. Uptime was recorded before the
+serial run (5.71 / 22.54 / 23.81 load) and budget (4.74 / 13.28 / 21.29);
+this shared-host sample is not an exclusive idle-host certification.
+
+All requested policy gates exited 0: kloc, kernel baseline, service boundary,
+environment, serde, composition roots, J1 delegation, dev-record completeness,
+epic coherence, review resolution, test cost, invariant lock, coverage matrix
+(dry run) and completeness, exit commands, decision register, ff-j6 and
+performance-runner policy. Non-denying workspace/all-target clippy exited 0;
+ratchet exited 0 at **1,335 occurrences / 873 source-distinct**, versus the
+unchanged hosted baseline **1,383 / 897**. Primary warnings in every changed
+Rust file: **zero**, including no new `result_large_err`, `collapsible_if`
+or `too_many_arguments`. Same-hosted-toolchain warning comparison remains
+in the unpushed hosted cut. `cargo deny check` exited 0 (existing allowance/
+skip warnings only).
+
+Prescribed prepush, with CI/GITHUB_ACTIONS unset, absolute
+`CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask` and
+`MAOS_17_2_CGROUP_MODE=undelegated`, exited 0. Kernel lib tests, workspace
+doctests, docs build/English-Korean coverage and workspace tests passed.
+Its budget leg was **advisory**, exit 1: one-daemon 30.543 s and
+participant-recall 41.594 s against unchanged 30 s budgets; not retried.
+Rule-10 disposition and same-line evidence: owner `20-7-stable-runner-perf-gates`,
+`deferred-work.md:3`, `review-1/prepush-review.log:660-664`, saved
+`review-1/prepush-review-junit.xml`. Generated intent-lineage report matched
+its saved original byte-for-byte (cmp exit 0).
+
+**Evidence and unverified boundaries.** All exact commands, environment
+overrides and exits are in
+[`review-1/commands.md`](20-10-purge-residue-removal-evidence/landing-1/review-1/commands.md)
+and adjacent JSON/logs/junit; review mutation digests are separate from the
+historical implementation snapshot. Real Podman, Docker T0 contradictions,
+delegated epic-17-exit scenes and hosted-toolchain lint comparison remain
+unexecuted locally, cut in `...-evidence/ci/ci-20-10-verify.yml`, never pushed.
+Local self-skips (signed T3 substrate, Python Ed25519 backend and strace)
+are explicitly not proof of those legs. Historical anonymous-root producer
+attribution and exclusive-idle budget certification remain owner-20-7 work.
+
 ### File List
 
-- [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [custody comment](../../crates/maos-bin/src/egress.rs).
+- [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [creator-PID custody roots](../../crates/maos-bin/src/egress.rs).
 - [New hermetic witnesses](../../crates/maos-bin/tests/purge_residue_20_10.rs), [purge fixture isolation](../../crates/maos-bin/tests/maos_uninstall_16_4.rs), [producer harness-cycle fix](../../crates/maos-bin/tests/worker_supervision_16_3.rs), [real hosted scenes](../../crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs), [source scanner enrollment](../../crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs).
 - [Terminal job pin](../../.github/workflows/discipline.yml), [pin reader](../../xtask/tests/epic17_exit_workflow_17_7.rs), [exact KLOC pins](../../xtask/kloc.toml).
 - [ADR-067](../../docs/adr/ADR-067-maos-data-root-layout-and-purge.md), [operator guide](../../docs/maos.dev/run-maos.md), [site guide](../../docs-site/docs/run-maos.md), [Korean guide](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md), [cookbook](../../docs-site/docs/cookbook/cli-wrapper-spirit.md), [Korean cookbook](../../docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md).
@@ -653,3 +765,4 @@ No commit, push, `.devcontainer` change, kernel edit or target override/clean.
   final serial/default workspace suites and prescribed prepush rc 0. Hosted-only
   witnesses and the AC1 mutation cut but not pushed/run; status intentionally unchanged.
 - 2026-11-02: Hosted run `41521146083` cold-swap failure diagnosed as an over-strict cross-writer journal oracle, with a deterministic recorded-order red-before vector and causal/audit-drained replacement. No purge, kernel, production or budget change.
+- 2026-11-03: Review corrections retain live/anonymous T3 roots and shared parents, validate HOME/legacy ancestry/protected paths, make residue an explicit nonzero outcome, document the same-UID attribution boundary, and strengthen all identified witnesses. Exact maos-bin 34188 / aggregate 192516 (hardfail 192517), kernel unchanged; five baseline-red vectors and nine byte-restored assertion-red plants; focused, serial/default, gates, clippy, deny and prepush observed green except separately recorded prepush budget advisories. No status flip or push.

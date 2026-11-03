@@ -73,3 +73,16 @@ assertion. Three fixed runs left the private count **2 -> 2**
 (`producer-fixed-counts.json`). No production supervisor or kernel line was
 changed. This attributes the measured leaking fixture, not every historical
 empty directory on the host.
+
+## Review corrections (additive, after `ac1fc12a`)
+
+The preceding tables preserve the original landing snapshot and line numbers.
+Current witnesses, five baseline-red vectors, nine assertion-red mutations,
+SHA-256 digests and byte-restoration commands are recorded in
+[`review-1/plants.md`](review-1/plants.md). Each mutation was copy-backed,
+compared byte-for-byte and touched before the final 147-test focused green
+run. Full serial and default suites each passed 5,571 tests, with 138
+configured skips; substrate-gated local returns are not hosted proof.
+This correction retains live/anonymous process roots and shared parents,
+requires safe absolute HOME/legacy ancestors, and reports residue explicitly
+with a nonzero exit without changing receipt schema/status vocabulary.

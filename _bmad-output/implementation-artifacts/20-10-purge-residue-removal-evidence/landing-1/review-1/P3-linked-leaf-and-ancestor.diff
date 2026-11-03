@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -304,7 +304,7 @@
+ #[cfg(target_os = "linux")]
+ fn directory(path: &Path) -> std::io::Result<std::fs::File> {
+     use rustix::fs::{Mode, OFlags};
+-    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
++    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC;
+     if !path.is_absolute() {
+         return Err(std::io::ErrorKind::InvalidInput.into());
+     }

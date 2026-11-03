@@ -68,6 +68,11 @@ agree. Other-home or unattributable containers remain report-only; label-less
 containers are ignored. Absent-CID T3 custody and empty dead-creator cgroups
 are reclaimed, never live/unknown custody or populated cgroups. Receipt rows
 name each result; `complete` does not mean every `left (<residue>)` row is gone.
+This metadata rule is a same-UID trust boundary, not unforgeable provenance:
+a same-user rootless container creator can forge it. Only empty process roots
+with dead creator PIDs are reclaimed; anonymous/live roots and shared parents
+(including `maos.slice`) stay. Residue is explicit in the receipt's `next_step`
+and CLI summary (`complete with residue: N left`), with exit 1 and unchanged schema.
 
 **Disk use:** Workspaces have no size quota. A runaway Worker can write until the filesystem holding the workspaces root is full; with the default root, that is the filesystem holding `MAOS_HOME`, including the Transparency Log, and retained workspaces accumulate across runs. Set `MAOS_WORKER_WORKSPACES_ROOT` to a directory on a separate filesystem to keep Worker output off the audit store. After each Worker run MAOS checks the free space on the workspace's filesystem and, below 1 GiB (1073741824 bytes), prints `maos run: WARNING: Worker workspaces filesystem at <workspace> has <n> bytes free (below 1073741824); …` to stderr; if the check itself fails it prints `maos run: WARNING: cannot check free space on Worker workspaces filesystem at <workspace>: <error>`. The warning neither refuses nor stops the run, and it is not journaled. The missing size cap is a claim boundary (`RELEASE-HOLDS.md`, Claim boundaries row 20): MAOS does not claim that a Worker's disk use is bounded.
 

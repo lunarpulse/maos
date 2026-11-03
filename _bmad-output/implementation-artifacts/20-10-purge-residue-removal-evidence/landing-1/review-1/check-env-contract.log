@@ -1,0 +1,2 @@
+{"passed":true,"registered_count":118,"violations":[]}
+check-env-contract: PASS (118 maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)

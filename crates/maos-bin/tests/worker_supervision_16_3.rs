@@ -2852,3 +2852,69 @@ async fn an_armed_root_resolver_reassigns_once_then_escalates() {
     );
     assert_eq!(kernel_sent_rows(&world).len(), 2, "both crashes delivered");
 }
+
+#[test]
+fn purge_review_p1_preserves_another_live_supervisors_cached_root() {
+    const CHILD: &str = "PURGE_REVIEW_CACHED_ROOT_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let fixture = tempfile::tempdir().expect("private runtime");
+        let runtime = fixture.path().join("runtime");
+        std::fs::create_dir(&runtime).expect("runtime");
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&runtime, std::fs::Permissions::from_mode(0o700)).expect("mode");
+        let status = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args([
+                "--exact",
+                "purge_review_p1_preserves_another_live_supervisors_cached_root",
+                "--nocapture",
+            ])
+            .env(CHILD, fixture.path())
+            .env("XDG_RUNTIME_DIR", &runtime)
+            .env("TMPDIR", fixture.path())
+            .status()
+            .expect("isolated supervisor witness");
+        assert!(
+            status.success(),
+            "purge broke a live second-home supervisor"
+        );
+        return;
+    }
+    let fixture = PathBuf::from(std::env::var_os(CHILD).expect("fixture"));
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    let _entered = runtime.enter();
+    std::fs::create_dir_all(fixture.join("second-home")).expect("second home");
+    let world = KernelWorld::new(&fixture.join("second-home"));
+    let supervisor = world.supervisor(Default::default());
+    let spawn = supervisor
+        .create_t3_state_dir()
+        .expect("initial cached-root allocation");
+    let cached = spawn.parent().expect("process root").to_path_buf();
+    std::fs::remove_dir(&spawn).expect("leave cached root empty");
+    let home = fixture.join("purged-home");
+    std::fs::create_dir(&home).expect("home");
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_maos"))
+        .env_clear()
+        .env("HOME", &home)
+        .env("MAOS_HOME", home.join("maos"))
+        .env("XDG_DATA_HOME", home.join("data"))
+        .env("XDG_CONFIG_HOME", home.join("config"))
+        .env("TMPDIR", &fixture)
+        .env("XDG_RUNTIME_DIR", fixture.join("runtime"))
+        .args(["purge", "--yes", "--receipt"])
+        .arg(fixture.join("receipt.json"))
+        .output()
+        .expect("purge the first home");
+    assert!(
+        out.status.code().is_some_and(|code| code == 0 || code == 1),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        cached.exists(),
+        "live supervisor's cached empty process root was removed"
+    );
+    let next = supervisor
+        .create_t3_state_dir()
+        .expect("second home must still allocate T3 custody after purge");
+    std::fs::remove_dir(next).expect("cleanup");
+}

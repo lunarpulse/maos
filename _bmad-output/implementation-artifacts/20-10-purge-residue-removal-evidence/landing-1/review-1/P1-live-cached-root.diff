@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -513,7 +513,7 @@
+         return false;
+     }
+     if !spawn {
+-        return process_root_pid(path).is_some_and(process_absent) && rmdir(path);
++        return rmdir(path);
+     }
+     let Ok(dir) = directory(path) else {
+         return false;

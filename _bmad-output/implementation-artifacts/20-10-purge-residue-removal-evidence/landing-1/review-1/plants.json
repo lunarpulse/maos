@@ -1,0 +1,56 @@
+[
+  {
+    "finding": "P1-live-cached-root",
+    "exit_code": 100,
+    "sha256": "ad8e171611898c079bf0cec867175942fc0d9506415ccbea6e45a9f998f21f67",
+    "seconds": 8.328
+  },
+  {
+    "finding": "P2-shared-slice",
+    "exit_code": 100,
+    "sha256": "dff2f76756730b7ebfb31c5474a5d4fcb56f21af8e8d6324f03cf40f4f5246a8",
+    "seconds": 3.018
+  },
+  {
+    "finding": "P3-linked-leaf-and-ancestor",
+    "exit_code": 100,
+    "sha256": "28ba7dd71dee28afc38c71a309886c4b5a1100fa1ae77c0062e619bc0dcd0a66",
+    "seconds": 2.718
+  },
+  {
+    "finding": "P4-container-before-workspace",
+    "exit_code": 100,
+    "sha256": "9987a24107adb2c97496a7135a5291d69c2f5e3b7fa8e398a05be4fa36185c0c",
+    "seconds": 6.775
+  },
+  {
+    "finding": "P5-retained-report-receipt",
+    "exit_code": 100,
+    "sha256": "75ade5783f5e684ddd1d270719237e659e562486b87fa6b2502345ad3374c5e8",
+    "seconds": 6.424
+  },
+  {
+    "finding": "F1-residue-exit",
+    "exit_code": 100,
+    "sha256": "e5d5fcca0ea1a9b8b5780d1d70c10ba5845b82b2ab647903b30c8d550edde2ba",
+    "seconds": 10.231
+  },
+  {
+    "finding": "F2-legacy-ancestor",
+    "exit_code": 100,
+    "sha256": "22f5bdaaf4b6ce4d4a3feb8a561cc2192b960b8fd1637ce232a2c778d22dc32f",
+    "seconds": 9.779
+  },
+  {
+    "finding": "F3-home-boundary",
+    "exit_code": 100,
+    "sha256": "b3353cb8facd9552fda5a8e90e1b6c6b10bec17dd2e759bf06ae870ccdd1c1f5",
+    "seconds": 10.431
+  },
+  {
+    "finding": "AC6-ambient-runner-in-module",
+    "exit_code": 100,
+    "sha256": "516887d6fd2c932edd5996a2b3de6b57997e8e9ff44dd69ad55618e0a3f26645",
+    "seconds": 7.125
+  }
+]

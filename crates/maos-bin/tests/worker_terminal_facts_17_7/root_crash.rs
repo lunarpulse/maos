@@ -242,7 +242,9 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
     .output()
     .expect("confirmed purge");
     assert!(
-        purge.status.success(),
+        purge.status.success()
+            || (purge.status.code() == Some(1)
+                && String::from_utf8_lossy(&purge.stdout).contains("complete with residue:")),
         "purge failed: stdout={} stderr={}",
         String::from_utf8_lossy(&purge.stdout),
         String::from_utf8_lossy(&purge.stderr)
@@ -316,7 +318,9 @@ fn purge_cgroup_native_binding_and_dead_creator_twins() {
     .output()
     .expect("purge");
     assert!(
-        purge.status.success(),
+        purge.status.success()
+            || (purge.status.code() == Some(1)
+                && String::from_utf8_lossy(&purge.stdout).contains("complete with residue:")),
         "{}",
         String::from_utf8_lossy(&purge.stderr)
     );

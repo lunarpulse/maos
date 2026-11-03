@@ -184,8 +184,15 @@ impl Inventory {
             }
             // No `container exists` probe on a dry run: only ps/inspect are allowed.
             // Spawn-directory removal is conditional on proving absence in the confirmed pass.
-            for (path, _) in &self.custody {
-                println!("maos purge: would remove T3 state {} (only if empty or its CID is confirmed absent; otherwise retained)",path.display());
+            for (path, spawn) in &self.custody {
+                if *spawn || process_root_pid(path).is_some_and(process_absent) {
+                    println!("maos purge: would remove T3 state {} (spawn CID must be absent; process root must be empty with a dead creator)",path.display());
+                } else {
+                    println!(
+                        "maos purge: would retain T3 state {} (live or unknown process owner)",
+                        path.display()
+                    );
+                }
             }
         }
     }
@@ -366,6 +373,22 @@ fn rmdir(path: &Path) -> bool {
         && before.dev() == now.st_dev
         && rustix::fs::unlinkat(&parent, name, rustix::fs::AtFlags::REMOVEDIR).is_ok()
 }
+#[cfg(target_os = "linux")]
+fn process_absent(pid: u32) -> bool {
+    matches!(std::fs::symlink_metadata(Path::new("/proc").join(pid.to_string())), Err(error) if error.kind()==std::io::ErrorKind::NotFound)
+}
+#[cfg(target_os = "linux")]
+fn process_root_pid(path: &Path) -> Option<u32> {
+    let (pid, nonce) = path
+        .file_name()?
+        .to_str()?
+        .strip_prefix("process-")?
+        .split_once('-')?;
+    if nonce.len() != 8 || !nonce.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    pid.parse().ok().filter(|pid| *pid > 0)
+}
 /// Match the kernel's suffix from the right: Spirit ids themselves may contain '-'.
 #[cfg(target_os = "linux")]
 fn creator_pid(path: &Path) -> Option<u32> {
@@ -387,24 +410,15 @@ fn cgroup_removable(path: &Path) -> bool {
     if !owned_dir(path, false) {
         return false;
     }
+    // The shared parent has an unprotected allocation window in other homes.
+    // Purge owns no lock coordinating native creators, so it removes leaves only.
     if path.file_name().is_some_and(|n| n == "maos.slice") {
-        return directory(path)
-            .and_then(|dir| names(&dir).map(|entries| (dir, entries)))
-            .is_ok_and(|(dir, entries)| {
-                entries.iter().all(|name| {
-                    rustix::fs::statat(&dir, name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW).is_ok_and(
-                        |stat| {
-                            rustix::fs::FileType::from_raw_mode(stat.st_mode)
-                                == rustix::fs::FileType::RegularFile
-                        },
-                    )
-                })
-            });
+        return false;
     }
     let Some(pid) = creator_pid(path) else {
         return false;
     };
-    matches!(std::fs::symlink_metadata(Path::new("/proc").join(pid.to_string())), Err(error) if error.kind()==std::io::ErrorKind::NotFound)
+    process_absent(pid)
         && directory(path)
             .and_then(|dir| read_control(&dir, "cgroup.events"))
             .is_ok_and(|events| {
@@ -432,7 +446,6 @@ fn cgroup_inventory(mount: &Path) -> Vec<PathBuf> {
                         leaves.push(leaf);
                     }
                 }
-                leaves.push(path);
             }
         } else {
             for name in entries {
@@ -490,7 +503,6 @@ fn custody_inventory() -> Vec<(PathBuf, bool)> {
             }
             dirs.push((process, false));
         }
-        dirs.push((root, false));
     }
     dirs.sort_by_key(|(p, _)| std::cmp::Reverse(p.components().count()));
     dirs
@@ -501,7 +513,7 @@ fn reclaim_custody(path: &Path, spawn: bool) -> bool {
         return false;
     }
     if !spawn {
-        return rmdir(path);
+        return process_root_pid(path).is_some_and(process_absent) && rmdir(path);
     }
     let Ok(dir) = directory(path) else {
         return false;
@@ -560,13 +572,26 @@ mod tests {
             .path()
             .join("foreign/maos.slice/spirit-foreign-2147483647-4");
         std::fs::create_dir_all(&foreign).expect("foreign");
-        std::os::unix::fs::symlink(foreign.parent().expect("parent"), slice.join("linked"))
-            .expect("symlink");
+        let linked_leaf = slice.join("spirit-linked-2147483647-5");
+        std::fs::write(foreign.join("cgroup.events"), b"populated 0\n").expect("foreign events");
+        std::os::unix::fs::symlink(&foreign, &linked_leaf).expect("valid-name leaf symlink");
+        let linked_ancestor = fixture.path().join("unit/linked-ancestor");
+        std::os::unix::fs::symlink(
+            foreign.parent().expect("slice").parent().expect("ancestor"),
+            &linked_ancestor,
+        )
+        .expect("linked ancestor");
         let paths = cgroup_inventory(fixture.path());
         assert!(paths.contains(&dead) && paths.contains(&live) && paths.contains(&populated));
         assert!(
-            !paths.iter().any(|p| p.starts_with(slice.join("linked"))),
-            "never follow links"
+            !cgroup_removable(&linked_leaf),
+            "valid-name symlink leaf must be rejected by nofollow, not naming"
+        );
+        assert!(
+            !paths
+                .iter()
+                .any(|p| p.starts_with(&linked_leaf) || p.starts_with(&linked_ancestor)),
+            "linked leaf and recursive ancestor must never be followed"
         );
         assert!(cgroup_removable(&dead), "dead empty leaf is reclaimable");
         assert!(
@@ -603,5 +628,19 @@ mod tests {
             Path::new("workspaces/x"),
             Path::new("workspaces/x")
         ));
+    }
+    #[test]
+    fn review_p2_shared_slice_parent_is_never_reclaimed() {
+        let fixture = tempfile::tempdir().expect("cgroup fixture");
+        let slice = fixture.path().join("maos.slice");
+        std::fs::create_dir(&slice).expect("creator allocation window");
+        assert!(
+            !cgroup_removable(&slice),
+            "shared slice parent must not be eligible for rmdir"
+        );
+        assert!(
+            !cgroup_inventory(fixture.path()).contains(&slice),
+            "shared parent must never enter removal inventory"
+        );
     }
 }

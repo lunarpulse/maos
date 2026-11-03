@@ -395,6 +395,7 @@ where
 pub enum PurgeError {
     Usage(String),
     Configuration(String),
+    ResidueRemaining(usize),
     StoreInUse(PathBuf),
     OfflineOperationInProgress(PathBuf),
     LockUnavailable {
@@ -415,7 +416,7 @@ impl PurgeError {
         match self {
             Self::StoreInUse(_) | Self::OfflineOperationInProgress(_) => 69,
             Self::LockUnavailable { .. } | Self::ReceiptRefused(_) | Self::Configuration(_) => 78,
-            Self::Usage(_) | Self::Io { .. } | Self::Audit(_) => 1,
+            Self::Usage(_) | Self::Io { .. } | Self::Audit(_) | Self::ResidueRemaining(_) => 1,
         }
     }
 }
@@ -428,6 +429,7 @@ impl std::fmt::Display for PurgeError {
                 "{message}\nUsage: maos purge [--yes] [--dry-run] [--keep-log] [--receipt <path>]"
             ),
             Self::Configuration(message) => write!(f, "purge configuration invalid: {message}"),
+            Self::ResidueRemaining(left) => write!(f, "complete with residue: {left} left; inspect the receipt and reported removal commands"),
             Self::StoreInUse(path) => write!(
                 f,
                 "{} is held by a running MAOS process — StoreInUse, refusing to erase from a live store",
@@ -597,7 +599,7 @@ struct ReceiptRecord<'a> {
     roots: &'a [ReceiptRoot],
     signature: Option<&'a str>,
     proof: Option<&'a str>,
-    next_step: &'static str,
+    next_step: String,
 }
 
 struct ReceiptFile {
@@ -823,7 +825,10 @@ impl ReceiptFile {
             roots,
             signature: None,
             proof: None,
-            next_step: "Remove the Cargo-owned binary with: cargo uninstall maos",
+            next_step: format!(
+                "{}. Remove the Cargo-owned binary with: cargo uninstall maos",
+                purge_summary(status, residue_count(roots))
+            ),
         };
         serde_json::to_writer_pretty(&mut *file, &record).map_err(|error| PurgeError::Io {
             operation: "encode receipt",
@@ -845,13 +850,14 @@ impl ReceiptFile {
 
 pub fn run(args: &[String]) -> Result<(), PurgeError> {
     let options = PurgeOptions::parse(args)?;
+    let user_home = required_user_home()?;
     // Fail closed when the home cannot be resolved: silently dropping the
     // home root would report a clean purge over a tree that still exists.
     let home = maos_domain::operator_door::maos_home()
         .map_err(|error| PurgeError::Configuration(format!("cannot resolve MAOS home: {error}")))?;
     let home_unresolvable = home.is_none();
     let mut roots = maos_roots();
-    let audit_path = resolved_audit_path()?;
+    let audit_path = normalized_absolute(&resolved_audit_path()?)?;
     // A relocated audit database (MAOS_AUDIT_DB outside every aggregated
     // tree) drags MAOS-written siblings with it; enumerate them or purge
     // leaves a full copy of the Transparency Log behind un-named.
@@ -871,6 +877,9 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
             roots.extend(audit_sidecar_roots(database));
         }
     }
+    for root in &mut roots {
+        root.path = normalized_absolute(&root.path)?;
+    }
     roots.sort_by(|left, right| {
         left.path
             .cmp(&right.path)
@@ -880,7 +889,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
     roots.dedup_by(|left, right| {
         left.path == right.path && left.written_by == right.written_by && left.kind == right.kind
     });
-    validate_purge_roots(&roots)?;
+    validate_purge_roots(&roots, &user_home)?;
     let snapshot = FilesystemSnapshot::capture(&roots)?;
     let planned: Vec<PlannedRoot> = roots
         .into_iter()
@@ -1028,10 +1037,10 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
         eprintln!("maos purge: note: {error}");
         clean = false;
     }
+    let left = residue_count(&receipt_roots);
+    let status = if clean { "complete" } else { "partial" };
     let mut finalize_error = None;
-    if let Err(error) =
-        receipt.finish_with(if clean { "complete" } else { "partial" }, &receipt_roots)
-    {
+    if let Err(error) = receipt.finish_with(status, &receipt_roots) {
         eprintln!(
             "maos purge: could not finalize receipt at {}: {error}",
             receipt_path.display()
@@ -1061,8 +1070,12 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
     println!("maos purge: receipt: {}", receipt_path.display());
     print_report_only_residue(&workspace_residue);
     println!("maos purge: remove the Cargo-owned binary with: cargo uninstall maos");
+    println!("maos purge: {}", purge_summary(status, left));
     if let Some(error) = finalize_error {
         return Err(error);
+    }
+    if left > 0 {
+        return Err(PurgeError::ResidueRemaining(left));
     }
     Ok(())
 }
@@ -1090,10 +1103,110 @@ fn map_lock_error(error: crate::operator_door::StoreLockError) -> PurgeError {
     }
 }
 
-fn validate_purge_roots(roots: &[MaosRoot]) -> Result<(), PurgeError> {
+fn normalized_absolute(path: &Path) -> Result<PathBuf, PurgeError> {
+    if !path.is_absolute()
+        || path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(PurgeError::Configuration(format!(
+            "refusing non-absolute or parent-traversing path {}",
+            path.display()
+        )));
+    }
+    Ok(path.components().collect())
+}
+
+fn required_user_home() -> Result<PathBuf, PurgeError> {
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        PurgeError::Configuration(
+            "HOME must be set to an absolute path; no shared /tmp fallback is purgeable".into(),
+        )
+    })?;
+    normalized_absolute(Path::new(&home))
+}
+
+#[cfg(unix)]
+fn validate_legacy_ancestors(path: &Path) -> Result<(), PurgeError> {
+    use rustix::fs::{Mode, OFlags};
+    use std::os::unix::fs::MetadataExt;
+    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    let mut directory = std::fs::File::from(
+        rustix::fs::open("/", flags, Mode::empty())
+            .map_err(|e| PurgeError::Configuration(format!("cannot anchor legacy root: {e}")))?,
+    );
+    for component in path.parent().into_iter().flat_map(Path::components) {
+        let std::path::Component::Normal(name) = component else {
+            continue;
+        };
+        match rustix::fs::openat(&directory, name, flags, Mode::empty()) {
+            Ok(opened) => directory = opened.into(),
+            Err(rustix::io::Errno::NOENT) => return Ok(()),
+            Err(error) => {
+                return Err(PurgeError::Configuration(format!(
+                    "refusing unsafe legacy ancestor of {}: {error}",
+                    path.display()
+                )))
+            }
+        }
+        let metadata = directory.metadata().map_err(|e| {
+            PurgeError::Configuration(format!("cannot inspect legacy ancestor: {e}"))
+        })?;
+        let uid = metadata.uid();
+        let shared_sticky = uid == 0 && metadata.mode() & 0o1000 != 0;
+        if (uid != 0 && uid != rustix::process::geteuid().as_raw())
+            || (metadata.mode() & 0o022 != 0 && !shared_sticky)
+        {
+            return Err(PurgeError::Configuration(format!(
+                "refusing untrusted legacy ancestor of {}",
+                path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn residue_count(roots: &[ReceiptRoot]) -> usize {
+    roots
+        .iter()
+        .filter(|root| {
+            root.written_by == WrittenBy::Maos
+                && (root.disposition.starts_with("left")
+                    || root.disposition == "partially-removed"
+                    || root.disposition == "backend-unavailable")
+        })
+        .count()
+}
+
+fn purge_summary(status: &str, left: usize) -> String {
+    if left > 0 {
+        format!("{status} with residue: {left} left")
+    } else {
+        format!("{status}: 0 left")
+    }
+}
+
+fn validate_purge_roots(roots: &[MaosRoot], user_home: &Path) -> Result<(), PurgeError> {
+    #[cfg(unix)]
+    for root in roots.iter().filter(|root| {
+        matches!(
+            root.label,
+            "legacy registry and skills data tree" | "registry import cache"
+        )
+    }) {
+        validate_legacy_ancestors(&root.path)?;
+    }
+    let canonical_home = canonicalize_allow_missing(user_home)?;
     for root in roots {
         if root.written_by != WrittenBy::Maos {
             continue;
+        }
+        let canonical_root = canonicalize_allow_missing(&root.path)?;
+        if user_home.starts_with(&root.path) || canonical_home.starts_with(&canonical_root) {
+            return Err(PurgeError::Configuration(format!(
+                "refusing unsafe purge root {} (equal to HOME or an ancestor)",
+                root.path.display()
+            )));
         }
         let parent = root.path.parent();
         if !root.path.is_absolute()

@@ -237,8 +237,8 @@ impl Drop for WorkerEgress {
     }
 }
 
-/// T3 custody stays outside durable MAOS_HOME. ADR-067 purge reclaims absent-CID
-/// spawn directories and empty process roots; unknown/live custody is retained.
+/// T3 custody stays outside durable MAOS_HOME. Purge reclaims absent-CID spawn
+/// directories and dead-owner process roots; shared parents and live/unknown owners stay.
 pub fn create_worker_state_root() -> io::Result<PathBuf> {
     if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
         let runtime_dir = PathBuf::from(runtime_dir);
@@ -256,7 +256,7 @@ pub fn create_worker_state_root() -> io::Result<PathBuf> {
 /// Allocate one fresh state directory beneath this process root.
 pub fn create_worker_state_dir(root: &Path) -> io::Result<PathBuf> {
     validate_private_dir(root)?;
-    create_private_child_dir(root)
+    create_private_child_dir(root, false)
 }
 
 /// Create a private root below `parent`, then allocate its fresh process-owned
@@ -267,7 +267,7 @@ fn create_root_dir(parent: &Path) -> io::Result<PathBuf> {
         .mode(0o700)
         .create(parent)?;
     validate_private_dir(parent)?;
-    create_private_child_dir(parent)
+    create_private_child_dir(parent, true)
 }
 
 fn validate_private_dir(path: &Path) -> io::Result<()> {
@@ -287,11 +287,17 @@ fn validate_private_dir(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn create_private_child_dir(parent: &Path) -> io::Result<PathBuf> {
+fn create_private_child_dir(parent: &Path, process_root: bool) -> io::Result<PathBuf> {
     for _ in 0..8 {
         let mut nonce = [0u8; 4];
         getrandom::fill(&mut nonce).map_err(io::Error::other)?;
-        let path = parent.join(format!("{:08x}", u32::from_ne_bytes(nonce)));
+        let nonce = u32::from_ne_bytes(nonce);
+        let name = if process_root {
+            format!("process-{}-{nonce:08x}", std::process::id())
+        } else {
+            format!("{nonce:08x}")
+        };
+        let path = parent.join(name);
         match std::fs::DirBuilder::new().mode(0o700).create(&path) {
             Ok(()) => return Ok(path),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}

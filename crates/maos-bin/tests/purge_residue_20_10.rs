@@ -26,6 +26,12 @@ impl Fixture {
         ] {
             std::fs::create_dir_all(root.join(path)).expect("fixture directory");
         }
+        std::fs::create_dir(root.join("maos/workspaces/maos-worker-7")).expect("owned workspace");
+        std::fs::write(
+            root.join("maos/workspaces/maos-worker-7/sentinel"),
+            b"workspace must still exist at rm",
+        )
+        .expect("sentinel");
         std::fs::set_permissions(root.join("runtime"), std::fs::Permissions::from_mode(0o700))
             .expect("private runtime");
         let ids: Vec<String> = (1..=5).map(|i| format!("{i:064x}")).collect();
@@ -54,7 +60,7 @@ impl Fixture {
         }
         std::fs::write(root.join("candidates"), ids.join("\n")).expect("candidates");
         let absent_cid = format!("{:064x}", 6);
-        let script = format!("#!/bin/sh\nroot='{}'\nprintf '%s\\n' \"$*\" >> \"$root/calls\"\n[ -z \"$AWS_SECRET_ACCESS_KEY\" ] || exit 99\ncase \"$1\" in\nps) cat \"$root/candidates\";;\ninspect) cat \"$root/$2.json\";;\nrm) [ -f \"$root/receipt.json\" ] || exit 98; grep -q '\"pending\"' \"$root/receipt.json\" || exit 97; touch \"$root/removed-$5\";;\ncontainer) [ -f \"$root/removed-$3\" ] && exit 1; [ \"$3\" = '{absent_cid}' ] && exit 1; exit 0;;\nunshare) exit 0;;\n*) exit 96;;\nesac\n",root.display());
+        let script = format!("#!/bin/sh\nroot='{}'\nprintf '%s\\n' \"$*\" >> \"$root/calls\"\n[ -z \"$AWS_SECRET_ACCESS_KEY\" ] || exit 99\ncase \"$1\" in\nps) cat \"$root/candidates\";;\ninspect) cat \"$root/$2.json\";;\nrm) [ -f \"$root/maos/workspaces/maos-worker-7/sentinel\" ] || {{ echo 'workspace removed before container' >&2; exit 96; }}; [ -f \"$root/receipt.json\" ] || exit 98; grep -q '\"pending\"' \"$root/receipt.json\" || exit 97; touch \"$root/removed-$5\";;\ncontainer) [ -f \"$root/removed-$3\" ] && exit 1; [ \"$3\" = '{absent_cid}' ] && exit 1; exit 0;;\nunshare) exit 0;;\n*) exit 96;;\nesac\n",root.display());
         std::fs::write(root.join("bin/podman"), script).expect("stub");
         std::fs::set_permissions(
             root.join("bin/podman"),
@@ -99,7 +105,11 @@ impl Fixture {
         }
         let out = c.output().expect("purge");
         assert!(
-            out.status.success(),
+            out.status.success()
+                || (yes
+                    && out.status.code() == Some(1)
+                    && String::from_utf8_lossy(&out.stdout)
+                        .contains("maos purge: complete with residue:")),
             "stdout={} stderr={}",
             String::from_utf8_lossy(&out.stdout),
             String::from_utf8_lossy(&out.stderr)
@@ -168,7 +178,7 @@ fn ac2_other_home_missing_mount_mismatched_name_and_impostor_survive() {
 #[test]
 fn ac3_dry_run_uses_only_readonly_verbs_and_preserves_custody() {
     let f = Fixture::new();
-    let empty = f.private("empty");
+    let empty = f.private("process-2147483647-00000000");
     let out = f.purge(false);
     let report = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -191,7 +201,7 @@ fn ac3_dry_run_uses_only_readonly_verbs_and_preserves_custody() {
 #[test]
 fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
     let f = Fixture::new();
-    let empty = f.private("empty");
+    let empty = f.private("process-2147483647-00000000");
     let absent = f.private("process/absent");
     let present = f.private("process/present");
     let unknown = f.private("process/unknown");
@@ -203,6 +213,28 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
     assert!(present.exists(), "live home's custody removed");
     assert!(unknown.exists(), "unknown custody removed");
     let report = String::from_utf8_lossy(&out.stdout);
+    let bytes = std::fs::read(f.root().join("receipt.json")).expect("receipt");
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&bytes).unwrap_or_else(|e| panic!("{e}"));
+    let rows = receipt["roots"]
+        .as_array()
+        .unwrap_or_else(|| panic!("receipt rows"));
+    for path in [&present, &unknown] {
+        assert!(
+            report.contains(&format!(
+                "left (T3 custody residue): T3 state {}",
+                path.display()
+            )),
+            "missing retained state report: {report}"
+        );
+        assert!(
+            rows.iter()
+                .any(|row| row["path"] == path.display().to_string()
+                    && row["written_by"] == "maos"
+                    && row["disposition"] == "left (T3 custody residue)"),
+            "missing retained custody receipt row: {receipt}"
+        );
+    }
     for forbidden in [
         "termination_unconfirmed",
         "kill_failed",
@@ -213,11 +245,43 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
 }
 #[test]
 fn ac6_runtime_helper_is_shared_and_receipt_convention_is_preserved() {
-    let source = include_str!("../src/purge.rs");
-    assert!(
-        !source.contains("child.try_wait()"),
-        "purge has a second bounded runtime implementation"
-    );
+    let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut pending = vec![source_dir.clone()];
+    let mut scanned = 0;
+    while let Some(dir) = pending.pop() {
+        for entry in std::fs::read_dir(&dir).expect("source directory") {
+            let path = entry.expect("source entry").path();
+            if path.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            let relative = path.strip_prefix(&source_dir).expect("source path");
+            let purge_module = relative
+                .components()
+                .any(|component| component.as_os_str() == "purge")
+                || path
+                    .file_name()
+                    .is_some_and(|name| name.to_string_lossy().starts_with("purge"));
+            if path.extension().is_none_or(|extension| extension != "rs") || !purge_module {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).expect("purge source");
+            for spelling in [
+                "Command::new",
+                "std::process::Command",
+                ".try_wait(",
+                ".spawn(",
+            ] {
+                assert!(
+                    !source.contains(spelling),
+                    "ambient runtime runner {spelling} in {}",
+                    path.display()
+                );
+            }
+            scanned += 1;
+        }
+    }
+    assert!(scanned >= 2, "every purge module must be scanned");
     let f = Fixture::new();
     f.purge(true);
     for call in f.calls().lines() {
@@ -312,4 +376,133 @@ fn ac5_private_directory_validation_preserves_symlinks_and_wrong_modes() {
     std::os::unix::fs::symlink(&outside, parent.join("linked")).expect("link");
     f.purge(true);
     assert!(wrong.exists() && outside.exists() && parent.join("linked").symlink_metadata().is_ok());
+}
+
+#[test]
+fn review_f1_surviving_residue_has_an_explicit_summary_and_nonzero_exit() {
+    let f = Fixture::new();
+    let retained = f.private("legacy-process/unknown");
+    let out = f
+        .command()
+        .args(["purge", "--yes", "--receipt"])
+        .arg(f.root().join("receipt.json"))
+        .output()
+        .expect("purge");
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "surviving custody must not be exit-zero success"
+    );
+    let report = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        report.contains("complete with residue:") && report.contains(" left"),
+        "{report}"
+    );
+    let text = std::fs::read_to_string(f.root().join("receipt.json")).expect("receipt");
+    let receipt: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(receipt["schema_version"], 1);
+    assert_eq!(
+        receipt["status"], "complete",
+        "D-08 A status vocabulary is unchanged"
+    );
+    let rows = receipt["roots"]
+        .as_array()
+        .unwrap_or_else(|| panic!("receipt roots"));
+    let left = rows
+        .iter()
+        .filter(|row| {
+            row["written_by"] == "maos"
+                && row["disposition"].as_str().is_some_and(|d| {
+                    d.starts_with("left") || d == "partially-removed" || d == "backend-unavailable"
+                })
+        })
+        .count();
+    assert!(left > 0);
+    let summary = format!("complete with residue: {left} left");
+    assert_eq!(
+        report.lines().last(),
+        Some(format!("maos purge: {summary}").as_str())
+    );
+    assert!(
+        receipt["next_step"]
+            .as_str()
+            .is_some_and(|s| s.starts_with(&summary)),
+        "{text}"
+    );
+    assert!(retained.exists());
+}
+#[test]
+fn review_f2_unset_relative_home_and_legacy_ancestor_links_are_refused() {
+    for home in [None, Some("relative-home")] {
+        let f = Fixture::new();
+        let mut cmd = f.command();
+        if let Some(home) = home {
+            cmd.env("HOME", home);
+        } else {
+            cmd.env_remove("HOME");
+        }
+        let out = cmd.arg("purge").output().expect("dry refusal");
+        assert_eq!(
+            out.status.code(),
+            Some(78),
+            "HOME must be absolute and present: {}",
+            String::from_utf8_lossy(&out.stdout)
+        );
+        assert!(f.calls().is_empty(), "HOME refusal ran runtime");
+    }
+    let f = Fixture::new();
+    let outside = f.root().join("outside");
+    std::fs::create_dir_all(outside.join("share/maos")).expect("victim");
+    std::fs::write(outside.join("share/maos/sentinel"), b"keep").expect("sentinel");
+    std::os::unix::fs::symlink(&outside, f.root().join("home/.local"))
+        .expect("legacy ancestor link");
+    let out = f
+        .command()
+        .args(["purge", "--yes", "--receipt"])
+        .arg(f.root().join("receipt.json"))
+        .output()
+        .expect("legacy refusal");
+    assert_eq!(
+        out.status.code(),
+        Some(78),
+        "legacy ancestor symlink was accepted"
+    );
+    assert!(outside.join("share/maos/sentinel").exists());
+    assert!(f.calls().is_empty());
+}
+#[test]
+fn review_f3_home_ancestor_and_parent_components_are_refused() {
+    for target in ["home", ""] {
+        let f = Fixture::new();
+        let receipt = tempfile::tempdir().expect("outside receipt");
+        let out = f
+            .command()
+            .env("MAOS_MEMORY_ROOT", f.root().join(target))
+            .args(["purge", "--yes", "--receipt"])
+            .arg(receipt.path().join("receipt.json"))
+            .output()
+            .expect("home boundary refusal");
+        assert_eq!(
+            out.status.code(),
+            Some(78),
+            "HOME/ancestor purge root accepted"
+        );
+        assert!(f.root().join("home").exists());
+        assert!(f.calls().is_empty());
+    }
+    let f = Fixture::new();
+    std::fs::create_dir(f.root().join("stores")).expect("audit parent");
+    let out = f
+        .command()
+        .env_remove("MAOS_HOME")
+        .env("MAOS_AUDIT_DB", f.root().join("stores/../audit.sqlite"))
+        .args(["purge", "--keep-log"])
+        .output()
+        .expect("protected audit refusal");
+    assert_eq!(
+        out.status.code(),
+        Some(78),
+        "protected path with parent components accepted"
+    );
+    assert!(f.calls().is_empty());
 }

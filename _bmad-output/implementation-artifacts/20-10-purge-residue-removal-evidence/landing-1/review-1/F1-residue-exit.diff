@@ -1,0 +1,12 @@
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+@@ -1074,9 +1074,6 @@
+     if let Some(error) = finalize_error {
+         return Err(error);
+     }
+-    if left > 0 {
+-        return Err(PurgeError::ResidueRemaining(left));
+-    }
+     Ok(())
+ }
+ 

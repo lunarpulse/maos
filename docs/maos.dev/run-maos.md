@@ -117,13 +117,23 @@ home's workspace roots must agree. Other-home or unattributable labelled
 containers are only reported with a removal command; label-less containers
 are ignored. Empty dead-creator `maos.slice/spirit-*` leaves are removed, never
 populated or live-creator leaves and never by killing. Private T3 custody is
-removed only for confirmed-absent CIDs, then empty process/state roots;
-unknown/live custody is retained. Dry-run custody lines are conditional on
-that absence check and invoke only read-only `ps`/`inspect`. Receipts add
+removed only for confirmed-absent CIDs, then empty process roots with a
+positively absent creator PID. Live/anonymous process roots, shared state
+parents and `maos.slice` are retained; unknown/live spawn custody is retained.
+Dry-run spawn-custody lines are conditional on CID absence and use only read-only `ps`/`inspect`. Receipts add
 `podman://<CID>`, `cgroup://<path>` and custody-directory rows, without changing
 the schema: `left (<residue>)` can coexist with status `complete`, as with
 Worker workspace residue. Read every row. User-namespace mappings and podman
 storage/configuration are never edited.
+
+Matching metadata is not unforgeable proof: another container creator under the
+same rootless UID can forge the labels, name and mount. Same-UID runtime control
+is not a privilege boundary. Bare `podman` is resolved on trusted operator PATH.
+Surviving MAOS-written receipt rows produce `complete with residue: N left` in
+the existing `next_step` string and final CLI line, with exit 1; receipt status
+vocabulary and schema remain unchanged. HOME must be set and absolute; HOME or
+ancestor purge roots and `..` paths are refused. Legacy ancestors are checked
+without following symlinks; purge never uses the shared HOME-unset `/tmp` fallback.
 
 `maos purge --keep-log --yes` checkpoints and keeps the Transparency Log. This
 also keeps shared-memory rows and the principal namespace index when they share

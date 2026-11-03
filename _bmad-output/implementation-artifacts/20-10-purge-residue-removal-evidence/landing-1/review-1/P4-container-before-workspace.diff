@@ -1,0 +1,32 @@
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+@@ -994,14 +994,6 @@
+     let keyring = keyring_store();
+     let mut left_files = Vec::new();
+     let mut workspace_residue = Vec::new();
+-    let runtime_offset = secret_offset + known_secret_keys().len();
+-    runtime.remove(|index, disposition| {
+-        receipt_roots[runtime_offset + index].disposition = disposition.to_string();
+-        Ok(())
+-    })?;
+-    // A crash leaves honest `pending` rows. Batch volatile custody outcomes:
+-    // thousands of empty roots must not rewrite the entire receipt N times.
+-    receipt.update(&receipt_roots)?;
+     let dispositions = remove_planned_roots(
+         &planned,
+         &protected,
+@@ -1012,6 +1004,14 @@
+             receipt.update(&receipt_roots)
+         },
+     )?;
++    let runtime_offset = secret_offset + known_secret_keys().len();
++    runtime.remove(|index, disposition| {
++        receipt_roots[runtime_offset + index].disposition = disposition.to_string();
++        Ok(())
++    })?;
++    // A crash leaves honest `pending` rows. Batch volatile custody outcomes:
++    // thousands of empty roots must not rewrite the entire receipt N times.
++    receipt.update(&receipt_roots)?;
+ 
+     // Filesystem deletion is complete. Nothing below may skip credential
+     // erasure, receipt finalization, or the report: every step degrades to a

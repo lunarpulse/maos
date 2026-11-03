@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -236,8 +236,6 @@
+                 } else {
+                     "left (T3 custody residue)"
+                 };
+-                println!("maos purge: {disposition}: T3 state {}; inspect CID custody before removing with `rmdir -- {}`",path.display(),shell_quote(path));
+-                record(index, disposition)?;
+                 index += 1;
+             }
+         }

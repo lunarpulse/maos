@@ -69,6 +69,11 @@ source가 모두 일치할 때만 유지된 컨테이너를 workspace보다 먼�
 무시합니다. CID 부재가 확인된 T3 custody와 빈 dead-creator cgroup만 정리하며
 live/unknown custody 또는 populated cgroup은 제거하지 않습니다. receipt는 결과를
 각 행에 기록하며 `complete`여도 `left (<residue>)` 행이 남을 수 있습니다.
+이 metadata 규칙은 same-UID trust boundary이며 위조 불가능한 provenance가 아닙니다.
+같은 rootless 사용자의 container creator는 이를 위조할 수 있습니다. 빈 process root는
+creator PID 부재가 확인되어야 정리하며 anonymous/live root와 `maos.slice` 등 공유
+parent는 보존합니다. residue는 기존 receipt `next_step`과 CLI 마지막 줄에
+`complete with residue: N left`로 표시하고 exit 1을 반환하며 schema는 유지합니다.
 
 **Disk 사용:** workspace에는 크기 quota가 없습니다. 폭주하는 Worker는 workspaces root가 있는 파일시스템이 가득 찰 때까지 쓸 수 있습니다. 기본 root에서는 그것이 Transparency Log를 포함한 `MAOS_HOME`의 파일시스템이며, 유지된 workspace는 실행마다 쌓입니다. Worker 출력을 audit 저장소와 분리하려면 `MAOS_WORKER_WORKSPACES_ROOT`를 별도 파일시스템의 디렉터리로 설정하세요. 각 Worker 실행 후 MAOS는 workspace가 있는 파일시스템의 여유 공간을 확인하고, 1 GiB(1073741824 bytes) 미만이면 stderr에 `maos run: WARNING: Worker workspaces filesystem at <workspace> has <n> bytes free (below 1073741824); …`를 출력합니다. 확인 자체가 실패하면 `maos run: WARNING: cannot check free space on Worker workspaces filesystem at <workspace>: <error>`를 출력합니다. 이 경고는 실행을 거부하거나 멈추지 않으며 journal에 기록되지 않습니다. 크기 상한이 없다는 점은 claim boundary입니다(`RELEASE-HOLDS.md`, Claim boundaries 20행). MAOS는 Worker의 디스크 사용량이 제한된다고 주장하지 않습니다.
 

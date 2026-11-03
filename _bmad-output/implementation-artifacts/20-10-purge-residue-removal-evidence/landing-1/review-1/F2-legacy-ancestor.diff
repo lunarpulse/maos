@@ -1,0 +1,10 @@
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+@@ -1194,7 +1194,6 @@
+             "legacy registry and skills data tree" | "registry import cache"
+         )
+     }) {
+-        validate_legacy_ancestors(&root.path)?;
+     }
+     let canonical_home = canonicalize_allow_missing(user_home)?;
+     for root in roots {

@@ -1,0 +1,19 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -413,7 +413,7 @@
+     // The shared parent has an unprotected allocation window in other homes.
+     // Purge owns no lock coordinating native creators, so it removes leaves only.
+     if path.file_name().is_some_and(|n| n == "maos.slice") {
+-        return false;
++        return true;
+     }
+     let Some(pid) = creator_pid(path) else {
+         return false;
+@@ -446,6 +446,7 @@
+                         leaves.push(leaf);
+                     }
+                 }
++                leaves.push(path);
+             }
+         } else {
+             for name in entries {

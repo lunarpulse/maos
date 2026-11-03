@@ -110,6 +110,17 @@ fn assert_root(
     );
 }
 
+fn purge_completed(output: &std::process::Output) -> bool {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    output.status.success()
+        || (output.status.code() == Some(1)
+            && stdout.contains("maos purge: receipt: ")
+            && stdout
+                .lines()
+                .last()
+                .is_some_and(|line| line.starts_with("maos purge: complete with residue: ")))
+}
+
 fn maos_command(root: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
@@ -285,7 +296,7 @@ fn purge_dry_run_is_inert_then_removes_only_maos_owned_state() {
         .output()
         .expect("run destructive purge");
     assert!(
-        purge.status.success(),
+        purge_completed(&purge),
         "purge failed: stdout={} stderr={}",
         String::from_utf8_lossy(&purge.stdout),
         String::from_utf8_lossy(&purge.stderr)
@@ -581,7 +592,7 @@ fn purge_keep_log_discloses_and_preserves_a_queryable_checkpointed_log() {
         .output()
         .expect("run keep-log purge");
     assert!(
-        purge.status.success(),
+        purge_completed(&purge),
         "keep-log purge failed: stdout={} stderr={}",
         String::from_utf8_lossy(&purge.stdout),
         String::from_utf8_lossy(&purge.stderr)
@@ -724,7 +735,7 @@ fn purge_keep_log_retains_distinct_tenant_audit_and_host_memory_databases() {
         .output()
         .expect("run tenant keep-log purge");
     assert!(
-        purge.status.success(),
+        purge_completed(&purge),
         "tenant keep-log purge failed: {}",
         String::from_utf8_lossy(&purge.stderr)
     );
@@ -839,7 +850,7 @@ fn override_audit_db_without_maos_home_is_the_resolved_log_keep_log_retains_it()
         .output()
         .expect("run override-scope purge");
     assert!(
-        purge.status.success(),
+        purge_completed(&purge),
         "override-scope purge failed: {}",
         String::from_utf8_lossy(&purge.stderr)
     );
@@ -974,7 +985,7 @@ fn override_audit_db_under_maos_home_is_enumerated_and_removed() {
         .output()
         .expect("run override purge");
     assert!(
-        purge.status.success(),
+        purge_completed(&purge),
         "override purge failed: {}",
         String::from_utf8_lossy(&purge.stderr)
     );
@@ -1329,8 +1340,8 @@ fn purge_reports_a_type_mismatched_directory_root_and_leaves_it_named() {
         .output()
         .expect("run type-mismatch purge");
     assert!(
-        purge.status.success(),
-        "a type mismatch is a per-root disposition, not a run failure: {}",
+        purge_completed(&purge),
+        "a type mismatch must finalize the receipt with explicit residue: {}",
         String::from_utf8_lossy(&purge.stderr)
     );
     let stdout = String::from_utf8_lossy(&purge.stdout);
@@ -1364,11 +1375,9 @@ fn purge_reports_a_type_mismatched_directory_root_and_leaves_it_named() {
     );
 }
 
-/// Item 4(c) — with HOME and MAOS_HOME both unset, the permanent legacy leg
-/// (the producers' /tmp fallback) is still enumerated and the unresolvable
-/// home is disclosed. The dry run must not create any /tmp artifact.
+/// HOME-unset purge is a typed refusal, never a shared-/tmp cleanup fallback.
 #[test]
-fn purge_dry_run_enumerates_the_legacy_tmp_leg_when_home_is_unset() {
+fn purge_dry_run_refuses_the_legacy_tmp_fallback_when_home_is_unset() {
     let temp = tempfile::tempdir().expect("create legacy-leg fixture");
     let root = temp.path();
     let legacy_tree = PathBuf::from("/tmp/.local/share/maos");
@@ -1389,35 +1398,20 @@ fn purge_dry_run_enumerates_the_legacy_tmp_leg_when_home_is_unset() {
         .arg("purge")
         .output()
         .expect("run home-unset dry run");
-    assert!(
-        dry_run.status.success(),
-        "dry run failed: {}",
-        String::from_utf8_lossy(&dry_run.stderr)
+    assert_eq!(
+        dry_run.status.code(),
+        Some(78),
+        "HOME-unset purge must refuse"
     );
-    let stdout = String::from_utf8_lossy(&dry_run.stdout);
-    assert!(
-        stdout.contains("maos purge: unresolvable: MAOS home (neither MAOS_HOME nor HOME set)"),
-        "the unresolvable home must be disclosed: {stdout}"
-    );
-    assert!(
-        stdout.contains("legacy registry and skills data tree"),
-        "the /tmp legacy leg must be enumerated: {stdout}"
-    );
-    assert!(
-        stdout.contains("registry import cache"),
-        "the /tmp import cache must be enumerated: {stdout}"
-    );
-
-    // Cleanup tripwire: the dry run must have created neither /tmp artifact.
+    assert!(String::from_utf8_lossy(&dry_run.stderr).contains("HOME"));
+    assert!(dry_run.stdout.is_empty());
     for (path, existed) in [(&legacy_tree, legacy_before), (&import_cache, cache_before)] {
-        if path.symlink_metadata().is_ok() && !existed {
-            if path.is_dir() {
-                std::fs::remove_dir_all(path).expect("remove dry-run /tmp artifact");
-            } else {
-                std::fs::remove_file(path).expect("remove dry-run /tmp artifact");
-            }
-            panic!("a dry run must not create {}", path.display());
-        }
+        assert_eq!(
+            path.symlink_metadata().is_ok(),
+            existed,
+            "HOME refusal changed {}",
+            path.display()
+        );
     }
 }
 
@@ -1893,7 +1887,7 @@ fn init_prints_an_executable_truthful_purge_instruction() {
         .output()
         .expect("execute exactly the printed purge instruction");
     assert!(
-        purge_output.status.success(),
+        purge_completed(&purge_output),
         "printed instruction failed: stdout={} stderr={}",
         String::from_utf8_lossy(&purge_output.stdout),
         String::from_utf8_lossy(&purge_output.stderr)
@@ -1912,7 +1906,7 @@ fn init_prints_an_executable_truthful_purge_instruction() {
         .output()
         .expect("repeat the printed purge instruction");
     assert!(
-        second_output.status.success(),
+        purge_completed(&second_output),
         "repeated printed instruction failed: {}",
         String::from_utf8_lossy(&second_output.stderr)
     );

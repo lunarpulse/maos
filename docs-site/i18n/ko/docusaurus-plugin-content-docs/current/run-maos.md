@@ -113,13 +113,24 @@ Linux에서 확인된 purge는 이 home의 T3 컨테이너를 workspace보다 �
 labelled 컨테이너는 제거 명령만 표시하며 label이 없는 컨테이너는 무시합니다.
 `maos.slice/spirit-*` leaf는 비어 있고 creator가 종료된 경우에만 제거하며,
 실행 중인 creator나 member를 죽이지 않습니다. private T3 custody는 CID 부재가
-확인된 경우만 제거하고 빈 process/state root를 정리합니다. CID가 없거나 실행 중인
-custody는 보존합니다. dry run의 custody 제거 표시는 부재 확인을 조건으로 하며
+확인된 spawn만 제거합니다. process root는 비어 있고 이름의 creator PID 부재가
+확인되어야 제거합니다. live/anonymous process root, 공유 state parent와
+`maos.slice`는 보존합니다. CID가 없거나 실행 중인 spawn custody도 보존합니다.
+dry run의 custody 제거 표시는 부재 확인을 조건으로 하며
 읽기 전용 `ps`/`inspect`만 호출합니다. receipt는 schema 변경 없이
 `podman://<CID>`, `cgroup://<path>`, custody 디렉터리 행을 추가합니다.
 Worker workspace residue와 마찬가지로 `left (<residue>)` 행이 있어도 status는
 `complete`일 수 있으므로 모든 행을 확인하십시오. user-namespace mapping과
 podman storage/configuration은 수정하지 않습니다.
+
+일치하는 metadata는 위조 불가능한 증명이 아닙니다. 같은 rootless UID의 다른
+container creator는 label, 이름, mount를 위조할 수 있으며 same-UID runtime
+control은 privilege boundary가 아닙니다. bare `podman`은 운영자가 신뢰하는
+PATH에서 찾습니다. MAOS 작성 residue가 남으면 기존 `next_step` 문자열과 CLI
+마지막 줄에 `complete with residue: N left`를 표시하고 exit 1을 반환합니다.
+receipt status 어휘와 schema는 바꾸지 않습니다. HOME은 설정된 절대 경로여야 하며,
+HOME 자체/상위 purge root와 `..` 경로는 거부합니다. legacy ancestor는 symlink를
+따르지 않고 검사하며 HOME이 없을 때 공유 `/tmp` fallback을 purge하지 않습니다.
 
 `maos purge --keep-log --yes`는 Transparency Log를 checkpoint한 뒤 보존합니다.
 같은 데이터베이스를 공유할 때 shared-memory row와 principal namespace index도

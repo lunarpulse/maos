@@ -1,0 +1,15 @@
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+@@ -1202,12 +1202,6 @@
+             continue;
+         }
+         let canonical_root = canonicalize_allow_missing(&root.path)?;
+-        if user_home.starts_with(&root.path) || canonical_home.starts_with(&canonical_root) {
+-            return Err(PurgeError::Configuration(format!(
+-                "refusing unsafe purge root {} (equal to HOME or an ancestor)",
+-                root.path.display()
+-            )));
+-        }
+         let parent = root.path.parent();
+         if !root.path.is_absolute()
+             || parent.is_none()
