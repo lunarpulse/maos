@@ -1,7 +1,7 @@
 # 20-9 FLAG-Winston decision record
 
 **Date:** 2026-11-03  
-**Status:** `PROPOSED`. The operator rules D-20-9-13, D-20-9-14 and D-20-9-15, plus D-20-9-11 (whose option B adds KW). This record grants nothing and claims no implementation or landing.  
+**Status:** `RULING RECORDED` 2026-11-03 (ask `d_batch4`): D-20-9-13 A, D-20-9-14 A, D-20-9-15 A (targeted STOP 21230 for 20-9 L2 only), and D-20-9-11 A. R remains a measured request, binding at dev start; no implementation or landing claimed.  
 **Scope:** the kernel row of `20-9-spawned-form-lifecycle-hooks`: the schedule watchdog's D07 A suppression (ruled 2026-11-01, ask `rows203c`) and the PF-04 refused-poll observer. The spawned-form hooks, WIT 2.4.0, the hot swap, upgrade and cold swap, and the schedules carriage are kernel-free.  
 **Story:** `_bmad-output/implementation-artifacts/20-9-spawned-form-lifecycle-hooks.md` (frontmatter, §Kernel and kloc pricing, §Decisions).  
 **Evidence:** `20-9-spawned-form-lifecycle-hooks-evidence/creation/measurements.md`, `kloc-kernel-8c809f9c-and-prototypes.json`, `prototypes/*.diff`.  
@@ -35,18 +35,7 @@ With KW: ≤ 26891 / 21096. L2, kernel last.
 
 ## ADR-069 room and the cumulative STOP
 
-Expected cumulative measured tokei: 21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) + 33 (20-8 KS, PROPOSED) + 25 (20-14 KT,
-PROPOSED) − 1 (20-13 KT3, PROPOSED) = **21182**. With R: **21203** (6 below the 21209 STOP, 797 below the 22000 alarm).
-With R + KW: 21209 (0 below). **At R's ×2 ceiling: 21224, which crosses the STOP.** Every 20-8 ruling (KS, KB, K0) leaves 20-9
-at about 21203 (measurements §Contingencies).
-
-The measured cumulative fits by 6 lines, but the ceiling the D02 A envelope asks for does not. The creation contract
-therefore raises **D-20-9-15** (split / exchange / bump). The exchange is already applied in R (−11 tokei against the inline
-shapes). Recommended: **A**, one joint targeted bump of the internal cumulative STOP from 21209 to **21250**, ruled together with
-20-14's D-20-14-12 (both ×2 allowances: 21125 + 33 + 50 + 42 − 1 = 21249; 750 below the alarm). If D-20-14-12 is ruled
-differently, 21230 for 20-9 L2 alone (covers R's ×2 ceiling 21224; 770 below the alarm). The alternatives: B bump to the ADR-069 alarm line (22000);
-C split (PF-04 to a new key, D07 A here); D no bump, so the measured figure governs and L2 returns to the operator if the re-based
-figure exceeds 21209.
+Expected cumulative measured tokei: 21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) + 33 (20-8) + 25 (20-14) − 1 (20-13) + 21 (20-9) = **21203**. The shared internal STOP remains **21209** for everything else; D-20-9-15 A sets **21230 for 20-9 L2**, covering R's ×2 ceiling of 21224. D-20-14-12 C (ask `d2014_12`, 2026-11-03) sets **21250 for the combined 20-9 L2 + 20-14 L2 cumulative**. ADR-069's **22000** alarm is unchanged. Every later kernel lander re-bases against the exact landed pins.
 
 ## Landing and accounting (if granted)
 

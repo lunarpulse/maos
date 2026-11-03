@@ -1,0 +1,130 @@
+{
+  "scope": "/mnt/build/cargo-maos/debug/incremental",
+  "crate_prefix": "worker_terminal_facts_17_7-",
+  "cutoff": 1793723574.5166643,
+  "candidates": [
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0eweuw8ooxr3e/s-hntfgfsns9-0fv2w0o-0mx1q05c1p7id7wjlccbxvqhy",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0eweuw8ooxr3e/s-hntfgfsns9-0fv2w0o.lock",
+      "mtime": 1793710998.226811,
+      "device": 66,
+      "inode": 108018471
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0h4elxlvfei0e/s-hntdkfwtwj-071hqgm-0gwm3pkzoqi3yvci40qw1d3xp",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0h4elxlvfei0e/s-hntdkfwtwj-071hqgm.lock",
+      "mtime": 1793706886.478452,
+      "device": 66,
+      "inode": 107987133
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-07kv3rmp2me99/s-hntbd1gdb1-1pivyn0-cltrwgrsuys0phr0vao3mfjt6",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-07kv3rmp2me99/s-hntbd1gdb1-1pivyn0.lock",
+      "mtime": 1793702113.2815144,
+      "device": 66,
+      "inode": 107953090
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2wdbdmvyekoad/s-hnsowv2gpf-1lh1c1k-1s7vetwafn52ryeoyxi7uk2en",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2wdbdmvyekoad/s-hnsowv2gpf-1lh1c1k.lock",
+      "mtime": 1793653231.7925513,
+      "device": 66,
+      "inode": 107074007
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-3vu4050p375h1/s-hnrxaz0vnb-0m2jh6f-5q985dxyu3f13y16sbr1od5yv",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-3vu4050p375h1/s-hnrxaz0vnb-0m2jh6f.lock",
+      "mtime": 1793593159.3134353,
+      "device": 66,
+      "inode": 106270251
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2y11eebiilif3/s-hnruptpthy-0cuja0d-8jo0t45gj8484pud6inlct0w1",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2y11eebiilif3/s-hnruptpthy-0cuja0d.lock",
+      "mtime": 1793587490.2529142,
+      "device": 66,
+      "inode": 106125568
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0lsr1s0eth572/s-hnrrk4lfyk-10d5rci-14haja6f0at9272r3kdvw4y6f",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0lsr1s0eth572/s-hnrrk4lfyk-10d5rci.lock",
+      "mtime": 1793580614.4746065,
+      "device": 66,
+      "inode": 105980982
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-36pgj1fijhapr/s-hnrrdqtoe0-0kwukrq-aj8pxgwqzmga6aei2rspwll0s",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-36pgj1fijhapr/s-hnrrdqtoe0-0kwukrq.lock",
+      "mtime": 1793580228.4292433,
+      "device": 66,
+      "inode": 105971935
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-11focwc3c2zhc/s-hnrr91q8v4-172b402-61p1k6ntv1wcxgoh3r0ds5djr",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-11focwc3c2zhc/s-hnrr91q8v4-172b402.lock",
+      "mtime": 1793579944.043958,
+      "device": 66,
+      "inode": 105966114
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-08hlehv5077qn/s-hnrr4ygm22-1is17v2-6zxo9n34na1kgwqn58sxtvj38",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-08hlehv5077qn/s-hnrr4ygm22-1is17v2.lock",
+      "mtime": 1793579697.7941864,
+      "device": 66,
+      "inode": 105954394
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-22fcmf2on45gg/s-hnrpmhqyjf-027ltq2-ep4ioy60i1uvjp8hxocwas56d",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-22fcmf2on45gg/s-hnrpmhqyjf-027ltq2.lock",
+      "mtime": 1793576403.705672,
+      "device": 66,
+      "inode": 105886553
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-30f7fssklqbzk/s-hnrpjbjeet-1edbf6v-c7t6lvqyhm64ts0ojmfyrkwje",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-30f7fssklqbzk/s-hnrpjbjeet-1edbf6v.lock",
+      "mtime": 1793576213.602923,
+      "device": 66,
+      "inode": 105873397
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-3etr28h9p7qlu/s-hnrnq9tkge-0yemajk-arx73jzeodzsq9mda36uac5hk",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-3etr28h9p7qlu/s-hnrnq9tkge-0yemajk.lock",
+      "mtime": 1793572279.9168987,
+      "device": 66,
+      "inode": 105733675
+    },
+    {
+      "path": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-378vt572dxlrd/s-hnrn9h0vr2-1to7imn-azca0vv8zwhclxcodnkomadtt",
+      "lock": "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-378vt572dxlrd/s-hnrn9h0vr2-1to7imn.lock",
+      "mtime": 1793571263.7094252,
+      "device": 66,
+      "inode": 105611039
+    }
+  ],
+  "pids_scanned": 27,
+  "rust_processes": [],
+  "references": [],
+  "unreadable": [
+    {
+      "pid": 1,
+      "kind": "fd",
+      "same_uid": false
+    },
+    {
+      "pid": 1,
+      "kind": "maps",
+      "same_uid": false
+    },
+    {
+      "pid": 7,
+      "kind": "fd",
+      "same_uid": false
+    },
+    {
+      "pid": 7,
+      "kind": "maps",
+      "same_uid": false
+    }
+  ]
+}

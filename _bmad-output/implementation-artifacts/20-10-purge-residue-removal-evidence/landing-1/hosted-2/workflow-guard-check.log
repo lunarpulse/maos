@@ -1,0 +1,41 @@
+Eval assertions passed: base requires owned CID survival AND dead-creator empty-leaf survival; plant requires owned CID survival then byte-restored green; exact head count34; no StoreInUse allowlist. Workflow source unchanged.
+
+            filter='all()'
+          else
+            filter='test(root_crash::)'
+          fi
+          set +e
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10 --timeout 1800 --rootless-canary -- \
+            cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-fail-fast --no-capture -E "$filter" 2>&1 | tee evidence/scenes.log
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${statuses[1]}" -eq 0
+          rc=${statuses[0]}
+          echo "$rc" > evidence/scene-exit-code
+          if [ '${{ matrix.tree }}' = head ]; then
+            test "$rc" -eq 0
+            python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 34 \
+              --required-test root_crash::root_crash_retains_stopped_container_and_purge_reports_it \
+              --required-test root_crash::purge_cgroup_native_binding_and_dead_creator_twins evidence/scenes.log
+            ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/scenes.log
+          else
+            test "$rc" -ne 0
+            if [ '${{ matrix.tree }}' = plant ]; then
+              grep -q 'owned CID .* survived purge' evidence/scenes.log
+            else
+              grep -q 'owned CID .* survived purge' evidence/scenes.log
+              grep -q 'dead-creator empty leaf survived' evidence/scenes.log
+            fi
+          fi
+      - name: Restore plant byte-for-byte, force a rebuild, and require green
+        if: matrix.tree == 'plant'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+          cmp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+          touch crates/maos-bin/src/purge_runtime.rs
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10-restored --timeout 1800 --rootless-canary -- \
+            cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-capture \
+              -E 'test(root_crash_retains_stopped_container_and_purge_reports_it)' 2>&1 | tee evidence/restored.log
+          ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/restored.log

@@ -1,8 +1,10 @@
 # 20-8 creation — records owed
 
-Rulings in force: D01 A / D02 A / D11 A (2026-10-30); D-18-7-11 A (2026-10-26). D-20-8-01…12 are **PROPOSED**. Line numbers are at
+At creation: D01 A / D02 A / D11 A (2026-10-30); D-18-7-11 A (2026-10-26); D-20-8-01…12 proposed. Line numbers are at
 `8c809f9c` unless marked post-edit. They record provenance and are not current offsets. Story and tracker status are `ready-for-dev`;
 no implementation closure is claimed.
+
+**Rulings recorded 2026-11-03 (ask `d_batch4`):** D-20-8-01…12 as recommended. KS and the ceilings remain measured requests, binding at dev start; no implementation or landing claimed.
 
 ## Applied at creation (Create208, 2026-11-03)
 

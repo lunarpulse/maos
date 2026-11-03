@@ -96,3 +96,13 @@ restorations use copy-back + `cmp` + `touch`. Hosted branch baseline/plant
 failures in run 41584515474 are unrelated harness setup failures, **not**
 intended removal/dead-creator proven reds. Both T0 jobs passed without
 contradicting a ruled D-row. The terminal scene count remains 34.
+
+## Hosted shared-ancestry follow-up (baseline `2752e750`)
+
+[`hosted-2/plants.md`](hosted-2/plants.md) records the deterministic shared-lock
+ancestor defect in runs41610868202 /41610893716, the independent foreign
+TempDir fix, the original-layout red and the nested-layout mutation. Both reds
+hit the pre-T3 structural invariant; copy-back/cmp/touch restore precedes the
+81/81 focused serial green. The suite remains34 terminal tests. Production
+locking and the hosted cut's intended removal/dead-leaf diagnostics are
+unchanged; corrected real hosted baseline/head/plant proof remains unverified.

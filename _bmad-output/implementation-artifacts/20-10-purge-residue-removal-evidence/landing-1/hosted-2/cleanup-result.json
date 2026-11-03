@@ -1,0 +1,37 @@
+{
+  "operation": "Python Eval guarded shutil.rmtree of individual stale terminal-suite incremental session directories",
+  "outcome": "completed",
+  "proc_scan": "cleanup-proc-scan.json",
+  "removed_sessions": [
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0eweuw8ooxr3e/s-hntfgfsns9-0fv2w0o-0mx1q05c1p7id7wjlccbxvqhy",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0h4elxlvfei0e/s-hntdkfwtwj-071hqgm-0gwm3pkzoqi3yvci40qw1d3xp",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-07kv3rmp2me99/s-hntbd1gdb1-1pivyn0-cltrwgrsuys0phr0vao3mfjt6",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2wdbdmvyekoad/s-hnsowv2gpf-1lh1c1k-1s7vetwafn52ryeoyxi7uk2en",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-3vu4050p375h1/s-hnrxaz0vnb-0m2jh6f-5q985dxyu3f13y16sbr1od5yv",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2y11eebiilif3/s-hnruptpthy-0cuja0d-8jo0t45gj8484pud6inlct0w1",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0lsr1s0eth572/s-hnrrk4lfyk-10d5rci-14haja6f0at9272r3kdvw4y6f",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-36pgj1fijhapr/s-hnrrdqtoe0-0kwukrq-aj8pxgwqzmga6aei2rspwll0s",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-11focwc3c2zhc/s-hnrr91q8v4-172b402-61p1k6ntv1wcxgoh3r0ds5djr",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-08hlehv5077qn/s-hnrr4ygm22-1is17v2-6zxo9n34na1kgwqn58sxtvj38",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-22fcmf2on45gg/s-hnrpmhqyjf-027ltq2-ep4ioy60i1uvjp8hxocwas56d",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-30f7fssklqbzk/s-hnrpjbjeet-1edbf6v-c7t6lvqyhm64ts0ojmfyrkwje",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-3etr28h9p7qlu/s-hnrnq9tkge-0yemajk-arx73jzeodzsq9mda36uac5hk",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-378vt572dxlrd/s-hnrn9h0vr2-1to7imn-azca0vv8zwhclxcodnkomadtt"
+  ],
+  "skipped_locked_sessions": [],
+  "allocated_bytes_before": 653934592,
+  "free_bytes_before": 455035375616,
+  "free_bytes_after": 454737399808,
+  "observed_free_space_increase_bytes": -297975808,
+  "scope_preserved": [
+    "incremental crate roots",
+    "session lockfiles",
+    "all other crates",
+    "deps",
+    "all current-task sessions",
+    "all target roots"
+  ],
+  "free_bytes_after_sync": 455048085504,
+  "observed_free_space_increase_after_sync_bytes": 12709888,
+  "attribution": "Allocated bytes are the du total of removed sessions, not a physical-reclamation guarantee (hardlinks/reflinks may survive). Filesystem-wide free-space deltas may include unrelated host activity."
+}

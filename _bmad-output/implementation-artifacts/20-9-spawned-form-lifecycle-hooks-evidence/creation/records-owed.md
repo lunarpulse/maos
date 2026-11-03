@@ -1,9 +1,11 @@
 # 20-9 creation — records owed
 
 Rulings in force: D01 A / D02 A / D11 A (2026-10-30); D07 A (2026-11-01, `rows203c`); D-19-5-10 C; R5; D-20-3c-01 A.
-D-20-9-01…16 are **PROPOSED**. Line numbers are working-tree lines at creation (the same as `8c809f9c` for every row touched)
+At creation D-20-9-01…16 were proposed. Line numbers are working-tree lines at creation (the same as `8c809f9c` for every row touched)
 unless marked post-edit. They record provenance; they are not current offsets. Story and tracker status are `ready-for-dev`, and
 no implementation closure is claimed.
+
+**Rulings recorded 2026-11-03:** D-20-9-01…16 as recommended (ask `d_batch4`), including D-15 A STOP 21230 for 20-9 L2. D-20-14-12 C (ask `d2014_12`) sets joint STOP 21250 for the combined 20-9 L2 + 20-14 L2 cumulative; shared STOP 21209 otherwise, ADR-069 alarm 22000 unchanged. Kernel request binds at dev start; no landing claimed.
 
 ## Applied at creation (Create209, 2026-11-03)
 

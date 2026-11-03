@@ -1,8 +1,10 @@
 # 20-13 creation — records owed
 
-Rulings in force: D01 A / D02 A / D11 A (2026-10-30); DECIDE-1 split (2026-10-23). D-20-13-01…16 are **PROPOSED**.
+At creation: D01 A / D02 A / D11 A (2026-10-30); DECIDE-1 split (2026-10-23); D-20-13-01…16 proposed.
 Original line numbers below are at `8c809f9c`; they are provenance, not current offsets (other creators edit the same
 shared files concurrently; every edit was a targeted, exactly-once substring replacement on this story's own rows).
+
+**Rulings recorded 2026-11-03 (ask `d_batch4`):** D-20-13-01…16 as recommended. KT3 and the ceilings remain measured requests, binding at dev start; no implementation or landing claimed.
 
 ## Applied at creation (Create2013 owns these lines this session)
 

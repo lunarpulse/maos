@@ -155,11 +155,29 @@ fn custody_dirs(cid: &str) -> Vec<PathBuf> {
 
 #[test]
 fn root_crash_retains_stopped_container_and_purge_reports_it() {
+    let dir = tempfile::tempdir().expect("scratch");
+    let home = dir.path().join("home");
+    // Drop the live foreign root before its independent HOME ancestry.
+    let foreign_dir = tempfile::tempdir().expect("foreign scratch");
+    let foreign_home = foreign_dir.path().join("home");
+    let target_parent = dir.path().canonicalize().expect("target user HOME");
+    let foreign_parent = foreign_home
+        .parent()
+        .expect("foreign user HOME")
+        .canonicalize()
+        .expect("canonical foreign user HOME");
+    let temp_root = std::env::temp_dir().canonicalize().expect("OS temp root");
+    let shared_ancestor = target_parent
+        .ancestors()
+        .take_while(|path| *path != temp_root.as_path())
+        .find(|path| foreign_parent.starts_with(path));
+    assert!(
+        shared_ancestor.is_none(),
+        "target and live foreign home share locked ancestor below OS temp root: {shared_ancestor:?}"
+    );
     if !super::scene("root-crash") {
         return;
     }
-    let dir = tempfile::tempdir().expect("scratch");
-    let home = dir.path().join("home");
     std::fs::create_dir_all(&home).expect("home");
     let manifest = dir.path().join("worker.toml");
     std::fs::write(&manifest, MANIFEST).expect("manifest");
@@ -210,7 +228,6 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
         !old_custody.is_empty() && !new_custody.is_empty(),
         "crashed roots retained CID custody"
     );
-    let foreign_home = dir.path().join("foreign-home");
     std::fs::create_dir_all(&foreign_home).expect("foreign home");
     let (foreign, foreign_cid) = start_root(&foreign_home, &manifest);
     let _foreign = LiveRoot(foreign);

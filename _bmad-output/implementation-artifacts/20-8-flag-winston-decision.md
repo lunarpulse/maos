@@ -1,7 +1,7 @@
 # 20-8 FLAG-Winston decision record
 
 **Date:** 2026-11-03  
-**Status:** `PROPOSED`. The operator rules D-20-8-07 (and D-20-8-01 for landing order). No grant, implementation or landing is claimed.  
+**Status:** `RULING RECORDED` 2026-11-03 (ask `d_batch4`): D-20-8-07 A, D-20-8-01 A and the envelope as recommended. KS remains a measured request, binding at dev start; no implementation or landing claimed.  
 **Scope:** the kernel seam of `20-8-manifest-contract-completion`: how the `[swap_invariants]` declaration reaches the swap that must honour it.  
 **Story:** `_bmad-output/implementation-artifacts/20-8-manifest-contract-completion.md` (frontmatter, §Kernel and kloc pricing, §Decisions, §Contract for 20-9).  
 **Evidence:** `20-8-manifest-contract-completion-evidence/creation/measurements.md`, `kloc-kernel-8c809f9c-and-prototypes.json`, `prototypes/{kb,kb4,ks}-kernel-only.diff` (full-tree variants alongside).  
@@ -29,13 +29,9 @@ kernel last.
 
 ## ADR-069 room and the cumulative STOP
 
-Expected cumulative measured tokei with the granted, unlanded rows: 21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) = **21125**.
-With A: **21158** (51 below the 21209 cumulative STOP, 842 below the 22000 alarm). At A's ×2 ceiling: **21191** (18 below the STOP).
-B: 21133; D: 21157. No option crosses 21209, so no split/exchange/bump row is raised. The later kernel lander among 20-1b, 20-4, 20-11
-and 20-8 re-bases against the then-landed pins before pinning. **Stated risk:** after A, 20-9 (watchdog source hook, D07 suppression,
-lifecycle ABI, all forecast kernel) has at most 51 lines under the STOP and will need its own bump decision. Same-day PROPOSED rows also
-claim the room: 20-14 KT +25 and 20-13 KT3 −1. With all measured, the cumulative is **21182** (27 left). At every ×2 ceiling it exceeds 21209,
-and the measured cumulative governs (later lander returns to the operator). B (KB) would leave 25 more lines than A.
+Expected cumulative measured tokei: 21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) + 33 (20-8) + 25 (20-14) − 1 (20-13) + 21 (20-9) = **21203**. The shared internal STOP remains **21209**; D-20-9-15 A sets **21230** for 20-9 L2 only. ADR-069's alarm remains **22000**. Every later kernel lander re-bases on the exact landed pins.
+
+D-20-14-12 C (ask `d2014_12`, 2026-11-03) sets joint STOP **21250** for the combined 20-9 L2 + 20-14 L2 cumulative; shared STOP **21209** applies otherwise.
 
 ## Landing and accounting (if granted)
 

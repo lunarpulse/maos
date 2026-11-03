@@ -1,7 +1,7 @@
 # 20-13 FLAG-Winston decision record
 
 **Date:** 2026-11-03  
-**Status:** `REQUESTED` — PROPOSED at story creation; **not granted**. The operator (Lunarpulse) rules D-20-13-04 and D-20-13-13; this record is rewritten to the ruled shape then.  
+**Status:** `RULING RECORDED` 2026-11-03 (ask `d_batch4`): D-20-13-04 A and D-20-13-13 A as recommended. KT3 remains a measured request, binding at dev start; no implementation or landing claimed.  
 **Scope:** kernel row **KT3** for `20-13-pluggable-crypto-provider-selection` (AC7, L2 kernel last); no implementation or landing claimed.  
 **Story:** `_bmad-output/implementation-artifacts/20-13-pluggable-crypto-provider-selection.md`, frontmatter, §Decisions, §Kernel and kloc pricing.  
 **Evidence:** `20-13-pluggable-crypto-provider-selection-evidence/creation/measurements.md`, `kloc-kernel-8c809f9c-and-prototypes.json`, `kt3-required-ctor-param.diff`, `kt1-builder-ring-default.diff`, `ktd-builder-debug-supertrait.diff`, `ki-trait-identity.diff`, `ko-trait-open-sealed.diff`, `gate-sim-base.txt`.  
@@ -18,7 +18,7 @@ finds it (`gate-sim-base.txt`).
 
 | ID | Shape | Kernel physical | Kernel tokei | Status |
 |---|---|---:|---:|---|
-| **KT3** | `new(policy, crypto)` required; T3 arm uses `self.crypto`; `impl Default` removed; manual `Debug` | **+1** (26842) | **−1** (21041) | REQUESTED (D-20-13-04 A) |
+| **KT3** | `new(policy, crypto)` required; T3 arm uses `self.crypto`; `impl Default` removed; manual `Debug` | **+1** (26842) | **−1** (21041) | RULED 2026-11-03: **A** (ask d_batch4); measured request |
 | KT1 | builder `with_crypto_provider`, `ring` default kept | +20 (26861) | +14 (21056) | priced (D-04 B) |
 | KTd | KT1 with a `Debug` supertrait on `CryptoProvider` | +11 (26852) | +6 (21048) | priced (D-04 B variant) |
 | KI | `CryptoProvider::identity()` | +19 (26860) | +18 (21060) | priced (D-20-13-03 B; not requested) |
@@ -29,13 +29,9 @@ Requested ceilings (STOP above): **kernel ≤ 26843 physical / 21042 tokei**. Ev
 
 ## Kernel grant and ADR-069 room
 
-Base `8c809f9c`: **26841 physical / 21042 tokei** (20-7 K1w+K2r landed). Ruled, unlanded rows: 20-1b +68 (computed from
-21011, re-base owed), 20-4 +9, 20-11 +6 → expected **21125**. With KT3: **21124** expected, ceiling sum 21125; physical
-26943. STOP **21209**; ADR-069 alarm **22000** (876 below at the KT3 expectation), envelope **23000**. No alarm row.
+Expected cumulative measured tokei: 21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) + 33 (20-8) + 25 (20-14) − 1 (20-13) + 21 (20-9) = **21203**. Shared internal STOP **21209**; D-20-9-15 A sets **21230** for 20-9 L2 only; ADR-069 alarm **22000** unchanged. Later kernel landers re-base on the exact landed pins.
 
-**Concurrent PROPOSED rows at the same HEAD:** 20-8 KS +33, 20-14 KT +25, 20-9 R +21 → expectation 21204 before this
-row, **21203 with KT3** (6 below 21209). Every costlier shape crosses the STOP: KT1 21218, KTd 21210, KT3+KI 21221, any KO
-≥ 21240 → story D-20-13-16 (split / exchange / bump, operator).
+D-20-14-12 C (ask `d2014_12`, 2026-11-03) sets joint STOP **21250** for the combined 20-9 L2 + 20-14 L2 cumulative; shared STOP **21209** applies otherwise.
 
 ## Landing and accounting (if granted)
 

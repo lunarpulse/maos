@@ -873,6 +873,66 @@ Corrected real delegated baseline/head/plant scenes and post-fix hosted-toolchai
 lint require an operator rerun; local self-skips are not that proof. No commit,
 push, CI-branch edit, story/status flip or kernel modification was made.
 
+#### Hosted follow-up — runs 41610868202 / 41610893716, 2026-11-03
+
+Baseline for this scoped correction: `2752e750c8cc7cfcb6fed2ccabbd4e4e0ed4f040`.
+The remaining hosted root-crash failure was a **fixture lock-ancestry defect**:
+target `<scratch>/home` and foreign `<scratch>/foreign-home` shared the scratch
+user HOME/ancestor. The foreign live process correctly held a shared ancestor
+guard and prevented exclusive purge. This was neither a production lock bug nor
+a timing flake. Exact job/log citations and separation of passing real cgroup
+legs from the blocked AC1 base/plant:
+[`hosted-2/branch-run-diagnosis.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-2/branch-run-diagnosis.md).
+
+The foreign root now owns an independent TempDir, declared before its LiveRoot
+so process shutdown precedes temporary-ancestry deletion. A canonical
+shared-ancestor invariant at `root_crash.rs:174-176` executes before the optional
+T3 gate. Applied to HEAD's original fixture layout, the new witness failed
+with exit100 on the intended shared-ancestor assertion. A nested foreign-temp
+plant independently failed on the same invariant, exit100; source copy-back,
+`cmp`, `touch` and final formatting each exited0. The restore intermediary was
+removed. Restored focused serial suites passed **81/81**, including all **34**
+terminal tests, exit0. CID removal, foreign CID survival, label-less impostor
+survival, production ancestor locking and StoreInUse refusal remain unchanged.
+
+Scoped scan: the live same-store refusal in `purge_residue_20_10.rs:321-370` is
+intentional, not a success-expected foreign twin; other-home entries there are
+stub metadata. `root_shutdown_unload_16_3.rs` has no such purge scene. Neither
+needs relocation. The branch-only verification cut is unchanged: intended
+owned-CID/dead-leaf diagnostics and byte-restoration checks remain strict.
+No StoreInUse allowlist, signed-substrate bypass or test-count increase.
+
+Formatting and KLOC gates exited0; inherited post-20-4 counts remain
+**maos-bin34363 / aggregate192896 / xtask44420**, aggregate hardfail192897.
+No production counted lines or pins changed. Kernel remains **26841 physical /
+21042 code**, with no changed/added/removed files. Non-denying all-target
+workspace clippy on Rust1.98.1 exited0; complete-stream ratchet exited0 at
+**1331 occurrences /871 source-distinct**, unchanged1383/897 baseline. The sole
+changed Rust file has zero primary warnings. Exact structural/record gate
+commands and outcomes are recorded in the command ledger; no hosted-toolchain
+lint or corrected hosted runtime result is claimed.
+
+Cleanup scanned27 `/proc` PIDs with no active Rust/cargo tooling or candidate
+reference and no inaccessible same-UID entry. After nonblocking session locks,
+14 stale terminal incremental session directories were removed, preserving
+current-task sessions, crate roots, lockfiles, deps and every other crate.
+Their allocated-byte total was653934592; filesystem free-space increase after
+Btrfs flush was12709888 bytes, not an exclusive-reclamation guarantee.
+No cargo clean or broad target deletion. Witness TempDirs and restore scratch
+are absent. Details: `hosted-2/cleanup-proc-scan.json` and `cleanup-result.json`.
+
+Lesson/disposition is also recorded in the owned20-10 `deferred-work.md` row:
+distinct MAOS_HOME leaves do not prove independent lock ancestry. Full witness,
+mutation SHA-256, restore sequence, scan findings, proof boundaries and exact
+commands:
+[`hosted-2/plants.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-2/plants.md)
+and adjacent `commands.md` / `commands.json`. Parent scoped this follow-up to
+focused serial suites, formatting, structural/record gates and clippy delta;
+no new full workspace/default/prepush matrix was requested or run. A fresh
+operator-owned hosted baseline/head/plant rerun remains required: the prior
+StoreInUse failures are not accepted removal reds. No commit, push, story/status
+flip, kernel or production-policy change.
+
 ### File List
 
 - [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [creator-PID custody roots](../../crates/maos-bin/src/egress.rs).
@@ -882,6 +942,7 @@ push, CI-branch edit, story/status flip or kernel modification was made.
 - [FR2 coverage row](../../tests/coverage-matrix.yaml), [loaded-budget disposition](deferred-work.md), this Dev Agent Record, and [landing/hosted-cut evidence](20-10-purge-residue-removal-evidence/landing-1/plants.md).
 - Cold-swap oracle incident: `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`; the resolved cold-swap row in `deferred-work.md`; this record and the 20-1a Dev Agent Record. The earlier implementation-diff digest is not regenerated or expanded.
 - Hosted incident: [AF_UNIX hosted-length witness](../../crates/maos-bin/tests/egress_daemon_17_1.rs), [startup failure context](../../crates/maos-bin/tests/root_shutdown_unload_16_3.rs), the existing terminal/custody witnesses, [workflow contract](../../xtask/tests/epic17_exit_workflow_17_7.rs), [corrected branch-only cut](20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml), ADR-067, exact pins and [hosted incident evidence](20-10-purge-residue-removal-evidence/landing-1/hosted-1/hosted-findings.md).
+- Hosted shared-ancestry follow-up: [independent foreign-root fixture and pre-gate invariant](../../crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs), the owned lesson row, this record, and [focused follow-up evidence](20-10-purge-residue-removal-evidence/landing-1/hosted-2/plants.md). No workflow, production source or pin change.
 
 
 ## Change Log
@@ -898,3 +959,4 @@ push, CI-branch edit, story/status flip or kernel modification was made.
 - 2026-11-02: Hosted run `41521146083` cold-swap failure diagnosed as an over-strict cross-writer journal oracle, with a deterministic recorded-order red-before vector and causal/audit-drained replacement. No purge, kernel, production or budget change.
 - 2026-11-03: Review corrections retain live/anonymous T3 roots and shared parents, validate HOME/legacy ancestry/protected paths, make residue an explicit nonzero outcome, document the same-UID attribution boundary, and strengthen all identified witnesses. Exact maos-bin 34188 / aggregate 192516 (hardfail 192517), kernel unchanged; five baseline-red vectors and nine byte-restored assertion-red plants; focused, serial/default, gates, clippy, deny and prepush observed green except separately recorded prepush budget advisories. No status flip or push.
 - 2026-11-03: Hosted incidents 41584515474 / 41584453971 corrected at cause: use the existing delegated-unit namespace; confine creator-PID naming to volatile custody so durable AF_UNIX socket paths stay short; separate terminal fixture HOME/MAOS_HOME and expose startup stderr. Three byte-restored assertion-red plants, focused164/164, serial5573/5573 and prepush0; default's known snapshot-owner failure remains recorded/unretried under owner20-7. Exact bin34191 / aggregate192519 (hardfail192520), kernel unchanged; corrected hosted cut remains unpushed.
+- 2026-11-03: Hosted runs41610868202 /41610893716 classified as a shared-ancestor fixture defect; foreign LiveRoot moved to independent TempDir with a pre-T3 canonical ancestry invariant. Original-layout and nested-layout reds100; byte-restored focused serial81/81, terminal count34 unchanged; local clippy1331/871 with no changed-file warnings. Production lock policy and intended hosted red diagnostics unchanged; operator rerun still required. Inherited post-20-4 counts unchanged.

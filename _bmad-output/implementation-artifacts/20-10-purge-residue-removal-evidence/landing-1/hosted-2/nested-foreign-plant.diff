@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
++++ b/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
+@@ -158,7 +158,7 @@
+     let dir = tempfile::tempdir().expect("scratch");
+     let home = dir.path().join("home");
+     // Drop the live foreign root before its independent HOME ancestry.
+-    let foreign_dir = tempfile::tempdir().expect("foreign scratch");
++    let foreign_dir = tempfile::tempdir_in(dir.path()).expect("foreign scratch");
+     let foreign_home = foreign_dir.path().join("home");
+     let target_parent = dir.path().canonicalize().expect("target user HOME");
+     let foreign_parent = foreign_home

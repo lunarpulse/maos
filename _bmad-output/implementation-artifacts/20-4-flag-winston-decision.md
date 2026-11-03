@@ -20,7 +20,9 @@
 
 Creation base `a8af3215`: **26841 physical / 21042 tokei**. Reverted prototype: KA **+2/+2**, KIO1 **+7/+5**, KIO2 **+4/+2**; R **+13/+9**, giving **26854 / 21051** measured. Granted ceilings: **26867 physical / 21060 tokei**; STOP above. ADR-069's alarm is **22000 tokei**, envelope **23000**: derived remaining room is **949** at the prototype measurement or **940** at the standalone ceiling. Neither is spending authority; no alarm is crossed by this prototype.
 
-20-7's kernel landing is already in the creation base. The later kernel lander among 20-1b, 20-4 and 20-11 MUST re-base against the exact then-landed pins before pinning. Expected cumulative measured tokei: **21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) = 21125**, leaving **875** below the alarm. Cumulative STOP is **21209** (791 below the alarm), not the sum of independent standalone ceilings; return to the operator above it.
+20-7's kernel landing is already in the creation base. Later kernel landers MUST re-base against the exact then-landed pins. Expected cumulative measured tokei: **21042 + 68 (20-1b) + 9 (20-4) + 6 (20-11) + 33 (20-8) + 25 (20-14) − 1 (20-13) + 21 (20-9) = 21203**, leaving 797 below the ADR-069 alarm. The shared cumulative STOP remains **21209**, not the sum of independent standalone ceilings. D-20-9-15 A (ask `d_batch4`, 2026-11-03) sets **21230 for 20-9 L2 only**; ADR-069 alarm **22000** is unchanged.
+
+D-20-14-12 C (ask `d2014_12`, 2026-11-03) also sets a joint STOP **21250** for the combined 20-9 L2 + 20-14 L2 cumulative; the shared **21209** STOP remains for everything else.
 
 ## Landing and accounting
 

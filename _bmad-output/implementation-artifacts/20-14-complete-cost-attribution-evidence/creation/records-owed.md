@@ -1,9 +1,11 @@
 # 20-14 creation — records owed
 
-Rulings in force: D01 A / D02 A / D11 A (2026-10-30). D-20-14-01…11 are **PROPOSED**, not ruled. Line numbers are at
+At creation: D01 A / D02 A / D11 A (2026-10-30); D-20-14-01…12 proposed. Line numbers are at
 `8c809f9c`; every shared-file edit below is an in-line substring edit (no line added or removed), applied by an
 exactly-once scripted replace after a fresh read, so sibling creators' concurrent rows (20-8, 20-13) are untouched.
 No implementation closure is claimed.
+
+**Rulings recorded 2026-11-03:** D-20-14-01…11 as recommended (ask `d_batch4`), including -02 B and -03 B; D-20-14-12 C (ask `d2014_12`), joint STOP 21250 for the combined 20-9 L2 + 20-14 L2 cumulative. KT and ceilings remain measured requests, binding at dev start; no implementation or landing claimed.
 
 ## Applied at creation (Create2014 owns these files this session)
 
