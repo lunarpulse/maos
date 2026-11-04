@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="46" skipped="0" failures="0" errors="0" uuid="fb7543f2-3285-42df-a61b-5c03bf4e1c9d" timestamp="2026-11-03T19:05:38.754+00:00" time="6.922">
+    <testsuite name="maos-bin::enterprise_daemon_seam_13_5a" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime" classname="maos-bin::enterprise_daemon_seam_13_5a" timestamp="2026-11-03T19:05:38.754+00:00" time="0.008"/>
+    </testsuite>
+    <testsuite name="maos-bin::enterprise_identity_wiring" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="kms_configured_but_down_refuses_sealed_write_and_never_writes_plaintext" classname="maos-bin::enterprise_identity_wiring" timestamp="2026-11-03T19:05:38.763+00:00" time="0.003"/>
+        <testcase name="siem_configured_but_down_surfaces_an_operator_error_and_never_drops" classname="maos-bin::enterprise_identity_wiring" timestamp="2026-11-03T19:05:38.765+00:00" time="0.003"/>
+        <testcase name="sso_configured_but_down_denies_issuance_and_never_falls_open" classname="maos-bin::enterprise_identity_wiring" timestamp="2026-11-03T19:05:38.768+00:00" time="0.002"/>
+        <testcase name="zero_config_reports_no_subsystems_and_is_a_byte_identical_noop" classname="maos-bin::enterprise_identity_wiring" timestamp="2026-11-03T19:05:38.770+00:00" time="0.003"/>
+    </testsuite>
+    <testsuite name="maos-bin::provider_endpoint_pin_20_4" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="airgap_pin_tracks_ollama_configuration_in_keyless_replay" classname="maos-bin::provider_endpoint_pin_20_4" timestamp="2026-11-03T19:05:38.773+00:00" time="0.588"/>
+        <testcase name="endpoint_and_model_are_assertions_not_reconfiguration" classname="maos-bin::provider_endpoint_pin_20_4" timestamp="2026-11-03T19:05:39.361+00:00" time="0.374"/>
+        <testcase name="matching_endpoint_pin_and_model_admit" classname="maos-bin::provider_endpoint_pin_20_4" timestamp="2026-11-03T19:05:39.735+00:00" time="0.414"/>
+        <testcase name="wrong_endpoint_pin_refuses_before_inference" classname="maos-bin::provider_endpoint_pin_20_4" timestamp="2026-11-03T19:05:40.149+00:00" time="0.198"/>
+    </testsuite>
+    <testsuite name="maos-bin::provider_selection_20_4" tests="12" skipped="0" errors="0" failures="0">
+        <testcase name="empty_default_preserves_existing_router_default" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:40.347+00:00" time="0.270"/>
+        <testcase name="epic_gemini_shell_command_selects_and_routes" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:40.617+00:00" time="0.269"/>
+        <testcase name="existing_key_precedence_is_preserved_p3" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:40.886+00:00" time="0.984"/>
+        <testcase name="fallback_is_refused_before_inference" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:41.870+00:00" time="0.163"/>
+        <testcase name="gemini_key_really_registers_without_replay_p3" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:42.033+00:00" time="0.224"/>
+        <testcase name="invalid_credentials_refuse_without_echoing_bytes" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:42.256+00:00" time="0.600"/>
+        <testcase name="kimi_key_really_registers_without_replay_p3" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:42.856+00:00" time="0.226"/>
+        <testcase name="kimi_shell_selects_and_routes" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:43.082+00:00" time="0.233"/>
+        <testcase name="new_keys_route_in_replay" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:43.316+00:00" time="0.462"/>
+        <testcase name="researcher_primary_overrides_declaration_order" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:43.778+00:00" time="0.358"/>
+        <testcase name="undeclared_primary_is_a_typed_refusal" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:44.136+00:00" time="0.169"/>
+        <testcase name="unknown_default_refuses_with_registered_ids" classname="maos-bin::provider_selection_20_4" timestamp="2026-11-03T19:05:44.305+00:00" time="0.163"/>
+    </testsuite>
+    <testsuite name="maos-bin::bin/maos" tests="25" skipped="0" errors="0" failures="0">
+        <testcase name="env_contract::tests::all_entries_start_with_maos_prefix" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:44.468+00:00" time="0.004"/>
+        <testcase name="env_contract::tests::lookup_finds_known_var" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:44.472+00:00" time="0.003"/>
+        <testcase name="env_contract::tests::registry_names_are_unique" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:44.475+00:00" time="0.003"/>
+        <testcase name="migration_plan::tests::persisted_plan_file_drift_is_refused_after_a_candidate_mutates_on_disk" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:44.478+00:00" time="0.015"/>
+        <testcase name="migration_plan::tests::plan_is_atomically_persisted_under_maos_home_and_round_trips" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:44.493+00:00" time="0.014"/>
+        <testcase name="provider_config_review::catalog_endpoint_matches_driver_endpoint_f6" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:44.507+00:00" time="0.003"/>
+        <testcase name="story_13_5a_enterprise_daemon_seam::story_13_5a_daemon_governance_is_dead_wired_unwired_and_fails_closed_when_denied" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:44.510+00:00" time="0.744"/>
+        <testcase name="story_13_5a_enterprise_daemon_seam::story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.254+00:00" time="0.193"/>
+        <testcase name="story_13_5a_enterprise_daemon_seam::story_13_5a_pdp_subject_binding_uses_the_daemon_issuance_pid" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.447+00:00" time="0.133"/>
+        <testcase name="tests::live_mcp_butler_refused_mint_preserves_error_and_never_calls_client" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.580+00:00" time="0.015"/>
+        <testcase name="tests::live_mcp_researcher_fetch_refused_mint_preserves_error_and_never_calls_fetch" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.596+00:00" time="0.016"/>
+        <testcase name="tests::live_mcp_researcher_search_refused_mint_preserves_error_and_never_calls_client" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.612+00:00" time="0.017"/>
+        <testcase name="tests::story_13_6d_parses_validated_cross_wall_traceback_request" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.628+00:00" time="0.003"/>
+        <testcase name="tests::story_13_6d_rejects_invalid_or_incomplete_traceback_request" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.631+00:00" time="0.003"/>
+        <testcase name="tests::story_16_6_known_class_names_match_classify_spirit" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.634+00:00" time="0.003"/>
+        <testcase name="tests::story_17_4_scalar_port_refuses_a_claimed_spirit_id" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.637+00:00" time="0.010"/>
+        <testcase name="tests::story_9_6_classifies_founder_and_diagnostic_spirits" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.647+00:00" time="0.003"/>
+        <testcase name="tests::story_9_6_halt_port_mira_scalar_requires_port" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.650+00:00" time="0.003"/>
+        <testcase name="tests::story_9_6_halt_port_non_allowlisted_tag_returns_false" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.653+00:00" time="0.003"/>
+        <testcase name="tests::story_9_6_halt_port_none_policy_returns_false" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.656+00:00" time="0.003"/>
+        <testcase name="tests::story_9_6_halt_port_orchestrator_dispatch_ambiguity_requires_port" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.659+00:00" time="0.003"/>
+        <testcase name="tests::story_9_6_missing_capabilities_required_means_empty_caps" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.663+00:00" time="0.004"/>
+        <testcase name="tests::story_9_6_pick_next_spirit_callable" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.666+00:00" time="0.003"/>
+        <testcase name="tests::story_9_6_port_requirement_uses_halt_transport_not_posture" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.669+00:00" time="0.003"/>
+        <testcase name="tests::story_9_6_single_driver_guard_classify_round_trips" classname="maos-bin::bin/maos" timestamp="2026-11-03T19:05:45.673+00:00" time="0.003"/>
+    </testsuite>
+</testsuites>

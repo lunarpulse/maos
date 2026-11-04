@@ -1,0 +1,10 @@
+{
+  "code": "unused_imports",
+  "message": "unused import: `InferenceOptions`",
+  "spans": [
+    {
+      "file": "crates/maos-providers/src/openai.rs",
+      "line": 11
+    }
+  ]
+}

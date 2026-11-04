@@ -1,0 +1,109 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused imports: `InferenceResponse`, `ProviderAttribution`, and `TokenUsage`
+  --> crates/maos-providers/tests/openai_round_trip_test.rs:9:41
+   |
+ 9 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |                                         ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+10 |     TokenUsage,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-providers` (test "openai_round_trip_test") generated 1 warning (run `cargo fix --test "openai_round_trip_test" -p maos-providers` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.90s
+     Running tests/gemini_round_trip_test.rs (/mnt/build/cargo-maos/debug/deps/gemini_round_trip_test-48755b8c68ba93a5)
+
+running 3 tests
+test credential_bytes_refused_without_echo ... ok
+test native_wire_header_usage_parts_and_stop_reasons ... ok
+test non_success_status_remains_data ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/kimi_round_trip_test.rs (/mnt/build/cargo-maos/debug/deps/kimi_round_trip_test-1a97ae995c2dc370)
+
+running 2 tests
+test compatible_bad_key_refuses_before_transport ... ok
+test compatible_wire_uses_kimi_key_and_attribution ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/openai_round_trip_test.rs (/mnt/build/cargo-maos/debug/deps/openai_round_trip_test-39814fd5e16e81ec)
+
+running 3 tests
+test openai_round_trip_with_error_fixture ... ok
+test openai_round_trip_with_fixture_response ... ok
+test openai_round_trip_with_max_tokens_fixture ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/provider_review_20_4.rs (/mnt/build/cargo-maos/debug/deps/provider_review_20_4-fa3252e5475afeb4)
+
+running 13 tests
+test absent_finish_reason_refuses_p2 ... ok
+test blocked_candidate_without_content_preserves_stop_p1 ... ok
+test compatible_transport_errors_are_bounded_f5 ... ok
+test compatible_usage_and_stop_guards_f2_f4 ... ok
+test direct_error_display_is_bounded_f5 ... ok
+test empty_finish_reason_refuses_p2 ... ok
+test invalid_configured_model_refuses_f1 ... ok
+test missing_usage_field_refuses_f2 ... ok
+test missing_usage_refuses_f2 ... ok
+test model_override_cannot_escape_admitted_pin_f1 ... ok
+test overflowing_usage_refuses_f2 ... ok
+test vendor_errors_and_display_are_bounded_f5 ... ok
+test vendor_stop_is_bounded_f4 ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

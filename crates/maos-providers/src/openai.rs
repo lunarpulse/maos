@@ -113,7 +113,7 @@ impl Provider for OpenAiProvider {
                     ("content-type", "application/json"),
                 ],
             )
-            .map_err(|e| ProviderError::Transport(e.to_string()))?;
+            .map_err(crate::provider::transport_error)?;
 
         let response_json: serde_json::Value = serde_json::from_slice(&response_bytes)
             .map_err(|e| ProviderError::Serde(e.to_string()))?;
@@ -165,19 +165,13 @@ fn parse_openai_response(
         .map(|s| match s {
             "stop" => StopReason::StopSequence,
             "length" => StopReason::MaxTokens,
-            other => StopReason::ProviderStop(other.into()),
+            other => crate::provider::vendor_stop(other),
         })
         .unwrap_or(StopReason::StopSequence);
 
     let usage = json.get("usage");
-    let input_tokens = usage
-        .and_then(|u| u.get("prompt_tokens"))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u32;
-    let output_tokens = usage
-        .and_then(|u| u.get("completion_tokens"))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u32;
+    let input_tokens = crate::provider::usage_count(usage, "prompt_tokens")?;
+    let output_tokens = crate::provider::usage_count(usage, "completion_tokens")?;
 
     Ok(InferenceResponse {
         text: content.into(),
@@ -362,14 +356,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_missing_usage_defaults_zero() {
+    fn parse_missing_usage_is_refused() {
         let json = serde_json::json!({
             "choices": [{ "message": { "content": "text" }, "finish_reason": "stop" }]
         });
-        let resp = parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini", "openai")
-            .unwrap();
-        assert_eq!(resp.usage.input_tokens, 0);
-        assert_eq!(resp.usage.output_tokens, 0);
+        assert!(matches!(
+            parse_openai_response(&json, "https://api.openai.com", "gpt-4o-mini", "openai"),
+            Err(ProviderError::Serde(_))
+        ));
     }
 
     #[test]

@@ -24,6 +24,9 @@
 //! * `crates/maos-bin/src/main.rs` — third model argument of `AnthropicProvider`,
 //!   `OpenAiProvider`, `OllamaProvider`, `GeminiProvider` (`new` / `with_api_key`);
 //!   fifth argument of `OpenAiProvider::compatible`; all five hosts must be found.
+//!   Models may be literal arguments or `crate::NAME.1.into()` references to
+//!   attribute-free root tuple constants parsed with `syn`; comments, conditional
+//!   declarations and lexical shadows are never accepted as shared defaults.
 //!
 //! Hermetic `#[cfg(test)]` fixtures and fuzz seeds in OTHER files are NOT scanned:
 //! they pin a retired id as inert test data, and the debt is disclosed, not
@@ -73,6 +76,7 @@ struct Retired {
 }
 
 /// One model id found at one place in the tree.
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
 struct Pin {
     file: String,
     line: usize,
@@ -239,6 +243,34 @@ fn main_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
     .expect("static");
     let literal =
         regex::Regex::new(r#"^\s*"([^"]+)"\.(?:into|to_string|to_owned)\(\)\s*$"#).expect("static");
+    let reference = regex::Regex::new(r"^\s*crate::(\w+)\.1\.into\(\)\s*$").expect("static");
+    let ast = syn::parse_file(text).map_err(|e| format!("cannot parse shared defaults: {e}"))?;
+    let defaults: BTreeMap<_, _> = ast
+        .items
+        .iter()
+        .filter_map(|item| {
+            let syn::Item::Const(item) = item else {
+                return None;
+            };
+            if !item.attrs.is_empty() {
+                return None;
+            }
+            let syn::Expr::Tuple(tuple) = item.expr.as_ref() else {
+                return None;
+            };
+            let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(model),
+                ..
+            }) = tuple.elems.iter().nth(1)?
+            else {
+                return None;
+            };
+            Some((
+                item.ident.to_string(),
+                (model.value(), model.span().start().line),
+            ))
+        })
+        .collect();
     let mut pins: Vec<Pin> = Vec::new();
     for c in ctor.captures_iter(text) {
         let open = c.get(0).map_or(0, |m| m.end());
@@ -278,25 +310,29 @@ fn main_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
         } else {
             c[1].to_ascii_lowercase()
         };
-        let Some(m) = list
-            .split('\0')
-            .nth(index)
-            .and_then(|a| literal.captures(a))
-        else {
-            return Err(format!(
-                "line {line}: `{}Provider` constructor has no readable model literal as its {} argument — the pin could rot unscanned",
-                &c[1], if index == 4 { "fifth" } else { "third" }
-            ));
+        let argument = list.split('\0').nth(index).unwrap_or("");
+        let (model, pin_line) = if let Some(m) = literal.captures(argument) {
+            let skip: usize = list.split('\0').take(index).map(|a| a.len() + 1).sum();
+            let at = skip + m.get(1).map_or(0, |g| g.start());
+            (m[1].to_owned(), line + list[..at].matches('\n').count())
+        } else if let Some((model, declaration_line)) = reference
+            .captures(argument)
+            .and_then(|r| defaults.get(&r[1]))
+        {
+            (model.clone(), *declaration_line)
+        } else {
+            return Err(format!("line {line}: `{}Provider` constructor has no readable model literal or shared default — the pin could rot unscanned", &c[1]));
         };
-        let skip: usize = list.split('\0').take(index).map(|a| a.len() + 1).sum();
-        let at = skip + m.get(1).map_or(0, |g| g.start());
         pins.push(Pin {
             file: file.into(),
-            line: line + list[..at].matches('\n').count(),
+            line: pin_line,
             provider,
-            model: m[1].to_string(),
+            model,
         });
     }
+    // Multiple calls may share one declaration; govern that source pin once.
+    pins.sort_unstable();
+    pins.dedup();
     for host in ["anthropic", "openai", "ollama", "gemini", "kimi"] {
         if !pins.iter().any(|p| p.provider == host) {
             return Err(format!(

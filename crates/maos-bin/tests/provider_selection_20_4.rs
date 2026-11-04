@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! 20-4 AC1/2/3/5: real roots, isolated homes, explicit replay, no paid key.
+//! 20-4 AC1/2/3/5: isolated roots, seeded routing and no-inference keyed boots.
 #[allow(dead_code)]
 #[path = "support/provider204.rs"]
 mod support;
@@ -117,7 +117,7 @@ fn fallback_is_refused_before_inference() -> TestResult {
 }
 
 #[test]
-fn new_keys_register_and_preserve_default_order_in_replay() -> TestResult {
+fn new_keys_route_in_replay() -> TestResult {
     for (key, id) in [
         ("MAOS_GEMINI_API_KEY", "gemini"),
         ("MAOS_KIMI_API_KEY", "kimi"),
@@ -126,6 +126,8 @@ fn new_keys_register_and_preserve_default_order_in_replay() -> TestResult {
         let mut child = command(home.path())
             .arg("shell")
             .env(key, "test-key-visible-ascii")
+            // Replay proves explicit routing, not native key registration.
+            .env("MAOS_DEFAULT_PROVIDER", id)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -175,5 +177,66 @@ fn undeclared_primary_is_a_typed_refusal() -> TestResult {
     assert!(!intents(home.path())?
         .iter()
         .any(|s| s.starts_with("infer:")));
+    Ok(())
+}
+
+fn real_registration(key: &str, id: &str, absent: &str) -> TestResult {
+    let home = tempfile::tempdir()?;
+    for (selected, accepted) in [(id, true), (absent, false)] {
+        let out = command(home.path())
+            .arg("shell")
+            .env("MAOS_INFERENCE_MODE", "live")
+            .env_remove("MAOS_REPLAY_CASSETTE")
+            .env(key, "test-key-visible-ascii")
+            .env("MAOS_DEFAULT_PROVIDER", selected)
+            .stdin(std::process::Stdio::null())
+            .output()?;
+        assert_eq!(
+            out.status.success(),
+            accepted,
+            "{id}/{selected}: {}",
+            stderr(&out)
+        );
+        assert!(!intents(home.path())?
+            .iter()
+            .any(|s| s.starts_with("infer:")));
+    }
+    Ok(())
+}
+#[test]
+fn gemini_key_really_registers_without_replay_p3() -> TestResult {
+    real_registration("MAOS_GEMINI_API_KEY", "gemini", "kimi")
+}
+#[test]
+fn kimi_key_really_registers_without_replay_p3() -> TestResult {
+    real_registration("MAOS_KIMI_API_KEY", "kimi", "gemini")
+}
+#[test]
+fn existing_key_precedence_is_preserved_p3() -> TestResult {
+    for new_key in ["MAOS_GEMINI_API_KEY", "MAOS_KIMI_API_KEY"] {
+        for (old_key, id) in [
+            ("MAOS_ANTHROPIC_API_KEY", "anthropic"),
+            ("MAOS_OPENAI_API_KEY", "openai"),
+        ] {
+            let home = tempfile::tempdir()?;
+            let mut child = command(home.path())
+                .arg("shell")
+                .env(new_key, "new-key")
+                .env(old_key, "old-key")
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()?;
+            std::io::Write::write_all(
+                &mut child.stdin.take().ok_or("stdin")?,
+                b"@hello-spirit hello\n",
+            )?;
+            let out = child.wait_with_output()?;
+            assert!(out.status.success(), "{}", stderr(&out));
+            assert!(intents(home.path())?
+                .iter()
+                .any(|s| s.starts_with(&format!("infer:{id}->"))));
+        }
+    }
     Ok(())
 }

@@ -1,0 +1,276 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+   Compiling maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.57s
+     Running tests/provider_review_20_4.rs (/mnt/build/cargo-maos/debug/deps/provider_review_20_4-fa3252e5475afeb4)
+
+running 10 tests
+test absent_finish_reason_refuses_p2 ... FAILED
+test blocked_candidate_without_content_preserves_stop_p1 ... FAILED
+test empty_finish_reason_refuses_p2 ... FAILED
+test invalid_configured_model_refuses_f1 ... FAILED
+test missing_usage_field_refuses_f2 ... FAILED
+test missing_usage_refuses_f2 ... FAILED
+test model_override_cannot_escape_admitted_pin_f1 ... FAILED
+test overflowing_usage_refuses_f2 ... FAILED
+test vendor_errors_and_display_are_bounded_f5 ... FAILED
+test vendor_stop_is_bounded_f4 ... FAILED
+
+failures:
+
+---- absent_finish_reason_refuses_p2 stdout ----
+
+thread 'absent_finish_reason_refuses_p2' (450920) panicked at crates/maos-providers/tests/provider_review_20_4.rs:37:5:
+assertion failed: matches!(complete(true,&value),Err(ProviderError::Serde(_)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: provider_review_20_4::absent_finish_reason_refuses_p2
+             at ./tests/provider_review_20_4.rs:37:5
+   4: provider_review_20_4::absent_finish_reason_refuses_p2::{closure#0}
+             at ./tests/provider_review_20_4.rs:35:41
+   5: <provider_review_20_4::absent_finish_reason_refuses_p2::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- blocked_candidate_without_content_preserves_stop_p1 stdout ----
+Error: Serde("missing candidates[0].content.parts")
+
+---- empty_finish_reason_refuses_p2 stdout ----
+
+thread 'empty_finish_reason_refuses_p2' (450922) panicked at crates/maos-providers/tests/provider_review_20_4.rs:42:5:
+assertion failed: matches!(complete(true,&value),Err(ProviderError::Serde(_)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: empty_finish_reason_refuses_p2
+             at ./tests/provider_review_20_4.rs:42:5
+   4: provider_review_20_4::empty_finish_reason_refuses_p2::{closure#0}
+             at ./tests/provider_review_20_4.rs:40:36
+   5: <provider_review_20_4::empty_finish_reason_refuses_p2::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- invalid_configured_model_refuses_f1 stdout ----
+
+thread 'invalid_configured_model_refuses_f1' (450923) panicked at crates/maos-providers/tests/provider_review_20_4.rs:58:5:
+assertion failed: matches!(GeminiProvider::with_api_key(io,"https://test.invalid".into(),"model?query".into(),"key".into()),Err(ProviderError::Serde(_)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: provider_review_20_4::invalid_configured_model_refuses_f1
+             at ./tests/provider_review_20_4.rs:58:5
+   4: provider_review_20_4::invalid_configured_model_refuses_f1::{closure#0}
+             at ./tests/provider_review_20_4.rs:56:41
+   5: <provider_review_20_4::invalid_configured_model_refuses_f1::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- missing_usage_field_refuses_f2 stdout ----
+
+thread 'missing_usage_field_refuses_f2' (450924) panicked at crates/maos-providers/tests/provider_review_20_4.rs:80:9:
+assertion failed: matches!(complete(gemini,&value),Err(ProviderError::Serde(_)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: provider_review_20_4::missing_usage_field_refuses_f2
+             at ./tests/provider_review_20_4.rs:80:9
+   4: provider_review_20_4::missing_usage_field_refuses_f2::{closure#0}
+             at ./tests/provider_review_20_4.rs:76:40
+   5: <provider_review_20_4::missing_usage_field_refuses_f2::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- missing_usage_refuses_f2 stdout ----
+
+thread 'missing_usage_refuses_f2' (450925) panicked at crates/maos-providers/tests/provider_review_20_4.rs:64:9:
+assertion failed: matches!(complete(gemini,&value),Err(ProviderError::Serde(_)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: provider_review_20_4::missing_usage_refuses_f2
+             at ./tests/provider_review_20_4.rs:64:9
+   4: provider_review_20_4::missing_usage_refuses_f2::{closure#0}
+             at ./tests/provider_review_20_4.rs:61:34
+   5: <provider_review_20_4::missing_usage_refuses_f2::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- model_override_cannot_escape_admitted_pin_f1 stdout ----
+
+thread 'model_override_cannot_escape_admitted_pin_f1' (450926) panicked at crates/maos-providers/tests/provider_review_20_4.rs:50:9:
+model override admitted
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: provider_review_20_4::model_override_cannot_escape_admitted_pin_f1
+             at ./tests/provider_review_20_4.rs:50:9
+   3: provider_review_20_4::model_override_cannot_escape_admitted_pin_f1::{closure#0}
+             at ./tests/provider_review_20_4.rs:45:54
+   4: <provider_review_20_4::model_override_cannot_escape_admitted_pin_f1::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- overflowing_usage_refuses_f2 stdout ----
+
+thread 'overflowing_usage_refuses_f2' (450927) panicked at crates/maos-providers/tests/provider_review_20_4.rs:72:89:
+assertion failed: matches!(complete(gemini,&value),Err(ProviderError::Serde(_)))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: overflowing_usage_refuses_f2
+             at ./tests/provider_review_20_4.rs:72:89
+   4: provider_review_20_4::overflowing_usage_refuses_f2::{closure#0}
+             at ./tests/provider_review_20_4.rs:68:34
+   5: <provider_review_20_4::overflowing_usage_refuses_f2::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- vendor_errors_and_display_are_bounded_f5 stdout ----
+
+thread 'vendor_errors_and_display_are_bounded_f5' (450928) panicked at crates/maos-providers/tests/provider_review_20_4.rs:105:29:
+assertion failed: body.len() <= 512
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: vendor_errors_and_display_are_bounded_f5
+             at ./tests/provider_review_20_4.rs:105:29
+   4: provider_review_20_4::vendor_errors_and_display_are_bounded_f5::{closure#0}
+             at ./tests/provider_review_20_4.rs:101:50
+   5: <provider_review_20_4::vendor_errors_and_display_are_bounded_f5::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- vendor_stop_is_bounded_f4 stdout ----
+
+thread 'vendor_stop_is_bounded_f4' (450929) panicked at crates/maos-providers/tests/provider_review_20_4.rs:91:13:
+assertion failed: actual.len() <= 64
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:150:5
+   3: vendor_stop_is_bounded_f4
+             at ./tests/provider_review_20_4.rs:91:13
+   4: provider_review_20_4::vendor_stop_is_bounded_f4::{closure#0}
+             at ./tests/provider_review_20_4.rs:84:35
+   5: <provider_review_20_4::vendor_stop_is_bounded_f4::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    absent_finish_reason_refuses_p2
+    blocked_candidate_without_content_preserves_stop_p1
+    empty_finish_reason_refuses_p2
+    invalid_configured_model_refuses_f1
+    missing_usage_field_refuses_f2
+    missing_usage_refuses_f2
+    model_override_cannot_escape_admitted_pin_f1
+    overflowing_usage_refuses_f2
+    vendor_errors_and_display_are_bounded_f5
+    vendor_stop_is_bounded_f4
+
+test result: FAILED. 0 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p maos-providers --test provider_review_20_4`

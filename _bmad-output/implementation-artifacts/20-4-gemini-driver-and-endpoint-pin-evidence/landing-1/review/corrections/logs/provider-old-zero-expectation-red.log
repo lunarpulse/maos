@@ -1,0 +1,147 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused imports: `InferenceResponse`, `ProviderAttribution`, and `TokenUsage`
+  --> crates/maos-providers/tests/openai_round_trip_test.rs:9:41
+   |
+ 9 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |                                         ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+10 |     TokenUsage,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-providers` (test "openai_round_trip_test") generated 1 warning (run `cargo fix --test "openai_round_trip_test" -p maos-providers` to apply 1 suggestion)
+warning: unused imports: `InferenceResponse`, `ProviderAttribution`, and `TokenUsage`
+  --> crates/maos-providers/tests/ollama_round_trip_test.rs:9:41
+   |
+ 9 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |                                         ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+10 |     TokenUsage,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-providers` (test "ollama_round_trip_test") generated 1 warning (run `cargo fix --test "ollama_round_trip_test" -p maos-providers` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.14s
+     Running unittests src/lib.rs (/mnt/build/cargo-maos/debug/deps/maos_providers-1f1e6189e0a49026)
+
+running 35 tests
+test anthropic::tests::anthropic_integration ... ignored, requires live Anthropic API key + real transport (currently scaffold)
+test anthropic::tests::credential_store_failures_degrade_to_unconfigured ... ok
+test anthropic::tests::parse_max_tokens_stop_reason ... ok
+test anthropic::tests::parse_successful_response ... ok
+test anthropic::tests::provider_missing_api_key_is_unconfigured ... ok
+test anthropic::tests::provider_round_trip_with_mock_transport ... ok
+test anthropic::tests::request_body_has_expected_shape ... ok
+test anthropic::tests::request_model_id_overrides_the_configured_model ... ok
+test fixture_replay::tests::empty_ring_panics - should panic ... ok
+test fixture_replay::tests::error_response_propagated ... ok
+test fixture_replay::tests::ring_replays_in_order ... ok
+test fixture_replay::tests::round_trip_records_request ... ok
+test ollama::tests::ollama_integration ... ignored, requires a running local Ollama instance
+test ollama::tests::parse_max_tokens_stop_reason ... ok
+test ollama::tests::parse_missing_usage_defaults_zero ... ok
+test ollama::tests::parse_provider_stop_reason ... ok
+test ollama::tests::parse_successful_response ... ok
+test ollama::tests::provider_round_trip_with_mock_transport ... ok
+test ollama::tests::request_body_has_expected_shape ... ok
+test openai::tests::credential_store_failures_degrade_to_unconfigured ... ok
+test openai::tests::openai_integration ... ignored, requires live OpenAI API key + real transport
+test openai::tests::parse_max_tokens_stop_reason ... ok
+test openai::tests::parse_missing_usage_defaults_zero ... FAILED
+test openai::tests::parse_provider_stop_reason ... ok
+test openai::tests::parse_successful_response ... ok
+test openai::tests::provider_missing_api_key_is_unconfigured ... ok
+test openai::tests::provider_round_trip_with_mock_transport ... ok
+test openai::tests::request_body_has_expected_shape ... ok
+test rate_limit::tests::fingerprint_credential_stable ... ok
+test rate_limit::tests::from_env_overrides_defaults ... ok
+test rate_limit::tests::rate_limiter_isolates_per_key ... ok
+test rate_limit::tests::retry_after_reports_refill_window ... ok
+test rate_limit::tests::token_bucket_refill_recovers_capacity ... ok
+test rate_limit::tests::token_bucket_starts_full ... ok
+test tests::provider_driver_alias_resolves ... ok
+
+failures:
+
+---- openai::tests::parse_missing_usage_defaults_zero stdout ----
+
+thread 'openai::tests::parse_missing_usage_defaults_zero' (458947) panicked at crates/maos-providers/src/openai.rs:364:14:
+called `Result::unwrap()` on an `Err` value: Serde("missing or invalid usage.prompt_tokens")
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1870:5
+   3: unwrap<maos_domain::ports::inference::InferenceResponse, maos_providers::provider::ProviderError>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1231:23
+   4: parse_missing_usage_defaults_zero
+             at ./src/openai.rs:364:14
+   5: maos_providers::openai::tests::parse_missing_usage_defaults_zero::{closure#0}
+             at ./src/openai.rs:359:43
+   6: <maos_providers::openai::tests::parse_missing_usage_defaults_zero::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    openai::tests::parse_missing_usage_defaults_zero
+
+test result: FAILED. 31 passed; 1 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p maos-providers --lib`

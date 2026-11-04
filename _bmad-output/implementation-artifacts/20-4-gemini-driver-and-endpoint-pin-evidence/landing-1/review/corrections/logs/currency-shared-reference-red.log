@@ -1,0 +1,10 @@
+{"gate":"check-model-currency","passed":false,"files_scanned":17,"pins_checked":17,"findings":[{"file":"crates/maos-bin/src/main.rs","line":1,"detail":"line 3936: `AnthropicProvider` constructor has no readable model literal as its third argument — the pin could rot unscanned"}]}
+::error::check-model-currency: FAIL — 1 finding(s) over 17 pin(s):
+- crates/maos-bin/src/main.rs:1 — line 3936: `AnthropicProvider` constructor has no readable model literal as its third argument — the pin could rot unscanned
+
+check-model-currency: FAIL — 1 finding(s) over 17 pin(s):
+- crates/maos-bin/src/main.rs:1 — line 3936: `AnthropicProvider` constructor has no readable model literal as its third argument — the pin could rot unscanned
+
+
+
+Command exited with code 1

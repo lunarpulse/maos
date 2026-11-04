@@ -126,10 +126,10 @@ fn each_retired_or_unknown_pin_reds_naming_its_file_and_line() {
          "replacement (display-only guidance): `gpt-5.6-sol`"),
         ("xtask/provider-pricing.toml", "model = \"claude-sonnet-5-5\"", "model = \"claude-3-5-sonnet\"",
          "UNKNOWN model id `anthropic.claude-3-5-sonnet`"),
-        ("crates/maos-bin/src/main.rs", "\"claude-haiku-4-5-20251001\".into()", "\"claude-3-haiku-20240307\".into()", RETIRED),
-        ("crates/maos-bin/src/main.rs", "\"gpt-4o-mini\".into()", "\"gpt-4o-minnie\".into()",
+        ("crates/maos-bin/src/main.rs", "\"claude-haiku-4-5-20251001\"", "\"claude-3-haiku-20240307\"", RETIRED),
+        ("crates/maos-bin/src/main.rs", "\"gpt-4o-mini\"", "\"gpt-4o-minnie\"",
          "UNKNOWN model id `openai.gpt-4o-minnie`"),
-        ("crates/maos-bin/src/main.rs", "\"llama3.1:8b\".into()", "\"llama3:8b\".into()",
+        ("crates/maos-bin/src/main.rs", "\"llama3.1:8b\"", "\"llama3:8b\"",
          "UNKNOWN model id `ollama.llama3:8b`"),
         ("spirits/butler/manifest.toml", "\"anthropic.claude-haiku", "\"acme.claude-haiku", "UNKNOWN provider for `acme."),
     ];
@@ -305,12 +305,12 @@ fn a_gate_that_could_scan_nothing_is_a_refusal_not_a_pass() {
     assert!(refusal(&tree)
         .contains("crates/maos-bin/src/main.rs:1 no `anthropic` provider constructor found"));
 
-    // A constructor whose model is no longer a readable literal.
+    // A constructor whose model is neither a literal nor a declared shared default.
     let tree = Tree::real();
-    tree.plant(
+    tree.write(
         "crates/maos-bin/src/main.rs",
-        "\"claude-haiku-4-5-20251001\".into()",
-        "default_model()",
+        &five_host_fixture("gemini-3.5-flash-lite", Some("kimi-k3.1-pro"))
+            .replace("\"claude-haiku-4-5-20251001\".into()", "default_model()"),
     );
     assert!(refusal(&tree).contains("no readable model literal"));
 
@@ -399,6 +399,10 @@ fn a_comment_inside_a_constructor_never_stands_in_for_its_model() {
     // Pre-patch, the first non-URL literal in the window won, so a commented-out
     // current id hid the live retired one (fail-open).
     let tree = Tree::real();
+    tree.write(
+        "crates/maos-bin/src/main.rs",
+        &five_host_fixture("gemini-3.5-flash-lite", Some("kimi-k3.1-pro")),
+    );
     let line = tree.plant(
         "crates/maos-bin/src/main.rs",
         "\"claude-haiku-4-5-20251001\".into(),",
@@ -582,4 +586,84 @@ fn missing_kimi_constructor_fails_closed_20_4() {
         .findings
         .iter()
         .any(|f| f.detail.contains("no `kimi` provider constructor found")));
+}
+
+#[test]
+fn shared_defaults_remain_governed_at_the_declaration_f6() {
+    let tree = Tree::real();
+    let main = five_host_fixture("gemini-3.5-flash-lite", Some("kimi-k3.1-pro"))
+        .replace("\"gemini-3.5-flash-lite\".into()", "crate::SHARED.1.into()")
+        .replace(
+            "}\n",
+            " GeminiProvider::new(io, url, crate::SHARED.1.into(), None);\n}\n",
+        );
+    for (model, accepted) in [("gemini-3.5-flash-lite", true), ("gemini-unlisted", false)] {
+        tree.write(
+            "crates/maos-bin/src/main.rs",
+            &format!(
+                "const SHARED: (&str, &str) = (\"https://test.invalid\", \"{model}\");\n{main}"
+            ),
+        );
+        let report = tree.judge();
+        assert_eq!(
+            report.findings.is_empty(),
+            accepted,
+            "{:?}",
+            report.findings
+        );
+        if !accepted {
+            assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
+            assert!(report
+                .findings
+                .iter()
+                .any(|f| f.line == 1 && f.detail.contains("gemini-unlisted")));
+        }
+    }
+    for reference in ["SHARED.1.into()", "other::SHARED.1.into()"] {
+        tree.write(
+            "crates/maos-bin/src/main.rs",
+            &format!(
+                "const SHARED: (&str, &str) = (\"url\", \"gemini-3.5-flash-lite\");\n{}",
+                main.replace("crate::SHARED.1.into()", reference)
+            ),
+        );
+        assert!(tree
+            .judge()
+            .findings
+            .iter()
+            .any(|f| f.detail.contains("no readable model")));
+    }
+    tree.write("crates/maos-bin/src/main.rs", &main);
+    assert!(tree
+        .judge()
+        .findings
+        .iter()
+        .any(|f| f.detail.contains("no readable model")));
+}
+
+#[test]
+fn inactive_default_cannot_hide_an_unknown_live_model_f6() {
+    let tree = Tree::real();
+    let calls = five_host_fixture("gemini-3.5-flash-lite", Some("kimi-k3.1-pro"))
+        .replace("\"gemini-3.5-flash-lite\".into()", "crate::SHARED.1.into()");
+    for fake in [
+        "/*\nconst SHARED: (&str, &str) = (\"url\", \"gemini-3.5-flash-lite\");\n*/",
+        "#[cfg(any())]\nconst SHARED: (&str, &str) = (\"url\", \"gemini-3.5-flash-lite\");",
+    ] {
+        tree.write(
+            "crates/maos-bin/src/main.rs",
+            &format!(
+                "const SHARED: (&str, &str) = (\"url\", \"gemini-unlisted\");\n{calls}\n{fake}\n"
+            ),
+        );
+        let report = tree.judge();
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.line == 1 && f.detail.contains("gemini-unlisted")),
+            "{fake}: {:?}",
+            report.findings
+        );
+    }
 }

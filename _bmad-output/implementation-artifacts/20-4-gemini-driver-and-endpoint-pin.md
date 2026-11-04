@@ -176,7 +176,7 @@ different ruling. Every AC names a failing-before witness and a plant. **local**
 
 #### AC1 — Gemini answers: the driver round-trips and the shell selects it (epic AC1; D-20-4-01 A) — the command
 
-1. `crates/maos-providers/src/gemini.rs` (`GeminiProvider::{new, with_api_key}`, prototype `g1`): `POST {endpoint}/v1beta/models/{model}:generateContent` with `x-goog-api-key` and `content-type: application/json`; body `contents: [{role: "user", parts: [{text}]}]`, `generationConfig: {maxOutputTokens, temperature?}`; `options.model_id` overrides the configured model (as `anthropic.rs:79`); sent through `http_post_exchange` so a non-2xx is `ProviderError::ProviderRejected { status, body }`; the response text is every `candidates[0].content.parts[*].text` concatenated; `finishReason` `STOP` → `StopSequence`, `MAX_TOKENS` → `MaxTokens`, any other → `ProviderStop(<value>)`; usage from `usageMetadata.promptTokenCount` / `candidatesTokenCount`; attribution `gemini`; `credential_fingerprint` overridden. No vendor SDK (FR47). The key never appears in a URL.
+1. `crates/maos-providers/src/gemini.rs` (`GeminiProvider::{new, with_api_key}`, prototype `g1`): `POST {endpoint}/v1beta/models/{model}:generateContent` with `x-goog-api-key` and `content-type: application/json`; body `contents: [{role: "user", parts: [{text}]}]`, `generationConfig: {maxOutputTokens, temperature?}`; `options.model_id`, when present, must equal the configured/admitted model; both configured and requested ids must be nonempty ASCII `[A-Za-z0-9._:-]` (operator-adjudicated security review F1 supersedes the original override allowance); sent through `http_post_exchange` so a non-2xx is `ProviderError::ProviderRejected { status, body }`; the response text is every `candidates[0].content.parts[*].text` concatenated; `finishReason` `STOP` → `StopSequence`, `MAX_TOKENS` → `MaxTokens`, any other → `ProviderStop(<value>)`; usage from `usageMetadata.promptTokenCount` / `candidatesTokenCount`; attribution `gemini`; `credential_fingerprint` overridden. No vendor SDK (FR47). The key never appears in a URL.
 2. **Witness (local):** `cargo test -p maos-providers --test gemini_round_trip_test` (new) over a *recording* `MockTransport` (captures URL, headers, body; returns a fixture status + body) and fixtures `crates/maos-providers/tests/fixtures/gemini_{success,max_tokens,multi_part,safety,error_429}_response.json`: asserts path and model, the header, that the key is absent from the URL and body, every parsed field, and `429` → `ProviderRejected { status: 429, .. }`.
 3. **Failing-before (local):** the test target and `gemini.rs` do not exist at `a8af3215` (C3).
 4. **Plant (local, one):** send the key as a `?key=` query parameter (the vendor's documented curl form) ⇒ the no-key-in-URL assertion reds.
@@ -201,7 +201,7 @@ different ruling. Every AC names a failing-before witness and a plant. **local**
 #### AC4 — new model pins are governed (epic AC3, corrected to the closed 17-5 gate; D-20-4-03)
 
 1. `xtask/model-currency.toml` gains `[providers.gemini]` and `[providers.kimi]` (`allowed` per D-20-4-03, vendor pages cited and dated in its header, policy owner Winston `:7-9`); the `main.rs` defaults and the hello-spirit declarations `gemini.<id>`, `kimi.<id>` (`spirits/hello-spirit/manifest.toml:14`; the shell mints the router default and issuance refuses an undeclared provider, L5) are allowed pins.
-2. `xtask/src/check_model_currency.rs` scans `GeminiProvider::{new, with_api_key}` (model = third argument) and `OpenAiProvider::compatible` (model = fifth argument) and requires all five hosts (`:239-295`); module doc `:18-26` updated.
+2. `xtask/src/check_model_currency.rs` scans `GeminiProvider::{new, with_api_key}` (model = third argument) and `OpenAiProvider::compatible` (model = fifth argument) and requires all five hosts; literal arguments and `crate::NAME.1.into()` references to attribute-free root tuple constants are governed with declaration-line diagnostics and one pin per source definition (security review F6). Shared definitions are parsed as Rust, never inferred from comments, conditional declarations or lexical shadows; module documentation states this closed scope.
 3. `xtask/provider-pricing.toml` gains a row per default model from the vendors' pricing pages (`cost-reconcile` matches `(provider, model)` exactly, header `:1-7`).
 4. **Failing-before (measured):** with Gemini and Kimi constructors naming ids absent from the data file the gate passes — rc 0, 16 pins, identical to HEAD (`creation/measurements.md` §Gate blindness). Witness vectors in `xtask/tests/model_currency_gate.rs`: an unknown `gemini` id in a `main.rs` fixture reds; a retired `kimi` id reds; a fixture without a Kimi constructor reds.
 5. **Plant (local):** drop `Gemini` from the constructor regex ⇒ the Gemini vector reds.
@@ -607,6 +607,94 @@ tests and widened manifest readers, serial/default workspace nextest, all reques
 cargo deny and prescribed prepush. Paid live legs and L2 remain outside this pass's delivered proof.
 No push, commit, extra target directory or worktree was used.
 
+
+### Landing 1 — Review corrections (2026-11-03)
+
+Review base `ef134444`; operator-adjudicated P1–P3 and F1/F2/F4–F7 are
+implemented. F3 is covered by P2. F8 and F9 are dismissed with the adjudicated
+limiter-isolation and exact-base-URL/DNS/TLS reasons, not hidden or patched
+outside scope. No kernel source, dependency, status, CI branch or hosted/live
+cut changed; no commit or push was made.
+
+**Behavior:** explicit blocked Gemini candidates may omit generated content
+while preserving stop/usage/attribution; missing/empty finish reasons and
+missing/invalid/overflowing usage are serde refusals. Gemini model ids are
+ASCII `[A-Za-z0-9._:-]`, nonempty, and a request cannot change the admitted
+model. AC1's old override allowance is explicitly superseded by F1.
+Gemini/OpenAI/Kimi vendor stop labels are bounded at 64 UTF-8 bytes; provider
+error text uses a control-free 512-byte source prefix, including Display.
+Gemini's non-2xx status stays typed data; kernel error mapping is unchanged.
+
+**Registration proof:** supported live-mode EOF boots, with no cassette or
+inference, prove the respective new key actually registers its native id and
+the absent id is refused. Anthropic/OpenAI precedence has separate conflicts.
+Replay is explicitly selected and labelled routing-only. Both final
+map-insertion omission plants yield native-registration red / replay green;
+all restores used copy-back + `cmp` + `touch`, rc 0. Original two-red replay
+observations and the invalid-mode draft are retained, not relabelled.
+
+**Pin/currency maintenance:** five shared endpoint/model tuples feed real root
+constructors and the admission catalog; Ollama's configured URL is read once.
+The capturing-transport unit covers all five driver endpoints. Currency
+scanning resolves crate-qualified, attribute-free root tuple constants through
+existing `syn`, preserves declaration-line diagnostics and deduplicates shared
+pins. Missing/unqualified/foreign references, commented definitions and
+inactive cfg definitions have fail-closed witnesses. No new dependency was
+needed. Operator docs now explicitly state that endpoint pins are opt-in.
+
+**Observed verification:** provider package serial 64 passed / 3 existing
+ignored, rc 0; final currency serial 25/25, rc 0; five affected root binaries
+serial 46/46, rc 0; final complete workspace default inventory **5613 passed /
+138 skipped**, rc 0. The final workspace used supported nextest build-metadata
+reuse after genuine CLI fixture builds: ordinary workspace builds had
+restored an older cached `maosctl` alias and triggered nine journey freshness
+failures. A second non-green run also retained an old embedded KLOC pin.
+Those prerequisite failures, their real repairs and rejected CLI flag drafts
+are preserved; no timing flake was observed or retried to green.
+
+The final 18 structural gates all returned rc 0, including kernel/service,
+environment, serde, composition, J1, records/coherence, test-cost, invariant,
+coverage, exits/decisions, performance policy and model currency (22 pins /
+17 files). Final non-denying all-target workspace clippy and its ratchet
+returned rc 0: **1331 occurrences / 871 source-distinct**, unchanged from prior
+local debt and 52/26 below hosted baseline1383/897. No new correction-hunk
+warning or suppression was introduced. `cargo deny` returned rc 0 with existing
+allowance/duplicate warnings. Recorded host load at 18:28:47 UTC: 2.11/2.53/2.77.
+
+| Formatted measure | Review base | Final | Ceiling |
+|---|---:|---:|---:|
+| maos-providers | 1608 | 1679 | 1898 |
+| maos-bin | 34363 | 34504 | 34643 |
+| xtask | 44420 | 44452 | 44466 |
+| maos-domain | 10107 | 10107 | 10115 |
+| maos-manifest | 4604 | 4604 | 4610 |
+| aggregate | 192896 | 193140 | 193526 |
+
+Exact pins and first-segment `20-4 landing 1 review corrections` HISTORY are
+updated; aggregate hardfail193141 = measured193140 + 1. Kernel remains
+26841 physical /21042 tokei, all 95 hashes unchanged. No envelope was breached.
+
+**Evidence:** [dispositions and named red/green witnesses](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/disposition.md),
+[plants/restores](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/plants.md),
+[verification and build-once protocol](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/verification.md),
+[exact commands/exits](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/commands.md),
+[changed paths](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/files-changed.txt).
+Raw logs, both final JUnits, clippy events and hashed metadata inputs are retained
+in that correction directory.
+
+**Cleanup:** after the final gates, a `/proc` executable scan found no
+Cargo/rustc/nextest/clippy process and no unreadable live pid. Removed 87 stale
+incremental `s-*` sessions, preserving the newest per crate and all descendant
+mtime/ctime activity within two hours, plus only owned `/tmp/204l1-review`.
+Observed `du -s -B1` decreased cargo-maos222472871936 →221931663360
+(**541208576 bytes**) and tmp1428324352 →1418465280 (**9859072 bytes**).
+No deps/build/fingerprint directory was touched. The three protected
+`/tmp/204l1-wip` archive files remain; [cleanup.json](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/cleanup.json)
+records the exact removed sessions and process/recency proof.
+
+**Not re-run in this review scope:** full serial workspace nextest, full
+prescribed prepush, paid vendor calls, hosted execution/hosted-only clippy,
+and all Landing 2 kernel work. Earlier non-green prepush records remain intact.
 
 ### Story context creation
 

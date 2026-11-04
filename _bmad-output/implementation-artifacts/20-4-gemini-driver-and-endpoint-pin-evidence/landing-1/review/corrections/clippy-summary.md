@@ -1,0 +1,5 @@
+# Review correction clippy observation
+
+The final-source non-denying `cargo clippy --workspace --all-targets --message-format=json` stream finished successfully (exit 0, 63.42 s), including `build-finished: success=true`. Full final events are retained in `clippy.jsonl`; the initial 300.78 s observation is preserved separately in `clippy-initial.jsonl`. The final ratchet exited 0 with **1331 occurrences / 871 source-distinct warnings**, unchanged from the prior local landing observation (1331/871), and **52 / 26 below** the hosted baseline (1383/897).
+
+A query of diagnostics on the new/changed review code found no new warning. The sole matched provider-file diagnostic is the pre-existing unused `InferenceOptions` import at `crates/maos-providers/src/openai.rs:11`, outside the correction hunks. No changed review code produced `result_large_err`, `collapsible_if`, `too_many_arguments`, `unused_mut`, or `trim_split_whitespace`. These are local-toolchain observations, not a claimed hosted clippy run. The new code was also checked for those hosted-sensitive shapes; no warning suppression or baseline increase was added.

@@ -3930,39 +3930,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ollama_is_explicit = configured_ollama_url
         .as_deref()
         .is_some_and(|url| !url.trim().is_empty() && url != "skip");
-    let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
-    let mut configured_providers: maos_bin::admission::ProviderCatalog = [
-        (
-            "anthropic",
-            "https://api.anthropic.com",
-            "claude-haiku-4-5-20251001",
-        ),
-        ("openai", "https://api.openai.com", "gpt-4o-mini"),
-        (
-            "gemini",
-            "https://generativelanguage.googleapis.com",
-            "gemini-3.5-flash-lite",
-        ),
-        ("kimi", "https://api.moonshot.ai", "kimi-k3.1-pro"),
-        ("ollama", ollama_url.as_str(), "llama3.1:8b"),
-    ]
-    .into_iter()
-    .map(|(id, endpoint, model)| {
-        (
-            id.into(),
-            maos_bin::admission::ConfiguredProvider {
-                endpoint: endpoint.into(),
-                model,
-                registered: false,
-            },
-        )
-    })
-    .collect();
+    let ollama_url = configured_ollama_url.unwrap_or_else(|| crate::OLLAMA_DEFAULTS.0.into());
+    let mut configured_providers = configured_provider_catalog(&ollama_url);
 
     match AnthropicProvider::new(
         Arc::clone(&io_arc),
-        "https://api.anthropic.com".into(),
-        "claude-haiku-4-5-20251001".into(),
+        crate::ANTHROPIC_DEFAULTS.0.into(),
+        crate::ANTHROPIC_DEFAULTS.1.into(),
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
@@ -3980,8 +3954,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match maos_providers::OpenAiProvider::new(
         Arc::clone(&io_arc),
-        "https://api.openai.com".into(),
-        "gpt-4o-mini".into(),
+        crate::OPENAI_DEFAULTS.0.into(),
+        crate::OPENAI_DEFAULTS.1.into(),
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
@@ -3999,8 +3973,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match maos_providers::GeminiProvider::new(
         Arc::clone(&io_arc),
-        "https://generativelanguage.googleapis.com".into(),
-        "gemini-3.5-flash-lite".into(),
+        crate::GEMINI_DEFAULTS.0.into(),
+        crate::GEMINI_DEFAULTS.1.into(),
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
@@ -4019,8 +3993,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "kimi",
         maos_domain::ports::SecretKey::KimiApiKey,
         Arc::clone(&io_arc),
-        "https://api.moonshot.ai".into(),
-        "kimi-k3.1-pro".into(),
+        crate::KIMI_DEFAULTS.0.into(),
+        crate::KIMI_DEFAULTS.1.into(),
         Some(Arc::clone(&secret_store)),
     ) {
         Ok(provider) => {
@@ -4041,7 +4015,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Ok(provider) = maos_providers::OllamaProvider::new(
                 Arc::clone(&io_arc),
                 ollama_url,
-                "llama3.1:8b".into(),
+                crate::OLLAMA_DEFAULTS.1.into(),
             ) {
                 providers_map.insert("ollama".into(), Arc::new(provider));
                 live_provider_available |= ollama_is_explicit;
@@ -16813,5 +16787,175 @@ mod story_13_5a_enterprise_daemon_seam {
             ],
             "PDP must allow another pid and deny the daemon control pid for the same action"
         );
+    }
+}
+
+const ANTHROPIC_DEFAULTS: (&str, &str) = ("https://api.anthropic.com", "claude-haiku-4-5-20251001");
+const OPENAI_DEFAULTS: (&str, &str) = ("https://api.openai.com", "gpt-4o-mini");
+const GEMINI_DEFAULTS: (&str, &str) = (
+    "https://generativelanguage.googleapis.com",
+    "gemini-3.5-flash-lite",
+);
+const KIMI_DEFAULTS: (&str, &str) = ("https://api.moonshot.ai", "kimi-k3.1-pro");
+const OLLAMA_DEFAULTS: (&str, &str) = ("http://localhost:11434", "llama3.1:8b");
+
+fn configured_provider_catalog(ollama_url: &str) -> maos_bin::admission::ProviderCatalog {
+    [
+        ("anthropic", ANTHROPIC_DEFAULTS),
+        ("openai", OPENAI_DEFAULTS),
+        ("gemini", GEMINI_DEFAULTS),
+        ("kimi", KIMI_DEFAULTS),
+        ("ollama", (ollama_url, OLLAMA_DEFAULTS.1)),
+    ]
+    .into_iter()
+    .map(|(id, (endpoint, model))| {
+        (
+            id.into(),
+            maos_bin::admission::ConfiguredProvider {
+                endpoint: endpoint.into(),
+                model,
+                registered: false,
+            },
+        )
+    })
+    .collect()
+}
+
+#[cfg(test)]
+mod provider_config_review {
+    use super::*;
+    use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
+    use maos_domain::ports::{IoSubsystemPort, SecretKey, SecretStore};
+    struct Probe(std::sync::Mutex<String>);
+    impl Probe {
+        fn capture(&self, url: &str) -> IoError {
+            *self.0.lock().expect("probe mutex") = url.into();
+            IoError::Transport("endpoint probe: no network".into())
+        }
+    }
+    impl IoSubsystemPort for Probe {
+        fn http_get(&self, _: &str) -> Result<Vec<u8>, IoError> {
+            panic!("unexpected GET")
+        }
+        fn http_post(&self, url: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
+            Err(self.capture(url))
+        }
+        fn http_post_exchange(
+            &self,
+            url: &str,
+            _: &[u8],
+            _: &[(&str, &str)],
+            _: &str,
+        ) -> Result<HttpExchange, IoError> {
+            Err(self.capture(url))
+        }
+    }
+    struct Keys;
+    impl SecretStore for Keys {
+        fn get(
+            &self,
+            _: SecretKey,
+        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
+            Ok(Some("fixture-key".into()))
+        }
+        fn put(&self, _: SecretKey, _: &str) -> Result<(), maos_domain::ports::SecretStoreError> {
+            panic!("unexpected put")
+        }
+        fn delete(
+            &self,
+            _: SecretKey,
+        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
+        {
+            panic!("unexpected delete")
+        }
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+    #[test]
+    fn catalog_endpoint_matches_driver_endpoint_f6() -> Result<(), Box<dyn std::error::Error>> {
+        use maos_providers::{
+            AnthropicProvider, GeminiProvider, OllamaProvider, OpenAiProvider, Provider,
+        };
+        let probe = Arc::new(Probe(std::sync::Mutex::new(String::new())));
+        let io: Arc<dyn IoSubsystemPort> = probe.clone();
+        let catalog = configured_provider_catalog(OLLAMA_DEFAULTS.0);
+        let drivers: [(&str, &str, Box<dyn Provider>); 5] = [
+            (
+                "anthropic",
+                "/v1/messages",
+                Box::new(AnthropicProvider::with_api_key(
+                    io.clone(),
+                    crate::ANTHROPIC_DEFAULTS.0.into(),
+                    crate::ANTHROPIC_DEFAULTS.1.into(),
+                    "key".into(),
+                )?),
+            ),
+            (
+                "openai",
+                "/v1/chat/completions",
+                Box::new(OpenAiProvider::with_api_key(
+                    io.clone(),
+                    crate::OPENAI_DEFAULTS.0.into(),
+                    crate::OPENAI_DEFAULTS.1.into(),
+                    "key".into(),
+                )?),
+            ),
+            (
+                "gemini",
+                "",
+                Box::new(GeminiProvider::with_api_key(
+                    io.clone(),
+                    crate::GEMINI_DEFAULTS.0.into(),
+                    crate::GEMINI_DEFAULTS.1.into(),
+                    "key".into(),
+                )?),
+            ),
+            (
+                "kimi",
+                "/v1/chat/completions",
+                Box::new(OpenAiProvider::compatible(
+                    "kimi",
+                    SecretKey::KimiApiKey,
+                    io.clone(),
+                    crate::KIMI_DEFAULTS.0.into(),
+                    crate::KIMI_DEFAULTS.1.into(),
+                    Some(Arc::new(Keys)),
+                )?),
+            ),
+            (
+                "ollama",
+                "/api/chat",
+                Box::new(OllamaProvider::new(
+                    io,
+                    crate::OLLAMA_DEFAULTS.0.into(),
+                    crate::OLLAMA_DEFAULTS.1.into(),
+                )?),
+            ),
+        ];
+        let req = maos_domain::ports::inference::InferenceRequest::new(
+            1,
+            maos_domain::invariants::i1::CapabilityToken::new(
+                maos_domain::invariants::i1::TokenId::ZERO,
+                1,
+                0,
+                [0; 64],
+            ),
+            "probe".into(),
+            Default::default(),
+            None,
+            vec![],
+        );
+        for (id, route, driver) in drivers {
+            assert!(driver.complete(&req).is_err());
+            let actual = probe.0.lock().map_err(|_| "probe mutex")?;
+            let gemini_route = format!("/v1beta/models/{}:generateContent", GEMINI_DEFAULTS.1);
+            assert_eq!(
+                actual.strip_suffix(if id == "gemini" { &gemini_route } else { route }),
+                Some(catalog[id].endpoint.as_str()),
+                "{id}"
+            );
+        }
+        Ok(())
     }
 }

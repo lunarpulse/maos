@@ -120,6 +120,21 @@ endpoint_url = "http://127.0.0.1:11434"
 not reconfiguration. Non-empty `fallback` is refused as `fallback_unsupported`:
 the primary token cannot authorise another provider.
 
+Endpoint pinning is **opt-in**: declaring `[providers]` selects/asserts configuration,
+but only an explicit `provider_endpoint_pin` field enables the SHA-256 check.
+Manifests without `[providers]`, or with a primary id but no pin, are not
+endpoint-pinned. Deployment policy must require pins where endpoint locking is
+mandatory. Gemini also refuses per-request model ids that differ from its
+configured/admitted model; model ids must use only ASCII letters, digits, `.`, `_`,
+`:`, or `-`.
+
+Gemini and OpenAI-compatible responses must include valid, nonnegative `u32`
+input/output usage counts; absent or overflowing accounting data is refused
+rather than reported as zero. Gemini also requires a nonempty finish reason;
+an explicit blocked candidate may have no generated content and keeps its vendor
+stop reason. Vendor stop labels are capped at 64 UTF-8 bytes; provider error text
+is limited to a 512-byte source prefix with control characters removed.
+
 Compute a pin with `printf %s 'http://127.0.0.1:11434' | sha256sum` and use the
 digest as `provider_endpoint_pin`. Admission checks SHA-256 of the **exact configured
 base-URL bytes**, without normalising scheme, case, port, path or trailing slash.

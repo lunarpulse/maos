@@ -50,6 +50,7 @@ impl GeminiProvider {
         api_key: String,
     ) -> Result<Self, ProviderError> {
         crate::provider::validate_api_key(SecretKey::GeminiApiKey, &api_key)?;
+        validate_model_id(&model_id)?;
         Ok(Self {
             api_key,
             endpoint_url,
@@ -66,6 +67,12 @@ impl Provider for GeminiProvider {
 
     fn complete(&self, req: &InferenceRequest) -> Result<InferenceResponse, ProviderError> {
         let model_id = req.options.model_id.as_deref().unwrap_or(&self.model_id);
+        validate_model_id(model_id)?;
+        if model_id != self.model_id {
+            return Err(ProviderError::Serde(
+                "request model differs from admitted model pin".into(),
+            ));
+        }
         let body = build_request_body(req);
         let body_bytes =
             serde_json::to_vec(&body).map_err(|e| ProviderError::Serde(e.to_string()))?;
@@ -84,11 +91,13 @@ impl Provider for GeminiProvider {
                 ],
                 "retry-after",
             )
-            .map_err(|e| ProviderError::Transport(e.to_string()))?;
+            .map_err(crate::provider::transport_error)?;
         if !(200..=299).contains(&exchange.status) {
             return Err(ProviderError::ProviderRejected {
                 status: exchange.status,
-                body: String::from_utf8_lossy(&exchange.body).into_owned(),
+                body: crate::provider::error_text(&String::from_utf8_lossy(
+                    &exchange.body[..exchange.body.len().min(512)],
+                )),
             });
         }
         let json: serde_json::Value = serde_json::from_slice(&exchange.body)
@@ -118,32 +127,40 @@ fn parse_response(
         .and_then(|c| c.as_array())
         .and_then(|arr| arr.first())
         .ok_or_else(|| ProviderError::Serde("missing candidates[0]".into()))?;
-    let text: String = candidate
-        .get("content")
-        .and_then(|c| c.get("parts"))
-        .and_then(|p| p.as_array())
-        .ok_or_else(|| ProviderError::Serde("missing candidates[0].content.parts".into()))?
-        .iter()
-        .filter_map(|part| part.get("text").and_then(|t| t.as_str()))
-        .collect();
-    let stop_reason = match candidate.get("finishReason").and_then(|s| s.as_str()) {
-        Some("STOP") | None => StopReason::StopSequence,
-        Some("MAX_TOKENS") => StopReason::MaxTokens,
-        Some(other) => StopReason::ProviderStop(other.into()),
+    let reason = candidate
+        .get("finishReason")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            ProviderError::Serde("missing or empty candidates[0].finishReason".into())
+        })?;
+    let stop_reason = match reason {
+        "STOP" => StopReason::StopSequence,
+        "MAX_TOKENS" => StopReason::MaxTokens,
+        other => crate::provider::vendor_stop(other),
+    };
+    let parts = candidate.get("content").and_then(|c| c.get("parts"));
+    let text = match parts {
+        Some(value) => value
+            .as_array()
+            .ok_or_else(|| ProviderError::Serde("invalid candidates[0].content.parts".into()))?
+            .iter()
+            .filter_map(|part| part.get("text").and_then(|t| t.as_str()))
+            .collect(),
+        None if matches!(stop_reason, StopReason::ProviderStop(_)) => String::new(),
+        None => {
+            return Err(ProviderError::Serde(
+                "missing candidates[0].content.parts".into(),
+            ))
+        }
     };
     let usage = json.get("usageMetadata");
-    let count = |k: &str| {
-        usage
-            .and_then(|u| u.get(k))
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32
-    };
     Ok(InferenceResponse {
         text,
         stop_reason,
         usage: TokenUsage {
-            input_tokens: count("promptTokenCount"),
-            output_tokens: count("candidatesTokenCount"),
+            input_tokens: crate::provider::usage_count(usage, "promptTokenCount")?,
+            output_tokens: crate::provider::usage_count(usage, "candidatesTokenCount")?,
         },
         provider_attribution: ProviderAttribution {
             provider_id: "gemini".into(),
@@ -151,4 +168,18 @@ fn parse_response(
             model_id: Some(model_id.into()),
         },
     })
+}
+
+fn validate_model_id(model: &str) -> Result<(), ProviderError> {
+    if !model.is_empty()
+        && model
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._:-".contains(&b))
+    {
+        Ok(())
+    } else {
+        Err(ProviderError::Serde(
+            "invalid Gemini model id syntax".into(),
+        ))
+    }
 }

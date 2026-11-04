@@ -26,7 +26,7 @@ fn native_wire_header_usage_parts_and_stop_reasons() -> TestResult {
         let provider = GeminiProvider::with_api_key(
             io,
             "https://generativelanguage.googleapis.com".into(),
-            "configured".into(),
+            "gemini-3.5-flash-lite".into(),
             "secret-204".into(),
         )?;
         let mut req = request();
@@ -90,7 +90,13 @@ fn non_success_status_remains_data() -> TestResult {
         Err(ProviderError::ProviderRejected {
             status: 429,
             body: actual,
-        }) => assert_eq!(actual, String::from_utf8(body)?),
+        }) => assert_eq!(
+            actual,
+            String::from_utf8(body)?
+                .chars()
+                .filter(|c| !c.is_control())
+                .collect::<String>()
+        ),
         other => panic!("lost HTTP status: {other:?}"),
     }
     Ok(())
