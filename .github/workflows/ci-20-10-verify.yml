@@ -1,0 +1,254 @@
+name: ci-20-10-verify
+# Branch-only cut. NEVER merge/push this workflow from the development agent.
+# Install under .github/workflows only on an operator-controlled ci/20-10-verify branch.
+# No hosted result is claimed by this file. T0 contradicting D-20-10-06 is STOP.
+# Removal plant diff sha256:
+# a93f7c5b725ad90be87c625198601194bafc6a3ea0cbee364538d733971ae80b
+on:
+  push:
+    branches: ['ci/20-10-verify']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Final story tree (default pushed SHA)
+        required: false
+      base_sha:
+        description: Pre-landing revision for hosted failing-before witnesses
+        default: d3e3f586cb325c16a691cd19d1fd62588b288a0d
+        required: false
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: never
+jobs:
+  t0:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: T0 decisions 1-4 (real rootless runtime, not a stub)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python3 - <<'PY' 2>&1 | tee evidence/t0.log
+          import importlib.util, json, os, pathlib, subprocess, tempfile
+          spec=importlib.util.spec_from_file_location('provision','scripts/provision_t3_tests.py')
+          module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+          def call(args):
+              p=subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+              print(json.dumps(dict(argv=args,rc=p.returncode,stdout=p.stdout,stderr=p.stderr)),flush=True)
+              return p
+          assert call(['podman','version']).returncode==0
+          assert call(['docker','version','--format','{{.Client.Version}}']).returncode==0
+          docker=call(['docker','create','--pidfile=/tmp/maos-20-10-docker-pid','--cidfile=/tmp/maos-20-10-docker-cid',module.IMAGE,'true'])
+          assert docker.returncode!=0 and 'unknown flag' in docker.stderr and 'pidfile' in docker.stderr, 'STOP: D-20-10-06 A contradicted; re-ask before landing'
+          with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as scratch:
+              root=pathlib.Path(scratch); workspace=root/'workspace'; workspace.mkdir()
+              cids=[]
+              try:
+                  for suffix,labels,command in [('pair',['maos.spirit_id=t0','maos.boot_nonce=1'],['sleep','60']),('spirit',['maos.spirit_id=t0'],['true']),('nonce',['maos.boot_nonce=1'],['true'])]:
+                      args=['podman','create','--name','maos-t0-'+suffix,'--network=none']
+                      for label in labels: args += ['--label',label]
+                      args += ['--volume',str(workspace)+'/./:/workspace:rw',module.IMAGE,*command]
+                      p=call(args); assert p.returncode==0; cids.append(p.stdout.strip())
+                  inspected=call(['podman','inspect',cids[0]]); assert inspected.returncode==0
+                  row=json.loads(inspected.stdout)[0]
+                  source=next(m['Source'] for m in row['Mounts'] if m['Destination']=='/workspace')
+                  assert pathlib.Path(source).parts==workspace.resolve().parts, 'STOP: establish mount-source comparison form before landing'
+                  call(['podman','ps','-a','--filter','label=maos.spirit_id','--filter','label=maos.boot_nonce','--format','{{.ID}}'])
+                  assert call(['podman','start',cids[0]]).returncode==0
+                  for cid in cids:
+                      assert call(['podman','rm','--force','--volumes','--time=0',cid]).returncode==0
+                      assert call(['podman','container','exists',cid]).returncode==1
+              finally:
+                  for cid in cids: call(['podman','rm','--force','--volumes','--time=0',cid])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: t0-20-10-${{ matrix.image }}
+          path: evidence
+  scenes:
+    needs: t0
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: ubuntu-24.04, tree: base}
+          - {image: ubuntu-24.04, tree: head}
+          - {image: ubuntu-26.04, tree: head}
+          - {image: ubuntu-24.04, tree: plant}
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - name: Overlay final witnesses on the baseline, or plant a no-op removal
+        env:
+          BASE_SHA: ${{ inputs.base_sha || 'd3e3f586cb325c16a691cd19d1fd62588b288a0d' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/final-sha
+          if [ '${{ matrix.tree }}' = base ]; then
+            cp crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs "$RUNNER_TEMP/root_crash.rs"
+            sha256sum "$RUNNER_TEMP/root_crash.rs" | tee evidence/witness.sha256
+            git checkout --detach "$BASE_SHA"
+            cp "$RUNNER_TEMP/root_crash.rs" crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs
+          elif [ '${{ matrix.tree }}' = plant ]; then
+            patch=_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ac1-removal-noop.diff
+            echo "a93f7c5b725ad90be87c625198601194bafc6a3ea0cbee364538d733971ae80b  $patch" | sha256sum -c -
+            cp crates/maos-bin/src/purge_runtime.rs "$RUNNER_TEMP/purge_runtime.rs"
+            git apply "$patch"
+            git diff -- crates/maos-bin/src/purge_runtime.rs > evidence/applied.diff
+            sha256sum evidence/applied.diff > evidence/applied.sha256
+          fi
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: verify-20-10-${{ matrix.tree }}-${{ matrix.image }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build registered scene siblings and test binary once
+        run: |
+          cargo build --locked -p maos-bin --bin maos
+          cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit
+          cargo nextest list --locked -p maos-bin --test worker_terminal_facts_17_7 --message-format json > evidence/binaries.json
+      - name: Hosted-length socket and hermetic purge contracts (AC1-AC3, AC5-AC7)
+        if: matrix.tree == 'head'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo nextest run --locked -p maos-bin --test egress_daemon_17_1 --test purge_residue_20_10 \
+            --profile ci --test-threads 1 --no-fail-fast --no-capture 2>&1 | tee evidence/contracts.log
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 21 \
+            --required-test hosted_length_home_keeps_egress_socket_below_sun_path_limit \
+            --required-test ac5_only_absent_cid_and_empty_state_are_reclaimed \
+            --required-test ac5_missing_inventory_cid_is_retained_after_container_removal \
+            --required-test ac5_inventory_directory_replacement_retains_both_inodes \
+            --required-test ac1_listed_candidate_vanishing_before_inspect_is_skipped \
+            --required-test ac1_failed_inspect_with_present_or_unconfirmed_candidate_remains_fatal \
+            --required-test ac7_adr_documents_home_scoped_runtime_removal evidence/contracts.log
+          ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/contracts.log
+      - name: Delegated runtime witnesses (AC1, AC2, AC4, AC5, AC6)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ '${{ matrix.tree }}' = plant ]; then
+            filter='test(root_crash_retains_stopped_container_and_purge_reports_it)'
+          elif [ '${{ matrix.tree }}' = head ]; then
+            filter='all()'
+          else
+            filter='test(root_crash::)'
+          fi
+          set +e
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10 --timeout 1800 --rootless-canary -- \
+            cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-fail-fast --no-capture -E "$filter" 2>&1 | tee evidence/scenes.log
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${statuses[1]}" -eq 0
+          rc=${statuses[0]}
+          echo "$rc" > evidence/scene-exit-code
+          if [ '${{ matrix.tree }}' = head ]; then
+            test "$rc" -eq 0
+            python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 35 \
+              --required-test root_crash::root_crash_retains_stopped_container_and_purge_reports_it \
+              --required-test root_crash::purge_cgroup_native_binding_and_dead_creator_twins \
+              --required-test unload_scenes::s5_budget_oracle_counts_exceeded_kind_not_a_delayed_warning evidence/scenes.log
+            ! grep -Eq 'SKIP|0 tests run:|[1-9][0-9]* skipped' evidence/scenes.log
+          else
+            test "$rc" -ne 0
+            if [ '${{ matrix.tree }}' = plant ]; then
+              grep -q 'owned CID .* survived purge' evidence/scenes.log
+            else
+              grep -q 'owned CID .* survived purge' evidence/scenes.log
+              grep -q 'dead-creator empty leaf survived' evidence/scenes.log
+            fi
+          fi
+      - name: Restore plant byte-for-byte, force a rebuild, and require green
+        if: matrix.tree == 'plant'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+          cmp "$RUNNER_TEMP/purge_runtime.rs" crates/maos-bin/src/purge_runtime.rs
+          touch crates/maos-bin/src/purge_runtime.rs
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-purge-20-10-restored --timeout 1800 --rootless-canary -- \
+            cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 --no-capture \
+              -E 'test(root_crash_retains_stopped_container_and_purge_reports_it)' 2>&1 | tee evidence/restored.log
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 1 \
+            --required-test root_crash::root_crash_retains_stopped_container_and_purge_reports_it evidence/restored.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: purge-20-10-${{ matrix.image }}-${{ matrix.tree }}
+          path: evidence
+  clippy-new-warnings:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy-20-10
+      - name: Compare baseline and final warnings on the same hosted toolchain
+        env:
+          BASE_SHA: ${{ inputs.base_sha || 'd3e3f586cb325c16a691cd19d1fd62588b288a0d' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/clippy-20-10"
+          final=$(git rev-parse HEAD)
+          rustc -Vv | tee "$RUNNER_TEMP/clippy-20-10/toolchain.txt"
+          env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json > "$RUNNER_TEMP/clippy-20-10/final.jsonl"
+          cargo run --locked -q -p xtask -- clippy-ratchet --input "$RUNNER_TEMP/clippy-20-10/final.jsonl" | tee "$RUNNER_TEMP/clippy-20-10/ratchet.json"
+          git checkout --detach "$BASE_SHA"
+          env -u CI -u GITHUB_ACTIONS cargo clippy --workspace --all-targets --locked --message-format=json > "$RUNNER_TEMP/clippy-20-10/base.jsonl"
+          git checkout --detach "$final"
+          python3 - <<'PY'
+          import collections, json, os, pathlib
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'clippy-20-10'
+          def warnings(path):
+              found=collections.Counter()
+              for line in path.read_text().splitlines():
+                  row=json.loads(line)
+                  if row.get('reason')!='compiler-message': continue
+                  msg=row['message']
+                  if msg['level']!='warning': continue
+                  for span in msg['spans']:
+                      if span['is_primary']:
+                          found[((msg.get('code') or {}).get('code'),span['file_name'],msg['message'])]+=1
+              return found
+          new=warnings(root/'final.jsonl')-warnings(root/'base.jsonl')
+          rows=[dict(lint=key[0],file=key[1],message=key[2],count=count) for key,count in sorted(new.items(),key=str)]
+          (root/'new-warnings-by-lint-file.json').write_text(json.dumps(rows,indent=2)+'\n')
+          print(json.dumps(rows,indent=2))
+          assert not rows, 'new hosted-toolchain warnings: fix code, never raise the 1383/897 baseline'
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: clippy-20-10-hosted
+          path: ${{ runner.temp }}/clippy-20-10
