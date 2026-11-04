@@ -667,3 +667,17 @@ fn inactive_default_cannot_hide_an_unknown_live_model_f6() {
         );
     }
 }
+
+#[test]
+fn shared_default_scan_skips_unrelated_item_bodies_hosted_1() {
+    let tree = Tree::real();
+    let calls = five_host_fixture("gemini-3.5-flash-lite", Some("kimi-k3.1-pro"))
+        .replace("\"gemini-3.5-flash-lite\".into()", "crate::SHARED.1.into()");
+    tree.write("crates/maos-bin/src/main.rs", &format!(
+        "#![forbid(unsafe_code)]\nconst SHARED: (&str, &str) = (\"url\", \"gemini-3.5-flash-lite\");\n\
+         fn unrelated() {{ let = ; }}\nconst fn also_unrelated() {{ let = ; }}\n{calls}"));
+    // These token-balanced bodies deliberately aren't Rust ASTs. The currency
+    // gate governs the root literal, not the unrelated function implementation.
+    let report = tree.judge();
+    assert!(report.findings.is_empty(), "{:?}", report.findings);
+}

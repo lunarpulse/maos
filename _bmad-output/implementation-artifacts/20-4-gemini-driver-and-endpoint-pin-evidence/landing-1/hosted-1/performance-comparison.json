@@ -1,0 +1,14 @@
+{
+  "before_tests": 25,
+  "after_tests": 26,
+  "before_sum_seconds": 13.639999999999999,
+  "after_sum_seconds": 15.879,
+  "unchanged_budget_seconds": 30,
+  "after_within_budget": true,
+  "before_mean_user_cpu": 0.5305912,
+  "after_mean_user_cpu": 0.4310398000000001,
+  "before_mean_wall": 0.5437247545924038,
+  "after_mean_wall": 0.44013648501131686,
+  "all_original_vectors_retained": true,
+  "user_cpu_reduction_percent": 18.762354143830496
+}

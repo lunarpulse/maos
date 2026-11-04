@@ -1,0 +1,32 @@
+[
+  {
+    "wall_seconds": 0.543578072974924,
+    "user_seconds": 0.530534,
+    "sys_seconds": 0.010957,
+    "exit": 0
+  },
+  {
+    "wall_seconds": 0.5423371510114521,
+    "user_seconds": 0.527521,
+    "sys_seconds": 0.012952999999999998,
+    "exit": 0
+  },
+  {
+    "wall_seconds": 0.5427116620121524,
+    "user_seconds": 0.5284,
+    "sys_seconds": 0.012980000000000002,
+    "exit": 0
+  },
+  {
+    "wall_seconds": 0.5444644099916331,
+    "user_seconds": 0.536797,
+    "sys_seconds": 0.005977999999999997,
+    "exit": 0
+  },
+  {
+    "wall_seconds": 0.5455324769718572,
+    "user_seconds": 0.5297040000000002,
+    "sys_seconds": 0.014024000000000002,
+    "exit": 0
+  }
+]

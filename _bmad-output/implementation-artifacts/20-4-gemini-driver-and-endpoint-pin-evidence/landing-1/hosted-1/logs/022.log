@@ -1,0 +1,361 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 4ca71820..2c10f4c7 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -3930,39 +3930,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     let ollama_is_explicit = configured_ollama_url
+         .as_deref()
+         .is_some_and(|url| !url.trim().is_empty() && url != "skip");
+-    let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
+-    let mut configured_providers: maos_bin::admission::ProviderCatalog = [
+-        (
+-            "anthropic",
+-            "https://api.anthropic.com",
+-            "claude-haiku-4-5-20251001",
+-        ),
+-        ("openai", "https://api.openai.com", "gpt-4o-mini"),
+-        (
+-            "gemini",
+-            "https://generativelanguage.googleapis.com",
+-            "gemini-3.5-flash-lite",
+-        ),
+-        ("kimi", "https://api.moonshot.ai", "kimi-k3.1-pro"),
+-        ("ollama", ollama_url.as_str(), "llama3.1:8b"),
+-    ]
+-    .into_iter()
+-    .map(|(id, endpoint, model)| {
+-        (
+-            id.into(),
+-            maos_bin::admission::ConfiguredProvider {
+-                endpoint: endpoint.into(),
+-                model,
+-                registered: false,
+-            },
+-        )
+-    })
+-    .collect();
++    let ollama_url = configured_ollama_url.unwrap_or_else(|| crate::OLLAMA_DEFAULTS.0.into());
++    let mut configured_providers = configured_provider_catalog(&ollama_url);
+ 
+     match AnthropicProvider::new(
+         Arc::clone(&io_arc),
+-        "https://api.anthropic.com".into(),
+-        "claude-haiku-4-5-20251001".into(),
++        crate::ANTHROPIC_DEFAULTS.0.into(),
++        crate::ANTHROPIC_DEFAULTS.1.into(),
+         Some(Arc::clone(&secret_store)),
+     ) {
+         Ok(provider) => {
+@@ -3980,8 +3954,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+ 
+     match maos_providers::OpenAiProvider::new(
+         Arc::clone(&io_arc),
+-        "https://api.openai.com".into(),
+-        "gpt-4o-mini".into(),
++        crate::OPENAI_DEFAULTS.0.into(),
++        crate::OPENAI_DEFAULTS.1.into(),
+         Some(Arc::clone(&secret_store)),
+     ) {
+         Ok(provider) => {
+@@ -3999,8 +3973,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+ 
+     match maos_providers::GeminiProvider::new(
+         Arc::clone(&io_arc),
+-        "https://generativelanguage.googleapis.com".into(),
+-        "gemini-3.5-flash-lite".into(),
++        crate::GEMINI_DEFAULTS.0.into(),
++        crate::GEMINI_DEFAULTS.1.into(),
+         Some(Arc::clone(&secret_store)),
+     ) {
+         Ok(provider) => {
+@@ -4019,8 +3993,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         "kimi",
+         maos_domain::ports::SecretKey::KimiApiKey,
+         Arc::clone(&io_arc),
+-        "https://api.moonshot.ai".into(),
+-        "kimi-k3.1-pro".into(),
++        crate::KIMI_DEFAULTS.0.into(),
++        crate::KIMI_DEFAULTS.1.into(),
+         Some(Arc::clone(&secret_store)),
+     ) {
+         Ok(provider) => {
+@@ -4041,7 +4015,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             if let Ok(provider) = maos_providers::OllamaProvider::new(
+                 Arc::clone(&io_arc),
+                 ollama_url,
+-                "llama3.1:8b".into(),
++                crate::OLLAMA_DEFAULTS.1.into(),
+             ) {
+                 providers_map.insert("ollama".into(), Arc::new(provider));
+                 live_provider_available |= ollama_is_explicit;
+@@ -16815,3 +16789,173 @@ mod story_13_5a_enterprise_daemon_seam {
+         );
+     }
+ }
++
++const ANTHROPIC_DEFAULTS: (&str, &str) = ("https://api.anthropic.com", "claude-haiku-4-5-20251001");
++const OPENAI_DEFAULTS: (&str, &str) = ("https://api.openai.com", "gpt-4o-mini");
++const GEMINI_DEFAULTS: (&str, &str) = (
++    "https://generativelanguage.googleapis.com",
++    "gemini-3.5-flash-lite",
++);
++const KIMI_DEFAULTS: (&str, &str) = ("https://api.moonshot.ai", "kimi-k3.1-pro");
++const OLLAMA_DEFAULTS: (&str, &str) = ("http://localhost:11434", "llama3.1:8b");
++
++fn configured_provider_catalog(ollama_url: &str) -> maos_bin::admission::ProviderCatalog {
++    [
++        ("anthropic", ANTHROPIC_DEFAULTS),
++        ("openai", OPENAI_DEFAULTS),
++        ("gemini", GEMINI_DEFAULTS),
++        ("kimi", KIMI_DEFAULTS),
++        ("ollama", (ollama_url, OLLAMA_DEFAULTS.1)),
++    ]
++    .into_iter()
++    .map(|(id, (endpoint, model))| {
++        (
++            id.into(),
++            maos_bin::admission::ConfiguredProvider {
++                endpoint: endpoint.into(),
++                model,
++                registered: false,
++            },
++        )
++    })
++    .collect()
++}
++
++#[cfg(test)]
++mod provider_config_review {
++    use super::*;
++    use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
++    use maos_domain::ports::{IoSubsystemPort, SecretKey, SecretStore};
++    struct Probe(std::sync::Mutex<String>);
++    impl Probe {
++        fn capture(&self, url: &str) -> IoError {
++            *self.0.lock().expect("probe mutex") = url.into();
++            IoError::Transport("endpoint probe: no network".into())
++        }
++    }
++    impl IoSubsystemPort for Probe {
++        fn http_get(&self, _: &str) -> Result<Vec<u8>, IoError> {
++            panic!("unexpected GET")
++        }
++        fn http_post(&self, url: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
++            Err(self.capture(url))
++        }
++        fn http_post_exchange(
++            &self,
++            url: &str,
++            _: &[u8],
++            _: &[(&str, &str)],
++            _: &str,
++        ) -> Result<HttpExchange, IoError> {
++            Err(self.capture(url))
++        }
++    }
++    struct Keys;
++    impl SecretStore for Keys {
++        fn get(
++            &self,
++            _: SecretKey,
++        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
++            Ok(Some("fixture-key".into()))
++        }
++        fn put(&self, _: SecretKey, _: &str) -> Result<(), maos_domain::ports::SecretStoreError> {
++            panic!("unexpected put")
++        }
++        fn delete(
++            &self,
++            _: SecretKey,
++        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
++        {
++            panic!("unexpected delete")
++        }
++        fn is_healthy(&self) -> bool {
++            true
++        }
++    }
++    #[test]
++    fn catalog_endpoint_matches_driver_endpoint_f6() -> Result<(), Box<dyn std::error::Error>> {
++        use maos_providers::{
++            AnthropicProvider, GeminiProvider, OllamaProvider, OpenAiProvider, Provider,
++        };
++        let probe = Arc::new(Probe(std::sync::Mutex::new(String::new())));
++        let io: Arc<dyn IoSubsystemPort> = probe.clone();
++        let catalog = configured_provider_catalog(OLLAMA_DEFAULTS.0);
++        let drivers: [(&str, &str, Box<dyn Provider>); 5] = [
++            (
++                "anthropic",
++                "/v1/messages",
++                Box::new(AnthropicProvider::with_api_key(
++                    io.clone(),
++                    crate::ANTHROPIC_DEFAULTS.0.into(),
++                    crate::ANTHROPIC_DEFAULTS.1.into(),
++                    "key".into(),
++                )?),
++            ),
++            (
++                "openai",
++                "/v1/chat/completions",
++                Box::new(OpenAiProvider::with_api_key(
++                    io.clone(),
++                    crate::OPENAI_DEFAULTS.0.into(),
++                    crate::OPENAI_DEFAULTS.1.into(),
++                    "key".into(),
++                )?),
++            ),
++            (
++                "gemini",
++                "",
++                Box::new(GeminiProvider::with_api_key(
++                    io.clone(),
++                    crate::GEMINI_DEFAULTS.0.into(),
++                    crate::GEMINI_DEFAULTS.1.into(),
++                    "key".into(),
++                )?),
++            ),
++            (
++                "kimi",
++                "/v1/chat/completions",
++                Box::new(OpenAiProvider::compatible(
++                    "kimi",
++                    SecretKey::KimiApiKey,
++                    io.clone(),
++                    crate::KIMI_DEFAULTS.0.into(),
++                    crate::KIMI_DEFAULTS.1.into(),
++                    Some(Arc::new(Keys)),
++                )?),
++            ),
++            (
++                "ollama",
++                "/api/chat",
++                Box::new(OllamaProvider::new(
++                    io,
++                    crate::OLLAMA_DEFAULTS.0.into(),
++                    crate::OLLAMA_DEFAULTS.1.into(),
++                )?),
++            ),
++        ];
++        let req = maos_domain::ports::inference::InferenceRequest::new(
++            1,
++            maos_domain::invariants::i1::CapabilityToken::new(
++                maos_domain::invariants::i1::TokenId::ZERO,
++                1,
++                0,
++                [0; 64],
++            ),
++            "probe".into(),
++            Default::default(),
++            None,
++            vec![],
++        );
++        for (id, route, driver) in drivers {
++            assert!(driver.complete(&req).is_err());
++            let actual = probe.0.lock().map_err(|_| "probe mutex")?;
++            let gemini_route = format!("/v1beta/models/{}:generateContent", GEMINI_DEFAULTS.1);
++            assert_eq!(
++                actual.strip_suffix(if id == "gemini" { &gemini_route } else { route }),
++                Some(catalog[id].endpoint.as_str()),
++                "{id}"
++            );
++        }
++        Ok(())
++    }
++}
+diff --git a/crates/maos-bin/tests/provider_selection_20_4.rs b/crates/maos-bin/tests/provider_selection_20_4.rs
+index 2dcb1135..dd316c6e 100644
+--- a/crates/maos-bin/tests/provider_selection_20_4.rs
++++ b/crates/maos-bin/tests/provider_selection_20_4.rs
+@@ -1,5 +1,5 @@
+ #![forbid(unsafe_code)]
+-//! 20-4 AC1/2/3/5: real roots, isolated homes, explicit replay, no paid key.
++//! 20-4 AC1/2/3/5: isolated roots, seeded routing and no-inference keyed boots.
+ #[allow(dead_code)]
+ #[path = "support/provider204.rs"]
+ mod support;
+@@ -117,7 +117,7 @@ fn fallback_is_refused_before_inference() -> TestResult {
+ }
+ 
+ #[test]
+-fn new_keys_register_and_preserve_default_order_in_replay() -> TestResult {
++fn new_keys_route_in_replay() -> TestResult {
+     for (key, id) in [
+         ("MAOS_GEMINI_API_KEY", "gemini"),
+         ("MAOS_KIMI_API_KEY", "kimi"),
+@@ -126,6 +126,8 @@ fn new_keys_register_and_preserve_default_order_in_replay() -> TestResult {
+         let mut child = command(home.path())
+             .arg("shell")
+             .env(key, "test-key-visible-ascii")
++            // Replay proves explicit routing, not native key registration.
++            .env("MAOS_DEFAULT_PROVIDER", id)
+             .stdin(std::process::Stdio::piped())
+             .stdout(std::process::Stdio::piped())
+             .stderr(std::process::Stdio::piped())
+@@ -177,3 +179,64 @@ fn undeclared_primary_is_a_typed_refusal() -> TestResult {
+         .any(|s| s.starts_with("infer:")));
+     Ok(())
+ }
++
++fn real_registration(key: &str, id: &str, absent: &str) -> TestResult {
++    let home = tempfile::tempdir()?;
++    for (selected, accepted) in [(id, true), (absent, false)] {
++        let out = command(home.path())
++            .arg("shell")
++            .env("MAOS_INFERENCE_MODE", "live")
++            .env_remove("MAOS_REPLAY_CASSETTE")
++            .env(key, "test-key-visible-ascii")
++            .env("MAOS_DEFAULT_PROVIDER", selected)
++            .stdin(std::process::Stdio::null())
++            .output()?;
++        assert_eq!(
++            out.status.success(),
++            accepted,
++            "{id}/{selected}: {}",
++            stderr(&out)
++        );
++        assert!(!intents(home.path())?
++            .iter()
++            .any(|s| s.starts_with("infer:")));
++    }
++    Ok(())
++}
++#[test]
++fn gemini_key_really_registers_without_replay_p3() -> TestResult {
++    real_registration("MAOS_GEMINI_API_KEY", "gemini", "kimi")
++}
++#[test]
++fn kimi_key_really_registers_without_replay_p3() -> TestResult {
++    real_registration("MAOS_KIMI_API_KEY", "kimi", "gemini")
++}
++#[test]
++fn existing_key_precedence_is_preserved_p3() -> TestResult {
++    for new_key in ["MAOS_GEMINI_API_KEY", "MAOS_KIMI_API_KEY"] {
++        for (old_key, id) in [
++            ("MAOS_ANTHROPIC_API_KEY", "anthropic"),
++            ("MAOS_OPENAI_API_KEY", "openai"),
++        ] {
++            let home = tempfile::tempdir()?;
++            let mut child = command(home.path())
++                .arg("shell")
++                .env(new_key, "new-key")
++                .env(old_key, "old-key")
++                .stdin(std::process::Stdio::piped())
++                .stdout(std::process::Stdio::piped())
++                .stderr(std::process::Stdio::piped())
++                .spawn()?;
++            std::io::Write::write_all(
++                &mut child.stdin.take().ok_or("stdin")?,
++                b"@hello-spirit hello\n",
++            )?;
++            let out = child.wait_with_output()?;
++            assert!(out.status.success(), "{}", stderr(&out));
++            assert!(intents(home.path())?
++                .iter()
++                .any(|s| s.starts_with(&format!("infer:{id}->"))));
++        }
++    }
++    Ok(())
++}
+
+
+Ran in a temporary shell while the session shell is busy with another command: session variables and functions were unavailable, and nothing set here persists.

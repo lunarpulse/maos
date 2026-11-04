@@ -1,0 +1,61 @@
+{
+  "before_bytes": {
+    "cargo": 222600966144,
+    "tmp": 1453056000
+  },
+  "proc_scan": {
+    "at_utc": "2026-11-04T13:31:04Z",
+    "checked": 27,
+    "found": [],
+    "unreadable": []
+  },
+  "cutoff_epoch": 1793791859.4421933,
+  "policy": "Keep newest per incremental crate directory and all maximum descendant mtime/ctime within two hours; recheck immediately before deletion",
+  "kept_newest": 5929,
+  "kept_recent": 625,
+  "deleted_sessions": [
+    "/mnt/build/cargo-maos/debug/incremental/maos_audit-20kq5g9q4yggo/s-hntpsk62su-15ce8rt-bnjcfvkayki2inoqua2tt341f",
+    "/mnt/build/cargo-maos/debug/incremental/maos_iac-15ynxwm7jo7n7/s-hntpslc3s0-04ppcn9-aueu21i90grf71b15fr4fhntr",
+    "/mnt/build/cargo-maos/debug/incremental/maos_eval-2jv7aowpsm4uh/s-hntpsm92j9-1ot0dna-exf7ok7e0jzdwvzx333rmonhc",
+    "/mnt/build/cargo-maos/debug/incremental/maos_kernel_core-0jx04thhu8q9n/s-hntpspr575-0mfz0xh-12x0j4a22rcjj6tg31xj8og88",
+    "/mnt/build/cargo-maos/debug/incremental/maos_cohort-2igsstzsguuju/s-hntpsnwace-0rbr8pp-ba07nuiv048fo6yiao8tefwwj",
+    "/mnt/build/cargo-maos/debug/incremental/maos_loom_lite-1bubzj6ub5env/s-hntpsp4jry-1954sir-7cq21qx47abjulcpu5ho48x6w",
+    "/mnt/build/cargo-maos/debug/incremental/butler-1fsa23j9efv7s/s-hntpsqarkq-1bcqy71-4dv9uas2ou1igzwzlbpyyttia",
+    "/mnt/build/cargo-maos/debug/incremental/maos_bench-1cco72bzvdz98/s-hntpstj0cc-1hedv6m-e3z6evlw75g1czcwlz8wk2mrz",
+    "/mnt/build/cargo-maos/debug/incremental/maos_digest-234b3oj1f1xt2/s-hntpsuc9ba-064gjly-4z5x6h6dxqabatxni4m1gg4jv",
+    "/mnt/build/cargo-maos/debug/incremental/maos_control-0ld9x2yc8k60o/s-hntpssjeac-0xr2t7s-925vtjatdhfe0lr9umz9wx2ev",
+    "/mnt/build/cargo-maos/debug/incremental/maos_siem-0pk5h7lo6tk0f/s-hntpsvvw11-19n7m9n-3anto1f0nao07g7r6nculae7k",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2h3jwdc4u429k/s-hnue98gi4h-0m9ti8t-bjeeu9lakxyymggye42l2x1hq",
+    "/mnt/build/cargo-maos/debug/incremental/maos_uninstall_16_4-39e4irrduwos6/s-hnudiruog6-1mot37s-2nlwbp60id2d2y4s3fnmy332l",
+    "/mnt/build/cargo-maos/debug/incremental/root_shutdown_unload_16_3-2xln84yokpt34/s-hnudiruooq-01oy41g-bhqyc99pd0sswv2vfc4x6njsx",
+    "/mnt/build/cargo-maos/debug/incremental/egress_daemon_17_1-3bjk7yc4bn119/s-hnudiruvgj-0waydlk-1gw3cuhmsdwdbtdjoabwgpbsm",
+    "/mnt/build/cargo-maos/debug/incremental/maos_bin-2d17ezw06uep2/s-hnudlovyxe-1d9cnlb-b2v1vroz613w3m3nvsgltiwjy",
+    "/mnt/build/cargo-maos/debug/incremental/shell_host_16_2-15i8vk447ohau/s-hnuggjyi0m-12jtjzf-dpii2ulr2e0xstvyvn3awin9f",
+    "/mnt/build/cargo-maos/debug/incremental/purge_residue_20_10-1p8rz53pl7z3r/s-hnue8t7ixo-016d41t-1bfmn1ey1gen9829abe8s2glb",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3gz42dr5ovt02/s-hnudkklxrj-03ix72p-aegod5dyeakihsnmvu8aq8ek5",
+    "/mnt/build/cargo-maos/debug/incremental/maos_registry-2gwiz1gbpjghg/s-hntpsohnuc-041pw1d-181zzgauop0auzjd5ho2nx2wx",
+    "/mnt/build/cargo-maos/debug/incremental/maos_cli-2adr7p2l8uekl/s-hntpsqoz8t-1bv47da-d4ycttgaq363qwr7b1dfmcvp4",
+    "/mnt/build/cargo-maos/debug/incremental/maos_shell-2pc747861xaa4/s-hntpst7spa-0cioxlt-c4bok9s4s0jpaoz3keobkd6d9",
+    "/mnt/build/cargo-maos/debug/incremental/maos_spirit_cli-36x8v84dh81th/s-hntpstq9d4-1vhf1rb-9zrr1j8hmh0w0y7umd0a8m7b1",
+    "/mnt/build/cargo-maos/debug/incremental/maosctl-34608ftnb1rpf/s-hntpszg79r-1xh6m6d-9xk2mshba9fvbhlunv3n3tf4e",
+    "/mnt/build/cargo-maos/debug/incremental/maos_bin-2hsivobao0ylb/s-hntpt072zf-08y9e5p-blld5zuls01meear7qgnw3n9t",
+    "/mnt/build/cargo-maos/debug/incremental/maos-289b8rxwgpiuq/s-hntpt2ymgh-18djy7c-d6g5vl8bypojffzdi0s8gfeb1",
+    "/mnt/build/cargo-maos/debug/incremental/erasure_scan_20_11-1cma10pa2vo37/s-hnug5k610g-1sgavws-9axzqodiqli02zfgv48hw1ypt",
+    "/mnt/build/cargo-maos/debug/incremental/erasure_live_20_11-292kh0ah1pood/s-hnugc2ipeq-1b8kqga-5zit5qgg6lgixxjahyw30ykiu"
+  ],
+  "skipped": [],
+  "tmp_removed": [],
+  "protected_wip": [
+    "/tmp/204l1-wip/tracked.patch",
+    "/tmp/204l1-wip/new-files.tar.gz",
+    "/tmp/204l1-wip/SHA256SUMS"
+  ],
+  "after_bytes": {
+    "cargo": 221768646656,
+    "tmp": 1453056000
+  },
+  "freed_bytes": {
+    "cargo": 832319488,
+    "tmp": 0
+  }
+}

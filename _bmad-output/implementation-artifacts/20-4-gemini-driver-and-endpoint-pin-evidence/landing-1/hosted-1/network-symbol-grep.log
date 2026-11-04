@@ -1,0 +1,156 @@
++/// Bind hello's implicit requests to the same provider its token names.
++#[cfg(feature = "network")]
++struct BoundInference<P> {
++    inner: P,
++    provider: String,
++}
++#[cfg(feature = "network")]
++impl<P: std::borrow::Borrow<InferencePortAdapter>> maos_domain::ports::inference::InferencePort
++    for BoundInference<P>
++{
+     let butler_principal: Arc<std::sync::OnceLock<String>> = Arc::default();
++    let provider_catalog: Arc<std::sync::OnceLock<maos_bin::admission::ProviderCatalog>> =
++        Arc::default();
+     let researcher_wiring: ResearcherSlot = Arc::default();
+     let factory_researcher_wiring = Arc::clone(&researcher_wiring);
+
++    match maos_providers::GeminiProvider::new(
++        Arc::clone(&io_arc),
++        crate::GEMINI_DEFAULTS.0.into(),
++        crate::GEMINI_DEFAULTS.1.into(),
++        }
++        Err(maos_providers::ProviderError::Unconfigured) => {}
++        Err(error) => {
++            eprintln!("maos: Gemini provider configuration failed: {error}");
++            std::process::exit(78);
++    }
++    match maos_providers::OpenAiProvider::compatible(
++        "kimi",
++        maos_domain::ports::SecretKey::KimiApiKey,
++        Arc::clone(&io_arc),
++        }
++        Err(maos_providers::ProviderError::Unconfigured) => {}
++        Err(error) => {
++            eprintln!("maos: Kimi provider configuration failed: {error}");
++            std::process::exit(78);
+-            for id in ["anthropic", "openai", "ollama"] {
++            for id in maos_providers::PROVIDER_IDS {
+                 providers_map
+                     .entry(id.to_owned())
+                     .or_insert_with(|| Arc::clone(&replay));
++            let gated =
++                maos_bin::admission::gate_manifest(maos_spirit_hello::MANIFEST_TOML, &|name| {
++                    name == "hello-spirit"
+                 })
+-                .transpose()?;
++            if let Some(providers) = &gated.providers {
++                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
++                    .map_err(|refusal| refusal.to_string())?;
++            }
++            let maos_bin::admission::GatedManifest {
++                sandbox_cfg,
++                resource_caps,
++                caps_required,
++                    if let Some(section) = &gated.providers {
++                        maos_bin::admission::check_provider_pins(section, provider_catalog.get())
++                            .map_err(|refusal| refusal.to_string())?;
++                    }
+                     gated.require_in_process("topology")?;
++            if let Some(section) = &gated.providers {
++                maos_bin::admission::check_provider_pins(section, provider_catalog.get())
++                    .map_err(|refusal| refusal.to_string())?;
++            }
+             let wasm = gated.class_section.forms == ["wasm-component"];
++            let gated =
++                maos_bin::admission::gate_manifest(&manifest_toml, &|name| name == "hello-spirit")
++                    .map_err(|refusal| refusal.to_string())?;
++            if let Some(providers) = &gated.providers {
++                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
++                    .map_err(|refusal| refusal.to_string())?;
++                token_provider_id = providers.primary.id.clone();
+             }
+-                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
++            let maos_bin::admission::GatedManifest {
++                sandbox_cfg,
++                resource_caps,
++                caps_required,
+ struct BinPrivateOpsImpl {
++    provider_catalog: Arc<std::sync::OnceLock<maos_bin::admission::ProviderCatalog>>,
+     memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+     capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
+     transparency_log: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
++        if let Some(section) = &gated.providers {
++            maos_bin::admission::check_provider_pins(section, self.provider_catalog.get())?;
++        }
+         gated.require_in_process("operator door")?;
+         if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
+
++#[cfg(feature = "network")]
++struct ProviderAdmissionContext<'a> {
++    spirits_root: &'a std::path::Path,
++    journal: &'a maos_kernel_core::journal::JournalAdapter,
++    providers: Option<&'a maos_bin::admission::ProviderCatalog>,
++}
++
+ /// Story 13.5a — admit the daemon's control Spirit through the CANONICAL
++    let gated =
++        maos_bin::admission::gate_manifest(&manifest_toml, &|name| classify_spirit(name).is_some())
++            .map_err(|refusal| refusal.to_string())?;
++    if let Some(section) = &gated.providers {
++        maos_bin::admission::check_provider_pins(section, providers)
++            .map_err(|refusal| refusal.to_string())?;
++    }
++    let maos_bin::admission::GatedManifest {
++        sandbox_cfg,
++        resource_caps,
++        caps_required,
++
++fn configured_provider_catalog(ollama_url: &str) -> maos_bin::admission::ProviderCatalog {
++    [
++        ("anthropic", ANTHROPIC_DEFAULTS),
++        ("openai", OPENAI_DEFAULTS),
++            id.into(),
++            maos_bin::admission::ConfiguredProvider {
++                endpoint: endpoint.into(),
++                model,
++                registered: false,
++
++#[cfg(test)]
++mod provider_config_review {
++    use super::*;
++    use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
++    use maos_domain::ports::{IoSubsystemPort, SecretKey, SecretStore};
++    struct Probe(std::sync::Mutex<String>);
++    impl Probe {
++        fn capture(&self, url: &str) -> IoError {
++    }
++    impl IoSubsystemPort for Probe {
++        fn http_get(&self, _: &str) -> Result<Vec<u8>, IoError> {
++            panic!("unexpected GET")
++        }
++    struct Keys;
++    impl SecretStore for Keys {
++        fn get(
++            &self,
++            _: SecretKey,
++        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
++            Ok(Some("fixture-key".into()))
++        }
++        fn put(&self, _: SecretKey, _: &str) -> Result<(), maos_domain::ports::SecretStoreError> {
++            panic!("unexpected put")
++        }
++        fn delete(
++            _: SecretKey,
++        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
++        {
++            panic!("unexpected delete")
++        }
++    fn catalog_endpoint_matches_driver_endpoint_f6() -> Result<(), Box<dyn std::error::Error>> {
++        use maos_providers::{
++            AnthropicProvider, GeminiProvider, OllamaProvider, OpenAiProvider, Provider,
++        };
++        let probe = Arc::new(Probe(std::sync::Mutex::new(String::new())));
++        let io: Arc<dyn IoSubsystemPort> = probe.clone();
++        let catalog = configured_provider_catalog(OLLAMA_DEFAULTS.0);
++        let drivers: [(&str, &str, Box<dyn Provider>); 5] = [
++            (

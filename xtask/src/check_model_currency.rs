@@ -236,6 +236,14 @@ fn pricing_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
 /// Read each constructor's own argument list; compatible drivers name their
 /// provider first and their model fifth, native drivers name their model third.
 fn main_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
+    fn root_const(input: syn::parse::ParseStream<'_>) -> syn::Result<syn::ItemConst> {
+        input.call(syn::Attribute::parse_inner)?;
+        let prefix = input.fork();
+        let _: syn::Visibility = prefix.parse()?;
+        prefix.parse::<syn::Token![const]>()?;
+        prefix.parse::<syn::Ident>()?;
+        input.parse()
+    }
     // From line start, with no `//` before the call: a commented call opens nothing.
     let ctor = regex::Regex::new(
         r"(?m)^(?:[^/\n]|/[^/\n])*?\b(Anthropic|OpenAi|Ollama|Gemini)Provider::(new|with_api_key|compatible)\(",
@@ -244,24 +252,32 @@ fn main_pins(file: &str, text: &str) -> Result<Vec<Pin>, String> {
     let literal =
         regex::Regex::new(r#"^\s*"([^"]+)"\.(?:into|to_string|to_owned)\(\)\s*$"#).expect("static");
     let reference = regex::Regex::new(r"^\s*crate::(\w+)\.1\.into\(\)\s*$").expect("static");
-    let ast = syn::parse_file(text).map_err(|e| format!("cannot parse shared defaults: {e}"))?;
-    let defaults: BTreeMap<_, _> = ast
-        .items
-        .iter()
-        .filter_map(|item| {
-            let syn::Item::Const(item) = item else {
-                return None;
-            };
-            if !item.attrs.is_empty() {
-                return None;
+    use proc_macro2::{Delimiter, TokenStream, TokenTree};
+    let tokens = text
+        .parse::<TokenStream>()
+        .map_err(|e| format!("cannot parse shared defaults: {e}"))?;
+    // Discard fn/impl/mod brace groups before syn sees their contents. Only
+    // attribute-free constant prefixes may reach ItemConst; spans stay original.
+    let defaults: BTreeMap<_, _> = tokens
+        .into_iter()
+        .scan(TokenStream::new(), |item, token| {
+            let block = matches!(&token, TokenTree::Group(g) if g.delimiter() == Delimiter::Brace);
+            let end = block || matches!(&token, TokenTree::Punct(p) if p.as_char() == ';');
+            if !block {
+                item.extend([token]);
             }
-            let syn::Expr::Tuple(tuple) = item.expr.as_ref() else {
+            Some(end.then(|| std::mem::take(item)))
+        })
+        .flatten()
+        .filter_map(|tokens| syn::parse::Parser::parse2(root_const, tokens).ok())
+        .filter_map(|item| {
+            let syn::Expr::Tuple(tuple) = *item.expr else {
                 return None;
             };
             let syn::Expr::Lit(syn::ExprLit {
                 lit: syn::Lit::Str(model),
                 ..
-            }) = tuple.elems.iter().nth(1)?
+            }) = tuple.elems.into_iter().nth(1)?
             else {
                 return None;
             };

@@ -1,0 +1,1542 @@
+diff --git a/crates/maos-bin/src/admission.rs b/crates/maos-bin/src/admission.rs
+index d9c16d1d..5a6504b7 100644
+--- a/crates/maos-bin/src/admission.rs
++++ b/crates/maos-bin/src/admission.rs
+@@ -291,6 +291,12 @@ pub enum AdmissionRefusal {
+         archived_version: String,
+         successor_version: String,
+     },
++    /// The selected provider is undeclared, unregistered, or its model assertion differs.
++    ProviderUnavailable { provider: String },
++    /// The root's exact configured base URL does not satisfy the manifest.
++    EndpointPinMismatch { provider: String },
++    /// Fallback would require authority the primary token does not carry.
++    FallbackUnsupported,
+ }
+ 
+ impl AdmissionRefusal {
+@@ -316,6 +322,9 @@ impl AdmissionRefusal {
+             Self::Admission { .. } => "admission_refused",
+             Self::Start { .. } => "start_failed",
+             Self::MigratorMissing { .. } => "migrator_missing",
++            Self::ProviderUnavailable { .. } => "provider_unavailable",
++            Self::EndpointPinMismatch { .. } => "endpoint_pin_mismatch",
++            Self::FallbackUnsupported => "fallback_unsupported",
+         }
+     }
+ 
+@@ -388,6 +397,9 @@ impl std::fmt::Display for AdmissionRefusal {
+                  [migrates_from] names no pattern matching it (ADR-020 / FR11, refused at \
+                  the daemon's admission chokepoint)"
+             ),
++            Self::ProviderUnavailable { provider } => write!(f, "provider_unavailable: '{provider}' is undeclared, unregistered, or its model assertion differs"),
++            Self::EndpointPinMismatch { provider } => write!(f, "endpoint_pin_mismatch: '{provider}' does not match the configured endpoint"),
++            Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
+         }
+     }
+ }
+@@ -459,6 +471,7 @@ pub struct GatedManifest {
+     pub on_crash: Option<OnCrashSection>,
+     pub on_revocation: Option<OnRevocationSection>,
+     pub supervision: Option<SupervisionSection>,
++    pub providers: Option<maos_kernel_core::security::ProvidersSection>,
+     /// The raw text, kept for the model-provenance gate, which parses its own
+     /// section out of the whole document, and for the FR11 archive record.
+     pub manifest_toml: String,
+@@ -694,6 +707,29 @@ pub fn gate_manifest(
+     let on_revocation =
+         optional_section(&root, "on_revocation", OnRevocationSection::from_toml_str)?;
+     let supervision = optional_section(&root, "supervision", SupervisionSection::from_toml_str)?;
++    let providers = optional_section(
++        &root,
++        "providers",
++        maos_kernel_core::security::ProvidersSection::from_toml_str,
++    )?;
++    if let Some(section) = &providers {
++        for config in std::iter::once(&section.primary).chain(&section.fallback) {
++            let prefix = format!("{}.", config.id);
++            if !caps_required
++                .provider
++                .complete
++                .iter()
++                .any(|d| *d == config.id || d.starts_with(&prefix))
++            {
++                return Err(AdmissionRefusal::ProviderUnavailable {
++                    provider: config.id.clone(),
++                });
++            }
++        }
++        if !section.fallback.is_empty() {
++            return Err(AdmissionRefusal::FallbackUnsupported);
++        }
++    }
+     // The component's manifest has now passed every structural gate. The
+     // refusal is feature-selected because a published binary's engine closure
+     // is an export-control property, not runtime configuration.
+@@ -720,10 +756,58 @@ pub fn gate_manifest(
+         on_crash,
+         on_revocation,
+         supervision,
++        providers,
+         manifest_toml: manifest_toml.to_owned(),
+     })
+ }
+ 
++/// Immutable boot configuration, captured before replay replaces the drivers.
++pub struct ConfiguredProvider {
++    pub endpoint: String,
++    pub model: &'static str,
++    pub registered: bool,
++}
++pub type ProviderCatalog = BTreeMap<String, ConfiguredProvider>;
++
++/// Check configuration assertions before admission can mint authority.
++pub fn check_provider_pins(
++    providers: &maos_kernel_core::security::ProvidersSection,
++    catalog: Option<&ProviderCatalog>,
++) -> Result<(), AdmissionRefusal> {
++    use sha2::Digest;
++    for config in std::iter::once(&providers.primary).chain(&providers.fallback) {
++        let registered = catalog
++            .and_then(|c| c.get(&config.id))
++            .filter(|p| p.registered)
++            .ok_or_else(|| AdmissionRefusal::ProviderUnavailable {
++                provider: config.id.clone(),
++            })?;
++        if config
++            .model_id
++            .as_deref()
++            .is_some_and(|m| m != registered.model)
++        {
++            return Err(AdmissionRefusal::ProviderUnavailable {
++                provider: config.id.clone(),
++            });
++        }
++        let pin_ok = config.provider_endpoint_pin.as_deref().is_none_or(|pin| {
++            hex::encode(sha2::Sha256::digest(registered.endpoint.as_bytes()))
++                .eq_ignore_ascii_case(pin)
++        });
++        let url_ok = config
++            .endpoint_url
++            .as_deref()
++            .is_none_or(|url| url == registered.endpoint);
++        if !(pin_ok && url_ok) {
++            return Err(AdmissionRefusal::EndpointPinMismatch {
++                provider: config.id.clone(),
++            });
++        }
++    }
++    Ok(())
++}
++
+ /// An optional `[name]` section, serialized the way `gate_manifest` serializes
+ /// every section and parsed by its manifest type. Absent ⇒ `None`; present and
+ /// malformed ⇒ the gate-7 refusal.
+@@ -787,6 +871,7 @@ pub struct AdmissionDeps<'a> {
+     /// receives `on_consolidate`, and `on_telemetry_event` while its live
+     /// class is Observer.
+     pub hooks: Option<&'a crate::hook_pump::HookPump>,
++    pub providers: Option<&'a ProviderCatalog>,
+ }
+ 
+ /// Whether the triple runs its third leg.
+@@ -843,6 +928,9 @@ pub async fn load_admit_start(
+     start: StartPolicy,
+     on_loaded: &mut (dyn FnMut(u32) + Send),
+ ) -> Result<Admitted, AdmissionRefusal> {
++    if let Some(providers) = &gated.providers {
++        check_provider_pins(providers, deps.providers)?;
++    }
+     let spirit_id = gated.spirit_id.clone();
+     let archive_root = maos_audit::default_archive_dir();
+ 
+@@ -914,7 +1002,7 @@ pub async fn load_admit_start(
+         None,
+         None,
+         None,
+-        None,
++        gated.providers.as_ref(),
+         Some(&gated.class_section),
+     ) {
+         Ok(spec) => spec,
+diff --git a/crates/maos-bin/src/env_contract.rs b/crates/maos-bin/src/env_contract.rs
+index 0808eb60..536d033a 100644
+--- a/crates/maos-bin/src/env_contract.rs
++++ b/crates/maos-bin/src/env_contract.rs
+@@ -91,6 +91,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+         purpose: "OpenAI credential; a present non-empty value marks the live provider eligible (15-6 §A6 review)",
+         stability: EnvStability::UserFacing,
+     },
++    EnvVar {
++        name: "MAOS_GEMINI_API_KEY",
++        purpose: "Gemini credential; a non-empty value marks the live provider eligible",
++        stability: EnvStability::UserFacing,
++    },
++    EnvVar {
++        name: "MAOS_KIMI_API_KEY",
++        purpose: "Kimi credential; a non-empty value marks the live provider eligible",
++        stability: EnvStability::UserFacing,
++    },
++    EnvVar {
++        name: "MAOS_DEFAULT_PROVIDER",
++        purpose: "Router default provider id; empty is unset; an unregistered id refuses boot",
++        stability: EnvStability::UserFacing,
++    },
+     // Story 18-8 AC2 — MCP bearers, read only through the captured env
+     // `SecretStore` (`SecretKey::McpBearer`); sent as `Authorization: Bearer`.
+     EnvVar {
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index bb7d7ff7..2c10f4c7 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -891,9 +891,12 @@ fn first_declared_provider(gated: &maos_bin::admission::GatedManifest) -> Option
+     declared_providers(gated).into_iter().next()
+ }
+ 
+-/// Story 18-3 (D-18-3-02 B) — every declared `ProviderInfer`, in order.
++/// Binding choices: explicit `[providers].primary`, otherwise declared order.
+ #[cfg(feature = "network")]
+ fn declared_providers(gated: &maos_bin::admission::GatedManifest) -> Vec<String> {
++    if let Some(providers) = &gated.providers {
++        return vec![providers.primary.id.clone()];
++    }
+     maos_kernel_core::security::capabilities_required_to_scopes(&gated.caps_required)
+         .into_iter()
+         .filter_map(|scope| match scope {
+@@ -903,6 +906,28 @@ fn declared_providers(gated: &maos_bin::admission::GatedManifest) -> Vec<String>
+         .collect()
+ }
+ 
++/// Bind hello's implicit requests to the same provider its token names.
++#[cfg(feature = "network")]
++struct BoundInference<P> {
++    inner: P,
++    provider: String,
++}
++#[cfg(feature = "network")]
++impl<P: std::borrow::Borrow<InferencePortAdapter>> maos_domain::ports::inference::InferencePort
++    for BoundInference<P>
++{
++    fn complete(
++        &self,
++        mut req: maos_domain::ports::inference::InferenceRequest,
++    ) -> Result<
++        maos_domain::ports::inference::InferenceResponse,
++        maos_domain::ports::inference::InferenceError,
++    > {
++        req.provider_id = Some(self.provider.clone());
++        maos_domain::ports::inference::InferencePort::complete(self.inner.borrow(), req)
++    }
++}
++
+ /// Story 18-1 / 18-3 — the door-staged TARGET manifest, gated (its declared
+ /// providers name a successor's token).
+ #[cfg(feature = "network")]
+@@ -3398,6 +3423,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     // Story 19-2 (D-19-2-08 A) — the Butler principal bound at boot, read by
+     // the door's pick route (filled below, once the scene is loaded).
+     let butler_principal: Arc<std::sync::OnceLock<String>> = Arc::default();
++    let provider_catalog: Arc<std::sync::OnceLock<maos_bin::admission::ProviderCatalog>> =
++        Arc::default();
+     let researcher_wiring: ResearcherSlot = Arc::default();
+     let factory_researcher_wiring = Arc::clone(&researcher_wiring);
+     let factory_distillate_writer = Arc::clone(&distillate_writer);
+@@ -3605,6 +3632,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         // must work with no `maos init` (FR58 zero-config). Only the HTTP
+         // BIND below stays gated on the env pair / `control.json`.
+         let private_ops = Arc::new(BinPrivateOpsImpl {
++            provider_catalog: Arc::clone(&provider_catalog),
+             memory: Arc::clone(&memory),
+             capability: Arc::clone(&capability),
+             transparency_log: Arc::clone(&transparency_log),
+@@ -3897,11 +3925,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         std::collections::BTreeMap::new();
+     let mut live_provider_available = false;
+     let mut default_id: Option<String> = None;
++    // Configuration, not credentials: pins mean the same thing in keyless replay.
++    let configured_ollama_url = std::env::var("MAOS_OLLAMA_URL").ok();
++    let ollama_is_explicit = configured_ollama_url
++        .as_deref()
++        .is_some_and(|url| !url.trim().is_empty() && url != "skip");
++    let ollama_url = configured_ollama_url.unwrap_or_else(|| crate::OLLAMA_DEFAULTS.0.into());
++    let mut configured_providers = configured_provider_catalog(&ollama_url);
+ 
+     match AnthropicProvider::new(
+         Arc::clone(&io_arc),
+-        "https://api.anthropic.com".into(),
+-        "claude-haiku-4-5-20251001".into(),
++        crate::ANTHROPIC_DEFAULTS.0.into(),
++        crate::ANTHROPIC_DEFAULTS.1.into(),
+         Some(Arc::clone(&secret_store)),
+     ) {
+         Ok(provider) => {
+@@ -3919,8 +3954,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+ 
+     match maos_providers::OpenAiProvider::new(
+         Arc::clone(&io_arc),
+-        "https://api.openai.com".into(),
+-        "gpt-4o-mini".into(),
++        crate::OPENAI_DEFAULTS.0.into(),
++        crate::OPENAI_DEFAULTS.1.into(),
+         Some(Arc::clone(&secret_store)),
+     ) {
+         Ok(provider) => {
+@@ -3936,17 +3971,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         }
+     }
+ 
++    match maos_providers::GeminiProvider::new(
++        Arc::clone(&io_arc),
++        crate::GEMINI_DEFAULTS.0.into(),
++        crate::GEMINI_DEFAULTS.1.into(),
++        Some(Arc::clone(&secret_store)),
++    ) {
++        Ok(provider) => {
++            providers_map.insert("gemini".into(), Arc::new(provider));
++            live_provider_available = true;
++            default_id.get_or_insert_with(|| "gemini".into());
++            eprintln!("maos: Gemini provider registered");
++        }
++        Err(maos_providers::ProviderError::Unconfigured) => {}
++        Err(error) => {
++            eprintln!("maos: Gemini provider configuration failed: {error}");
++            std::process::exit(78);
++        }
++    }
++    match maos_providers::OpenAiProvider::compatible(
++        "kimi",
++        maos_domain::ports::SecretKey::KimiApiKey,
++        Arc::clone(&io_arc),
++        crate::KIMI_DEFAULTS.0.into(),
++        crate::KIMI_DEFAULTS.1.into(),
++        Some(Arc::clone(&secret_store)),
++    ) {
++        Ok(provider) => {
++            providers_map.insert("kimi".into(), Arc::new(provider));
++            live_provider_available = true;
++            default_id.get_or_insert_with(|| "kimi".into());
++            eprintln!("maos: Kimi provider registered");
++        }
++        Err(maos_providers::ProviderError::Unconfigured) => {}
++        Err(error) => {
++            eprintln!("maos: Kimi provider configuration failed: {error}");
++            std::process::exit(78);
++        }
++    }
++
+     {
+-        let configured_ollama_url = std::env::var("MAOS_OLLAMA_URL").ok();
+-        let ollama_is_explicit = configured_ollama_url
+-            .as_deref()
+-            .is_some_and(|url| !url.trim().is_empty() && url != "skip");
+-        let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
+         if !ollama_url.is_empty() && ollama_url != "skip" {
+             if let Ok(provider) = maos_providers::OllamaProvider::new(
+                 Arc::clone(&io_arc),
+                 ollama_url,
+-                "llama3.1:8b".into(),
++                crate::OLLAMA_DEFAULTS.1.into(),
+             ) {
+                 providers_map.insert("ollama".into(), Arc::new(provider));
+                 live_provider_available |= ollama_is_explicit;
+@@ -4017,7 +4086,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             // driver also answers every id the kernel interns; a Spirit's
+             // token and request then name its own declared provider on a
+             // keyless runner. The default is unchanged.
+-            for id in ["anthropic", "openai", "ollama"] {
++            for id in maos_providers::PROVIDER_IDS {
+                 providers_map
+                     .entry(id.to_owned())
+                     .or_insert_with(|| Arc::clone(&replay));
+@@ -4044,6 +4113,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         } => {}
+     }
+ 
++    if let Some(selected) = std::env::var_os("MAOS_DEFAULT_PROVIDER").filter(|s| !s.is_empty()) {
++        let registered = providers_map.keys().cloned().collect::<Vec<_>>().join(", ");
++        let selected = selected
++            .to_str()
++            .ok_or("MAOS_DEFAULT_PROVIDER must be UTF-8")?;
++        if !providers_map.contains_key(selected) {
++            return Err(format!(
++                "MAOS_DEFAULT_PROVIDER '{selected}' is not registered (registered: {registered})"
++            )
++            .into());
++        }
++        default_id = Some(selected.into());
++    }
++    for (id, config) in &mut configured_providers {
++        config.registered = providers_map.contains_key(id);
++    }
++    provider_catalog
++        .set(configured_providers)
++        .map_err(|_| "provider catalog already initialized")?;
++
+     let router = Arc::new(
+         maos_kernel_core::inference::router::MultiProviderRouter::new(providers_map, default_id),
+     );
+@@ -4332,6 +4421,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         maos_bin::installed_spirits::InstalledSpirits::boot(
+             installed_manifests,
+             &maos_bin::admission::AdmissionDeps {
++                providers: provider_catalog.get(),
+                 scheduler: &scheduler,
+                 security: &security,
+                 transparency_log: &transparency_log,
+@@ -4385,57 +4475,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         // `main`, so the door teardown in the caller runs on BOTH arms by
+         // construction (Story 16-2 AC2, review obligation (n)).
+         let shell_result: Result<(), Box<dyn std::error::Error>> = async {
+-            let manifest_root: toml::Value = maos_spirit_hello::MANIFEST_TOML
+-                .parse()
+-                .map_err(|e| format!("shell: cannot parse hello-spirit manifest: {e}"))?;
+-            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
+-                &toml::to_string(&manifest_root["sandbox"]).unwrap_or_default(),
+-            )?;
+-            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
+-                &toml::to_string(&manifest_root["resources"]).unwrap_or_default(),
+-            )?;
+-            let caps_required = maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
+-                &toml::to_string(
+-                    manifest_root
+-                        .get("capabilities")
+-                        .and_then(|c| c.get("required"))
+-                        .ok_or("missing [capabilities.required]")?,
+-                )
+-                .map_err(|e| format!("caps: {e}"))?,
+-            )?;
+-            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
+-                &toml::to_string(&manifest_root["output_shape"]).unwrap_or_default(),
+-            )?;
+-            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
+-                &toml::to_string(&manifest_root["class"]).unwrap_or_default(),
+-            )?;
+-            let caps_required =
+-                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
+-            let posture_section =
+-                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
+-                    &toml::to_string(&manifest_root["posture"]).unwrap_or_default(),
+-                )?;
+-            let epistemic_policy = manifest_root
+-                .get("epistemic_policy")
+-                .map(|v| {
+-                    let s = toml::to_string(v)
+-                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
+-                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+-                        .map_err(|e| format!("epistemic_policy parse: {e}"))
+-                })
+-                .transpose()?;
+-            // `maos run`'s bundle shape: scheduling/lifecycle default (the
+-            // reference Spirit fires no scheduled hooks), budget parsed from
+-            // the manifest, class carried for the ABI-stability admission
+-            // check inside `load`.
+-            let budget = manifest_root
+-                .get("budget")
+-                .map(|v| {
+-                    let s = toml::to_string(v).map_err(|e| format!("budget serialize: {e}"))?;
+-                    maos_kernel_core::security::manifest::Budget::from_toml_str(&s)
+-                        .map_err(|e| format!("budget parse: {e}"))
++            let gated =
++                maos_bin::admission::gate_manifest(maos_spirit_hello::MANIFEST_TOML, &|name| {
++                    name == "hello-spirit"
+                 })
+-                .transpose()?;
++                .map_err(|refusal| refusal.to_string())?;
++            if let Some(providers) = &gated.providers {
++                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
++                    .map_err(|refusal| refusal.to_string())?;
++            }
++            let maos_bin::admission::GatedManifest {
++                sandbox_cfg,
++                resource_caps,
++                caps_required,
++                output_shape,
++                class_section,
++                posture_section,
++                epistemic_policy,
++                budget,
++                providers,
++                ..
++            } = gated;
++            let default_provider = providers
++                .as_ref()
++                .map_or(default_provider, |p| p.primary.id.as_str());
+             let bundle = maos_kernel_core::scheduler::SpiritManifestBundle {
+                 budget,
+                 class: Some(class_section.clone()),
+@@ -4472,7 +4535,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                     None,
+                     None,
+                     None,
+-                    None,
++                    providers.as_ref(),
+                     Some(&class_section),
+                 )
+                 .map_err(|e| {
+@@ -4529,7 +4592,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             // the reader moves to its own thread in D-16-2-D) and `stdout()`
+             // unlocked (the REPL thread is the only writer).
+             maos_shell::run_shell(
+-                Arc::new(inference)
++                Arc::new(BoundInference {
++                    inner: inference,
++                    provider: default_provider.into(),
++                })
+                     as Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync>,
+                 &host,
+                 std::io::BufReader::new(std::io::stdin()),
+@@ -5671,6 +5737,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                             child_path.display()
+                         )
+                     })?;
++                    if let Some(section) = &gated.providers {
++                        maos_bin::admission::check_provider_pins(section, provider_catalog.get())
++                            .map_err(|refusal| refusal.to_string())?;
++                    }
+                     gated.require_in_process("topology")?;
+                     let kind = classify_spirit(&gated.class_section.name)
+                         .expect("gate_manifest refused every class classify_spirit does not know");
+@@ -5815,6 +5885,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                     // the standalone arm and the door.
+                     let admitted = maos_bin::admission::load_admit_start(
+                         &maos_bin::admission::AdmissionDeps {
++                            providers: provider_catalog.get(),
+                             scheduler: &scheduler,
+                             security: &security,
+                             transparency_log: &transparency_log,
+@@ -6205,6 +6276,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                 classify_spirit(name).is_some()
+             })
+             .map_err(|refusal| format!("maos run: {refusal}"))?;
++            if let Some(section) = &gated.providers {
++                maos_bin::admission::check_provider_pins(section, provider_catalog.get())
++                    .map_err(|refusal| refusal.to_string())?;
++            }
+             let wasm = gated.class_section.forms == ["wasm-component"];
+             if !wasm {
+                 gated.require_in_process("standalone native manifest without a launch binding")?;
+@@ -6699,6 +6774,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             // `Loaded` SCB the way `main.rs` did until this story.
+             let admitted = maos_bin::admission::load_admit_start(
+                 &maos_bin::admission::AdmissionDeps {
++                    providers: provider_catalog.get(),
+                     scheduler: &scheduler,
+                     security: &security,
+                     transparency_log: &transparency_log,
+@@ -9246,8 +9322,11 @@ description = "smoke test spirit successor"
+                 security.as_ref(),
+                 &capability,
+                 &transparency_log,
+-                std::path::Path::new("spirits"),
+-                shared_journal.as_ref(),
++                ProviderAdmissionContext {
++                    spirits_root: std::path::Path::new("spirits"),
++                    journal: shared_journal.as_ref(),
++                    providers: provider_catalog.get(),
++                },
+                 enterprise_runtime.as_ref(),
+                 enterprise_pdp_runtime.as_ref(),
+                 cohort_daemon.as_ref(),
+@@ -9465,6 +9544,7 @@ description = "smoke test spirit successor"
+         // instead of hardcoding capability scopes. The adapter reads the
+         // manifest's [capabilities.required] section and registers scopes
+         // in the policy table.
++        let mut token_provider_id = router.default_id().unwrap_or("anthropic").to_string();
+         {
+             // Initialize monotonic counter for journal timestamps and token issuance.
+             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+@@ -9476,59 +9556,26 @@ description = "smoke test spirit successor"
+                     manifest_path.display()
+                 )
+             })?;
+-
+-            // Parse full TOML document, then extract individual sections.
+-            let manifest_root: toml::Value = toml::from_str(&manifest_toml)
+-                .map_err(|e| format!("manifest TOML parse error: {e}"))?;
+-
+-            fn extract_section(
+-                root: &toml::Value,
+-                section: &str,
+-            ) -> Result<String, Box<dyn std::error::Error>> {
+-                let value = root
+-                    .get(section)
+-                    .ok_or_else(|| format!("missing manifest section [{section}]"))?;
+-                let serialized = toml::to_string(value)
+-                    .map_err(|e| format!("failed to serialize [{section}] section: {e}"))?;
+-                Ok(serialized)
++            let gated =
++                maos_bin::admission::gate_manifest(&manifest_toml, &|name| name == "hello-spirit")
++                    .map_err(|refusal| refusal.to_string())?;
++            if let Some(providers) = &gated.providers {
++                maos_bin::admission::check_provider_pins(providers, provider_catalog.get())
++                    .map_err(|refusal| refusal.to_string())?;
++                token_provider_id = providers.primary.id.clone();
+             }
+ 
+-            // Parse each manifest section individually.
+-            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
+-                &extract_section(&manifest_root, "sandbox")?,
+-            )?;
+-            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
+-                &extract_section(&manifest_root, "resources")?,
+-            )?;
+-            let caps_required = {
+-                let caps_required_val = manifest_root
+-                    .get("capabilities")
+-                    .and_then(|c| c.get("required"));
+-                let caps_required_toml = match caps_required_val {
+-                    Some(v) => toml::to_string(v)
+-                        .map_err(|e| format!("failed to serialize [capabilities.required]: {e}"))?,
+-                    None => {
+-                        return Err(
+-                            format!("missing manifest section [capabilities.required]").into()
+-                        );
+-                    }
+-                };
+-                maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
+-                    &caps_required_toml,
+-                )?
+-            };
+-            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
+-                &extract_section(&manifest_root, "output_shape")?,
+-            )?;
+-            // Story 7.5a — parse the `[class]` section so the ABI Stability
+-            // Triple is enforced on the hello-spirit admission path. The
+-            // reference manifest declares manifest_schema_version = 1 (N-1) and
+-            // min_substrate_version = "0.1.0-alpha" → admits with an N-1 WARN.
+-            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
+-                &extract_section(&manifest_root, "class")?,
+-            )?;
+-            let caps_required =
+-                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
++            let maos_bin::admission::GatedManifest {
++                sandbox_cfg,
++                resource_caps,
++                caps_required,
++                output_shape,
++                class_section,
++                posture_section,
++                epistemic_policy,
++                providers,
++                ..
++            } = gated;
+ 
+             // Open the Lifecycle Journal for admission (the Load event).
+             let journal_path = maos_audit::default_journal_path();
+@@ -9539,24 +9586,6 @@ description = "smoke test spirit successor"
+             let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+                 .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
+ 
+-            // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
+-
+-            // Admit hello-spirit through the canonical admission path.
+-            let posture_section =
+-                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
+-                    &extract_section(&manifest_root, "posture")?,
+-                )
+-                .map_err(|e| format!("posture parse: {e}"))?;
+-            let epistemic_policy = manifest_root
+-                .get("epistemic_policy")
+-                .map(|v| {
+-                    let s = toml::to_string(v)
+-                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
+-                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
+-                        .map_err(|e| format!("epistemic_policy parse: {e}"))
+-                })
+-                .transpose()?;
+-
+             let _spec = security.admit_spirit(
+                 0,
+                 "hello-spirit",
+@@ -9571,7 +9600,7 @@ description = "smoke test spirit successor"
+                 None,
+                 None,
+                 None,
+-                None,
++                providers.as_ref(),
+                 Some(&class_section),
+             )?;
+ 
+@@ -9599,14 +9628,13 @@ description = "smoke test spirit successor"
+         // Initialize monotonic counter for token issuance
+ 
+         // Issue a valid capability token for the in-process hello-Spirit
+-        let token_provider_id = router.default_id().unwrap_or("anthropic").to_string();
+         let token = issue_enterprise_governed_capability(
+             capability.as_ref(),
+             enterprise_runtime.as_deref(),
+             enterprise_pdp_runtime.as_ref(),
+             0,
+             Scope::ProviderInfer {
+-                provider: token_provider_id,
++                provider: token_provider_id.clone(),
+             },
+             60,
+             [0u8; 32],
+@@ -9624,9 +9652,17 @@ description = "smoke test spirit successor"
+         eprintln!("maos: issued token {token_id_hex}");
+         eprintln!("maos: one-shot mode — executing hello-Spirit");
+ 
++        let bound_inference = BoundInference {
++            inner: &inference,
++            provider: token_provider_id,
++        };
+         // Call hello-Spirit (sync call on async runtime — fine for one-shot)
+-        let resp = maos_spirit_hello::run(&inference, token, &audit_db_path.display().to_string())
+-            .map_err(|e| format!("hello-Spirit error: {e}"))?;
++        let resp = maos_spirit_hello::run(
++            &bound_inference,
++            token,
++            &audit_db_path.display().to_string(),
++        )
++        .map_err(|e| format!("hello-Spirit error: {e}"))?;
+         if let Some(recorder) = cassette_recorder.as_ref() {
+             recorder
+                 .flush()
+@@ -10038,6 +10074,7 @@ fn record_admitted_manifest(map: &AdmittedManifests, spirit_id: &str, text: &str
+ /// `submit` a door into THIS daemon rather than a sibling simulation.
+ #[cfg(feature = "network")]
+ struct BinPrivateOpsImpl {
++    provider_catalog: Arc<std::sync::OnceLock<maos_bin::admission::ProviderCatalog>>,
+     memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+     capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
+     transparency_log: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+@@ -10209,6 +10246,9 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
+         let gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
+             classify_spirit(name).is_some()
+         })?;
++        if let Some(section) = &gated.providers {
++            maos_bin::admission::check_provider_pins(section, self.provider_catalog.get())?;
++        }
+         gated.require_in_process("operator door")?;
+         if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
+             && classify_spirit(&gated.class_section.name) == Some(LoadedSpiritKind::Mira)
+@@ -10252,6 +10292,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
+                 })?;
+         let admitted = maos_bin::admission::load_admit_start(
+             &maos_bin::admission::AdmissionDeps {
++                providers: self.provider_catalog.get(),
+                 scheduler: &self.scheduler,
+                 security: &self.security,
+                 transparency_log: &self.transparency_log,
+@@ -11657,6 +11698,13 @@ impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
+     }
+ }
+ 
++#[cfg(feature = "network")]
++struct ProviderAdmissionContext<'a> {
++    spirits_root: &'a std::path::Path,
++    journal: &'a maos_kernel_core::journal::JournalAdapter,
++    providers: Option<&'a maos_bin::admission::ProviderCatalog>,
++}
++
+ /// Story 13.5a — admit the daemon's control Spirit through the CANONICAL
+ /// admission path so its manifest-declared `loom.*` grants land in the policy
+ /// table the kernel consults at mint time.
+@@ -11670,11 +11718,15 @@ impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
+ #[cfg(feature = "network")]
+ fn admit_daemon_control_spirit(
+     security: &maos_kernel_core::security::SecurityManagerAdapter,
+-    spirits_root: &std::path::Path,
+-    journal: &maos_kernel_core::journal::JournalAdapter,
++    context: ProviderAdmissionContext<'_>,
+     spirit_pid: u32,
+     spirit_id: &str,
+ ) -> Result<(), Box<dyn std::error::Error>> {
++    let ProviderAdmissionContext {
++        spirits_root,
++        journal,
++        providers,
++    } = context;
+     let manifest_path = spirits_root.join(spirit_id).join("manifest.toml");
+     let manifest_toml = std::fs::read_to_string(&manifest_path).map_err(|error| {
+         format!(
+@@ -11682,45 +11734,25 @@ fn admit_daemon_control_spirit(
+             manifest_path.display()
+         )
+     })?;
+-    let manifest_root: toml::Value = toml::from_str(&manifest_toml)
+-        .map_err(|error| format!("control Spirit manifest TOML parse error: {error}"))?;
+-    let section = |name: &str| -> Result<String, String> {
+-        let value = manifest_root
+-            .get(name)
+-            .ok_or_else(|| format!("control Spirit manifest is missing section [{name}]"))?;
+-        toml::to_string(value).map_err(|error| format!("serialize [{name}]: {error}"))
+-    };
+-    let sandbox_cfg =
+-        maos_kernel_core::security::SandboxConfig::from_toml_str(&section("sandbox")?)?;
+-    let resource_caps =
+-        maos_kernel_core::security::ResourceCaps::from_toml_str(&section("resources")?)?;
+-    let caps_required = {
+-        let value = manifest_root
+-            .get("capabilities")
+-            .and_then(|caps| caps.get("required"))
+-            .ok_or("control Spirit manifest is missing [capabilities.required]")?;
+-        let text = toml::to_string(value)
+-            .map_err(|error| format!("serialize [capabilities.required]: {error}"))?;
+-        maos_kernel_core::security::CapabilitiesRequired::from_toml_str(&text)?
+-    };
+-    let output_shape =
+-        maos_kernel_core::security::OutputShape::from_toml_str(&section("output_shape")?)?;
+-    let posture_section =
+-        maos_kernel_core::security::manifest::PostureSection::from_toml_str(&section("posture")?)
+-            .map_err(|error| format!("posture parse: {error}"))?;
+-    let epistemic_policy = manifest_root
+-        .get("epistemic_policy")
+-        .map(|value| {
+-            let text = toml::to_string(value)
+-                .map_err(|error| format!("epistemic_policy serialize: {error}"))?;
+-            maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&text)
+-                .map_err(|error| format!("epistemic_policy parse: {error}"))
+-        })
+-        .transpose()?;
+-    let class_section =
+-        maos_kernel_core::security::ClassSection::from_toml_str(&section("class")?)?;
+-    // Story 17-3b review (g): this path admits a policy identity without
+-    // `gate_manifest`, so it must not accept the third-party form.
++    let gated =
++        maos_bin::admission::gate_manifest(&manifest_toml, &|name| classify_spirit(name).is_some())
++            .map_err(|refusal| refusal.to_string())?;
++    if let Some(section) = &gated.providers {
++        maos_bin::admission::check_provider_pins(section, providers)
++            .map_err(|refusal| refusal.to_string())?;
++    }
++    let maos_bin::admission::GatedManifest {
++        sandbox_cfg,
++        resource_caps,
++        caps_required,
++        output_shape,
++        class_section,
++        posture_section,
++        epistemic_policy,
++        providers,
++        ..
++    } = gated;
++    // Control identities remain first-party even in a WASM-enabled binary.
+     if class_section
+         .forms
+         .iter()
+@@ -11728,8 +11760,6 @@ fn admit_daemon_control_spirit(
+     {
+         return Err("control Spirit must be a first-party class, not wasm-component".into());
+     }
+-    let caps_required =
+-        caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
+ 
+     security.admit_spirit(
+         spirit_pid,
+@@ -11745,7 +11775,7 @@ fn admit_daemon_control_spirit(
+         None,
+         None,
+         None,
+-        None,
++        providers.as_ref(),
+         Some(&class_section),
+     )?;
+     Ok(())
+@@ -11763,8 +11793,7 @@ fn build_enterprise_daemon_governance(
+     security: &maos_kernel_core::security::SecurityManagerAdapter,
+     capability: &Arc<CapabilityRegistryAdapter>,
+     transparency_log: &Arc<maos_iac::TransparencyLogAdapter>,
+-    spirits_root: &std::path::Path,
+-    journal: &maos_kernel_core::journal::JournalAdapter,
++    context: ProviderAdmissionContext<'_>,
+     enterprise_runtime: Option<&Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+     bootstrap: Option<&CohortDaemonBootstrap>,
+@@ -11785,8 +11814,7 @@ fn build_enterprise_daemon_governance(
+     let control_spirit = bootstrap.control_spirit.as_str().to_string();
+     admit_daemon_control_spirit(
+         security,
+-        spirits_root,
+-        journal,
++        context,
+         DAEMON_CONTROL_SPIRIT_PID,
+         &control_spirit,
+     )?;
+@@ -16286,8 +16314,11 @@ mod story_13_5a_enterprise_daemon_seam {
+                 security.as_ref(),
+                 &capability,
+                 &transparency_log,
+-                &workspace_root().join("spirits"),
+-                &journal,
++                ProviderAdmissionContext {
++                    spirits_root: &workspace_root().join("spirits"),
++                    journal: &journal,
++                    providers: None,
++                },
+                 runtime.as_ref(),
+                 pdp.as_ref(),
+                 Some(&bootstrap),
+@@ -16565,8 +16596,11 @@ mod story_13_5a_enterprise_daemon_seam {
+             security.as_ref(),
+             &capability,
+             &transparency_log,
+-            &workspace_root().join("spirits"),
+-            &journal,
++            ProviderAdmissionContext {
++                spirits_root: &workspace_root().join("spirits"),
++                journal: &journal,
++                providers: None,
++            },
+             Some(&kms_down),
+             None,
+             Some(&bootstrap),
+@@ -16702,8 +16736,11 @@ mod story_13_5a_enterprise_daemon_seam {
+             security.as_ref(),
+             &capability,
+             &transparency_log,
+-            &workspace_root().join("spirits"),
+-            &journal,
++            ProviderAdmissionContext {
++                spirits_root: &workspace_root().join("spirits"),
++                journal: &journal,
++                providers: None,
++            },
+             Some(&runtime),
+             Some(&pdp),
+             Some(&bootstrap),
+@@ -16752,3 +16789,173 @@ mod story_13_5a_enterprise_daemon_seam {
+         );
+     }
+ }
++
++const ANTHROPIC_DEFAULTS: (&str, &str) = ("https://api.anthropic.com", "claude-haiku-4-5-20251001");
++const OPENAI_DEFAULTS: (&str, &str) = ("https://api.openai.com", "gpt-4o-mini");
++const GEMINI_DEFAULTS: (&str, &str) = (
++    "https://generativelanguage.googleapis.com",
++    "gemini-3.5-flash-lite",
++);
++const KIMI_DEFAULTS: (&str, &str) = ("https://api.moonshot.ai", "kimi-k3.1-pro");
++const OLLAMA_DEFAULTS: (&str, &str) = ("http://localhost:11434", "llama3.1:8b");
++
++fn configured_provider_catalog(ollama_url: &str) -> maos_bin::admission::ProviderCatalog {
++    [
++        ("anthropic", ANTHROPIC_DEFAULTS),
++        ("openai", OPENAI_DEFAULTS),
++        ("gemini", GEMINI_DEFAULTS),
++        ("kimi", KIMI_DEFAULTS),
++        ("ollama", (ollama_url, OLLAMA_DEFAULTS.1)),
++    ]
++    .into_iter()
++    .map(|(id, (endpoint, model))| {
++        (
++            id.into(),
++            maos_bin::admission::ConfiguredProvider {
++                endpoint: endpoint.into(),
++                model,
++                registered: false,
++            },
++        )
++    })
++    .collect()
++}
++
++#[cfg(test)]
++mod provider_config_review {
++    use super::*;
++    use maos_domain::ports::io_subsystem::{HttpExchange, IoError};
++    use maos_domain::ports::{IoSubsystemPort, SecretKey, SecretStore};
++    struct Probe(std::sync::Mutex<String>);
++    impl Probe {
++        fn capture(&self, url: &str) -> IoError {
++            *self.0.lock().expect("probe mutex") = url.into();
++            IoError::Transport("endpoint probe: no network".into())
++        }
++    }
++    impl IoSubsystemPort for Probe {
++        fn http_get(&self, _: &str) -> Result<Vec<u8>, IoError> {
++            panic!("unexpected GET")
++        }
++        fn http_post(&self, url: &str, _: &[u8], _: &[(&str, &str)]) -> Result<Vec<u8>, IoError> {
++            Err(self.capture(url))
++        }
++        fn http_post_exchange(
++            &self,
++            url: &str,
++            _: &[u8],
++            _: &[(&str, &str)],
++            _: &str,
++        ) -> Result<HttpExchange, IoError> {
++            Err(self.capture(url))
++        }
++    }
++    struct Keys;
++    impl SecretStore for Keys {
++        fn get(
++            &self,
++            _: SecretKey,
++        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
++            Ok(Some("fixture-key".into()))
++        }
++        fn put(&self, _: SecretKey, _: &str) -> Result<(), maos_domain::ports::SecretStoreError> {
++            panic!("unexpected put")
++        }
++        fn delete(
++            &self,
++            _: SecretKey,
++        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
++        {
++            panic!("unexpected delete")
++        }
++        fn is_healthy(&self) -> bool {
++            true
++        }
++    }
++    #[test]
++    fn catalog_endpoint_matches_driver_endpoint_f6() -> Result<(), Box<dyn std::error::Error>> {
++        use maos_providers::{
++            AnthropicProvider, GeminiProvider, OllamaProvider, OpenAiProvider, Provider,
++        };
++        let probe = Arc::new(Probe(std::sync::Mutex::new(String::new())));
++        let io: Arc<dyn IoSubsystemPort> = probe.clone();
++        let catalog = configured_provider_catalog(OLLAMA_DEFAULTS.0);
++        let drivers: [(&str, &str, Box<dyn Provider>); 5] = [
++            (
++                "anthropic",
++                "/v1/messages",
++                Box::new(AnthropicProvider::with_api_key(
++                    io.clone(),
++                    crate::ANTHROPIC_DEFAULTS.0.into(),
++                    crate::ANTHROPIC_DEFAULTS.1.into(),
++                    "key".into(),
++                )?),
++            ),
++            (
++                "openai",
++                "/v1/chat/completions",
++                Box::new(OpenAiProvider::with_api_key(
++                    io.clone(),
++                    crate::OPENAI_DEFAULTS.0.into(),
++                    crate::OPENAI_DEFAULTS.1.into(),
++                    "key".into(),
++                )?),
++            ),
++            (
++                "gemini",
++                "",
++                Box::new(GeminiProvider::with_api_key(
++                    io.clone(),
++                    crate::GEMINI_DEFAULTS.0.into(),
++                    crate::GEMINI_DEFAULTS.1.into(),
++                    "key".into(),
++                )?),
++            ),
++            (
++                "kimi",
++                "/v1/chat/completions",
++                Box::new(OpenAiProvider::compatible(
++                    "kimi",
++                    SecretKey::KimiApiKey,
++                    io.clone(),
++                    crate::KIMI_DEFAULTS.0.into(),
++                    crate::KIMI_DEFAULTS.1.into(),
++                    Some(Arc::new(Keys)),
++                )?),
++            ),
++            (
++                "ollama",
++                "/api/chat",
++                Box::new(OllamaProvider::new(
++                    io,
++                    crate::OLLAMA_DEFAULTS.0.into(),
++                    crate::OLLAMA_DEFAULTS.1.into(),
++                )?),
++            ),
++        ];
++        let req = maos_domain::ports::inference::InferenceRequest::new(
++            1,
++            maos_domain::invariants::i1::CapabilityToken::new(
++                maos_domain::invariants::i1::TokenId::ZERO,
++                1,
++                0,
++                [0; 64],
++            ),
++            "probe".into(),
++            Default::default(),
++            None,
++            vec![],
++        );
++        for (id, route, driver) in drivers {
++            assert!(driver.complete(&req).is_err());
++            let actual = probe.0.lock().map_err(|_| "probe mutex")?;
++            let gemini_route = format!("/v1beta/models/{}:generateContent", GEMINI_DEFAULTS.1);
++            assert_eq!(
++                actual.strip_suffix(if id == "gemini" { &gemini_route } else { route }),
++                Some(catalog[id].endpoint.as_str()),
++                "{id}"
++            );
++        }
++        Ok(())
++    }
++}
+diff --git a/crates/maos-bin/src/purge.rs b/crates/maos-bin/src/purge.rs
+index a829d7f6..f525680c 100644
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+@@ -335,11 +335,13 @@ fn sibling_team_logs(keep_log: bool, audit_path: &Path) -> Vec<PathBuf> {
+ 
+ /// Every MAOS-owned credential, from the closed `SecretKey::ALL` (Story 18-8
+ /// AC2: the eight MCP bearers ride the same list).
+-fn known_secret_keys() -> [(maos_domain::ports::SecretKey, &'static str); 10] {
++fn known_secret_keys() -> [(maos_domain::ports::SecretKey, &'static str); 12] {
+     maos_domain::ports::SecretKey::ALL.map(|key| {
+         let label = match key {
+             maos_domain::ports::SecretKey::AnthropicApiKey => "Anthropic API credential",
+             maos_domain::ports::SecretKey::OpenAiApiKey => "OpenAI API credential",
++            maos_domain::ports::SecretKey::GeminiApiKey => "Gemini API credential",
++            maos_domain::ports::SecretKey::KimiApiKey => "Kimi API credential",
+             maos_domain::ports::SecretKey::McpBearer(_) => key.as_str(),
+         };
+         (key, label)
+diff --git a/crates/maos-bin/tests/provider_endpoint_pin_20_4.rs b/crates/maos-bin/tests/provider_endpoint_pin_20_4.rs
+new file mode 100644
+index 00000000..1fa2dd19
+--- /dev/null
++++ b/crates/maos-bin/tests/provider_endpoint_pin_20_4.rs
+@@ -0,0 +1,96 @@
++#![forbid(unsafe_code)]
++//! 20-4 AC6: admission checks exact configured URL bytes, before inference.
++#[allow(dead_code)]
++#[path = "support/provider204.rs"]
++mod support;
++use sha2::{Digest, Sha256};
++use support::*;
++
++#[test]
++fn wrong_endpoint_pin_refuses_before_inference() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = researcher(
++        home.path(),
++        "openai",
++        &format!(
++            "[providers.primary]\nid = \"openai\"\nprovider_endpoint_pin = \"{}\"\n",
++            "0".repeat(64)
++        ),
++    )?;
++    assert!(!out.status.success(), "wrong pin admitted");
++    assert!(
++        stderr(&out).contains("endpoint_pin_mismatch"),
++        "{}",
++        stderr(&out)
++    );
++    assert!(!intents(home.path())?
++        .iter()
++        .any(|s| s.starts_with("infer:")));
++    assert!(issuance_payloads(home.path())?
++        .iter()
++        .all(|s| !s.contains("ProviderInfer")));
++    Ok(())
++}
++#[test]
++fn matching_endpoint_pin_and_model_admit() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let pin = hex::encode(Sha256::digest(b"https://api.openai.com"));
++    let out = researcher(home.path(), "openai", &format!("[providers.primary]\nid = \"openai\"\nprovider_endpoint_pin = \"{pin}\"\nendpoint_url = \"https://api.openai.com\"\nmodel_id = \"gpt-4o-mini\"\n"))?;
++    assert!(out.status.success(), "{}", stderr(&out));
++    Ok(())
++}
++#[test]
++fn endpoint_and_model_are_assertions_not_reconfiguration() -> TestResult {
++    for assertion in [
++        "endpoint_url = \"https://elsewhere.invalid\"",
++        "model_id = \"gpt-unconfigured\"",
++    ] {
++        let home = tempfile::tempdir()?;
++        let out = researcher(
++            home.path(),
++            "openai",
++            &format!("[providers.primary]\nid = \"openai\"\n{assertion}\n"),
++        )?;
++        assert!(!out.status.success());
++        assert!(!intents(home.path())?
++            .iter()
++            .any(|s| s.starts_with("infer:")));
++    }
++    Ok(())
++}
++#[test]
++fn airgap_pin_tracks_ollama_configuration_in_keyless_replay() -> TestResult {
++    let endpoint = "http://127.0.0.1:11434";
++    let pin = hex::encode(Sha256::digest(endpoint.as_bytes()));
++    for (url, accepted) in [(endpoint, true), ("http://10.0.0.5:11434", false)] {
++        let home = tempfile::tempdir()?;
++        let mut doc: toml::Value = toml::from_str(&std::fs::read_to_string(
++            root().join("spirits/researcher/manifest.toml"),
++        )?)?;
++        doc["capabilities"]["required"]["provider"]["complete"] =
++            toml::Value::Array(vec![toml::Value::String("ollama".into())]);
++        let manifest = home.path().join("airgap.toml");
++        std::fs::write(
++            &manifest,
++            format!(
++                "{}\n[providers.primary]\nid = \"ollama\"\nprovider_endpoint_pin = \"{pin}\"\n",
++                toml::to_string(&doc)?
++            ),
++        )?;
++        let out = command(home.path())
++            .arg("run")
++            .arg(manifest)
++            .arg("--once")
++            .env("MAOS_OLLAMA_URL", url)
++            .env(
++                "MAOS_REPLAY_CASSETTE",
++                root().join("crates/maos-journey-test/cassettes/j-researcher/survey-distill.json"),
++            )
++            .output()?;
++        assert_eq!(out.status.success(), accepted, "{}", stderr(&out));
++        if !accepted {
++            assert!(stderr(&out).contains("endpoint_pin_mismatch"));
++        }
++    }
++    Ok(())
++}
+diff --git a/crates/maos-bin/tests/provider_selection_20_4.rs b/crates/maos-bin/tests/provider_selection_20_4.rs
+new file mode 100644
+index 00000000..dd316c6e
+--- /dev/null
++++ b/crates/maos-bin/tests/provider_selection_20_4.rs
+@@ -0,0 +1,242 @@
++#![forbid(unsafe_code)]
++//! 20-4 AC1/2/3/5: isolated roots, seeded routing and no-inference keyed boots.
++#[allow(dead_code)]
++#[path = "support/provider204.rs"]
++mod support;
++use support::*;
++
++#[test]
++fn epic_gemini_shell_command_selects_and_routes() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = shell(
++        home.path(),
++        "gemini",
++        "crates/maos-journey-test/cassettes/providers/gemini-shell-intro.json",
++    )?;
++    assert!(out.status.success(), "{}", stderr(&out));
++    assert!(String::from_utf8_lossy(&out.stdout).contains("Hello from the Gemini routing seed"));
++    assert!(intents(home.path())?
++        .iter()
++        .any(|s| s.starts_with("infer:gemini->replay:")));
++    assert!(issuance_payloads(home.path())?
++        .iter()
++        .any(|s| s.contains("ProviderInfer") && s.contains("gemini")));
++    Ok(())
++}
++#[test]
++fn kimi_shell_selects_and_routes() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = shell(
++        home.path(),
++        "kimi",
++        "crates/maos-journey-test/cassettes/providers/kimi-shell-intro.json",
++    )?;
++    assert!(out.status.success(), "{}", stderr(&out));
++    assert!(String::from_utf8_lossy(&out.stdout).contains("Hello from the Kimi routing seed"));
++    assert!(intents(home.path())?
++        .iter()
++        .any(|s| s.starts_with("infer:kimi->replay:")));
++    Ok(())
++}
++#[test]
++fn unknown_default_refuses_with_registered_ids() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = command(home.path())
++        .arg("shell")
++        .env("MAOS_DEFAULT_PROVIDER", "bedrock")
++        .output()?;
++    assert!(!out.status.success());
++    let err = stderr(&out);
++    assert!(
++        err.contains("MAOS_DEFAULT_PROVIDER") && err.contains("bedrock"),
++        "{err}"
++    );
++    for id in ["anthropic", "openai", "gemini", "kimi", "ollama"] {
++        assert!(err.contains(id), "{err}");
++    }
++    Ok(())
++}
++#[test]
++fn invalid_credentials_refuse_without_echoing_bytes() -> TestResult {
++    for key in [
++        "MAOS_ANTHROPIC_API_KEY",
++        "MAOS_OPENAI_API_KEY",
++        "MAOS_GEMINI_API_KEY",
++        "MAOS_KIMI_API_KEY",
++    ] {
++        let home = tempfile::tempdir()?;
++        let secret = "sk-DO-NOT-ECHO\u{1}tail";
++        let out = command(home.path())
++            .arg("shell")
++            .env(key, secret)
++            .output()?;
++        assert_eq!(out.status.code(), Some(78), "{key}: {}", stderr(&out));
++        assert!(!stderr(&out).contains("DO-NOT-ECHO"));
++        assert!(!String::from_utf8_lossy(&out.stdout).contains("DO-NOT-ECHO"));
++    }
++    Ok(())
++}
++#[test]
++fn researcher_primary_overrides_declaration_order() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = researcher(
++        home.path(),
++        "openai",
++        "[providers.primary]\nid = \"openai\"\n",
++    )?;
++    assert!(out.status.success(), "{}", stderr(&out));
++    let rows = intents(home.path())?;
++    assert!(
++        rows.iter().any(|s| s.starts_with("infer:openai->")),
++        "{rows:?}"
++    );
++    assert!(
++        !rows.iter().any(|s| s.starts_with("infer:anthropic->")),
++        "{rows:?}"
++    );
++    Ok(())
++}
++#[test]
++fn fallback_is_refused_before_inference() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = researcher(
++        home.path(),
++        "openai",
++        "[providers.primary]\nid = \"anthropic\"\n[[providers.fallback]]\nid = \"openai\"\n",
++    )?;
++    assert!(!out.status.success());
++    assert!(
++        stderr(&out).contains("fallback_unsupported"),
++        "{}",
++        stderr(&out)
++    );
++    assert!(!intents(home.path())?
++        .iter()
++        .any(|s| s.starts_with("infer:")));
++    Ok(())
++}
++
++#[test]
++fn new_keys_route_in_replay() -> TestResult {
++    for (key, id) in [
++        ("MAOS_GEMINI_API_KEY", "gemini"),
++        ("MAOS_KIMI_API_KEY", "kimi"),
++    ] {
++        let home = tempfile::tempdir()?;
++        let mut child = command(home.path())
++            .arg("shell")
++            .env(key, "test-key-visible-ascii")
++            // Replay proves explicit routing, not native key registration.
++            .env("MAOS_DEFAULT_PROVIDER", id)
++            .stdin(std::process::Stdio::piped())
++            .stdout(std::process::Stdio::piped())
++            .stderr(std::process::Stdio::piped())
++            .spawn()?;
++        std::io::Write::write_all(
++            &mut child.stdin.take().ok_or("stdin")?,
++            b"@hello-spirit hello\n",
++        )?;
++        let out = child.wait_with_output()?;
++        assert!(out.status.success(), "{}", stderr(&out));
++        assert!(intents(home.path())?
++            .iter()
++            .any(|s| s.starts_with(&format!("infer:{id}->"))));
++    }
++    Ok(())
++}
++
++#[test]
++fn empty_default_preserves_existing_router_default() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = shell(
++        home.path(),
++        "",
++        "crates/maos-journey-test/cassettes/j0/shell-intro.json",
++    )?;
++    assert!(out.status.success(), "{}", stderr(&out));
++    assert!(intents(home.path())?
++        .iter()
++        .any(|s| s.starts_with("infer:anthropic->")));
++    Ok(())
++}
++
++#[test]
++fn undeclared_primary_is_a_typed_refusal() -> TestResult {
++    let home = tempfile::tempdir()?;
++    let out = researcher(
++        home.path(),
++        "openai",
++        "[providers.primary]\nid = \"gemini\"\n",
++    )?;
++    assert!(!out.status.success());
++    assert!(
++        stderr(&out).contains("provider_unavailable"),
++        "{}",
++        stderr(&out)
++    );
++    assert!(!intents(home.path())?
++        .iter()
++        .any(|s| s.starts_with("infer:")));
++    Ok(())
++}
++
++fn real_registration(key: &str, id: &str, absent: &str) -> TestResult {
++    let home = tempfile::tempdir()?;
++    for (selected, accepted) in [(id, true), (absent, false)] {
++        let out = command(home.path())
++            .arg("shell")
++            .env("MAOS_INFERENCE_MODE", "live")
++            .env_remove("MAOS_REPLAY_CASSETTE")
++            .env(key, "test-key-visible-ascii")
++            .env("MAOS_DEFAULT_PROVIDER", selected)
++            .stdin(std::process::Stdio::null())
++            .output()?;
++        assert_eq!(
++            out.status.success(),
++            accepted,
++            "{id}/{selected}: {}",
++            stderr(&out)
++        );
++        assert!(!intents(home.path())?
++            .iter()
++            .any(|s| s.starts_with("infer:")));
++    }
++    Ok(())
++}
++#[test]
++fn gemini_key_really_registers_without_replay_p3() -> TestResult {
++    real_registration("MAOS_GEMINI_API_KEY", "gemini", "kimi")
++}
++#[test]
++fn kimi_key_really_registers_without_replay_p3() -> TestResult {
++    real_registration("MAOS_KIMI_API_KEY", "kimi", "gemini")
++}
++#[test]
++fn existing_key_precedence_is_preserved_p3() -> TestResult {
++    for new_key in ["MAOS_GEMINI_API_KEY", "MAOS_KIMI_API_KEY"] {
++        for (old_key, id) in [
++            ("MAOS_ANTHROPIC_API_KEY", "anthropic"),
++            ("MAOS_OPENAI_API_KEY", "openai"),
++        ] {
++            let home = tempfile::tempdir()?;
++            let mut child = command(home.path())
++                .arg("shell")
++                .env(new_key, "new-key")
++                .env(old_key, "old-key")
++                .stdin(std::process::Stdio::piped())
++                .stdout(std::process::Stdio::piped())
++                .stderr(std::process::Stdio::piped())
++                .spawn()?;
++            std::io::Write::write_all(
++                &mut child.stdin.take().ok_or("stdin")?,
++                b"@hello-spirit hello\n",
++            )?;
++            let out = child.wait_with_output()?;
++            assert!(out.status.success(), "{}", stderr(&out));
++            assert!(intents(home.path())?
++                .iter()
++                .any(|s| s.starts_with(&format!("infer:{id}->"))));
++        }
++    }
++    Ok(())
++}
+diff --git a/crates/maos-bin/tests/support/provider204.rs b/crates/maos-bin/tests/support/provider204.rs
+new file mode 100644
+index 00000000..957a57be
+--- /dev/null
++++ b/crates/maos-bin/tests/support/provider204.rs
+@@ -0,0 +1,95 @@
++use std::io::Write;
++use std::path::{Path, PathBuf};
++use std::process::{Command, Output, Stdio};
++
++pub type TestResult = Result<(), Box<dyn std::error::Error>>;
++pub fn root() -> PathBuf {
++    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
++}
++pub fn command(home: &Path) -> Command {
++    let mut cmd = Command::new(env!("CARGO_BIN_EXE_maos"));
++    cmd.current_dir(root())
++        .env_clear()
++        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
++        .env("HOME", home)
++        .env("MAOS_HOME", home.join("maos"))
++        .env("XDG_DATA_HOME", home.join("xdg"))
++        .env("MAOS_SECRETS_BACKEND", "env")
++        .env("MAOS_OLLAMA_URL", "skip")
++        .env("MAOS_INFERENCE_MODE", "replay")
++        .env(
++            "MAOS_REPLAY_CASSETTE",
++            root().join("crates/maos-journey-test/cassettes/j0/shell-intro.json"),
++        );
++    cmd
++}
++pub fn shell(
++    home: &Path,
++    provider: &str,
++    cassette: &str,
++) -> Result<Output, Box<dyn std::error::Error>> {
++    let mut child = command(home)
++        .arg("shell")
++        .env("MAOS_DEFAULT_PROVIDER", provider)
++        .env("MAOS_REPLAY_CASSETTE", root().join(cassette))
++        .stdin(Stdio::piped())
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped())
++        .spawn()?;
++    child
++        .stdin
++        .take()
++        .ok_or("missing stdin")?
++        .write_all(b"@hello-spirit hello\n")?;
++    Ok(child.wait_with_output()?)
++}
++pub fn intents(home: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
++    let path = home.join("maos/audit/transparency.sqlite");
++    if !path.exists() {
++        return Ok(Vec::new());
++    }
++    let conn =
++        rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
++    let mut stmt = conn.prepare("SELECT intent FROM transparency_log ORDER BY rowid")?;
++    let rows = stmt.query_map([], |r| r.get(0))?;
++    Ok(rows.collect::<Result<Vec<_>, _>>()?)
++}
++pub fn issuance_payloads(home: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
++    let conn = rusqlite::Connection::open_with_flags(
++        home.join("maos/audit/transparency.sqlite"),
++        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
++    )?;
++    let mut stmt = conn.prepare("SELECT payload_redacted FROM transparency_log WHERE intent LIKE 'cap.issue%' ORDER BY rowid")?;
++    let rows = stmt.query_map([], |r| r.get::<_, Option<Vec<u8>>>(0))?;
++    let mut payloads = Vec::new();
++    for row in rows {
++        payloads.push(String::from_utf8_lossy(&row?.unwrap_or_default()).into_owned());
++    }
++    Ok(payloads)
++}
++pub fn researcher(
++    home: &Path,
++    provider: &str,
++    config: &str,
++) -> Result<Output, Box<dyn std::error::Error>> {
++    let text = std::fs::read_to_string(root().join("spirits/researcher/manifest.toml"))?;
++    let mut doc: toml::Value = toml::from_str(&text)?;
++    doc["capabilities"]["required"]["provider"]["complete"] = toml::Value::Array(vec![
++        toml::Value::String("anthropic.claude-sonnet-5-5".into()),
++        toml::Value::String(provider.into()),
++    ]);
++    let manifest = home.join("researcher.toml");
++    std::fs::write(&manifest, format!("{}\n{config}", toml::to_string(&doc)?))?;
++    Ok(command(home)
++        .args(["run"])
++        .arg(&manifest)
++        .arg("--once")
++        .env(
++            "MAOS_REPLAY_CASSETTE",
++            root().join("crates/maos-journey-test/cassettes/j-researcher/survey-distill.json"),
++        )
++        .output()?)
++}
++pub fn stderr(out: &Output) -> String {
++    String::from_utf8_lossy(&out.stderr).into_owned()
++}

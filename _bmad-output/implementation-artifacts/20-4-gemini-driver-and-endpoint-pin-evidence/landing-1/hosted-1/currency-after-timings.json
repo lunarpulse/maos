@@ -1,0 +1,111 @@
+{
+  "tests": 26,
+  "sum_seconds": 15.879,
+  "cases": [
+    {
+      "name": "each_retired_or_unknown_pin_reds_naming_its_file_and_line",
+      "seconds": 5.935
+    },
+    {
+      "name": "a_gate_that_could_scan_nothing_is_a_refusal_not_a_pass",
+      "seconds": 1.754
+    },
+    {
+      "name": "a_manifest_that_hides_its_pins_from_the_scan_reds",
+      "seconds": 1.22
+    },
+    {
+      "name": "the_cli_subcommand_is_wired_green_at_head_and_red_on_a_plant",
+      "seconds": 0.979
+    },
+    {
+      "name": "the_swept_tree_is_green_and_governs_its_pins",
+      "seconds": 0.979
+    },
+    {
+      "name": "a_duplicate_on_one_line_names_that_line_not_line_one",
+      "seconds": 0.718
+    },
+    {
+      "name": "a_providers_section_model_id_is_a_pin",
+      "seconds": 0.581
+    },
+    {
+      "name": "a_provider_table_reds_on_the_entry_line_through_comments_literals_and_duplicates",
+      "seconds": 0.557
+    },
+    {
+      "name": "an_empty_entries_array_is_an_empty_price_book",
+      "seconds": 0.53
+    },
+    {
+      "name": "two_price_rows_sharing_a_model_each_name_their_own_line",
+      "seconds": 0.496
+    },
+    {
+      "name": "an_unparseable_manifest_reds_instead_of_passing_unread",
+      "seconds": 0.459
+    },
+    {
+      "name": "a_comment_inside_a_constructor_never_stands_in_for_its_model",
+      "seconds": 0.293
+    },
+    {
+      "name": "a_dangling_manifest_link_is_a_refusal_not_a_skip",
+      "seconds": 0.284
+    },
+    {
+      "name": "a_host_provider_constructor_that_goes_missing_reds_even_if_the_others_remain",
+      "seconds": 0.163
+    },
+    {
+      "name": "a_one_line_call_with_a_non_literal_model_refuses_instead_of_reading_past_it",
+      "seconds": 0.142
+    },
+    {
+      "name": "inactive_default_cannot_hide_an_unknown_live_model_f6",
+      "seconds": 0.128
+    },
+    {
+      "name": "gemini_unknown_constructor_model_is_governed_20_4",
+      "seconds": 0.126
+    },
+    {
+      "name": "kimi_k2_constructor_is_refused_as_deprecated_20_4",
+      "seconds": 0.112
+    },
+    {
+      "name": "main_rs_constructors_are_read_in_every_layout_and_comments_open_no_call",
+      "seconds": 0.11
+    },
+    {
+      "name": "shared_defaults_remain_governed_at_the_declaration_f6",
+      "seconds": 0.109
+    },
+    {
+      "name": "missing_kimi_constructor_fails_closed_20_4",
+      "seconds": 0.108
+    },
+    {
+      "name": "shared_default_scan_skips_unrelated_item_bodies_hosted_1",
+      "seconds": 0.068
+    },
+    {
+      "name": "the_api_key_argument_is_never_judged_as_the_model",
+      "seconds": 0.018
+    },
+    {
+      "name": "the_shipped_data_names_a_replacement_for_every_retired_id",
+      "seconds": 0.004
+    },
+    {
+      "name": "the_data_file_is_refused_when_it_would_make_the_guidance_lie",
+      "seconds": 0.003
+    },
+    {
+      "name": "the_data_file_refuses_an_empty_provider_map_and_blank_or_repeated_retired_ids",
+      "seconds": 0.003
+    }
+  ],
+  "budget_seconds": 30.0
+}

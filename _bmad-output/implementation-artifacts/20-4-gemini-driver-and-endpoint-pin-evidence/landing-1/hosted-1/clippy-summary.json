@@ -1,0 +1,19 @@
+{
+  "exit": 0,
+  "occurrences": 1331,
+  "source_distinct": 871,
+  "prior_recorded_local": [
+    1331,
+    871
+  ],
+  "hosted_baseline": [
+    1383,
+    897
+  ],
+  "delta_vs_prior_recorded_local": [
+    0,
+    0
+  ],
+  "hotfix_owned_diagnostics": [],
+  "hosted_rerun": false
+}

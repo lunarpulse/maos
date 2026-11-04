@@ -704,6 +704,75 @@ records the exact removed sessions and process/recency proof.
 prescribed prepush, paid vendor calls, hosted execution/hosted-only clippy,
 and all Landing 2 kernel work. Earlier non-green prepush records remain intact.
 
+### Landing 1 — Hosted-1 regressions (2026-11-04)
+
+Baseline supplied by Main: clean HEAD `76efc19d`. Discipline run `41815429165`
+identified two regressions introduced by correction commit `73e7afbc`, not
+record-only failures or the registered timing-flake families.
+
+**Network boundary (job126524848874):** the required
+`cargo test -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1`
+was exercised before edits: rc101, E0433 at the catalog helper's return and
+constructed admission types. `main.rs:16802` now gates that helper on `network`;
+`:16825` gates its provider-only unit module on `all(test, network)`.
+Shared tuple constants remain attribute-free, and lib.rs/CI controls are
+unchanged. The same negative-feature control is now **7/7, rc0**.
+Default-feature verb control plus the catalog unit are **8/8 serial, rc0**.
+
+The full L1/correction diff was read and grep-audited for other optional
+provider/admission symbols. Native all-target checks with `network`,
+`fixture_replay`, and `network,wasm-host` each returned rc0.
+The additionally requested no-default all-target check returned **rc101** in
+untouched `eval_halt_18_2.rs:26,353,357` (ungated cassette/provider test imports,
+outside both 20-4 diffs). Main was notified; that older test was not modified or
+excluded. The aarch64-apple-darwin workflow target was not cross-compiled here.
+
+**Model-currency cost (job126540412403):** hosted evidence was
+30.601 s over 25 tests, exceeding the unchanged 30.000 s sum budget.
+`check_model_currency.rs:238` now lexes root items, discards fn/impl/mod brace
+groups before syn sees their bodies, and prefix-checks candidates before
+constructing only `ItemConst` ASTs. Root visibility, original declaration spans,
+attribute refusal, crate-qualified binding, comment/cfg/shadow controls and
+fresh per-audit inputs are retained; no cache or budget exception was added.
+
+The new `shared_default_scan_skips_unrelated_item_bodies_hosted_1:672` witness
+was observed red before this cutover (rc101); the final serial suite is
+**26/26, rc0**, retaining every original test name. Fresh JUnit sums were
+13.640 s /25 before and **15.879 s /26 after**, below the unchanged 30 s budget.
+Local wall sums did not improve and are not presented as a speedup.
+Five controlled audit profiles measured mean user CPU
+0.5305912 →0.4310398 s (**18.762% lower**), mean wall
+0.5437248 →0.4401365 s. This confirms a real AST cost, not that it was the
+majority of audit cost or that a hosted rerun has passed. A premature stale
+measurement draft and intermediate attempts are explicitly disqualified/
+retained rather than substituted for final evidence.
+
+**Verification:** fmt completed; final 19 structural/record gates returned rc0.
+Non-denying full workspace/all-target clippy and the unchanged ratchet returned
+rc0: **1331 occurrences /871 source-distinct**, unchanged from prior local debt
+and below hosted1383/897. No new diagnostic was emitted on the hotfix code.
+No full workspace nextest/prepush, paid vendor leg or hosted rerun was claimed.
+
+**Exact formatted pins:** bin34551 →34552 (+1, ceiling34643);
+xtask44452 →44466 (+14, **at ceiling44466**); aggregate193187 →193202 (+15,
+ceiling193526), hardfail193203 = measured +1. Kernel remains26841/21042 with
+all95 hashes unchanged. No envelope was exceeded.
+
+**Cleanup:** after all gates, `/proc` verified no Cargo/rustc/nextest/clippy
+process. Only28 stale incremental sessions were removed; newest5929 sessions
+and625 additional recent sessions were retained. Target bytes
+222600966144 →221768646656 (**832319488 freed**); `/tmp`
+1453056000 →1453056000 (0 freed; no new owned scratch remained).
+The protected WIP archive trio remains. No deps/build/fingerprint directory
+was deleted. Final host load was89.62/97.98/100.20; exact cleanup metadata is
+in `landing-1/hosted-1/cleanup.json`.
+
+Evidence: [network audit](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/hosted-1/network-audit.md),
+[measured performance](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/hosted-1/performance.md),
+[commands/exits](20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/hosted-1/commands.md),
+raw logs, both fresh currency JUnits, timing/profile JSON and the clippy stream
+under `landing-1/hosted-1/`. No commit, push, kernel change or status flip.
+
 ### Story context creation
 
 Created 2026-11-02 by `anthropic/claude-opus-5-5` (bmad-create-story, lighter measured contract) at `a8af3215`,
