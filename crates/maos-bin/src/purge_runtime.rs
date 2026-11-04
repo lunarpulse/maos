@@ -21,6 +21,18 @@ fn text(args: &[&str]) -> Result<Vec<u8>, PurgeError> {
         _ => Err(PurgeError::Configuration(format!("cannot enumerate owned containers: podman {} failed or exceeded its deadline/output limit", args.join(" ")))),
     }
 }
+fn inspect(cid: &str) -> Result<Option<Vec<u8>>, PurgeError> {
+    match podman(&["inspect", cid], 2) {
+        Invocation::Exited { status, stdout, stdout_complete: true, stderr_complete: true, .. } if status.success() => Ok(Some(stdout)),
+        Invocation::Exited { status, stderr, .. } => {
+            if !status.success() && exists(cid) == Some(false) {
+                return Ok(None);
+            }
+            Err(PurgeError::Configuration(format!("cannot enumerate owned containers: podman inspect {cid} failed or exceeded its output limit (status={status}, stderr={})", String::from_utf8_lossy(&stderr))))
+        }
+        _ => Err(PurgeError::Configuration(format!("cannot enumerate owned containers: podman inspect {cid} failed or exceeded its deadline/output limit"))),
+    }
+}
 #[derive(serde::Deserialize)]
 struct Inspect {
     #[serde(rename = "Id")]
@@ -53,13 +65,19 @@ struct Container {
     cid: String,
     name: String,
 }
+#[cfg(target_os = "linux")]
+struct Custody {
+    path: PathBuf,
+    spawn: bool,
+    proof: Option<(std::fs::File, String)>,
+}
 #[derive(Default)]
 pub(super) struct Inventory {
     containers: Vec<Container>,
     #[cfg(target_os = "linux")]
     cgroups: Vec<PathBuf>,
     #[cfg(target_os = "linux")]
-    custody: Vec<(PathBuf, bool)>,
+    custody: Vec<Custody>,
 }
 impl Inventory {
     pub(super) fn collect(planned: &[PlannedRoot]) -> Result<Self, PurgeError> {
@@ -84,10 +102,12 @@ impl Inventory {
                 if parse_container_id(candidate.as_bytes()).is_none() || !seen.insert(candidate) {
                     continue;
                 }
-                let inspected: Vec<Inspect> =
-                    serde_json::from_slice(&text(&["inspect", candidate])?).map_err(|e| {
-                        PurgeError::Configuration(format!("invalid podman inspect response: {e}"))
-                    })?;
+                let Some(inspected) = inspect(candidate)? else {
+                    continue;
+                };
+                let inspected: Vec<Inspect> = serde_json::from_slice(&inspected).map_err(|e| {
+                    PurgeError::Configuration(format!("invalid podman inspect response: {e}"))
+                })?;
                 let [item] = inspected.as_slice() else {
                     return Err(PurgeError::Configuration(
                         "podman inspect did not return exactly one container".into(),
@@ -165,7 +185,7 @@ impl Inventory {
                     .iter()
                     .map(|p| format!("cgroup://{}", p.display())),
             );
-            paths.extend(self.custody.iter().map(|(p, _)| p.display().to_string()));
+            paths.extend(self.custody.iter().map(|c| c.path.display().to_string()));
         }
         paths
     }
@@ -182,10 +202,11 @@ impl Inventory {
                     report_cgroup(path);
                 }
             }
-            // No `container exists` probe on a dry run: only ps/inspect are allowed.
-            // Spawn-directory removal is conditional on proving absence in the confirmed pass.
-            for (path, spawn) in &self.custody {
-                if *spawn || process_root_pid(path).is_some_and(process_absent) {
+            // This phase never probes absence; inventory can resolve failed inspect
+            // with a read-only exists probe. Spawn removal still requires confirmed absence.
+            for custody in &self.custody {
+                let path = &custody.path;
+                if custody.spawn || process_root_pid(path).is_some_and(process_absent) {
                     println!("maos purge: would remove T3 state {} (spawn CID must be absent; process root must be empty with a dead creator)",path.display());
                 } else {
                     println!(
@@ -229,8 +250,9 @@ impl Inventory {
                 record(index, disposition)?;
                 index += 1;
             }
-            for (path, spawn) in &self.custody {
-                let removed = reclaim_custody(path, *spawn);
+            for custody in &self.custody {
+                let path = &custody.path;
+                let removed = reclaim_custody(custody);
                 let disposition = if removed {
                     "removed"
                 } else {
@@ -356,11 +378,15 @@ fn read_control(dir: &std::fs::File, name: &str) -> std::io::Result<Vec<u8>> {
 }
 #[cfg(target_os = "linux")]
 fn rmdir(path: &Path) -> bool {
+    directory(path).is_ok_and(|dir| rmdir_held(path, &dir))
+}
+#[cfg(target_os = "linux")]
+fn rmdir_held(path: &Path, dir: &std::fs::File) -> bool {
     use std::os::unix::fs::MetadataExt;
     let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
         return false;
     };
-    let (Ok(dir), Ok(parent)) = (directory(path), directory(parent)) else {
+    let Ok(parent) = directory(parent) else {
         return false;
     };
     let (Ok(before), Ok(now)) = (
@@ -481,7 +507,8 @@ fn state_roots() -> Vec<PathBuf> {
     roots
 }
 #[cfg(target_os = "linux")]
-fn custody_inventory() -> Vec<(PathBuf, bool)> {
+fn custody_inventory() -> Vec<Custody> {
+    use std::os::unix::fs::MetadataExt;
     let mut dirs = Vec::new();
     for root in state_roots() {
         if !owned_dir(&root, true) {
@@ -497,47 +524,67 @@ fn custody_inventory() -> Vec<(PathBuf, bool)> {
             if let Ok(spawns) = directory(&process).and_then(|d| names(&d)) {
                 for spawn in spawns.into_iter().map(|s| process.join(s)) {
                     if owned_dir(&spawn, true) {
-                        dirs.push((spawn, true));
+                        let proof = directory(&spawn).ok().and_then(|dir| {
+                            let metadata = dir.metadata().ok()?;
+                            if metadata.uid() != rustix::process::geteuid().as_raw()
+                                || metadata.mode() & 0o7777 != 0o700
+                            {
+                                return None;
+                            }
+                            let cid = parse_container_id(&read_control(&dir, "cid").ok()?)?;
+                            Some((dir, cid))
+                        });
+                        dirs.push(Custody {
+                            path: spawn,
+                            spawn: true,
+                            proof,
+                        });
                     }
                 }
             }
-            dirs.push((process, false));
+            dirs.push(Custody {
+                path: process,
+                spawn: false,
+                proof: None,
+            });
         }
     }
-    dirs.sort_by_key(|(p, _)| std::cmp::Reverse(p.components().count()));
+    dirs.sort_by_key(|c| std::cmp::Reverse(c.path.components().count()));
     dirs
 }
 #[cfg(target_os = "linux")]
-fn reclaim_custody(path: &Path, spawn: bool) -> bool {
-    if !owned_dir(path, true) {
-        return false;
+fn reclaim_custody(custody: &Custody) -> bool {
+    let path = &custody.path;
+    if !custody.spawn {
+        return owned_dir(path, true)
+            && process_root_pid(path).is_some_and(process_absent)
+            && rmdir(path);
     }
-    if !spawn {
-        return process_root_pid(path).is_some_and(process_absent) && rmdir(path);
-    }
-    let Ok(dir) = directory(path) else {
+    let Some((dir, cid)) = &custody.proof else {
         return false;
     };
-    let Ok(cid) = read_control(&dir, "cid") else {
-        return false;
-    };
-    let Some(cid) = parse_container_id(&cid) else {
-        return false;
-    };
-    if exists(&cid) != Some(false) {
+    if exists(cid) != Some(false) {
         return false;
     }
     use std::os::unix::fs::MetadataExt;
-    let Ok(metadata) = dir.metadata() else {
+    let (Ok(metadata), Ok(current)) = (dir.metadata(), directory(path).and_then(|d| d.metadata()))
+    else {
         return false;
     };
+    if metadata.uid() != rustix::process::geteuid().as_raw()
+        || metadata.mode() & 0o7777 != 0o700
+        || metadata.dev() != current.dev()
+        || metadata.ino() != current.ino()
+    {
+        return false;
+    }
     let mut left = Vec::new();
-    if super::remove_directory_contents(&dir, path, metadata.dev(), &[], &mut left).is_err()
+    if super::remove_directory_contents(dir, path, metadata.dev(), &[], &mut left).is_err()
         || !left.is_empty()
     {
         return false;
     }
-    rmdir(path)
+    rmdir_held(path, dir)
 }
 
 #[cfg(all(test, target_os = "linux"))]

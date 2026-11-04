@@ -214,7 +214,7 @@
 - **NFR-Maint-3:** ABI compatibility matrix 100% within current major; 100% N-1 boundary including negative typed-error cases. v0.1 (within-major); v1.0 (N-1).
 - **NFR-Maint-4:** STABILITY.md publishes live (kernel_version, abi_version, manifest_schema_version) compatibility matrix. v1.0.
 - **NFR-Maint-5:** Deprecation timeline: 2 minor releases of warning, 1 major release to remove. v1.0.
-- **NFR-Maint-6:** 1-year LTS commitment at v1.0; 2-year LTS commitment at v1.5 once support load is known; security-only patches after year 1.
+- **NFR-Maint-6:** 1-year LTS commitment at v1.0; 2-year LTS commitment at v1.5 once support load is known; security-only patches after year 1. *(Owner `20-5-v1-0-rc-tag-and-lts-rule` AC2, created 2026-11-04: the generated STABILITY.md text says 2 years at HEAD — D-20-5-05.)*
 - **NFR-Maint-7:** BREAKING.md required entry for every breaking change with migration steps; CI grep-enforced. v1.0.
 - **NFR-Maint-8:** Capability-token TOCTOU test: 100% re-validation at use against current state. v1.0.
 - **NFR-Maint-9:** Manifest schema N-1 compatibility — kernel version V can load manifests written for V-1 with documented degradation paths. Closes ADR-025 NFR-coverage gap. v1.0.

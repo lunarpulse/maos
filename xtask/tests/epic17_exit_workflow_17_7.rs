@@ -242,7 +242,7 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
     assert_eq!(images, ["ubuntu-24.04", "ubuntu-26.04"]);
     assert_eq!(job["runs-on"].as_str(), Some("${{ matrix.image }}"));
     assert_eq!(job["env"]["MAOS_FIXTURE_TRANSPORT"].as_str(), Some("1"));
-    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(34));
+    assert_eq!(job["env"]["EPIC17_TERMINAL_SUITE_TESTS"].as_u64(), Some(35));
     assert!(job["env"]["MAOS_CGROUP_CANARY_ARCHIVE"].is_null());
     for value in job["env"].as_mapping().expect("job environment").values() {
         assert!(
@@ -290,6 +290,7 @@ fn epic17_archive_keeps_terminal_and_quota_proofs_on_both_t3_images() {
         "supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault",
         "unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership",
         "unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership",
+        "unload_scenes::s5_budget_oracle_counts_exceeded_kind_not_a_delayed_warning",
     ]);
     for (name, suite, unit) in [
         (
@@ -465,4 +466,88 @@ fn purge_cut_units_pass_the_real_harness_unit_validation() {
         checked, 2,
         "initial and byte-restored scene commands must both be checked"
     );
+}
+
+#[test]
+fn purge_cut_restored_green_accepts_filtered_tests_but_requires_the_scene() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let cut = fs::read_to_string(root.join("_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml"))
+        .expect("20-10 branch-only workflow cut");
+    let workflow: Value = match serde_yaml::from_str(&cut) {
+        Ok(value) => value,
+        Err(error) => panic!("20-10 workflow YAML: {error}"),
+    };
+    let scenes = &workflow["jobs"]["scenes"];
+    let restore = named(
+        scenes,
+        "Restore plant byte-for-byte, force a rebuild, and require green",
+    )["run"]
+        .as_str()
+        .expect("restore command");
+    let checker = restore
+        .lines()
+        .skip_while(|line| !line.contains(" check-log "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        checker.starts_with(
+            "python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 1"
+        ),
+        "filtered restore must use the exact-count/required-PASS checker"
+    );
+    assert!(
+        !checker.contains("grep -Eq"),
+        "filter exclusions are not ignored tests"
+    );
+    let contracts = named(
+        scenes,
+        "Hosted-length socket and hermetic purge contracts (AC1-AC3, AC5-AC7)",
+    )["run"]
+        .as_str()
+        .expect("hermetic contracts");
+    assert!(contracts.contains("--expected-count 21"));
+    assert!(contracts
+        .contains("--required-test ac5_missing_inventory_cid_is_retained_after_container_removal"));
+    assert!(contracts
+        .contains("--required-test ac5_inventory_directory_replacement_retains_both_inodes"));
+    assert!(contracts
+        .contains("--required-test ac1_listed_candidate_vanishing_before_inspect_is_skipped"));
+    assert!(contracts.contains(
+        "--required-test ac1_failed_inspect_with_present_or_unconfirmed_candidate_remains_fatal"
+    ));
+    let scene = "root_crash::root_crash_retains_stopped_container_and_purge_reports_it";
+    let valid = format!(
+        "Starting 1 test across 1 binary (34 tests skipped)\nPASS [ 0.123s] maos-bin::worker_terminal_facts_17_7 {scene}\nSummary [ 0.123s] 1 test run: 1 passed, 34 skipped\n"
+    );
+    let dir = fresh_dir("maos-purge-restored-check");
+    let log = dir.join("restored.log");
+    let command = checker.replace("evidence/restored.log", &format!("'{}'", log.display()));
+    let cases = [
+        (valid.clone(), true),
+        (valid.replace("PASS [", "SKIP ["), false),
+        (valid.replace(scene, "wrong_scene"), false),
+        (
+            valid.replace("1 test run: 1 passed", "0 tests run: 0 passed"),
+            false,
+        ),
+    ];
+    let mut outcomes = Vec::new();
+    for (text, expected) in cases {
+        fs::write(&log, &text).expect("checker fixture");
+        let output = std::process::Command::new("bash")
+            .args(["-e", "-c", &command])
+            .current_dir(&root)
+            .output()
+            .expect("actual restored checker command");
+        outcomes.push((output.status.success(), expected, text, output.stderr));
+    }
+    fs::remove_dir_all(dir).expect("checker fixture cleanup");
+    for (observed, expected, text, error) in outcomes {
+        assert_eq!(
+            observed,
+            expected,
+            "log={text}; stderr={}",
+            String::from_utf8_lossy(&error)
+        );
+    }
 }

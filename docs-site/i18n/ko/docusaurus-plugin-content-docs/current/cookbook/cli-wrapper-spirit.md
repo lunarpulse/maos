@@ -66,8 +66,11 @@ permitted_egress_destinations = ["api.openai.com"]
 `maos purge --yes`는 두 MAOS identity label, 이름, 이 home의 `/workspace`
 source가 모두 일치할 때만 유지된 컨테이너를 workspace보다 먼저 제거합니다.
 다른 home이나 소유권 미확인 컨테이너는 명령만 표시하고 label이 없는 컨테이너는
-무시합니다. CID 부재가 확인된 T3 custody와 빈 dead-creator cgroup만 정리하며
-live/unknown custody 또는 populated cgroup은 제거하지 않습니다. receipt는 결과를
+무시합니다. T3 custody는 runtime 제거 전에 검증하여 보관한 CID의 부재를 새로
+확인하고, 같은 private 소유 디렉터리의 identity를 재검사한 뒤에만 정리합니다.
+Podman이 제거 중 cidfile을 삭제해도 보관한 CID를 사용하며, inventory에서 CID가
+없거나 잘못된 경우에는 제거하지 않습니다. 빈 dead-creator cgroup만 정리하고
+live/unknown custody 또는 populated cgroup은 보존합니다. receipt는 결과를
 각 행에 기록하며 `complete`여도 `left (<residue>)` 행이 남을 수 있습니다.
 이 metadata 규칙은 same-UID trust boundary이며 위조 불가능한 provenance가 아닙니다.
 같은 rootless 사용자의 container creator는 이를 위조할 수 있습니다. 빈 process root는

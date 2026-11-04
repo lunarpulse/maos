@@ -1,5 +1,13 @@
 # 20-8 FLAG-Winston decision record
 
+**Shared kernel STOP supersession — 2026-11-04 (ask `halt_grant`).** Historical internal STOP
+21209 / 21,209 and the 20-9-only 21230 / 21,230 are superseded by **21250 / 21,250 for the whole
+cumulative measured kernel ledger at each landing**. D-20-14-12 C's joint 21250 now equals that shared STOP,
+not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21203 + 12 = 21215**
+(physical **27032 + 16 = 27048**). ADR-069 alarm **22000** and envelope **23000** are unchanged.
+Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
+
+
 **Date:** 2026-11-03  
 **Status:** `RULING RECORDED` 2026-11-03 (ask `d_batch4`): D-20-8-07 A, D-20-8-01 A and the envelope as recommended. KS remains a measured request, binding at dev start; no implementation or landing claimed.  
 **Scope:** the kernel seam of `20-8-manifest-contract-completion`: how the `[swap_invariants]` declaration reaches the swap that must honour it.  

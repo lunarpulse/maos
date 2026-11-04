@@ -49,7 +49,7 @@ fn world_with(dir: &Path, seams: SupervisorSeams) -> World {
 }
 
 fn world_with_log(dir: &Path, seams: SupervisorSeams, tl: Arc<TransparencyLogAdapter>) -> World {
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    super::init_clock();
     let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
     let capability = Arc::new(
         maos_kernel_core::capability::CapabilityRegistryAdapter::new(

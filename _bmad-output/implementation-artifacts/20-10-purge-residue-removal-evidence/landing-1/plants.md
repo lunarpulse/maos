@@ -106,3 +106,25 @@ hit the pre-T3 structural invariant; copy-back/cmp/touch restore precedes the
 81/81 focused serial green. The suite remains34 terminal tests. Production
 locking and the hosted cut's intended removal/dead-leaf diagnostics are
 unchanged; corrected real hosted baseline/head/plant proof remains unverified.
+
+## Hosted AC5 cidfile lifecycle (baseline `73e7afbc`)
+
+[`hosted-3/plants.md`](hosted-3/plants.md) records run41803510235's production
+custody defect after successful container removal, the faithful cidfile-deleting
+stub red, and the capture-discard plant red. Source restore uses copy-back,
+cmp and touch before the focused88/88, runtime3/3 and workflow5/5 greens.
+Missing-at-inventory and directory-replacement negatives remain conservative.
+The cut's restored checker now requires exactly1 named PASS and permits33 filter
+exclusions; hermetic count19, terminal34. Corrected real hosted head/restored
+plant and hosted lint remain unverified; initial base/plant reds are intended.
+
+## Final combined follow-up (same baseline, three diagnosed items)
+
+[`hosted-3/combined-plants.md`](hosted-3/combined-plants.md) supersedes the
+custody-only phase's final counts: custody capture, conservative vanished-
+candidate disambiguation, and test-only S5 typed-kind/shared-clock repair.
+Each has an observed original red and a byte-restored mutation red. Final
+serial91/91, runtime3/3 and workflow5/5 pass; terminal35/hermetic21, exact
+bin34551/aggregate193187/hardfail193188 within the dated D02 A re-base.
+Current cut/source digests and all command exits are adjacent. Corrected real
+hosted execution and hosted lint remain operator-owned, not claimed local proof.

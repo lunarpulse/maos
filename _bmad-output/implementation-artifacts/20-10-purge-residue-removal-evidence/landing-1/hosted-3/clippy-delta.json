@@ -1,0 +1,39 @@
+{
+  "baseline": "_bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/clippy.jsonl",
+  "method": "Unique primary lint/file/message/line/column sites; compare lint/file/message multiplicities so pure line shifts are not new warnings.",
+  "new_warning_groups": [],
+  "changed_files": {
+    "crates/maos-bin/src/purge_runtime.rs": {
+      "before": [],
+      "after": []
+    },
+    "crates/maos-bin/tests/purge_residue_20_10.rs": {
+      "before": [],
+      "after": []
+    },
+    "crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs": {
+      "before": [],
+      "after": []
+    },
+    "xtask/tests/epic17_exit_workflow_17_7.rs": {
+      "before": [
+        [
+          "clippy::needless_borrows_for_generic_args",
+          "xtask/tests/epic17_exit_workflow_17_7.rs",
+          "the borrowed expression implements the required traits",
+          15,
+          14
+        ]
+      ],
+      "after": [
+        [
+          "clippy::needless_borrows_for_generic_args",
+          "xtask/tests/epic17_exit_workflow_17_7.rs",
+          "the borrowed expression implements the required traits",
+          15,
+          14
+        ]
+      ]
+    }
+  }
+}

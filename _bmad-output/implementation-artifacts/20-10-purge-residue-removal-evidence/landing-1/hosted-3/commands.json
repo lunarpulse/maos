@@ -1,0 +1,933 @@
+[
+  {
+    "name": "workflow-customization-resolver",
+    "command": "python3 /home/lunarpulse/dev_ws/_bmad/scripts/resolve_customization.py --skill /home/lunarpulse/dev_ws/.claude/skills/bmad-quick-dev --key workflow",
+    "exit_code": 0,
+    "seconds": null,
+    "unset_environment": [],
+    "environment_overrides": {}
+  },
+  {
+    "name": "baseline",
+    "command": "/usr/bin/git rev-parse HEAD",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "cidfile-red-before",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --profile ci --test-threads 1 -E 'test(ac5_only_absent_cid_and_empty_state_are_reclaimed)'",
+    "exit_code": 100,
+    "seconds": 2.768,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-custody",
+    "command": "/home/lunarpulse/.cargo/bin/cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.618,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "kloc-measure",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 1,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "capture-first-green",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --profile ci --test-threads 1 -E 'test(ac5_)'",
+    "exit_code": 0,
+    "seconds": 10.43,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-capture-original",
+    "command": "/usr/bin/cp /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/purge-runtime.restore",
+    "exit_code": 0,
+    "seconds": 0.008,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "capture-discard-plant-diff",
+    "command": "/usr/bin/diff -u --label a/crates/maos-bin/src/purge_runtime.rs --label b/crates/maos-bin/src/purge_runtime.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/purge-runtime.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 1,
+    "seconds": 0.008,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "capture-plant-red",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --profile ci --test-threads 1 -E 'test(ac5_only_absent_cid_and_empty_state_are_reclaimed)'",
+    "exit_code": 100,
+    "seconds": 7.826,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "capture-copy-back",
+    "command": "/usr/bin/cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/purge-runtime.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 0,
+    "seconds": 0.004,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "capture-cmp",
+    "command": "/usr/bin/cmp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/purge-runtime.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "capture-touch",
+    "command": "/usr/bin/touch /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "remove-capture-restore",
+    "command": "/usr/bin/rm -- /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/purge-runtime.restore",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-final-capture",
+    "command": "/home/lunarpulse/.cargo/bin/cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.918,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "kloc-measure-after-witness-rename",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 1,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "fmt-final",
+    "command": "/home/lunarpulse/.cargo/bin/cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.667,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "kloc-check",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "registered-fixtures",
+    "command": "/mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit",
+    "exit_code": 0,
+    "seconds": 1.165,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "focused-serial-final",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --bin maos --test purge_residue_20_10 --test egress_daemon_17_1 --test worker_terminal_facts_17_7 --test maos_uninstall_16_4 --test root_shutdown_unload_16_3 --profile ci --test-threads 1 --no-fail-fast -E 'binary(purge_residue_20_10) | binary(egress_daemon_17_1) | binary(worker_terminal_facts_17_7) | binary(maos_uninstall_16_4) | binary(root_shutdown_unload_16_3) | test(purge::runtime_residue::tests::)'",
+    "exit_code": 0,
+    "seconds": 114.39,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-focused-junit",
+    "command": "/usr/bin/cp /mnt/build/cargo-maos/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/focused-serial-junit.xml",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "workflow-contracts",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p xtask --test epic17_exit_workflow_17_7 --profile ci --test-threads 1 --no-capture",
+    "exit_code": 0,
+    "seconds": 11.732,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "runtime-unit-safety",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --lib --profile ci --test-threads 1 -E 'test(purge::runtime_residue::tests::)'",
+    "exit_code": 0,
+    "seconds": 4.22,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-runtime-junit",
+    "command": "/usr/bin/cp /mnt/build/cargo-maos/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/runtime-unit-junit.xml",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "clippy-stream",
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo clippy --workspace --all-targets --locked --message-format=json",
+    "exit_code": 0,
+    "seconds": 137.12,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "clippy-ratchet",
+    "command": "/mnt/build/cargo-maos/debug/xtask clippy-ratchet --input /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/clippy.jsonl",
+    "exit_code": 0,
+    "seconds": 0.215,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "rustc-version",
+    "command": "/home/lunarpulse/.cargo/bin/rustc --version",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "hosted-removal-plant-applies",
+    "command": "/usr/bin/git apply --check /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ac1-removal-noop.diff",
+    "exit_code": 0,
+    "seconds": 0.007,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "stale-incremental-allocated",
+    "command": "/usr/bin/du -s -B1 -- /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-0cb54wbb9dp7l/s-hntq4tteqy-1ahh0r5-00ga0jqe2czt6gyiolp2n6m1u /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3p00ttll6o2i3/s-hntpwt2z8a-1ewaz5k-4tnsrz1ghk12j02qbufjxb2id /mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0h4elxlvfei0e/s-hntp0y1mtm-1czv6o8-due9qi6vgjoietnz3q88peioz /mnt/build/cargo-maos/debug/incremental/purge_residue_20_10-2nzw0g951kesi/s-hntp0ra6g8-0jwkkjn-5gttueulyxq0owqx4jg9bxntl /mnt/build/cargo-maos/debug/incremental/purge_residue_20_10-34ednt38wdpee/s-hntomimgo3-1slnmbr-e78l1p20ibc80skux4or5g417 /mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0eweuw8ooxr3e/s-hntoltyjz3-0mhfr3j-0hnp7h831unwynifrwauybyx0 /mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2h3jwdc4u429k/s-hntn1wd08r-1ft94ov-1s6q3j9150z16omx4djiwtaka /mnt/build/cargo-maos/debug/incremental/purge_residue_20_10-3qlxh167u3u7y/s-hntazluajv-074vo2p-6y6q1j90i0uqt0dcki2hh4zkt /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-1zlmhvv0t8rqq/s-hntarc4aup-0096ass-939hmeun6d44c3rk6wsopfyww /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3gz42dr5ovt02/s-hnt9zrpwwr-0nwq92f-52ko7rzjtf2hf9yl5krolcol5 /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-0m1vvvzo1me1u/s-hnt9kd5rfk-1bsoz85-54yf8onns0h3zpp1l0wwpnjlj /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-33mzm15tu1ake/s-hnrup097iz-0gzw1fk-ecs3sw8r8grwtg1dexknba9hz /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-1jktc27qtikxr/s-hnrrd5i61n-104ii3f-b020odi9lwx2223iq6prz6xca /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-1tn9kdbzhsixl/s-hnrr8ijg80-1m9n0pq-drxzcjbw5dp37rcyhov9tuaco /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-16pvcggczfowd/s-hnrr417064-0iws4rz-0gbenrvdc9h97ee3ntoiltj1k /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3jqu1rj7aize9/s-hnrplzidbo-12khi5m-edclh4x1ke01dd8k2557bm6rd /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-2w0js2uygnfor/s-hnrpi6h2r4-0nkvg4m-4it1dtc1ib889m81ddyuxb1uk /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3vbqfi0o4ajri/s-hnroxnpcbd-1p66yrq-6y1flp4u9vt9gb486datzwmuw /mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-0g9s5yfu0f9ef/s-hnrnpuiv3f-0ggq6qn-2y872txz8hxbf3k5372u07krx",
+    "exit_code": 0,
+    "seconds": 0.068,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "flush-incremental-cleanup",
+    "command": "/usr/bin/sync -f /mnt/build/cargo-maos/debug/incremental",
+    "exit_code": 0,
+    "seconds": 0.565,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "implementation-diff",
+    "command": "/usr/bin/git diff 73e7afbcae81f4fb4858e9d52ded3d592bed636d -- /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/purge_residue_20_10.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs /home/lunarpulse/dev_ws/xtask/tests/epic17_exit_workflow_17_7.rs /home/lunarpulse/dev_ws/xtask/kloc.toml /home/lunarpulse/dev_ws/docs/adr/ADR-067-maos-data-root-layout-and-purge.md /home/lunarpulse/dev_ws/docs/maos.dev/run-maos.md /home/lunarpulse/dev_ws/docs-site/docs/run-maos.md /home/lunarpulse/dev_ws/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md /home/lunarpulse/dev_ws/docs-site/docs/cookbook/cli-wrapper-spirit.md /home/lunarpulse/dev_ws/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md",
+    "exit_code": 0,
+    "seconds": 0.016,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "verify-cut-diff",
+    "command": "/usr/bin/git diff 73e7afbcae81f4fb4858e9d52ded3d592bed636d -- /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml",
+    "exit_code": 0,
+    "seconds": 0.003,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "vanished-candidate-red-before",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --profile ci --test-threads 1 -E 'test(ac1_listed_candidate_vanishing_before_inspect_is_skipped)'",
+    "exit_code": 100,
+    "seconds": 2.768,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "s5-oracle-red-before",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 -E 'test(s5_budget_oracle_counts_exceeded_kind_not_a_delayed_warning)'",
+    "exit_code": 100,
+    "seconds": 7.676,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-combined",
+    "command": "/home/lunarpulse/.cargo/bin/cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.773,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-kloc-measure",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 1,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "race-s5-first-green",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --test worker_terminal_facts_17_7 --profile ci --test-threads 1 -E 'test(ac1_listed_candidate_) | test(ac1_failed_inspect_) | test(s5_budget_oracle_)'",
+    "exit_code": 0,
+    "seconds": 8.777,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-vanished-original",
+    "command": "/usr/bin/cp /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/vanished-runtime.restore",
+    "exit_code": 0,
+    "seconds": 0.008,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-s5-original",
+    "command": "/usr/bin/cp /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/s5-oracle.restore",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "vanished-skip-plant-diff",
+    "command": "/usr/bin/diff -u --label a/crates/maos-bin/src/purge_runtime.rs --label b/crates/maos-bin/src/purge_runtime.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/vanished-runtime.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 1,
+    "seconds": 0.006,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "vanished-skip-plant-red",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --profile ci --test-threads 1 -E 'test(ac1_listed_candidate_vanishing_before_inspect_is_skipped)'",
+    "exit_code": 100,
+    "seconds": 6.374,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "vanished-copy-back",
+    "command": "/usr/bin/cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/vanished-runtime.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "vanished-cmp",
+    "command": "/usr/bin/cmp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/vanished-runtime.restore /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "vanished-touch",
+    "command": "/usr/bin/touch /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "remove-vanished-restore",
+    "command": "/usr/bin/rm -- /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/vanished-runtime.restore",
+    "exit_code": 0,
+    "seconds": 0.002,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "s5-ratio-plant-diff",
+    "command": "/usr/bin/diff -u --label a/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs --label b/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/s5-oracle.restore /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs",
+    "exit_code": 1,
+    "seconds": 0.007,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "s5-ratio-plant-red",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test worker_terminal_facts_17_7 --profile ci --test-threads 1 -E 'test(s5_budget_oracle_counts_exceeded_kind_not_a_delayed_warning)'",
+    "exit_code": 100,
+    "seconds": 6.424,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "s5-copy-back",
+    "command": "/usr/bin/cp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/s5-oracle.restore /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "s5-cmp",
+    "command": "/usr/bin/cmp /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/s5-oracle.restore /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "s5-touch",
+    "command": "/usr/bin/touch /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "remove-s5-restore",
+    "command": "/usr/bin/rm -- /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/s5-oracle.restore",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "fmt-combined-restored",
+    "command": "/home/lunarpulse/.cargo/bin/cargo fmt --all",
+    "exit_code": 0,
+    "seconds": 2.618,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-kloc-check",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "combined-registered-fixtures",
+    "command": "/mnt/build/cargo-maos/debug/xtask build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit",
+    "exit_code": 0,
+    "seconds": 1.115,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "combined-focused-serial",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --test purge_residue_20_10 --test egress_daemon_17_1 --test worker_terminal_facts_17_7 --test maos_uninstall_16_4 --test root_shutdown_unload_16_3 --profile ci --test-threads 1 --no-fail-fast",
+    "exit_code": 0,
+    "seconds": 108.833,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "save-combined-focused-junit",
+    "command": "/usr/bin/cp /mnt/build/cargo-maos/nextest/ci/junit.xml /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/combined-focused-junit.xml",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-runtime-unit-safety",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p maos-bin --lib --profile ci --test-threads 1 -E 'test(purge::runtime_residue::tests::)'",
+    "exit_code": 0,
+    "seconds": 3.118,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-workflow-contracts",
+    "command": "/home/lunarpulse/.cargo/bin/cargo nextest run --locked -p xtask --test epic17_exit_workflow_17_7 --profile ci --test-threads 1 --no-capture",
+    "exit_code": 0,
+    "seconds": 10.129,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-clippy-stream",
+    "command": "env -u CI -u GITHUB_ACTIONS /home/lunarpulse/.cargo/bin/cargo clippy --workspace --all-targets --locked --message-format=json",
+    "exit_code": 0,
+    "seconds": 132.35,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-clippy-ratchet",
+    "command": "/mnt/build/cargo-maos/debug/xtask clippy-ratchet --input /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/landing-1/hosted-3/combined-clippy.jsonl",
+    "exit_code": 0,
+    "seconds": 0.214,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "combined-implementation-diff",
+    "command": "/usr/bin/git diff 73e7afbcae81f4fb4858e9d52ded3d592bed636d -- /home/lunarpulse/dev_ws/crates/maos-bin/src/purge_runtime.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/purge_residue_20_10.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs /home/lunarpulse/dev_ws/xtask/tests/epic17_exit_workflow_17_7.rs /home/lunarpulse/dev_ws/xtask/kloc.toml /home/lunarpulse/dev_ws/docs/adr/ADR-067-maos-data-root-layout-and-purge.md /home/lunarpulse/dev_ws/docs/maos.dev/run-maos.md /home/lunarpulse/dev_ws/docs-site/docs/run-maos.md /home/lunarpulse/dev_ws/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md /home/lunarpulse/dev_ws/docs-site/docs/cookbook/cli-wrapper-spirit.md /home/lunarpulse/dev_ws/docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/cli-wrapper-spirit.md /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs /home/lunarpulse/dev_ws/crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs /home/lunarpulse/dev_ws/.github/workflows/discipline.yml",
+    "exit_code": 0,
+    "seconds": 0.032,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-verify-cut-diff",
+    "command": "/usr/bin/git diff 73e7afbcae81f4fb4858e9d52ded3d592bed636d -- /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml",
+    "exit_code": 0,
+    "seconds": 0.008,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "combined-hosted-plant-applies",
+    "command": "/usr/bin/git apply --check /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-10-purge-residue-removal-evidence/ci/ac1-removal-noop.diff",
+    "exit_code": 0,
+    "seconds": 0.001,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {}
+  },
+  {
+    "name": "final-kloc-check",
+    "command": "/mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0,
+    "seconds": 0.124,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-kernel-baseline",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json",
+    "exit_code": 0,
+    "seconds": 0.016,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-service-boundary",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-service-boundary",
+    "exit_code": 0,
+    "seconds": 1.165,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-env-contract",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-env-contract",
+    "exit_code": 0,
+    "seconds": 0.464,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-serde-error-handling",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-serde-error-handling",
+    "exit_code": 0,
+    "seconds": 0.264,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-composition-root-completeness",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-composition-root-completeness",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-j1-loopback-delegation",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-j1-loopback-delegation",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-dev-record-completeness",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-dev-record-completeness",
+    "exit_code": 0,
+    "seconds": 0.114,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-epic-close-coherence",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-epic-close-coherence",
+    "exit_code": 0,
+    "seconds": 0.032,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-review-findings-resolved",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-review-findings-resolved",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-test-cost",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-test-cost",
+    "exit_code": 0,
+    "seconds": 0.364,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-invariant-lock",
+    "command": "/mnt/build/cargo-maos/debug/xtask invariant-lock",
+    "exit_code": 0,
+    "seconds": 0.032,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-coverage-matrix",
+    "command": "/mnt/build/cargo-maos/debug/xtask coverage-matrix --dry-run",
+    "exit_code": 0,
+    "seconds": 0.016,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-coverage-matrix-completeness",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-coverage-matrix-completeness",
+    "exit_code": 0,
+    "seconds": 0.016,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-exit-commands",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-exit-commands",
+    "exit_code": 0,
+    "seconds": 0.615,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-decision-register",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-decision-register",
+    "exit_code": 0,
+    "seconds": 0.007,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-ff-j6",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-ff-j6",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  },
+  {
+    "name": "final-check-perf-runner-policy",
+    "command": "/mnt/build/cargo-maos/debug/xtask check-perf-runner-policy",
+    "exit_code": 0,
+    "seconds": 0.064,
+    "unset_environment": [
+      "CI",
+      "GITHUB_ACTIONS"
+    ],
+    "environment_overrides": {
+      "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask"
+    }
+  }
+]

@@ -1,0 +1,53 @@
+[
+  {
+    "command": "python3 /home/lunarpulse/dev_ws/_bmad/scripts/resolve_customization.py --skill /home/lunarpulse/dev_ws/.claude/skills/bmad-quick-dev --key workflow",
+    "exit_code": 0
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json",
+    "exit_code": 0
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit_code": 0
+  },
+  {
+    "command": "git status --short && git rev-parse HEAD",
+    "exit_code": 0,
+    "observed": "clean initial tree; 73e7afbcae81f4fb4858e9d52ded3d592bed636d"
+  },
+  {
+    "command": "printenv CARGO_TARGET_DIR",
+    "exit_code": 0,
+    "observed": "/mnt/build/cargo-maos"
+  },
+  {
+    "command": "rustfmt --edition 2021 crates/maos-bin/tests/erasure_unload_race_20_11.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-bin --test erasure_unload_race_20_11 -- --nocapture",
+    "exit_code": 101,
+    "observed": "0 passed; 1 failed; 0.29 s; final terminal receipt assertion failed at line 187"
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-service-boundary --json",
+    "exit_code": 0
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json",
+    "exit_code": 0
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json",
+    "exit_code": 0
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-decision-register --json",
+    "exit_code": 0
+  },
+  {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-exit-commands --json",
+    "exit_code": 0
+  }
+]

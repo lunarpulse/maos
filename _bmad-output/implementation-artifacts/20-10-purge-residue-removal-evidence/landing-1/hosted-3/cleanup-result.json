@@ -1,0 +1,39 @@
+{
+  "outcome": "completed",
+  "operation": "guarded Python Eval shutil.rmtree of individual stale sessions",
+  "removed": [
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-0cb54wbb9dp7l/s-hntq4tteqy-1ahh0r5-00ga0jqe2czt6gyiolp2n6m1u",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3p00ttll6o2i3/s-hntpwt2z8a-1ewaz5k-4tnsrz1ghk12j02qbufjxb2id",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0h4elxlvfei0e/s-hntp0y1mtm-1czv6o8-due9qi6vgjoietnz3q88peioz",
+    "/mnt/build/cargo-maos/debug/incremental/purge_residue_20_10-2nzw0g951kesi/s-hntp0ra6g8-0jwkkjn-5gttueulyxq0owqx4jg9bxntl",
+    "/mnt/build/cargo-maos/debug/incremental/purge_residue_20_10-34ednt38wdpee/s-hntomimgo3-1slnmbr-e78l1p20ibc80skux4or5g417",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-0eweuw8ooxr3e/s-hntoltyjz3-0mhfr3j-0hnp7h831unwynifrwauybyx0",
+    "/mnt/build/cargo-maos/debug/incremental/worker_terminal_facts_17_7-2h3jwdc4u429k/s-hntn1wd08r-1ft94ov-1s6q3j9150z16omx4djiwtaka",
+    "/mnt/build/cargo-maos/debug/incremental/purge_residue_20_10-3qlxh167u3u7y/s-hntazluajv-074vo2p-6y6q1j90i0uqt0dcki2hh4zkt",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-1zlmhvv0t8rqq/s-hntarc4aup-0096ass-939hmeun6d44c3rk6wsopfyww",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3gz42dr5ovt02/s-hnt9zrpwwr-0nwq92f-52ko7rzjtf2hf9yl5krolcol5",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-0m1vvvzo1me1u/s-hnt9kd5rfk-1bsoz85-54yf8onns0h3zpp1l0wwpnjlj",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-33mzm15tu1ake/s-hnrup097iz-0gzw1fk-ecs3sw8r8grwtg1dexknba9hz",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-1jktc27qtikxr/s-hnrrd5i61n-104ii3f-b020odi9lwx2223iq6prz6xca",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-1tn9kdbzhsixl/s-hnrr8ijg80-1m9n0pq-drxzcjbw5dp37rcyhov9tuaco",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-16pvcggczfowd/s-hnrr417064-0iws4rz-0gbenrvdc9h97ee3ntoiltj1k",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3jqu1rj7aize9/s-hnrplzidbo-12khi5m-edclh4x1ke01dd8k2557bm6rd",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-2w0js2uygnfor/s-hnrpi6h2r4-0nkvg4m-4it1dtc1ib889m81ddyuxb1uk",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-3vbqfi0o4ajri/s-hnroxnpcbd-1p66yrq-6y1flp4u9vt9gb486datzwmuw",
+    "/mnt/build/cargo-maos/debug/incremental/epic17_exit_workflow_17_7-0g9s5yfu0f9ef/s-hnrnpuiv3f-0ggq6qn-2y872txz8hxbf3k5372u07krx"
+  ],
+  "skipped_locked": [],
+  "allocated_bytes_before": 234217472,
+  "free_bytes_before": 455574241280,
+  "free_bytes_after_sync": 455741702144,
+  "observed_free_space_increase_bytes": 167460864,
+  "attribution": "du allocated bytes are not exclusive physical reclamation; hardlinks/reflinks and unrelated host activity affect the filesystem-wide free delta.",
+  "preserved": [
+    "all current-task sessions",
+    "crate roots",
+    "session locks",
+    "other crates",
+    "deps",
+    "target roots"
+  ]
+}

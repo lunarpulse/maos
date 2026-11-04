@@ -1,0 +1,484 @@
+diff -ruN '--exclude=.git' a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+--- a/crates/maos-bin/src/worker_spawn.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-bin/src/worker_spawn.rs	2026-11-04 09:13:15.032506150 +0000
+@@ -608,12 +608,15 @@
+     let resolved_caps = resolve_worker_caps(manifest_root, policy.as_ref())?;
+ 
+     // 1. Parse [cli_wrapper].
+-    let cw_toml = toml::to_string(
+-        manifest_root
+-            .get("cli_wrapper")
+-            .ok_or("maos run: missing [cli_wrapper] section")?,
+-    )
+-    .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
++    let mut cw_section = manifest_root
++        .get("cli_wrapper")
++        .ok_or("maos run: missing [cli_wrapper] section")?
++        .clone();
++    // Story 20-5 — the schema version is checked before the strict parse.
++    CliWrapperConfig::take_schema_version(&mut cw_section)
++        .map_err(|e| format!("maos run: [cli_wrapper] {e}"))?;
++    let cw_toml = toml::to_string(&cw_section)
++        .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
+     let mut config = CliWrapperConfig::from_toml_str(&cw_toml)
+         .map_err(|e| format!("maos run: [cli_wrapper] parse: {e}"))?;
+ 
+diff -ruN '--exclude=.git' a/crates/maos-domain/src/cli_wrapper.rs b/crates/maos-domain/src/cli_wrapper.rs
+--- a/crates/maos-domain/src/cli_wrapper.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-domain/src/cli_wrapper.rs	2026-11-04 09:13:14.989624010 +0000
+@@ -76,6 +76,18 @@
+     )]
+     ERespawnWithContextUnsupported,
+ 
++    /// Story 20-5 — the Worker manifest's `[cli_wrapper] manifest_schema_version`
++    /// is outside this kernel's window (absent means 1). Checked before the strict
++    /// parse, so a newer manifest is refused as too new, never as an unknown key.
++    #[error(
++        "cli_wrapper manifest_schema_version {declared} unsupported: this kernel accepts {min_supported}..={max_supported}"
++    )]
++    ECliWrapperSchemaUnsupported {
++        declared: u32,
++        min_supported: u32,
++        max_supported: u32,
++    },
++
+     /// Egress requests require a configured daemon proxy and host permission.
+     #[error("CliWrapperSpirit egress proxy unavailable")]
+     EEgressProxyUnavailable,
+diff -ruN '--exclude=.git' a/crates/maos-manifest/src/manifest.rs b/crates/maos-manifest/src/manifest.rs
+--- a/crates/maos-manifest/src/manifest.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-manifest/src/manifest.rs	2026-11-04 09:13:15.031940001 +0000
+@@ -4493,6 +4493,36 @@
+ }
+ 
+ impl CliWrapperConfig {
++    /// Story 20-5 — remove `manifest_schema_version` from a `[cli_wrapper]`
++    /// table and check it against the supported window BEFORE the strict parse.
++    /// Absent means 1 (every pre-20-5 Worker manifest); a non-integer is refused.
++    pub fn take_schema_version(
++        section: &mut toml::Value,
++    ) -> Result<u32, maos_domain::cli_wrapper::CliWrapperAdmissionError> {
++        use maos_spirit_abi::{
++            MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MAX,
++            MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MIN,
++        };
++        let declared = match section
++            .as_table_mut()
++            .and_then(|table| table.remove("manifest_schema_version"))
++        {
++            None => 1,
++            Some(toml::Value::Integer(value)) => u32::try_from(value).unwrap_or(0),
++            Some(_) => 0,
++        };
++        if declared < MIN || declared > MAX {
++            return Err(
++                maos_domain::cli_wrapper::CliWrapperAdmissionError::ECliWrapperSchemaUnsupported {
++                    declared,
++                    min_supported: MIN,
++                    max_supported: MAX,
++                },
++            );
++        }
++        Ok(declared)
++    }
++
+     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+         let cfg: Self = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+         cfg.validate()?;
+diff -ruN '--exclude=.git' a/crates/maos-spirit-abi/src/lib.rs b/crates/maos-spirit-abi/src/lib.rs
+--- a/crates/maos-spirit-abi/src/lib.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-spirit-abi/src/lib.rs	2026-11-04 09:13:14.989493826 +0000
+@@ -169,3 +169,14 @@
+ /// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
+ /// ```
+ pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;
++
++/// Story 20-5 — schema version of a Worker (`[cli_wrapper]`) manifest. A
++/// separate counter from [`MANIFEST_SCHEMA_VERSION`]: a Worker manifest has no
++/// `[class]`. An absent `[cli_wrapper] manifest_schema_version` means `1`.
++pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;
++
++/// Oldest `[cli_wrapper]` schema version this kernel accepts.
++pub const MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;
++
++/// Newest `[cli_wrapper]` schema version this kernel accepts; higher is refused.
++pub const MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = CLI_WRAPPER_SCHEMA_VERSION;
+diff -ruN '--exclude=.git' a/xtask/src/check_rc_readiness.rs b/xtask/src/check_rc_readiness.rs
+--- a/xtask/src/check_rc_readiness.rs	1970-01-01 00:00:00.000000000 +0000
++++ b/xtask/src/check_rc_readiness.rs	2026-11-04 09:13:02.424773893 +0000
+@@ -0,0 +1,126 @@
++#![forbid(unsafe_code)]
++
++//! Story 20-5 — `check-rc-readiness`: the tree-state half of the
++//! `v1.0.0-rc.N` readiness contract (`docs/release/rc-checklist.md`). It reads
++//! only committed files; the CI-evidence half (aggregate, T3 fuzz chain, perf
++//! verdicts) is `check-release-precondition` on the tag SHA. It never signs,
++//! tags or publishes.
++
++use std::collections::BTreeSet;
++use std::path::Path;
++
++use serde::Serialize;
++
++#[derive(Debug, Serialize)]
++struct Leg {
++    leg: &'static str,
++    passed: bool,
++    detail: String,
++}
++
++/// Provisioning rows a release candidate needs `present`
++/// (`docs/runbooks/provisioning-checklist.md`).
++const PROVISIONED: [&str; 3] = [
++    "`MAOS_RELEASE_PUBKEY`",
++    "`RELEASE_SIGNING_KEY`",
++    "`fuzz-ledger branch permission`",
++];
++
++pub fn run(workspace_root: &Path, tag: Option<&str>, json: bool) -> Result<(), String> {
++    let read = |rel: &str| {
++        std::fs::read_to_string(workspace_root.join(rel))
++            .map_err(|error| format!("check-rc-readiness: cannot read {rel}: {error}"))
++    };
++    let mut legs = Vec::new();
++
++    let cargo: toml::Value = toml::from_str(&read("Cargo.toml")?)
++        .map_err(|error| format!("check-rc-readiness: Cargo.toml: {error}"))?;
++    let version = cargo["workspace"]["package"]["version"]
++        .as_str()
++        .unwrap_or("")
++        .to_string();
++    let is_rc = version
++        .split_once("-rc.")
++        .is_some_and(|(_, n)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
++    let tag_ok = tag.is_none_or(|tag| tag.strip_prefix('v') == Some(version.as_str()));
++    legs.push(Leg {
++        leg: "version",
++        passed: is_rc && tag_ok,
++        detail: format!("workspace version {version}, tag {}", tag.unwrap_or("-")),
++    });
++
++    let stability = crate::stability_matrix::run(workspace_root, true, false);
++    legs.push(Leg {
++        leg: "stability-matrix",
++        passed: stability.is_ok(),
++        detail: stability.err().unwrap_or_else(|| "in sync".into()),
++    });
++
++    let status = crate::sprint_status::load_sprint_status(
++        &workspace_root
++            .join("_bmad-output/implementation-artifacts/sprint-status.yaml")
++            .to_string_lossy(),
++    );
++    let open: BTreeSet<&String> = status
++        .iter()
++        .filter(|(key, value)| {
++            key.starts_with("20-")
++                && key.as_bytes().get(3).is_some_and(u8::is_ascii_digit)
++                && value.as_str() != "done"
++        })
++        .map(|(key, _)| key)
++        .collect();
++    legs.push(Leg {
++        leg: "epic-20-stories",
++        passed: !status.is_empty() && open.is_empty(),
++        detail: format!("not done: {open:?}"),
++    });
++
++    let checklist = read("docs/runbooks/provisioning-checklist.md")?;
++    let absent: Vec<&str> = PROVISIONED
++        .into_iter()
++        .filter(|item| {
++            !checklist.lines().any(|line| {
++                line.starts_with(&format!("| {item} |"))
++                    && line.trim_end().ends_with("| `present` |")
++            })
++        })
++        .collect();
++    legs.push(Leg {
++        leg: "provisioning",
++        passed: absent.is_empty(),
++        detail: format!("not present: {absent:?}"),
++    });
++
++    let deny = read("deny.toml")?;
++    let deferred = read("_bmad-output/implementation-artifacts/deferred-work.md")?;
++    let undocumented: Vec<&str> = deny
++        .lines()
++        .filter_map(|line| line.trim().strip_prefix("\"RUSTSEC-"))
++        .map(|rest| rest.trim_end_matches(['"', ',']))
++        .filter(|id| !deferred.contains(&format!("RUSTSEC-{id}")))
++        .collect();
++    legs.push(Leg {
++        leg: "deny-ignores",
++        passed: undocumented.is_empty(),
++        detail: format!("ignored without a deferred-work row: {undocumented:?}"),
++    });
++
++    let passed = legs.iter().all(|leg| leg.passed);
++    if json {
++        println!(
++            "{}",
++            serde_json::json!({ "gate": "check-rc-readiness", "passed": passed, "legs": legs })
++        );
++    } else {
++        for leg in &legs {
++            let verdict = if leg.passed { "PASS" } else { "FAIL" };
++            eprintln!("check-rc-readiness: {verdict} {} — {}", leg.leg, leg.detail);
++        }
++    }
++    if passed {
++        Ok(())
++    } else {
++        Err("check-rc-readiness: the tree is not rc-ready".into())
++    }
++}
+diff -ruN '--exclude=.git' a/xtask/src/check_release_precondition.rs b/xtask/src/check_release_precondition.rs
+--- a/xtask/src/check_release_precondition.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/xtask/src/check_release_precondition.rs	2026-11-04 09:12:30.772052524 +0000
+@@ -30,7 +30,72 @@
+     head_sha: &'a str,
+ }
+ 
+-pub fn run(check_runs_path: Option<&str>, json: bool) -> Result<(), String> {
++/// Story 20-5 — the T3 targets `fuzz-prerelease.yml` chains (PRD NFR-Sec-5/6).
++const T3_TARGETS: [&str; 3] = ["manifest_parser", "frame_deser", "fuzz_exec_deps_parse_elf"];
++const T3_LINKS: usize = 5;
++const T3_SECONDS: u64 = 86_400;
++
++#[derive(Debug, Deserialize)]
++struct FuzzLedger {
++    schema_version: u32,
++    records: Vec<FuzzRecord>,
++}
++
++#[derive(Debug, Deserialize)]
++struct FuzzRecord {
++    target: String,
++    tier: String,
++    commit: String,
++    cpu_seconds: u64,
++    run_id: String,
++}
++
++/// Story 20-5 — refuse a release SHA without a complete T3 chain for every
++/// target: one workflow run's five links, at this exact commit, >= 24 h of
++/// libFuzzer-measured seconds. Configured time and other runs never count.
++pub fn check_t3_fuzz_chain(ledger_path: &str, sha: &str) -> Result<(), String> {
++    let text = std::fs::read_to_string(ledger_path)
++        .map_err(|error| format!("failed to read fuzz ledger {ledger_path}: {error}"))?;
++    let ledger: FuzzLedger = serde_json::from_str(&text)
++        .map_err(|error| format!("invalid fuzz ledger {ledger_path}: {error}"))?;
++    if ledger.schema_version != 1 {
++        return Err(format!(
++            "fuzz ledger schema_version {} is not 1",
++            ledger.schema_version
++        ));
++    }
++    for target in T3_TARGETS {
++        let mut runs: std::collections::BTreeMap<&str, (usize, u64)> = Default::default();
++        for record in ledger
++            .records
++            .iter()
++            .filter(|r| r.target == target && r.tier == "T3" && r.commit == sha)
++        {
++            let run = record
++                .run_id
++                .rsplit_once('-')
++                .map_or(record.run_id.as_str(), |(run, _)| run);
++            let entry = runs.entry(run).or_default();
++            entry.0 += 1;
++            entry.1 += record.cpu_seconds;
++        }
++        if !runs
++            .values()
++            .any(|(links, seconds)| *links == T3_LINKS && *seconds >= T3_SECONDS)
++        {
++            return Err(format!(
++                "release precondition failed: no complete T3 fuzz chain for {target} at {sha} ({T3_LINKS} links, >= {T3_SECONDS} measured seconds, one run)"
++            ));
++        }
++    }
++    Ok(())
++}
++
++pub fn run(
++    check_runs_path: Option<&str>,
++    fuzz_ledger: Option<&str>,
++    json: bool,
++) -> Result<(), String> {
+     let input = match check_runs_path {
+         Some(path) => std::fs::read_to_string(path)
+             .map_err(|error| format!("failed to read check-runs response {path}: {error}"))?,
+@@ -77,6 +142,9 @@
+             run.conclusion.as_deref().unwrap_or("null")
+         ));
+     }
++    if let Some(ledger) = fuzz_ledger {
++        check_t3_fuzz_chain(ledger, &run.head_sha)?;
++    }
+     if json {
+         println!(
+             "{}",
+diff -ruN '--exclude=.git' a/xtask/src/main.rs b/xtask/src/main.rs
+--- a/xtask/src/main.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/xtask/src/main.rs	2026-11-04 09:13:02.732771175 +0000
+@@ -84,6 +84,7 @@
+ mod check_multi_provider_drift;
+ mod check_pentest_gate;
+ mod check_pub_field_constructors;
++mod check_rc_readiness;
+ mod check_red_team_gate;
+ mod check_release_precondition;
+ mod check_review_findings_resolved;
+@@ -788,12 +789,25 @@
+         #[arg(long)]
+         json: bool,
+     },
++    /// Story 20-5 — tree-state readiness of a `vX.Y.Z-rc.N` candidate (version,
++    /// STABILITY.md, Epic 20 closure, provisioning, deny ignores); never tags.
++    #[command(name = "check-rc-readiness")]
++    CheckRcReadiness {
++        /// The tag the operator will cut; must equal `v` + the workspace version.
++        #[arg(long)]
++        tag: Option<String>,
++        #[arg(long)]
++        json: bool,
++    },
+     /// Story 15-4 AC3 — require a successful discipline aggregate before publication.
+     #[command(name = "check-release-precondition")]
+     CheckReleasePrecondition {
+         /// GitHub check-runs API response; reads stdin when omitted.
+         #[arg(long)]
+         check_runs: Option<String>,
++        /// Story 20-5 — `fuzz-ledger.json`; require a complete T3 chain for the SHA.
++        #[arg(long)]
++        fuzz_ledger: Option<String>,
+         #[arg(long)]
+         json: bool,
+     },
+@@ -1458,9 +1472,15 @@
+             targets,
+             json,
+         } => release_dry_run::run(manifest_only, &dist_dir, &targets, json),
+-        Commands::CheckReleasePrecondition { check_runs, json } => {
+-            check_release_precondition::run(check_runs.as_deref(), json)
++        Commands::CheckRcReadiness { tag, json } => {
++            let workspace_root = std::env::current_dir().expect("failed to get current dir");
++            check_rc_readiness::run(&workspace_root, tag.as_deref(), json)
+         }
++        Commands::CheckReleasePrecondition {
++            check_runs,
++            fuzz_ledger,
++            json,
++        } => check_release_precondition::run(check_runs.as_deref(), fuzz_ledger.as_deref(), json),
+         Commands::CheckPerfVerdict {
+             sha,
+             ledger,
+diff -ruN '--exclude=.git' a/xtask/src/stability_matrix.rs b/xtask/src/stability_matrix.rs
+--- a/xtask/src/stability_matrix.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/xtask/src/stability_matrix.rs	2026-11-04 09:13:15.096296525 +0000
+@@ -137,6 +137,13 @@
+     let kernel_version = parse_workspace_version(&cargo_path)?;
+     let member_count = count_cargo_toml_members(&cargo_path)?;
+     let lts_clock = lts_clock_start(workspace_root);
++    let channel = release_channel(&kernel_version);
++    let cw_current = parse_const(&abi_src, "CLI_WRAPPER_SCHEMA_VERSION")
++        .ok_or_else(|| "CLI_WRAPPER_SCHEMA_VERSION not found".to_string())?;
++    let cw_min = parse_const(&abi_src, "MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION")
++        .ok_or_else(|| "MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION not found".to_string())?;
++    let cw_max = parse_const(&abi_src, "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION")
++        .ok_or_else(|| "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION not found".to_string())?;
+ 
+     // N-1 / N-2 rows derived from the live window. N-1 exists only when the
+     // current schema is at least 2 (CURRENT-1 ≥ MIN); below that it is N/A.
+@@ -183,9 +190,12 @@
+ | Leg | Live value |
+ |---|---|
+ | `kernel_version` | `{kernel_version}` |
++| release channel | {channel} |
+ | `abi_version` | `{abi_version}` |
+ | `manifest_schema_version` (current) | `{current_schema}` |
+ | supported schema window | `{min_schema}..={max_schema}` |
++| `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `{cw_current}` |
++| supported `[cli_wrapper]` window | `{cw_min}..={cw_max}` |
+ | workspace crates | `{member_count}` |
+ 
+ | Manifest schema | Kernel behavior |
+@@ -195,6 +205,7 @@
+ {n_minus_2}
+ | `manifest_schema_version > {max_schema}` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
+ | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
++| `[cli_wrapper]` `manifest_schema_version` outside `{cw_min}..={cw_max}` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
+ 
+ The version gate is **fail-closed in both directions**: an out-of-window
+ manifest is refused with an actionable typed error, never silently
+@@ -214,11 +225,13 @@
+ 
+ ## LTS Policy
+ 
+-MAOS v1.5 carries a **2-year LTS commitment** (NFR-Maint-6): the v1.0 line
+-receives **security-only patches for 2 years** from the LTS clock-start below.
+-The 2-year term takes effect at v1.5, extending the original v1.0 1-year window.
++MAOS v1.0 carries a **1-year LTS commitment** (NFR-Maint-6) from the LTS
++clock-start below; **security-only patches after year 1**. A 2-year commitment
++is a v1.5 decision, taken once support load is known. A release candidate
++(`-rc.N`) carries no LTS commitment and never starts the clock
++(`docs/release/lts-policy.md`).
+ 
+-<!-- lts-clock-start: filled by `stability-matrix` IFF a `1.0.0`/`v1.0.0` git tag exists (Epic 10 cuts the tag); placeholder until then — do NOT fabricate a SHA/tag. -->
++<!-- lts-clock-start: filled by `stability-matrix` IFF a `1.0.0`/`v1.0.0` git tag exists (`ops-ga-tag-after-holds` cuts it after RELEASE-HOLDS Holds 1–2 clear); placeholder until then — do NOT fabricate a SHA/tag. -->
+ - **LTS clock-start:** {lts_clock}
+ 
+ ## Substrate-Self Compliance Scope
+@@ -364,7 +377,20 @@
+             }
+         }
+     }
+-    "pending — the `1.0.0` tag is cut in Epic 10 (`epic-10-v10-ship-gate`); this fills automatically when the tag exists.".to_string()
++    "pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` after RELEASE-HOLDS Holds 1–2 clear; this fills automatically when the tag exists.".to_string()
++}
++
++/// Story 20-5 — the release channel, from the SemVer pre-release suffix of
++/// `[workspace.package].version`: `rc` is a release candidate (no LTS clock),
++/// no suffix is GA, any other suffix is a development pre-release.
++fn release_channel(kernel_version: &str) -> &'static str {
++    match kernel_version.split_once('-').map(|(_, pre)| pre) {
++        None => "GA",
++        Some(pre) if pre.starts_with("rc.") => {
++            "release candidate — pre-release; LTS clock not started"
++        }
++        Some(_) => "development pre-release — no LTS commitment",
++    }
+ }
+ 
+ /// NFR-Maint-3 cross-check: each `#[maos_attrs::deprecated_since(...)]`
+@@ -471,7 +497,7 @@
+         assert_eq!(a, b, "render must be byte-deterministic for --check");
+         assert!(a.contains("## Compatibility Matrix"));
+         assert!(a.contains("## LTS Policy"));
+-        assert!(a.contains("2-year LTS"));
++        assert!(a.contains("1-year LTS"));
+         assert!(a.contains("## Substrate-Self Compliance Scope"));
+         assert!(a.contains("SOC 2") && a.contains("ISO 27001") && a.contains("FedRAMP"));
+         assert!(a.contains("## Export"));
+@@ -487,9 +513,17 @@
+             .parent()
+             .unwrap()
+             .to_path_buf();
+-        // No 1.0.0 tag exists pre-Epic-10 → deterministic placeholder.
++        // No 1.0.0 tag exists before `ops-ga-tag-after-holds` → placeholder.
+         let clock = lts_clock_start(&root);
+-        assert!(clock.contains("Epic 10") || clock.contains("tag `"));
++        assert!(clock.contains("ops-ga-tag-after-holds") || clock.contains("tag `"));
++    }
++
++    #[test]
++    fn release_channel_follows_the_prerelease_suffix() {
++        assert_eq!(release_channel("1.0.0"), "GA");
++        assert!(release_channel("1.0.0-rc.1").starts_with("release candidate"));
++        assert!(release_channel("0.1.0-alpha.1").starts_with("development"));
++        assert!(release_channel("1.0.0-rcx").starts_with("development"));
+     }
+ 
+     /// Proven-red negative test for `--check` (Story 9.5a, AC-2, D8/Epic-8

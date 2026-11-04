@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="3" skipped="0" failures="0" errors="0" uuid="3a8ce955-5097-4423-9560-5d785983f9c1" timestamp="2026-11-04T09:42:08.277+00:00" time="0.011">
+    <testsuite name="maos-bin" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="purge::runtime_residue::tests::ac4_dead_empty_live_creator_populated_and_symlink_twins" classname="maos-bin" timestamp="2026-11-04T09:42:08.277+00:00" time="0.005"/>
+        <testcase name="purge::runtime_residue::tests::authority_paths_are_componentwise_absolute_and_never_traverse_parents" classname="maos-bin" timestamp="2026-11-04T09:42:08.282+00:00" time="0.003"/>
+        <testcase name="purge::runtime_residue::tests::review_p2_shared_slice_parent_is_never_reclaimed" classname="maos-bin" timestamp="2026-11-04T09:42:08.285+00:00" time="0.003"/>
+    </testsuite>
+</testsuites>

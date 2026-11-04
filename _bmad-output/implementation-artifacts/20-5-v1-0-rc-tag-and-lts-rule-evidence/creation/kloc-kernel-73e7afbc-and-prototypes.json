@@ -1,0 +1,142 @@
+{
+  "head": "73e7afbc",
+  "instrument": "/mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json / kloc-check --json on git archive 73e7afbc copies under /tmp/c205; rustfmt --edition 2021 on touched files; never compiled",
+  "base": {
+    "kernel": {
+      "passed": true,
+      "actual-lines": 26841,
+      "pinned-lines": 26841,
+      "baseline-file": "/tmp/c205/base/xtask/kernel-core-baseline.toml",
+      "file-set-entries": 95,
+      "set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "pinned-set-hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "changed": [],
+      "added": [],
+      "removed": []
+    },
+    "kloc_aggregate": 193140,
+    "per_crate_touched": {
+      "maos-kernel-core": 21042,
+      "xtask": 44452,
+      "maos-manifest": 4604,
+      "maos-domain": 10107,
+      "maos-bin": 34504,
+      "maos-spirit-abi": 1042
+    }
+  },
+  "prototypes": {
+    "cw-peel": {
+      "description": "D-20-5-02 A: [cli_wrapper] manifest_schema_version peeled and checked before the strict parse; struct unchanged",
+      "kernel_physical": 26841,
+      "kernel_set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "kernel_passed": true,
+      "kernel_changed_files": [],
+      "kernel_tokei": 21042,
+      "aggregate": 193179,
+      "delta_vs_base": {
+        "maos-bin": 2,
+        "maos-domain": 8,
+        "maos-manifest": 26,
+        "maos-spirit-abi": 3
+      },
+      "diff_lines": 105
+    },
+    "cw-field": {
+      "description": "D-20-5-02 B: CliWrapperConfig field (serde default 1) + pre-parse check; every struct literal gains the field",
+      "kernel_physical": 26843,
+      "kernel_set_hash": "e91bcad8d9faedc458a6cb5ffe49bbb8ffb2a63ee6fcd16e598d4ecf305dda64",
+      "kernel_passed": false,
+      "kernel_changed_files": [
+        "lifecycle/cli_wrapper/admission.rs",
+        "lifecycle/cli_wrapper/lifecycle.rs"
+      ],
+      "kernel_tokei": 21044,
+      "aggregate": 193183,
+      "delta_vs_base": {
+        "maos-bin": 2,
+        "maos-domain": 8,
+        "maos-kernel-core": 2,
+        "maos-manifest": 28,
+        "maos-spirit-abi": 3
+      },
+      "diff_lines": 224
+    },
+    "cw-kernel": {
+      "description": "D-20-5-02 C: B + kernel window check in admit_cli_wrapper_journaled",
+      "kernel_physical": 26860,
+      "kernel_set_hash": "36e1530631538f0e67df2d856a1cd3eaefe64ebe620dc09ba4919e87fb5e5314",
+      "kernel_passed": false,
+      "kernel_changed_files": [
+        "lifecycle/cli_wrapper/admission.rs",
+        "lifecycle/cli_wrapper/lifecycle.rs"
+      ],
+      "kernel_tokei": 21058,
+      "aggregate": 193197,
+      "delta_vs_base": {
+        "maos-bin": 2,
+        "maos-domain": 8,
+        "maos-kernel-core": 16,
+        "maos-manifest": 28,
+        "maos-spirit-abi": 3
+      },
+      "diff_lines": 255
+    },
+    "sm-stability-matrix": {
+      "description": "D-20-5-04/-05: release_channel row, [cli_wrapper] window rows, NFR-Maint-6 LTS text, placeholder re-pointed",
+      "kernel_physical": 26841,
+      "kernel_set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "kernel_passed": true,
+      "kernel_changed_files": [],
+      "kernel_tokei": 21042,
+      "aggregate": 193172,
+      "delta_vs_base": {
+        "maos-spirit-abi": 3,
+        "xtask": 29
+      },
+      "diff_lines": 125
+    },
+    "gate-fuzz-chain": {
+      "description": "D-20-5-06 A: check-release-precondition --fuzz-ledger T3 chain leg",
+      "kernel_physical": 26841,
+      "kernel_set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "kernel_passed": true,
+      "kernel_changed_files": [],
+      "kernel_tokei": 21042,
+      "aggregate": 193204,
+      "delta_vs_base": {
+        "xtask": 64
+      },
+      "diff_lines": 115
+    },
+    "gate-fuzz-chain-plus-rc-readiness": {
+      "description": "D-20-5-07 A: fuzz leg + new check-rc-readiness command",
+      "kernel_physical": 26841,
+      "kernel_set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "kernel_passed": true,
+      "kernel_changed_files": [],
+      "kernel_tokei": 21042,
+      "aggregate": 193324,
+      "delta_vs_base": {
+        "xtask": 184
+      },
+      "diff_lines": 272
+    },
+    "rec-recommended-bundle": {
+      "description": "recommended bundle: cw-peel + sm + fuzz leg + check-rc-readiness",
+      "kernel_physical": 26841,
+      "kernel_set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+      "kernel_passed": true,
+      "kernel_changed_files": [],
+      "kernel_tokei": 21042,
+      "aggregate": 193392,
+      "delta_vs_base": {
+        "maos-bin": 2,
+        "maos-domain": 8,
+        "maos-manifest": 26,
+        "maos-spirit-abi": 3,
+        "xtask": 213
+      },
+      "diff_lines": 484
+    }
+  }
+}

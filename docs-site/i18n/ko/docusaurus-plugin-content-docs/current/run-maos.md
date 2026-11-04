@@ -112,12 +112,17 @@ Linux에서 확인된 purge는 이 home의 T3 컨테이너를 workspace보다 �
 `/workspace` mount가 모두 일치해야 합니다. 다른 home 또는 소유권을 확인할 수 없는
 labelled 컨테이너는 제거 명령만 표시하며 label이 없는 컨테이너는 무시합니다.
 `maos.slice/spirit-*` leaf는 비어 있고 creator가 종료된 경우에만 제거하며,
-실행 중인 creator나 member를 죽이지 않습니다. private T3 custody는 CID 부재가
-확인된 spawn만 제거합니다. process root는 비어 있고 이름의 creator PID 부재가
-확인되어야 제거합니다. live/anonymous process root, 공유 state parent와
-`maos.slice`는 보존합니다. CID가 없거나 실행 중인 spawn custody도 보존합니다.
+실행 중인 creator나 member를 죽이지 않습니다. private T3 custody는 컨테이너 제거
+전에 inventory에서 검증하여 보관한 CID의 부재를 새로 확인하고, 같은 private
+소유 디렉터리의 device/inode를 재검사한 뒤에만 제거합니다. Podman은 제거 시
+cidfile도 삭제할 수 있으므로 inventory에서 CID가 없거나 잘못된 경우에는 이후
+파일이 없어져도 제거 권한으로 삼지 않습니다. process root는 비어 있고 이름의
+creator PID 부재가 확인되어야 제거합니다. live/anonymous process root, 공유
+state parent와 `maos.slice`, 실행 중이거나 CID를 확인할 수 없는 spawn custody는 보존합니다.
 dry run의 custody 제거 표시는 부재 확인을 조건으로 하며
-읽기 전용 `ps`/`inspect`만 호출합니다. receipt는 schema 변경 없이
+읽기 전용 `ps`/`inspect`를 사용합니다. inspect 실패 때만 bounded `container exists`로
+재확인하여 부재가 확인된 후보만 건너뛰며, 존재하거나 부재를 확인할 수 없으면
+inspect status/stderr를 포함한 오류로 거부합니다. receipt는 schema 변경 없이
 `podman://<CID>`, `cgroup://<path>`, custody 디렉터리 행을 추가합니다.
 Worker workspace residue와 마찬가지로 `left (<residue>)` 행이 있어도 status는
 `complete`일 수 있으므로 모든 행을 확인하십시오. user-namespace mapping과

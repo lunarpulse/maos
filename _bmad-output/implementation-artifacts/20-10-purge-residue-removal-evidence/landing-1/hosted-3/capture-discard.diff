@@ -1,0 +1,11 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -523,7 +523,7 @@
+                         dirs.push(Custody {
+                             path: spawn,
+                             spawn: true,
+-                            proof,
++                            proof: None,
+                         });
+                     }
+                 }

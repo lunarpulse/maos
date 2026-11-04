@@ -116,11 +116,17 @@ identity labels, their matching name, and a `/workspace` mount under this
 home's workspace roots must agree. Other-home or unattributable labelled
 containers are only reported with a removal command; label-less containers
 are ignored. Empty dead-creator `maos.slice/spirit-*` leaves are removed, never
-populated or live-creator leaves and never by killing. Private T3 custody is
-removed only for confirmed-absent CIDs, then empty process roots with a
-positively absent creator PID. Live/anonymous process roots, shared state
+populated or live-creator leaves and never by killing. Private T3 custody
+requires a valid CID captured before removal and freshly confirmed absent,
+with the same private, owned directory identity rechecked. Podman may delete
+its cidfile during removal; a CID missing at inventory never authorizes cleanup.
+Empty process roots additionally require a positively absent creator PID.
+Live/anonymous process roots, shared state
 parents and `maos.slice` are retained; unknown/live spawn custody is retained.
-Dry-run spawn-custody lines are conditional on CID absence and use only read-only `ps`/`inspect`. Receipts add
+Dry-run spawn-custody lines are conditional on CID absence. Enumeration uses
+read-only `ps`/`inspect`, with bounded `container exists` only after failed
+inspect: confirmed absence skips a vanished candidate; present/unknown stays
+fatal with inspect status/stderr. Receipts add
 `podman://<CID>`, `cgroup://<path>` and custody-directory rows, without changing
 the schema: `left (<residue>)` can coexist with status `complete`, as with
 Worker workspace residue. Read every row. User-namespace mappings and podman

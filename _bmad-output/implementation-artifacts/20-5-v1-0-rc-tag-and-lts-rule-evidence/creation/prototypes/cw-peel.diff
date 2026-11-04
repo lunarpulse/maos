@@ -1,0 +1,105 @@
+diff -ruN '--exclude=.git' a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+--- a/crates/maos-bin/src/worker_spawn.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-bin/src/worker_spawn.rs	2026-11-04 09:09:35.739555509 +0000
+@@ -608,12 +608,15 @@
+     let resolved_caps = resolve_worker_caps(manifest_root, policy.as_ref())?;
+ 
+     // 1. Parse [cli_wrapper].
+-    let cw_toml = toml::to_string(
+-        manifest_root
+-            .get("cli_wrapper")
+-            .ok_or("maos run: missing [cli_wrapper] section")?,
+-    )
+-    .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
++    let mut cw_section = manifest_root
++        .get("cli_wrapper")
++        .ok_or("maos run: missing [cli_wrapper] section")?
++        .clone();
++    // Story 20-5 — the schema version is checked before the strict parse.
++    CliWrapperConfig::take_schema_version(&mut cw_section)
++        .map_err(|e| format!("maos run: [cli_wrapper] {e}"))?;
++    let cw_toml = toml::to_string(&cw_section)
++        .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
+     let mut config = CliWrapperConfig::from_toml_str(&cw_toml)
+         .map_err(|e| format!("maos run: [cli_wrapper] parse: {e}"))?;
+ 
+diff -ruN '--exclude=.git' a/crates/maos-domain/src/cli_wrapper.rs b/crates/maos-domain/src/cli_wrapper.rs
+--- a/crates/maos-domain/src/cli_wrapper.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-domain/src/cli_wrapper.rs	2026-11-04 09:09:35.691130821 +0000
+@@ -76,6 +76,18 @@
+     )]
+     ERespawnWithContextUnsupported,
+ 
++    /// Story 20-5 — the Worker manifest's `[cli_wrapper] manifest_schema_version`
++    /// is outside this kernel's window (absent means 1). Checked before the strict
++    /// parse, so a newer manifest is refused as too new, never as an unknown key.
++    #[error(
++        "cli_wrapper manifest_schema_version {declared} unsupported: this kernel accepts {min_supported}..={max_supported}"
++    )]
++    ECliWrapperSchemaUnsupported {
++        declared: u32,
++        min_supported: u32,
++        max_supported: u32,
++    },
++
+     /// Egress requests require a configured daemon proxy and host permission.
+     #[error("CliWrapperSpirit egress proxy unavailable")]
+     EEgressProxyUnavailable,
+diff -ruN '--exclude=.git' a/crates/maos-manifest/src/manifest.rs b/crates/maos-manifest/src/manifest.rs
+--- a/crates/maos-manifest/src/manifest.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-manifest/src/manifest.rs	2026-11-04 09:09:35.738943474 +0000
+@@ -4493,6 +4493,36 @@
+ }
+ 
+ impl CliWrapperConfig {
++    /// Story 20-5 — remove `manifest_schema_version` from a `[cli_wrapper]`
++    /// table and check it against the supported window BEFORE the strict parse.
++    /// Absent means 1 (every pre-20-5 Worker manifest); a non-integer is refused.
++    pub fn take_schema_version(
++        section: &mut toml::Value,
++    ) -> Result<u32, maos_domain::cli_wrapper::CliWrapperAdmissionError> {
++        use maos_spirit_abi::{
++            MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MAX,
++            MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MIN,
++        };
++        let declared = match section
++            .as_table_mut()
++            .and_then(|table| table.remove("manifest_schema_version"))
++        {
++            None => 1,
++            Some(toml::Value::Integer(value)) => u32::try_from(value).unwrap_or(0),
++            Some(_) => 0,
++        };
++        if declared < MIN || declared > MAX {
++            return Err(
++                maos_domain::cli_wrapper::CliWrapperAdmissionError::ECliWrapperSchemaUnsupported {
++                    declared,
++                    min_supported: MIN,
++                    max_supported: MAX,
++                },
++            );
++        }
++        Ok(declared)
++    }
++
+     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+         let cfg: Self = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+         cfg.validate()?;
+diff -ruN '--exclude=.git' a/crates/maos-spirit-abi/src/lib.rs b/crates/maos-spirit-abi/src/lib.rs
+--- a/crates/maos-spirit-abi/src/lib.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-spirit-abi/src/lib.rs	2026-11-04 09:09:35.690989546 +0000
+@@ -169,3 +169,14 @@
+ /// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
+ /// ```
+ pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;
++
++/// Story 20-5 — schema version of a Worker (`[cli_wrapper]`) manifest. A
++/// separate counter from [`MANIFEST_SCHEMA_VERSION`]: a Worker manifest has no
++/// `[class]`. An absent `[cli_wrapper] manifest_schema_version` means `1`.
++pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;
++
++/// Oldest `[cli_wrapper]` schema version this kernel accepts.
++pub const MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;
++
++/// Newest `[cli_wrapper]` schema version this kernel accepts; higher is refused.
++pub const MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = CLI_WRAPPER_SCHEMA_VERSION;

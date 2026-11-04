@@ -1,0 +1,302 @@
+{
+  "instrument": "prebuilt /mnt/build/cargo-maos/debug/xtask; env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=<copy>/xtask <bin> <gate> --json, run from each git-archive copy root under /tmp/proto2011halt (deleted after measurement); rustfmt 1.9.0 --edition 2021 on touched files only; never compiled",
+  "head": "73e7afbcae81f4fb4858e9d52ded3d592bed636d",
+  "variants": {
+    "base": {
+      "description": "HEAD 73e7afbc untouched archive",
+      "check_kernel_baseline": {
+        "passed": true,
+        "actual_lines": 26841,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "db39bc4a1ab6a6c22575990ae934e698a519d3efd46a8dbb38e62bc376697b59",
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": true,
+        "maos-kernel-core": 21042,
+        "maos-domain": 10107,
+        "aggregate": 193140,
+        "over_budget": []
+      },
+      "check_service_boundary": {
+        "passed": true,
+        "violations": [],
+        "HaltRegistry_signature_hash": "b6d6524333a6327adc96c8a3ef78e2a10134ea7e2a9c534d930d6a248eda4af8"
+      }
+    },
+    "o1": {
+      "description": "O1 invoke_halt fence, unload closes (late-halt-o1-invoke-fence.diff)",
+      "check_kernel_baseline": {
+        "passed": false,
+        "actual_lines": 26864,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "a4c95f87179c6e292274759c338b6cdaa6ef09440beb9ec540e6eb4b9c84df8c",
+        "changed": [
+          "halt/mod.rs",
+          "scheduler/scheduler_loop.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": false,
+        "maos-kernel-core": 21057,
+        "maos-domain": 10111,
+        "aggregate": 193159,
+        "over_budget": [
+          "aggregate 193159 >= 193141",
+          "maos-domain 10111 > 10107",
+          "maos-kernel-core 21057 > 21042"
+        ]
+      },
+      "check_service_boundary": {
+        "passed": false,
+        "violations": [
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: removed public kernel symbol 'maos_kernel_core::halt::HaltRegistry' \u2014 kernel surface is monotonically additive within a major version (see ABI Stability Triple)"
+          },
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: new public kernel symbol 'maos_kernel_core::halt::HaltRegistry' has class 'other' (must be one of: universal-arithmetic, data-movement, supervision); add classification to xtask/kernel-api-classes.toml via invariant-lock review"
+          }
+        ],
+        "HaltRegistry_signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
+      },
+      "check_service_boundary_after_single_hash_refresh": {
+        "passed": true
+      }
+    },
+    "o2": {
+      "description": "O2 receipted final drain (late-halt-o2-receipted-final-drain.diff)",
+      "check_kernel_baseline": {
+        "passed": false,
+        "actual_lines": 26864,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "78b68706da596d7155c66d33d7b448b7bd4c8e38003db25fd2b807ab74788328",
+        "changed": [
+          "halt/termination.rs",
+          "scheduler/scheduler_loop.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": false,
+        "maos-kernel-core": 21061,
+        "maos-domain": 10107,
+        "aggregate": 193159,
+        "over_budget": [
+          "aggregate 193159 >= 193141",
+          "maos-kernel-core 21061 > 21042"
+        ]
+      },
+      "check_service_boundary": {
+        "passed": true,
+        "violations": [],
+        "HaltRegistry_signature_hash": "b6d6524333a6327adc96c8a3ef78e2a10134ea7e2a9c534d930d6a248eda4af8"
+      }
+    },
+    "o2l": {
+      "description": "O2-loop drain-until-empty under spirits lock (late-halt-o2l-drain-until-empty-loop.diff)",
+      "check_kernel_baseline": {
+        "passed": false,
+        "actual_lines": 26869,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "8d6d366cf5477126429f7dd09c52ba410191bdcdd459d8dbdb490f4bbe5fb00c",
+        "changed": [
+          "halt/termination.rs",
+          "scheduler/scheduler_loop.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": false,
+        "maos-kernel-core": 21066,
+        "maos-domain": 10107,
+        "aggregate": 193164,
+        "over_budget": [
+          "aggregate 193164 >= 193141",
+          "maos-kernel-core 21066 > 21042"
+        ]
+      },
+      "check_service_boundary": {
+        "passed": true,
+        "violations": [],
+        "HaltRegistry_signature_hash": "b6d6524333a6327adc96c8a3ef78e2a10134ea7e2a9c534d930d6a248eda4af8"
+      }
+    },
+    "o3": {
+      "description": "O3 = O1 + O2 (late-halt-o3-fence-plus-receipted-drain.diff)",
+      "check_kernel_baseline": {
+        "passed": false,
+        "actual_lines": 26887,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "48283945ef2b8d448c9eb36684955a5e856df422d3b1f405e79c56947e329458",
+        "changed": [
+          "halt/mod.rs",
+          "halt/termination.rs",
+          "scheduler/scheduler_loop.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": false,
+        "maos-kernel-core": 21076,
+        "maos-domain": 10111,
+        "aggregate": 193178,
+        "over_budget": [
+          "aggregate 193178 >= 193141",
+          "maos-domain 10111 > 10107",
+          "maos-kernel-core 21076 > 21042"
+        ]
+      },
+      "check_service_boundary": {
+        "passed": false,
+        "violations": [
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: removed public kernel symbol 'maos_kernel_core::halt::HaltRegistry' \u2014 kernel surface is monotonically additive within a major version (see ABI Stability Triple)"
+          },
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: new public kernel symbol 'maos_kernel_core::halt::HaltRegistry' has class 'other' (must be one of: universal-arithmetic, data-movement, supervision); add classification to xtask/kernel-api-classes.toml via invariant-lock review"
+          }
+        ],
+        "HaltRegistry_signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
+      },
+      "check_service_boundary_after_single_hash_refresh": {
+        "passed": true
+      }
+    },
+    "o4l": {
+      "description": "O4 fence inside terminate_spirit, silent drain deleted (late-halt-o4-fence-in-single-writer.diff)",
+      "check_kernel_baseline": {
+        "passed": false,
+        "actual_lines": 26857,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "3ca85290a78c40a71a31c560058c76f2dce4fe9dbc4e395398fd6535c0f2c92e",
+        "changed": [
+          "halt/mod.rs",
+          "halt/termination.rs",
+          "scheduler/scheduler_loop.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": false,
+        "maos-kernel-core": 21054,
+        "maos-domain": 10111,
+        "aggregate": 193156,
+        "over_budget": [
+          "aggregate 193156 >= 193141",
+          "maos-domain 10111 > 10107",
+          "maos-kernel-core 21054 > 21042"
+        ]
+      },
+      "check_service_boundary": {
+        "passed": true,
+        "violations": [],
+        "HaltRegistry_signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
+      },
+      "note": "copy taken after the in-place HaltRegistry hash refresh; its check_service_boundary run is the post-refresh result"
+    },
+    "o4": {
+      "description": "O4m = O4 with a close_for_spirit method (late-halt-o4m-fence-in-single-writer-method.diff)",
+      "check_kernel_baseline": {
+        "passed": false,
+        "actual_lines": 26862,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "86873ba5f4c93959a26d642685cb853fdfd64755c6c7a42cb8629e66c291f4de",
+        "changed": [
+          "halt/mod.rs",
+          "halt/termination.rs",
+          "scheduler/scheduler_loop.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": false,
+        "maos-kernel-core": 21056,
+        "maos-domain": 10111,
+        "aggregate": 193158,
+        "over_budget": [
+          "aggregate 193158 >= 193141",
+          "maos-domain 10111 > 10107",
+          "maos-kernel-core 21056 > 21042"
+        ]
+      },
+      "check_service_boundary": {
+        "passed": false,
+        "violations": [
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: removed public kernel symbol 'maos_kernel_core::halt::HaltRegistry' \u2014 kernel surface is monotonically additive within a major version (see ABI Stability Triple)"
+          },
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: new public kernel symbol 'maos_kernel_core::halt::HaltRegistry' has class 'other' (must be one of: universal-arithmetic, data-movement, supervision); add classification to xtask/kernel-api-classes.toml via invariant-lock review"
+          }
+        ],
+        "HaltRegistry_signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
+      },
+      "check_service_boundary_after_single_hash_refresh": {
+        "passed": true
+      }
+    },
+    "o4r": {
+      "description": "O4r = O4m with untyped RegistryInsertFailed refusal, no domain change (late-halt-o4r-untyped-refusal.diff; surface JSON not refreshed)",
+      "check_kernel_baseline": {
+        "passed": false,
+        "actual_lines": 26864,
+        "pinned_lines": 26841,
+        "file_set_entries": 95,
+        "set_hash": "9e75e2f2eaf02791f962312c5a0774a14eb1b802e9b37400a339a7d71314cd3b",
+        "changed": [
+          "halt/mod.rs",
+          "halt/termination.rs",
+          "scheduler/scheduler_loop.rs"
+        ],
+        "added": [],
+        "removed": []
+      },
+      "kloc_check": {
+        "passed": false,
+        "maos-kernel-core": 21058,
+        "maos-domain": 10107,
+        "aggregate": 193156,
+        "over_budget": [
+          "aggregate 193156 >= 193141",
+          "maos-kernel-core 21058 > 21042"
+        ]
+      },
+      "check_service_boundary": {
+        "passed": false,
+        "violations": [
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: removed public kernel symbol 'maos_kernel_core::halt::HaltRegistry' \u2014 kernel surface is monotonically additive within a major version (see ABI Stability Triple)"
+          },
+          {
+            "path": "maos_kernel_core::halt::HaltRegistry",
+            "message": "NFR-Test-2 violation: new public kernel symbol 'maos_kernel_core::halt::HaltRegistry' has class 'other' (must be one of: universal-arithmetic, data-movement, supervision); add classification to xtask/kernel-api-classes.toml via invariant-lock review"
+          }
+        ],
+        "HaltRegistry_signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
+      }
+    }
+  }
+}

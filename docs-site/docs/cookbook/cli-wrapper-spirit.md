@@ -65,8 +65,11 @@ The source tree's live manifests declare their vendor endpoint: `spirits/worker/
 Confirmed `maos purge --yes` removes retained containers before workspaces only
 when both MAOS identity labels, the name, and this home's `/workspace` source
 agree. Other-home or unattributable containers remain report-only; label-less
-containers are ignored. Absent-CID T3 custody and empty dead-creator cgroups
-are reclaimed, never live/unknown custody or populated cgroups. Receipt rows
+containers are ignored. T3 custody requires a valid CID captured before runtime
+removal, a fresh absence proof, and the same private owned directory identity.
+Podman can delete its cidfile during removal; a missing/invalid CID at inventory
+never grants cleanup. Empty dead-creator cgroups are reclaimed, never populated
+cgroups or live/unknown custody. Receipt rows
 name each result; `complete` does not mean every `left (<residue>)` row is gone.
 This metadata rule is a same-UID trust boundary, not unforgeable provenance:
 a same-user rootless container creator can forge it. Only empty process roots

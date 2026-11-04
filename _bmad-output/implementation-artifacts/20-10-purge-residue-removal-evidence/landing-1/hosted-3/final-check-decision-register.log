@@ -1,0 +1,2 @@
+check-decision-register: 23 rows, 6 open
+  D19: deadline UNQUERYABLE (not green, not satisfied) — UNQUERYABLE — "before the next `j1-*` story leaves `ready-for-dev`" was SELF-VOIDING: 2c is the lane closer and there is no next `j1-*` story. It bound at the round-table or never.

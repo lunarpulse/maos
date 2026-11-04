@@ -1,0 +1,207 @@
+diff --git a/crates/maos-domain/src/halt.rs b/crates/maos-domain/src/halt.rs
+--- a/crates/maos-domain/src/halt.rs
++++ b/crates/maos-domain/src/halt.rs
+@@ -337,6 +337,8 @@ pub enum InvokeHaltError {
+     JournalWriteFailed(String),
+     #[error("registry insert failed: {0}")]
+     RegistryInsertFailed(String),
++    #[error("spirit pid {0} is being unloaded; halt refused")]
++    SpiritUnloading(u32),
+ }
+ 
+ /// I14 — Hot-swap halt-continuity typed error per ADR-019.
+@@ -684,6 +686,8 @@ mod tests {
+         assert!(e.to_string().contains("jw"));
+         let e = InvokeHaltError::RegistryInsertFailed("ri".into());
+         assert!(e.to_string().contains("ri"));
++        let e = InvokeHaltError::SpiritUnloading(7);
++        assert!(e.to_string().contains("pid 7"));
+     }
+ 
+     #[test]
+diff --git a/crates/maos-kernel-core/src/halt/mod.rs b/crates/maos-kernel-core/src/halt/mod.rs
+--- a/crates/maos-kernel-core/src/halt/mod.rs
++++ b/crates/maos-kernel-core/src/halt/mod.rs
+@@ -102,6 +102,9 @@ pub struct HaltRegistry {
+     pending: RwLock<HashMap<HaltId, HaltState>>,
+     /// Story 4.3 — per-halt metadata for resolution-side lookups.
+     metadata: RwLock<HashMap<HaltId, PendingHaltMetadata>>,
++    /// Story 20-11 (D-20-11-11) — pids whose teardown began; `invoke_halt`
++    /// holds this lock across its writes, so a closed pid commits no halt.
++    closed: std::sync::Mutex<std::collections::HashSet<u32>>,
+     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
+     #[cfg(feature = "spirit_test")]
+     isolation_hook: Option<
+@@ -212,6 +215,16 @@ impl HaltRegistry {
+         Ok(())
+     }
+ 
++    /// Story 20-11 (D-20-11-11) — refuse every later `invoke_halt` for
++    /// `spirit_pid`, after any invocation already committing. Pids are never
++    /// reused within a process (`allocate_pid`).
++    pub(crate) fn close_for_spirit(&self, spirit_pid: u32) {
++        self.closed
++            .lock()
++            .unwrap_or_else(std::sync::PoisonError::into_inner)
++            .insert(spirit_pid);
++    }
++
+     /// Legacy insert — for callers that don't have metadata (v0.3-β compat).
+     pub fn insert_pending(&self, halt_id: HaltId, state: HaltState) -> Result<(), InvokeHaltError> {
+         let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
+@@ -533,6 +546,14 @@ pub fn invoke_halt(
+ 
+     let halt_id = maos_domain::halt::HaltId::new(payload.halt_id.clone())
+         .map_err(|_| InvokeHaltError::RegistryInsertFailed("invalid halt_id".into()))?;
++    // Story 20-11 (D-20-11-11) — held across the three writes below.
++    let closed = registry
++        .closed
++        .lock()
++        .unwrap_or_else(std::sync::PoisonError::into_inner);
++    if closed.contains(&spirit_pid) {
++        return Err(InvokeHaltError::SpiritUnloading(spirit_pid));
++    }
+ 
+     let timestamp_ns = SystemTime::now()
+         .duration_since(UNIX_EPOCH)
+diff --git a/crates/maos-kernel-core/src/halt/termination.rs b/crates/maos-kernel-core/src/halt/termination.rs
+--- a/crates/maos-kernel-core/src/halt/termination.rs
++++ b/crates/maos-kernel-core/src/halt/termination.rs
+@@ -81,43 +81,59 @@ pub fn terminate_spirit(
+ 
+         vec![receipt]
+     } else {
+-        let mut receipts = Vec::with_capacity(pending.len());
+-        for (halt_id, _state) in pending {
+-            tl.insert_frame_event(
+-                FrameKind::EpistemicHalt,
+-                spirit_pid,
+-                None,
+-                kind_str,
+-                &[],
+-                FrameOrigin::Kernel,
+-            );
+-            let frame_id = tl.last_frame_id();
++        receipt_drained(tl, pending, spirit_pid, kind_str, boot_nonce)
++    }
++}
+ 
+-            let receipt = HaltReceipt::new(
+-                halt_id.clone(),
+-                timestamp_ns,
+-                spirit_pid,
+-                boot_nonce,
+-                frame_id,
+-            )
+-            .with_resolution(HaltState::Terminated, kind_str, timestamp_ns);
++/// Story 20-11 (D-20-11-11) — the per-halt arm of the single receipt writer,
++/// also used for halts drained after `terminate_spirit` (unload's last drain).
++pub(crate) fn receipt_drained(
++    tl: &TransparencyLogAdapter,
++    pending: Vec<(HaltId, HaltState)>,
++    spirit_pid: u32,
++    kind_str: &str,
++    boot_nonce: u64,
++) -> Vec<HaltReceipt> {
++    let timestamp_ns = SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .unwrap_or_default()
++        .as_nanos() as u64;
++    let mut receipts = Vec::with_capacity(pending.len());
++    for (halt_id, _state) in pending {
++        tl.insert_frame_event(
++            FrameKind::EpistemicHalt,
++            spirit_pid,
++            None,
++            kind_str,
++            &[],
++            FrameOrigin::Kernel,
++        );
++        let frame_id = tl.last_frame_id();
++
++        let receipt = HaltReceipt::new(
++            halt_id.clone(),
++            timestamp_ns,
++            spirit_pid,
++            boot_nonce,
++            frame_id,
++        )
++        .with_resolution(HaltState::Terminated, kind_str, timestamp_ns);
+ 
+-            let payload = match serde_json::to_vec(&receipt) {
+-                Ok(p) => p,
+-                Err(e) => {
+-                    format!(r#"{{"error":"{}","halt_id":"{}"}}"#, e, halt_id.as_str()).into_bytes()
+-                }
+-            };
+-            tl.insert_frame_event(
+-                FrameKind::EpistemicHalt,
+-                spirit_pid,
+-                None,
+-                kind_str,
+-                &payload,
+-                FrameOrigin::Kernel,
+-            );
+-            receipts.push(receipt);
+-        }
+-        receipts
++        let payload = match serde_json::to_vec(&receipt) {
++            Ok(p) => p,
++            Err(e) => {
++                format!(r#"{{"error":"{}","halt_id":"{}"}}"#, e, halt_id.as_str()).into_bytes()
++            }
++        };
++        tl.insert_frame_event(
++            FrameKind::EpistemicHalt,
++            spirit_pid,
++            None,
++            kind_str,
++            &payload,
++            FrameOrigin::Kernel,
++        );
++        receipts.push(receipt);
+     }
++    receipts
+ }
+diff --git a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -557,6 +557,8 @@ impl SpiritSchedulerAdapter {
+             FrameOrigin::SpiritAuto,
+         );
+ 
++        // Story 20-11 (D-20-11-11) — admit no halt for this pid from here on.
++        self._halt_registry.close_for_spirit(spirit_pid);
+         // Story 16-6 — UNCONDITIONAL cleanup, ahead of the hook.
+         // Story 5.3 — produce halt-receipts for planned unload (NFR-Rel-11)
+         let _receipts = terminate_spirit(
+@@ -570,8 +572,15 @@ impl SpiritSchedulerAdapter {
+         self.capability.revoke_all_for_pid(spirit_pid);
+         self.capability.context_budget().remove(spirit_pid);
+         self.capability.set_paused(spirit_pid, false);
+-        // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
+-        let _ = self._halt_registry.drain_for_spirit(spirit_pid);
++        // Story 20-11 (D-20-11-11) — a halt re-pended after that drain (door
++        // rollback) gets its receipt from the same writer; never discarded.
++        crate::halt::termination::receipt_drained(
++            &self.tl,
++            self._halt_registry.drain_for_spirit(spirit_pid),
++            spirit_pid,
++            TerminationKind::PlannedUnload.as_str(),
++            scb.boot_nonce,
++        );
+         {
+             let mut spirits = self.spirits.write().unwrap();
+             spirits.remove(&spirit_pid);
+diff --git a/docs/ci-baselines/kernel-surface-v0.1-beta.json b/docs/ci-baselines/kernel-surface-v0.1-beta.json
+--- a/docs/ci-baselines/kernel-surface-v0.1-beta.json
++++ b/docs/ci-baselines/kernel-surface-v0.1-beta.json
+@@ -615,7 +615,7 @@
+     {
+       "kind": "struct",
+       "path": "maos_kernel_core::halt::HaltRegistry",
+-      "signature_hash": "b6d6524333a6327adc96c8a3ef78e2a10134ea7e2a9c534d930d6a248eda4af8"
++      "signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
+     },
+     {
+       "kind": "struct",

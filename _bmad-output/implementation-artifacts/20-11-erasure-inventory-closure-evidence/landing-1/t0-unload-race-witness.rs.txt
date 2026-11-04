@@ -1,0 +1,191 @@
+#![forbid(unsafe_code)]
+
+//! T0 measurement 2: exercise the real unload and invoke_halt implementations.
+//! The existing redaction-policy boundary pauses receipt serialization after
+//! terminate_spirit's drain; no production code or kernel byte is modified.
+
+use std::borrow::Cow;
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
+
+use maos_domain::frame::EpistemicHaltPayload;
+use maos_domain::halt::HaltId;
+use maos_iac::adapter::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
+use maos_kernel_core::halt::{invoke_halt, HaltRegistry};
+use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
+use maos_kernel_core::scheduler::{
+    control_block::{ScbLifecycleState, SpiritManifestBundle},
+    scheduler_loop::SpiritSchedulerAdapter,
+};
+
+#[derive(Debug)]
+struct PauseReceipt {
+    reached: mpsc::SyncSender<()>,
+    resume: Mutex<mpsc::Receiver<()>>,
+    default: CorpusBackedRedactionPolicy,
+}
+
+impl RedactionPolicy for PauseReceipt {
+    fn redact<'a>(&self, bytes: &'a [u8]) -> Cow<'a, [u8]> {
+        let receipt = serde_json::from_slice::<serde_json::Value>(bytes).ok();
+        if receipt.as_ref().and_then(|v| v["resolution_kind"].as_str()) == Some("planned_unload") {
+            self.reached.send(()).expect("observer receives pause");
+            self.resume
+                .lock()
+                .expect("pause mutex")
+                .recv_timeout(Duration::from_secs(10))
+                .expect("real halt invocation completes during unload");
+        }
+        self.default.redact(bytes)
+    }
+}
+
+#[derive(Default)]
+struct Spirit;
+impl maos_spirit_abi::lifecycle::Spirit for Spirit {}
+
+#[tokio::test]
+async fn t0_unload_must_receipt_halt_invoked_after_termination_drain() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let scratch = tempfile::tempdir().expect("scratch");
+    let (reached_tx, reached_rx) = mpsc::sync_channel(1);
+    let (resume_tx, resume_rx) = mpsc::sync_channel(1);
+    let tl = Arc::new(
+        TransparencyLogAdapter::open_with_policy(
+            &scratch.path().join("tl.db"),
+            0x2011,
+            Box::new(PauseReceipt {
+                reached: reached_tx,
+                resume: Mutex::new(resume_rx),
+                default: CorpusBackedRedactionPolicy::new(),
+            }),
+        )
+        .expect("transparency log"),
+    );
+    let journal = Arc::new(
+        maos_kernel_core::journal::JournalAdapter::open(&scratch.path().join("journal.ndjson"))
+            .expect("journal"),
+    );
+    let registry = Arc::new(HaltRegistry::new());
+    let capability = Arc::new(
+        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0; 32]),
+            0x2011,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            maos_kernel_core::capability::cap_audit::channel().0,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default()),
+        ),
+    );
+    let db = scratch.path().join("memory.db");
+    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+            scratch.path().join("memory"),
+            4,
+        )),
+        Arc::new(maos_kernel_core::memory::shared::SharedMemoryStore::open(&db).expect("shared")),
+        Arc::new(
+            maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&db)
+                .expect("principal index"),
+        ),
+        Arc::clone(&tl),
+    ));
+    let telemetry = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+    let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
+        Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&telemetry))),
+        Arc::clone(&tl),
+    ));
+    let scheduler = Arc::new(SpiritSchedulerAdapter::new(
+        Arc::clone(&tl),
+        capability,
+        memory,
+        iac,
+        Arc::clone(&registry),
+        telemetry,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ));
+    let pid = scheduler
+        .load(
+            "race-20-11",
+            SpiritManifestBundle::default(),
+            Spirit,
+            0x2011,
+        )
+        .await
+        .expect("load");
+    let observer_scheduler = Arc::clone(&scheduler);
+    let observer_tl = Arc::clone(&tl);
+    let observer_registry = Arc::clone(&registry);
+    let observer = std::thread::spawn(move || {
+        reached_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("unload reaches receipt");
+        let scbs = observer_scheduler.scbs();
+        assert_eq!(
+            scbs.read().expect("scbs")[&pid].current_state(),
+            ScbLifecycleState::Unloaded
+        );
+        let payload = EpistemicHaltPayload::new(
+            "late-20-11".into(),
+            "ambiguity".into(),
+            1.0,
+            None,
+            "policy-20-11".into(),
+            "derived-20-11".into(),
+        )
+        .expect("valid halt");
+        invoke_halt(
+            &observer_tl,
+            &journal,
+            &observer_registry,
+            payload,
+            pid,
+            "race-20-11",
+            0x2011,
+        )
+        .expect("real invocation succeeds despite Unloaded SCB");
+        assert!(observer_registry
+            .lookup_pending_metadata(&HaltId::new("late-20-11").expect("id"))
+            .is_some());
+        resume_tx.send(()).expect("resume unload");
+    });
+    scheduler.unload(pid).await.expect("unload succeeds");
+    observer.join().expect("observer");
+    let rows = tl
+        .query_frames(FrameFilter {
+            spirit_pid: Some(pid),
+            kind: Some(FrameKind::EpistemicHalt),
+            order_by_insertion: true,
+            ..Default::default()
+        })
+        .expect("durable halt rows");
+    let receipt_ids: Vec<_> = rows
+        .iter()
+        .filter(|row| row.intent == "planned_unload" && !row.payload_redacted.is_empty())
+        .filter_map(|row| {
+            serde_json::from_slice::<maos_domain::halt::HaltReceipt>(&row.payload_redacted).ok()
+        })
+        .map(|receipt| receipt.halt_id.as_str().to_owned())
+        .collect();
+    assert!(
+        rows.iter().any(|row| row.intent == "ambiguity"),
+        "late invocation is durable"
+    );
+    assert!(
+        registry.halt_metadata_for_spirit(pid, 0).is_empty(),
+        "second drain discarded late halt"
+    );
+    assert_eq!(scheduler.resolve_pid("race-20-11"), None);
+    println!("Unloaded SCB accepted late-20-11; durable invocation, registry empty, SCB removed; receipt_ids={receipt_ids:?}");
+    assert!(
+        receipt_ids.iter().any(|id| id == "late-20-11"),
+        "unload discarded late-20-11 without a terminal receipt"
+    );
+}

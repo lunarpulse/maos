@@ -12,6 +12,14 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 20.9: Spawned-form lifecycle hooks and state-preserving swap
 
+**Shared kernel STOP supersession — 2026-11-04 (ask `halt_grant`).** Historical internal STOP
+21209 / 21,209 and the 20-9-only 21230 / 21,230 are superseded by **21250 / 21,250 for the whole
+cumulative measured kernel ledger at each landing**. D-20-14-12 C's joint 21250 now equals that shared STOP,
+not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21203 + 12 = 21215**
+(physical **27032 + 16 = 27048**). ADR-069 alarm **22000** and envelope **23000** are unchanged.
+Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
+
+
 Status: ready-for-dev
 
 <!-- Created 2026-11-03 at 8c809f9c (main; `git log -1 -- crates xtask` = 8c809f9c) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30); D07 A (2026-11-01, ask rows203c, "decided at 20-9"); D-19-5-10 C (2026-10-28, ask w3_19_5_d10, the received FR10 clause); R5 (2026-10-24, the two watchdog items); D-20-3c-01 A (I14 owner). D-20-9-01…16 were ruled 2026-11-03 by the operator (ask d_batch4), all as recommended A; D-20-14-12 C (ask d2014_12) sets the joint targeted STOP described below. Grants bind at dev start after remeasurement/rebase. No cargo ran (parent rule). Cites were re-read in a `git archive 8c809f9c` copy (`creation/cites-8c809f9c.md`), because the working tree carries Dev204L1's uncommitted 20-4 L1 edits. Kernel and kloc were measured by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`). Prototypes are saved as diffs and were never applied. Stale E20 §20-9 cites were corrected in place (`creation/records-owed.md` §A). Builds on 20-8 (ruled as recommended 2026-11-03, created the same day): WIT `maos:spirit@2.3.0`, manifest schema 7, `emit_manifest_declaration_event`, `SpiritManifestBundle.swap_invariants` / `HotSwapError::SwapInvariantDropped` (20-8 §Contract for 20-9). -->

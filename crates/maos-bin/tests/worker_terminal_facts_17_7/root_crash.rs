@@ -277,7 +277,17 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
         assert_eq!(exists_code(cid), Some(0), "non-owned CID {cid} was touched");
     }
     for path in old_custody.iter().chain(&new_custody) {
-        assert!(!path.exists(), "CID custody survived: {}", path.display());
+        assert!(
+            !path.exists(),
+            "CID custody survived: {}; stdout={} stderr={} receipt={:?} custody={:?}",
+            path.display(),
+            String::from_utf8_lossy(&purge.stdout),
+            String::from_utf8_lossy(&purge.stderr),
+            std::fs::read_to_string(&receipt),
+            std::fs::read_dir(path).map(|entries| entries
+                .map(|entry| entry.map(|e| e.path()))
+                .collect::<Vec<_>>())
+        );
     }
 }
 

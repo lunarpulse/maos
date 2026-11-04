@@ -6,7 +6,7 @@ context_commit: a8af3215
 baseline_commit: d3e3f586cb325c16a691cd19d1fd62588b288a0d
 security_sensitive: true
 kernel_grant: "RULED 2026-11-02 (ask s2010): kernel-Δ 0; no kernel grant. HEAD pins 26841 physical / 21042 tokei."
-kloc_grant: "RULED 2026-11-02 (ask s2010; D-20-10-10 A; D02 A ×3 unmeasured). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): maos-bin ≤ 34548; aggregate ≤ 192876; every other crate 0. The later maos-bin lander re-bases its draw on the then-current pin."
+kloc_grant: "RULED 2026-11-02 (ask s2010; D-20-10-10 A; D02 A ×3 unmeasured). Original pre-20-4 ceilings: maos-bin ≤ 34548; aggregate ≤ 192876; every other crate 0. CURRENT 2026-11-03 orchestrator-adjudicated, D02 A: combined required hosted corrections re-base within already authorized inherited ceilings, maos-bin ≤ 34643 and aggregate ≤ 193526; STOP above. Inherited measured base 34504/193140; final 34551/193187 (+47), hardfail193188 = measured + 1. Exact after cargo fmt --all; kernel/xtask and other grants unchanged. This is a re-base, not a widening."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:67-71`): security-critical — an irreversible destructive command whose ownership rule decides whether another MAOS home's Workers or a foreign container are killed (cross-home isolation), plus a concurrency boundary (a live creator racing cgroup removal). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC1, AC2, AC4 and AC5, Test Infrastructure on glm-5.3 (standing policy `proof-contract.md:57-71`; any session substitution recorded at review). A FLAG-Winston reading is added only if a kernel option is ruled. Creation anthropic/claude-opus-5-5."
 ---
 
@@ -202,6 +202,8 @@ unit — `epic-17-exit`, `ubuntu-24.04` and `ubuntu-26.04`.)*
    and it has one mount with destination `/workspace` whose source equals `<root>/<name>` for a `RootKind::WorkerWorkspaces`
    root of this purge (`purge.rs:67-96`), compared component-wise in the form measurement 1 establishes — runtime-supplied
    text is never canonicalised through the filesystem and never used as a path to delete.
+   A nonzero inspect is skipped only after a bounded `container exists` exits1;
+   present or unconfirmed candidates stay fatal with inspect status/stderr.
 2. Each owned CID: `podman rm --force --volumes --time=0 <CID>`, then `podman container exists <CID>` (exit 1 = absent),
    each under a deadline, through **one** bounded runtime helper that replaces the two wait loops (`purge.rs:1440-1453`,
    `:2029-2042`) and runs the client with the environment `t3/spawn.rs:58-73` allows. CIDs, never names, go to the runtime.
@@ -232,7 +234,8 @@ unit — `epic-17-exit`, `ubuntu-24.04` and `ubuntu-26.04`.)*
 ### AC3 — the dry run stays inert (epic AC1 "no side effects on dry-run")
 
 1. `maos purge` without `--yes` prints `would remove container <CID> (<name>)`, `would remove cgroup <path>`,
-   `would remove T3 state <path>` and the not-attributable list; it runs only read-only runtime verbs (`ps`, `inspect`);
+   `would remove T3 state <path>` and the not-attributable list; it runs only read-only runtime verbs (`ps`, `inspect`,
+   and bounded `container exists` solely to disambiguate a failed inspect, per the 2026-11-03 orchestrator instruction);
    no `rm`, `kill`, `unshare`, rmdir or write; the podman-storage guard (`purge.rs:1994-2013`, D:1069) still gates every
    runtime call.
 2. **Failing-before (local):** a stub-runtime vector expecting the `would remove container` line reds at `a8af3215`.
@@ -262,9 +265,11 @@ unit — `epic-17-exit`, `ubuntu-24.04` and `ubuntu-26.04`.)*
    kernel verdict was `TerminationUnconfirmed` (P1–P4 above) is handled as possibly live by AC1's forced removal.
    `crates/maos-kernel-core/src/security/sandbox/t3/child.rs` is byte-identical at landing.
 2. Under `$XDG_RUNTIME_DIR/maos-worker-state` and `/tmp/maos-worker-state-<euid>` (`egress.rs:242-255`), each validated
-   as `egress.rs:273-288` validates (directory, owner euid, mode 0700, not a symlink): remove each spawn dir whose `cid`
-   names a CID `container exists` reports absent after AC1's pass, then empty `process-<creator pid>-<nonce>` roots only if that PID is positively absent; shared state parents are never removed;
-   keep and report live/anonymous process roots, spawn dirs without `cid`, and dirs naming a CID that still exists. Receipt rows with the directory
+   as `egress.rs:273-288` validates (directory, owner euid, mode 0700, not a symlink): capture a valid spawn CID
+   and held directory identity at inventory before AC1's removal can delete the cidfile; reclaim only with a fresh
+   `container exists` absence proof and renewed ownership/mode/device/inode checks. Then remove empty
+   `process-<creator pid>-<nonce>` roots only if that PID is positively absent; shared state parents are never removed.
+   Keep/report live/anonymous roots, missing/invalid-at-inventory CID custody, and still-present/unknown CIDs. Receipt rows use the directory
    path. The `egress.rs:240-241` comment says so.
 3. **Failing-before (local):** a fixture state root (an empty dead-creator process root; a spawn dir whose CID
    the stub reports absent; one whose CID is present; one without CID) — at the baseline all survive;
@@ -933,6 +938,155 @@ operator-owned hosted baseline/head/plant rerun remains required: the prior
 StoreInUse failures are not accepted removal reds. No commit, push, story/status
 flip, kernel or production-policy change.
 
+#### Hosted AC5 cidfile-lifecycle correction — run 41803510235, 2026-11-03
+
+Scoped baseline: `73e7afbcae81f4fb4858e9d52ded3d592bed636d`. The independent
+foreign-home fixture now reaches production. Both real heads remove the owned
+CIDs and preserve the foreign/impostor CIDs, then fail on spawn custody;
+restored plant fails at the same point. Both real cgroup/native-binding legs
+pass. Base and initial no-op plant hit their intended diagnostics. This is a
+**production AC5 defect**, not StoreInUse or a timing flake. Exact hosted
+job/log citations:
+[`hosted-3/hosted-diagnosis.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-3/hosted-diagnosis.md).
+
+Cause: container removal preceded the first custody CID-file read, but Podman's
+documented `rm` side effect deletes its cidfile. The old hosted logs did not
+directly print that missing file; the historical causal link is source-supported
+inference, independently reproduced by the new faithful cidfile-deleting stub.
+Original production with the strengthened `purge_residue_20_10.rs:202` witness
+exits100: `removed container's custody leaked after runtime deleted its cidfile`.
+
+Inventory now captures each valid spawn CID with its held no-follow directory
+before any runtime removal, validating private0700/euid ownership. Reclamation
+requires a fresh bounded `container exists` exit1 proof and matching held/current
+device/inode with renewed ownership/mode checks; final rmdir is bound to the
+held identity. A missing/invalid CID at inventory never grants deletion. The
+existing strong absent/present/unknown/live/legacy/receipt coverage is retained.
+New negatives at `:265` and `:289` prove missing-at-inventory conservatism and
+retention of both original/replacement directory data during an `rm` swap.
+
+Capture-discard plant: storing `proof: None` exits100 on the intended
+`absent CID custody leaked` assertion. Copy-back, `cmp`, `touch`, restore-scratch
+removal and final formatting each exit0. Plant digest, exact commands and
+scoped implementation/cut digests:
+[`hosted-3/plants.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-3/plants.md)
+and adjacent `diff-sha256.json`, `commands.md` / `commands.json`. No active plant.
+
+Custody-only local matrix, before the added race/S5 items: registered scene fixtures provisioned (5 artifacts,
+exit0); **88/88** focused tests (egress5, uninstall23, purge14, shutdown12,
+terminal34), exit0; library runtime safety **3/3**, exit0; executed workflow
+contracts **5/5**, exit0. The focused command's25 excluded bin-unit tests do
+not contain library purge tests; those are covered by the separate3-test run.
+The new workflow test executes the actual restored checker: required PASS plus33
+filter exclusions succeeds; explicit SKIP, wrong required name and zero run fail.
+Hermetic cut count is19; terminal count remains34. Base/plant intended-red
+diagnostics and copy/cmp/touch remain strict; existing removal plant still
+applies. Hosted custody failures now include stdout/stderr, receipt and listing.
+
+Formatted measurement and exact pins: **maos-bin34537 (+33)**, under the
+20-10 ceiling34548; **aggregate193173 (+33)** over inherited post-20-4
+baseline193140, under that inherited ceiling193526; hardfail **193174**
+(measured+1). xtask44452 unchanged, no other crate grant changed. The first
+measurement was blocked by a peer's evidence `.rs`; its owner renamed that
+evidence, without this agent changing it. Old exact pins then correctly failed;
+the measured re-pin passes. No scope exclusion or estimate was substituted.
+Kernel source is untouched; final baseline/structural/record gate outcomes
+are retained in the command ledger.
+
+Non-denying all-target workspace clippy on Rust1.98.1 exits0; complete-stream
+ratchet **1331/871**, exit0, baseline1383/897 unchanged. Full local comparison
+against20-4's corrected stream finds no new lint/file/message multiplicities.
+Touched maos-bin files have no warnings; the xtask test retains its existing
+line15 `needless_borrows_for_generic_args` only. No warning suppression or
+baseline change. Hosted-toolchain lint remains unverified.
+
+Adjacent-consumer audit found only the inventory CID-file read in maos-bin;
+egress and supervision use empty-root rmdir, not a post-removal CID recovery.
+ADR-067 and canonical/site English/Korean run/cookbook wording now distinguish
+captured CID authority from a merely missing file. No path shape, socket name,
+environment variable, kernel file or producer lifetime change; existing hosted-
+length vector is included in egress5. Receipt schema/vocabulary is unchanged.
+
+After cargo finished,29 `/proc` PIDs were scanned; no active Rust tooling,
+candidate references or inaccessible same-UID entries. Locked granular cleanup
+removed19 stale sessions for the three affected test crates:234217472 allocated
+bytes, observed free-space increase167460864 bytes after flush (filesystem-wide,
+not exclusive physical-reclamation proof). Current sessions, crate roots,
+lockfiles, other crates, deps and target roots remain. No cargo clean/broad
+deletion; named workflow scratch and restore intermediary are absent.
+
+The owned deferred/lesson row records the production cause and disposition.
+Fresh corrected real delegated/Podman head/restored-plant green and hosted lint
+remain operator-owned and unverified; local gated returns are not that proof.
+Full workspace/default/prepush and docs-site builds were not requested/run in
+this scoped follow-up. No commit, push, CI-branch edit or story/status flip.
+
+#### Combined hosted correction — enumeration race and S5, 2026-11-03
+
+Main added two further diagnoses from main run41803503598 to this same pass.
+Workspace job126484784599 exposed a real shared-Podman enumeration race:
+a listed candidate can disappear before inspect. `inspect` now skips only
+nonzero status followed by a bounded `container exists` exit1. Present,
+error or deadline stays fatal; inspect status/stderr are printed. The new
+dry-run vector (`purge_residue_20_10.rs:164`) is red100 before the fix and when
+the skip is planted away. The negative at `:200` covers exists0/125/timeout,
+requiring refusal78, diagnostic evidence and no mutation/receipt. The conditional
+read-only probe is explicitly allowed by Main's instruction and now reflected
+in current AC1/AC3 and English/Korean/ADR wording; it is not a retry or a hidden
+relaxation of the storage/mutation guard. The original AC5 fix remains intact.
+
+Loom job126484785052's S5 failure is **test-only**, not another production
+regression: two rows sampled2.422539097s and2.622919372s are200.380275ms apart,
+matching warning-to-timeout separation. Frame kinds/reset trace were absent
+from that log; warning/exceeded and clock-offset attribution remain source-
+supported inference. The old ratio>=1 oracle deterministically counts2 for
+those warning/exceeded payloads. `unload_scenes.rs:21` proves old-predicate
+red100 and restored-old-filter plant red100. Rows retain `FrameKind`; the
+live assertion counts exactly one BudgetExceeded and still checks the injected
+hook/cap payload. Both World constructors share one `std::sync::Once` at the
+terminal binary root. No production clock/budget change, count relaxation,
+serialization workaround or retry-to-green. A same-line rule-10 note is appended
+to the existing20-7-owned `deferred-work.md:4`, citing the200ms pair and18-0
+clock-reinit precedent. Other timing families remain open.
+
+**Budget re-base — 2026-11-03, orchestrator-adjudicated, D02 A.** Main permits
+this combined required delta within already authorized inherited caps:
+maos-bin<=34643, aggregate<=193526; STOP above, no ceiling widening. The old
+34548 absolute cap was set against pre-20-4 bin34191; the inherited current
+base is34504/193140. Final formatted measurement is **34551 /193187 (+47)**:
+custody+33, enumeration+14; S5/test-file changes uncharged by the existing gate.
+Exact pins are bin34551 and aggregate hardfail**193188** (measured+1), with
+live20-10 key and `->` in first HISTORY segments. xtask44452 and kernel
+26841/21042 are unchanged; no other grant changed.
+
+After all three byte-restored mutations, final fmt exits0. Registered scene
+fixtures are provisioned (5 artifacts,0). Combined focused serial nextest:
+**91/91,0 skips, exit0** (egress5, uninstall23, purge16, shutdown12,
+terminal35); library runtime safety**3/3,0**; workflow contracts**5/5,0**.
+Discipline/cut terminal pin and required names are35; hermetic cut is21.
+Restored cut requires exactly1 named PASS and permits34 filter exclusions,
+while explicit SKIP/wrong name/zero run fail. Base/plant intended-red diagnostics
+and byte-restoration remain strict; existing removal no-op patch still applies.
+Expanded custody diagnostics print stdout/stderr, receipt and directory listing.
+
+Final complete non-denying clippy exits0 on Rust1.98.1; ratchet**1331/871,0**
+against unchanged1383/897 baseline. No new lint/file/message multiplicities
+against20-4's corrected local stream; existing xtask1/supervisor2 warnings remain.
+Structural/record gate outcomes and every command/exit are in the final ledger.
+No hosted-toolchain warning result is inferred from this local comparison.
+
+Initial custody-only phase evidence above is historical, not the combined final
+tree. Final witness names/lines, three mutation hashes, implementation/cut
+SHA-256, exact limits, proof boundaries and cleanup:
+[`hosted-3/combined-plants.md`](20-10-purge-residue-removal-evidence/landing-1/hosted-3/combined-plants.md).
+The granular19-session prune accounts for234217472 allocated bytes and observed
+167460864-byte free-space increase after flush, with no broad target deletion.
+Final27-PID scan has no active Rust tooling; all restore/named scratch is absent.
+Corrected real hosted head/restored-plant, concurrent enumeration and S5 clock
+behavior remain operator verification; local gated returns are not that proof.
+No new full workspace/default/prepush or docs-site matrix was requested/run.
+No commit, push, CI-branch or story/status flip; unrelated work is preserved.
+
 ### File List
 
 - [Purge orchestration](../../crates/maos-bin/src/purge.rs), [new runtime reclamation module](../../crates/maos-bin/src/purge_runtime.rs), [creator-PID custody roots](../../crates/maos-bin/src/egress.rs).
@@ -943,6 +1097,8 @@ flip, kernel or production-policy change.
 - Cold-swap oracle incident: `crates/maos-bin/tests/one_daemon_one_door_16_1.rs`; the resolved cold-swap row in `deferred-work.md`; this record and the 20-1a Dev Agent Record. The earlier implementation-diff digest is not regenerated or expanded.
 - Hosted incident: [AF_UNIX hosted-length witness](../../crates/maos-bin/tests/egress_daemon_17_1.rs), [startup failure context](../../crates/maos-bin/tests/root_shutdown_unload_16_3.rs), the existing terminal/custody witnesses, [workflow contract](../../xtask/tests/epic17_exit_workflow_17_7.rs), [corrected branch-only cut](20-10-purge-residue-removal-evidence/ci/ci-20-10-verify.yml), ADR-067, exact pins and [hosted incident evidence](20-10-purge-residue-removal-evidence/landing-1/hosted-1/hosted-findings.md).
 - Hosted shared-ancestry follow-up: [independent foreign-root fixture and pre-gate invariant](../../crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs), the owned lesson row, this record, and [focused follow-up evidence](20-10-purge-residue-removal-evidence/landing-1/hosted-2/plants.md). No workflow, production source or pin change.
+- Hosted AC5 lifecycle correction: validated pre-removal custody capture in `purge_runtime.rs`, faithful runtime stub plus missing-CID/inode-swap negatives, expanded real-scene diagnostics, restored-log checker/workflow regression, ADR/operator English/Korean wording, exact maos-bin/aggregate pins, owned lesson/record, and [hosted-3 evidence](20-10-purge-residue-removal-evidence/landing-1/hosted-3/plants.md). Other work remains untouched.
+- Combined enumeration/S5 addition: `purge_runtime.rs` failed-inspect disambiguation and diagnostics; new purge race vectors; shared terminal clock initializer plus typed unload rows/oracle; supervisor caller; discipline/cut count35 and required-name pins; workflow regression/count21; current dry-run contract wording; exact combined pins, owned production lesson and same-line existing20-7 flake note; [combined final proof](20-10-purge-residue-removal-evidence/landing-1/hosted-3/combined-plants.md).
 
 
 ## Change Log
@@ -960,3 +1116,5 @@ flip, kernel or production-policy change.
 - 2026-11-03: Review corrections retain live/anonymous T3 roots and shared parents, validate HOME/legacy ancestry/protected paths, make residue an explicit nonzero outcome, document the same-UID attribution boundary, and strengthen all identified witnesses. Exact maos-bin 34188 / aggregate 192516 (hardfail 192517), kernel unchanged; five baseline-red vectors and nine byte-restored assertion-red plants; focused, serial/default, gates, clippy, deny and prepush observed green except separately recorded prepush budget advisories. No status flip or push.
 - 2026-11-03: Hosted incidents 41584515474 / 41584453971 corrected at cause: use the existing delegated-unit namespace; confine creator-PID naming to volatile custody so durable AF_UNIX socket paths stay short; separate terminal fixture HOME/MAOS_HOME and expose startup stderr. Three byte-restored assertion-red plants, focused164/164, serial5573/5573 and prepush0; default's known snapshot-owner failure remains recorded/unretried under owner20-7. Exact bin34191 / aggregate192519 (hardfail192520), kernel unchanged; corrected hosted cut remains unpushed.
 - 2026-11-03: Hosted runs41610868202 /41610893716 classified as a shared-ancestor fixture defect; foreign LiveRoot moved to independent TempDir with a pre-T3 canonical ancestry invariant. Original-layout and nested-layout reds100; byte-restored focused serial81/81, terminal count34 unchanged; local clippy1331/871 with no changed-file warnings. Production lock policy and intended hosted red diagnostics unchanged; operator rerun still required. Inherited post-20-4 counts unchanged.
+- 2026-11-03: Run41803510235 exposes real AC5 late-cidfile-read defect after the repaired fixture reaches removal. Capture validated CID/held identity before Podman rm, require fresh absence and identity on reclaim; missing-at-inventory stays conservative. Faithful-stub red100 and capture plant red100; byte-restored focused88/88, library3/3 and workflow5/5 green. Hermetic cut19, terminal34; restored checker permits filter exclusions only with exact required PASS. Formatted bin34537 / aggregate193173 (hardfail193174), xtask/kernel unchanged; local lint1331/871 with no new warnings. Corrected hosted proof remains operator-owned.
+- 2026-11-03: Orchestrator-adjudicated, D02 A combined re-base within inherited bin34643/aggregate193526 caps. Add conservative vanished-candidate disambiguation with inspect status/stderr and read-only fallback; repair S5 typed-kind oracle/shared clock Once without production/budget change. Both new red-before vectors and byte-restored plants100; combined serial91/91, library3/3, workflow5/5 and lint1331/871 green. Exact bin34551/aggregate193187/hardfail193188, xtask/kernel unchanged; terminal35/hermetic21. Corrected hosted proof remains unverified; no push/status flip.

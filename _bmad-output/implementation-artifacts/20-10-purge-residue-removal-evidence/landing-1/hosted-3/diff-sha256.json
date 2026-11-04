@@ -1,0 +1,11 @@
+{
+  "implementation.diff": "0e6e845215187b976747f2fd4e31c2e41bea3fd0bb77935faf26d2c94add0e42",
+  "verify-cut.diff": "46bd5c420ac88065fe66d8388f5947ba230fe2cdf574ad1fe2e5c211eeb2a227",
+  "capture-discard.diff": "ec5b121aff6690f803271519b7809f8b1bbfb128c17c8f99ee2a274558aebc31",
+  "custody-only-ci-20-10-verify.yml": "4f5a8ee0339bd2c270a8eb21298aef9c083480c93880a391a69212f99d90df60",
+  "combined-implementation.diff": "93ce55e728b7c6d3905155d495e2a8bce486ad1b417bbc75f17d2ab4192045e8",
+  "combined-verify-cut.diff": "d018ec708e111b9d90f65101f08e51ff1693706d8b669efd641d54ff85794496",
+  "vanished-skip.diff": "8328de1a2a868ba1735075fccc244d695cbf6c85f1eae701e1c2b6610c6ce612",
+  "s5-ratio.diff": "9dbbe447b0f2ecd88aaa4971a5b10222482a22545db59c186af02c1adc4a1cfb",
+  "ci-20-10-verify.yml": "b5394fe3cff775e8e242e8c3c79c292f6a8fa5fa5603a0763c96b7b09c5590c4"
+}

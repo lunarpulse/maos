@@ -1,0 +1,16 @@
+--- a/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs
++++ b/crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs
+@@ -13,8 +13,11 @@
+ const BOOT_NONCE: u64 = 0x17_07_51;
+ type Row = (u32, String, serde_json::Value, FrameKind);
+ 
+-fn is_unload_budget_exceeded((_, intent, _, kind): &Row) -> bool {
+-    *kind == FrameKind::BudgetExceeded && intent == "hook.budget.on_unload"
++fn is_unload_budget_exceeded((_, intent, payload, _): &Row) -> bool {
++    intent == "hook.budget.on_unload"
++        && payload["ratio_breached"]
++            .as_f64()
++            .is_some_and(|ratio| ratio >= 1.0)
+ }
+ 
+ #[test]

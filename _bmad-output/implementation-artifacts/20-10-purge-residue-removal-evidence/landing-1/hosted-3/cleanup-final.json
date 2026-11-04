@@ -1,0 +1,11 @@
+{
+  "rust_processes": [],
+  "pids_scanned": 27,
+  "restore_files": {
+    "purge-runtime.restore": false,
+    "vanished-runtime.restore": false,
+    "s5-oracle.restore": false
+  },
+  "named_scratch_glob_result": "No files found matching pattern",
+  "granular_prune": "cleanup-proc-scan.json and cleanup-result.json; 19 old sessions removed, all current-task sessions retained"
+}

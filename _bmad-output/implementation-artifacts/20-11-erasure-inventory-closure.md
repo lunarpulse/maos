@@ -5,8 +5,21 @@ created: 2026-11-02
 context_commit: a8af3215
 baseline_commit: a8af3215
 security_sensitive: true
-kernel_grant: "RULED 2026-11-02 (ask s2011; D-20-11-04 A): KS ScheduleWatchdog::forget_spirit measured at a8af3215 from 26841 physical / 21042 tokei, +10 / +6. Ceilings (STOP above): kernel ≤ 26861 physical / 21054 tokei; kernel lands last. The second or later kernel landing re-bases; cumulative STOP above 21209 tokei, ADR-069 alarm 22000; expected cumulative with 20-1b +68 and 20-4 +9 is 21125."
-kloc_grant: "RULED 2026-11-02 (ask s2011; D-20-11-08 A; D02 A ×2 measured / ×3 unmeasured). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): kernel ≤ 26861 / 21054; maos-iac ≤ 8630; maos-audit ≤ 8261; maos-bin ≤ 34698; maos-registry ≤ 4368; aggregate ≤ 194058. Every other crate 0."
+kernel_grant: >-
+  RULED 2026-11-02 (ask s2011; KS) and 2026-11-04 (ask halt_grant; D-20-11-11 A = O4).
+  Measured from 26841 physical / 21042 tokei: KS +10/+6 and O4 +16/+12, bundle +26/+18 = 26867/21060.
+  Binding D02 A ×2 ceiling 26893 physical / 21078 tokei; O4 allowance +32/+24 adds to KS's +20/+12.
+  Grant binds only at the final kernel landing after re-measurement/re-base; KS + O4 and AC3 land last.
+  Shared cumulative measured STOP 21250 for the whole ledger at each landing (ask halt_grant);
+  expected cumulative 21203 + 12 = 21215; ADR-069 alarm 22000 / envelope 23000 unchanged.
+kloc_grant: >-
+  RULED asks s2011 and halt_grant; D02 A ×2 measured / ×3 unmeasured.
+  At 73e7afbc re-base: kernel ceiling 26893/21078; maos-iac 8630; maos-audit 8261;
+  maos-bin L1 35704 (34504 + 1200); maos-registry 4368; maos-domain 10115 (10107 + 2×4, O4 at L2).
+  Aggregate ceiling 195404 = current measured 193140 + original allowance 2232 + O4 allowance 32
+  (24 kernel tokei + 8 domain); original creation ceiling 194058 is historical.
+  Exact pins and aggregate hardfail = measured + 1 at landing; re-base again onto then-landed pins.
+  Every other crate 0. No pin or source change is authorized by this recording pass.
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): an attesting control (a signed proof-of-erasure, rule 11), cross-Spirit isolation (pid reuse across boots, legal holds), concurrency (EC-13 lock windows, forget/hold serialization) and, if ruled, a kernel FLAG-Winston row. Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC2.4, AC3, AC5.3 and the proof format (D-20-11-09), Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -17,9 +30,17 @@ Status: ready-for-dev
 <!-- Created 2026-11-02 at a8af3215 (main; origin 47631284) by bmad-create-story under the lighter measured creation contract. Operator rulings in force: D01 A, D02 A, D11 A (2026-10-30). D-20-11-01…10 are PROPOSED, not ruled — the operator rules; a different ruling rewrites only the clauses marked with that row. No cargo ran: cites re-read at HEAD (`creation/cites-a8af3215.md`); kernel and kloc by the prebuilt gate binary on `git archive` copies (`creation/measurements.md`); prototypes saved as diffs, never applied. Stale epic cites are corrected here and owed to the epic (`creation/records-owed.md` §A). -->
 
 **Status rationale — ready-for-dev.** Prerequisite 20-3c is `done` (PF:129). Nothing needs a machine the repository
-lacks: every category is provable on the hermetic offline harness and the door; only AC6 (a running spawned Spirit)
-needs the hosted T3 substrate, which exists (`provision-t3-test-substrate`). Kernel rows are optional and land last
-(D-20-11-07 A).
+lacks: the hermetic harness and door cover the local categories; only AC6 (a running spawned Spirit) needs the
+hosted T3 substrate (`provision-t3-test-substrate`). The ruled final kernel landing is mandatory for AC3 and
+watchdog cleanup; L1 remains kernel-free (ask `halt_landing`, 2026-11-04).
+
+**T0 STOP history — 2026-11-04, HEAD `73e7afbc` (Dev2011).** Measurement 2 reproduced the unreceipted
+second-drain race with the real scheduler and `invoke_halt`: an `Unloaded` SCB accepts a durable halt which
+`scheduler_loop.rs:574` discards without a terminal receipt. No L1 implementation or status transition occurred
+in that preflight. **The operator subsequently ruled D-20-11-11 A / O4 (`halt_grant`) and moved AC3 to the
+final kernel landing (`halt_landing`) on 2026-11-04.** L1 AC1, AC2 and AC4–AC7 may proceed kernel-free once
+the orchestrator hands over the cargo slot; it currently belongs to Dev2010. The observed red remains evidence,
+not a repaired claim. See [T0 STOP evidence](20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md).
 
 > **The capability:** *`maosctl uninstall <spirit>` signs only what it observed: every per-Spirit store FR65 names is
 > enumerated from where it lives, removed or honestly labelled, and the signed bundle proves it — including for a
@@ -129,22 +150,34 @@ Full OLD → NEW table: `creation/cites-a8af3215.md` (C1–C7, F1–F26).
 **Operator-ruling list:** (1) D-20-11-01…10; (2) the kernel row(s) or none; (3) the envelope above. Each figure
 lands exact, with a HISTORY row whose first segment cites this key with `->` (D11 A).
 
-## Decisions — RULED 2026-11-02 (ask s2011)
+**Superseding grant — 2026-11-04 (ask `halt_grant`).** O4 is granted at +16 physical / +12 tokei kernel and
++4 maos-domain, measured at `73e7afbc`. KS + O4 measured = **26867 / 21060**; the binding D02 A ×2 ceiling is
+**26893 / 21078** (KS allowance +20/+12, O4 allowance +32/+24). Domain measured = **10111**, ceiling
+**10115** from pin 10107. The creation table above is historical. The grant binds only at final kernel landing
+after re-measure/re-base; no pin moves now. The whole-ledger measured STOP is **21250**, superseding 21209,
+20-9-only 21230 and the separate joint-21250 exception; **21203 + 12 = 21215** cumulative measured tokei.
+The same ledger measures physical **27032 + 16 = 27048**. ADR-069 alarm 22000 / envelope 23000 are unchanged.
+
+## Decisions — RULED asks s2011 (2026-11-02), halt_grant / halt_landing (2026-11-04)
 
 **Rulings 2026-11-02 (ask s2011):** The operator ruled every D-20-11-01…10 row exactly as recommended, including D-20-11-02 B, D-20-11-03 B and D-20-11-04 A. Kernel KS and the ceilings are granted as recorded in frontmatter.
+
+**Rulings 2026-11-04:** `halt_grant` selects D-20-11-11 **A / O4** and shared measured STOP **21250**;
+`halt_landing` moves AC3 to final kernel KS + O4 while L1 implements AC1, AC2, AC4–AC7 kernel-free.
 
 | ID | Question | Options | Recommendation and evidence | Status |
 |---|---|---|---|---|
 | **D-20-11-01** | What "intent lineage references" are enumerated and removed | **A** the Spirit's own Distillate frames at its incarnations (D-02) via `distillates_written_by` (P2), body-scrubbed with the ADR-044 tombstone (reason `spirit-uninstall`) + a `distillate.redacted` marker naming the Spirit, ids into `erased_distillate_frame_ids` (pre-inclusion proofs); a distillate whose derivation names a held principal stays and is a named gap; IAC-frame `intent_lineage` arrays (NFR-Aud-14 audit chain) retained and named in the reason · **B** A + rewrite the lineage arrays of every IAC frame from/to the Spirit · **C** enumerate only: `CoverageGap` with count and ids | **A.** I13 lineage persists only in kind-11 bodies (`distillate.rs:136`); writer = citer (`:348-377`), so a Spirit's distillates are its own. B rewrites counterpart Spirits' audit chain (`frame.rs:36-50`) with no tombstone convention; C keeps data FR65 says is removed. | RULED 2026-11-02: **A** (ask s2011) |
 | **D-20-11-02** | Which incarnations the new categories cover | **A** latest boot only (today, `all_boots=false`, `main.rs:10560`) · **B** every boot, keyed `(boot_nonce, pid)` (`resolve_spirit_name(…, true)`, `lib.rs:1758-1763`), for lineage and orphaned halts; existing principal discovery unchanged · **C** B + re-key the existing pid-only lookups (`principal_ids_for_spirit_pid`, `revoke_all_for_pid`) | **B.** Boot-local pids repeat across boots (`deferred-work.md:1329`); latest-only signs `Removed` over earlier boots' distillates. `(boot_nonce, pid)` never touches another Spirit. C reopens shipped principal discovery that 20-3b's stable-owner path covers (`erasure_uninstall_13_5b.rs:1197`). | RULED 2026-11-02: **B** (ask s2011) |
-| **D-20-11-03** | Pending halts: how counted and removed | **A** KH (+10/+6): door counts `unload_receipted` receipts (minus the `term-…` marker); offline: orphaned halts (invocation frame at an incarnation, no terminal receipt, no `halt.resolve` decision) closed through `terminate_spirit` on a transient `HaltRegistry` with `UnplannedCrash` · **B** kernel-free: door pre-reads `drain_for_spirit_dry_run(pid)`, post-verifies `halt_metadata_for_spirit(pid, 0)` empty, counts the `PlannedUnload` receipts by TL read-back after the unload frame; offline as A · **C** enumerate only, no receipts | **B.** Exact without kernel lines; same single receipt writer (PF:212). A is the same evidence through a kernel API. C leaves open halts for an erased Spirit. T0 measurement 2 (second unreceipted drain, `scheduler_loop.rs:574`) can reopen this as STOP + D-row. | RULED 2026-11-02: **B** (ask s2011) |
+| **D-20-11-03** | Pending halts: how counted and removed | **A** KH (+10/+6): door counts `unload_receipted` receipts (minus the `term-…` marker); offline: orphaned halts (invocation frame at an incarnation, no terminal receipt, no `halt.resolve` decision) closed through `terminate_spirit` on a transient `HaltRegistry` with `UnplannedCrash` · **B** kernel-free: door pre-reads `drain_for_spirit_dry_run(pid)`, post-verifies `halt_metadata_for_spirit(pid, 0)` empty, counts the `PlannedUnload` receipts by TL read-back after the unload frame; offline as A · **C** enumerate only, no receipts | **B.** Exact without kernel lines; same single receipt writer (PF:212). A is the same evidence through a kernel API. C leaves open halts for an erased Spirit. T0 measurement 2 (second unreceipted drain, `scheduler_loop.rs:574`) can reopen this as STOP + D-row. | RULED 2026-11-02: **B** (ask s2011); amended 2026-11-04: O4 fence required and AC3 moves to final kernel landing (`halt_grant`, `halt_landing`) |
 | **D-20-11-04** | Scheduled invocations | **A** KS (+10/+6): door enumerates `[[schedule]]` ids from the SCB snapshot before unload, then `forget_spirit` drops the watchdog's buckets and stamps; offline: ids from the installed manifest, or for a compiled-in Spirit a named gap ("re-admitted by the binary at next boot") · **B** as A without `forget_spirit`; the reason names the per-process state retained until root exit · **C** enumerate only | **A.** The rate bucket keyed by Spirit id (`schedule_watchdog.rs:97`) survives uninstall and a same-id reinstall in the same root inherits it; six tokei make `Removed` literally true. | RULED 2026-11-02: **A** (ask s2011) |
 | **D-20-11-05** | The installed registry package | **A** on an `Erased` terminal remove the index entry and generation dirs (`uninstall_package`), category `installed_package` `Removed{1}` / `VerifiedEmpty`; `Held`/`Failed` keep it and say so; `cli.rs:63-66` becomes true · **B** keep it; `installed_package` `CoverageGap` "the next serving boot re-admits it" (`main.rs:4308-4313`); CLI doc corrected · **C** route removal to 20-1b | **A.** An uninstalled Spirit re-admitted at the next boot, schedules included, is not uninstalled; the crate change is small. Coordinate `storage.rs` with 20-1b. | RULED 2026-11-02: **A** (ask s2011) |
 | **D-20-11-06** | EC-13 shape | **A** kernel-free: rowid windows (P1); sweeps re-check this principal's hold and the hold set per window under the TL lock; cascade and door forget leave the async worker (`block_in_place`, multi-thread root `main.rs:1856`); door release via `MemoryManagerAdapter::release_legal_hold` · **B** A + KF (+37/+33): the late sweep runs under the kernel serializer · **C** off-worker only, no paging | **A.** `place_legal_hold` writes under the same TL lock, so each window is linearized against placement; B buys the same guarantee for 33 kernel tokei; C keeps the writer stall EC-13 names. | RULED 2026-11-02: **A** (ask s2011) |
-| **D-20-11-07** | Landing shape | **A** one key, two landings: L1 kernel-free (every AC; a pending kernel category reports its kernel-free reason), L2 the ruled kernel row(s) last, re-based · **B** one landing · **C** split key for the kernel row | **A** when any kernel row is ruled (kernel last, 20-3c/20-7 precedent); collapses to one landing if none is. | RULED 2026-11-02: **A** (ask s2011) |
+| **D-20-11-07** | Landing shape | **A** one key, two landings: L1 kernel-free; L2 ruled kernel rows last, re-based · **B** one landing · **C** split kernel key | **A.** Amended 2026-11-04 by ask `halt_landing`: L1 AC1, AC2, AC4–AC7 with honest pending-kernel reasons; AC3 (halt count / receipt category) moves to the final kernel landing with KS + O4. AC8 records follow each landing; no full-story closure before L2. | RULED **A** 2026-11-02 (`s2011`), amended 2026-11-04 (`halt_landing`) |
 | **D-20-11-08** | Per-crate envelope (D02 A applied) | **A** the envelope above (×2 measured / ×3 unmeasured) · **B** exact measured grants, every correction re-asks · **C** ×1.3 (rule 6) | **A.** 20-3b and 20-3c landed at 2–3× creation forecasts; most of this story is unmeasured. | RULED 2026-11-02: **A** (ask s2011) |
 | **D-20-11-09** | Proof evidence for categories without frame proofs (schedules, halts, package, tokens) and principal-free Spirits | **A** each claimed status is backed by a `principal.uninstall.category` TL evidence frame written before the post-tree capture (excluded from forget scans by `transparency_log.rs:1589`); the bundle carries post-inclusion proofs for them; schema bump; Rust and Python verifiers check per category; `NotFound` only when every category is empty · **B** narrow P18 to frame-backed categories; others signature-attested and labelled so · **C** keep P18 and `NotFound` as is | **A.** NFR-Aud-12 asks for an externally verifiable receipt; B weakens verification; C fails FR65 for every principal-free Spirit (`main.rs:10721-10741`). Fixes the Python/Rust P18 mismatch (§C R2). | RULED 2026-11-02: **A** (ask s2011) |
 | **D-20-11-10** | Inventory beyond FR65's list | **A** every other per-Spirit store found at T0 (creation list: FR11 manifest archive, skill queue entries by author pid, Lifecycle Journal) is a named category with a counted status and reason — never silent · **B** erase them too · **C** FR65's list + package only | **A.** NFR-Aud-12's owner row (`deferred-work.md:78`) asks for the complete inventory; B reaches into FR11 migration refusals (`admission.rs:847-855`) and 18-7 skill revisions; C signs a silent omission. | RULED 2026-11-02: **A** (ask s2011) |
+| **D-20-11-11** | T0 measurement 2 proves an unreceipted late halt; L1 AC3 cannot close under D-03 B. Which kernel repair is requested from FLAG-Winston, under a separate grant and a re-ruled landing dependency? Declining all four keeps the former **B**: the story stays stopped until an independently granted repair lands | **A** (O4) fence inside the single writer: `terminate_spirit` closes the pid in a private `HaltRegistry.closed` lock before its drain; `invoke_halt` holds that lock across its three writes and refuses a closed pid with a typed `InvokeHaltError::SpiritUnloading(pid)` (no durable row); the silent drain at `scheduler_loop.rs:573-574` is deleted. Kernel **+16 / +12** (26857 / 21054), maos-domain +4 · **B** (O1) the same fence, but `unload` closes before `terminate_spirit` and `:574` stays silent. +23 / +15, domain +4 · **C** (O2) route `:574`'s drain through `terminate_spirit`'s per-halt arm (`pub(crate) receipt_drained`), giving a terminal `PlannedUnload` receipt per late halt. +23 / +19, domain 0, no surface change · **D** (O3) B + C. +46 / +34, domain +4 | **A.** It is the cheapest race-free shape and keeps one receipt writer; it covers unload, crash and revocation at one site and removes the only silent drain. Hot swap (20-3c K1p carried set) never reaches the fence. B leaves a silent `:574` drain for a door-rollback re-pend; C is the only option that turns the T0 witness green unmodified, but it leaves a window from `:574` onward (the halt stays pending for a removed pid); D costs the most and crosses 20-9's single 21230. A, B and D each need one in-place `HaltRegistry` hash refresh in `kernel-surface-v0.1-beta.json:618`, and the T0 oracle is re-stated as typed refusal with no durable row. Historical pricing crossed the former STOP 21209. **RULED 2026-11-04 (`halt_grant`): A / O4**, measured +16/+12 kernel and +4 domain; KS + O4 measured 26867/21060, binding D02 A ×2 ceiling 26893/21078 and domain 10115 after re-measure/re-base at final kernel landing. Shared measured STOP **21250** for the whole ledger; cumulative **21203 + 12 = 21215**. Ask `halt_landing` moves AC3 to that final landing; L1 AC1, AC2, AC4–AC7 stays kernel-free. Measured on `git archive` copies by the prebuilt gates. [Pricing](20-11-erasure-inventory-closure-evidence/landing-1/late-halt-repair-pricing.md) · [T0 evidence](20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md). | **RULED 2026-11-04: A / O4 (`halt_grant`); AC3 final kernel landing (`halt_landing`); grant binds only after re-measure/re-base** |
 
 ## Acceptance Criteria
 
@@ -153,6 +186,10 @@ harness for the offline path: `crates/maos-bin/tests/erasure_uninstall_13_5b.rs`
 real binary run). Every failing-before is observed at `a8af3215` before the change and recorded.)*
 
 ### AC1 — no category is labelled by assumption (epic AC1)
+
+**Placement (ask `halt_landing`, 2026-11-04):** AC1 ships in L1 for the categories it implements. The
+`pending_halts` category keeps an explicit `CoverageGap` naming AC3's final-kernel dependency; its signed
+category evidence authenticates that limitation, never a halt count or a successful erasure claim.
 
 1. `intent_lineage`, `pending_halts`, `scheduled_invocations`, `installed_package` (D-05) and the named stores
    (D-10) take their status from a query of the store that holds them; the constants at `main.rs:10845-10860` are
@@ -179,6 +216,10 @@ real binary run). Every failing-before is observed at `a8af3215` before the chan
 
 ### AC3 — pending halts enumerated, removed, proved (D-20-11-03)
 
+**Final kernel landing only** (ask `halt_landing`, 2026-11-04): both door and offline halt enumeration/count,
+receipt category and witnesses/plants move with KS + O4. O4's typed late-invocation refusal and the single-writer
+fence must be witnessed before AC3 can close. L1 must not infer AC3 completion from an empty registry.
+
 1. Door: the live Spirit's pending halts end in the unload's `PlannedUnload` receipts; the count comes from those
    receipts (not the `term-…` marker); the registry holds none for the pid afterwards → `Removed{n}` / `VerifiedEmpty`.
 2. Offline: orphaned halts of the Spirit's incarnations get one terminal receipt each through `terminate_spirit`
@@ -191,6 +232,10 @@ real binary run). Every failing-before is observed at `a8af3215` before the chan
    and reds.
 
 ### AC4 — scheduled invocations and the installed package (D-20-11-04, -05)
+
+**L1 / final-kernel split:** L1 queries the SCB/manifest and removes the installed package, but names retained
+watchdog buckets/stamps as a `CoverageGap` until root exit. The final KS landing makes AC4.1's watchdog-state
+removal literal. L1's plant drops snapshot enumeration; the final kernel plant drops `forget_spirit`.
 
 1. Door: `[[schedule]]` ids read from the SCB snapshot before unload; after uninstall no SCB, no watchdog state
    (D-04 A: `last_fire_ns(pid, id) == 0`) and no `schedule.fire:<id>` frame for the pid over ≥ 5 polls under
@@ -219,6 +264,10 @@ real binary run). Every failing-before is observed at `a8af3215` before the chan
 5. **Plant (local):** window size `i64::MAX` ⇒ AC5.2 reds.
 
 ### AC6 — a running spawned Spirit (epic AC2's T3 clause)
+
+**Placement:** L1 observes the live categories it implements (AC2/AC4) and labels both pending halt receipts
+(AC3) and watchdog cleanup honestly. The final kernel landing verifies the completed AC3/AC4 categories;
+L1 must not claim that kernel-dependent proof or borrow a hosted run from an ancestor.
 
 1. **Hosted** (`provision-t3-test-substrate`, `ubuntu-24.04`): a running T3 Worker whose `[[schedule]]` entry is
    firing (`schedule.fire` frames present) is uninstalled over the door; the proof's AC3/AC4 categories come from the
@@ -255,9 +304,10 @@ real binary run). Every failing-before is observed at `a8af3215` before the chan
 - [ ] **T1 — Proof format (AC1, D-09).** Evidence frames, per-category verification in `proof.rs` and `verify.py`,
   `NotFound` rule; failing-before + plant.
 - [ ] **T2 — Intent lineage (AC2).** `distillates_written_by`, scrub + marker, all-boot incarnations; witnesses + plant.
-- [ ] **T3 — Pending halts (AC3).** Door count + post-verify; offline orphan query and receipts; witnesses + plant.
-- [ ] **T4 — Schedules and package (AC4).** SCB snapshot enumeration, watchdog handle, `uninstall_package`, CLI doc;
-  witnesses + plant.
+- [ ] **T3 — Pending halts (AC3, final kernel landing only).** Door count + post-verify, offline orphan query and
+  receipts, O4 late-invocation refusal / in-flight / crash witnesses and plants; no AC3 implementation in L1.
+- [ ] **T4 — Schedules and package (AC4).** L1 SCB/manifest snapshot enumeration, retained-watchdog reason,
+  `uninstall_package`, CLI doc and snapshot plant; `forget_spirit` and its plant at the final KS landing.
 - [ ] **T5 — EC-13 (AC5).** Rowid windows, per-window hold re-check, off-worker forget, serialized door release;
   witnesses + plant.
 - [ ] **T6 — Inventory (AC7).** Typed store list, named categories, vector + plant.
@@ -265,8 +315,9 @@ real binary run). Every failing-before is observed at `a8af3215` before the chan
 - [ ] **T8 — L1 landing (kernel-free).** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged;
   `kloc-check`, `check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`;
   one hosted discipline run on the final tree. No commit or push without the operator.
-- [ ] **T9 — L2 kernel (if ruled).** KS (and KH/KF if ruled) last; re-base onto the then-current pin; FLAG-Winston
-  record; exact kernel pins + content hashes; AC8.
+- [ ] **T9 — Final kernel landing (L2).** Granted KS + O4 last, together with AC3 halt counts/receipt category;
+  re-base onto then-current pins, obey shared measured STOP 21250; FLAG-Winston record, exact pins/content hashes,
+  single HaltRegistry surface-hash refresh under ADR-066, O4 domain variant and AC8. KH/KF are not granted.
 
 ## Dev Notes
 
@@ -279,7 +330,7 @@ real binary run). Every failing-before is observed at `a8af3215` before the chan
 | Audit | `crates/maos-audit/src/lib.rs` (orphan-halt query next to `resolve_spirit_name` `:1679-1767`); `erasure/proof.rs:20-33,167-399` (evidence, schema) | AC1, AC3 |
 | Registry | `crates/maos-registry/src/storage.rs:136-220` (`uninstall_package`) | AC4 |
 | CLI | `crates/maos-cli/src/cli.rs:63-66` (doc) | AC4 |
-| Kernel ◆ (if ruled) | `scheduler/schedule_watchdog.rs` (KS); `scheduler/scheduler_loop.rs:531-593` (KH); `memory/mod.rs:619-635` (KF); pins `xtask/kernel-core-baseline.toml:505` + HISTORY, `xtask/kloc.toml:264` | AC3–AC5 |
+| Kernel ◆ (final landing only) | `scheduler/schedule_watchdog.rs` (KS); `halt/mod.rs`, `halt/termination.rs`, `scheduler/scheduler_loop.rs:573-574` deletion (O4); `maos-domain/src/halt.rs` typed refusal; kernel pins/content hashes and single `HaltRegistry` surface-hash refresh | AC3, AC4 |
 | Tools / tests (uncharged) | `tools/verify-erasure/verify.py:304-312`; `crates/maos-bin/tests/erasure_uninstall_13_5b.rs` + new door/T3 tests; `crates/maos-iac` unit tests | all |
 | Records | `tests/coverage-matrix.yaml:896-903,959-965`; `docs/adr/ADR-044-…md`; `deferred-work.md:75,78,1331` | AC8 |
 
@@ -309,7 +360,7 @@ real binary run). Every failing-before is observed at `a8af3215` before the chan
 - A new category never uses a bare pid: always `(boot_nonce, pid)` or the stable owner.
 - No category status without a query; no `Removed` without evidence the verifier checks (D-09).
 - Never scrub cost frames, `principal.uninstall.%`/`principal.forget*` records or another Spirit's rows.
-- No kernel line without the ruled row; any `crates/maos-kernel-core/src` change outside KS/KH/KF is STOP.
+- No kernel line before the final landing; any kernel change outside granted KS + O4 is STOP. KH/KF are not granted.
 - One cargo process per checkout; `env -u CI -u GITHUB_ACTIONS`; inherit the target directory; plants byte-restored
   in the real tree (`proof-contract.md:24-31`).
 
@@ -404,15 +455,87 @@ done stories, 166 deferred-owner assertions, 0 violations); `check-epic-close-co
 `maos-wasm-host 2420 > 2412`) from a sibling's uncommitted `crates/maos-wasm-host/src/runner.rs` edit, not this
 story's; the `git archive a8af3215` copy measured 191826, `over_budget=[]`.
 
+### Landing 1 preflight — STOP (2026-11-04, Dev2011)
+
+Baseline: `73e7afbcae81f4fb4858e9d52ded3d592bed636d`; initial `git status --short` empty. Read the entire story,
+including all ruled D-rows and creation measurements/records. No runtime, kernel, pins, tracker, coverage matrix,
+ADR or closure claims changed: T0 measurement 2 hit the explicitly ruled STOP before T1–T8.
+
+**Observed witness:** `t0_unload_must_receipt_halt_invoked_after_termination_drain`, saved
+[source:48](20-11-erasure-inventory-closure-evidence/landing-1/t0-unload-race-witness.rs.txt#L48), terminal receipt
+assertion at line 187. The existing TL redaction-policy seam pauses the first termination receipt after
+`terminate_spirit`'s drain; a concurrent thread asserts the real SCB is `Unloaded`, calls real `invoke_halt`, and
+checks pending metadata before resuming the real unload. Unload succeeds; the durable invocation remains, metadata
+is empty and the SCB is gone, but the only receipt names `term-race-20-11-1-1793782986345734392`, not `late-20-11`.
+No production plant or kernel modification was used. Full output and exact commands are in
+[landing-1 evidence](20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md).
+
+**Measurements:** baseline gates passed unchanged: physical kernel 26841 (95 files), kernel tokei 21042;
+maos-bin 34504, maos-iac 8270, maos-audit 7721, maos-registry 4248, aggregate 193140. No grant consumed.
+The assignment's re-based maos-bin L1 ceiling is 35704 (34504 + original 1200 allowance); other story frontmatter
+ceilings remain unchanged. No re-pin is warranted for this evidence-only STOP.
+
+**Record checks:** `check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`,
+`check-decision-register` and `check-exit-commands` each ran once with the prescribed prebuilt-gate environment,
+all exit 0. These are structural record checks, not acceptance proof. The only cargo test run exited 101 at the
+intended receipt oracle; no retry. Detailed command/exit ledger and raw output are in landing-1 evidence.
+
+**Cleanup:** /proc scan found no cargo/rustc process; granular stale incremental-session pruning retained newest
+and last-two-hour sessions and freed **10136645632 allocated bytes**. No deps/build/fingerprint removal.
+The test's scoped temporary directory dropped on unwind; no named `/tmp` scratch was created.
+
+**Preflight disposition, subsequently superseded:** the initial STOP left all runtime ACs open. On 2026-11-04
+the operator granted D-20-11-11 A / O4 (`halt_grant`) and moved AC3 to the final kernel landing (`halt_landing`).
+FR65/NFR-Aud-12 and EC-13 remain open until witnessed; no implementation or hosted proof is claimed by this
+recording pass. The existing purge-proof route stays with 20-10. The temporary integration test was removed after
+its exact formatted source and failure output were preserved as `.rs.txt` evidence, outside Rust/KLOC scanning.
+
+### Ruling application — 2026-11-04, Dev2011 (docs only)
+
+Recorded `halt_grant`: O4 granted, measured kernel +16/+12 and domain +4; KS + O4 measured 26867/21060,
+binding D02 A ×2 ceiling 26893/21078, domain ceiling 10115. The single receipt writer closes the pid through
+`HaltRegistry.closed`; `invoke_halt` holds the lock across all writes and refuses typed before any write; delete
+the silent drain, refresh only the HaltRegistry surface hash at final landing under ADR-066. No source or pin
+was changed. Shared measured STOP 21250 applies to the whole ledger; cumulative 21215 tokei.
+
+Recorded `halt_landing`: L1 AC1, AC2, AC4–AC7 kernel-free, explicit pending halt/watchdog limitations;
+final kernel KS + O4 carries AC3. Story/tracker stay `ready-for-dev`. Shared-STOP supersession notes preserve
+historical pricing/rulings in pending stories, FLAG-Winston records, epic, preflight and tracker.
+No cargo, tests or gates ran for this docs-only recording pass; Dev2010 owns the cargo slot.
+
 ### Agent Model Used
 
 anthropic/claude-opus-5-5 (creation).
 
+openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation).
+
 ### Debug Log References
+
+- [T0 STOP report and command ledger](20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md)
+- [Full failing-before output](20-11-erasure-inventory-closure-evidence/landing-1/t0-unload-race-cargo-test.log)
 
 ### Completion Notes List
 
+- Initial T0 STOP preserved; operator asks `halt_grant` / `halt_landing` now recorded. No L1 AC is yet complete.
+
 ### File List
+
+- `20-11-erasure-inventory-closure.md` — T0 evidence history, ruled O4 grant, amended landing split and Dev Agent Record.
+- `20-11-flag-winston-decision.md` — granted KS + O4, measured/ceiling distinction and final-landing protocol.
+- `20-11-erasure-inventory-closure-evidence/landing-1/` — witness source, complete failing-before log,
+  baseline measurements, command ledger and STOP report.
+- `deferred-work.md` — existing second-drain risk upgraded to observed, same owner; no closure.
+- `sprint-status.yaml` — dated shared-STOP/grant/landing notes; 20-11 remains ready-for-dev.
+- `20-1b-vetting-yank-policy-and-quarantine.md`, `20-4-gemini-driver-and-endpoint-pin.md`,
+  `20-8-manifest-contract-completion.md`, `20-9-spawned-form-lifecycle-hooks.md`,
+  `20-13-pluggable-crypto-provider-selection.md`, `20-14-complete-cost-attribution.md`,
+  `20-5-v1-0-rc-tag-and-lts-rule.md` — dated shared-STOP supersession, historical pricing retained.
+- `20-4-flag-winston-decision.md`, `20-8-flag-winston-decision.md`, `20-9-flag-winston-decision.md`,
+  `20-13-flag-winston-decision.md`, `20-14-flag-winston-decision.md` — same shared-STOP supersession.
+- `../planning-artifacts/epics/epic-20-ship-it-w5.md`,
+  `../planning-artifacts/epic-20-preflight-2026-10-30.md` — cumulative ledger and 20-11 landing amendment.
+- `20-11-erasure-inventory-closure-evidence/landing-1/late-halt-repair-pricing.md`,
+  `20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md` — dated subsequent rulings above preserved evidence.
 
 ## Change Log
 
@@ -422,3 +545,9 @@ anthropic/claude-opus-5-5 (creation).
   Spirit gets `not_found` and no proof. Kernel optional: KS +10/+6 recommended, KH +10/+6, KF +37/+33 priced by
   reverted prototype; maos-iac +90 measured.
 - 2026-11-02: Operator rulings recorded (ask s2011): D-20-11-01…10 as recommended; kernel KS and ceilings per frontmatter. Status remains ready-for-dev.
+- 2026-11-04: Landing-1 T0 STOP at `73e7afbc`: real unload silently discards a halt invoked after its first drain;
+  witness exit 101. D-20-11-11 proposed; no kernel/runtime/pin/status changes and no implementation closure.
+- 2026-11-04: Operator ask `halt_grant` ruled D-20-11-11 **A / O4** and raised the whole-ledger measured STOP
+  to **21250**; KS + O4 measured 26867/21060, binding D02 A ×2 ceiling 26893/21078, domain ceiling 10115.
+  Ask `halt_landing` moves AC3 to final kernel KS + O4; L1 AC1, AC2, AC4–AC7 remains kernel-free.
+  T0 STOP history/red preserved; status stays ready-for-dev; no source, pins, cargo or gates in this recording pass.

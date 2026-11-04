@@ -60,7 +60,7 @@ impl Fixture {
         }
         std::fs::write(root.join("candidates"), ids.join("\n")).expect("candidates");
         let absent_cid = format!("{:064x}", 6);
-        let script = format!("#!/bin/sh\nroot='{}'\nprintf '%s\\n' \"$*\" >> \"$root/calls\"\n[ -z \"$AWS_SECRET_ACCESS_KEY\" ] || exit 99\ncase \"$1\" in\nps) cat \"$root/candidates\";;\ninspect) cat \"$root/$2.json\";;\nrm) [ -f \"$root/maos/workspaces/maos-worker-7/sentinel\" ] || {{ echo 'workspace removed before container' >&2; exit 96; }}; [ -f \"$root/receipt.json\" ] || exit 98; grep -q '\"pending\"' \"$root/receipt.json\" || exit 97; touch \"$root/removed-$5\";;\ncontainer) [ -f \"$root/removed-$3\" ] && exit 1; [ \"$3\" = '{absent_cid}' ] && exit 1; exit 0;;\nunshare) exit 0;;\n*) exit 96;;\nesac\n",root.display());
+        let script = format!("#!/bin/sh\nroot='{}'\nprintf '%s\\n' \"$*\" >> \"$root/calls\"\n[ -z \"$AWS_SECRET_ACCESS_KEY\" ] || exit 99\ncase \"$1\" in\nps) cat \"$root/candidates\";;\ninspect) cat \"$root/$2.json\";;\nrm) [ -f \"$root/maos/workspaces/maos-worker-7/sentinel\" ] || {{ echo 'workspace removed before container' >&2; exit 96; }}; [ -f \"$root/receipt.json\" ] || exit 98; grep -q '\"pending\"' \"$root/receipt.json\" || exit 97; for cidfile in \"$root\"/runtime/maos-worker-state/*/*/cid \"$root\"/maos-worker-state-*/*/*/cid; do if [ -f \"$cidfile\" ] && [ \"$(cat \"$cidfile\")\" = \"$5\" ]; then rm -f -- \"$cidfile\" || exit 95; fi; done; touch \"$root/removed-$5\";;\ncontainer) [ -f \"$root/removed-$3\" ] && exit 1; [ \"$3\" = '{absent_cid}' ] && exit 1; exit 0;;\nunshare) exit 0;;\n*) exit 96;;\nesac\n",root.display());
         std::fs::write(root.join("bin/podman"), script).expect("stub");
         std::fs::set_permissions(
             root.join("bin/podman"),
@@ -159,6 +159,82 @@ fn ac1_owned_cid_removed_before_workspaces_and_receipted() {
         "{text}"
     );
 }
+
+#[test]
+fn ac1_listed_candidate_vanishing_before_inspect_is_skipped() {
+    let f = Fixture::new();
+    let vanished = format!("{:064x}", 6);
+    std::fs::write(
+        f.root().join("candidates"),
+        format!("{}\n{vanished}\n", f.owned),
+    )
+    .expect("racing candidates");
+    let out = f
+        .command()
+        .args(["purge", "--dry-run"])
+        .output()
+        .expect("dry purge");
+    assert!(
+        out.status.success(),
+        "vanished listed candidate must not abort read-only purge: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let calls = f.calls();
+    assert!(calls.contains(&format!("inspect {vanished}")), "{calls}");
+    assert!(
+        calls.contains(&format!("container exists {vanished}")),
+        "{calls}"
+    );
+    assert!(!f.root().join("receipt.json").exists());
+    for call in calls.lines() {
+        assert!(
+            call.starts_with("ps ")
+                || call.starts_with("inspect ")
+                || call.starts_with("container exists "),
+            "dry-run mutation: {call}"
+        );
+    }
+}
+
+#[test]
+fn ac1_failed_inspect_with_present_or_unconfirmed_candidate_remains_fatal() {
+    for mode in ["present", "error", "timeout"] {
+        let f = Fixture::new();
+        std::fs::write(f.root().join("candidates"), &f.other).expect("candidate");
+        std::fs::remove_file(f.root().join(format!("{}.json", f.other)))
+            .expect("make inspect fail");
+        if mode != "present" {
+            let stub = f.root().join("bin/podman");
+            let script = std::fs::read_to_string(&stub).expect("stub");
+            let response = if mode == "error" {
+                "container) exit 125; "
+            } else {
+                "container) sleep 10; exit 1; "
+            };
+            std::fs::write(&stub, script.replace("container) ", response)).expect("exists failure");
+        }
+        let out = f
+            .command()
+            .args(["purge", "--dry-run"])
+            .output()
+            .expect("dry refusal");
+        let error = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(78), "{mode}: {error}");
+        assert!(
+            error.contains("status=") && error.contains("stderr=") && error.contains(".json"),
+            "inspect exit/stderr evidence missing for {mode}: {error}"
+        );
+        let calls = f.calls();
+        assert!(
+            calls.contains(&format!("container exists {}", f.other)),
+            "{calls}"
+        );
+        assert!(!calls
+            .lines()
+            .any(|call| call.starts_with("rm ") || call.starts_with("unshare ")));
+        assert!(!f.root().join("receipt.json").exists());
+    }
+}
 #[test]
 fn ac2_other_home_missing_mount_mismatched_name_and_impostor_survive() {
     let f = Fixture::new();
@@ -207,11 +283,18 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
     let absent = f.private("process/absent");
     let present = f.private("process/present");
     let unknown = f.private("process/unknown");
+    let removed = f.private("process/removed");
+    std::fs::write(removed.join("cid"), &f.owned).expect("removed CID");
+    std::fs::write(removed.join("pid"), b"2147483647").expect("spawn pid");
     std::fs::write(absent.join("cid"), format!("{:064x}", 6)).expect("absent CID");
     std::fs::write(present.join("cid"), &f.other).expect("present CID");
     let out = f.purge(true);
     assert!(!empty.exists(), "empty process root leaked");
     assert!(!absent.exists(), "absent CID custody leaked");
+    assert!(
+        !removed.exists(),
+        "removed container's custody leaked after runtime deleted its cidfile"
+    );
     assert!(present.exists(), "live home's custody removed");
     assert!(unknown.exists(), "unknown custody removed");
     assert!(
@@ -252,6 +335,62 @@ fn ac5_only_absent_cid_and_empty_state_are_reclaimed() {
     ] {
         assert!(!report.contains(forbidden), "{report}");
     }
+}
+
+#[test]
+fn ac5_missing_inventory_cid_is_retained_after_container_removal() {
+    let f = Fixture::new();
+    let unknown = f.private("process/missing-at-inventory");
+    std::fs::write(unknown.join("pid"), b"2147483647").expect("unconfirmed spawn pid");
+    assert!(!unknown.join("cid").exists());
+    f.purge(true);
+    assert!(f.root().join(format!("removed-{}", f.owned)).exists());
+    assert!(
+        unknown.join("pid").is_file() && !unknown.join("cid").exists(),
+        "a CID never captured at inventory must not authorize custody removal"
+    );
+    let text = std::fs::read_to_string(f.root().join("receipt.json")).expect("receipt");
+    let receipt: serde_json::Value =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("receipt: {e}"));
+    assert!(
+        receipt["roots"].as_array().is_some_and(|rows| rows
+            .iter()
+            .any(|row| row["path"] == unknown.display().to_string()
+                && row["disposition"] == "left (T3 custody residue)")),
+        "missing conservative custody receipt: {text}"
+    );
+}
+
+#[test]
+fn ac5_inventory_directory_replacement_retains_both_inodes() {
+    let f = Fixture::new();
+    let spawn = f.private("process/replaced");
+    std::fs::write(spawn.join("cid"), &f.owned).expect("captured CID");
+    std::fs::write(spawn.join("pid"), b"inventoried").expect("original custody");
+    let stub = f.root().join("bin/podman");
+    let script = std::fs::read_to_string(&stub).expect("runtime stub");
+    let replacement = format!(
+        "touch \"$root/removed-$5\"; mv '{0}' '{0}-inventoried'; mkdir -m 700 '{0}'; printf replacement > '{0}/pid'",
+        spawn.display()
+    );
+    let swapped = script.replace("touch \"$root/removed-$5\"", &replacement);
+    assert_ne!(
+        swapped, script,
+        "runtime replacement hook must be installed"
+    );
+    std::fs::write(&stub, swapped).expect("replacement hook");
+    f.purge(true);
+    assert_eq!(
+        std::fs::read(spawn.join("pid")).expect("replacement custody"),
+        b"replacement",
+        "captured CID must not authorize the replacement directory"
+    );
+    assert_eq!(
+        std::fs::read(spawn.with_file_name("replaced-inventoried").join("pid"))
+            .expect("held original custody"),
+        b"inventoried",
+        "inode mismatch must refuse before clearing the held original"
+    );
 }
 #[test]
 fn ac6_runtime_helper_is_shared_and_receipt_convention_is_preserved() {

@@ -1,0 +1,90 @@
+diff --git a/crates/maos-domain/src/halt.rs b/crates/maos-domain/src/halt.rs
+--- a/crates/maos-domain/src/halt.rs
++++ b/crates/maos-domain/src/halt.rs
+@@ -337,6 +337,8 @@ pub enum InvokeHaltError {
+     JournalWriteFailed(String),
+     #[error("registry insert failed: {0}")]
+     RegistryInsertFailed(String),
++    #[error("spirit pid {0} is being unloaded; halt refused")]
++    SpiritUnloading(u32),
+ }
+ 
+ /// I14 — Hot-swap halt-continuity typed error per ADR-019.
+@@ -684,6 +686,8 @@ mod tests {
+         assert!(e.to_string().contains("jw"));
+         let e = InvokeHaltError::RegistryInsertFailed("ri".into());
+         assert!(e.to_string().contains("ri"));
++        let e = InvokeHaltError::SpiritUnloading(7);
++        assert!(e.to_string().contains("pid 7"));
+     }
+ 
+     #[test]
+diff --git a/crates/maos-kernel-core/src/halt/mod.rs b/crates/maos-kernel-core/src/halt/mod.rs
+--- a/crates/maos-kernel-core/src/halt/mod.rs
++++ b/crates/maos-kernel-core/src/halt/mod.rs
+@@ -102,6 +102,9 @@ pub struct HaltRegistry {
+     pending: RwLock<HashMap<HaltId, HaltState>>,
+     /// Story 4.3 — per-halt metadata for resolution-side lookups.
+     metadata: RwLock<HashMap<HaltId, PendingHaltMetadata>>,
++    /// Story 20-11 (D-20-11-11) — pids `terminate_spirit` closed (never reused,
++    /// `allocate_pid`); `invoke_halt` holds this lock across its writes.
++    closed: std::sync::Mutex<std::collections::HashSet<u32>>,
+     /// Story 4.5 — AC5 isolation hook for corpus runner observation.
+     #[cfg(feature = "spirit_test")]
+     isolation_hook: Option<
+@@ -533,6 +536,14 @@ pub fn invoke_halt(
+ 
+     let halt_id = maos_domain::halt::HaltId::new(payload.halt_id.clone())
+         .map_err(|_| InvokeHaltError::RegistryInsertFailed("invalid halt_id".into()))?;
++    // Story 20-11 (D-20-11-11) — held across the three writes below.
++    let closed = registry
++        .closed
++        .lock()
++        .unwrap_or_else(std::sync::PoisonError::into_inner);
++    if closed.contains(&spirit_pid) {
++        return Err(InvokeHaltError::SpiritUnloading(spirit_pid));
++    }
+ 
+     let timestamp_ns = SystemTime::now()
+         .duration_since(UNIX_EPOCH)
+diff --git a/crates/maos-kernel-core/src/halt/termination.rs b/crates/maos-kernel-core/src/halt/termination.rs
+--- a/crates/maos-kernel-core/src/halt/termination.rs
++++ b/crates/maos-kernel-core/src/halt/termination.rs
+@@ -36,6 +36,13 @@ pub fn terminate_spirit(
+         .unwrap_or_default()
+         .as_nanos() as u64;
+ 
++    // Story 20-11 (D-20-11-11) — close the pid, after any invocation already
++    // committing, before the drain: no halt can land after it.
++    registry
++        .closed
++        .lock()
++        .unwrap_or_else(std::sync::PoisonError::into_inner)
++        .insert(spirit_pid);
+     let pending = registry.drain_for_spirit(spirit_pid);
+     let kind_str = kind.as_str();
+ 
+diff --git a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -570,8 +570,6 @@ impl SpiritSchedulerAdapter {
+         self.capability.revoke_all_for_pid(spirit_pid);
+         self.capability.context_budget().remove(spirit_pid);
+         self.capability.set_paused(spirit_pid, false);
+-        // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
+-        let _ = self._halt_registry.drain_for_spirit(spirit_pid);
+         {
+             let mut spirits = self.spirits.write().unwrap();
+             spirits.remove(&spirit_pid);
+diff --git a/docs/ci-baselines/kernel-surface-v0.1-beta.json b/docs/ci-baselines/kernel-surface-v0.1-beta.json
+--- a/docs/ci-baselines/kernel-surface-v0.1-beta.json
++++ b/docs/ci-baselines/kernel-surface-v0.1-beta.json
+@@ -615,7 +615,7 @@
+     {
+       "kind": "struct",
+       "path": "maos_kernel_core::halt::HaltRegistry",
+-      "signature_hash": "b6d6524333a6327adc96c8a3ef78e2a10134ea7e2a9c534d930d6a248eda4af8"
++      "signature_hash": "a917eddcb762e31e151adbbb2dad84de0ce445df29bfd8abbddd9a4d3b19f910"
+     },
+     {
+       "kind": "struct",

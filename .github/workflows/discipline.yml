@@ -2259,7 +2259,7 @@ jobs:
       CARGO: /bin/false
       MAOS_FIXTURE_DIR: ${{ github.workspace }}/target/maos-fixtures
       MAOS_FIXTURE_TRANSPORT: '1'
-      EPIC17_TERMINAL_SUITE_TESTS: 34
+      EPIC17_TERMINAL_SUITE_TESTS: 35
       EPIC17_TERMINAL_REQUIRED_TESTS: |
         root_crash::root_crash_retains_stopped_container_and_purge_reports_it
         root_crash::purge_cgroup_native_binding_and_dead_creator_twins
@@ -2293,6 +2293,7 @@ jobs:
         supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
         unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
         unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
+        unload_scenes::s5_budget_oracle_counts_exceeded_kind_not_a_delayed_warning
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

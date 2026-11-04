@@ -1,5 +1,13 @@
 # 20-9 FLAG-Winston decision record
 
+**Shared kernel STOP supersession — 2026-11-04 (ask `halt_grant`).** Historical internal STOP
+21209 / 21,209 and the 20-9-only 21230 / 21,230 are superseded by **21250 / 21,250 for the whole
+cumulative measured kernel ledger at each landing**. D-20-14-12 C's joint 21250 now equals that shared STOP,
+not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21203 + 12 = 21215**
+(physical **27032 + 16 = 27048**). ADR-069 alarm **22000** and envelope **23000** are unchanged.
+Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
+
+
 **Date:** 2026-11-03  
 **Status:** `RULING RECORDED` 2026-11-03 (ask `d_batch4`): D-20-9-13 A, D-20-9-14 A, D-20-9-15 A (targeted STOP 21230 for 20-9 L2 only), and D-20-9-11 A. R remains a measured request, binding at dev start; no implementation or landing claimed.  
 **Scope:** the kernel row of `20-9-spawned-form-lifecycle-hooks`: the schedule watchdog's D07 A suppression (ruled 2026-11-01, ask `rows203c`) and the PF-04 refused-poll observer. The spawned-form hooks, WIT 2.4.0, the hot swap, upgrade and cold swap, and the schedules carriage are kernel-free.  

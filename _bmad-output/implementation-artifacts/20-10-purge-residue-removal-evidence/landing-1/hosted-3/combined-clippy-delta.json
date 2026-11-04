@@ -1,0 +1,80 @@
+{
+  "baseline": "_bmad-output/implementation-artifacts/20-4-gemini-driver-and-endpoint-pin-evidence/landing-1/review/corrections/clippy.jsonl",
+  "new_warning_groups": [],
+  "changed_files": {
+    "crates/maos-bin/src/purge_runtime.rs": {
+      "before": [],
+      "after": []
+    },
+    "crates/maos-bin/tests/purge_residue_20_10.rs": {
+      "before": [],
+      "after": []
+    },
+    "crates/maos-bin/tests/worker_terminal_facts_17_7/root_crash.rs": {
+      "before": [],
+      "after": []
+    },
+    "xtask/tests/epic17_exit_workflow_17_7.rs": {
+      "before": [
+        [
+          "clippy::needless_borrows_for_generic_args",
+          "xtask/tests/epic17_exit_workflow_17_7.rs",
+          "the borrowed expression implements the required traits",
+          15,
+          14
+        ]
+      ],
+      "after": [
+        [
+          "clippy::needless_borrows_for_generic_args",
+          "xtask/tests/epic17_exit_workflow_17_7.rs",
+          "the borrowed expression implements the required traits",
+          15,
+          14
+        ]
+      ]
+    },
+    "crates/maos-bin/tests/worker_terminal_facts_17_7.rs": {
+      "before": [],
+      "after": []
+    },
+    "crates/maos-bin/tests/worker_terminal_facts_17_7/unload_scenes.rs": {
+      "before": [],
+      "after": []
+    },
+    "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs": {
+      "before": [
+        [
+          "clippy::cloned_ref_to_slice_refs",
+          "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs",
+          "unnecessary use of `clone` to create a slice from a reference",
+          745,
+          13
+        ],
+        [
+          "clippy::let_and_return",
+          "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs",
+          "returning the result of a `let` binding from a block",
+          534,
+          13
+        ]
+      ],
+      "after": [
+        [
+          "clippy::cloned_ref_to_slice_refs",
+          "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs",
+          "unnecessary use of `clone` to create a slice from a reference",
+          745,
+          13
+        ],
+        [
+          "clippy::let_and_return",
+          "crates/maos-bin/tests/worker_terminal_facts_17_7/supervisor_scenes.rs",
+          "returning the result of a `let` binding from a block",
+          534,
+          13
+        ]
+      ]
+    }
+  }
+}

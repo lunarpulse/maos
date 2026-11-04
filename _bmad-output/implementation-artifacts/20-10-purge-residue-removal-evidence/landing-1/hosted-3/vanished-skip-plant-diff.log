@@ -1,0 +1,12 @@
+--- a/crates/maos-bin/src/purge_runtime.rs
++++ b/crates/maos-bin/src/purge_runtime.rs
+@@ -25,9 +25,6 @@
+     match podman(&["inspect", cid], 2) {
+         Invocation::Exited { status, stdout, stdout_complete: true, stderr_complete: true, .. } if status.success() => Ok(Some(stdout)),
+         Invocation::Exited { status, stderr, .. } => {
+-            if !status.success() && exists(cid) == Some(false) {
+-                return Ok(None);
+-            }
+             Err(PurgeError::Configuration(format!("cannot enumerate owned containers: podman inspect {cid} failed or exceeded its output limit (status={status}, stderr={})", String::from_utf8_lossy(&stderr))))
+         }
+         _ => Err(PurgeError::Configuration(format!("cannot enumerate owned containers: podman inspect {cid} failed or exceeded its deadline/output limit"))),

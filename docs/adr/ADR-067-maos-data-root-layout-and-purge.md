@@ -117,14 +117,24 @@ leaves only when `cgroup.events` reports `populated 0` and the creator has no
 `/proc/<pid>`. The shared `maos.slice` parent is never removed: empty does not
 exclude a live creator between parent allocation and leaf creation. Purge never
 kills members or writes `cgroup.kill`. Private mode-0700, euid-owned T3 spawn
-custody is reclaimed only after its CID is confirmed absent. Only volatile
+custody requires a valid CID captured through its held, no-follow directory
+during inventory, before container removal: [Podman's `--cidfile`
+contract](https://github.com/containers/podman/blob/v4.9.3/docs/source/markdown/options/cidfile.write.md)
+removes that file along with the container. Reclamation uses that captured CID with a fresh
+bounded `container exists` exit 1 proof, rechecks directory ownership/mode and
+device/inode identity, then clears and removes that same directory. A CID
+missing or invalid at inventory never grants deletion, even if its file is
+absent later. Only volatile
 Worker-state process roots encode `process-<creator pid>-<nonce>` and are rmdired
 when empty and the creator PID is positively absent. Durable egress socket
 roots retain short eight-hex nonce names: the PID prefix must not lengthen
 AF_UNIX paths beyond `sun_path` capacity. Live-owner and historical anonymous roots
 are retained; shared state parents are never removed. Unknown/present-CID spawn
 custody stays. Directory traversal and control-file reads do not follow
-links. A dry run invokes only `ps`/`inspect` and changes no state, including
+links. A dry run uses read-only `ps`/`inspect`; only a failed inspect may trigger
+a bounded `container exists` probe. Nonzero inspect is silently skipped only
+when that probe exits1 (absent); present or unconfirmed candidates remain fatal,
+with inspect exit status/stderr reported. Dry run changes no state, including
 podman storage; spawn removal is reported as conditional on CID absence.
 Purge never edits user-namespace mappings, podman configuration or storage.
 

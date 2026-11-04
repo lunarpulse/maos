@@ -20,6 +20,12 @@ mod t3_substrate;
 
 const CID: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
+fn init_clock() {
+    // All in-process Worlds share the process-global base, including under libtest.
+    static CLOCK: std::sync::Once = std::sync::Once::new();
+    CLOCK.call_once(maos_kernel_core::capability::cap_tokens::init_monotonic_base);
+}
+
 /// `require_t3` prints the one `SKIP:` line when the substrate is absent.
 fn scene(name: &str) -> bool {
     t3_substrate::require_t3(name)

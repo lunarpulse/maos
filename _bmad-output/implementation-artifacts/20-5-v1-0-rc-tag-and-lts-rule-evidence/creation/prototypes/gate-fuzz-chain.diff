@@ -1,0 +1,115 @@
+diff -ruN '--exclude=.git' a/xtask/src/check_release_precondition.rs b/xtask/src/check_release_precondition.rs
+--- a/xtask/src/check_release_precondition.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/xtask/src/check_release_precondition.rs	2026-11-04 09:12:30.772052524 +0000
+@@ -30,7 +30,72 @@
+     head_sha: &'a str,
+ }
+ 
+-pub fn run(check_runs_path: Option<&str>, json: bool) -> Result<(), String> {
++/// Story 20-5 — the T3 targets `fuzz-prerelease.yml` chains (PRD NFR-Sec-5/6).
++const T3_TARGETS: [&str; 3] = ["manifest_parser", "frame_deser", "fuzz_exec_deps_parse_elf"];
++const T3_LINKS: usize = 5;
++const T3_SECONDS: u64 = 86_400;
++
++#[derive(Debug, Deserialize)]
++struct FuzzLedger {
++    schema_version: u32,
++    records: Vec<FuzzRecord>,
++}
++
++#[derive(Debug, Deserialize)]
++struct FuzzRecord {
++    target: String,
++    tier: String,
++    commit: String,
++    cpu_seconds: u64,
++    run_id: String,
++}
++
++/// Story 20-5 — refuse a release SHA without a complete T3 chain for every
++/// target: one workflow run's five links, at this exact commit, >= 24 h of
++/// libFuzzer-measured seconds. Configured time and other runs never count.
++pub fn check_t3_fuzz_chain(ledger_path: &str, sha: &str) -> Result<(), String> {
++    let text = std::fs::read_to_string(ledger_path)
++        .map_err(|error| format!("failed to read fuzz ledger {ledger_path}: {error}"))?;
++    let ledger: FuzzLedger = serde_json::from_str(&text)
++        .map_err(|error| format!("invalid fuzz ledger {ledger_path}: {error}"))?;
++    if ledger.schema_version != 1 {
++        return Err(format!(
++            "fuzz ledger schema_version {} is not 1",
++            ledger.schema_version
++        ));
++    }
++    for target in T3_TARGETS {
++        let mut runs: std::collections::BTreeMap<&str, (usize, u64)> = Default::default();
++        for record in ledger
++            .records
++            .iter()
++            .filter(|r| r.target == target && r.tier == "T3" && r.commit == sha)
++        {
++            let run = record
++                .run_id
++                .rsplit_once('-')
++                .map_or(record.run_id.as_str(), |(run, _)| run);
++            let entry = runs.entry(run).or_default();
++            entry.0 += 1;
++            entry.1 += record.cpu_seconds;
++        }
++        if !runs
++            .values()
++            .any(|(links, seconds)| *links == T3_LINKS && *seconds >= T3_SECONDS)
++        {
++            return Err(format!(
++                "release precondition failed: no complete T3 fuzz chain for {target} at {sha} ({T3_LINKS} links, >= {T3_SECONDS} measured seconds, one run)"
++            ));
++        }
++    }
++    Ok(())
++}
++
++pub fn run(
++    check_runs_path: Option<&str>,
++    fuzz_ledger: Option<&str>,
++    json: bool,
++) -> Result<(), String> {
+     let input = match check_runs_path {
+         Some(path) => std::fs::read_to_string(path)
+             .map_err(|error| format!("failed to read check-runs response {path}: {error}"))?,
+@@ -77,6 +142,9 @@
+             run.conclusion.as_deref().unwrap_or("null")
+         ));
+     }
++    if let Some(ledger) = fuzz_ledger {
++        check_t3_fuzz_chain(ledger, &run.head_sha)?;
++    }
+     if json {
+         println!(
+             "{}",
+diff -ruN '--exclude=.git' a/xtask/src/main.rs b/xtask/src/main.rs
+--- a/xtask/src/main.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/xtask/src/main.rs	2026-11-04 09:12:30.753365307 +0000
+@@ -794,6 +794,9 @@
+         /// GitHub check-runs API response; reads stdin when omitted.
+         #[arg(long)]
+         check_runs: Option<String>,
++        /// Story 20-5 — `fuzz-ledger.json`; require a complete T3 chain for the SHA.
++        #[arg(long)]
++        fuzz_ledger: Option<String>,
+         #[arg(long)]
+         json: bool,
+     },
+@@ -1458,9 +1461,11 @@
+             targets,
+             json,
+         } => release_dry_run::run(manifest_only, &dist_dir, &targets, json),
+-        Commands::CheckReleasePrecondition { check_runs, json } => {
+-            check_release_precondition::run(check_runs.as_deref(), json)
+-        }
++        Commands::CheckReleasePrecondition {
++            check_runs,
++            fuzz_ledger,
++            json,
++        } => check_release_precondition::run(check_runs.as_deref(), fuzz_ledger.as_deref(), json),
+         Commands::CheckPerfVerdict {
+             sha,
+             ledger,

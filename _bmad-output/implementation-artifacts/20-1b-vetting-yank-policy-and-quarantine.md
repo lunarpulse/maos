@@ -13,6 +13,14 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 20.1b: Vetting, yank policy and FR13 quarantine
 
+**Shared kernel STOP supersession — 2026-11-04 (ask `halt_grant`).** Historical internal STOP
+21209 / 21,209 and the 20-9-only 21230 / 21,230 are superseded by **21250 / 21,250 for the whole
+cumulative measured kernel ledger at each landing**. D-20-14-12 C's joint 21250 now equals that shared STOP,
+not a separate exception. With ruled 20-11 O4, cumulative measured tokei is **21203 + 12 = 21215**
+(physical **27032 + 16 = 27048**). ADR-069 alarm **22000** and envelope **23000** are unchanged.
+Older arithmetic/rulings below remain historical; later kernel landers must re-measure and re-base.
+
+
 Status: backlog
 
 <!-- Split from story 20-1 on 2026-11-01/02 under operator ruling D-20-1-01 B (ask split201). Part B (AC6–AC13) and Tasks T6–T10 moved here unchanged; the story file for the exit path is `20-1a-registry-publish-install-exit-path.md`. Shared evidence: `20-1-registry-client-install-verb-vetter-and-yank-evidence/`. Decisions, rulings, pricing and Dev Notes live in 20-1a and are not repeated here. -->

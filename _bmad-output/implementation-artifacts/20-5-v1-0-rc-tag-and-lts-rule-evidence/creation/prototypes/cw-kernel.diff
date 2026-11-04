@@ -1,0 +1,255 @@
+diff -ruN '--exclude=.git' a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+--- a/crates/maos-bin/src/main.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-bin/src/main.rs	2026-11-04 09:10:06.511592823 +0000
+@@ -14753,6 +14753,7 @@
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        manifest_schema_version: 1,
+     };
+     let err = admit_cli_wrapper_journaled(&cfg, SandboxTier::T3, 1, &log, false, &[])
+         .expect_err("step5: stale declared shape must refuse");
+diff -ruN '--exclude=.git' a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+--- a/crates/maos-bin/src/worker_spawn.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-bin/src/worker_spawn.rs	2026-11-04 09:10:06.508403756 +0000
+@@ -608,12 +608,14 @@
+     let resolved_caps = resolve_worker_caps(manifest_root, policy.as_ref())?;
+ 
+     // 1. Parse [cli_wrapper].
+-    let cw_toml = toml::to_string(
+-        manifest_root
+-            .get("cli_wrapper")
+-            .ok_or("maos run: missing [cli_wrapper] section")?,
+-    )
+-    .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
++    let cw_section = manifest_root
++        .get("cli_wrapper")
++        .ok_or("maos run: missing [cli_wrapper] section")?;
++    // Story 20-5 — the schema version is checked before the strict parse.
++    CliWrapperConfig::check_schema_version(cw_section)
++        .map_err(|e| format!("maos run: [cli_wrapper] {e}"))?;
++    let cw_toml = toml::to_string(cw_section)
++        .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
+     let mut config = CliWrapperConfig::from_toml_str(&cw_toml)
+         .map_err(|e| format!("maos run: [cli_wrapper] parse: {e}"))?;
+ 
+diff -ruN '--exclude=.git' a/crates/maos-domain/src/cli_wrapper.rs b/crates/maos-domain/src/cli_wrapper.rs
+--- a/crates/maos-domain/src/cli_wrapper.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-domain/src/cli_wrapper.rs	2026-11-04 09:10:06.463293312 +0000
+@@ -76,6 +76,18 @@
+     )]
+     ERespawnWithContextUnsupported,
+ 
++    /// Story 20-5 — the Worker manifest's `[cli_wrapper] manifest_schema_version`
++    /// is outside this kernel's window (absent means 1). Checked before the strict
++    /// parse, so a newer manifest is refused as too new, never as an unknown key.
++    #[error(
++        "cli_wrapper manifest_schema_version {declared} unsupported: this kernel accepts {min_supported}..={max_supported}"
++    )]
++    ECliWrapperSchemaUnsupported {
++        declared: u32,
++        min_supported: u32,
++        max_supported: u32,
++    },
++
+     /// Egress requests require a configured daemon proxy and host permission.
+     #[error("CliWrapperSpirit egress proxy unavailable")]
+     EEgressProxyUnavailable,
+diff -ruN '--exclude=.git' a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs	2026-11-04 09:10:25.681631605 +0000
+@@ -217,6 +217,22 @@
+ /// version matches the observed shape — there is no code path that silently
+ /// retries into a started state. (Tested in
+ /// `tests/cli_wrapper_shape_mismatch_journal_7_4.rs`.)
++/// Story 20-5 — the Worker manifest's schema window, enforced at the kernel's
++/// admission chokepoint (the triple's leg 2 for manifests without `[class]`).
++fn check_cli_wrapper_schema(config: &CliWrapperConfig) -> Result<(), CliWrapperAdmissionError> {
++    let declared = config.manifest_schema_version;
++    let min_supported = maos_spirit_abi::MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION;
++    let max_supported = maos_spirit_abi::MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION;
++    if declared < min_supported || declared > max_supported {
++        return Err(CliWrapperAdmissionError::ECliWrapperSchemaUnsupported {
++            declared,
++            min_supported,
++            max_supported,
++        });
++    }
++    Ok(())
++}
++
+ pub fn admit_cli_wrapper_journaled(
+     config: &CliWrapperConfig,
+     sandbox_tier: SandboxTier,
+@@ -225,6 +241,7 @@
+     proxy_configured: bool,
+     granted: &[maos_domain::host_grant::EgressDestination],
+ ) -> Result<(), CliWrapperAdmissionError> {
++    check_cli_wrapper_schema(config)?;
+     check_egress(config, proxy_configured, granted)?;
+     match probe_and_verify_shape(config, sandbox_tier) {
+         Ok(()) => Ok(()),
+@@ -402,6 +419,7 @@
+                 control_channel: CliWrapperControlChannel::Signals,
+                 shutdown_signal: None,
+             },
++            manifest_schema_version: 1,
+         }
+     }
+ 
+diff -ruN '--exclude=.git' a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs	2026-11-04 09:10:06.508931443 +0000
+@@ -75,6 +75,7 @@
+                 control_channel: CliWrapperControlChannel::Signals,
+                 shutdown_signal: None,
+             },
++            manifest_schema_version: 1,
+         }
+     }
+ 
+diff -ruN '--exclude=.git' a/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs b/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs
+--- a/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs	2026-11-04 09:10:06.512880562 +0000
+@@ -41,6 +41,7 @@
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        manifest_schema_version: 1,
+     }
+ }
+ 
+diff -ruN '--exclude=.git' a/crates/maos-kernel-core/tests/cli_wrapper_admission.rs b/crates/maos-kernel-core/tests/cli_wrapper_admission.rs
+--- a/crates/maos-kernel-core/tests/cli_wrapper_admission.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-kernel-core/tests/cli_wrapper_admission.rs	2026-11-04 09:10:06.513033398 +0000
+@@ -36,6 +36,7 @@
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        manifest_schema_version: 1,
+     }
+ }
+ 
+@@ -67,6 +68,7 @@
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        manifest_schema_version: 1,
+     }
+ }
+ 
+diff -ruN '--exclude=.git' a/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs b/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs
+--- a/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs	2026-11-04 09:10:06.513159374 +0000
+@@ -243,6 +243,7 @@
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        manifest_schema_version: 1,
+     };
+ 
+     // Deferred policy → fail loud (no silent downgrade).
+diff -ruN '--exclude=.git' a/crates/maos-kernel-core/tests/cli_wrapper_egress_admission_17_1.rs b/crates/maos-kernel-core/tests/cli_wrapper_egress_admission_17_1.rs
+--- a/crates/maos-kernel-core/tests/cli_wrapper_egress_admission_17_1.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-kernel-core/tests/cli_wrapper_egress_admission_17_1.rs	2026-11-04 09:10:06.513286472 +0000
+@@ -28,6 +28,7 @@
+             shutdown_signal: None,
+         },
+         egress: egress.iter().map(|value| destination(value)).collect(),
++        manifest_schema_version: 1,
+     }
+ }
+ 
+diff -ruN '--exclude=.git' a/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs b/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs
+--- a/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs	2026-11-04 09:10:06.513395486 +0000
+@@ -40,6 +40,7 @@
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        manifest_schema_version: 1,
+     }
+ }
+ 
+diff -ruN '--exclude=.git' a/crates/maos-manifest/src/manifest.rs b/crates/maos-manifest/src/manifest.rs
+--- a/crates/maos-manifest/src/manifest.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-manifest/src/manifest.rs	2026-11-04 09:10:06.549300523 +0000
+@@ -4440,6 +4440,15 @@
+     /// Posture for the subprocess: stdio shape, control-channel mechanism,
+     /// shutdown signal.
+     pub posture: CliWrapperPosture,
++    /// Story 20-5 — the Worker manifest's schema version; absent means 1.
++    /// Checked against the window by [`CliWrapperConfig::check_schema_version`]
++    /// before the strict parse.
++    #[serde(default = "default_cli_wrapper_schema_version")]
++    pub manifest_schema_version: u32,
++}
++
++fn default_cli_wrapper_schema_version() -> u32 {
++    1
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+@@ -4493,6 +4502,33 @@
+ }
+ 
+ impl CliWrapperConfig {
++    /// Story 20-5 — read `manifest_schema_version` from a `[cli_wrapper]`
++    /// table and check it against the supported window BEFORE the strict parse.
++    /// Absent means 1 (every pre-20-5 Worker manifest); a non-integer is refused.
++    pub fn check_schema_version(
++        section: &toml::Value,
++    ) -> Result<u32, maos_domain::cli_wrapper::CliWrapperAdmissionError> {
++        use maos_spirit_abi::{
++            MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MAX,
++            MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION as MIN,
++        };
++        let declared = match section.get("manifest_schema_version") {
++            None => 1,
++            Some(toml::Value::Integer(value)) => u32::try_from(*value).unwrap_or(0),
++            Some(_) => 0,
++        };
++        if declared < MIN || declared > MAX {
++            return Err(
++                maos_domain::cli_wrapper::CliWrapperAdmissionError::ECliWrapperSchemaUnsupported {
++                    declared,
++                    min_supported: MIN,
++                    max_supported: MAX,
++                },
++            );
++        }
++        Ok(declared)
++    }
++
+     pub fn from_toml_str(s: &str) -> Result<Self, ManifestError> {
+         let cfg: Self = toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
+         cfg.validate()?;
+diff -ruN '--exclude=.git' a/crates/maos-spirit-abi/src/lib.rs b/crates/maos-spirit-abi/src/lib.rs
+--- a/crates/maos-spirit-abi/src/lib.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/crates/maos-spirit-abi/src/lib.rs	2026-11-04 09:10:06.463161585 +0000
+@@ -169,3 +169,14 @@
+ /// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
+ /// ```
+ pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;
++
++/// Story 20-5 — schema version of a Worker (`[cli_wrapper]`) manifest. A
++/// separate counter from [`MANIFEST_SCHEMA_VERSION`]: a Worker manifest has no
++/// `[class]`. An absent `[cli_wrapper] manifest_schema_version` means `1`.
++pub const CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;
++
++/// Oldest `[cli_wrapper]` schema version this kernel accepts.
++pub const MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = 1;
++
++/// Newest `[cli_wrapper]` schema version this kernel accepts; higher is refused.
++pub const MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION: u32 = CLI_WRAPPER_SCHEMA_VERSION;
+diff -ruN '--exclude=.git' a/spirits/worker/tests/cli_wrapper_admission.rs b/spirits/worker/tests/cli_wrapper_admission.rs
+--- a/spirits/worker/tests/cli_wrapper_admission.rs	2026-11-04 08:58:18.000000000 +0000
++++ b/spirits/worker/tests/cli_wrapper_admission.rs	2026-11-04 09:10:06.513513807 +0000
+@@ -47,6 +47,7 @@
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        manifest_schema_version: 1,
+     }
+ }
+ 

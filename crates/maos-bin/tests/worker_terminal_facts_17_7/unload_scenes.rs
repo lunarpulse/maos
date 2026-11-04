@@ -6,10 +6,44 @@ use std::time::{Duration, Instant};
 
 use maos_bin::supervision::{OnUnloadFault, SupervisorSeams, WorkerSupervisor, WorkerTask};
 use maos_kernel_core::iac::transparency_log::{FrameFilter, TransparencyLogAdapter};
+use maos_kernel_core::iac::FrameKind;
 use maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 
 const BOOT_NONCE: u64 = 0x17_07_51;
+type Row = (u32, String, serde_json::Value, FrameKind);
+
+fn is_unload_budget_exceeded((_, intent, _, kind): &Row) -> bool {
+    *kind == FrameKind::BudgetExceeded && intent == "hook.budget.on_unload"
+}
+
+#[test]
+fn s5_budget_oracle_counts_exceeded_kind_not_a_delayed_warning() {
+    let rows: Vec<Row> = [
+        (FrameKind::BudgetWarning, 2.422539097),
+        (FrameKind::BudgetExceeded, 2.622919372),
+    ]
+    .into_iter()
+    .map(|(kind, ratio)| {
+        (
+            42,
+            "hook.budget.on_unload".into(),
+            serde_json::json!({"ratio_breached":ratio,"hook_name":"on_unload","cap_seconds":1}),
+            kind,
+        )
+    })
+    .collect();
+    let exceeded: Vec<_> = rows
+        .iter()
+        .filter(|row| is_unload_budget_exceeded(row))
+        .collect();
+    assert_eq!(
+        exceeded.len(),
+        1,
+        "a delayed warning is not another exceeded frame"
+    );
+    assert_eq!(exceeded[0].3, FrameKind::BudgetExceeded);
+}
 
 pub(super) struct World {
     pub(super) tl: Arc<TransparencyLogAdapter>,
@@ -24,7 +58,7 @@ pub(super) struct World {
 
 impl World {
     pub(super) fn new(dir: &Path) -> Self {
-        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        super::init_clock();
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(BOOT_NONCE));
         let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
         let capability = Arc::new(
@@ -118,7 +152,7 @@ impl World {
         )
     }
 
-    fn rows(&self) -> Vec<(u32, String, serde_json::Value)> {
+    fn rows(&self) -> Vec<Row> {
         self.tl
             .query_frames(FrameFilter::default())
             .expect("read transparency log")
@@ -129,6 +163,7 @@ impl World {
                     row.intent,
                     serde_json::from_slice(&row.payload_redacted)
                         .unwrap_or(serde_json::Value::Null),
+                    row.kind,
                 )
             })
             .collect()
@@ -369,9 +404,9 @@ async fn exercise_unload(
     let rows = world.rows();
     let at_pid: Vec<_> = rows
         .iter()
-        .filter(|(row_pid, _, _)| *row_pid == pid)
+        .filter(|(row_pid, _, _, _)| *row_pid == pid)
         .collect();
-    let hook_or_lifecycle = at_pid.iter().any(|(_, intent, payload)| {
+    let hook_or_lifecycle = at_pid.iter().any(|(_, intent, payload, _)| {
         intent == "lifecycle.unload" && payload["lifecycle_event"] == "Unload"
     });
     assert!(
@@ -380,7 +415,7 @@ async fn exercise_unload(
     );
     let receipts: Vec<_> = at_pid
         .iter()
-        .filter(|(_, intent, payload)| intent == "planned_unload" && !payload.is_null())
+        .filter(|(_, intent, payload, _)| intent == "planned_unload" && !payload.is_null())
         .collect();
     assert_eq!(
         receipts.len(),
@@ -392,7 +427,7 @@ async fn exercise_unload(
     // would classify a planned stop as a crash.
     let faults: Vec<_> = at_pid
         .iter()
-        .filter(|(_, intent, payload)| {
+        .filter(|(_, intent, payload, _)| {
             intent.starts_with("fault.")
                 || (intent == "task.orphaned" && payload["cause"] != "on_unload_hook_failure")
                 || intent == "unplanned_crash"
@@ -406,16 +441,9 @@ async fn exercise_unload(
         faults.is_empty(),
         "planned stop must not create a crash/orphan row: {faults:?}"
     );
-    // `hook_dispatch.rs` writes a warning row (ratio < 1) as well as the
-    // exceeded row when the hook's wall time crosses both thresholds.
     let exceeded: Vec<_> = at_pid
         .iter()
-        .filter(|(_, intent, payload)| {
-            intent == "hook.budget.on_unload"
-                && payload["ratio_breached"]
-                    .as_f64()
-                    .is_some_and(|ratio| ratio >= 1.0)
-        })
+        .filter(|row| is_unload_budget_exceeded(row))
         .collect();
     assert_eq!(
         exceeded.len(),
@@ -425,12 +453,12 @@ async fn exercise_unload(
     if expected_budget_row {
         assert!(exceeded
             .iter()
-            .any(|(_, _, payload)| payload["hook_name"] == "on_unload"
+            .any(|(_, _, payload, _)| payload["hook_name"] == "on_unload"
                 && payload["cap_seconds"] == 1));
     }
     let exits: Vec<_> = at_pid
         .iter()
-        .filter(|(_, intent, _)| intent == "cli.subprocess.exit")
+        .filter(|(_, intent, _, _)| intent == "cli.subprocess.exit")
         .collect();
     assert_eq!(exits.len(), 1, "T3 bridge writes one exit record");
     let exit_container = &exits[0].2["container"];

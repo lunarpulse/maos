@@ -1,0 +1,1 @@
+{"gate":"check-exit-commands","passed":true,"epics_in_roster":2,"blocks_read":2,"tokens_resolved":10,"owed":[],"findings":[],"surface_notes":[],"surfaces":{"maos":9,"maosctl":27,"xtask":97,"one_shot_modes":32}}
