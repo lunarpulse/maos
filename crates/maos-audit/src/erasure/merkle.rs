@@ -12,10 +12,12 @@ pub type NodeHash = [u8; 32];
 
 /// Inclusion/exclusion proof path through a binary Merkle tree.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MerkleProof {
     /// The leaf hash the proof is for (excluded leaf for exclusion proofs).
     pub leaf: NodeHash,
     /// For exclusion proofs, the adjacent in-tree leaf used to recompute the root.
+    #[serde(deserialize_with = "required_option")]
     pub adjacent_leaf: Option<NodeHash>,
     /// Index of the leaf in the sorted leaf vector.
     pub leaf_index: usize,
@@ -23,6 +25,14 @@ pub struct MerkleProof {
     pub siblings: Vec<NodeHash>,
     /// `false` = this leaf is the left child at the level, `true` = right child.
     pub directions: Vec<bool>,
+}
+
+pub(super) fn required_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    serde::Deserialize::deserialize(deserializer)
 }
 
 /// Small binary Merkle tree built over a sorted leaf set.
@@ -178,38 +188,74 @@ pub fn prove_exclusion(tree: &MerkleTree, leaf: NodeHash) -> Option<MerkleProof>
     })
 }
 
-/// Recompute the root from a leaf and its proof; compare to `expected_root`.
-/// For exclusion proofs, recomputes from the adjacent leaf.
-pub fn verify_proof(expected_root: NodeHash, leaf: NodeHash, proof: &MerkleProof) -> bool {
-    // An exclusion proof records the claimed-excluded leaf in `proof.leaf`
-    // and the real adjacent leaf in `proof.adjacent_leaf`.  If they coincide
-    // the proof is degenerate and proves nothing.
-    if proof.adjacent_leaf == Some(leaf) {
+/// Verify an inclusion only in a nonempty tree, with its exact sorted index.
+/// The empty-tree exclusion sentinel is never an inclusion proof.
+pub fn verify_inclusion_proof(tree: &MerkleTree, leaf: NodeHash, proof: &MerkleProof) -> bool {
+    proof.leaf == leaf
+        && proof.adjacent_leaf.is_none()
+        && tree.leaves.get(proof.leaf_index) == Some(&leaf)
+        && verify_path(tree, leaf, proof)
+}
+
+/// Verify exclusion against the declared complete leaf set and its canonical
+/// adjacent leaf. Empty-tree exclusion has a separate, unambiguous context.
+pub fn verify_exclusion_proof(tree: &MerkleTree, proof: &MerkleProof) -> bool {
+    if tree.leaves.is_empty() {
+        return tree.root == empty_root()
+            && proof.adjacent_leaf.is_none()
+            && proof.leaf_index == 0
+            && proof.siblings.is_empty()
+            && proof.directions.is_empty();
+    }
+    let Err(position) = tree.leaves.binary_search(&proof.leaf) else {
+        return false;
+    };
+    let adjacent_index = position.saturating_sub(1);
+    let adjacent = tree.leaves[adjacent_index];
+    proof.leaf_index == adjacent_index
+        && proof.adjacent_leaf == Some(adjacent)
+        && verify_path(tree, adjacent, proof)
+}
+
+fn verify_path(tree: &MerkleTree, leaf: NodeHash, proof: &MerkleProof) -> bool {
+    if tree.leaves.is_empty()
+        || proof.leaf_index >= tree.leaves.len()
+        || proof.siblings.len() != proof.directions.len()
+        || proof.siblings.len() != (usize::BITS - (tree.leaves.len() - 1).leading_zeros()) as usize
+    {
         return false;
     }
-    if proof.siblings.is_empty() {
-        if let Some(adjacent) = proof.adjacent_leaf {
-            // Zero-height exclusion proof on a single-leaf tree: the one real
-            // (adjacent) leaf IS the root.
-            return adjacent == expected_root;
-        }
-        // No adjacent leaf: either a single-leaf inclusion (the leaf is the
-        // root) or the empty-tree exclusion sentinel.
-        if leaf == expected_root {
-            return true;
-        }
-        return expected_root == empty_root() && leaf != empty_root();
+    fold_path(tree.root, leaf, proof)
+}
+
+/// Membership against a trusted root when the application has no complete leaf
+/// set (collective attestations). This is NEVER an exclusion verifier.
+pub fn verify_inclusion_path(root: NodeHash, leaf: NodeHash, proof: &MerkleProof) -> bool {
+    root != empty_root()
+        && proof.leaf == leaf
+        && proof.adjacent_leaf.is_none()
+        && fold_path(root, leaf, proof)
+}
+
+fn fold_path(root: NodeHash, leaf: NodeHash, proof: &MerkleProof) -> bool {
+    if proof.siblings.len() != proof.directions.len() || proof.siblings.len() > usize::BITS as usize
+    {
+        return false;
     }
-    let base_leaf = proof.adjacent_leaf.unwrap_or(leaf);
-    let mut current = base_leaf;
-    for (sibling, is_right) in proof.siblings.iter().zip(proof.directions.iter()) {
+    let mut index = proof.leaf_index;
+    let mut current = leaf;
+    for (sibling, is_right) in proof.siblings.iter().zip(&proof.directions) {
+        if *is_right != (index & 1 == 1) {
+            return false;
+        }
         current = if *is_right {
             hash_pair(sibling, &current)
         } else {
             hash_pair(&current, sibling)
         };
+        index /= 2;
     }
-    current == expected_root
+    index == 0 && current == root
 }
 
 #[cfg(test)]
@@ -222,11 +268,11 @@ mod tests {
         let tree = build_tree_from_frame_ids(&ids);
         let leaf = hash_leaf(&ids[3]);
         let proof = prove_inclusion(&tree, leaf).unwrap();
-        assert!(verify_proof(tree.root, leaf, &proof));
+        assert!(verify_inclusion_proof(&tree, leaf, &proof));
 
         let missing: [u8; 16] = [255; 16];
         let excl = prove_exclusion(&tree, hash_leaf(&missing)).unwrap();
-        assert!(verify_proof(tree.root, excl.leaf, &excl));
+        assert!(verify_exclusion_proof(&tree, &excl));
         assert_ne!(excl.adjacent_leaf, Some(excl.leaf));
     }
 
@@ -235,7 +281,7 @@ mod tests {
         let tree = build_tree_from_frame_ids(&[]);
         let leaf = hash_leaf(&[1u8; 16]);
         let proof = prove_exclusion(&tree, leaf).unwrap();
-        assert!(verify_proof(tree.root, leaf, &proof));
+        assert!(verify_exclusion_proof(&tree, &proof));
     }
     #[test]
     fn single_leaf_tree_inclusion_verifies() {
@@ -249,7 +295,7 @@ mod tests {
         let proof = prove_inclusion(&tree, leaf).expect("single-leaf inclusion proof");
         assert!(proof.siblings.is_empty());
         assert!(
-            verify_proof(tree.root, leaf, &proof),
+            verify_inclusion_proof(&tree, leaf, &proof),
             "single-leaf inclusion MUST verify (leaf == root)"
         );
     }
@@ -261,7 +307,7 @@ mod tests {
         let tree = build_tree_from_frame_ids(&ids);
         let absent = hash_leaf(&[99u8; 16]);
         let excl = prove_exclusion(&tree, absent).expect("single-leaf exclusion proof");
-        assert!(verify_proof(tree.root, excl.leaf, &excl));
+        assert!(verify_exclusion_proof(&tree, &excl));
     }
 
     #[test]
@@ -274,17 +320,15 @@ mod tests {
                 let leaf = hash_leaf(id);
                 let proof = prove_inclusion(&tree, leaf).unwrap();
                 assert!(
-                    verify_proof(tree.root, leaf, &proof),
+                    verify_inclusion_proof(&tree, leaf, &proof),
                     "{n}-leaf inclusion {id:?}"
                 );
+                assert!(verify_inclusion_path(tree.root, leaf, &proof));
             }
             // Exclusion of a non-member.
             let absent = hash_leaf(&[200u8; 16]);
             let excl = prove_exclusion(&tree, absent).unwrap();
-            assert!(
-                verify_proof(tree.root, excl.leaf, &excl),
-                "{n}-leaf exclusion"
-            );
+            assert!(verify_exclusion_proof(&tree, &excl), "{n}-leaf exclusion");
         }
     }
 
@@ -298,7 +342,7 @@ mod tests {
         assert_eq!(tree.leaves.len(), 2);
         let leaf = hash_leaf(&[3u8; 16]);
         let proof = prove_inclusion(&tree, leaf).unwrap();
-        assert!(verify_proof(tree.root, leaf, &proof));
+        assert!(verify_inclusion_proof(&tree, leaf, &proof));
     }
 
     #[test]
@@ -311,7 +355,7 @@ mod tests {
         if let Some(sib) = proof.siblings.first_mut() {
             sib[0] ^= 0xff;
             assert!(
-                !verify_proof(tree.root, leaf, &proof),
+                !verify_inclusion_proof(&tree, leaf, &proof),
                 "tampered proof must fail"
             );
         }
@@ -319,8 +363,23 @@ mod tests {
         let good = prove_inclusion(&tree, hash_leaf(&ids[3])).unwrap();
         let wrong_leaf = hash_leaf(&ids[4]);
         assert!(
-            !verify_proof(tree.root, wrong_leaf, &good),
+            !verify_inclusion_proof(&tree, wrong_leaf, &good),
             "valid proof for one leaf must not verify a different leaf"
         );
+    }
+
+    #[test]
+    fn empty_tree_sentinel_is_never_inclusion_and_path_lengths_are_exact() {
+        let empty = build_tree_from_frame_ids(&[]);
+        let leaf = hash_leaf(&[1; 16]);
+        let sentinel = prove_exclusion(&empty, leaf).expect("empty exclusion");
+        assert!(verify_exclusion_proof(&empty, &sentinel));
+        assert!(!verify_inclusion_proof(&empty, leaf, &sentinel));
+        assert!(!verify_inclusion_path(empty.root, leaf, &sentinel));
+        let tree = build_tree_from_frame_ids(&[[1; 16], [2; 16]]);
+        let mut proof = prove_inclusion(&tree, leaf).expect("inclusion");
+        proof.directions.clear();
+        assert!(!verify_inclusion_proof(&tree, leaf, &proof));
+        assert!(!verify_inclusion_path(tree.root, leaf, &proof));
     }
 }

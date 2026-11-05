@@ -1,0 +1,29 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "maos-bin",
+    "--bin",
+    "maos",
+    "review_p9_",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "started": "2026-11-05T13:06:44.052743+00:00",
+  "seconds": 320.94528183800867,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/root-late-final-1.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/root-late-final-1.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

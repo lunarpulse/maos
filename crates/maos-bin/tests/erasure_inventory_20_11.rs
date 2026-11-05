@@ -321,7 +321,7 @@ fn ac1_category_evidence_is_required_by_both_verifiers() {
     assert!(
         error
             .to_string()
-            .contains("schema/category evidence mismatch"),
+            .contains("complete mandatory category inventory required"),
         "{error}"
     );
     std::fs::write(
@@ -337,7 +337,8 @@ fn ac1_category_evidence_is_required_by_both_verifiers() {
         .expect("python verifier");
     assert!(!rejected.status.success());
     assert!(
-        String::from_utf8_lossy(&rejected.stderr).contains("schema/category evidence mismatch"),
+        String::from_utf8_lossy(&rejected.stderr)
+            .contains("complete mandatory inventory is required"),
         "{rejected:?}"
     );
 }
@@ -417,19 +418,7 @@ fn ac2_held_derivation_and_installed_package_are_retained() {
         .expect("hold");
     let output = f.run();
     assert_eq!(output.status.code(), Some(5));
-    let terminal: serde_json::Value =
-        serde_json::from_slice(&output.stdout).unwrap_or_else(|e| panic!("terminal {e}"));
-    let path = terminal["error"]
-        .as_str()
-        .and_then(|error| {
-            error
-                .split_once("partial erasure proof: ")
-                .map(|(_, path)| path)
-        })
-        .expect("partial proof path");
-    let proof: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(path).expect("partial bundle"))
-            .unwrap_or_else(|e| panic!("proof {e}"));
+    let proof = f.proof(&output);
     assert_eq!(f.body(id), before);
     assert!(root
         .join("installed/hello-spirit/1.0.0-test/manifest.toml")
@@ -469,4 +458,425 @@ fn ac4_failed_proof_write_keeps_installed_package() {
         installs.get("hello-spirit").is_some(),
         "Failed uninstall removed the boot entry"
     );
+}
+
+fn seed_identity_principal(f: &Fixture, boot: u64, identity: Option<&str>, subject: &str) {
+    use maos_domain::ports::MemoryManagerPort as _;
+    let tl = Arc::new(
+        TransparencyLogAdapter::open_with_global_legal_holds(&f.db, &f.db, boot).expect("TL"),
+    );
+    let memory = maos_kernel_core::memory::MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::PrivateMemoryStore::new(
+            f.dir.path().join("memory"),
+            4096,
+        )),
+        Arc::new(maos_kernel_core::memory::SharedMemoryStore::open(&f.db).expect("shared")),
+        Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&f.db).expect("index")),
+        tl,
+    );
+    if let Some(identity) = identity {
+        memory
+            .bind_storage_identity(7, identity)
+            .expect("admitted stable owner");
+    }
+    memory
+        .write(
+            7,
+            maos_domain::memory::MemoryTier::Private,
+            &maos_domain::memory::MemoryNamespace::Principal {
+                principal_id: subject.into(),
+                schema: "identity-review".into(),
+            },
+            "private",
+            maos_domain::memory::MemoryValue::Text(format!("private value for {subject}")),
+        )
+        .expect("real indexed private write");
+}
+
+fn principal_rows(f: &Fixture, subject: &str) -> u64 {
+    rusqlite::Connection::open(&f.db)
+        .expect("principal index")
+        .query_row(
+            "SELECT count(*) FROM principal_index WHERE principal_id=?1",
+            [subject],
+            |row| row.get(0),
+        )
+        .expect("count durable principal rows")
+}
+
+fn assert_reused_pid_isolated(same_boot: bool) {
+    let f = Fixture::new();
+    f.install();
+    f.seed(1, "hello-spirit", 7, true);
+    seed_identity_principal(&f, 1, Some("hello-spirit"), "subject-a@example.org");
+    if same_boot {
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        let path = f.dir.path().join("home/journal/lifecycle.ndjson");
+        std::fs::create_dir_all(path.parent().expect("journal parent")).expect("journal directory");
+        let journal = maos_kernel_core::journal::JournalAdapter::open(&path).expect("real journal");
+        journal.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(
+            maos_domain::invariants::i10::LifecycleEntry {
+                timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                lifecycle_event: maos_domain::invariants::i10::LifecycleEvent::Unload,
+                spirit_id: "hello-spirit".into(),
+                payload: None,
+                effective_sandbox_tier: None,
+            },
+        ));
+        drop(journal);
+    }
+    let boot = if same_boot { 1 } else { 2 };
+    let unrelated = f.seed(boot, "other-spirit", 7, true).expect("B lineage");
+    seed_identity_principal(&f, boot, Some("other-spirit"), "subject-b@example.org");
+    let unrelated_body = f.body(unrelated);
+    let output = f.run();
+    assert_eq!(
+        principal_rows(&f, "subject-b@example.org"),
+        1,
+        "uninstall A erased B's stable principal through a recycled numeric pid: {output:?}"
+    );
+    assert_eq!(
+        f.body(unrelated),
+        unrelated_body,
+        "uninstall A erased B's lineage after pid reuse"
+    );
+    assert_eq!(
+        principal_rows(&f, "subject-a@example.org"),
+        0,
+        "A's own principal must be erased"
+    );
+    assert!(output.status.success(), "{output:?}");
+}
+
+#[test]
+fn review_f1_cross_boot_pid_reuse_preserves_other_stable_owner() {
+    assert_reused_pid_isolated(false);
+}
+
+#[test]
+fn review_f1_same_boot_after_exit_preserves_other_stable_owner_and_lineage() {
+    assert_reused_pid_isolated(true);
+}
+
+#[test]
+fn review_f1_legacy_numeric_owner_is_a_named_gap_not_an_erasure() {
+    let f = Fixture::new();
+    let registry = f.install();
+    f.seed(1, "hello-spirit", 7, false);
+    seed_identity_principal(&f, 1, None, "legacy-owner@example.org");
+    let output = f.run();
+    assert!(
+        !output.status.success(),
+        "ambiguous numeric owner was reported erased: {output:?}"
+    );
+    assert_eq!(
+        principal_rows(&f, "legacy-owner@example.org"),
+        1,
+        "legacy owner was guessed"
+    );
+    assert!(registry
+        .join("installed/hello-spirit/1.0.0-test/manifest.toml")
+        .is_file());
+    let proof = f.proof(&output);
+    let category = proof["categories"]
+        .as_array()
+        .unwrap_or_else(|| panic!("categories {proof}"))
+        .iter()
+        .find(|category| category["name"] == "principal_index")
+        .unwrap_or_else(|| panic!("principal category {proof}"));
+    assert_eq!(category["status"]["status"], "CoverageGap");
+    assert!(
+        category["status"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("legacy_numeric_owner")),
+        "named ambiguity gap required: {category}"
+    );
+}
+
+#[test]
+fn review_p7_corrupt_admission_does_not_become_installed_unknown() {
+    let f = Fixture::new();
+    let registry = f.install();
+    let lineage = f.seed(1, "hello-spirit", 7, true).expect("owned lineage");
+    let body = f.body(lineage);
+    rusqlite::Connection::open(&f.db).expect("database").execute(
+        "UPDATE transparency_log SET boot_nonce='invalid-boot' WHERE kind=19 AND intent='hello-spirit'", [],
+    ).expect("genuine SQLite typed-row decode failure");
+    let output = f.run();
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "resolver I/O/decode failure was swallowed: {output:?}"
+    );
+    assert!(
+        registry
+            .join("installed/hello-spirit/1.0.0-test/manifest.toml")
+            .is_file(),
+        "unresolvable ownership must not uninstall the package"
+    );
+    assert_eq!(
+        f.body(lineage),
+        body,
+        "failed identity resolution must precede destructive work"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof() {
+    use maos_skill::SkillQueueStore as _;
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt as _;
+    use std::process::Stdio;
+    struct ChildGuard(Option<std::process::Child>);
+    impl Drop for ChildGuard {
+        fn drop(&mut self) {
+            if let Some(mut child) = self.0.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+    let f = Fixture::new();
+    let registry = f.install();
+    f.seed(1, "hello-spirit", 7, false);
+    seed_identity_principal(&f, 1, Some("hello-spirit"), "journal-subject@example.org");
+    let journal = f.dir.path().join("home/journal/lifecycle.ndjson");
+    std::fs::create_dir_all(journal.parent().expect("journal parent")).expect("journal directory");
+    std::fs::write(&journal, []).expect("readable lifecycle journal");
+    let queue = f.dir.path().join("home/skills/queue.json");
+    maos_skill::LocalFsSkillQueueStore::at_path(queue.clone())
+        .save(&[])
+        .expect("valid empty queue");
+    let queue_bytes = std::fs::read(&queue).expect("queue bytes");
+    std::fs::remove_file(&queue).expect("prepare inventory barrier");
+    rustix::fs::mkfifoat(
+        rustix::fs::CWD,
+        &queue,
+        rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+    )
+    .expect("real retained-inventory read barrier");
+    let mut child = ChildGuard(Some(
+        f.command()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("real uninstall"),
+    ));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    let mut writer = loop {
+        match rustix::fs::open(
+            &queue,
+            rustix::fs::OFlags::WRONLY | rustix::fs::OFlags::NONBLOCK | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        ) {
+            Ok(file) => break std::fs::File::from(file),
+            Err(rustix::io::Errno::NXIO) => {
+                assert!(
+                    child
+                        .0
+                        .as_mut()
+                        .expect("child")
+                        .try_wait()
+                        .expect("child status")
+                        .is_none(),
+                    "root exited before the inventory read barrier"
+                );
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "root never reached the inventory read barrier"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            Err(error) => panic!("inventory barrier open: {error}"),
+        }
+    };
+    // The initial shared journal is already open before any queue load. Make
+    // the later lifecycle finalization open fail, without refusing root startup.
+    std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o400))
+        .expect("real append denial");
+    std::fs::remove_file(&queue).expect("unlink barrier while reader retains its fd");
+    std::fs::write(&queue, &queue_bytes).expect("subsequent inventory reads remain real");
+    writer
+        .write_all(&queue_bytes)
+        .expect("release inventory read");
+    drop(writer);
+    let output = child
+        .0
+        .take()
+        .expect("child")
+        .wait_with_output()
+        .expect("uninstall result");
+    std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o600))
+        .expect("restore fixture permission");
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "real lifecycle open must fail: {output:?}"
+    );
+    assert!(
+        registry
+            .join("installed/hello-spirit/1.0.0-test/manifest.toml")
+            .is_file(),
+        "Failed finalization deleted the installed generation: {output:?}"
+    );
+    let proof = f.proof(&output);
+    let categories = proof["categories"]
+        .as_array()
+        .unwrap_or_else(|| panic!("categories {proof}"));
+    for name in ["installed_package", "lifecycle_journal"] {
+        let category = categories
+            .iter()
+            .find(|category| category["name"] == name)
+            .unwrap_or_else(|| panic!("missing {name}: {proof}"));
+        assert_eq!(category["status"]["status"], "CoverageGap",
+            "failed lifecycle finalization cannot attest a removed package or verified-empty journal: {category}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn review_p5_partial_delete_retains_complete_generation_and_signed_real_erasures() {
+    use std::os::unix::fs::PermissionsExt as _;
+    fn snapshot(root: &std::path::Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
+        fn visit(
+            root: &std::path::Path,
+            path: &std::path::Path,
+            files: &mut std::collections::BTreeMap<PathBuf, Vec<u8>>,
+        ) {
+            for entry in std::fs::read_dir(path).expect("generation") {
+                let entry = entry.expect("entry");
+                if entry.file_type().expect("type").is_dir() {
+                    visit(root, &entry.path(), files);
+                } else {
+                    files.insert(
+                        entry
+                            .path()
+                            .strip_prefix(root)
+                            .expect("relative")
+                            .to_owned(),
+                        std::fs::read(entry.path()).expect("bytes"),
+                    );
+                }
+            }
+        }
+        let mut files = std::collections::BTreeMap::new();
+        visit(root, root, &mut files);
+        files
+    }
+    let f = Fixture::new();
+    let registry = f.install();
+    f.seed(1, "hello-spirit", 7, true);
+    seed_identity_principal(
+        &f,
+        1,
+        Some("hello-spirit"),
+        "deleted-before-package-error@example.org",
+    );
+    let generation = registry.join("installed/hello-spirit/1.0.0-test");
+    for part in 0..64 {
+        let path = generation.join(format!("part-{part:03}"));
+        std::fs::create_dir(&path).expect("part");
+        std::fs::write(
+            path.join("artifact.bin"),
+            format!("signed complete part {part}"),
+        )
+        .expect("artifact");
+    }
+    let blocker = std::fs::read_dir(&generation)
+        .expect("order")
+        .map(|entry| entry.expect("entry"))
+        .filter(|entry| entry.file_type().expect("type").is_dir())
+        .last()
+        .expect("part")
+        .path();
+    std::fs::set_permissions(&blocker, std::fs::Permissions::from_mode(0o500))
+        .expect("actual deletion denial");
+    let before = snapshot(&generation);
+    let output = f.run();
+    std::fs::set_permissions(&blocker, std::fs::Permissions::from_mode(0o700))
+        .expect("restore fixture mode");
+    assert_eq!(output.status.code(), Some(5), "{output:?}");
+    assert_eq!(
+        snapshot(&generation),
+        before,
+        "Failed reinstalled torn bytes"
+    );
+    assert_eq!(
+        principal_rows(&f, "deleted-before-package-error@example.org"),
+        0
+    );
+    let proof = f.proof(&output);
+    verify(&proof);
+    assert_eq!(
+        category(&proof, "installed_package")["status"]["status"],
+        "CoverageGap"
+    );
+    assert_eq!(category(&proof, "memory_namespace")["status"]["count"], 1);
+    let batch = proof["category_evidence"]
+        .as_array()
+        .expect("evidence")
+        .iter()
+        .find(|item| item["name"] == "memory_namespace")
+        .expect("memory evidence");
+    assert_eq!(
+        batch["removals"][0]["deleted_entries"], 1,
+        "count must come from the actual ForgetReceipt"
+    );
+    let index: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(registry.join("installed-index.json")).expect("index"),
+    )
+    .unwrap_or_else(|error| panic!("index: {error}"));
+    assert_eq!(index["hello-spirit"], "hello-spirit/1.0.0-test");
+}
+
+#[test]
+fn review_pending_uninstall_repeat_recovers_subject_scope_after_index_deletion() {
+    let f = Fixture::new();
+    let registry = f.install();
+    f.seed(1, "hello-spirit", 7, false);
+    let subject = "repeat-after-partial@example.org";
+    seed_identity_principal(&f, 1, Some("hello-spirit"), subject);
+    let malformed = [201; 16];
+    rusqlite::Connection::open(&f.db).expect("TL").execute(
+        "INSERT INTO transparency_log(frame_id,timestamp_ns,spirit_pid,boot_nonce,kind,intent,payload_redacted,origin)
+         VALUES(?1,1,999,1,11,'legacy.malformed',X'78',1)",[malformed.as_slice()],
+    ).expect("real malformed legacy row");
+    let first = f.run();
+    assert_eq!(first.status.code(), Some(5), "{first:?}");
+    assert_eq!(
+        principal_rows(&f, subject),
+        0,
+        "first run really deleted the live binding"
+    );
+    verify(&f.proof(&first));
+    assert!(registry
+        .join("installed/hello-spirit/1.0.0-test/manifest.toml")
+        .is_file());
+    let tl = TransparencyLogAdapter::open_with_global_legal_holds(&f.db, &f.db, 2).expect("TL");
+    assert!(tl
+        .scrub_distillate_unless_held(malformed, "gdpr-forget")
+        .expect("explicit legacy-body remediation"));
+    let body = format!("{{\"principal_id\":\"{subject}\",\"canary\":\"new matching commit\"}}");
+    tl.insert_frame_event(
+        FrameKind::McpInvocation,
+        88,
+        None,
+        "repeat.late",
+        body.as_bytes(),
+        FrameOrigin::SpiritAuto,
+    );
+    let late = tl.last_frame_id();
+    drop(tl);
+    let second = f.run();
+    assert!(second.status.success(), "{second:?}");
+    assert!(
+        TransparencyLogAdapter::is_kernel_tombstone(&f.body(late)),
+        "repeat silently restarted from an empty subject index"
+    );
+    let proof = f.proof(&second);
+    verify(&proof);
+    assert_eq!(proof["subject_count"], 1);
+    assert!(proof["frame_sweep_completion"].is_object());
+    assert!(!registry.join("installed/hello-spirit").exists());
 }

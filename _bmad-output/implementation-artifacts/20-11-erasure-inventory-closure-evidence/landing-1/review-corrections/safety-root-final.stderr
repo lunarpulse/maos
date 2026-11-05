@@ -1,0 +1,1852 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+   Compiling maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:487:21
+    |
+487 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+   |
+23 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:13:17
+   |
+13 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+   |
+29 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+    |
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+    |
+401 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:46:5
+   |
+44 | struct DiskCandidate {
+   |        ------------- field in this struct
+45 |     name: String,
+46 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-iac` (lib) generated 3 warnings (1 duplicate) (run `cargo fix --lib -p maos-iac` to apply 2 suggestions)
+   Compiling maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+warning: `maos-cohort` (lib) generated 1 warning
+   Compiling maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+   Compiling maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+   Compiling maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+warning: `maos-kernel-core` (lib) generated 37 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 21 suggestions)
+   Compiling maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+warning: `maos-iac` (lib test) generated 3 warnings (2 duplicates) (run `cargo fix --lib -p maos-iac --tests` to apply 1 suggestion)
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+    --> crates/maos-control/src/lib.rs:1064:28
+     |
+1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+warning: `maos-control` (lib) generated 2 warnings
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_domain::invariants::i3::FrameOrigin`
+   --> crates/maos-bin/src/cross_team_crossing.rs:925:9
+    |
+925 |     use maos_domain::invariants::i3::FrameOrigin;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `FrameKind`
+   --> crates/maos-bin/src/cross_team_crossing.rs:928:20
+    |
+928 |     use maos_iac::{FrameKind, TransparencyLogAdapter};
+    |                    ^^^^^^^^^
+
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+warning: unused import: `maos_mcp::McpClient`
+    --> crates/maos-bin/src/main.rs:1445:9
+     |
+1445 |     use maos_mcp::McpClient as _;
+     |         ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `purpose` and `stability` are never read
+ --> crates/maos-bin/src/env_contract.rs:3:9
+  |
+1 | pub struct EnvVar {
+  |            ------ fields in this struct
+2 |     pub name: &'static str,
+3 |     pub purpose: &'static str,
+  |         ^^^^^^^
+4 |     pub stability: EnvStability,
+  |         ^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-bin` (lib test) generated 3 warnings (run `cargo fix --lib -p maos-bin --tests` to apply 3 suggestions)
+warning: `maos-bin` (bin "maos" test) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6m 34s
+────────────
+ Nextest run ID ae7798ff-6d5f-47ba-8c4f-228f041c95a8 with nextest profile: default
+    Starting 118 tests across 3 binaries (49 tests skipped)
+        PASS [   0.005s] (  1/118) maos-iac adapter::decision_audit_tests::lineage_broadcast_empty_to_succeeds
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::lineage_broadcast_empty_to_succeeds ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.005s] (  2/118) maos-iac adapter::decision_audit_tests::i12_non_decision_frames_not_decorated
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::i12_non_decision_frames_not_decorated ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.007s] (  3/118) maos-iac adapter::distillate::tests::admit_for_consumer_denies_non_matching_lineage
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::admit_for_consumer_denies_non_matching_lineage ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.007s] (  4/118) maos-iac adapter::decision_audit_tests::i12_10_decision_frames_100_percent_carry_refs
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::i12_10_decision_frames_100_percent_carry_refs ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.007s] (  5/118) maos-iac adapter::channels::tests::audit_frame_kinds_reject_router
+  stdout ───
+
+    running 1 test
+    test adapter::channels::tests::audit_frame_kinds_reject_router ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.010s] (  6/118) maos-iac adapter::channels::tests::channel_classes_match_addendum
+  stdout ───
+
+    running 1 test
+    test adapter::channels::tests::channel_classes_match_addendum ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.011s] (  7/118) maos-iac adapter::decision_logger::tests::decorate_decision_frame_passes_spirit_id_to_provider
+  stdout ───
+
+    running 1 test
+    test adapter::decision_logger::tests::decorate_decision_frame_passes_spirit_id_to_provider ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.011s] (  8/118) maos-iac adapter::decision_logger::tests::decorate_decision_frame_does_not_mutate_non_decision_frames
+  stdout ───
+
+    running 1 test
+    test adapter::decision_logger::tests::decorate_decision_frame_does_not_mutate_non_decision_frames ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.011s] (  9/118) maos-iac adapter::channels::tests::all_iac_frame_kinds_are_routable
+  stdout ───
+
+    running 1 test
+    test adapter::channels::tests::all_iac_frame_kinds_are_routable ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.012s] ( 10/118) maos-iac adapter::decision_logger::tests::frame_carries_i12_refs_non_decision_frame_true
+  stdout ───
+
+    running 1 test
+    test adapter::decision_logger::tests::frame_carries_i12_refs_non_decision_frame_true ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 11/118) maos-iac adapter::log_recall::tests::cross_wall_recall_journals_disclosure_before_remote_read
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_journals_disclosure_before_remote_read ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.008s] ( 12/118) maos-iac adapter::distillate::tests::write_distillate_single_hop_returns_receipt
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::write_distillate_single_hop_returns_receipt ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.013s] ( 13/118) maos-iac adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_empty_lineage_rejected
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_empty_lineage_rejected ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.007s] ( 14/118) maos-iac adapter::log_recall::tests::cross_wall_recall_granted_without_read_port_fails_closed
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_granted_without_read_port_fails_closed ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.008s] ( 15/118) maos-iac adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.015s] ( 16/118) maos-iac adapter::distillate::tests::write_distillate_rejects_depth_zero
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::write_distillate_rejects_depth_zero ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.016s] ( 17/118) maos-iac adapter::distillate::tests::write_distillate_emits_capability_invocation
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::write_distillate_emits_capability_invocation ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.005s] ( 18/118) maos-iac adapter::log_recall::tests::cross_wall_recall_journals_refusal
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_journals_refusal ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.005s] ( 19/118) maos-iac adapter::log_recall::tests::cross_wall_recall_no_grant_is_observable
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_no_grant_is_observable ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 20/118) maos-iac adapter::log_recall::tests::cross_wall_recall_journals_failure_when_remote_read_fails
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_journals_failure_when_remote_read_fails ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.017s] ( 21/118) maos-iac adapter::distillate::tests::cross_principal_citation_is_rejected_and_writes_no_row
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::cross_principal_citation_is_rejected_and_writes_no_row ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.006s] ( 22/118) maos-iac adapter::log_recall::tests::cross_wall_recall_stale_state_is_observable
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_stale_state_is_observable ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.012s] ( 23/118) maos-iac adapter::decision_logger::tests::frame_carries_i12_refs_nonempty_decision_frame_true
+  stdout ───
+
+    running 1 test
+    test adapter::decision_logger::tests::frame_carries_i12_refs_nonempty_decision_frame_true ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 24/118) maos-iac adapter::log_recall::tests::cross_wall_recall_unavailable_state_is_observable
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_unavailable_state_is_observable ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 25/118) maos-iac adapter::log_recall::tests::cross_wall_recall_without_injected_consent_fails_closed
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_without_injected_consent_fails_closed ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.019s] ( 26/118) maos-iac adapter::decision_logger::tests::frame_carries_i12_refs_empty_decision_frame_false
+  stdout ───
+
+    running 1 test
+    test adapter::decision_logger::tests::frame_carries_i12_refs_empty_decision_frame_false ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 27/118) maos-iac adapter::log_recall::tests::cross_wall_recall_wrong_direction_is_observable
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cross_wall_recall_wrong_direction_is_observable ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.012s] ( 28/118) maos-iac adapter::decision_logger::tests::decorate_decision_frame_attaches_digest_refs
+  stdout ───
+
+    running 1 test
+    test adapter::decision_logger::tests::decorate_decision_frame_attaches_digest_refs ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.013s] ( 29/118) maos-iac adapter::decision_audit_tests::lineage_same_spirit_empty_lineage_spirit_auto_succeeds
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::lineage_same_spirit_empty_lineage_spirit_auto_succeeds ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.020s] ( 30/118) maos-iac adapter::distillate::tests::write_distillate_rejects_empty_intent_lineage
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::write_distillate_rejects_empty_intent_lineage ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.020s] ( 31/118) maos-iac adapter::distillate::tests::admit_for_consumer_allows_matching_lineage
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::admit_for_consumer_allows_matching_lineage ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.013s] ( 32/118) maos-iac adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.020s] ( 33/118) maos-iac adapter::distillate::tests::two_hop_flattening_to_original_raw
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::two_hop_flattening_to_original_raw ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.014s] ( 34/118) maos-iac adapter::decision_audit_tests::lineage_human_authored_cross_spirit_auto_populates
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::lineage_human_authored_cross_spirit_auto_populates ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.014s] ( 35/118) maos-iac adapter::decision_audit_tests::lineage_human_authored_non_empty_lineage_not_overwritten
+  stdout ───
+
+    running 1 test
+    test adapter::decision_audit_tests::lineage_human_authored_non_empty_lineage_not_overwritten ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.015s] ( 36/118) maos-iac adapter::distillate::tests::write_distillate_source_frame_not_found
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::write_distillate_source_frame_not_found ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.007s] ( 37/118) maos-iac adapter::log_recall::tests::cursor_pagination_no_overlap_and_monotonic_order
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cursor_pagination_no_overlap_and_monotonic_order ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.007s] ( 38/118) maos-iac adapter::log_recall::tests::cursor_pagination_three_page_walk
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::cursor_pagination_three_page_walk ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.021s] ( 39/118) maos-iac adapter::distillate::tests::write_distillate_rejects_empty_source
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::write_distillate_rejects_empty_source ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.021s] ( 40/118) maos-iac adapter::distillate::tests::same_principal_citation_still_succeeds
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::same_principal_citation_still_succeeds ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.007s] ( 41/118) maos-iac adapter::log_recall::tests::fetch_cross_spirit_rejected
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::fetch_cross_spirit_rejected ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 42/118) maos-iac adapter::log_recall::tests::fetch_nonexistent_frame_returns_not_found
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::fetch_nonexistent_frame_returns_not_found ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.005s] ( 43/118) maos-iac adapter::mailbox::tests::broadcast_slow_subscriber_sees_lagged
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::broadcast_slow_subscriber_sees_lagged ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.007s] ( 44/118) maos-iac adapter::log_recall::tests::fetch_emits_capability_invocation
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::fetch_emits_capability_invocation ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.022s] ( 45/118) maos-iac adapter::distillate::tests::diamond_dependency_is_not_a_cycle
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::diamond_dependency_is_not_a_cycle ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 46/118) maos-iac adapter::log_recall::tests::recall_emitter_scope_only_returns_own_frames
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::recall_emitter_scope_only_returns_own_frames ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 47/118) maos-iac adapter::log_recall::tests::recall_emits_capability_invocation
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::recall_emits_capability_invocation ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 48/118) maos-iac adapter::log_recall::tests::fetch_returns_owned_frame
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::fetch_returns_owned_frame ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.005s] ( 49/118) maos-iac adapter::log_recall::tests::recall_limit_zero_returns_empty
+  stdout ───
+
+    running 1 test
+    test adapter::log_recall::tests::recall_limit_zero_returns_empty ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.032s] ( 50/118) maos-iac adapter::distillate::tests::direct_distillate_insert_is_rejected
+  stdout ───
+
+    running 1 test
+    test adapter::distillate::tests::direct_distillate_insert_is_rejected - should panic ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'adapter::distillate::tests::direct_distillate_insert_is_rejected' (2259760) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1196:13:
+    MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows may only be inserted via DistillateWriter (insert_distillate_frame); a direct insert_frame_event(FrameKind::Distillate, …) bypasses the I11 audit-chain + citer-authorization checks and is forbidden.
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_id
+                 at ./src/adapter/transparency_log.rs:1196:13
+       3: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_sender
+                 at ./src/adapter/transparency_log.rs:1145:18
+       4: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event
+                 at ./src/adapter/transparency_log.rs:1070:14
+       5: maos_iac::adapter::distillate::tests::direct_distillate_insert_is_rejected
+                 at ./src/adapter/distillate.rs:818:20
+       6: maos_iac::adapter::distillate::tests::direct_distillate_insert_is_rejected::{closure#0}
+                 at ./src/adapter/distillate.rs:815:46
+       7: <maos_iac::adapter::distillate::tests::direct_distillate_insert_is_rejected::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       8: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        PASS [   0.004s] ( 51/118) maos-iac adapter::mailbox::tests::cross_host_addressing_rejected_when_no_router_configured
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::cross_host_addressing_rejected_when_no_router_configured ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 52/118) maos-iac adapter::mailbox::tests::register_spirit_rejects_double_registration
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::register_spirit_rejects_double_registration ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 53/118) maos-iac adapter::mailbox::tests::deliver_and_receive_round_trip
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::deliver_and_receive_round_trip ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 54/118) maos-iac adapter::mailbox::tests::register_spirit_creates_channels
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::register_spirit_creates_channels ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 55/118) maos-iac adapter::mailbox::tests::cross_host_routes_through_installed_a2a_router
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::cross_host_routes_through_installed_a2a_router ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 56/118) maos-iac adapter::mailbox::tests::deliver_to_unregistered_spirit_fails
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::deliver_to_unregistered_spirit_fails ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 57/118) maos-iac adapter::mailbox::tests::telemetry_event_uses_broadcast
+  stdout ───
+
+    running 1 test
+    test adapter::mailbox::tests::telemetry_event_uses_broadcast ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 58/118) maos-iac adapter::metrics::tests::exact_buckets_equality
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::exact_buckets_equality ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 59/118) maos-iac adapter::metrics::tests::histogram_observation_in_correct_bucket
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::histogram_observation_in_correct_bucket ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 60/118) maos-iac adapter::metrics::tests::inflight_guard_decrements_on_early_return
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::inflight_guard_decrements_on_early_return ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 61/118) maos-iac adapter::metrics::tests::inflight_guard_increments_and_decrements
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::inflight_guard_increments_and_decrements ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 62/118) maos-iac adapter::metrics::tests::label_strings_are_snake_case
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::label_strings_are_snake_case ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 63/118) maos-iac adapter::metrics::tests::pending_frames_gauge_increment_decrement_round_trip
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::pending_frames_gauge_increment_decrement_round_trip ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 64/118) maos-iac adapter::metrics::tests::pending_frames_gauge_saturates_at_zero
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::pending_frames_gauge_saturates_at_zero ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 65/118) maos-iac adapter::metrics::tests::pending_frames_no_increment_on_error_path
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::pending_frames_no_increment_on_error_path ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 66/118) maos-iac adapter::metrics::tests::render_prometheus_has_required_lines
+  stdout ───
+
+    running 1 test
+    test adapter::metrics::tests::render_prometheus_has_required_lines ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 67/118) maos-iac adapter::payload::tests::schedule_fire_record_optional_compliance_claim_round_trip
+  stdout ───
+
+    running 1 test
+    test adapter::payload::tests::schedule_fire_record_optional_compliance_claim_round_trip ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 68/118) maos-iac adapter::payload::tests::schedule_fire_record_round_trip
+  stdout ───
+
+    running 1 test
+    test adapter::payload::tests::schedule_fire_record_round_trip ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 69/118) maos-iac adapter::redaction::tests::clause_source_frame_refs_survive_without_exempting_other_hex_or_secrets
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::clause_source_frame_refs_survive_without_exempting_other_hex_or_secrets ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 70/118) maos-iac adapter::redaction::tests::detect_credential_flags_prefix_secrets_but_not_hex_refs
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::detect_credential_flags_prefix_secrets_but_not_hex_refs ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 71/118) maos-iac adapter::redaction::tests::redaction_detects_anthropic_key
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::redaction_detects_anthropic_key ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 72/118) maos-iac adapter::redaction::tests::redaction_detects_aws_key
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::redaction_detects_aws_key ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 73/118) maos-iac adapter::redaction::tests::redaction_detects_github_token
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::redaction_detects_github_token ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 74/118) maos-iac adapter::redaction::tests::redaction_detects_hex_token
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::redaction_detects_hex_token ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 75/118) maos-iac adapter::redaction::tests::redaction_detects_private_key
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::redaction_detects_private_key ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 76/118) maos-iac adapter::redaction::tests::redaction_filter_zero_alloc_on_clean_payload
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::redaction_filter_zero_alloc_on_clean_payload ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 77/118) maos-iac adapter::redaction::tests::redaction_preserves_surrounding_text
+  stdout ───
+
+    running 1 test
+    test adapter::redaction::tests::redaction_preserves_surrounding_text ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.007s] ( 78/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_f13_sustained_matching_writer_returns_pending_at_the_fixed_pass_cap
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_f13_sustained_matching_writer_returns_pending_at_the_fixed_pass_cap ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.036s] ( 79/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.03s
+
+
+        PASS [   0.007s] ( 80/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_legacy_direct_parent_closure_reads_each_snapshot_window_once
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_legacy_direct_parent_closure_reads_each_snapshot_window_once ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 81/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_legacy_receipt_order_is_timestamp_then_frame_id_after_closure
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_legacy_receipt_order_is_timestamp_then_frame_id_after_closure ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.019s] ( 82/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+  stderr ───
+
+    thread 'adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed' (2260006) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1432:17:
+    MAOS kernel panic — Transparency Log write failed: real append write fault. Architecture §7.3 I2: log-before-deliver guarantee broken; kernel halts. Audit the SQLite file for corruption.
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row_with_correlation
+                 at ./src/adapter/transparency_log.rs:1432:17
+       3: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row
+                 at ./src/adapter/transparency_log.rs:1263:14
+       4: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_id
+                 at ./src/adapter/transparency_log.rs:1203:36
+       5: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_sender
+                 at ./src/adapter/transparency_log.rs:1145:18
+       6: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event
+                 at ./src/adapter/transparency_log.rs:1070:14
+       7: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:561:13
+       8: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       9: <core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:275:9
+      10: do_call<core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure_env#0}>, ()>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:576:43
+      11: __rust_try
+      12: catch_unwind<(), core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure_env#0}>>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:544:19
+      13: catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure_env#0}>, ()>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+      14: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:560:19
+      15: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:540:66
+      16: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+      17: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        PASS [   0.018s] ( 83/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+  stderr ───
+
+    thread 'adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed' (2260008) panicked at crates/maos-iac/src/adapter/transparency_log.rs:2521:17:
+    MAOS I2 binding (Story 9.2 P7): transparency-log write failed for 'rejected.kernel': real kernel write fault
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: insert_kernel_event_returning_id
+                 at ./src/adapter/transparency_log.rs:2521:17
+       3: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:622:13
+       4: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       5: <core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:275:9
+       6: do_call<core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure_env#0}>, ()>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:576:43
+       7: __rust_try
+       8: catch_unwind<(), core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure_env#0}>>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:544:19
+       9: catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure_env#0}>, ()>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+      10: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:621:19
+      11: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:601:73
+      12: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_kernel_append_panic_keeps_last_frame_id_backed::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+      13: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        PASS [   0.022s] ( 84/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction' (2260014) panicked at crates/maos-iac/src/adapter/transparency_log.rs:3114:34:
+    MAOS kernel panic — Transparency Log write failed: real schema frame write fault. I2.
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::register_schema_lifecycle::{closure#2}
+                 at ./src/adapter/transparency_log.rs:3114:34
+       3: <core::result::Result<usize, rusqlite::error::Error>>::unwrap_or_else::<<maos_iac::adapter::transparency_log::TransparencyLogAdapter>::register_schema_lifecycle::{closure#2}>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1620:23
+       4: register_schema_lifecycle
+                 at ./src/adapter/transparency_log.rs:3114:11
+       5: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:489:21
+       6: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:275:9
+       8: do_call<core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure_env#0}>, ()>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:576:43
+       9: __rust_try
+      10: catch_unwind<(), core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure_env#0}>>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:544:19
+      11: catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure_env#0}>, ()>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+      12: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:488:19
+      13: maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure#0}
+                 at ./src/adapter/../../tests/support/erasure_races_20_11.rs:459:71
+      14: <maos_iac::adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+      15: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        PASS [   0.004s] ( 85/118) maos-iac adapter::transparency_log::erasure_scan_work::ac5_opaque_outcome_payload_is_storable_but_bad_recovery_is_reported
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_scan_work::ac5_opaque_outcome_payload_is_storable_but_bad_recovery_is_reported ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.005s] ( 86/118) maos-iac adapter::transparency_log::erasure_scan_work::ac5_rowid_scans_restore_timestamp_and_frame_id_order
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_scan_work::ac5_rowid_scans_restore_timestamp_and_frame_id_order ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 87/118) maos-iac adapter::transparency_log::tests::approval_log_is_distinct_table
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::approval_log_is_distinct_table ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 88/118) maos-iac adapter::transparency_log::tests::concurrent_inserts_from_threads
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::concurrent_inserts_from_threads ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.005s] ( 89/118) maos-iac adapter::transparency_log::tests::cross_team_correlation_requires_both_physical_logs
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::cross_team_correlation_requires_both_physical_logs ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 90/118) maos-iac adapter::transparency_log::tests::frame_kind_non_exhaustive_match
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::frame_kind_non_exhaustive_match ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.092s] ( 91/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.09s
+
+
+        PASS [   0.003s] ( 92/118) maos-iac adapter::transparency_log::tests::frame_kind_silent_failure_suspect_from_i64
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::frame_kind_silent_failure_suspect_from_i64 ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 93/118) maos-iac adapter::transparency_log::tests::frame_kind_spirit_revoked_discriminant
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::frame_kind_spirit_revoked_discriminant ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 94/118) maos-iac adapter::transparency_log::tests::frame_kind_spirit_revoked_from_i64
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::frame_kind_spirit_revoked_from_i64 ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.003s] ( 95/118) maos-iac adapter::transparency_log::tests::frame_kind_task_stalled_from_i64
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::frame_kind_task_stalled_from_i64 ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.006s] ( 96/118) maos-iac adapter::transparency_log::tests::hundred_sequential_inserts_are_ordered
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::hundred_sequential_inserts_are_ordered ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 97/118) maos-iac adapter::transparency_log::tests::iac_bus_port_broadcast_writes_and_routes
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::iac_bus_port_broadcast_writes_and_routes ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 98/118) maos-iac adapter::transparency_log::tests::iac_bus_port_enqueue_writes_and_routes
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::iac_bus_port_enqueue_writes_and_routes ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] ( 99/118) maos-iac adapter::transparency_log::tests::insert_approval_decision_creates_row
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::insert_approval_decision_creates_row ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] (100/118) maos-iac adapter::transparency_log::tests::insert_frame_event_creates_one_row
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::insert_frame_event_creates_one_row ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] (101/118) maos-iac adapter::transparency_log::tests::insert_frame_with_capability_token
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::insert_frame_with_capability_token ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.019s] (102/118) maos-iac adapter::transparency_log::tests::insert_frame_panics_on_write_failure
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::insert_frame_panics_on_write_failure - should panic ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+  stderr ───
+
+    thread 'adapter::transparency_log::tests::insert_frame_panics_on_write_failure' (2260173) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1432:17:
+    MAOS kernel panic — Transparency Log write failed: no such table: transparency_log. Architecture §7.3 I2: log-before-deliver guarantee broken; kernel halts. Audit the SQLite file for corruption.
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row_with_correlation
+                 at ./src/adapter/transparency_log.rs:1432:17
+       3: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row
+                 at ./src/adapter/transparency_log.rs:1263:14
+       4: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_id
+                 at ./src/adapter/transparency_log.rs:1203:36
+       5: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_sender
+                 at ./src/adapter/transparency_log.rs:1145:18
+       6: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event
+                 at ./src/adapter/transparency_log.rs:1070:14
+       7: insert_frame_panics_on_write_failure
+                 at ./src/adapter/../../tests/support/transparency_log_unit.rs:504:17
+       8: maos_iac::adapter::transparency_log::tests::insert_frame_panics_on_write_failure::{closure#0}
+                 at ./src/adapter/../../tests/support/transparency_log_unit.rs:491:42
+       9: <maos_iac::adapter::transparency_log::tests::insert_frame_panics_on_write_failure::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+      10: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        PASS [   0.005s] (103/118) maos-iac adapter::transparency_log::tests::insertion_cursor_does_not_skip_a_later_row_after_clock_rollback
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::insertion_cursor_does_not_skip_a_later_row_after_clock_rollback ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] (104/118) maos-iac adapter::transparency_log::tests::open_in_memory_succeeds
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::open_in_memory_succeeds ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.004s] (105/118) maos-iac adapter::transparency_log::tests::query_filter_by_spirit_pid
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::query_filter_by_spirit_pid ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   0.015s] (106/118) maos-iac adapter::transparency_log::tests::query_filter_by_since_ns_excludes_older_frames
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::query_filter_by_since_ns_excludes_older_frames ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.01s
+
+
+        PASS [   0.003s] (107/118) maos-iac adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+
+        PASS [   1.134s] (108/118) maos-iac adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 1.13s
+
+  stderr ───
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=25 max_steps=81956 total_steps=2000922 ratio=0.04095911784667269 sql=SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=25 max_steps=86052 total_steps=2100922 ratio=0.040959159835538876 sql=SELECT frame_id,boot_nonce,spirit_pid,payload_redacted,timestamp_ns,rowid FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=50 max_steps=90148 total_steps=4401844 ratio=0.02047959900441724 sql=SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=50 max_steps=69665 total_steps=3401716 ratio=0.02047936982393592 sql=SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid>?2 AND rowid<=?3 AND instr(payload_redacted,CAST(?1 AS BLOB))>0 AND intent NOT IN ('principal.forget','principal.forget.held','distillate.redacted') AND intent NOT LIKE 'principal.uninstall.%'
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=75 max_steps=81964 total_steps=6003810 ratio=0.013651997648160085 sql=SELECT lower(hex(frame_id)) FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 AND ((json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3) OR (kind IN (28,29) AND json_extract(CAST(payload_redacted AS TEXT),'$.redaction_reason')='gdpr-forget')) ELSE 0 END
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=25 max_steps=81956 total_steps=2000922 ratio=0.04095911784667269 sql=SELECT lower(hex(frame_id)),payload_redacted,timestamp_ns FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=25 max_steps=45090 total_steps=1100873 ratio=0.040958403012881596 sql=SELECT r.payload_redacted, r.timestamp_ns, r.frame_id FROM transparency_log r INDEXED BY idx_tlog_redistill_request_rowid WHERE r.rowid > ?2 AND r.rowid <= ?3 AND ?1 IS ?1 AND r.intent = 'distillate.redistill.requested' AND NOT EXISTS (SELECT 1 FROM transparency_log o INDEXED BY idx_tlog_redistill_outcome WHERE o.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(o.payload_redacted AS TEXT),2) THEN json_extract(CAST(o.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = json_extract(CAST(r.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') UNION ALL SELECT 1 FROM transparency_log bad INDEXED BY idx_tlog_redistill_outcome WHERE bad.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(bad.payload_redacted AS TEXT),2) THEN json_extract(CAST(bad.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = X'' AND json_extract(CAST(bad.payload_redacted AS TEXT),'$') IS NULL)
+    EC-13 work seeded_kind11_rows=100000 high_water=100002 windows=25 max_steps=45097 total_steps=1101048 ratio=0.04095825068480211 sql=SELECT rowid, boot_nonce, spirit_pid, CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) AND json_type(CAST(payload_redacted AS TEXT),'$.spirit_id') = 'text' THEN json_extract(CAST(payload_redacted AS TEXT),'$.spirit_id') ELSE intent END FROM transparency_log WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND (kind=19 OR (kind=7 AND intent='lifecycle.load' AND capability_token IS NULL))
+
+        PASS [   1.343s] (109/118) maos-iac adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m_rowid_with_100k_rows
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m_rowid_with_100k_rows ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 1.34s
+
+  stderr ───
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=25 max_steps=81956 total_steps=2000922 ratio=0.04095911784667269 sql=SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=25 max_steps=86052 total_steps=2100922 ratio=0.040959159835538876 sql=SELECT frame_id,boot_nonce,spirit_pid,payload_redacted,timestamp_ns,rowid FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=50 max_steps=90148 total_steps=4401844 ratio=0.02047959900441724 sql=SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=50 max_steps=69665 total_steps=3401716 ratio=0.02047936982393592 sql=SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid>?2 AND rowid<=?3 AND instr(payload_redacted,CAST(?1 AS BLOB))>0 AND intent NOT IN ('principal.forget','principal.forget.held','distillate.redacted') AND intent NOT LIKE 'principal.uninstall.%'
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=75 max_steps=81964 total_steps=6003810 ratio=0.013651997648160085 sql=SELECT lower(hex(frame_id)) FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 AND ((json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3) OR (kind IN (28,29) AND json_extract(CAST(payload_redacted AS TEXT),'$.redaction_reason')='gdpr-forget')) ELSE 0 END
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=25 max_steps=81956 total_steps=2000922 ratio=0.04095911784667269 sql=SELECT lower(hex(frame_id)),payload_redacted,timestamp_ns FROM transparency_log INDEXED BY idx_tlog_distillate_rowid WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=25 max_steps=45090 total_steps=1100873 ratio=0.040958403012881596 sql=SELECT r.payload_redacted, r.timestamp_ns, r.frame_id FROM transparency_log r INDEXED BY idx_tlog_redistill_request_rowid WHERE r.rowid > ?2 AND r.rowid <= ?3 AND ?1 IS ?1 AND r.intent = 'distillate.redistill.requested' AND NOT EXISTS (SELECT 1 FROM transparency_log o INDEXED BY idx_tlog_redistill_outcome WHERE o.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(o.payload_redacted AS TEXT),2) THEN json_extract(CAST(o.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = json_extract(CAST(r.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') UNION ALL SELECT 1 FROM transparency_log bad INDEXED BY idx_tlog_redistill_outcome WHERE bad.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(bad.payload_redacted AS TEXT),2) THEN json_extract(CAST(bad.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = X'' AND json_extract(CAST(bad.payload_redacted AS TEXT),'$') IS NULL)
+    EC-13 work seeded_kind11_rows=100000 high_water=1000002 windows=25 max_steps=45097 total_steps=1101048 ratio=0.04095825068480211 sql=SELECT rowid, boot_nonce, spirit_pid, CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) AND json_type(CAST(payload_redacted AS TEXT),'$.spirit_id') = 'text' THEN json_extract(CAST(payload_redacted AS TEXT),'$.spirit_id') ELSE intent END FROM transparency_log WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND (kind=19 OR (kind=7 AND intent='lifecycle.load' AND capability_token IS NULL))
+
+        PASS [   1.777s] (110/118) maos-iac adapter::transparency_log::tests::correlation_column_migrates_an_existing_transparency_log
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::correlation_column_migrates_an_existing_transparency_log ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 1.77s
+
+
+        PASS [   2.026s] (111/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_f8_cross_process_hold_and_body_mutation_have_one_sqlite_order
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_f8_cross_process_hold_and_body_mutation_have_one_sqlite_order ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 2.02s
+
+
+        PASS [   2.028s] (112/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 2.02s
+
+
+        PASS [   8.890s] (113/118) maos-iac adapter::transparency_log::tests::team_shard_keeps_legal_holds_in_global_database
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::tests::team_shard_keeps_legal_holds_in_global_database ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 8.89s
+
+
+        PASS [   9.553s] (114/118) maos-iac adapter::transparency_log::erasure_races_20_11::review_marker_orders_independent_writer_commits_not_handler_return_time
+  stdout ───
+
+    running 1 test
+    test adapter::transparency_log::erasure_races_20_11::review_marker_orders_independent_writer_commits_not_handler_return_time ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 9.55s
+
+
+        PASS [  10.629s] (115/118) maos-bin::bin/maos uninstall_review_20_11::review_p9_ambiguous_malformed_retained_and_owned_erasure_uncertified
+  stdout ───
+
+    running 1 test
+    test uninstall_review_20_11::review_p9_ambiguous_malformed_retained_and_owned_erasure_uncertified ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 10.62s
+
+
+        PASS [  10.713s] (116/118) maos-bin::bin/maos uninstall_review_20_11::review_p9_owned_malformed_late_lineage_is_erased_and_proved
+  stdout ───
+
+    running 1 test
+    test uninstall_review_20_11::review_p9_owned_malformed_late_lineage_is_erased_and_proved ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 10.71s
+
+
+        PASS [  10.719s] (117/118) maos-bin::bin/maos uninstall_review_20_11::review_p9_late_only_held_lineage_retains_package_and_signed_gap
+  stdout ───
+
+    running 1 test
+    test uninstall_review_20_11::review_p9_late_only_held_lineage_retains_package_and_signed_gap ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 10.71s
+
+
+        PASS [  10.732s] (118/118) maos-bin::bin/maos uninstall_review_20_11::review_p9_own_hold_after_first_forget_retains_package_and_names_hold
+  stdout ───
+
+    running 1 test
+    test uninstall_review_20_11::review_p9_own_hold_after_first_forget_retains_package_and_names_hold ... ok
+
+    test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 10.73s
+
+
+────────────
+     Summary [  10.732s] 118 tests run: 118 passed, 49 skipped

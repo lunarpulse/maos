@@ -114,43 +114,107 @@ pub struct PendingPackageUninstall {
     installs: BTreeMap<String, String>,
     removed: Option<(String, String)>,
     _serializer: std::sync::MutexGuard<'static, ()>,
+    backup: Option<fs::File>,
+    deleted: bool,
+    restored: bool,
 }
 
 impl PendingPackageUninstall {
-    /// Only after proof persistence succeeds may the generation bytes go away.
-    pub fn commit(mut self) -> Result<(), StorageError> {
-        if let Some(path) = &self.staged {
-            fs::remove_dir_all(path).map_err(|error| StorageError::Io(error.to_string()))?;
+    pub fn generation(&self) -> Option<&str> {
+        self.removed
+            .as_ref()
+            .map(|(_, generation)| generation.as_str())
+    }
+
+    /// Keep the complete archive through proof and lifecycle finalization.
+    pub fn delete_generation(&mut self) -> Result<(), StorageError> {
+        if !self.deleted {
+            if let Some(path) = &self.staged {
+                if let Err(error) = fs::remove_dir_all(path) {
+                    self.rollback().map_err(|recovery| {
+                        StorageError::Io(format!(
+                            "delete failed: {error}; recovery failed: {recovery}"
+                        ))
+                    })?;
+                    return Err(StorageError::Io(error.to_string()));
+                }
+            }
+            self.deleted = true;
+        }
+        Ok(())
+    }
+    pub fn accept(mut self) {
+        self.removed = None;
+    }
+
+    pub fn rollback(&mut self) -> Result<(), StorageError> {
+        let Some((name, generation)) = &self.removed else {
+            return Ok(());
+        };
+        if !self.restored {
+            if let Some(backup) = &mut self.backup {
+                use std::io::{Seek, SeekFrom};
+                backup
+                    .seek(SeekFrom::Start(0))
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+                let restored = tempfile::tempdir_in(
+                    self.directory
+                        .parent()
+                        .ok_or_else(|| StorageError::Io("package parent missing".into()))?,
+                )
+                .map_err(|error| StorageError::Io(error.to_string()))?;
+                tar::Archive::new(backup)
+                    .unpack(restored.path())
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+                fs::rename(restored.path(), &self.directory)
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+            }
+            self.restored = true;
+        }
+        self.installs.insert(name.clone(), generation.clone());
+        if LocalFsRegistryStorage::load_installs(
+            self.index_path
+                .parent()
+                .ok_or_else(|| StorageError::Io("inventory parent missing".into()))?,
+        )? != self.installs
+        {
+            write_json_atomic(&self.index_path, &self.installs)?;
         }
         self.removed = None;
+        if let Some(path) = &self.staged {
+            remove_staging(path).map_err(|error| StorageError::Io(error.to_string()))?;
+        }
         Ok(())
     }
 }
 
 impl Drop for PendingPackageUninstall {
     fn drop(&mut self) {
-        let Some((name, generation)) = self.removed.take() else {
-            return;
-        };
-        if let Err(error) = self
-            .staged
-            .as_ref()
-            .map_or(Ok(()), |path| fs::rename(path, &self.directory))
-        {
-            eprintln!(
-                "maos-registry: uninstall rollback could not restore {}: {error}",
-                self.directory.display()
-            );
-            return;
-        }
-        self.installs.insert(name, generation);
-        if let Err(error) = write_json_atomic(&self.index_path, &self.installs) {
-            eprintln!(
-                "maos-registry: uninstall rollback could not restore {}: {error}",
-                self.index_path.display()
-            );
+        if let Err(error) = self.rollback() {
+            eprintln!("maos-registry: explicit uninstall recovery required: {error}");
         }
     }
+}
+
+fn remove_staging(path: &Path) -> io::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(path)?.permissions().mode();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode | 0o700))?;
+    }
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            remove_staging(&entry.path())?;
+        } else {
+            fs::remove_file(entry.path())?;
+        }
+    }
+    fs::remove_dir(path)
 }
 
 impl LocalFsRegistryStorage {
@@ -231,20 +295,49 @@ impl LocalFsRegistryStorage {
         Self::installed_manifests_at(&root)?;
         let directory = root.join("installed").join(spirit_id);
         let staged = root.join(format!(".uninstall-{spirit_id}-{}", unique_suffix()));
+        let backup = if directory.exists() {
+            let mut file = tempfile::tempfile_in(&root)
+                .map_err(|error| StorageError::Io(error.to_string()))?;
+            {
+                let mut archive = tar::Builder::new(&mut file);
+                archive.follow_symlinks(false);
+                archive
+                    .append_dir_all(".", &directory)
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+                archive
+                    .finish()
+                    .map_err(|error| StorageError::Io(error.to_string()))?;
+            }
+            file.sync_all()
+                .map_err(|error| StorageError::Io(error.to_string()))?;
+            Some(file)
+        } else {
+            None
+        };
         let staged = match fs::rename(&directory, &staged) {
             Ok(()) => Some(staged),
             Err(error) if error.kind() == io::ErrorKind::NotFound => None,
             Err(error) => return Err(StorageError::Io(error.to_string())),
         };
-        let pending = PendingPackageUninstall {
+        let mut pending = PendingPackageUninstall {
             index_path: root.join("installed-index.json"),
             directory,
             staged,
             installs,
             removed: Some((spirit_id.to_owned(), generation)),
             _serializer: serializer,
+            backup,
+            deleted: false,
+            restored: false,
         };
-        write_json_atomic(&pending.index_path, &pending.installs)?;
+        if let Err(error) = write_json_atomic(&pending.index_path, &pending.installs) {
+            pending.rollback().map_err(|recovery| {
+                StorageError::Io(format!(
+                    "stage failed: {error}; recovery failed: {recovery}"
+                ))
+            })?;
+            return Err(error);
+        }
         Ok(Some(pending))
     }
 

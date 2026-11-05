@@ -1,0 +1,28 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "list",
+    "--locked",
+    "--workspace",
+    "--message-format",
+    "json",
+    "--list-type",
+    "binaries-only"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T15:33:29.512745+00:00",
+  "seconds": 10.479469796991907,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-test-binaries-metadata.json",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-test-binaries-metadata.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": "/tmp/dev2011b-review.9OTbuj/python/lib/python3.13/site-packages",
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

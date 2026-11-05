@@ -1,0 +1,39 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "--locked",
+    "-p",
+    "maos-bin",
+    "-p",
+    "maos-iac",
+    "--lib",
+    "--bin",
+    "maos",
+    "--test",
+    "erasure_inventory_20_11",
+    "-E",
+    "test(ac2_principal_and_principal_free_lineage_are_both_erased) | test(ac5_every_scan_has_bounded_sqlite_work)",
+    "--no-fail-fast",
+    "--success-output",
+    "immediate",
+    "--failure-output",
+    "immediate"
+  ],
+  "exit_code": 100,
+  "started": "2026-11-05T14:34:42.397499+00:00",
+  "seconds": 48.997258574992884,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac2-max-plant.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac2-max-plant.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": "/tmp/dev2011b-review.9OTbuj/python/lib/python3.13/site-packages",
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

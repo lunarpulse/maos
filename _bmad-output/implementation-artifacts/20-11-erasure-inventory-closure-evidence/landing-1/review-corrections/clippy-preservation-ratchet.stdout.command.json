@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/mnt/build/cargo-maos/debug/xtask",
+    "clippy-ratchet",
+    "--input",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-final.jsonl"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T16:36:48.333934+00:00",
+  "seconds": 0.1822852479526773,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-ratchet.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-ratchet.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask",
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

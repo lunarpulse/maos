@@ -1,0 +1,24 @@
+name: Provision the hash-locked erasure verifier
+description: Install the declared Ed25519 backend without replacing the runner's Python interpreter.
+runs:
+  using: composite
+  steps:
+    - name: Install and preflight the pinned verifier backend
+      shell: bash
+      run: |
+        set -euo pipefail
+        verifier=$(mktemp -d "$RUNNER_TEMP/maos-erasure-verifier.XXXXXX")
+        python3 -m venv "$verifier"
+        "$verifier/bin/python" -m pip install --disable-pip-version-check \
+          --require-hashes --only-binary=:all: \
+          -r "$GITHUB_WORKSPACE/tools/verify-erasure/requirements.txt"
+        "$verifier/bin/python" - <<'PY'
+        import cryptography
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        assert cryptography.__version__ == "50.0.0", cryptography.__version__
+        key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+        key.public_key().verify(key.sign(b"20-11 verifier preflight"), b"20-11 verifier preflight")
+        print("erasure verifier backend: cryptography", cryptography.__version__)
+        PY
+        site=$("$verifier/bin/python" -c 'import site; print(site.getsitepackages()[0])')
+        printf 'PYTHONPATH=%s%s\n' "$site" "${PYTHONPATH:+:$PYTHONPATH}" >> "$GITHUB_ENV"

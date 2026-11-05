@@ -1,0 +1,33 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "-p",
+    "maos-bin",
+    "--test",
+    "shell_host_16_2",
+    "-E",
+    "test(ac5_) | test(ac4_door_snapshots_real_scb_schedules_before_unload)",
+    "--no-fail-fast",
+    "--success-output",
+    "immediate",
+    "--failure-output",
+    "immediate"
+  ],
+  "exit_code": 100,
+  "started": "2026-11-05T12:18:04.348524+00:00",
+  "seconds": 673.6937283070292,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-2.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-2.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": "/tmp/dev2011b-review.9OTbuj/python/lib/python3.13/site-packages",
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

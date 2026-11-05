@@ -1,0 +1,39 @@
+{
+  "command": [
+    "tokei",
+    "--output",
+    "json",
+    "--types",
+    "Rust",
+    "-e",
+    "target",
+    "-e",
+    "tests",
+    "-e",
+    "benches",
+    "-e",
+    "examples",
+    "-e",
+    "fuzz",
+    "-e",
+    "spirits",
+    "-e",
+    "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+    "."
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T19:08:57.964740+00:00",
+  "seconds": 0.04306206607725471,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-partial-redaction-raw.json",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-partial-redaction-raw.stderr",
+  "environment": {
+    "CI": "true",
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

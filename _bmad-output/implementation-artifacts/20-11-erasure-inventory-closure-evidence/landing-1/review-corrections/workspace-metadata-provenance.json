@@ -1,0 +1,91 @@
+{
+  "workspace_members": 58,
+  "binary_targets": 678,
+  "target_directory": "/mnt/build/cargo-maos",
+  "producer_keys": [
+    "rust-build-meta",
+    "rust-binaries"
+  ],
+  "focused_related_binaries": [
+    {
+      "id": "maos-audit::erasure_review_20_11",
+      "name": "erasure_review_20_11",
+      "kind": "test"
+    },
+    {
+      "id": "maos-audit::erasure_sla_test",
+      "name": "erasure_sla_test",
+      "kind": "test"
+    },
+    {
+      "id": "maos-audit::erasure_smoke_test",
+      "name": "erasure_smoke_test",
+      "kind": "test"
+    },
+    {
+      "id": "maos-audit::fr4_classifier_16_2",
+      "name": "fr4_classifier_16_2",
+      "kind": "test"
+    },
+    {
+      "id": "maos-audit::fr4_full_mediation_test",
+      "name": "fr4_full_mediation_test",
+      "kind": "test"
+    },
+    {
+      "id": "maos-audit::fr4_worker_rows_16_3",
+      "name": "fr4_worker_rows_16_3",
+      "kind": "test"
+    },
+    {
+      "id": "maos-audit::multi_backend_erasure_test",
+      "name": "multi_backend_erasure_test",
+      "kind": "test"
+    },
+    {
+      "id": "maos-bin::erasure_inventory_20_11",
+      "name": "erasure_inventory_20_11",
+      "kind": "test"
+    },
+    {
+      "id": "maos-bin::erasure_live_20_11",
+      "name": "erasure_live_20_11",
+      "kind": "test"
+    },
+    {
+      "id": "maos-bin::erasure_scan_20_11",
+      "name": "erasure_scan_20_11",
+      "kind": "test"
+    },
+    {
+      "id": "maos-bin::erasure_uninstall_13_5b",
+      "name": "erasure_uninstall_13_5b",
+      "kind": "test"
+    },
+    {
+      "id": "maos-bin::forget_floors_18_6",
+      "name": "forget_floors_18_6",
+      "kind": "test"
+    },
+    {
+      "id": "maos-bin::hook_pump_17_4",
+      "name": "hook_pump_17_4",
+      "kind": "test"
+    },
+    {
+      "id": "maos-iac::erasure_index_20_11",
+      "name": "erasure_index_20_11",
+      "kind": "test"
+    },
+    {
+      "id": "maos-kernel-core::fr4_1000_call_fixture",
+      "name": "fr4_1000_call_fixture",
+      "kind": "test"
+    },
+    {
+      "id": "xtask::erasure_verifier_runner_20_11",
+      "name": "erasure_verifier_runner_20_11",
+      "kind": "test"
+    }
+  ]
+}

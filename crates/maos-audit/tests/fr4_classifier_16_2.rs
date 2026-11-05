@@ -391,6 +391,22 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "task.complete",
             None,
+            "distillate.redacted",
+            r#"{"redacted_frame_id":"01ab:01ab:01ab:01ab:01ab:01ab:01ab:01ab","original_kind":11}"#,
+            0,
+            "atomic unscoped distillate redaction",
+        ),
+        (
+            "task.complete",
+            None,
+            "distillate.redistill.requested",
+            r#"{"request":{"redacted_distillate_frame_id":"01ab01ab01ab01ab01ab01ab01ab01ab","writer_spirit_pid":7,"writer_boot_nonce":[42,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"surviving_source_log_ref":[]}}"#,
+            0,
+            "atomic request precedes body redaction",
+        ),
+        (
+            "task.complete",
+            None,
             "distillate.redistill.requested",
             r#"{"request":{"redacted_distillate_frame_id":"01ab01ab01ab01ab01ab01ab01ab01ab","writer_spirit_pid":7,"writer_boot_nonce":[42,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"surviving_source_log_ref":[]}}"#,
             0,
@@ -645,42 +661,64 @@ fn token_arg_position(method: &str) -> Option<usize> {
 /// token-bearing included), or the lifecycle `DecisionDispatch` writer — the
 /// sites that demand a disposition.
 fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
-    // External test-only modules carry the compilation guard on their file.
-    if src.trim_start().starts_with("#![cfg(test)]") {
-        return Vec::new();
+    use syn::spanned::Spanned as _;
+    use syn::visit::Visit as _;
+    fn test_only(attributes: &[syn::Attribute]) -> bool {
+        attributes.iter().any(|attribute| {
+            attribute.path().is_ident("cfg")
+                && attribute
+                    .parse_args::<syn::Path>()
+                    .is_ok_and(|path| path.is_ident("test"))
+        })
     }
-    // Compute #[cfg(test)] line spans (item start to its closing brace, approximated
-    // by the next top-level closing brace at column 0).
-    let lines: Vec<&str> = src.lines().collect();
-    let mut test_spans: Vec<(usize, usize)> = Vec::new(); // 0-based inclusive
-    for (i, line) in lines.iter().enumerate() {
-        if line.trim() == "#[cfg(test)]" {
-            // find the item's opening brace line, then match braces
-            let mut j = i + 1;
-            while j < lines.len() && !lines[j].contains('{') {
-                if lines[j].trim().starts_with("fn ") || lines[j].contains("fn ") {
-                    break; // a bare test fn — treat one line
-                }
-                j += 1;
+    #[derive(Default)]
+    struct TestItems(Vec<(usize, usize)>);
+    impl<'ast> syn::visit::Visit<'ast> for TestItems {
+        fn visit_item(&mut self, item: &'ast syn::Item) {
+            let attributes = match item {
+                syn::Item::Const(item) => &item.attrs,
+                syn::Item::Enum(item) => &item.attrs,
+                syn::Item::ExternCrate(item) => &item.attrs,
+                syn::Item::Fn(item) => &item.attrs,
+                syn::Item::ForeignMod(item) => &item.attrs,
+                syn::Item::Impl(item) => &item.attrs,
+                syn::Item::Macro(item) => &item.attrs,
+                syn::Item::Mod(item) => &item.attrs,
+                syn::Item::Static(item) => &item.attrs,
+                syn::Item::Struct(item) => &item.attrs,
+                syn::Item::Trait(item) => &item.attrs,
+                syn::Item::TraitAlias(item) => &item.attrs,
+                syn::Item::Type(item) => &item.attrs,
+                syn::Item::Union(item) => &item.attrs,
+                syn::Item::Use(item) => &item.attrs,
+                _ => return,
+            };
+            if test_only(attributes) {
+                let span = item.span();
+                self.0.push((span.start().line - 1, span.end().line - 1));
+            } else {
+                syn::visit::visit_item(self, item);
             }
-            let mut depth = 0usize;
-            let mut k = j;
-            let mut opened = false;
-            while k < lines.len() {
-                depth += lines[k].matches('{').count();
-                depth -= lines[k].matches('}').count();
-                if lines[k].contains('{') {
-                    opened = true;
-                }
-                if opened && depth == 0 {
-                    break;
-                }
-                k += 1;
+        }
+        fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
+            if test_only(&item.attrs) {
+                let span = item.span();
+                self.0.push((span.start().line - 1, span.end().line - 1));
+            } else {
+                syn::visit::visit_impl_item_fn(self, item);
             }
-            test_spans.push((i, k.min(lines.len() - 1)));
         }
     }
-    let in_test = |idx: usize| test_spans.iter().any(|(a, b)| idx >= *a && idx <= *b);
+    // On invalid syntax, exclude nothing: the text doorbell remains fail-closed.
+    let mut test_items = TestItems::default();
+    if let Ok(file) = syn::parse_file(src) {
+        if test_only(&file.attrs) {
+            return Vec::new();
+        }
+        test_items.visit_file(&file);
+    }
+    let in_test = |idx: usize| test_items.0.iter().any(|(a, b)| idx >= *a && idx <= *b);
+    let lines: Vec<&str> = src.lines().collect();
 
     let mut sites: Vec<ScannedSite> = Vec::new();
     // (file, fn) → count of ALL insert_frame_event* call sites in that fn so
@@ -689,7 +727,11 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
         std::collections::BTreeMap::new();
     let bytes = src.as_bytes();
     let mut search = 0usize;
-    while let Some(rel) = src[search..].find("insert_frame_event") {
+    while let Some(rel) = ["insert_frame_event", "append_erasure_row"]
+        .iter()
+        .filter_map(|writer| src[search..].find(writer))
+        .min()
+    {
         let at = search + rel;
         // Method name must be one of the four writers, called as `.method(`.
         let after = &src[at..];
@@ -698,6 +740,7 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
             "insert_frame_event_with_correlation",
             "insert_frame_event_with_id",
             "insert_frame_event",
+            "append_erasure_row",
         ]
         .iter()
         .find(|m| after.starts_with(**m))
@@ -706,6 +749,10 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
             search = at + "insert_frame_event".len();
             continue;
         };
+        if method == "append_erasure_row" && src[..at].ends_with("fn ") {
+            search = at + method.len();
+            continue;
+        }
         let open = at + method.len();
         if !src[open..].trim_start().starts_with('(') {
             search = open;
@@ -809,14 +856,22 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
             args.push(cur.trim().to_string());
         }
 
-        let Some(token_pos) = token_arg_position(method) else {
-            continue;
+        let token_arg = if method == "append_erasure_row" {
+            "None".to_owned()
+        } else {
+            let Some(token_pos) = token_arg_position(method) else {
+                continue;
+            };
+            args.get(token_pos).cloned().unwrap_or_default()
         };
-        let token_arg = args.get(token_pos).cloned().unwrap_or_default();
         // `insert_frame_event_with_id(frame_id, kind, …)` carries the kind
         // SECOND (18-3 landing: its first argument is the explicit frame id,
         // which read as a "variable kind").
-        let kind_pos = usize::from(method == "insert_frame_event_with_id");
+        let kind_pos = if method == "append_erasure_row" {
+            3
+        } else {
+            usize::from(method == "insert_frame_event_with_id")
+        };
         let kind_arg = args.get(kind_pos).cloned().unwrap_or_default();
 
         let kind_is_capability_invocation = kind_arg
@@ -1045,6 +1100,28 @@ mod tests {
 }
 
 #[test]
+fn cfg_test_braceless_items_do_not_hide_production_writers() {
+    for item in [
+        "use std::string::String;",
+        "const TEST_VALUE: usize = 0;",
+        "type TestValue = u32;",
+        "static TEST_VALUE: usize = 0;",
+        "mod test_only;",
+    ] {
+        let src = format!(
+            "#[cfg(test)]\n{item}\n\
+             pub fn production_writer() {{\n\
+             tl.insert_frame_event(FrameKind::TaskComplete, 7, None, \"production\", b\"{{}}\", FrameOrigin::Kernel);\n\
+             }}\n"
+        );
+        let sites = scan_source(&src, "production.rs");
+        assert_eq!(sites.len(), 1, "test-only item hid production: {item}");
+        assert_eq!(sites[0].f, "production_writer", "{item}");
+        assert_eq!(sites[0].ordinal, 0, "{item}");
+    }
+}
+
+#[test]
 fn scanner_inventories_optional_capability_tokens_not_only_literal_none() {
     let src = r#"
 fn shared_writer(pid: u32, token: Option<&TokenId>) {
@@ -1135,7 +1212,7 @@ fn real_forget_tombstones_survive_replay_sealed_and_trajectory_export() {
     let dir = tempfile::tempdir().unwrap();
     let db = dir.path().join("audit.sqlite");
     {
-        let log = TransparencyLogAdapter::open(&db, 42).unwrap();
+        let log = TransparencyLogAdapter::open_with_global_legal_holds(&db, &db, 42).unwrap();
         log.insert_frame_event(
             FrameKind::McpInvocation,
             7,
@@ -1198,4 +1275,18 @@ fn tokenless_task_assign_is_a_non_call_and_a_token_bearing_one_still_projects() 
         classify_fr4_row(&call_with_token("task.assign", "standard", 3)),
         Fr4RowDisposition::Call
     );
+}
+
+#[test]
+fn transactional_erasure_writers_are_inventoried_not_their_definition() {
+    let source = r#"
+fn append_erasure_row(conn: &Connection,counter:&mut u64,boot:u64,kind:FrameKind,intent:&str,payload:&[u8]) {}
+fn production(conn: &Connection,counter:&mut u64) {
+    Self::append_erasure_row(conn,counter,1,FrameKind::TaskComplete,"frame.redacted",b"{}");
+}
+"#;
+    let sites = scan_source(source, "transparency_log.rs");
+    assert_eq!(sites.len(), 1);
+    assert_eq!(sites[0].f, "production");
+    assert_eq!(sites[0].ordinal, 0);
 }

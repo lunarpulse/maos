@@ -1509,6 +1509,31 @@ fn ac5_million_row_pending_forget_finishes_and_repeats_without_corruption() {
     door_scan_with_continuous_writer(1_000_000);
 }
 
+fn erasure_fixture_footprint(root: &std::path::Path) -> (u64, u64) {
+    let mut bytes = (0, 0);
+    for entry in std::fs::read_dir(root).expect("fixture footprint directory") {
+        let entry = entry.expect("fixture footprint entry");
+        let metadata = std::fs::symlink_metadata(entry.path()).expect("fixture metadata");
+        if metadata.is_dir() {
+            let child = erasure_fixture_footprint(&entry.path());
+            bytes.0 += child.0;
+            bytes.1 += child.1;
+        } else {
+            bytes.0 += metadata.len();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt as _;
+                bytes.1 += metadata.blocks() * 512;
+            }
+            #[cfg(not(unix))]
+            {
+                bytes.1 += metadata.len();
+            }
+        }
+    }
+    bytes
+}
+
 fn door_scan_with_continuous_writer(count: u64) {
     use rusqlite::OptionalExtension as _;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -1529,29 +1554,51 @@ fn door_scan_with_continuous_writer(count: u64) {
     let door = regression_door(&world, &scheduler, &rt, 2011);
     let mut db = rusqlite::Connection::open(world.dir.path().join("transparency.sqlite"))
         .expect("seed connection");
-    let tx = db.transaction().expect("seed transaction");
     let body = vec![b'x'; 1024];
     let target_id = [0u8; 16];
-    {
-        let mut insert = tx.prepare("INSERT INTO transparency_log (frame_id, timestamp_ns, kind, spirit_pid, boot_nonce, capability_token, intent, payload_redacted, origin, correlation_id) VALUES (?1,?2,1,7,2011,NULL,'scan.filler',?3,0,NULL)").expect("seed statement");
-        for i in 1..=count {
-            insert
-                .execute(rusqlite::params![
-                    i.to_be_bytes().repeat(2),
-                    i as i64,
-                    &body
-                ])
-                .expect("seed row");
+    let mut footprint = (0_u64, 0_u64);
+    // A single million-row transaction retains a second database-sized WAL.
+    // Keep the real 1 KiB payload and row count, but checkpoint each bounded
+    // seed batch before the door/writer latency interval starts.
+    for first in (1..=count).step_by(4096) {
+        let tx = db.transaction().expect("seed transaction");
+        {
+            let mut insert = tx.prepare("INSERT INTO transparency_log (frame_id, timestamp_ns, kind, spirit_pid, boot_nonce, capability_token, intent, payload_redacted, origin, correlation_id) VALUES (?1,?2,1,7,2011,NULL,'scan.filler',?3,0,NULL)").expect("seed statement");
+            for i in first..=first.saturating_add(4095).min(count) {
+                let mut id = [0_u8; 16];
+                id[..8].copy_from_slice(&i.to_be_bytes());
+                id[8..].copy_from_slice(&i.to_be_bytes());
+                insert
+                    .execute(rusqlite::params![id.as_slice(), i as i64, &body])
+                    .expect("seed row");
+            }
+            if first == 1 {
+                insert
+                    .execute(rusqlite::params![
+                        target_id.as_slice(),
+                        0,
+                        br#"{"principal_id":"scan-target@example.org"}"#.as_slice(),
+                    ])
+                    .expect("real principal-bearing frame");
+            }
         }
-        insert
-            .execute(rusqlite::params![
-                &target_id[..],
-                0,
-                br#"{"principal_id":"scan-target@example.org"}"#.as_slice()
-            ])
-            .expect("real principal-bearing frame");
+        tx.commit().expect("seed commit");
+        // Before truncation, both the just-committed WAL and copied database
+        // are present: this captures the seed's physical high-water.
+        let current = erasure_fixture_footprint(world.dir.path());
+        footprint.0 = footprint.0.max(current.0);
+        footprint.1 = footprint.1.max(current.1);
+        db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")
+            .expect("truncate seed WAL");
     }
-    tx.commit().expect("seed commit");
+    eprintln!(
+        "EC-13 fixture rows={count} seed_peak_apparent_bytes={} seed_peak_allocated_bytes={}",
+        footprint.0, footprint.1
+    );
+    assert!(
+        footprint.1 <= count * 1792 + 32 * 1024 * 1024,
+        "large fixture retained a second database-sized WAL: rows={count}, footprint={footprint:?}"
+    );
     let tl = Arc::clone(&world.transparency_log);
     let stop = Arc::new(AtomicBool::new(false));
     let _stop_guard = StopOnDrop(stop.as_ref());
@@ -1580,6 +1627,16 @@ fn door_scan_with_continuous_writer(count: u64) {
         principal: "scan-target@example.org".into(),
         reason: None,
     };
+    // The completion is necessarily newer than this operation's entry fence.
+    // Do not make its observer scan the entire 1 GiB fixture on every poll
+    // after the routed-append full indexes have correctly been removed.
+    let completion_after: i64 = db
+        .query_row(
+            "SELECT coalesce(max(rowid),0) FROM transparency_log",
+            [],
+            |row| row.get(0),
+        )
+        .expect("completion observation fence");
     barrier.wait();
     let start = Instant::now();
     let result = submit_and_wait(door.as_ref(), forget());
@@ -1602,8 +1659,8 @@ fn door_scan_with_continuous_writer(count: u64) {
             loop {
                 let completed: Option<Vec<u8>> = db
                     .query_row(
-                        "SELECT payload_redacted FROM transparency_log WHERE kind=?1 AND intent=?2",
-                        rusqlite::params![FrameKind::TelemetryEvent as i64, intent],
+                        "SELECT payload_redacted FROM transparency_log WHERE rowid>?3 AND kind=?1 AND intent=?2",
+                        rusqlite::params![FrameKind::TelemetryEvent as i64, intent, completion_after],
                         |row| row.get(0),
                     )
                     .optional()
@@ -1629,9 +1686,7 @@ fn door_scan_with_continuous_writer(count: u64) {
     let delays = writer.join().expect("writer");
     let max = delays.iter().copied().max().expect("writer attempted");
     let ratio = max.as_secs_f64() / elapsed.as_secs_f64();
-    // Scheduling/fsync can exceed a page's CPU work on a loaded host. Keep
-    // these raw timings; the binding unchanged <25% work oracle measures the
-    // actual production statements in erasure_scan_work, including the plant.
+    // The wall-latency criterion is independent of the constituent VM-work bound.
     eprintln!("EC-13 door rows={count} wall={elapsed:?} max_insert={max:?} writes={} wall_ratio={ratio} response={result:?}", delays.len());
     let read_body = |id: &[u8]| {
         db.query_row(
@@ -1653,6 +1708,52 @@ fn door_scan_with_continuous_writer(count: u64) {
     );
     assert_eq!(read_body(&target_id), tombstone);
     assert_eq!(read_body(&count.to_be_bytes().repeat(2)), body);
+    let current = erasure_fixture_footprint(world.dir.path());
+    footprint.0 = footprint.0.max(current.0);
+    footprint.1 = footprint.1.max(current.1);
+    eprintln!(
+        "EC-13 fixture rows={count} peak_apparent_bytes={} peak_allocated_bytes={}",
+        footprint.0, footprint.1
+    );
+    assert!(
+        footprint.1 <= count * 1792 + 32 * 1024 * 1024,
+        "fixture peak exceeded its concurrency-safe disk envelope: {footprint:?}"
+    );
+    drop(door);
+    drop(rt);
+    drop(scheduler);
+    db.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")
+        .expect("truncate completed fixture WAL");
+    drop(db);
+    // Close every owner before TempDir cleanup, not merely at process exit.
+    let KernelWorld {
+        dir,
+        transparency_log,
+        journal,
+        halt_registry,
+        memory,
+        capability,
+        policy,
+    } = world;
+    drop((
+        transparency_log,
+        journal,
+        halt_registry,
+        memory,
+        capability,
+        policy,
+    ));
+    let path = dir.path().to_owned();
+    dir.close().expect("remove large fixture immediately");
+    assert!(
+        !path.exists(),
+        "large fixture directory leaked: {}",
+        path.display()
+    );
+    assert!(
+        ratio < 0.25,
+        "writer blocked for {max:?} of {elapsed:?} at {count} rows (ratio={ratio})"
+    );
 }
 
 #[test]

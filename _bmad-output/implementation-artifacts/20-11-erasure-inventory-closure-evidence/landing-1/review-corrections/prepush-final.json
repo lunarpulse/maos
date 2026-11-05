@@ -1,0 +1,1640 @@
+{
+  "base": "cbed4dad0f1bc9882f04a3c637bdf6a8c6509700",
+  "base_age_seconds": 64389,
+  "changed_paths": [
+    ".config/nextest.toml",
+    ".dockerignore",
+    ".github/actions/provision-erasure-verifier/action.yml",
+    ".github/workflows/container.yml",
+    ".github/workflows/discipline.yml",
+    ".github/workflows/release.yml",
+    "Cargo.lock",
+    "Dockerfile",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-before-transfer.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-before-transfer.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-before-transfer.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-transfer-final.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-transfer-measurements.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-transfer-tests.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/audit-integration-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/audit-integration-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/audit-integration-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/audit-integration-final-2.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/audit-integration-final-2.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/audit-integration-final-2.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/before-state.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-checkpoint-2.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-checkpoint-2.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-checkpoint-2.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-checkpoint.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-checkpoint.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-checkpoint.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-2.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-2.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-2.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-3.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-3.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/bin-integration-final-3.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cargo-deny-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cargo-deny-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cargo-deny-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-affected-regions.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-final.jsonl",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-final.jsonl.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-partial-redaction-final.jsonl",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-partial-redaction-final.jsonl.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-partial-redaction-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-partial-redaction-ratchet.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-partial-redaction-ratchet.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-partial-redaction-ratchet.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-final.jsonl",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-final.jsonl.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-ratchet.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-ratchet.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-preservation-ratchet.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-ratchet-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-ratchet-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/clippy-ratchet-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cross-kind-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cross-kind-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cross-kind-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cross-verifier-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cross-verifier-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cross-verifier-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac2-max-plant.patch",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac2-max-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac2-max-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac2-max-plant.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac7-plant.patch",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac7-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac7-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-ac7-plant.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-cites.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-plant-results.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-plants-1.metadata.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-plants-1.patch",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-plants-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-plants-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/current-plants-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/diagnostic-lock-sites.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-2.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-2.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/disk-door-final-2.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-partial-redaction-raw.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-partial-redaction-raw.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-partial-redaction-raw.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-partial-redaction.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-post-plants.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/exact-source-preservation.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-after-nextest-2.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-after-nextest-2.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-after-nextest-2.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-after-nextest.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-after-nextest.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-after-nextest.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-before-nextest.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-before-nextest.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-before-nextest.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-checkpoint-measurements.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fair-test-identities.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac2-plant.patch",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac2-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac2-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac2-plant.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac7-plant.patch",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac7-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac7-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-ac7-plant.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-control-results.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-plants-1.patch",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-plants-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-plants-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/final-plants-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/finalization-structural-races-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/finalization-structural-races-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/finalization-structural-races-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fixtures-post-partial-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fixtures-post-partial-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fixtures-post-partial-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-checkpoint.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-checkpoint.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-checkpoint.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-fair-checkpoint.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-fair-checkpoint.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-fair-checkpoint.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-partial-redaction-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-partial-redaction-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-partial-redaction-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-preservation.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-preservation.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-preservation.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-review-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-review-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-review-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-safety-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-safety-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/fmt-safety-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-2.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-2.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-2.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-3.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-3.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-3.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-breaking.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-breaking.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-breaking.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-composition-root.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-composition-root.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-composition-root.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-coverage-completeness.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-coverage-completeness.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-coverage-completeness.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-decision-register.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-decision-register.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-decision-register.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-dev-record-repaired.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-dev-record-repaired.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-dev-record-repaired.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-dev-record.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-dev-record.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-dev-record.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-env-contract.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-env-contract.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-env-contract.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-epic-coherence.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-epic-coherence.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-epic-coherence.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-exit-commands.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-exit-commands.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-exit-commands.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-kernel-baseline.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-kernel-baseline.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-kernel-baseline.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-kloc.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-kloc.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-kloc.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-public-fields.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-public-fields.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-public-fields.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-serde-errors.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-serde-errors.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-serde-errors.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-service-boundary.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-service-boundary.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-service-boundary.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-test-cost.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-test-cost.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-final-test-cost.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-kernel-baseline.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-kernel-baseline.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-kernel-baseline.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-kloc.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-kloc.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-kloc.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-kernel.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-kernel.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-kernel.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-kloc.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-kloc.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-kloc.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-service.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-service.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-partial-service.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-workspace-dev-record.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-workspace-dev-record.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-workspace-dev-record.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-service-boundary.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-service-boundary.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-service-boundary.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hold-body-order-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hold-body-order-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hold-body-order-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hosted-a-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hosted-a-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hosted-a-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hosted-a-local-proxy.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hosted-c-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hosted-c-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/hosted-c-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-checkpoint.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-checkpoint.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-checkpoint.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-edge-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-edge-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-edge-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-fair-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-fair-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-fair-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-races-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-races-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-races-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-unit-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-unit-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/iac-unit-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/identity-resolver-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/identity-resolver-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/identity-resolver-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/index-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/index-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/index-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/journal-finalization-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/journal-finalization-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/journal-finalization-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before-qualified.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before-qualified.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before-qualified.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before-runtime.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before-runtime.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before-runtime.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/late-observations-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/legacy-closure-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/legacy-closure-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/legacy-closure-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/libraries-checkpoint.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/libraries-checkpoint.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/libraries-checkpoint.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/libraries-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/libraries-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/libraries-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/lock-diagnostic.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/lock-diagnostic.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/lock-diagnostic.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/metadata-parser-deps-full.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/metadata-parser-deps-full.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/metadata-parser-deps-full.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/metadata-parser-deps.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/metadata-parser-deps.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/metadata-parser-deps.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/metadata-producer-build-cells.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-recovery-python-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-recovery-python-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-recovery-python-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-transfer-after.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-transfer-after.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-transfer-after.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-transfer-before.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-transfer-before.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-transfer-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/narrow-transfer-identities.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/native-partial-redaction-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/native-partial-redaction-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/native-partial-redaction-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/native-post-fixtures-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/native-post-fixtures-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/native-post-fixtures-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/nextest-after-transfer.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/nextest-after-transfer.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/nextest-after-transfer.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/nextest-before-transfer.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/nextest-before-transfer.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/nextest-before-transfer.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/non-poisoning-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/non-poisoning-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/non-poisoning-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-print-only-control.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-print-only-control.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-print-only-control.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-print-only-unbounded.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-print-only-unbounded.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-print-only-unbounded.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-real-delay-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-real-delay-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-real-delay-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-real-delay-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-real-delay-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-real-delay-plant.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/p2-wall-oracle-controls.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/package-partial-delete-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/package-partial-delete-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/package-partial-delete-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-page-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-page-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-page-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant-diff.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant.patch",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant.patch.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-repair-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-repair-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-repair-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-restored.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-restored.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-restored.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/prepush-final.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/prepush-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-before-unmasked.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-before-unmasked.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-before-unmasked.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-critical-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-critical-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-critical-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-repair-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-repair-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/preservation-repair-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/proof-scanner-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/proof-scanner-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/proof-scanner-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/receipt-order-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/receipt-order-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/receipt-order-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/registry-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/registry-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/registry-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/remaining-before-2.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/remaining-before-2.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/remaining-before-2.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/remaining-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/remaining-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/remaining-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/review-resolution.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/root-late-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/root-late-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/root-late-final-1.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/safety-checkpoint-measurements.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/safety-root-final.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/safety-root-final.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/safety-root-final.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/same-boot-identity-before.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/same-boot-identity-before.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/same-boot-identity-before.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/verifier-runner-final-1.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/verifier-runner-final-1.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-binaries-metadata.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-binaries-metadata.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-binaries-metadata.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-cargo-metadata.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-cargo-metadata.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-cargo-metadata.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-binaries-metadata-j8.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-binaries-metadata-j8.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-binaries-metadata-j8.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-binaries-metadata-resumed.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-binaries-metadata-resumed.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-binaries-metadata.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-binaries-metadata.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-cargo-metadata.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-cargo-metadata.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-cargo-metadata.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-default.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-default.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-default.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-fixtures.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-native-build.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-native-build.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-native-build.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-fixtures.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-fixtures.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-fixtures.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-metadata-provenance.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-native-build.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-native-build.stdout",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-native-build.stdout.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-test-binaries-metadata.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-test-binaries-metadata.json.command.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-test-binaries-metadata.stderr",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-test-metadata-provenance.json",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review/triage.md",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure.md",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac2-before-recipes.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac2-render-restored.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac2-restore.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac2-token-plant.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac3-before-stub.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac3-final-refusal.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac3-local-workload-only.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac4-before-enrolment.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac6-ac7-old-hint-plant.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac6-restore.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac7-before-route.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac8-onb-size-leg.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/ac8-strip.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/acceptance.md",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/baseline-kernel.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/baseline-kloc.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/baseline-recipe-source.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/binaries-metadata.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/build-release-affected.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/build-test-fixtures.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/capabilities.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/cargo-metadata.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/cites-cbed4dad.md",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/cleanup.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/clippy-affected.jsonl",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/clippy-affected.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/clippy-delta.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/command-index.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/compile-shape-verbs.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/deb-rules-parse.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/final-compile-shape-build.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/final-compile-shape-mock-scan.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/final-default-debug-build.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/final-feature-closure.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/final-shell-syntax.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/final-symbol-advisory.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/final-workflow-and-recipe-vectors.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/fmt-after-enrolment-callers.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/fmt-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/fmt.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/focused-enrolment-corrections.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/focused-enrolment-unit.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/focused-renderer-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/focused-renderer.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/focused-runtime-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/focused-workflow-regressions-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/focused-workflow-regressions.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/formatted-measurement.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/generated-report-preservation.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/genuine-default-debug-build.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/glibc-floor.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/local-workload-tl-counts.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/manifest-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/metadata-timeout-processes.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/netns-declared-ci-refusal.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/netns-local-not-run.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/preflight-decisions.md",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/prepush.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/prepush.stdout",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/python-controls-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/python-controls.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/python-system-cryptography.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/python-verifier-dependency.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/python-verifier-venv.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/release-library-floor.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/render-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/renderer-build.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/review/triage.md",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/sign-final.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/size.json",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-check-decision-register.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-check-dev-record-completeness.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-check-epic-close-coherence.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-check-exit-commands.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-check-ship-gate-completeness.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-check-test-cost.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-coverage-matrix.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-kernel.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/standard-kloc.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/syntax-shell.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/t0-airgap.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/t0-default-build.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/t0-netns-prerequisite.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/tree-bound-nextest.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/version-comparator.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/workspace-binaries-metadata-resumed.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/workspace-cargo-metadata.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/workspace-metadata-timeout.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/workspace-nextest-executed.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/workspace-nextest-executed.stdout",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/workspace-nextest.log",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/workspace-nextest.stdout",
+    "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections.md",
+    "_bmad-output/implementation-artifacts/deferred-work.md",
+    "crates/maos-audit/Cargo.toml",
+    "crates/maos-audit/src/erasure/merkle.rs",
+    "crates/maos-audit/src/erasure/proof.rs",
+    "crates/maos-audit/src/fr4_classifier.rs",
+    "crates/maos-audit/src/lib.rs",
+    "crates/maos-audit/tests/erasure_review_20_11.rs",
+    "crates/maos-audit/tests/erasure_smoke_test.rs",
+    "crates/maos-audit/tests/fr4_classifier_16_2.rs",
+    "crates/maos-audit/tests/support/proof_unit_20_11.rs",
+    "crates/maos-bin/src/hook_pump.rs",
+    "crates/maos-bin/src/main.rs",
+    "crates/maos-bin/src/operator_door.rs",
+    "crates/maos-bin/src/purge.rs",
+    "crates/maos-bin/tests/erasure_inventory_20_11.rs",
+    "crates/maos-bin/tests/erasure_live_20_11.rs",
+    "crates/maos-bin/tests/erasure_uninstall_13_5b.rs",
+    "crates/maos-bin/tests/hook_pump_17_4.rs",
+    "crates/maos-bin/tests/maos_uninstall_16_4.rs",
+    "crates/maos-bin/tests/shell_host_16_2.rs",
+    "crates/maos-bin/tests/support/uninstall_review_20_11.rs",
+    "crates/maos-iac/src/adapter/erasure_scan_work.rs",
+    "crates/maos-iac/src/adapter/transparency_log.rs",
+    "crates/maos-iac/src/adapter/transparency_log/erasure_sweep.rs",
+    "crates/maos-iac/tests/erasure_index_20_11.rs",
+    "crates/maos-iac/tests/support/erasure_races_20_11.rs",
+    "crates/maos-iac/tests/support/transparency_log_unit.rs",
+    "crates/maos-loom-lite/src/store.rs",
+    "crates/maos-registry/Cargo.toml",
+    "crates/maos-registry/src/storage.rs",
+    "crates/maos-registry/tests/uninstall_review_20_11.rs",
+    "docs-site/docs/run-maos.md",
+    "docs/adr/ADR-044-gdpr-article-17-distillate-redaction.md",
+    "docs/adr/ADR-067-maos-data-root-layout-and-purge.md",
+    "docs/maos.dev/index.md",
+    "docs/maos.dev/install.md",
+    "docs/maos.dev/run-maos.md",
+    "docs/release/tag-procedure.md",
+    "docs/runbooks/ag-1-air-gap-deployment.md",
+    "docs/runbooks/provisioning-checklist.md",
+    "packaging/aur/PKGBUILD",
+    "packaging/build-packages.sh",
+    "packaging/check-installed.py",
+    "packaging/deb/changelog",
+    "packaging/deb/control",
+    "packaging/deb/rules",
+    "packaging/deb/source/format",
+    "packaging/homebrew/maos.rb",
+    "packaging/rpm/maos.spec",
+    "packaging/test_release_20_2.py",
+    "packaging/verify-release.py",
+    "packaging/witness-deb.sh",
+    "packaging/witness-recipe.sh",
+    "scripts/run_cgroup_ceiling_17_2.py",
+    "tests/air-gap-netns-corroborate.sh",
+    "tests/air-gap-trace.py",
+    "tests/coverage-matrix.yaml",
+    "tools/verify-erasure/requirements.txt",
+    "tools/verify-erasure/verify.py",
+    "xtask/gate-registry.toml",
+    "xtask/kloc.toml",
+    "xtask/src/check_ship_gate_completeness.rs",
+    "xtask/src/lib.rs",
+    "xtask/src/main.rs",
+    "xtask/src/render_packages.rs",
+    "xtask/tests/erasure_verifier_runner_20_11.rs",
+    "xtask/tests/macos_compile_guard_20_6.rs",
+    "xtask/tests/package_recipes_20_2.rs",
+    "xtask/tests/package_workflows_20_2.rs",
+    "xtask/tests/release_workflow_15_4.rs",
+    "xtask/tests/ship_gate_binding_20_3a.rs"
+  ],
+  "records": [
+    {
+      "check": "changed-paths",
+      "artifact": "merge-base..HEAD / HEAD..working tree / untracked",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "stability-matrix",
+      "artifact": "STABILITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 148
+    },
+    {
+      "check": "error-catalog-check",
+      "artifact": "docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 481
+    },
+    {
+      "check": "gen-abi-docs",
+      "artifact": "docs-site/abi/v1",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2564
+    },
+    {
+      "check": "check-serde-error-handling",
+      "artifact": "crates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 239
+    },
+    {
+      "check": "check-workspace-count",
+      "artifact": "Cargo.toml / docs/kernel-design.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 8
+    },
+    {
+      "check": "check-manifest-schema-version",
+      "artifact": "manifest schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "check-skill-schema",
+      "artifact": "skill schema",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "check-epic-close-coherence",
+      "artifact": "epic closure / discipline workflow",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 20
+    },
+    {
+      "check": "check-coverage-matrix-completeness",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 10
+    },
+    {
+      "check": "check-test-cost",
+      "artifact": "xtask/test-budgets.toml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 269
+    },
+    {
+      "check": "check-env-contract",
+      "artifact": "environment contract",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 449
+    },
+    {
+      "check": "check-unsafe",
+      "artifact": "capability validation sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "check-service-boundary",
+      "artifact": "service boundary sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1125
+    },
+    {
+      "check": "check-kernel-baseline",
+      "artifact": "kernel baseline",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "kloc-check",
+      "artifact": "xtask/kloc.toml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 44
+    },
+    {
+      "check": "check-breaking-md",
+      "artifact": "BREAKING.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "check-composition-root-completeness",
+      "artifact": "composition roots",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 38
+    },
+    {
+      "check": "check-pub-field-constructors",
+      "artifact": "public field constructors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 252
+    },
+    {
+      "check": "check-dependency-closure",
+      "artifact": "Cargo.lock / dependency closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 249
+    },
+    {
+      "check": "coverage-matrix",
+      "artifact": "tests/coverage-matrix.yaml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 17
+    },
+    {
+      "check": "check-corpus",
+      "artifact": "corpus manifest",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 100
+    },
+    {
+      "check": "abi-diff",
+      "artifact": "ABI surface",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1023
+    },
+    {
+      "check": "check-empty-kernel",
+      "artifact": "kernel invariant I9",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 254
+    },
+    {
+      "check": "check-loom",
+      "artifact": "loom substrate",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 252
+    },
+    {
+      "check": "check-fr47",
+      "artifact": "FR47 bindings",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14
+    },
+    {
+      "check": "check-a2a-sender-completeness",
+      "artifact": "A2A sender boundary",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 30
+    },
+    {
+      "check": "check-judge-config",
+      "artifact": "pinned judge configuration",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1688
+    },
+    {
+      "check": "check-security-md",
+      "artifact": "SECURITY.md",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2
+    },
+    {
+      "check": "templates-regen",
+      "artifact": "example Spirit templates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "corpus-staleness",
+      "artifact": "corpus validity dates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 9
+    },
+    {
+      "check": "calibrate",
+      "artifact": "calibration seed",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 5
+    },
+    {
+      "check": "check-review-findings-resolved",
+      "artifact": "review closure",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 62
+    },
+    {
+      "check": "check-dev-record-completeness",
+      "artifact": "story records",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 63
+    },
+    {
+      "check": "check-dev-model-tier",
+      "artifact": "story model tiers",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14
+    },
+    {
+      "check": "check-ship-gate-completeness",
+      "artifact": "ship registry",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 31
+    },
+    {
+      "check": "check-pentest-gate",
+      "artifact": "pen-test evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-third-party-trial",
+      "artifact": "trial evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-trial-attestation",
+      "artifact": "trial attestation",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 167
+    },
+    {
+      "check": "check-red-team-gate",
+      "artifact": "red-team evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 7
+    },
+    {
+      "check": "check-migration-merkle",
+      "artifact": "migration evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 14514
+    },
+    {
+      "check": "nfr-onb-1-gate",
+      "artifact": "onboarding evidence",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 4
+    },
+    {
+      "check": "cassette-age-gate",
+      "artifact": "cassette age policy",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 3
+    },
+    {
+      "check": "build-test-fixtures",
+      "artifact": "target/maos-fixtures/manifest.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 38514
+    },
+    {
+      "check": "binary-size:trigger",
+      "artifact": "cargo metadata / change set",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "binary-size:build",
+      "artifact": "release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 68740
+    },
+    {
+      "check": "binary-size",
+      "artifact": "tests/integration/onb_nfr2_timing.sh: stripped release maos",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "fmt",
+      "artifact": "workspace Rust sources",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 2720
+    },
+    {
+      "check": "docs:troubleshoot-bidi",
+      "artifact": "docs-site/route-manifest.json / docs/errors/error-catalog.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 101
+    },
+    {
+      "check": "docs:glossary-lock",
+      "artifact": "docs-site/i18n/ko / glossary",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; Loaded 42 locked terms, 3 denylist entries from DENYLIST [docs] scanned 110 en files; checked 37 ko counterparts [abi] scanned 18 en files; checked 9 ko counterparts Checked 46 ko translation files total FAIL: 1 glossary-lock violations: - LOCKED_TERM [docs ko]: run-maos.md: \"Spirit\" appears 7x in en but 4x in ko",
+      "wall_ms": 74
+    },
+    {
+      "check": "docs:anchor-ids",
+      "artifact": "docs-site anchors",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 60
+    },
+    {
+      "check": "docs:ko-coverage",
+      "artifact": "docs-site/i18n/ko (KO_COVERAGE_MIN=100)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 67
+    },
+    {
+      "check": "docs:build",
+      "artifact": "docs-site/build",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 6328
+    },
+    {
+      "check": "docs:routes",
+      "artifact": "docs-site/build / route-manifest.json",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 67
+    },
+    {
+      "check": "cargo-deny",
+      "artifact": "Cargo.lock / deny.toml (required cargo-deny)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 1290
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "status": "red",
+      "detail": "expected exit 0, actual exit status: 100; 34957 lines omitted; thread 'adapter::transparency_log::tests::insert_frame_panics_on_write_failure' (2930640) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1432:17: thread 'side_row_failure_rolls_back_the_base_row_and_halts' (2931092) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1432:17: thread 'journey_binary_freshness_refuses_newer_source' (2931825) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13: thread 'journey_binary_freshness_refuses_newer_source' (2931825) panicked at crates/maos-journey-test/tests/support/binaries.rs:55:13: thread 'missing_prebuilt_fixture_refuses_ci_but_allows_local_compilation' (2933148) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:79:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (2933146) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (2933146) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:86:9: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (2933146) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (2933146) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (2933146) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'configured_prebuilt_fixture_never_falls_back_when_unusable' (2933146) panicked at crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs:91:5: thread 'tokio-rt-worker' (2933389) panicked at crates/maos-kernel-core/tests/crash_detector_in_process_panic.rs:16:9: thread 'tokio-rt-worker' (2933961) panicked at crates/maos-kernel-core/tests/halt_carry_20_3c.rs:190:9: thread 'tokio-rt-worker' (2934044) panicked at crates/maos-kernel-core/tests/hook_dispatch_budget_envelope.rs:41:13: thread 'tokio-rt-worker' (2934076) panicked at crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs:42:9: thread 'tokio-rt-worker' (2934396) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'tokio-rt-worker' (2934397) panicked at crates/maos-kernel-core/tests/loaded_spirit_exit_16_6.rs:43:13: thread 'fixture_replay::tests::empty_ring_panics' (2936447) panicked at crates/maos-providers/src/fixture_replay.rs:47:13: thread 'sibling_provenance_refuses_an_unrecorded_executable' (2936744) panicked at crates/maos-registry/tests/../../../tests/harness/fixtures.rs:57:5: thread 'assert_no_deprecations_panics_when_warnings_present' (2937617) panicked at crates/maos-spirit-sdk/tests/deprecation_warnings_smoke.rs:112:5: thread 'assert_panics_message_contains_file_line_and_suggested_fix' (2937691) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:34:9: thread 'assert_panics_on_false_with_diagnostics' (2937692) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:28:5: thread 'assert_diagnostic_stable_output' (2937690) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:227:9: thread 'expect_frame_bytes_exact_fails_on_mismatch' (2937698) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:112:5: thread 'expect_frame_closest_diff_byte_correct' (2937700) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:251:9: thread 'expect_halt_panics_on_no_match' (2937711) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:160:5: thread 'expect_frame_panics_on_no_match' (2937712) panicked at crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:81:5: thread 'gate_otel_airgap_default_off_no_connects' (2937781) panicked at crates/maos-telemetry/tests/otel_gates.rs:171:13: thread 'gate_otel_airgap_default_off_no_connects' (2937880) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (2937909) panicked at crates/maos-telemetry/tests/otel_gates.rs:173:52: thread 'gate_otel_airgap_default_off_no_connects' (2937973) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_otel_airgap_default_off_no_connects' (2938011) panicked at crates/maos-telemetry/tests/otel_gates.rs:175:13: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (2939314) panicked at xtask/src/gate_common.rs:670:13: thread 'expansion_defaults_only_job_results' (2945520) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (2945520) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'expansion_defaults_only_job_results' (2945520) panicked at xtask/tests/workflow_honesty_20_3a.rs:64:17: thread 'gate_common::out_of_ledger_tests::a_gate_cannot_write_its_own_passed_field' (2946455) panicked at xtask/src/gate_common.rs:670:13: FAIL [ 42.312s] (5669/5688) maos-bin::shell_host_16_2 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption FAIL [ 42.312s] (5669/5688) maos-bin::shell_host_16_2 ac5_million_row_pending_forget_finishes_and_repeats_without_corruption thread 'ac5_million_row_pending_forget_finishes_and_repeats_without_corruption' (2930752) panicked at crates/maos-bin/tests/shell_host_16_2.rs:1675:17:",
+      "wall_ms": 652351
+    },
+    {
+      "check": "kernel-core-lib",
+      "artifact": "maos-kernel-core lib tests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 15772
+    },
+    {
+      "check": "workspace-doc",
+      "artifact": "workspace doctests",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 168253
+    },
+    {
+      "check": "test-budget",
+      "artifact": "/mnt/build/cargo-maos/nextest/default/junit.xml",
+      "status": "advisory",
+      "detail": "expected exit 0, actual exit status: 1; 0 lines omitted; {\"gate\":\"check-test-budget\",\"passed\":false,\"junit\":\"/mnt/build/cargo-maos/nextest/default/junit.xml\",\"binaries\":608,\"total_span_seconds\":474.02900075912476,\"total_sum_seconds\":1064.893999999999,\"findings\":[\"maos-bin::erasure_uninstall_13_5b took 31.188 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml\",\"ma ::error::check-test-budget: FAIL — 6 finding(s): - maos-bin::erasure_uninstall_13_5b took 31.188 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 32.233 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 35.469 s (Σ per-test time) over 42 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::shell_host_16_2 took 58.484 s (Σ per-test time) over 14 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 42.060 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - xtask::bin/xtask took 30.597 s (Σ per-test time) over 463 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml check-test-budget: FAIL — 6 finding(s): - maos-bin::erasure_uninstall_13_5b took 31.188 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::hook_pump_17_4 took 32.233 s (Σ per-test time) over 26 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::one_daemon_one_door_16_1 took 35.469 s (Σ per-test time) over 42 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-bin::shell_host_16_2 took 58.484 s (Σ per-test time) over 14 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - maos-iac::participant_recall_17_8 took 42.060 s (Σ per-test time) over 29 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml - xtask::bin/xtask took 30.597 s (Σ per-test time) over 463 test(s), budget 30.000 s — make it cheaper, or add an [[exception]] with reason + owner to xtask/test-budgets.toml",
+      "wall_ms": 68
+    },
+    {
+      "check": "ci-pins",
+      "artifact": ".github/workflows/discipline.yml",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-1-crash-detection-2s/Run crash corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:nfr-rel-2-hang-detection-60s/Run hang corpus (exactly one passing test)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 4 — retained T3 terminal facts (Story 17-7)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/CLI-wrapper spawn refuses on issuance-quota exhaustion (Story 17-9)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:epic-17-exit/Epic-17 exit line 5 — Observer live scene + activity corpus (Story 17-4)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:journey-hermetic-tier-1/Live skill port security witnesses (18-7, ten tests)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Native cgroup-v2 smoke — four real cases",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Real admitted session suite — 23 cases, serial",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-delegated/Rootless T3 Worker resource enforcement (x64)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:cgroup-ceiling-undelegated/Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"SCOPED-VERDICT \": 1 static emission sites; pin 8 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"GOVERNED-ATOMIC \": 1 static emission sites; pin 10 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"HOSTILE-LIFTING-CONTROL \": 1 static emission sites; pin 1 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "skip",
+      "detail": "\"RUNNER-SIGSYS \": 1 static emission sites; pin 2 has dynamic loop/closure/helper invocation cardinality, indeterminate locally; CI runtime marker guard remains authoritative",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"REPEATED-MAILBOX \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-PROVENANCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-REFUSALS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-FLOODS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-DIAGNOSTICS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-EXITS \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-ONCE \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"HOSTILE-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:marker",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates",
+      "status": "pass",
+      "detail": "\"WASM-IAC-SEND \": expected 1, actual 1 literal emission sites (heuristic, not runtime proof)",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Live escape-anomaly consumer under real T2 (Story 17-10)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/In-band recall through the admitted session (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:wasm-host-tests/Participant recall and consent envelopes, both forms (Story 17-8)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:windows-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:check-reza-production-path/GDPR response-only MCP principal cannot resurrect from cache (18-6)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "ci-pins:count",
+      "artifact": ".github/workflows/discipline.yml:macos-check/Run platform-neutral recall wire tests (Story 17-3d)",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    },
+    {
+      "check": "tracked-tree",
+      "artifact": "git diff HEAD / tracked status",
+      "status": "pass",
+      "detail": "exit 0",
+      "wall_ms": 0
+    }
+  ],
+  "output_diagnostics": [
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-2901191/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP (assert_fd_headroom): cannot read /tmp/maos-absent-limits-2901191/limits: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 absent_grant_keeps_d1_tokenless_proceed_posture: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 local_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 remote_exhaustion_refuses_before_workload: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop audit-drain Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic crashed second Worker (nack): signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigned section crashes twice: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic pending-halt stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic reassigning first section crashes: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic section crashed once, re-dispatched: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic escalating section: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-Worker dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic clear-judgement twin: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold resumed with provided context: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold released by accepted-halt: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic ambiguity halt resolved over the door: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic hold expiring at its bound: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 20-11 AC6 live Worker uninstall (AC2 fallback; schedule admission absent): signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V1 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V2 delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V4 re-pin consent delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 F4 pairing V3 recovered delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: NFR-Perf-8 real-spawn fan-out: set MAOS_20_7_FANOUT=smoke|soak (hosted smoke / Tier W soak only)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 paused Orchestrator holds dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 recall: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 safe-point drain: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root unload live Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown serving Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown one-shot Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown interrupted topology Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root shutdown standalone Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root startup shutdown Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 cohort root descendant Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated goal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 founder-loop delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 maos run cli-wrapper Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 replayed inbound delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 two-host delegation Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 hostless completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion permission-denial Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion prose-refusal Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 completion no-effect Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fixture credential-immunity Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 standalone completion Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker freeze: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 19-2 Worker revoke-stop: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 Worker FD hard-limit refusal: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 17-2 live Worker resource enforcement: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 binary root stalled then crashed Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 root-crash: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 client-first: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 fallback: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 ownership: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S1 immediate exit: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S2 exit-137: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S3 external SIGKILL: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S4 memory.max OOM: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload over-budget: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 S5 on_unload panic: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 configured workspaces root claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 host-probe marker claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace effect claude Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 workspace no-effect codex Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 epic three-workspace dispatch: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 purge-cgroups: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 every executable escape-corpus-v1 scenario: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 t3 egress socket custody: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 clear-twin topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 founder-loop journey delegated Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 J1 resume-continuity topology Workers: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: T3 sandbox_t3_spawn_linux: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_proven_red_network_canary_detected): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_enabled_no_endpoint_no_connects): strace unavailable: No such file or directory (os error 2)"
+    },
+    {
+      "check": "workspace-nextest",
+      "artifact": "workspace tests / cross-crate enrolment scanners",
+      "line": "SKIP: strace network tracing (gate_otel_airgap_default_off_no_connects): strace -V failed:"
+    }
+  ],
+  "wall_ms": 1195209
+}

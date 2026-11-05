@@ -1,0 +1,64 @@
+{
+  "commands": [
+    {
+      "command": [
+        "diff",
+        "-u",
+        "--label",
+        "a/crates/maos-bin/src/main.rs",
+        "--label",
+        "b/crates/maos-bin/src/main.rs",
+        "/tmp/dev2011b-review.9OTbuj/plant-current-main.rs",
+        "crates/maos-bin/src/main.rs"
+      ],
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "diff",
+        "-u",
+        "--label",
+        "a/crates/maos-bin/src/operator_door.rs",
+        "--label",
+        "b/crates/maos-bin/src/operator_door.rs",
+        "/tmp/dev2011b-review.9OTbuj/plant-current-door.rs",
+        "crates/maos-bin/src/operator_door.rs"
+      ],
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "diff",
+        "-u",
+        "--label",
+        "a/crates/maos-iac/src/adapter/transparency_log.rs",
+        "--label",
+        "b/crates/maos-iac/src/adapter/transparency_log.rs",
+        "/tmp/dev2011b-review.9OTbuj/plant-current-iac.rs",
+        "crates/maos-iac/src/adapter/transparency_log.rs"
+      ],
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "diff",
+        "-u",
+        "--label",
+        "a/crates/maos-registry/src/storage.rs",
+        "--label",
+        "b/crates/maos-registry/src/storage.rs",
+        "/tmp/dev2011b-review.9OTbuj/plant-current-storage.rs",
+        "crates/maos-registry/src/storage.rs"
+      ],
+      "exit_code": 1
+    }
+  ],
+  "independence": {
+    "AC1": "Valid: the principal-free fixture returned NotFound before proof (stderr:795-825).",
+    "AC7": "NOT an independent witness in this batch: the fixture's legacy owner did not populate the stable subject set, so AC1's temporary guard masked the observation omission (stderr:860-861). Do not count this red for AC7.",
+    "AC4": "Real SCB boundary uses capture ops, not the CLI proof cascade; empty snapshot cannot be caused by the main-file plants.",
+    "AC5": "IAC VM fixtures do not run the bin cascade or registry; their independent 4096*128 work cap and quarter ratio are unchanged.",
+    "P5": "Real index EACCES must be surfaced by rollback; no bin cascade or IAC fixture is involved."
+  },
+  "result": "Observed exit 100: 6 failed. Valid reds: AC1, AC4, both AC5 VM vectors, and P5 index error. The AC7 failure is contaminated and excluded. All four source files were restored with cp + cmp + touch, exit 0."
+}

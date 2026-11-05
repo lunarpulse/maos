@@ -1,0 +1,11 @@
+
+running 1 test
+test review_p5_partial_generation_delete_restores_the_complete_preimage ... FAILED
+
+failures:
+
+failures:
+    review_p5_partial_generation_delete_restores_the_complete_preimage
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+

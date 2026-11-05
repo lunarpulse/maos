@@ -2085,9 +2085,15 @@ impl DoorInner {
                 )
                 .await;
                 body["principal_id"] = serde_json::json!(principal);
-                body["outcome"] = serde_json::json!("erased");
-                body["forget"] = serde_json::json!(outcome);
-                body["terminal_code"] = serde_json::json!(0);
+                let complete = body["frame_sweep_status"] == "complete";
+                body["outcome"] = serde_json::json!(if complete { "erased" } else { "pending" });
+                if complete {
+                    body["forget"] = serde_json::json!(outcome);
+                } else {
+                    body["committed_component_receipt"] =
+                        serde_json::json!(outcome)["receipt"].take();
+                }
+                body["terminal_code"] = serde_json::json!(if complete { 0 } else { 5 });
                 OperatorOutcome::Completed(body)
             }
             Ok(outcome @ maos_domain::memory::ForgetOutcome::Suspended { .. }) => {

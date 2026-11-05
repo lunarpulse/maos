@@ -1,0 +1,48 @@
+
+running 30 tests
+test erasure::merkle::tests::empty_tree_exclusion ... ok
+test erasure::merkle::tests::empty_tree_sentinel_is_never_inclusion_and_path_lengths_are_exact ... ok
+test erasure::merkle::tests::duplicate_frame_ids_dedup ... ok
+test erasure::merkle::tests::inclusion_and_exclusion_round_trip ... ok
+test erasure::merkle::tests::single_leaf_tree_inclusion_verifies ... ok
+test erasure::merkle::tests::single_leaf_tree_exclusion_verifies ... ok
+test erasure::merkle::tests::tampered_proof_is_rejected ... ok
+test erasure::regional_teardown::tests::ac13_placement_is_region_specific_not_assumed ... ok
+test erasure::regional_teardown::tests::ac14_fail_closed_when_cascade_incomplete ... ok
+test erasure::proof::tests::erased_frame_absent_from_pre_tree_is_rejected ... ok
+test erasure::regional_teardown::tests::ac14_fail_closed_when_key_decommission_incomplete ... ok
+test erasure::regional_teardown::tests::from_outcome_rejects_unknown_store_names ... ok
+test erasure::merkle::tests::two_and_three_leaf_round_trips ... ok
+test erasure::regional_teardown::tests::cascade_completed_only_when_all_required_stores_covered ... ok
+test erasure::regional_teardown::tests::shared_is_required_not_uncovered ... ok
+test erasure::regional_teardown::tests::retained_seed_still_derives_region_key_after_decommission_attempt ... ok
+test erasure::regional_teardown::tests::store_sets_partition_known_stores ... ok
+test erasure::sla::tests::backwards_clock_is_treated_as_zero_delta ... ok
+test erasure::sla::tests::default_30_day_sla_misses_outside_window ... ok
+test erasure::sla::tests::default_30_day_sla_passes_within_window ... ok
+test erasure::sla::tests::enterprise_7_day_sla_has_tighter_boundary ... ok
+test erasure::sla::tests::same_tick_is_always_within_sla ... ok
+test erasure::regional_teardown::tests::verifier_rejects_home_signed_receipt_with_incomplete_key_phase ... ok
+test erasure::regional_teardown::tests::synthetic_complete_receipt_verifies_with_home_key ... ok
+test erasure::regional_teardown::tests::synthetic_complete_receipt_round_trips_through_json ... ok
+test erasure::regional_teardown::tests::synthetic_complete_receipt_rejects_region_and_wrong_home_keys ... ok
+test erasure::regional_teardown::tests::synthetic_complete_receipt_rejects_signed_payload_tampering ... ok
+test erasure::proof::tests::tampered_post_root_is_rejected ... ok
+test erasure::proof::tests::against_log_catches_withheld_frames ... ok
+test erasure::proof::tests::sign_and_verify_round_trip ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 129 filtered out; finished in 0.00s
+
+
+running 8 tests
+test adapter::transparency_log::erasure_scan_work::ac5_opaque_outcome_payload_is_storable_but_bad_recovery_is_reported ... ok
+test adapter::transparency_log::erasure_scan_work::ac5_rowid_scans_restore_timestamp_and_frame_id_order ... ok
+test adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f8_cross_process_hold_and_body_mutation_have_one_sqlite_order ... ok
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k ... ok
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 99 filtered out; finished in 10.85s
+

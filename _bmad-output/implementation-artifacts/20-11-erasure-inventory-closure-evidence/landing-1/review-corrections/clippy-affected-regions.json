@@ -1,0 +1,174 @@
+{
+  "scope": "Diagnostics in affected production regions only; no claim that existing warnings in these regions are newly introduced.",
+  "source_distinct": 28,
+  "diagnostics": [
+    {
+      "path": "crates/maos-audit/src/erasure/merkle.rs",
+      "line": 88,
+      "code": "clippy::manual_div_ceil",
+      "message": "manually reimplementing `div_ceil`"
+    },
+    {
+      "path": "crates/maos-audit/src/erasure/proof.rs",
+      "line": 356,
+      "code": "clippy::too_many_arguments",
+      "message": "this function has too many arguments (11/7)"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/drr_scheduler.rs",
+      "line": 18,
+      "code": "unused_imports",
+      "message": "unused import: `Instant`"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/orchestrator_dispatch.rs",
+      "line": 122,
+      "code": "unused_variables",
+      "message": "unused variable: `referenced`"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/distillate.rs",
+      "line": 152,
+      "code": "clippy::redundant_closure",
+      "message": "redundant closure"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/distillate.rs",
+      "line": 171,
+      "code": "clippy::redundant_closure",
+      "message": "redundant closure"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/distillate.rs",
+      "line": 180,
+      "code": "clippy::redundant_closure",
+      "message": "redundant closure"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/distillate.rs",
+      "line": 486,
+      "code": "clippy::needless_range_loop",
+      "message": "the loop variable `i` is used to index `bytes`"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/drr_scheduler.rs",
+      "line": 91,
+      "code": "clippy::result_large_err",
+      "message": "the `Err`-variant returned from this function is very large"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 242,
+      "code": "clippy::result_unit_err",
+      "message": "this returns a `Result<_, ()>`"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 248,
+      "code": "clippy::result_unit_err",
+      "message": "this returns a `Result<_, ()>`"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 262,
+      "code": "clippy::result_unit_err",
+      "message": "this returns a `Result<_, ()>`"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 266,
+      "code": "clippy::result_large_err",
+      "message": "the `Err`-variant returned from this function is very large"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 400,
+      "code": "clippy::result_large_err",
+      "message": "the `Err`-variant returned from this function is very large"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 410,
+      "code": "clippy::result_large_err",
+      "message": "the `Err`-variant returned from this function is very large"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 481,
+      "code": "clippy::needless_borrows_for_generic_args",
+      "message": "the borrowed expression implements the required traits"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/mailbox.rs",
+      "line": 684,
+      "code": "clippy::result_large_err",
+      "message": "the `Err`-variant returned from this function is very large"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/orchestrator_dispatch.rs",
+      "line": 67,
+      "code": "clippy::result_large_err",
+      "message": "the `Err`-variant returned from this function is very large"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/redaction.rs",
+      "line": 268,
+      "code": "clippy::unnecessary_fold",
+      "message": "this `.fold` can be written more succinctly using another method"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 724,
+      "code": "clippy::result_unit_err",
+      "message": "this returns a `Result<_, ()>`"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 1131,
+      "code": "clippy::too_many_arguments",
+      "message": "this function has too many arguments (9/7)"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 1177,
+      "code": "clippy::too_many_arguments",
+      "message": "this function has too many arguments (10/7)"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 1221,
+      "code": "clippy::too_many_arguments",
+      "message": "this function has too many arguments (10/7)"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "line": 2032,
+      "code": "clippy::type_complexity",
+      "message": "very complex type used. Consider factoring parts into `type` definitions"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/metrics.rs",
+      "line": 230,
+      "code": "mismatched_lifetime_syntaxes",
+      "message": "hiding a lifetime that's elided elsewhere is confusing"
+    },
+    {
+      "path": "crates/maos-bin/src/main.rs",
+      "line": 10769,
+      "code": "clippy::too_many_arguments",
+      "message": "this function has too many arguments (8/7)"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/metrics.rs",
+      "line": 420,
+      "code": "clippy::needless_return",
+      "message": "unneeded `return` statement"
+    },
+    {
+      "path": "crates/maos-iac/src/adapter/../../tests/support/transparency_log_unit.rs",
+      "line": 379,
+      "code": "clippy::bool_assert_comparison",
+      "message": "used `assert_eq!` with a literal bool"
+    }
+  ]
+}

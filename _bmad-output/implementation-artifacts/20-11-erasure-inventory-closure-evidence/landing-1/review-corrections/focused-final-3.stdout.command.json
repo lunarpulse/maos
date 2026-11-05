@@ -1,0 +1,35 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "--cargo-metadata",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-cargo-metadata.json",
+    "--binaries-metadata",
+    "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-test-binaries-metadata.json",
+    "-E",
+    "(package(maos-iac) & kind(lib)) | (package(maos-audit) & kind(lib)) | binary(erasure_review_20_11) | binary(erasure_smoke_test) | binary(fr4_classifier_16_2) | binary(fr4_full_mediation_test) | binary(fr4_worker_rows_16_3) | binary(fr4_1000_call_fixture) | binary(erasure_inventory_20_11) | test(uninstall_review_20_11) | binary(erasure_index_20_11) | binary(erasure_scan_20_11) | binary(erasure_verifier_runner_20_11) | binary(erasure_uninstall_13_5b) | binary(forget_floors_18_6) | binary(hook_pump_17_4) | test(ac4_door_snapshots_real_scb_schedules_before_unload) | test(ac5_door_hold_release_waits_for_inflight_forget)",
+    "--retries",
+    "0",
+    "--no-fail-fast",
+    "--success-output",
+    "immediate",
+    "--failure-output",
+    "immediate"
+  ],
+  "exit_code": 100,
+  "started": "2026-11-05T15:35:55.456082+00:00",
+  "seconds": 16.59051091299625,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-3.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/focused-final-3.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": "/tmp/dev2011b-review.9OTbuj/python/lib/python3.13/site-packages",
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

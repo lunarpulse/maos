@@ -1,0 +1,56 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 0.00s
+
+
+running 1 test
+test review_p8_whole_uninstall_inventory_proof_and_finalization_run_off_worker ... FAILED
+
+failures:
+
+failures:
+    review_p8_whole_uninstall_inventory_proof_and_finalization_run_off_worker
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.19s
+
+
+running 1 test
+test purge::runtime_residue::tests::review_p2_shared_slice_parent_is_never_reclaimed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+
+
+running 5 tests
+test review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof ... FAILED
+test review_p7_corrupt_admission_does_not_become_installed_unknown ... FAILED
+test review_f1_legacy_numeric_owner_is_a_named_gap_not_an_erasure ... FAILED
+test review_f1_cross_boot_pid_reuse_preserves_other_stable_owner ... FAILED
+test review_f1_same_boot_after_exit_preserves_other_stable_owner_and_lineage ... FAILED
+
+failures:
+
+failures:
+    review_f1_cross_boot_pid_reuse_preserves_other_stable_owner
+    review_f1_legacy_numeric_owner_is_a_named_gap_not_an_erasure
+    review_f1_same_boot_after_exit_preserves_other_stable_owner_and_lineage
+    review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof
+    review_p7_corrupt_admission_does_not_become_installed_unknown
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 9 filtered out; finished in 1.03s
+
+
+running 3 tests
+test adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed ... FAILED
+test adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer ... FAILED
+test adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation ... FAILED
+
+failures:
+
+failures:
+    adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer
+    adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation
+    adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 103 filtered out; finished in 0.32s
+

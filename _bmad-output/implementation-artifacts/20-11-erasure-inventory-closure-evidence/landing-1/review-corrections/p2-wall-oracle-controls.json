@@ -1,0 +1,9 @@
+{
+  "baseline": "93d39cc7ca185f513dee2d97bed2058f11554d9a",
+  "unbounded_page_control": {"command_record": "p2-print-only-control.stdout.command.json", "exit_code": 0, "wall_ratio": 0.2226100513347736, "disposition": "Below25%; not a wall-oracle red. The independent VM-work plant remains separate."},
+  "real_sqlite_delay_before": {"command_record": "p2-real-delay-before.stdout.command.json", "exit_code": 0, "wall_ratio": 0.7404264120316355, "wall_seconds": 3.572775548, "max_insert_seconds": 2.64537738, "disposition": "Actual one-shot SQLite trigger delayed insert_frame_event; old print-only test incorrectly passed."},
+  "restored_assertion_with_same_delay_plant": {"command_record": "p2-real-delay-plant.stdout.command.json", "exit_code": 101, "wall_ratio": 0.7352976869307355, "assertion": "writer blocked ... ratio=0.7352976869307355"},
+  "scan_source_restore": {"command": "cp /tmp/dev2011b-review.9OTbuj/p2-scan-source.rs crates/maos-iac/src/adapter/transparency_log.rs && cmp /tmp/dev2011b-review.9OTbuj/p2-scan-source.rs crates/maos-iac/src/adapter/transparency_log.rs && touch crates/maos-iac/src/adapter/transparency_log.rs", "exit_code": 0},
+  "fixture_restore": {"command": "cp /tmp/dev2011b-review.9OTbuj/p2-shell-source.rs crates/maos-bin/tests/shell_host_16_2.rs && cmp /tmp/dev2011b-review.9OTbuj/p2-shell-source.rs crates/maos-bin/tests/shell_host_16_2.rs && touch crates/maos-bin/tests/shell_host_16_2.rs", "exit_code": 0},
+  "final_source": "After byte-for-byte fixture restoration, re-applied only the ratio<0.25 assertion and removed the misleading replacement-oracle comment. Both real door sizes share that helper. No SQLite delay trigger or MAX page plant remains. Initial lock-only CLI failure retained separately; no test ran in that failure."
+}

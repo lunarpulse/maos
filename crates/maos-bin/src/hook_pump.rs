@@ -790,49 +790,85 @@ impl HookPump {
                 usize::from(matches!(outcome, RedistillOutcome::Redistilled { .. }));
             rows.push(serde_json::json!({"request":request,"outcome":outcome}));
         }
-        // An in-flight pass can commit after the initial kernel scan, before purge.
-        let (late_distillates, late_frames, late_requests, held, gaps) =
-            tokio::task::block_in_place(|| tl.scrub_forget_frames(&receipt.principal_id))
-                .map_err(|e| e.to_string())?;
-        for request in &late_requests {
-            let outcome = RedistillOutcome::Pending {
-                reason: Pending::Refused("late-frame".into()),
-            };
-            tl.insert_redistill_outcome(request, &outcome)
-                .map_err(|e| e.to_string())?;
-            rows.push(serde_json::json!({"request":request,"outcome":outcome}));
-        }
-        let late_ids: Vec<_> = late_distillates
-            .iter()
-            .chain(&late_frames)
-            .cloned()
-            .collect();
-        if let Some(pump) = pump.filter(|_| !late_ids.is_empty()) {
-            let bytes = serde_json::to_vec(&ForgetNotice {
-                scrubbed_frame_ids: late_ids,
-                redistill: Vec::new(),
-            })
-            .map_err(|e| e.to_string())?;
-            let dispatcher = pump.shared.dispatcher.upgrade();
-            let pids: Vec<_> = pump.shared.registry().keys().copied().collect();
-            for pid in pids {
-                let hook = match (pump.shared.scb(pid), &dispatcher) {
-                    (Some(scb), Some(dispatcher)) => {
-                        Some(dispatcher.fire_on_consolidate(&scb, &bytes).await)
-                    }
-                    _ => None,
+        // The final marker follows all hook work. A bounded tail that cannot be
+        // certified remains pending; already performed removals stay reported.
+        let mut sweep = maos_iac::adapter::transparency_log::ErasureSweep::new(
+            vec![receipt.principal_id.clone()],
+            None,
+        );
+        sweep.include_sources(
+            redacted_distillate_frame_ids
+                .iter()
+                .chain(redacted_principal_frame_ids)
+                .cloned(),
+        );
+        let (mut notified_distillates, mut notified_frames, mut dispatched) = (0, 0, 0);
+        let mut pending = None;
+        for _ in 0..8 {
+            if let Err(error) = tokio::task::block_in_place(|| tl.sweep_erasure(&mut sweep)) {
+                pending = Some(error.to_string());
+                break;
+            }
+            for request in &sweep.requests[dispatched..] {
+                let outcome = RedistillOutcome::Pending {
+                    reason: Pending::Refused("late-frame".into()),
                 };
-                if !matches!(
-                    hook,
-                    Some(
-                        HookOutcome::Fired { .. }
-                            | HookOutcome::BudgetWarning80 { fired: true, .. }
-                    )
-                ) {
-                    undelivered.push(pid);
+                tl.insert_redistill_outcome(request, &outcome)
+                    .map_err(|error| error.to_string())?;
+                rows.push(serde_json::json!({"request":request,"outcome":outcome}));
+            }
+            dispatched = sweep.requests.len();
+            let late_ids: Vec<_> = sweep.distillates[notified_distillates..]
+                .iter()
+                .chain(&sweep.principal_frames[notified_frames..])
+                .map(|(_, id)| id.clone())
+                .collect();
+            notified_distillates = sweep.distillates.len();
+            notified_frames = sweep.principal_frames.len();
+            if let Some(pump) = pump.filter(|_| !late_ids.is_empty()) {
+                let bytes = serde_json::to_vec(&ForgetNotice {
+                    scrubbed_frame_ids: late_ids,
+                    redistill: Vec::new(),
+                })
+                .map_err(|error| error.to_string())?;
+                let dispatcher = pump.shared.dispatcher.upgrade();
+                let pids: Vec<_> = pump.shared.registry().keys().copied().collect();
+                for pid in pids {
+                    let hook = match (pump.shared.scb(pid), &dispatcher) {
+                        (Some(scb), Some(dispatcher)) => {
+                            Some(dispatcher.fire_on_consolidate(&scb, &bytes).await)
+                        }
+                        _ => None,
+                    };
+                    if !matches!(
+                        hook,
+                        Some(
+                            HookOutcome::Fired { .. }
+                                | HookOutcome::BudgetWarning80 { fired: true, .. }
+                        )
+                    ) {
+                        undelivered.push(pid);
+                    }
+                }
+            }
+            match tokio::task::block_in_place(|| tl.certify_erasure(&mut sweep)) {
+                Ok(true) => break,
+                Ok(false) if sweep.blocked() => {
+                    pending = Some("held/malformed frame coverage retained".into());
+                    break;
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    pending = Some(error.to_string());
+                    break;
                 }
             }
         }
+        if sweep.completion.is_none() && pending.is_none() {
+            pending = Some("matching writer pass cap; completion pending".into());
+        }
+        undelivered.sort_unstable();
+        undelivered.dedup();
         for pid in &undelivered {
             tl.insert_frame_event(
                 maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete,
@@ -845,12 +881,25 @@ impl HookPump {
                 maos_domain::invariants::i3::FrameOrigin::Kernel,
             );
         }
-        Ok(
-            serde_json::json!({"redistill_outcomes":rows,"redistilled_count":redistilled_count,
+        sweep.distillates.sort_unstable();
+        sweep.principal_frames.sort_unstable();
+        sweep.held.sort_unstable();
+        sweep.malformed.sort_unstable();
+        Ok(serde_json::json!({
+            "redistill_outcomes":rows,"redistilled_count":redistilled_count,
             "pending_count":rows.len()-redistilled_count,"purge_undelivered":undelivered,
-            "late_redacted_distillate_frame_ids":late_distillates,"late_redacted_principal_frame_ids":late_frames,
-            "held_frame_ids":held,"malformed_frame_ids":gaps}),
-        )
+            "late_redacted_distillate_frame_ids":sweep.distillates.into_iter().map(|(_,id)|id).collect::<Vec<_>>(),
+            "late_redacted_principal_frame_ids":sweep.principal_frames.into_iter().map(|(_,id)|id).collect::<Vec<_>>(),
+            "held_frame_ids":sweep.held.into_iter().map(|(_,id)|id).collect::<Vec<_>>(),
+            "malformed_frame_ids":sweep.malformed.into_iter().map(|(_,id)|id).collect::<Vec<_>>(),
+            "held_principal_ids":sweep.held_principals,
+            "frame_sweep_status":if sweep.completion.is_some() {"complete"} else {"pending"},
+            "completion_boundary":"durable_transactional_marker",
+            "frame_sweep_completion":sweep.completion.map(|marker|serde_json::json!({
+                "frame_id":hex::encode(marker.frame_id),"through_rowid":marker.through_rowid
+            })),
+            "frame_sweep_pending":pending,
+        }))
     }
 
     /// Register an admitted compiled-in pid (`load_admit_start`, after the

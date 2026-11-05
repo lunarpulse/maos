@@ -352,6 +352,8 @@ def _environment(mode):
     }
     names.update(("RUSTC", "CARGO", "RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
     names.update(("CI", "GITHUB_ACTIONS", "MAOS_SECRETS_BACKEND"))
+    # 20-11: the hash-locked verifier backend must cross the delegated boundary.
+    names.add("PYTHONPATH")
     # Fixture lookup and explicit portable provenance must cross together.
     names.update(("MAOS_FIXTURE_DIR", "MAOS_FIXTURE_TRANSPORT"))
     # 20-15: compiler-denial guards, artifact locations and the producer-built

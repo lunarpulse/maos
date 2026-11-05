@@ -1,0 +1,31 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--no-fail-fast",
+    "-p",
+    "maos-audit",
+    "--test",
+    "erasure_review_20_11",
+    "--test",
+    "fr4_classifier_16_2",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "started": "2026-11-05T04:46:11.667333+00:00",
+  "seconds": 35.55459388898453,
+  "stdout": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/proof-scanner-before.stdout",
+  "stderr": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/proof-scanner-before.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

@@ -1,0 +1,13 @@
+
+running 2 tests
+test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed ... FAILED
+test adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction ... FAILED
+
+failures:
+
+failures:
+    adapter::transparency_log::erasure_races_20_11::review_non_poisoning_append_panic_keeps_last_frame_id_backed
+    adapter::transparency_log::erasure_races_20_11::review_non_poisoning_schema_panic_rolls_back_the_open_transaction
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 111 filtered out; finished in 0.02s
+

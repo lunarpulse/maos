@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cargo",
+    "metadata",
+    "--locked",
+    "--format-version",
+    "1"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T16:59:09.675519+00:00",
+  "seconds": 13.14317871601088,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-cargo-metadata.json",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/workspace-final-cargo-metadata.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": "/tmp/dev2011b-review.9OTbuj/python/lib/python3.13/site-packages",
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

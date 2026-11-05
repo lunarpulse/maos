@@ -1,0 +1,27 @@
+{
+  "context_commit": "93d39cc7ca185f513dee2d97bed2058f11554d9a",
+  "command": [
+    "tokei",
+    "--output",
+    "json",
+    "--types",
+    "Rust",
+    "/tmp/dev2011b-review.9OTbuj/baseline-iac/crates/maos-iac/src",
+    "/tmp/dev2011b-review.9OTbuj/baseline-iac/crates/maos-iac/tests",
+    "/tmp/dev2011b-review.9OTbuj/transparency_log_unit.before.rs"
+  ],
+  "exit_code": 0,
+  "baseline_src": 8551,
+  "baseline_tests": 2315,
+  "baseline_scan_module_code": 138,
+  "unit_body_at_transfer_code": 506,
+  "current_src": 8472,
+  "current_tests": 3547,
+  "current_unit_module_code": 504,
+  "current_scan_module_code": 168,
+  "current_src_if_unit_module_stayed": 8976,
+  "current_src_if_both_test_modules_stayed": 9143,
+  "src_if_only_scan_module_returned": 8639,
+  "ceiling_unchanged": 8630,
+  "disclosure": "Accounting transfer, not a ceiling relief; counterfactuals retain identical final code and restore only its source/test location."
+}

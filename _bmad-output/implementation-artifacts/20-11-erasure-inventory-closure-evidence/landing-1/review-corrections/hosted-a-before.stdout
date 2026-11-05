@@ -1,0 +1,11 @@
+
+running 1 test
+test hosted_a_existing_full_indexes_are_replaced_by_predicate_indexes ... FAILED
+
+failures:
+
+failures:
+    hosted_a_existing_full_indexes_are_replaced_by_predicate_indexes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+

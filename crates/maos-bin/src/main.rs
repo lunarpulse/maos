@@ -7412,7 +7412,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
             let spirit_id =
                 std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "hello-spirit".into());
-            let (mut terminal, redistillation) = run_uninstall_cascade(
+            let (terminal, redistillation) = run_uninstall_cascade(
                 &spirit_id,
                 memory.as_ref(),
                 capability.as_ref(),
@@ -7425,21 +7425,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             )
             .await;
-            // ADR-059 Decision 6 — only a successful erase writes the
-            // uninstall lifecycle success. 13.5b review: a journal failure
-            // on that path becomes the terminal, never a bare exit 1 hiding
-            // behind an already-printed `erased` receipt.
-            if terminal.exit_code() == 0 {
-                if let Err(error) = append_lifecycle_journal(
-                    maos_domain::invariants::i10::LifecycleEvent::Uninstall,
-                    &spirit_id,
-                ) {
-                    terminal = UninstallCascadeTerminal::Failed {
-                        spirit_id: spirit_id.clone(),
-                        error,
-                    };
-                }
-            }
             let exit_code = terminal.exit_code();
             let mut body = serde_json::to_value(&terminal)
                 .map_err(|error| format!("uninstall terminal encode failed: {error}"))?;
@@ -7471,6 +7456,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 body.as_object_mut()
                     .ok_or("ForgetOutcome must be object")?
                     .extend(fields.clone());
+            }
+            if body["frame_sweep_status"] == "pending" {
+                body["outcome"] = serde_json::json!("pending");
+                println!("{body}");
+                std::process::exit(5);
             }
             println!("{body}");
             // P29-cli: a legal-hold suspension is NOT a success — exit 3 so
@@ -10013,6 +10003,7 @@ enum UninstallCascadeTerminal {
     Failed {
         spirit_id: String,
         error: String,
+        proof_path: Option<String>,
     },
 }
 
@@ -10610,6 +10601,8 @@ async fn run_uninstall_cascade(
     memory_db_path: &std::path::Path,
     context: UninstallContext<'_>,
 ) -> (UninstallCascadeTerminal, serde_json::Value) {
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
     let mut redistillation = Vec::new();
     let terminal = match run_uninstall_cascade_inner(
         spirit_id,
@@ -10627,6 +10620,7 @@ async fn run_uninstall_cascade(
         Err(error) => UninstallCascadeTerminal::Failed {
             spirit_id: spirit_id.to_string(),
             error: error.to_string(),
+            proof_path: None,
         },
     };
     let mut payload = match serde_json::to_value(&terminal) {
@@ -10654,15 +10648,124 @@ async fn run_uninstall_cascade(
         &payload,
     );
     (terminal, report)
+    })
+    })
+}
+
+/// Stable-owner observations plus their real component receipts. A provisional
+/// signed gap inventory precedes irreversible erasure; final publication is the
+/// last fallible operation before accepting the recoverable package deletion.
+#[cfg(feature = "network")]
+struct UninstallProofInventory<'a> {
+    spirit: &'a str,
+    pid: u32,
+    pre: Vec<[u8; 16]>,
+    subjects: Vec<String>,
+    distillates: Vec<[u8; 16]>,
+    frames: Vec<[u8; 16]>,
+    completion: Option<maos_audit::erasure::proof::CompletionObservation>,
+    categories: Vec<maos_audit::erasure::proof::ErasureCategory>,
+    removals: std::collections::BTreeMap<String, Vec<maos_audit::erasure::proof::RemovalEvidence>>,
+    seed: [u8; 32],
+}
+#[cfg(feature = "network")]
+impl UninstallProofInventory<'_> {
+    fn persist(
+        &mut self,
+        tl: &maos_iac::adapter::transparency_log::TransparencyLogAdapter,
+    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+        self.normalize();
+        use maos_audit::erasure::proof::{
+            build_erasure_proof, write_proof_bundle, CategoryObservation,
+        };
+        let mut observations = Vec::with_capacity(self.categories.len());
+        for category in &self.categories {
+            let removals = self
+                .removals
+                .get(&category.name)
+                .cloned()
+                .unwrap_or_default();
+            let payload = serde_json::to_vec(
+                &serde_json::json!({"spirit_id":self.spirit,"category":category,"removals":removals}),
+            )?;
+            let frame = tl.insert_kernel_event_returning_id(
+                0,
+                maos_iac::adapter::transparency_log::FrameKind::Decision,
+                None,
+                "principal.uninstall.category",
+                &payload,
+            );
+            observations.push(CategoryObservation::new(category.clone(), frame, removals));
+        }
+        let post = tl.all_frame_ids()?;
+        let proof = build_erasure_proof(
+            self.spirit.into(),
+            self.pid,
+            maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+            &self.pre,
+            &post,
+            &self.distillates,
+            &self.subjects,
+            &self.frames,
+            observations,
+            self.completion,
+            &self.seed,
+        )?;
+        match write_proof_bundle(&proof, &maos_audit::default_erasure_proofs_dir()) {
+            Ok(path) => Ok(path),
+            Err(error) => {
+                if let Some(path) = error.published_path() {
+                    std::fs::remove_file(path).map_err(|cleanup|format!("failed proof publication at {}: {error}; candidate cleanup failed: {cleanup}",path.display()))?;
+                }
+                Err(error.into())
+            }
+        }
+    }
+    fn status(&mut self, name: &str, status: maos_audit::erasure::proof::CategoryStatus) {
+        if let Some(category) = self
+            .categories
+            .iter_mut()
+            .find(|category| category.name == name)
+        {
+            category.status = status;
+        }
+    }
+    fn add_frames<I, S>(
+        &mut self,
+        values: I,
+        lineage: bool,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        for value in values {
+            let value = value.as_ref();
+            let mut id = [0; 16];
+            if value.len() == 32 {
+                hex::decode_to_slice(value, &mut id)?;
+            } else {
+                hex::decode_to_slice(value.replace(':', ""), &mut id)?;
+            }
+            let target = if lineage {
+                &mut self.distillates
+            } else {
+                &mut self.frames
+            };
+            target.push(id);
+            self.pre.push(id);
+        }
+        Ok(())
+    }
+    fn normalize(&mut self) {
+        for frames in [&mut self.pre, &mut self.distillates, &mut self.frames] {
+            frames.sort_unstable();
+            frames.dedup();
+        }
+    }
 }
 
 #[cfg(feature = "network")]
-/// Story 9.2 — real uninstall cascade + proof-of-erasure emission.
-///
-/// Resolves the spirit name to its pid(s), forgets every principal
-/// namespace associated with those pids, revokes all capability tokens,
-/// builds a signed Merkle proof, and persists the bundle to the
-/// `MAOS_ERASURE_PROOFS_DIR` / XDG default.
 async fn run_uninstall_cascade_inner(
     spirit_id: &str,
     memory: &maos_kernel_core::memory::MemoryManagerAdapter,
@@ -10674,69 +10777,51 @@ async fn run_uninstall_cascade_inner(
     redistillation: &mut Vec<serde_json::Value>,
 ) -> Result<UninstallCascadeTerminal, Box<dyn std::error::Error>> {
     use maos_audit::erasure::proof::{
-        build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
+        CategoryStatus as Status, CompletionObservation, ErasureCategory,
+        RemovalEvidence as Evidence, REQUIRED_CATEGORIES,
     };
+    use maos_domain::memory::ForgetOutcome;
     use maos_domain::ports::MemoryManagerPort as _;
+    let gap = |reason: String| Status::CoverageGap { reason };
+    let removed = |count: u64| {
+        if count == 0 {
+            Status::VerifiedEmpty
+        } else {
+            Status::Removed { count }
+        }
+    };
     let UninstallContext {
         pump,
         door_schedules,
     } = context;
-
-    // Capture pre-erasure tree leaves.
-    let pre_frame_ids = transparency_log
-        .all_frame_ids()
-        .map_err(|e| format!("failed to read pre-erasure frame ids: {e}"))?;
-
-    // Resolve spirit name → pid(s).  Latest boot only matches the CLI default.
-    // Story 16-2 / D-16-2-F — no Transparency Log AT ALL is `not_found`
-    // (provably nothing to erase), distinct from a resolution failure on a
-    // TL that exists (an unknown Spirit name keeps the failed outcome the
-    // cascade gives it today — never a new `not_found`, which on a legacy TL
-    // holding unidentified hello-spirit rows would sign "nothing to erase"
-    // over data that exists).
-    // Verify Shared before any destructive operation. A second SQLite open can
-    // fail even while the process's long-lived store connection remains usable
-    // (for example after a permission change); failing here preserves the
-    // invariant that every post-erasure exit has a signed proof.
-    let shared_principal_rows = maos_audit::shared_tier_principal_row_count(memory_db_path)
-        .map_err(|e| format!("failed to verify shared-tier principal emptiness: {e}"))?;
-    let memory_root = maos_audit::default_memory_root();
-    let private_principal_rows = maos_audit::private_tier_principal_row_count(&memory_root)
-        .map_err(|e| format!("failed to verify private-tier principal emptiness: {e}"))?;
-
     let installed = maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
         .into_iter()
         .find(|(name, _)| name == spirit_id);
-    let incarnations = if !audit_db_path.exists()
-        || (pre_frame_ids.is_empty() && shared_principal_rows == 0 && private_principal_rows == 0)
-    {
-        // A new/empty TL is `not_found` only if both memory tiers are also
-        // empty. Residue in either tier must reach the signed proof path.
-        Vec::new()
-    } else {
-        match maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false) {
-            Ok(v) => v,
-            Err(_) if installed.is_some() => Vec::new(),
-            Err(error) if shared_principal_rows > 0 || private_principal_rows > 0 => {
-                eprintln!(
-                    "maos: uninstall — spirit '{spirit_id}' resolved to no incarnation \
-                     ({error}); attesting shared/private-tier residue only"
-                );
-                Vec::new()
-            }
-            Err(error) => {
-                return Err(format!("failed to resolve spirit '{spirit_id}': {error}").into());
-            }
-        }
-    };
-    // New categories use every boot; existing principal/token discovery
-    // retains latest-incarnation semantics (D-20-11-02 B).
-    let all_incarnations = if incarnations.is_empty() {
-        Vec::new()
-    } else {
-        maos_audit::resolve_spirit_name(audit_db_path, spirit_id, true)?
-    };
-    let lineage = transparency_log.distillates_written_by(&all_incarnations)?;
+    // Unknown is a successful empty query. I/O/schema/decode failures are never
+    // converted to emptiness, even for a refused-before-admission installation.
+    let incarnations = maos_audit::resolve_spirit_name_optional(audit_db_path, spirit_id, false)?;
+    let all_incarnations =
+        maos_audit::resolve_spirit_name_optional(audit_db_path, spirit_id, true)?;
+    let (lineage, unknown_lineage) = transparency_log.distillates_written_by_identity(spirit_id)?;
+    let mut subjects = memory.principal_ids_for_spirit(spirit_id)?;
+    subjects.extend(maos_audit::uninstall_principal_scope(
+        audit_db_path,
+        spirit_id,
+    )?);
+    subjects.sort();
+    subjects.dedup();
+    let legacy = maos_audit::legacy_numeric_principal_owners(memory_db_path)?;
+    let memory_root = maos_audit::default_memory_root();
+    let shared = maos_audit::shared_tier_principal_row_count(memory_db_path)?;
+    let private_before = maos_audit::private_tier_principal_row_count_for_spirit(
+        &memory_root,
+        spirit_id,
+        &subjects,
+    )?;
+    let retained = RetainedUninstallStore::ALL
+        .into_iter()
+        .map(|store| store.observe(spirit_id, &all_incarnations))
+        .collect::<Result<Vec<_>, _>>()?;
     let schedule_ids = match door_schedules {
         Some(ids) => ids.to_vec(),
         None => match &installed {
@@ -10755,483 +10840,378 @@ async fn run_uninstall_cascade_inner(
             None => Vec::new(),
         },
     };
-    let retained_categories = RetainedUninstallStore::ALL
-        .into_iter()
-        .map(|store| store.observe(spirit_id, &all_incarnations))
-        .collect::<Result<Vec<_>, _>>()?;
-    // An EMPTY incarnation set is decided BELOW, together with the shared
-    // residue check — shared-only pre-partition residue must reach its
-    // failed partial proof, not disappear behind `not_found`.
-
-    let mut total_deleted_entries: u64 = 0;
-    let mut total_deleted_index_rows: u64 = 0;
-    let mut total_revoked_tokens: usize = 0;
-    let mut all_principal_ids: Vec<String> = Vec::new();
-    let mut erased_distillate_frame_ids: Vec<[u8; 16]> = Vec::new();
-    let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
-    let mut held_principal_ids: Vec<String> = Vec::new();
-
-    let mut principal_ids = memory.principal_ids_for_spirit(spirit_id)?;
-    for (_, pid) in &incarnations {
-        principal_ids.extend(transparency_log.principal_ids_for_spirit_pid(*pid)?);
-    }
-    principal_ids.sort();
-    principal_ids.dedup();
-    // Count before any erasure; unreadable held owners become signed coverage gaps.
-    let private_counts: std::collections::HashMap<_, _> = principal_ids
-        .iter()
-        .map(|id| {
-            let count = memory.export_redactable(id, true).ok().map(|rows| {
-                rows.iter()
-                    .filter(|row| matches!(row.payload, maos_domain::memory::ExportPayload::Raw(_)))
-                    .count() as u64
-            });
-            (id.clone(), count)
-        })
-        .collect();
-    for principal_id in &principal_ids {
-        let forgotten =
-            tokio::task::block_in_place(|| memory.forget_with_reason(principal_id, None));
-        if let Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) = &forgotten {
-            let report =
-                maos_bin::hook_pump::HookPump::finish_forget(transparency_log, outcome, pump).await;
-            if let Some(rows) = report["redistill_outcomes"].as_array() {
-                redistillation.extend(rows.iter().cloned());
-            }
-        }
-        match forgotten {
-            Ok(maos_domain::memory::ForgetOutcome::Erased {
-                receipt,
-                redacted_distillate_frame_ids,
-                redacted_principal_frame_ids,
-                redistill,
-            }) => {
-                drop(redistill); // Already dispatched above, before proof construction.
-                total_deleted_entries += receipt.deleted_entries;
-                total_deleted_index_rows += receipt.deleted_index_rows;
-                all_principal_ids.push(principal_id.clone());
-                // Collect scrubbed distillate and principal frames for the proof.
-                for (frames, target) in [
-                    (
-                        redacted_distillate_frame_ids,
-                        &mut erased_distillate_frame_ids,
-                    ),
-                    (
-                        redacted_principal_frame_ids,
-                        &mut erased_principal_frame_ids,
-                    ),
-                ] {
-                    for hex_id in frames {
-                        if let Ok(bytes) = hex::decode(&hex_id) {
-                            if bytes.len() == 16 {
-                                let mut arr = [0u8; 16];
-                                arr.copy_from_slice(&bytes);
-                                target.push(arr);
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(maos_domain::memory::ForgetOutcome::Suspended { hold }) => {
-                eprintln!(
-                    "maos: uninstall blocked by legal hold for principal {}: {:?}",
-                    principal_id, hold
-                );
-                held_principal_ids.push(principal_id.clone());
-            }
-            Err(e) => {
-                return Err(format!("forget failed for principal {principal_id}: {e}").into());
-            }
-        }
-    }
-    total_revoked_tokens += incarnations
-        .iter()
-        .map(|(_, pid)| capability.revoke_all_for_pid(*pid))
-        .sum::<usize>();
-    let mut held_lineage = Vec::new();
-    for frame in &lineage {
-        let removed = tokio::task::block_in_place(|| {
-            transparency_log.scrub_uninstalled_distillate(spirit_id, frame.frame_id)
-        })?;
-        if removed {
-            erased_distillate_frame_ids.push(frame.frame_id);
-        } else {
-            held_lineage.push(hex::encode(frame.frame_id));
-        }
-    }
-    erased_distillate_frame_ids.sort();
-    erased_distillate_frame_ids.dedup();
-
-    held_principal_ids.sort();
-    held_principal_ids.dedup();
-    let held_private_rows = held_principal_ids.iter().try_fold(0_u64, |count, id| {
-        private_counts[id].map(|rows| count + rows)
-    });
-    let mut held_attributable: u64 = held_principal_ids
-        .iter()
-        .filter_map(|id| private_counts[id])
-        .sum();
-    // Attribute unreadable residue by its namespace, never by the mere presence
-    // of an unreadable held principal. Other directories remain uninstall failures.
-    if held_private_rows.is_none() {
-        for owner in std::fs::read_dir(&memory_root)? {
-            let owner = owner?;
-            if !owner.file_type()?.is_dir() {
-                continue;
-            }
-            if owner.file_name().to_string_lossy().starts_with("h-")
-                && maos_audit::private_directory_identity(&owner.path())?.is_none()
-            {
-                continue;
-            }
-            for namespace in std::fs::read_dir(owner.path())? {
-                let namespace = namespace?;
-                if !namespace.file_type()?.is_dir() {
-                    continue;
-                }
-                let name = namespace.file_name().to_string_lossy().into_owned();
-                let encoded = if name.starts_with("h-") {
-                    let Some(identity) = maos_audit::private_directory_identity(&namespace.path())?
-                    else {
-                        continue;
-                    };
-                    identity
-                } else {
-                    name
-                };
-                let principal = hex::decode(encoded).ok().and_then(|bytes| {
-                    serde_json::from_slice::<maos_domain::memory::MemoryNamespace>(&bytes).ok()
-                });
-                if !matches!(principal, Some(maos_domain::memory::MemoryNamespace::Principal { principal_id, .. }) if held_principal_ids.contains(&principal_id) && private_counts[&principal_id].is_none())
-                {
-                    continue;
-                }
-                for value in std::fs::read_dir(namespace.path())? {
-                    let value = value?;
-                    if value.file_type()?.is_file()
-                        && [".json", ".md", ".bin", ".txt"]
-                            .iter()
-                            .any(|suffix| value.file_name().to_string_lossy().ends_with(suffix))
-                    {
-                        held_attributable += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    if all_principal_ids.is_empty()
-        && shared_principal_rows == 0
-        && Some(private_principal_rows) == held_private_rows
+    if subjects.is_empty()
+        && shared == 0
+        && private_before == 0
         && lineage.is_empty()
+        && unknown_lineage.is_empty()
+        && legacy.is_empty()
         && installed.is_none()
         && schedule_ids.is_empty()
-        && total_revoked_tokens == 0
-        && retained_categories
+        && retained
             .iter()
-            .all(|category| matches!(category.status, CategoryStatus::VerifiedEmpty))
+            .all(|category| matches!(category.status, Status::VerifiedEmpty))
     {
-        if held_principal_ids.is_empty() {
-            return Ok(UninstallCascadeTerminal::NotFound {
-                spirit_id: spirit_id.to_string(),
-            });
+        // D-16-2-F keeps an unknown name on a populated log a failed lookup,
+        // not an identity inferred from unrelated rows. Installed/residue
+        // cases above still reach their real queried inventory and proof.
+        if all_incarnations.is_empty() && transparency_log.has_frames()? {
+            return Err(
+                format!("unknown Spirit `{spirit_id}` in populated Transparency Log").into(),
+            );
         }
-        // Held, and this run destroyed no principal data — so there is nothing
-        // to attest and no proof is written. "No proof" keeps meaning "nothing
-        // happened", which is exactly how an operator reads it.
-        return Ok(UninstallCascadeTerminal::Held {
-            spirit_id: spirit_id.to_string(),
-            held_principal_ids,
-            erased_principal_ids: Vec::new(),
-            proof_path: None,
-            deleted_entries: 0,
-            revoked_tokens: total_revoked_tokens as u64,
+        return Ok(UninstallCascadeTerminal::NotFound {
+            spirit_id: spirit_id.into(),
         });
     }
-    // Past this point the cascade either destroyed principal data or found
-    // pre-partition Shared residue that requires a signed CoverageGap. Every
-    // exit below must therefore produce a signed artifact describing reality.
-
-    // Build and sign the proof bundle.
-    let uninstalled_at_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
-
-    // P6: the proof MUST be signed with the operator's audit key (Story 9.1).
-    // A missing/unreadable key is a hard failure — silently falling back to an
-    // ephemeral, unpersisted key would produce a proof that is permanently
-    // unverifiable.
-    let signing_seed: [u8; 32] =
-        maos_domain::audit_key::load_audit_key_seed(&None).map_err(|e| {
-            format!(
-                "no operator audit key configured (set MAOS_AUDIT_KEY_SEED / provision via \
-                 Story 9.1); cannot sign proof-of-erasure: {e}"
-            )
-        })?;
-    let remaining_private_principal_rows =
-        maos_audit::private_tier_principal_row_count(&memory_root)
-            .map_err(|e| format!("failed to verify post-erasure private tier: {e}"))?;
-    let unheld_orphans = remaining_private_principal_rows.saturating_sub(held_attributable);
-    let (private_status, private_failure) = if unheld_orphans > 0 {
-        let reason = format!(
-            "private tier still holds {remaining_private_principal_rows} principal value(s), \
-             {held_private_rows:?} under legal hold; {unheld_orphans} other value(s) are not indexed for this uninstall"
-        );
-        (
-            CategoryStatus::CoverageGap {
-                reason: reason.clone(),
-            },
-            Some(reason),
-        )
-    } else if held_private_rows.is_none() {
-        (CategoryStatus::CoverageGap { reason: "private principal values retained-under-hold/unreadable; held coverage could not be counted".into() }, None)
-    } else if remaining_private_principal_rows == 0 {
-        (CategoryStatus::VerifiedEmpty, None)
-    } else {
-        (
-            CategoryStatus::CoverageGap {
-                reason: "private principal values retained under durable legal hold".into(),
-            },
-            None,
-        )
+    let seed = maos_domain::audit_key::load_audit_key_seed(&None)
+        .map_err(|error| format!("operator audit key required before erasure: {error}"))?;
+    let mut inventory = UninstallProofInventory {
+        spirit: spirit_id,
+        pid: incarnations.last().map_or(0, |(_, pid)| *pid),
+        pre: transparency_log.all_frame_ids()?,
+        subjects: Vec::new(),
+        distillates: Vec::new(),
+        frames: Vec::new(),
+        completion: None,
+        categories: REQUIRED_CATEGORIES
+            .into_iter()
+            .map(|name| ErasureCategory {
+                name: name.into(),
+                status: gap("erasure finalization pending; no complete-erasure claim".into()),
+            })
+            .collect(),
+        removals: std::collections::BTreeMap::new(),
+        seed,
     };
-
-    // The Shared partition stops new principal rows from entering; this
-    // preflight count distinguishes that future guarantee from pre-existing
-    // residue, which is unreachable but not erased.
-    let (shared_status, shared_failure) = if shared_principal_rows == 0 {
-        (CategoryStatus::VerifiedEmpty, None)
-    } else {
-        let reason = format!(
-            "shared tier holds {shared_principal_rows} pre-partition principal row(s); the \
-             Story 13.5h partition makes them unreachable but there is no delete path, so \
-             they are NOT erased"
-        );
-        (
-            CategoryStatus::CoverageGap {
-                reason: reason.clone(),
-            },
-            Some(reason),
-        )
-    };
-
-    let mut categories = vec![
-        ErasureCategory {
-            name: "memory_namespace".into(),
-            status: CategoryStatus::Removed {
-                count: total_deleted_entries,
-            },
-        },
-        ErasureCategory {
-            name: "principal_index".into(),
-            status: CategoryStatus::Removed {
-                count: total_deleted_index_rows,
-            },
-        },
-        ErasureCategory {
-            name: "capability_tokens".into(),
-            status: CategoryStatus::Removed {
-                count: total_revoked_tokens as u64,
-            },
-        },
-        ErasureCategory {
-            name: "shared".into(),
-            status: shared_status,
-        },
-        ErasureCategory {
-            name: "private".into(),
-            status: private_status,
-        },
-        ErasureCategory {
-            name: "principal_frames".into(),
-            status: CategoryStatus::Removed {
-                count: erased_principal_frame_ids.len() as u64,
-            },
-        },
-        ErasureCategory {
-            name: "intent_lineage".into(),
-            status: if !held_lineage.is_empty() {
-                CategoryStatus::CoverageGap { reason: format!("{} held distillate(s): {}; IAC-frame intent_lineage audit arrays retained", held_lineage.len(), held_lineage.join(", ")) }
-            } else if lineage.is_empty() {
-                CategoryStatus::VerifiedEmpty
-            } else {
-                CategoryStatus::Removed { count: lineage.len() as u64 }
-            },
-        },
-        ErasureCategory {
-            name: "pending_halts".into(),
-            status: CategoryStatus::CoverageGap {
-                reason: "AC3 pending final kernel landing (KS + O4 late-halt fence); no halt count or receipt-erasure claim in landing 1; IAC-frame intent_lineage audit arrays retained (NFR-Aud-14)".into(),
-            },
-        },
-        ErasureCategory {
-            name: "scheduled_invocations".into(),
-            status: CategoryStatus::CoverageGap {
-                reason: format!("{} schedule id(s) observed: {}; {}; watchdog buckets/stamps retained until root exit pending KS; IAC-frame intent_lineage audit arrays retained",
-                    schedule_ids.len(), schedule_ids.join(", "),
-                    if door_schedules.is_some() { "SCB unloaded; firing stopped" }
-                    else if installed.is_some() { "installed manifest queried" }
-                    else { "compiled-in Spirit may be re-admitted by the binary at next boot" }),
-            },
-        },
-    ];
-    // 13.5b review: a mixed run erased some principals and was suspended on
-    // others. The held ones are an explicit coverage gap inside the same signed
-    // bundle, so the artifact can never be read as a complete erasure.
-    if !held_principal_ids.is_empty() {
-        categories.push(ErasureCategory {
-            name: "legal_hold".into(),
-            status: CategoryStatus::CoverageGap {
-                reason: format!(
-                    "suspended by durable legal hold, not erased: {}",
-                    held_principal_ids.join(", ")
-                ),
-            },
-        });
+    // A durable partial receipt exists BEFORE the first irreversible scrub. If
+    // later proof publication is unavailable this path remains available, not
+    // deleted or silently replaced by a bare Failed error.
+    let mut proof_path = inventory.persist(transparency_log)?;
+    const REGION_KEY_GAP: &str =
+        "region signing key not decommissioned — derivable from the retained base seed";
+    enum Failure {
+        Hold(String),
+        PendingCompletion(String),
+        RegionKey,
+        Fatal(String),
     }
-
-    // AC9 / D5.3: no region signing-key revocation mechanism is wired. The
-    // retained HOME seed can regenerate that key, so record the gap BEFORE
-    // signing the proof. A held run is not a regional teardown attempt.
-    let regional_failure =
-        maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
-            .home_region
-            .filter(|_| held_principal_ids.is_empty())
-            .map(|_| {
-                let reason =
-                    "region signing key not decommissioned — derivable from the retained base seed";
-                categories.push(ErasureCategory {
-                    name: "region_signing_key".into(),
-                    status: CategoryStatus::CoverageGap {
-                        reason: reason.into(),
-                    },
-                });
-                reason.to_string()
-            });
-    categories.extend(retained_categories);
-    let mut package_removal = None;
-    let package_status = if installed.is_none() {
-        CategoryStatus::VerifiedEmpty
-    } else if !held_principal_ids.is_empty()
-        || !held_lineage.is_empty()
-        || shared_failure.is_some()
-        || private_failure.is_some()
-        || regional_failure.is_some()
-    {
-        CategoryStatus::CoverageGap {
-            reason: "1 installed package retained on Held/Failed terminal".into(),
-        }
-    } else {
-        package_removal =
-            maos_registry::storage::LocalFsRegistryStorage::uninstall_package(spirit_id)?;
-        CategoryStatus::Removed { count: 1 }
-    };
-    if door_schedules.is_none()
-        && installed.is_some()
-        && matches!(package_status, CategoryStatus::Removed { .. })
-    {
-        if let Some(category) = categories
-            .iter_mut()
-            .find(|category| category.name == "scheduled_invocations")
-        {
-            category.status = if schedule_ids.is_empty() {
-                CategoryStatus::VerifiedEmpty
-            } else {
-                CategoryStatus::Removed {
-                    count: schedule_ids.len() as u64,
+    impl std::borrow::Borrow<str> for Failure {
+        fn borrow(&self) -> &str {
+            match self {
+                Self::Hold(reason) | Self::PendingCompletion(reason) | Self::Fatal(reason) => {
+                    reason
                 }
-            };
+                Self::RegionKey => REGION_KEY_GAP,
+            }
         }
     }
-    categories.push(ErasureCategory {
-        name: "installed_package".into(),
-        status: package_status,
-    });
-    // Journal one distinct row per observed status before capturing the post-tree.
-    let category_frame_ids = categories
-        .iter()
-        .map(|category| {
-            let payload = serde_json::to_vec(
-                &serde_json::json!({"spirit_id": spirit_id, "category": category}),
-            )?;
-            Ok(transparency_log.insert_kernel_event_returning_id(
-                0,
-                maos_iac::adapter::transparency_log::FrameKind::Decision,
-                None,
-                "principal.uninstall.category",
-                &payload,
-            ))
-        })
-        .collect::<Result<Vec<_>, serde_json::Error>>()?;
-    let post_frame_ids = transparency_log.all_frame_ids()?;
-
-    // P23: stamp the proof with the LATEST incarnation's pid (the current
-    // boot).  `resolve_spirit_name(all_boots=false)` returns only the latest
-    // boot, so this is the single current incarnation.
-    let stamp_pid = incarnations.last().map(|(_, pid)| *pid).unwrap_or(0);
-    let proof = build_erasure_proof(
-        spirit_id.to_string(),
-        stamp_pid,
-        uninstalled_at_ns,
-        &pre_frame_ids,
-        &post_frame_ids,
-        &erased_distillate_frame_ids,
-        &all_principal_ids,
-        &erased_principal_frame_ids,
-        &category_frame_ids,
-        categories,
-        &signing_seed,
-    )
-    .map_err(|e| format!("failed to build erasure proof: {e}"))?;
-
-    let proof_dir = maos_audit::default_erasure_proofs_dir();
-    let proof_path = write_proof_bundle(&proof, &proof_dir)
-        .map_err(|e| format!("failed to write erasure proof: {e}"))?;
-    if let Err(error) = package_removal.map_or(Ok(()), |removal| removal.commit()) {
-        std::fs::remove_file(&proof_path).map_err(|cleanup| {
-            format!("package deletion failed: {error}; discard proof failed: {cleanup}")
-        })?;
-        return Err(format!("package deletion failed: {error}").into());
+    let mut failures = Vec::new();
+    let mut held_principals = Vec::new();
+    let mut held_frames = Vec::new();
+    let mut malformed = Vec::new();
+    let mut entries = 0_u64;
+    let mut index_rows = 0_u64;
+    let mut tokens = 0_u64;
+    // Stage errors precede erasure; all later failure paths explicitly recover.
+    let mut package =
+        match maos_registry::storage::LocalFsRegistryStorage::uninstall_package(spirit_id) {
+            Ok(package) => package,
+            Err(error) => {
+                return Ok(UninstallCascadeTerminal::Failed {
+                    spirit_id: spirit_id.into(),
+                    error: format!("package stage failed: {error}"),
+                    proof_path: Some(proof_path.display().to_string()),
+                })
+            }
+        };
+    let generation = package
+        .as_ref()
+        .and_then(|package| package.generation())
+        .map(str::to_owned);
+    let work=async {
+    transparency_log.insert_kernel_event_returning_id(0,maos_iac::adapter::transparency_log::FrameKind::Decision,None,
+        "principal.uninstall.scope",&serde_json::to_vec(&serde_json::json!({"spirit_id":spirit_id,"principal_ids":subjects}))?);
+    for subject in &subjects {
+        match memory.forget_with_reason(subject,None) {
+            Ok(outcome @ ForgetOutcome::Erased {..})=>{
+                let report=maos_bin::hook_pump::HookPump::finish_forget(transparency_log,&outcome,pump).await;
+                if let Some(rows)=report["redistill_outcomes"].as_array() {redistillation.extend(rows.iter().cloned());}
+                if report.get("redistill_error").is_some() {failures.push(Failure::PendingCompletion(format!("forget completion pending: {}",report["redistill_error"])));}
+                for (name,target) in [("held_frame_ids",&mut held_frames),("malformed_frame_ids",&mut malformed)] {
+                    if let Some(values)=report[name].as_array() {target.extend(values.iter().filter_map(|value|value.as_str().map(str::to_owned)));}
+                }
+                for (name,lineage) in [("late_redacted_distillate_frame_ids",true),("late_redacted_principal_frame_ids",false)] {
+                    if let Some(values)=report[name].as_array() {
+                        let ids=values.iter().map(|value|value.as_str().map(str::to_owned).ok_or("invalid late erasure id")).collect::<Result<Vec<_>,_>>()?;
+                        inventory.add_frames(&ids,lineage)?;
+                    }
+                }
+                if let ForgetOutcome::Erased {receipt,redacted_distillate_frame_ids,redacted_principal_frame_ids,..}=outcome {
+                    entries+=receipt.deleted_entries; index_rows+=receipt.deleted_index_rows;
+                    inventory.subjects.push(subject.clone());
+                    if receipt.deleted_entries>0 {inventory.removals.entry("memory_namespace".into()).or_default().push(Evidence::MemoryNamespaceBatch {receipt_frame_id:hex::encode(receipt.frame_id),deleted_entries:receipt.deleted_entries});}
+                    if receipt.deleted_index_rows>0 {inventory.removals.entry("principal_index".into()).or_default().push(Evidence::PrincipalIndexBatch {receipt_frame_id:hex::encode(receipt.frame_id),deleted_index_rows:receipt.deleted_index_rows});}
+                    held_frames.extend(receipt.held_frame_ids); malformed.extend(receipt.malformed_distillate_frame_ids);
+                    inventory.add_frames(&redacted_distillate_frame_ids,true)?;
+                    inventory.add_frames(&redacted_principal_frame_ids,false)?;
+                }
+            }
+            Ok(ForgetOutcome::Suspended {..})=>held_principals.push(subject.clone()),
+            Err(error)=>failures.push(Failure::Fatal(format!("forget pending/retained for {subject}: {error}"))),
+        }
     }
-    if !held_lineage.is_empty() && held_principal_ids.is_empty() {
+    for (boot,pid) in &incarnations {
+        if *boot!=transparency_log.boot_nonce() || !transparency_log.current_pid_owned_by(spirit_id,*pid)? {continue;}
+        let count=capability.revoke_all_for_pid(*pid) as u64;
+        tokens+=count;
+        if count>0 {inventory.removals.entry("capability_tokens".into()).or_default().push(Evidence::CapabilityBatch {boot_nonce:*boot,spirit_pid:*pid,revoked_tokens:count});}
+    }
+    // One scope covers ALL stable principals and admission-qualified lineage.
+    // Dispatch-created tails are swept before one durable writer transaction
+    // checks the high-water and records the final scope marker.
+    let mut sweep=maos_iac::adapter::transparency_log::ErasureSweep::new(subjects.clone(),Some(spirit_id.into()));
+    let mut dispatched=0;
+    sweep.include_sources(inventory.distillates.iter().chain(&inventory.frames).map(hex::encode));
+    for _ in 0..8 {
+        if let Err(error)=transparency_log.sweep_erasure(&mut sweep) {failures.push(Failure::Fatal(format!("frame sweep pending: {error}")));break;}
+        for request in &sweep.requests[dispatched..] {
+            let outcome=maos_domain::memory::RedistillOutcome::Pending {reason:maos_domain::memory::RedistillPendingReason::Refused("late-frame".into())};
+            transparency_log.insert_redistill_outcome(request,&outcome)?;
+            redistillation.push(serde_json::json!({"request":request,"outcome":outcome}));
+        }
+        dispatched=sweep.requests.len();
+        match transparency_log.certify_erasure(&mut sweep) {
+            Ok(true)=>break,
+            Ok(false) if sweep.blocked()=>break,
+            Ok(false)=>{},
+            Err(error)=>{failures.push(Failure::Fatal(format!("frame sweep pending: {error}")));break;},
+        }
+    }
+    inventory.add_frames(sweep.distillates.iter().map(|(_,id)|id),true)?;
+    inventory.add_frames(sweep.principal_frames.iter().map(|(_,id)|id),false)?;
+    inventory.normalize();
+    held_frames.extend(sweep.held.into_iter().map(|(_,id)|id));
+    malformed.extend(sweep.malformed.into_iter().map(|(_,id)|id));
+    held_principals.extend(sweep.held_principals);
+    // A real removal supersedes an earlier hold observation. Malformed
+    // observations stay named until the final marker certifies the sweep.
+    for (retained, certified) in [(&mut held_frames,true),(&mut malformed,sweep.completion.is_some())] {
+        if certified {
+            retained.retain(|id| {
+                let mut frame=[0;16];
+                hex::decode_to_slice(id,&mut frame).is_err()
+                    || (inventory.distillates.binary_search(&frame).is_err() && inventory.frames.binary_search(&frame).is_err())
+            });
+        }
+    }
+    let mut unattributed=sweep.unattributed; unattributed.sort();unattributed.dedup();
+    inventory.completion=sweep.completion.map(|marker|CompletionObservation {frame_id:marker.frame_id,through_rowid:marker.through_rowid});
+    if inventory.completion.is_some() {
+        // Final certification supersedes an earlier frame-completion error.
+        // Real regeneration-only Pending outcomes remain in the public report.
+        failures.retain(|failure| !matches!(failure, Failure::PendingCompletion(_)));
+    } else {
+        let reason="frame completion pending/retained; no durable transactional marker".into();
+        failures.push(if held_principals.is_empty() && held_frames.is_empty() {
+            Failure::Fatal(reason)
+        } else {Failure::Hold(reason)});
+    }
+    for subject in &subjects {if transparency_log.is_under_legal_hold(subject)? {held_principals.push(subject.clone());}}
+    held_principals.sort();held_principals.dedup();held_frames.sort();held_frames.dedup();malformed.sort();malformed.dedup();
+    let (private_after,held_attributable)=maos_audit::private_tier_principal_row_counts_for_spirit(
+        &memory_root,spirit_id,&subjects,&held_principals)?;
+    let held_private_rows=held_principals.iter().try_fold(0_u64,|count,subject| {
+        let rows=memory.export_redactable(subject,true).ok()?;
+        count.checked_add(rows.iter().filter(|row|matches!(row.payload,maos_domain::memory::ExportPayload::Raw(_))).count() as u64)
+    });
+    // Unreadability of a held payload cannot cover another namespace. The
+    // metadata-only single walk attributes protected rows independently.
+    let unheld_private=private_after.saturating_sub(held_attributable);
+    let private_reason=if unheld_private>0 {
+        format!("private tier still holds {private_after} principal value(s), {held_private_rows:?} under legal hold; {unheld_private} other value(s) are not indexed for this uninstall")
+    } else if held_private_rows.is_none() {
+        "private principal values retained-under-hold/unreadable; held coverage could not be counted".into()
+    } else if private_after>0 {
+        "private principal values retained under durable legal hold".into()
+    } else {"no private principal values observed".into()};
+    if shared>0 {failures.push(Failure::Fatal(format!("{shared} pre-partition Shared principal rows retained, not erased")));}
+    if unheld_private>0 {failures.push(Failure::Fatal(private_reason.clone()));}
+    if !legacy.is_empty() {failures.push(Failure::Fatal(format!("legacy_numeric_owner: ambiguous owners retained: {}",legacy.join(", "))));}
+    if !held_frames.is_empty() {failures.push(Failure::Hold(format!("held frame derivations retained: {}",held_frames.join(", "))));}
+    if !malformed.is_empty() {failures.push(Failure::Fatal(format!("malformed lineage observations pending final certification: {}; real removals separately evidenced",malformed.join(", "))));}
+    if !unattributed.is_empty() {failures.push(Failure::Fatal(format!("unattributed_lineage: {}",unattributed.join(", "))));}
+    let regional=maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk().home_region.is_some();
+    if regional {failures.push(Failure::RegionKey);}
+    inventory.status("memory_namespace",removed(entries));
+    inventory.status("principal_index",if legacy.is_empty() {removed(index_rows)} else {gap(format!("legacy_numeric_owner: {} ambiguous principal(s) retained; stable-owner deletions separately evidenced",legacy.len()))});
+    inventory.status("capability_tokens",removed(tokens));
+    inventory.status("shared",if shared==0 {Status::VerifiedEmpty} else {gap(format!("{shared} pre-partition principal rows retained, unreachable but not erased"))});
+    inventory.status("private",gap(format!("kernel_private_index_hold_lease pending final kernel landing; {private_after} private principal value(s) remain; {private_reason}; no cross-store lease claim")));
+    let frame_gap=inventory.completion.is_none();
+    let frame_reason=format!("frame sweep pending/retained: held={held_frames:?}; uncertified_malformed_observations={malformed:?}; unattributed={unattributed:?}; evidenced_removed_distillates={}; evidenced_removed_principal_frames={}; no completion claim",inventory.distillates.len(),inventory.frames.len());
+    inventory.status("principal_frames",if frame_gap {gap(frame_reason.clone())} else {removed(inventory.frames.len() as u64)});
+    inventory.status("intent_lineage",if frame_gap {gap(frame_reason)} else {removed(inventory.distillates.len() as u64)});
+    for (name,ids) in [("principal_frames",&inventory.frames),("intent_lineage",&inventory.distillates)] {
+        inventory.removals.insert(name.into(),ids.iter().map(|id|Evidence::Frame {frame_id:hex::encode(id)}).collect());
+    }
+    inventory.status("legal_hold",if held_principals.is_empty() && held_frames.is_empty() {Status::VerifiedEmpty} else {gap(format!("durable holds retained: principals={held_principals:?}; frames={held_frames:?}"))});
+    inventory.status("pending_halts",gap("AC3/KS/O4 pending final kernel landing; no halt-count claim; IAC-frame intent_lineage audit arrays retained (NFR-Aud-14)".into()));
+    inventory.status("scheduled_invocations",gap(format!("{} schedule(s): {}; {}; watchdog buckets/stamps pending KS; IAC-frame intent_lineage audit arrays retained",schedule_ids.len(),schedule_ids.join(", "),if door_schedules.is_some() {"SCB unloaded; firing stopped"} else {"installed manifest queried; compiled-in Spirit may be re-admitted at next boot"})));
+    inventory.status("region_signing_key",if regional {gap(REGION_KEY_GAP.into())} else {Status::VerifiedEmpty});
+    for category in retained {inventory.status(&category.name,category.status);}
+    if !held_principals.is_empty() {failures.push(Failure::Hold("principal erasure suspended by durable legal hold".into()));}
+    Ok::<(),Box<dyn std::error::Error>>(())
+    }.await;
+    if let Err(error) = work {
+        failures.push(Failure::Fatal(format!(
+            "cascade observation failed after partial erasure: {error}"
+        )));
+        inventory.completion = None;
+        inventory.status(
+            "principal_frames",
+            gap("observation incomplete; matching-frame completion not claimed".into()),
+        );
+        inventory.status(
+            "intent_lineage",
+            gap("observation incomplete; lineage completion not claimed".into()),
+        );
+    }
+    let mut removed_package = false;
+    if failures.is_empty() {
+        if let Some(pending) = &mut package {
+            match pending.delete_generation() {
+                Ok(()) => removed_package = true,
+                Err(error) => failures.push(Failure::Fatal(format!(
+                    "package final delete failed: {error}"
+                ))),
+            }
+        }
+    }
+    if removed_package {
+        inventory.status("installed_package", removed(1));
+        if let Some(generation) = generation {
+            inventory.removals.insert(
+                "installed_package".into(),
+                vec![Evidence::Package {
+                    spirit_id: spirit_id.into(),
+                    generation,
+                }],
+            );
+        }
+        if door_schedules.is_none() {
+            inventory.status("scheduled_invocations", removed(schedule_ids.len() as u64));
+            if !schedule_ids.is_empty() {
+                inventory.removals.insert(
+                    "scheduled_invocations".into(),
+                    schedule_ids
+                        .into_iter()
+                        .map(|schedule_id| Evidence::Schedule { schedule_id })
+                        .collect(),
+                );
+            }
+        }
+    } else {
+        inventory.status(
+            "installed_package",
+            if installed.is_some() {
+                gap("installed package retained on Held/Failed terminal".into())
+            } else {
+                Status::VerifiedEmpty
+            },
+        );
+    }
+    // The recoverable complete generation remains armed through the LAST
+    // operation that may turn this terminal into Failed, including offline I10.
+    if failures.is_empty() {
+        if let Err(error) = append_lifecycle_journal(
+            maos_domain::invariants::i10::LifecycleEvent::Uninstall,
+            spirit_id,
+        ) {
+            failures.push(Failure::Fatal(error));
+            inventory.status(
+                "lifecycle_journal",
+                gap(
+                    "uninstall lifecycle finalization failed; earlier journal rows retained".into(),
+                ),
+            );
+        }
+        inventory.status(
+            "lifecycle_journal",
+            gap("append-only Lifecycle Journal retained, including this uninstall attempt".into()),
+        );
+    }
+    if failures.is_empty() {
+        match inventory.persist(transparency_log) {
+            Ok(path) => proof_path = path,
+            Err(error) => failures.push(Failure::Fatal(format!(
+                "proof finalization failed; retained earlier partial receipt: {error}"
+            ))),
+        }
+    }
+    if !failures.is_empty() {
+        if let Some(pending) = &mut package {
+            if let Err(error) = pending.rollback() {
+                failures.push(Failure::Fatal(format!(
+                    "package/index recovery failed: {error}"
+                )));
+            }
+        }
+        inventory.removals.remove("installed_package");
+        inventory.status(
+            "installed_package",
+            if installed.is_some() {
+                gap(format!(
+                    "installed generation retained/recovery required after failure: {}",
+                    failures.join("; ")
+                ))
+            } else {
+                Status::VerifiedEmpty
+            },
+        );
+        if door_schedules.is_none() && installed.is_some() {
+            inventory.removals.remove("scheduled_invocations");
+            inventory.status(
+                "scheduled_invocations",
+                gap(
+                    "installed manifest retained after failure; next-boot schedules not erased"
+                        .into(),
+                ),
+            );
+        }
+        match inventory.persist(transparency_log) {
+            Ok(path) => proof_path = path,
+            Err(error) => failures.push(Failure::Fatal(format!(
+                "partial proof update unavailable; earlier partial receipt retained: {error}"
+            ))),
+        }
+        if !held_principals.is_empty()
+            && failures
+                .iter()
+                .all(|failure| matches!(failure, Failure::Hold(_) | Failure::RegionKey))
+        {
+            return Ok(UninstallCascadeTerminal::Held {
+                spirit_id: spirit_id.into(),
+                held_principal_ids: held_principals,
+                erased_principal_ids: inventory.subjects,
+                proof_path: Some(proof_path.display().to_string()),
+                deleted_entries: entries,
+                revoked_tokens: tokens,
+            });
+        }
         return Ok(UninstallCascadeTerminal::Failed {
             spirit_id: spirit_id.into(),
-            error: format!(
-                "{} held lineage derivation(s) retained; partial erasure proof: {}",
-                held_lineage.len(),
-                proof_path.display()
-            ),
+            error: failures.join("; "),
+            proof_path: Some(proof_path.display().to_string()),
         });
     }
-
-    // Memory residue or an undecommissioned regional key is an incomplete
-    // uninstall. Retain the HOME seed and signed partial proof for recovery;
-    // do not issue a successful two-phase regional receipt.
-    if shared_failure.is_some() || private_failure.is_some() || regional_failure.is_some() {
-        let reason = [shared_failure, private_failure, regional_failure]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join("; ");
-        return Ok(UninstallCascadeTerminal::Failed {
-            spirit_id: spirit_id.to_string(),
-            error: format!("{reason}; partial erasure proof: {}", proof_path.display()),
-        });
+    if let Some(pending) = package {
+        pending.accept();
     }
-
-    if !held_principal_ids.is_empty() {
-        return Ok(UninstallCascadeTerminal::Held {
-            spirit_id: spirit_id.to_string(),
-            held_principal_ids,
-            erased_principal_ids: all_principal_ids,
-            proof_path: Some(proof_path.to_string_lossy().to_string()),
-            deleted_entries: total_deleted_entries,
-            revoked_tokens: total_revoked_tokens as u64,
-        });
-    }
-
     Ok(UninstallCascadeTerminal::Erased {
-        spirit_id: spirit_id.to_string(),
-        proof_path: proof_path.to_string_lossy().to_string(),
-        erased_principals: all_principal_ids.len() as u64,
+        spirit_id: spirit_id.into(),
+        proof_path: proof_path.display().to_string(),
+        erased_principals: inventory.subjects.len() as u64,
     })
 }
 
@@ -17206,3 +17186,7 @@ mod provider_config_review {
         Ok(())
     }
 }
+
+#[cfg(all(test, feature = "network"))]
+#[path = "../tests/support/uninstall_review_20_11.rs"]
+mod uninstall_review_20_11;

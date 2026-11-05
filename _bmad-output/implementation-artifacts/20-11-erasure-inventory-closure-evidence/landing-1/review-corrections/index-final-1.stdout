@@ -1,0 +1,7 @@
+
+running 2 tests
+test hosted_a_existing_full_indexes_are_replaced_by_predicate_indexes ... ok
+test hosted_a_ordinary_append_index_footprint_proxy ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.74s
+

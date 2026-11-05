@@ -24,6 +24,8 @@ path = "junit.xml"
 # an in-process `static Mutex`/`TEST_LOCK` serialises nothing. These binaries'
 # tests share host state (a tracked source file, fixed ports, a global cgroup or
 # store path) and run one at a time. `ci`/`expensive` inherit these overrides.
+# 20-11: the disk-backed 100k/1M erasure vectors also share this group so their
+# independently bounded database/WAL peaks cannot overlap each other.
 [test-groups]
 serial = { max-threads = 1 }
 
@@ -42,6 +44,9 @@ binary_id(xtask::example_spirit_regen_integration)
 | binary_id(maos-bin::host_grants_2b)
 | binary_id(maos-bin::cross_team_consent_13_3)
 | binary_id(maos-registry::fr59_yank_propagation_within_5min_test)
+| (binary_id(maos-bin::shell_host_16_2)
+   & (test(ac5_door_bounded_scan_admits_continuous_writer)
+      | test(ac5_million_row_pending_forget_finishes_and_repeats_without_corruption)))
 """
 test-group = "serial"
 

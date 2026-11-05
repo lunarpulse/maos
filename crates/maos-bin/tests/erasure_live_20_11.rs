@@ -246,7 +246,9 @@ fn exercise(worker: bool) {
         // Standalone `run <manifest>` intentionally does not enumerate installed
         // packages. The plain serving root is the real installed-boot surface.
         let mut serving = h::command(binary, home);
-        serving.env("MAOS_AUDIT_KEY", &key);
+        // Bare `maos` serves through the shell: inherited EOF shuts its door.
+        // Daemon retains Child.stdin until drop, keeping this root alive.
+        serving.env("MAOS_AUDIT_KEY", &key).stdin(Stdio::piped());
         let serving = h::Daemon::spawn(serving);
         h::wait("installed package refusal", &serving, || {
             serving

@@ -1,0 +1,6 @@
+Catalog codes: 67
+Troubleshoot pages: 67
+PASS: gate:troubleshoot-bidi — symmetric difference is empty
+PASS: route-manifest error_codes == error-catalog keys
+PASS: gate:troubleshoot-teach — code + cause + resolution distinct from summary
+PASS: catalog cause/remediation fields complete + distinct

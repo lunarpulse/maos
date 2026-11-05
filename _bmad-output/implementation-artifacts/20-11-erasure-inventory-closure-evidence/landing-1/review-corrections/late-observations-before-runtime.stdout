@@ -1,0 +1,13 @@
+
+running 2 tests
+test uninstall_review_20_11::review_p9_late_only_held_lineage_retains_package_and_signed_gap ... FAILED
+test uninstall_review_20_11::review_p9_late_only_malformed_lineage_retains_package_and_signed_gap ... FAILED
+
+failures:
+
+failures:
+    uninstall_review_20_11::review_p9_late_only_held_lineage_retains_package_and_signed_gap
+    uninstall_review_20_11::review_p9_late_only_malformed_lineage_retains_package_and_signed_gap
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.82s
+

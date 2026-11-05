@@ -1,0 +1,22 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -11003,7 +11003,7 @@
+     let frame_gap=inventory.completion.is_none();
+     let frame_reason=format!("frame sweep pending/retained: held={held_frames:?}; uncertified_malformed_observations={malformed:?}; unattributed={unattributed:?}; evidenced_removed_distillates={}; evidenced_removed_principal_frames={}; no completion claim",inventory.distillates.len(),inventory.frames.len());
+     inventory.status("principal_frames",if frame_gap {gap(frame_reason.clone())} else {removed(inventory.frames.len() as u64)});
+-    inventory.status("intent_lineage",if frame_gap {gap(frame_reason)} else {removed(inventory.distillates.len() as u64)});
++    inventory.status("intent_lineage",Status::VerifiedEmpty);
+     for (name,ids) in [("principal_frames",&inventory.frames),("intent_lineage",&inventory.distillates)] {
+         inventory.removals.insert(name.into(),ids.iter().map(|id|Evidence::Frame {frame_id:hex::encode(id)}).collect());
+     }
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1888,7 +1888,7 @@
+         range: (i64, i64),
+         mut each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
+     ) -> Result<(), AuditError> {
+-        const FORGET_SCAN_PAGE: i64 = 4096;
++        const FORGET_SCAN_PAGE: i64 = i64::MAX;
+         let mut after = range.0;
+         while after < range.1 {
+             let inner = self.inner.lock();

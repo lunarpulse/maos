@@ -1,0 +1,23 @@
+{
+  "command": [
+    "diff",
+    "-u",
+    "/tmp/dev2011b-review.9OTbuj/partial-redaction-after.rs",
+    "crates/maos-iac/src/adapter/transparency_log.rs"
+  ],
+  "exit_code": 1,
+  "started": "2026-11-05T19:17:24.001388+00:00",
+  "seconds": 0.0013083729427307844,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant.patch",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-plant-diff.stderr",
+  "environment": {
+    "CI": "true",
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

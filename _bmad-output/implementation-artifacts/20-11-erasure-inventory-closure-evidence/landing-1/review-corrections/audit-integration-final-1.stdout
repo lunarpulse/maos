@@ -1,0 +1,56 @@
+
+running 11 tests
+test f2_subject_commitment_depends_on_secret_signer_key ... ok
+test f5_paired_category_omission_is_rejected ... ok
+test f6_empty_tree_exclusion_cannot_be_used_as_pre_inclusion ... ok
+test f12_malformed_leaf_is_rejected_not_silently_dropped ... ok
+test f11_missing_subject_exclusion_is_rejected ... ok
+test f4_removed_count_is_bound_to_real_removal_evidence ... ok
+test f2_retained_bundle_is_owner_only ... ok
+test f9_predictable_temp_symlink_cannot_redirect_the_write ... ok
+test f9_existing_bundle_is_never_overwritten ... ok
+test review_p8_whole_uninstall_inventory_proof_and_finalization_run_off_worker ... ok
+test p3_p4_f4_f5_f6_f11_f12_both_verifiers_enforce_the_same_signed_contract ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.66s
+
+
+running 3 tests
+test zero_entry_forget_is_a_documented_noop ... ok
+test legal_hold_arm_suspends_and_blocks_second_forget ... ok
+test headline_erasure_demo_produces_verifiable_proof ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+
+running 22 tests
+test a_call_shaped_writer_stays_a_violation_at_a_spirit_pid ... ok
+test attributed_and_tokenless_recall_fetch_rows_remain_calls ... ok
+test every_never_call_kind_is_a_non_call ... ok
+test lifecycle_bogus_is_a_violation_the_prefix_is_refused ... ok
+test every_noncall_writer_shape_classifies_from_its_measured_payload ... ok
+test cfg_test_items_are_skipped ... ok
+test cfg_test_braceless_items_do_not_hide_production_writers ... ok
+test lifecycle_load_without_spirit_id_is_a_violation ... ok
+test lifecycle_start_with_foreign_pid_is_a_violation ... ok
+test forget_tombstones_are_typed_redacted_rows_not_fr4_schema_failures ... ok
+test plain_fr4_renders_every_row_with_its_intent ... ok
+test plain_table_gains_the_trailing_intent_column ... ok
+test ndjson_over_a_mixed_set_emits_exactly_the_call_rows ... ok
+test tokenless_inference_call_is_a_violation ... ok
+test tokenless_shell_turn_is_a_violation ... ok
+test tokenless_task_assign_is_a_non_call_and_a_token_bearing_one_still_projects ... ok
+test the_scanner_reds_on_an_unlisted_scratch_site ... ok
+test scanner_inventories_optional_capability_tokens_not_only_literal_none ... ok
+test transactional_erasure_writers_are_inventoried_not_their_definition ... ok
+test shared_recall_fetch_writers_have_call_dispositions ... ok
+test real_forget_tombstones_survive_replay_sealed_and_trajectory_export ... FAILED
+test every_writer_site_demanding_a_disposition_has_one ... ok
+
+failures:
+
+failures:
+    real_forget_tombstones_survive_replay_sealed_and_trajectory_export
+
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+

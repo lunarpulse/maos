@@ -1,0 +1,29 @@
+{
+  "command": [
+    "tokei",
+    "--output",
+    "json",
+    "--types",
+    "Rust",
+    "crates/maos-iac/src",
+    "crates/maos-iac/tests",
+    "crates/maos-registry/src",
+    "crates/maos-audit/src",
+    "crates/maos-bin/src"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T09:51:48.275344+00:00",
+  "seconds": 0.012156843033153564,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-before-transfer.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/accounting-before-transfer.stderr",
+  "environment": {
+    "CI": "true",
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

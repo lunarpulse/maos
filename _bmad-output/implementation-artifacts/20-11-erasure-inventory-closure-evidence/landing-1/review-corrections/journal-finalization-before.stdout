@@ -1,0 +1,11 @@
+
+running 1 test
+test review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof ... FAILED
+
+failures:
+
+failures:
+    review_p6_nonappendable_lifecycle_journal_retains_package_and_partial_proof
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.52s
+

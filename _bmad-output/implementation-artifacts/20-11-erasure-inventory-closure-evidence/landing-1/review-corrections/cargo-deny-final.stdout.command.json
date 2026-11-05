@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cargo",
+    "deny",
+    "--locked",
+    "--format",
+    "json",
+    "check"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T14:55:16.188715+00:00",
+  "seconds": 1.780012549017556,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cargo-deny-final.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cargo-deny-final.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

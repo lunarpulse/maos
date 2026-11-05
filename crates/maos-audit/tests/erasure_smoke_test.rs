@@ -8,8 +8,9 @@
 use std::sync::Arc;
 
 use maos_audit::erasure::proof::{
-    build_erasure_proof, verify_erasure_proof, verify_erasure_proof_against_log, CategoryStatus,
-    ErasureCategory,
+    build_erasure_proof, verify_erasure_proof, verify_erasure_proof_against_log,
+    CategoryObservation, CategoryStatus, CompletionObservation, ErasureCategory, RemovalEvidence,
+    REQUIRED_CATEGORIES,
 };
 use maos_domain::distillation::{DigestPayload, DistillationRequest};
 use maos_domain::invariants::i3::FrameOrigin;
@@ -145,12 +146,17 @@ fn headline_erasure_demo_produces_verifiable_proof() {
 
     // 2. Forget the principal.
     let outcome = memory.forget_with_reason(PRINCIPAL, None).unwrap();
-    let (erased_distillate_frame_ids, erased_principal_frame_ids) = match outcome {
+    let (erased_distillate_frame_ids, erased_principal_frame_ids, forget_receipt) = match outcome {
         maos_domain::memory::ForgetOutcome::Erased {
             redacted_distillate_frame_ids,
             redacted_principal_frame_ids,
+            receipt,
             ..
-        } => (redacted_distillate_frame_ids, redacted_principal_frame_ids),
+        } => (
+            redacted_distillate_frame_ids,
+            redacted_principal_frame_ids,
+            receipt,
+        ),
         other => panic!("expected Erased, got {other:?}"),
     };
 
@@ -167,19 +173,6 @@ fn headline_erasure_demo_produces_verifiable_proof() {
     );
 
     // 4. Build + sign the proof-of-erasure.
-    let category_frame_ids: Vec<_> = ["memory_namespace", "principal_frames"]
-        .into_iter()
-        .map(|name| {
-            tl.insert_kernel_event_returning_id(
-                7,
-                FrameKind::Decision,
-                None,
-                "principal.uninstall.category",
-                format!("{{\"category\":\"{name}\"}}").as_bytes(),
-            )
-        })
-        .collect();
-    let post_frame_ids = tl.all_frame_ids().unwrap();
     let erased_frame_ids: Vec<[u8; 16]> = erased_distillate_frame_ids
         .iter()
         .filter_map(|h| hex::decode(h).ok())
@@ -204,6 +197,68 @@ fn headline_erasure_demo_produces_verifiable_proof() {
             a
         })
         .collect();
+    let mut sweep =
+        maos_kernel_core::iac::transparency_log::ErasureSweep::new(vec![PRINCIPAL.into()], None);
+    tl.sweep_erasure(&mut sweep).expect("final frame sweep");
+    assert!(tl
+        .certify_erasure(&mut sweep)
+        .expect("transactional completion"));
+    let marker = sweep.completion.expect("durable marker");
+    let observations = REQUIRED_CATEGORIES
+        .into_iter()
+        .map(|name| {
+            let removals = match name {
+                "memory_namespace" => vec![RemovalEvidence::MemoryNamespaceBatch {
+                    receipt_frame_id: hex::encode(forget_receipt.frame_id),
+                    deleted_entries: forget_receipt.deleted_entries,
+                }],
+                "principal_index" => vec![RemovalEvidence::PrincipalIndexBatch {
+                    receipt_frame_id: hex::encode(forget_receipt.frame_id),
+                    deleted_index_rows: forget_receipt.deleted_index_rows,
+                }],
+                "intent_lineage" => erased_frame_ids
+                    .iter()
+                    .map(|id| RemovalEvidence::Frame {
+                        frame_id: hex::encode(id),
+                    })
+                    .collect(),
+                "principal_frames" => erased_principal_frame_ids
+                    .iter()
+                    .map(|id| RemovalEvidence::Frame {
+                        frame_id: hex::encode(id),
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            };
+            let count = match name {
+                "memory_namespace" => forget_receipt.deleted_entries,
+                "principal_index" => forget_receipt.deleted_index_rows,
+                "intent_lineage" => erased_frame_ids.len() as u64,
+                "principal_frames" => erased_principal_frame_ids.len() as u64,
+                _ => 0,
+            };
+            let category = ErasureCategory {
+                name: name.into(),
+                status: if count == 0 {
+                    CategoryStatus::Removed { count: 0 }
+                } else {
+                    CategoryStatus::Removed { count }
+                },
+            };
+            let payload =
+                serde_json::to_vec(&serde_json::json!({"category":category,"removals":removals}))
+                    .expect("category metadata");
+            let frame = tl.insert_kernel_event_returning_id(
+                7,
+                FrameKind::Decision,
+                None,
+                "principal.uninstall.category",
+                &payload,
+            );
+            CategoryObservation::new(category, frame, removals)
+        })
+        .collect();
+    let post_frame_ids = tl.all_frame_ids().expect("post-frame inventory");
     let seed = [0x9_2u8; 32];
     let proof = build_erasure_proof(
         "smoke-spirit".into(),
@@ -214,19 +269,11 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         &erased_frame_ids,
         &[PRINCIPAL.to_string()],
         &erased_principal_frame_ids,
-        &category_frame_ids,
-        vec![
-            ErasureCategory {
-                name: "memory_namespace".into(),
-                status: CategoryStatus::Removed { count: 1 },
-            },
-            ErasureCategory {
-                name: "principal_frames".into(),
-                status: CategoryStatus::Removed {
-                    count: erased_principal_frame_ids.len() as u64,
-                },
-            },
-        ],
+        observations,
+        Some(CompletionObservation {
+            frame_id: marker.frame_id,
+            through_rowid: marker.through_rowid,
+        }),
         &seed,
     )
     .unwrap();

@@ -1,0 +1,14 @@
+
+running 3 tests
+test adapter::transparency_log::erasure_races_20_11::review_p1_append_after_the_final_partial_page_is_not_left_unscrubbed ... ok
+test adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer ... FAILED
+test adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation ... FAILED
+
+failures:
+
+failures:
+    adapter::transparency_log::erasure_races_20_11::review_f13_scan_snapshot_does_not_chase_a_sustained_writer
+    adapter::transparency_log::erasure_races_20_11::review_f7_cross_process_replaced_hold_is_not_released_by_a_stale_observation
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 103 filtered out; finished in 0.39s
+

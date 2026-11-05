@@ -2608,10 +2608,12 @@ dependencies = [
  "hkdf 0.12.4",
  "maos-domain",
  "maos-kernel-core",
+ "proc-macro2",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "syn 2.0.117",
  "tempfile",
  "thiserror 2.0.18",
 ]

@@ -1554,7 +1554,7 @@ async fn regenerated_bodies_are_rescanned_and_old_or_non_surviving_results_are_p
                             )
                         };
                         if mode == "tombstone" {
-                            tl.scrub_distillate_body(id, "gdpr-forget").unwrap();
+                            assert!(tl.scrub_distillate_unless_held(id, "gdpr-forget").unwrap());
                         }
                         *result.lock().unwrap() = Some(id);
                         sink(

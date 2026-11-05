@@ -1,0 +1,11 @@
+
+running 1 test
+test review_f1_same_boot_after_exit_preserves_other_stable_owner_and_lineage ... FAILED
+
+failures:
+
+failures:
+    review_f1_same_boot_after_exit_preserves_other_stable_owner_and_lineage
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 3.56s
+

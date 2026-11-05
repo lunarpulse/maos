@@ -162,12 +162,26 @@ In a running daemon, live compiled-in Spirits receive a forget notice even if
 ordinary hook delivery was quarantined. The Researcher clears cached claims
 and its last output, rechecks cached ids against the log, and regenerates only
 from current surviving log payloads through governed recall. The root validates
-and re-scans the result, then sweeps again for frames written by in-flight
-passes before completing. Outstanding requests from an interrupted cascade
-are recovered on retry. Undelivered purges and regeneration errors are typed;
-an already-completed erasure is not reported as failed solely because
-regeneration failed. Offline/unavailable writers are typed pending rather
-than silently skipped; pending does not resume automatically across boots.
+and re-scans the result, then performs a bounded tail sweep. Frame completion is
+the **durable transactional TL marker**, not handler-return time: no matching
+erasure-eligible pre-marker frame body survives. Scope/forget/hold/redaction audit
+metadata, IAC lineage arrays and structured numerical facts are retained and
+named; rows committed after the marker are post-completion data and are not
+claimed erased. A busy, held or unverifiably attributed scope remains explicitly
+pending/retained. An owned malformed kind-11 body can be erased only with verified
+boot/pid/Spirit attribution; the proof names its real id, and only a final marker
+clears its earlier malformed observation. Ambiguous malformed bytes stay retained.
+Retained numerical facts remain citable. A partial cost/governance redaction is
+not a full-body tombstone and does not cause an unrelated forget to erase its
+neutral derivatives.
+An HTTP503
+`handler_still_running` keeps its unchanged deadline and does not cancel the
+in-flight handler; inspect its eventual report or repeat the identical request.
+Do not read a pending result as erased or complete. Regeneration-only pending
+is separate: unavailable writers can remain pending after frame erasure.
+Only journaled requests with no recorded outcome are recovered on a later
+forget/pump pass. A recorded Pending outcome is not automatically retried;
+requests do not automatically resume across boots.
 
 `maosctl forget --principal <id> --reason legal-hold` records a durable hold and
 exits 3 without scrubbing or regeneration. A prior hold also blocks erasure.
@@ -178,6 +192,61 @@ letters/digits are part of ids; trailing prose punctuation is a boundary, but
 an id glued directly to CJK text without spaces may not match. Detection is
 id-based, not semantic: copied content without the id, transformed/escaped ids,
 and later collection from an external source are outside this guarantee.
+
+### Uninstall a Spirit and retain its inventory proof
+
+`maosctl uninstall <id>` uses the live door when that Spirit has an SCB.
+For a refused installed package with no SCB, stop the serving root and use the
+locked offline path. Discovery uses stable owner identity and admission-qualified
+lineage, not recycled pids. Legacy numeric owners are a named coverage gap.
+Held/Failed results retain the complete installed generation and expose the
+available signed partial proof path; explicit recovery errors require operator
+attention. Already-performed erasures are not undone by a package rollback.
+
+A signed provisional gap receipt precedes irreversible changes. Normal finalization
+retains it beside the terminal inventory; a publication failure may leave only that
+earlier partial receipt. Use the returned JSON `proof_path`, not the first directory
+entry or filename order. A provisional receipt never certifies completion.
+Unreadable held values remain retained; their hold cannot cover a separate
+unindexed private namespace, which keeps the uninstall Failed.
+
+Proof verification checks an exact sixteen-category inventory and typed evidence
+totals, not just a signature. A valid partial inventory is **not** proof that all
+substrates were erased: L1 retains named AC3/KS/O4, watchdog and
+`kernel_private_index_hold_lease` gaps. Only the frame marker certifies the
+pre-marker TL scope. Same-UID independent writers have no barrier against
+post-marker re-introduction, and audit scope/lifecycle metadata is retained.
+
+**Final-tail regeneration limitation.** The uninstall tail records real requests
+as `Pending/Refused("late-frame")`, with count and original ids in its durable
+`redistillation` report. It does not dispatch them to another live Spirit.
+The signed frame proof's body-removal count is not a regeneration-complete claim.
+Neither repeating uninstall nor an ordinary forget automatically redrives a
+recorded Pending request. There is no operator retry command in L1.
+An authorized API embedding may explicitly retry outside uninstall: for a known
+subject, obtain a fresh real `ForgetOutcome::Erased` using
+`memory.forget_with_reason`, append the unchanged durable request to its
+`redistill` list, and invoke `HookPump::finish_forget(tl, &outcome, Some(live_pump))`.
+Preserve the real receipt/counts and verify the writer incarnation; do not
+fabricate a subject, receipt or ids, or override a Suspended hold. Unknown
+subjects and unavailable/ambiguous incarnations stay pending. An operator
+redistill-retry surface remains explicitly ownerless/open, trigger-owned by the
+first story adding that surface; no automatic recovery is claimed.
+
+The standalone verifier has a declared, hash-pinned Ed25519 backend. In a checkout
+on a supported Linux CPython runner, install it in an isolated environment:
+
+```sh
+python3 -m venv .venv-erasure-verify
+.venv-erasure-verify/bin/python -m pip install --require-hashes -r tools/verify-erasure/requirements.txt
+.venv-erasure-verify/bin/python tools/verify-erasure/verify.py <bundle> --pubkey-file <pinned-public-key>
+```
+
+CI provisions the same backend for both consuming jobs. Missing dependencies are
+failures, not skipped vectors. Bundles are limited to 128 MiB, owner-only and
+no-replace; subject commitments are signer-secret, but identity/timing/frame-id
+correlation remains visible. Keep the returned proof securely: product purge can
+remove retained proofs until the separate retention-policy work is ruled.
 
 ## Operate
 

@@ -22,10 +22,12 @@ hex = "0.4"
 # consistent with Decision B (NOT ring) and the audited RustCrypto stack;
 # no hand-rolled KDF (Winston ruling).
 hkdf = "0.12"
+tempfile = "3"
 
 [dev-dependencies]
-tempfile = "3"
 maos-kernel-core = { path = "../maos-kernel-core" }
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 # Story 1b.5b — fixture generator binary. Synthetic FR4 NDJSON producer that
 # never touches `maos-kernel-core`; uses only existing deps (`serde_json`)
 # plus a hand-rolled LCG for determinism. Lives under `src/bin/` so it does

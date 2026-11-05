@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/mnt/build/cargo-maos/debug/xtask",
+    "check-dev-record-completeness",
+    "--json"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T19:25:31.348991+00:00",
+  "seconds": 0.5190548039972782,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-workspace-dev-record.json",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/gate-post-workspace-dev-record.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": "/home/lunarpulse/dev_ws/xtask",
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

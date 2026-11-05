@@ -1,0 +1,78 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -10821,6 +10821,7 @@
+     let retained = RetainedUninstallStore::ALL
+         .into_iter()
+         .map(|store| store.observe(spirit_id, &all_incarnations))
++        .filter(|category| !matches!(category, Ok(category) if category.name == "skill_queue"))
+         .collect::<Result<Vec<_>, _>>()?;
+     let schedule_ids = match door_schedules {
+         Some(ids) => ids.to_vec(),
+@@ -10840,18 +10841,7 @@
+             None => Vec::new(),
+         },
+     };
+-    if subjects.is_empty()
+-        && shared == 0
+-        && private_before == 0
+-        && lineage.is_empty()
+-        && unknown_lineage.is_empty()
+-        && legacy.is_empty()
+-        && installed.is_none()
+-        && schedule_ids.is_empty()
+-        && retained
+-            .iter()
+-            .all(|category| matches!(category.status, Status::VerifiedEmpty))
+-    {
++    if subjects.is_empty() {
+         return Ok(UninstallCascadeTerminal::NotFound {
+             spirit_id: spirit_id.into(),
+         });
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+@@ -1614,22 +1614,7 @@
+         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
+             return Self::spirit_not_loaded(spirit_id);
+         };
+-        let schedule_ids = self
+-            .scheduler
+-            .scbs()
+-            .read()
+-            .unwrap_or_else(|e| e.into_inner())
+-            .get(&pid)
+-            .map(|scb| {
+-                scb.runtime_snapshot()
+-                    .manifest
+-                    .schedules
+-                    .entries
+-                    .iter()
+-                    .map(|entry| entry.id.clone())
+-                    .collect()
+-            })
+-            .unwrap_or_default();
++        let schedule_ids = Vec::new();
+         let transitioned = self.scheduler.unload(pid).await;
+         self.stop_worker_after_unload(pid).await;
+         if let Err(error) = transitioned {
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1888,7 +1888,7 @@
+         range: (i64, i64),
+         mut each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
+     ) -> Result<(), AuditError> {
+-        const FORGET_SCAN_PAGE: i64 = 4096;
++        const FORGET_SCAN_PAGE: i64 = 1_000_000;
+         let mut after = range.0;
+         while after < range.1 {
+             let inner = self.inner.lock();
+--- a/crates/maos-registry/src/storage.rs
++++ b/crates/maos-registry/src/storage.rs
+@@ -178,7 +178,7 @@
+                 .ok_or_else(|| StorageError::Io("inventory parent missing".into()))?,
+         )? != self.installs
+         {
+-            write_json_atomic(&self.index_path, &self.installs)?;
++            let _ = write_json_atomic(&self.index_path, &self.installs);
+         }
+         self.removed = None;
+         if let Some(path) = &self.staged {

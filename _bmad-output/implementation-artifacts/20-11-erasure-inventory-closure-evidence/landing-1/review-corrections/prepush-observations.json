@@ -1,0 +1,88 @@
+{
+  "command_receipt": "prepush-final.json.command.json",
+  "prepush_exit_code": 1,
+  "wall_ms": 1195209,
+  "status_counts": {
+    "pass": 84,
+    "red": 2,
+    "advisory": 1,
+    "skip": 5
+  },
+  "junit_file": "prepush-final-default-junit.xml",
+  "junit_root": {
+    "name": "nextest-run",
+    "tests": "5688",
+    "skipped": "0",
+    "failures": "1",
+    "errors": "0",
+    "uuid": "dfcbc68d-14b3-4607-9afd-bf16d16a4050",
+    "timestamp": "2026-11-05T19:45:39.048+00:00",
+    "time": "61.333"
+  },
+  "suite_count": 608,
+  "executed": 5688,
+  "failed": 1,
+  "passed": 5687,
+  "selected_cases": [
+    {
+      "suite": "maos-bin::one_daemon_one_door_16_1",
+      "case": {
+        "name": "ac1_19_5_a_refused_cold_swap_successor_reverts_to_the_predecessor",
+        "classname": "maos-bin::one_daemon_one_door_16_1",
+        "timestamp": "2026-11-05T19:45:48.132+00:00",
+        "time": "1.029"
+      },
+      "failed": false,
+      "metrics": []
+    },
+    {
+      "suite": "maos-bin::shell_host_16_2",
+      "case": {
+        "name": "ac5_door_bounded_scan_admits_continuous_writer",
+        "classname": "maos-bin::shell_host_16_2",
+        "timestamp": "2026-11-05T19:45:51.358+00:00",
+        "time": "6.511"
+      },
+      "failed": false,
+      "metrics": []
+    },
+    {
+      "suite": "maos-bin::shell_host_16_2",
+      "case": {
+        "name": "ac5_million_row_pending_forget_finishes_and_repeats_without_corruption",
+        "classname": "maos-bin::shell_host_16_2",
+        "timestamp": "2026-11-05T19:45:57.869+00:00",
+        "time": "42.312"
+      },
+      "failed": true,
+      "metrics": [
+        "pending operation did not finish: op-c86ac87a527319cb3cdecdce",
+        "EC-13 fixture rows=1000000 seed_peak_apparent_bytes=1487572544 seed_peak_allocated_bytes=1487568896",
+        "EC-13 route rows=1000000 wall=10.000086555s response=HandlerStillRunning { operation_id: \"op-c86ac87a527319cb3cdecdce\" }",
+        "EC-13 pending rows=1000000 operation_id=op-c86ac87a527319cb3cdecdce",
+        "pending operation did not finish: op-c86ac87a527319cb3cdecdce"
+      ]
+    },
+    {
+      "suite": "maos-kernel-core::forget_cascade_18_6",
+      "case": {
+        "name": "an_unrelated_forget_does_not_treat_partial_redaction_as_prior_erasure",
+        "classname": "maos-kernel-core::forget_cascade_18_6",
+        "timestamp": "2026-11-05T19:46:00.773+00:00",
+        "time": "0.372"
+      },
+      "failed": false,
+      "metrics": []
+    }
+  ],
+  "red_checks": [
+    "docs:glossary-lock",
+    "workspace-nextest"
+  ],
+  "notes": [
+    "The one prepush is retained as exit1; no retry-to-green.",
+    "Glossary mismatch is a real affected-translation defect, repaired separately; its original red is not hidden.",
+    "The1M completion-observation failure remains open; no deadline or budget change.",
+    "JUnit skipped0 is its executed-report field, not a claim that hosted-only legs ran."
+  ]
+}

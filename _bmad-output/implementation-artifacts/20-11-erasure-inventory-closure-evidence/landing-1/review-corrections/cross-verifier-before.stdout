@@ -1,0 +1,11 @@
+
+running 1 test
+test p3_p4_f4_f5_f6_f11_f12_both_verifiers_enforce_the_same_signed_contract ... FAILED
+
+failures:
+
+failures:
+    p3_p4_f4_f5_f6_f11_f12_both_verifiers_enforce_the_same_signed_contract
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 1.04s
+

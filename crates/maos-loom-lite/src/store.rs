@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use deadpool_postgres::{Config, ManagerConfig, Pool, PoolConfig, RecyclingMethod, Runtime};
-use maos_audit::erasure::merkle::{verify_proof, MerkleProof};
+use maos_audit::erasure::merkle::{verify_inclusion_path, MerkleProof};
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue};
 use maos_domain::ports::CollectiveEraseReceipt;
@@ -1710,7 +1710,7 @@ impl LoomLiteStore {
         if proof.adjacent_leaf.is_some()
             || proof.leaf != leaf_hash
             || leaf.canonical_hash() != leaf_hash
-            || !verify_proof(root, leaf_hash, &proof)
+            || !verify_inclusion_path(root, leaf_hash, &proof)
         {
             return Err(invalid("row binding or Merkle inclusion failed"));
         }

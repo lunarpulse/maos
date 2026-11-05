@@ -1,0 +1,132 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 41s
+     Running tests/uninstall_review_20_11.rs (/mnt/build/cargo-maos/debug/deps/uninstall_review_20_11-42850606d1e4cf61)
+
+thread 'review_p5_partial_generation_delete_restores_the_complete_preimage' (2030698) panicked at crates/maos-registry/tests/uninstall_review_20_11.rs:66:5:
+assertion `left == right` failed: failed deletion re-advertised a partially destroyed generation
+  left: [("part-063/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 54, 51])]
+ right: [("manifest.toml", [110, 97, 109, 101, 61, 39, 114, 101, 118, 105, 101, 119, 45, 115, 112, 105, 114, 105, 116, 39, 10]), ("part-000/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 48]), ("part-001/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49]), ("part-002/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50]), ("part-003/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51]), ("part-004/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52]), ("part-005/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53]), ("part-006/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 54]), ("part-007/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 55]), ("part-008/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 56]), ("part-009/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 57]), ("part-010/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 48]), ("part-011/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 49]), ("part-012/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 50]), ("part-013/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 51]), ("part-014/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 52]), ("part-015/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 53]), ("part-016/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 54]), ("part-017/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 55]), ("part-018/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 56]), ("part-019/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 49, 57]), ("part-020/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 48]), ("part-021/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 49]), ("part-022/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 50]), ("part-023/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 51]), ("part-024/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 52]), ("part-025/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 53]), ("part-026/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 54]), ("part-027/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 55]), ("part-028/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 56]), ("part-029/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 50, 57]), ("part-030/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 48]), ("part-031/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 49]), ("part-032/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 50]), ("part-033/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 51]), ("part-034/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 52]), ("part-035/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 53]), ("part-036/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 54]), ("part-037/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 55]), ("part-038/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 56]), ("part-039/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 51, 57]), ("part-040/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 48]), ("part-041/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 49]), ("part-042/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 50]), ("part-043/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 51]), ("part-044/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 52]), ("part-045/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 53]), ("part-046/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 54]), ("part-047/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 55]), ("part-048/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 56]), ("part-049/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 52, 57]), ("part-050/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 48]), ("part-051/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 49]), ("part-052/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 50]), ("part-053/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 51]), ("part-054/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 52]), ("part-055/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 53]), ("part-056/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 54]), ("part-057/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 55]), ("part-058/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 56]), ("part-059/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 53, 57]), ("part-060/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 54, 48]), ("part-061/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 54, 49]), ("part-062/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 54, 50]), ("part-063/artifact.bin", [99, 111, 109, 112, 108, 101, 116, 101, 32, 115, 105, 103, 110, 101, 100, 32, 103, 101, 110, 101, 114, 97, 116, 105, 111, 110, 32, 112, 97, 114, 116, 32, 54, 51])]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(std::path::PathBuf, alloc::vec::Vec<u8>)>, alloc::vec::Vec<(std::path::PathBuf, alloc::vec::Vec<u8>)>>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: review_p5_partial_generation_delete_restores_the_complete_preimage
+             at ./tests/uninstall_review_20_11.rs:66:5
+   5: uninstall_review_20_11::review_p5_partial_generation_delete_restores_the_complete_preimage::{closure#0}
+             at ./tests/uninstall_review_20_11.rs:28:72
+   6: <uninstall_review_20_11::review_p5_partial_generation_delete_restores_the_complete_preimage::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+error: test failed, to rerun pass `-p maos-registry --test uninstall_review_20_11`

@@ -50,6 +50,8 @@ use rusqlite::{Connection, OptionalExtension};
 use super::mailbox_stub::MailboxStub;
 use super::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 
+mod erasure_sweep;
+pub use erasure_sweep::{ErasureSweep, SweepCompletion};
 /// Frame-kind discriminator for the Transparency Log row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i64)]
@@ -220,10 +222,26 @@ pub struct TransparencyLogEntry {
 /// Cascade metadata only; candidate bodies are streamed and never retained.
 pub struct ForgetFrame {
     pub frame_id: [u8; 16],
+    pub timestamp_ns: i64,
     pub kind: i64,
     pub spirit_pid: u32,
     pub boot_nonce: u64,
     pub source_log_ref: Vec<String>,
+}
+
+struct ErasureTarget<'a> {
+    frame_id: &'a [u8; 16],
+    kind: i64,
+    id: &'a str,
+    principals: &'a [String],
+    spirit: Option<&'a str>,
+    reason: &'a str,
+    request: Option<&'a RedistillRequest>,
+}
+enum ErasureWrite {
+    Retry,
+    Held,
+    Redacted,
 }
 
 /// Payload-free row metadata. The raw kind is deliberately not decoded through
@@ -485,6 +503,8 @@ pub enum AuditError {
     Serialization(String),
     #[error("legal-hold authority is not bound")]
     LegalHoldAuthorityUnbound,
+    #[error("erasure pending: the finite frame/hold sweep could not certify completion; partial redactions may have occurred")]
+    ErasurePending,
 }
 
 /// j1-crosshost-2b AC3.2 — the outcome of one Transparency Log row write.
@@ -533,9 +553,15 @@ CREATE INDEX IF NOT EXISTS idx_tlog_spirit_pid
     ON transparency_log(spirit_pid, timestamp_ns);
 CREATE INDEX IF NOT EXISTS idx_tlog_kind
     ON transparency_log(kind, timestamp_ns);
--- The implicit rowid tail makes kind + rowid windows seekable.
-CREATE INDEX IF NOT EXISTS idx_tlog_kind_rowid ON transparency_log(kind);
-CREATE INDEX IF NOT EXISTS idx_tlog_intent_rowid ON transparency_log(intent);
+-- Retire L1's full indexes on existing databases as well as fresh installs.
+DROP INDEX IF EXISTS idx_tlog_kind_rowid;
+DROP INDEX IF EXISTS idx_tlog_intent_rowid;
+-- The implicit rowid tail makes the erasure-only predicates seekable without
+-- maintaining two additional B-trees for every ordinary routed append.
+CREATE INDEX IF NOT EXISTS idx_tlog_distillate_rowid
+    ON transparency_log(kind) WHERE kind = 11;
+CREATE INDEX IF NOT EXISTS idx_tlog_redistill_request_rowid
+    ON transparency_log(intent) WHERE intent = 'distillate.redistill.requested';
 -- Opaque TL payloads remain writable. X'' marks invalid JSON, never a JSON id.
 CREATE INDEX IF NOT EXISTS idx_tlog_redistill_outcome
     ON transparency_log(CASE WHEN json_valid(CAST(payload_redacted AS TEXT),2)
@@ -629,7 +655,8 @@ CREATE TABLE IF NOT EXISTS legal_holds (
     principal_id        TEXT    NOT NULL PRIMARY KEY,
     reason              TEXT    NOT NULL,
     case_ref            TEXT,
-    requested_at_ns     INTEGER NOT NULL
+    requested_at_ns     INTEGER NOT NULL,
+    hold_id             BLOB NOT NULL DEFAULT (randomblob(16))
 );";
 /// The Transparency Log + Approval Decision Log adapter.
 ///
@@ -641,7 +668,8 @@ CREATE TABLE IF NOT EXISTS legal_holds (
 // entry at xtask/i9-whitelist.toml.
 #[derive(Debug)]
 pub struct TransparencyLogAdapter {
-    inner: Mutex<TransparencyLogInner>,
+    // A queued log-before-deliver append gets the next turn between scan windows.
+    inner: parking_lot::FairMutex<TransparencyLogInner>,
     // Serializes a hold recheck with each body mutation, never an entire scan.
     erasure_holds: Mutex<()>,
     redaction: Box<dyn RedactionPolicy + Send + Sync>,
@@ -655,6 +683,17 @@ pub struct TransparencyLogAdapter {
 enum LegalHoldAuthority {
     Main,
     Attached,
+}
+
+struct HoldIdentity([u8; 16]);
+impl rusqlite::types::FromSql for HoldIdentity {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        value
+            .as_blob()?
+            .try_into()
+            .map(Self)
+            .map_err(|error| rusqlite::types::FromSqlError::Other(Box::new(error)))
+    }
 }
 
 struct TransparencyLogInner {
@@ -677,10 +716,7 @@ impl std::fmt::Debug for TransparencyLogInner {
 impl TransparencyLogAdapter {
     /// Return the frame_id of the most recently inserted frame event.
     pub fn last_frame_id(&self) -> [u8; 16] {
-        self.inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned")
-            .last_frame_id
+        self.inner.lock().last_frame_id
     }
 
     /// Story 17-8 AC2.3 — install the one recipient resolver (composition root,
@@ -700,12 +736,8 @@ impl TransparencyLogAdapter {
     /// Story 17-8 CR-4 — mint one kernel frame id ahead of a write, so every
     /// row an operation produces (base, side rows, markers) names the same id.
     pub fn mint_frame_id(&self) -> [u8; 16] {
-        Self::next_frame_id(
-            &mut self
-                .inner
-                .lock()
-                .expect("TransparencyLogAdapter inner poisoned"),
-        )
+        let mut inner = self.inner.lock();
+        Self::next_frame_id(&mut inner.next_frame_id_counter)
     }
     /// Open the per-Host SQLite file. Initializes both tables if not present.
     /// Panics if the file is opened with a schema version this kernel does
@@ -745,7 +777,7 @@ impl TransparencyLogAdapter {
     pub fn from_read_only_connection(conn: Connection) -> Self {
         Self {
             erasure_holds: Mutex::new(()),
-            inner: Mutex::new(TransparencyLogInner {
+            inner: parking_lot::FairMutex::new(TransparencyLogInner {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce: 0,
@@ -777,16 +809,52 @@ impl TransparencyLogAdapter {
     }
 
     fn bind_main_legal_holds(&self) -> Result<(), AuditError> {
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let mut inner = self.inner.lock();
         inner
             .conn
             .execute_batch(LEGAL_HOLDS_TABLE_SQL)
             .map_err(AuditError::SqliteWriteFatal)?;
+        Self::ensure_hold_identity(&mut inner.conn, LegalHoldAuthority::Main)?;
         inner.legal_hold_authority = Some(LegalHoldAuthority::Main);
         Ok(())
+    }
+
+    fn ensure_hold_identity(
+        conn: &mut Connection,
+        authority: LegalHoldAuthority,
+    ) -> Result<(), AuditError> {
+        let transaction = conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(AuditError::SqliteWriteFatal)?;
+        let schema = match authority {
+            LegalHoldAuthority::Main => "main",
+            LegalHoldAuthority::Attached => "maos_host_global",
+        };
+        let exists: bool = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('legal_holds',?1) WHERE name='hold_id')",
+            [schema], |row| row.get(0),
+        ).map_err(AuditError::SqliteRead)?;
+        if !exists {
+            transaction
+                .execute_batch(match authority {
+                    LegalHoldAuthority::Main => {
+                        "ALTER TABLE main.legal_holds ADD COLUMN hold_id BLOB;"
+                    }
+                    LegalHoldAuthority::Attached => {
+                        "ALTER TABLE maos_host_global.legal_holds ADD COLUMN hold_id BLOB;"
+                    }
+                })
+                .map_err(AuditError::SqliteWriteFatal)?;
+        }
+        transaction.execute_batch(match authority {
+            LegalHoldAuthority::Main => "UPDATE main.legal_holds SET hold_id=randomblob(16) WHERE hold_id IS NULL;
+                CREATE TRIGGER IF NOT EXISTS main.legal_hold_identity AFTER INSERT ON legal_holds WHEN NEW.hold_id IS NULL
+                BEGIN UPDATE legal_holds SET hold_id=randomblob(16) WHERE principal_id=NEW.principal_id; END;",
+            LegalHoldAuthority::Attached => "UPDATE maos_host_global.legal_holds SET hold_id=randomblob(16) WHERE hold_id IS NULL;
+                CREATE TRIGGER IF NOT EXISTS maos_host_global.legal_hold_identity AFTER INSERT ON legal_holds WHEN NEW.hold_id IS NULL
+                BEGIN UPDATE legal_holds SET hold_id=randomblob(16) WHERE principal_id=NEW.principal_id; END;",
+        }).map_err(AuditError::SqliteWriteFatal)?;
+        transaction.commit().map_err(AuditError::SqliteWriteFatal)
     }
 
     /// Open with a custom redaction policy (for tests and future composition).
@@ -839,7 +907,7 @@ impl TransparencyLogAdapter {
         )?;
         Ok(Self {
             erasure_holds: Mutex::new(()),
-            inner: Mutex::new(TransparencyLogInner {
+            inner: parking_lot::FairMutex::new(TransparencyLogInner {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce,
@@ -887,7 +955,7 @@ impl TransparencyLogAdapter {
             .expect("in-memory legal-hold schema init must succeed");
         Self {
             erasure_holds: Mutex::new(()),
-            inner: Mutex::new(TransparencyLogInner {
+            inner: parking_lot::FairMutex::new(TransparencyLogInner {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce,
@@ -902,10 +970,7 @@ impl TransparencyLogAdapter {
 
     /// Boot incarnation bound to writes and local Spirit recall.
     pub fn boot_nonce(&self) -> u64 {
-        self.inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned")
-            .boot_nonce
+        self.inner.lock().boot_nonce
     }
 
     /// Operator-only MCP refusal receipt shared by issuance and use-time mediation.
@@ -956,17 +1021,38 @@ impl TransparencyLogAdapter {
     }
 
     /// Generate a unique 16-byte frame ID using ULID.
-    fn next_frame_id(inner: &mut TransparencyLogInner) -> [u8; 16] {
-        inner.next_frame_id_counter += 1;
+    fn next_frame_id(counter: &mut u64) -> [u8; 16] {
+        *counter += 1;
         let ulid = ulid::Ulid::new();
         let mut bytes = ulid.to_bytes();
         // Mix in the counter for additional uniqueness within the same millisecond
-        let counter_bytes = inner.next_frame_id_counter.to_le_bytes();
+        let counter_bytes = counter.to_le_bytes();
         bytes[12] ^= counter_bytes[0];
         bytes[13] ^= counter_bytes[1];
         bytes[14] ^= counter_bytes[2];
         bytes[15] ^= counter_bytes[3];
         bytes
+    }
+
+    fn append_erasure_row(
+        conn: &Connection,
+        counter: &mut u64,
+        boot: u64,
+        kind: FrameKind,
+        intent: &str,
+        payload: &[u8],
+    ) -> Result<[u8; 16], AuditError> {
+        assert!(
+            matches!(kind, FrameKind::TaskComplete | FrameKind::Decision),
+            "erasure transaction writer is not a general frame-kind bypass"
+        );
+        let id = Self::next_frame_id(counter);
+        conn.execute(
+            "INSERT INTO transparency_log(frame_id,timestamp_ns,spirit_pid,boot_nonce,kind,intent,payload_redacted,origin)
+             VALUES(?1,?2,0,?3,?4,?5,?6,?7)",
+            rusqlite::params![id.as_slice(), wall_clock_now_ns() as i64, boot as i64, kind as i64, intent, payload, FrameOrigin::Kernel as i64],
+        ).map_err(AuditError::SqliteWriteFatal)?;
+        Ok(id)
     }
 
     /// Backward-compatible wrapper — delegates to [`Self::insert_frame_event_with_sender`]
@@ -1282,26 +1368,14 @@ impl TransparencyLogAdapter {
         sides: Option<SideRows<'_>>,
     ) -> FrameRowWrite {
         let redacted = self.redaction.redact(payload);
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        let frame_id = frame_id.unwrap_or_else(|| Self::next_frame_id(&mut inner));
+        let mut inner = self.inner.lock();
+        let frame_id =
+            frame_id.unwrap_or_else(|| Self::next_frame_id(&mut inner.next_frame_id_counter));
         let timestamp_ns = wall_clock_now_ns();
-
-        inner.last_frame_id = frame_id;
-        let conn = &inner.conn;
-        // Story 17-8 AC2.2 — side rows commit with their base row or not at all.
-        // IMMEDIATE takes the write lock at BEGIN (WAL multi-writer contract).
+        let boot_nonce = inner.boot_nonce;
         let transactional = sides.is_some();
-        let begun = if transactional {
-            conn.execute_batch("BEGIN IMMEDIATE;")
-        } else {
-            Ok(())
-        };
-
-        let result = begun.and_then(|()| {
-            conn.execute(
+        let write = |conn: &Connection| {
+            match conn.execute(
                 "INSERT INTO transparency_log
                 (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
                  capability_token, kind, intent, correlation_id, payload_redacted, origin)
@@ -1312,51 +1386,51 @@ impl TransparencyLogAdapter {
                     spirit_pid as i64,
                     from_spirit_id,
                     to_spirit_id,
-                    inner.boot_nonce as i64,
-                    capability_token.map(|t| &t[..]),
+                    boot_nonce as i64,
+                    capability_token.map(|token| &token[..]),
                     kind as i64,
                     intent,
                     correlation_id,
                     &redacted[..],
                     origin as i64,
                 ],
-            )
-        });
-        // Only the BASE row's primary key can mean "already journaled"; a side
-        // row is deduped upstream, so its failure is never read as a duplicate.
-        let result = match result {
-            Ok(_) => sides
-                .map_or(Ok(()), |sides| sides.write(conn, &frame_id))
-                .map(|()| FrameRowWrite::Written),
-            Err(e) if Self::is_duplicate_primary_key(&e) => Ok(FrameRowWrite::Duplicate),
-            Err(e) => Err(e),
-        };
-        let result = match result {
-            Ok(write) if transactional => {
-                let end = if write == FrameRowWrite::Written {
-                    "COMMIT;"
-                } else {
-                    "ROLLBACK;"
-                };
-                conn.execute_batch(end).map(|()| write)
-            }
-            other => other,
-        };
-
-        match result {
-            Ok(write) => write,
-            Err(e) => {
-                if transactional {
-                    let _ = conn.execute_batch("ROLLBACK;");
+            ) {
+                Ok(_) => sides
+                    .map_or(Ok(()), |sides| sides.write(conn, &frame_id))
+                    .map(|()| FrameRowWrite::Written),
+                // Only the base row's primary key can mean already journaled.
+                Err(error) if Self::is_duplicate_primary_key(&error) => {
+                    Ok(FrameRowWrite::Duplicate)
                 }
-                // j1-crosshost-2b AC3.2 — EVERY other write error still halts, and
-                // that is deliberate. This `panic!` IS the I2 log-before-deliver
-                // guarantee: converting it wholesale would trade a denial-of-service
-                // for SILENT AUDIT LOSS, which is strictly worse. Only the
-                // duplicate-primary-key arm above is exempt, because a row that is
-                // already in the log has not been lost. Do not widen this.
+                Err(error) => Err(error),
+            }
+        };
+        // Preserve IMMEDIATE + atomic side rows; RAII also rolls back unwinds.
+        let result = if transactional {
+            inner
+                .conn
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .and_then(|transaction| {
+                    let outcome = write(&transaction)?;
+                    match outcome {
+                        FrameRowWrite::Written => transaction.commit()?,
+                        FrameRowWrite::Duplicate => transaction.rollback()?,
+                    }
+                    Ok(outcome)
+                })
+        } else {
+            write(&inner.conn)
+        };
+        match result {
+            Ok(write) => {
+                inner.last_frame_id = frame_id;
+                write
+            }
+            Err(error) => {
+                // This panic, before delivery, is the I2 failure boundary.
+                // The fair mutex is not a poisoned-state authority.
                 panic!(
-                    "MAOS kernel panic — Transparency Log write failed: {e}. \
+                    "MAOS kernel panic — Transparency Log write failed: {error}. \
                      Architecture §7.3 I2: log-before-deliver guarantee broken; \
                      kernel halts. Audit the SQLite file for corruption."
                 );
@@ -1406,66 +1480,6 @@ impl TransparencyLogAdapter {
         LogBeforeDeliver::new(())
     }
 
-    /// Story 9.2 — overwrite a Distillate frame's payload with a redaction
-    /// tombstone.  This is the body-scrub half of Decision C; the marker
-    /// frame is appended separately so the audit chain remains append-only.
-    pub fn scrub_distillate_body(
-        &self,
-        frame_id: [u8; 16],
-        reason: &str,
-    ) -> Result<(), AuditError> {
-        let tombstone = serde_json::json!({
-            "redacted": true,
-            "reason": reason,
-            "original_kind": "Distillate",
-        });
-        self.replace_frame_body(frame_id, &tombstone)
-    }
-
-    fn replace_frame_body(
-        &self,
-        frame_id: [u8; 16],
-        body: &serde_json::Value,
-    ) -> Result<(), AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        let changed = inner
-            .conn
-            .execute(
-                "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
-                rusqlite::params![body.to_string().as_bytes(), &frame_id[..]],
-            )
-            .map_err(AuditError::SqliteWriteFatal)?;
-        if changed == 0 {
-            return Err(AuditError::SqliteRead(rusqlite::Error::QueryReturnedNoRows));
-        }
-        Ok(())
-    }
-
-    /// Story 9.2 — append a redaction-marker frame referencing a Distillate
-    /// frame.  Uses an intent string (`distillate.redacted`) rather than a new
-    /// `FrameKind` to keep the ABI frozen.
-    pub fn insert_distillate_redaction_marker(
-        &self,
-        principal_id: &str,
-        distillate_frame_id: [u8; 16],
-    ) -> LogBeforeDeliver<()> {
-        let payload = serde_json::json!({
-            "principal_id": principal_id,
-            "redacted_distillate_frame_id": format_frame_id_hex(&distillate_frame_id),
-        });
-        self.insert_frame_event(
-            FrameKind::TaskComplete,
-            0,
-            None,
-            "distillate.redacted",
-            payload.to_string().as_bytes(),
-            FrameOrigin::Kernel,
-        )
-    }
-
     /// Enumerate I13 carriers using full boot-local writer identities.
     pub fn distillates_written_by(
         &self,
@@ -1473,7 +1487,7 @@ impl TransparencyLogAdapter {
     ) -> Result<Vec<ForgetFrame>, AuditError> {
         let mut found = Vec::new();
         self.scan_rowid_windows(
-            "SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_kind_rowid \
+            "SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_distillate_rowid \
              WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11", None,
             |row| {
                 let boot = row.get::<_, i64>(1).map_err(AuditError::SqliteRead)? as u64;
@@ -1482,86 +1496,216 @@ impl TransparencyLogAdapter {
                 let body: Vec<u8> = row.get(3).map_err(AuditError::SqliteRead)?;
                 if Self::is_kernel_tombstone(&body) { return Ok(()); }
                 let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
-                found.push((row.get::<_, i64>(4).map_err(AuditError::SqliteRead)?, ForgetFrame {
+                found.push(ForgetFrame {
+                    timestamp_ns: row.get(4).map_err(AuditError::SqliteRead)?,
                     frame_id: bytes.try_into().map_err(|v: Vec<u8>|AuditError::MalformedFrameId(v.len()))?,
                     kind: 11, spirit_pid: pid, boot_nonce: boot,
                     source_log_ref: Self::distillate_source_refs(&body).unwrap_or_default(),
-                }));
+                });
                 Ok(())
             })?;
-        found.sort_by_key(|(timestamp, frame)| (*timestamp, frame.frame_id));
-        Ok(found.into_iter().map(|(_, frame)| frame).collect())
+        found.sort_by_key(|frame| (frame.timestamp_ns, frame.frame_id));
+        Ok(found)
     }
 
     fn protected_by_holds(
         &self,
         holds: &[PersistedLegalHold],
     ) -> Result<std::collections::HashSet<String>, AuditError> {
+        self.protected_at(holds, self.frame_high_water()?)
+    }
+
+    fn protected_at(
+        &self,
+        holds: &[PersistedLegalHold],
+        through: i64,
+    ) -> Result<std::collections::HashSet<String>, AuditError> {
+        if holds.is_empty() {
+            return Ok(std::collections::HashSet::new());
+        }
         let mut protected = std::collections::HashSet::new();
         for hold in holds {
-            for frame in self.principal_bearing_frames(&hold.principal_id)? {
+            for frame in self.forget_frames(
+                Some(&hold.principal_id),
+                &std::collections::HashSet::new(),
+                false,
+                (0, through),
+            )? {
                 protected.insert(format!("{:032x}", u128::from_be_bytes(frame.frame_id)));
             }
         }
-        for frame in self.distillate_closure(&protected, false)? {
+        for frame in self.distillate_closure_at(&protected, false, (0, through))? {
             protected.insert(format!("{:032x}", u128::from_be_bytes(frame.frame_id)));
         }
         Ok(protected)
     }
 
-    /// ADR-044 body scrub and marker; false names a held derivation.
-    pub fn scrub_uninstalled_distillate(
-        &self,
-        spirit_id: &str,
-        frame_id: [u8; 16],
-    ) -> Result<bool, AuditError> {
-        if !self.scrub_distillate_unless_held(frame_id, "spirit-uninstall")? {
-            return Ok(false);
-        }
-        let payload = serde_json::json!({"spirit_id": spirit_id, "redacted_distillate_frame_id": format_frame_id_hex(&frame_id)});
-        self.insert_frame_event(
-            FrameKind::TaskComplete,
-            0,
-            None,
-            "distillate.redacted",
-            payload.to_string().as_bytes(),
-            FrameOrigin::Kernel,
-        );
-        Ok(true)
-    }
-
-    /// Revalidate all held derivations and linearize the body update with
-    /// hold placement/release; also used for regenerated-body validation.
+    /// Hold recheck and body mutation share one IMMEDIATE transaction, including
+    /// the attached global authority. Independent connections cannot place a
+    /// hold in the gap. The frozen kernel's later private/index deletion is a
+    /// separately recorded coverage limitation, not covered by this TL lease.
     pub fn scrub_distillate_unless_held(
         &self,
         frame_id: [u8; 16],
         reason: &str,
     ) -> Result<bool, AuditError> {
-        let mut holds = self.list_legal_holds()?;
-        let mut protected = self.protected_by_holds(&holds)?;
-        loop {
-            let guard = self.erasure_holds.lock().unwrap_or_else(|e| e.into_inner());
-            let current = self.list_legal_holds()?;
-            if current != holds {
-                drop(guard);
-                holds = current;
-                protected = self.protected_by_holds(&holds)?;
-                continue;
+        self.scrub_body_unless_held(frame_id, FrameKind::Distillate as i64, reason)
+    }
+
+    fn scrub_body_unless_held(
+        &self,
+        frame_id: [u8; 16],
+        kind: i64,
+        reason: &str,
+    ) -> Result<bool, AuditError> {
+        let id = format!("{:032x}", u128::from_be_bytes(frame_id));
+        for _ in 0..8 {
+            let holds = self.list_legal_holds()?;
+            let protected = self.protected_by_holds(&holds)?;
+            match self.write_erasure_body(
+                ErasureTarget {
+                    frame_id: &frame_id,
+                    kind,
+                    id: &id,
+                    principals: &[],
+                    spirit: None,
+                    reason,
+                    request: None,
+                },
+                &holds,
+                &protected,
+            )? {
+                ErasureWrite::Retry => continue,
+                ErasureWrite::Held => return Ok(false),
+                ErasureWrite::Redacted => return Ok(true),
             }
-            if protected.contains(&format!("{:032x}", u128::from_be_bytes(frame_id))) {
-                return Ok(false);
-            }
-            self.scrub_distillate_body(frame_id, reason)?;
-            return Ok(true);
         }
+        Err(AuditError::ErasurePending)
+    }
+
+    fn write_erasure_body(
+        &self,
+        target: ErasureTarget<'_>,
+        holds: &[PersistedLegalHold],
+        protected: &std::collections::HashSet<String>,
+    ) -> Result<ErasureWrite, AuditError> {
+        let payload = target
+            .request
+            .map(|request| {
+                let mut value = serde_json::json!({ "request": request });
+                Self::redistill_metadata_ids(&mut value, true);
+                serde_json::to_vec(&value)
+                    .map_err(|error| AuditError::Serialization(error.to_string()))
+            })
+            .transpose()?;
+        let payload = payload.as_ref().map(|bytes| self.redaction.redact(bytes));
+        let _hold_guard = self
+            .erasure_holds
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let mut inner = self.inner.lock();
+        let authority = inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?;
+        let TransparencyLogInner {
+            conn,
+            next_frame_id_counter,
+            last_frame_id,
+            boot_nonce,
+            ..
+        } = &mut *inner;
+        let transaction = conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(AuditError::SqliteWriteFatal)?;
+        if Self::read_legal_holds(&transaction, authority)? != holds {
+            return Ok(ErasureWrite::Retry);
+        }
+        #[cfg(test)]
+        erasure_races_20_11::before_body_mutation();
+        if protected.contains(target.id) {
+            return Ok(ErasureWrite::Held);
+        }
+        let replacement = if matches!(target.kind, 28 | 29) {
+            if target.principals.is_empty() {
+                return Err(AuditError::Serialization(
+                    "dimensional redaction requires a subject".into(),
+                ));
+            }
+            let existing: Vec<u8> = transaction
+                .query_row(
+                    "SELECT payload_redacted FROM transparency_log WHERE frame_id=?1",
+                    [target.frame_id.as_slice()],
+                    |row| row.get(0),
+                )
+                .map_err(AuditError::SqliteRead)?;
+            Self::redacted_principals_body(
+                &existing,
+                target.principals,
+                target.reason,
+                *target.frame_id,
+            )?
+        } else {
+            let kind = if target.kind == 11 {
+                serde_json::json!("Distillate")
+            } else {
+                serde_json::json!(target.kind)
+            };
+            serde_json::to_vec(&serde_json::json!({ "redacted": true, "reason": target.reason, "original_kind": kind }))
+                .map_err(|error| AuditError::Serialization(error.to_string()))?
+        };
+        if let Some(payload) = payload.as_deref() {
+            Self::append_erasure_row(
+                &transaction,
+                next_frame_id_counter,
+                *boot_nonce,
+                FrameKind::TaskComplete,
+                "distillate.redistill.requested",
+                payload,
+            )?;
+        }
+        let changed = transaction
+            .execute(
+                "UPDATE transparency_log SET payload_redacted=?1 WHERE frame_id=?2 AND kind=?3",
+                rusqlite::params![replacement, target.frame_id.as_slice(), target.kind],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        if changed != 1 {
+            return Err(AuditError::Serialization(
+                "erasure target disappeared or changed kind".into(),
+            ));
+        }
+        let id = format_frame_id_hex(target.frame_id);
+        let marker = match (target.kind, target.spirit, target.principals.first()) {
+            (11, Some(spirit), _) => {
+                serde_json::json!({"spirit_id":spirit,"redacted_distillate_frame_id":id})
+            }
+            (11, None, Some(principal)) if target.principals.len() == 1 => {
+                serde_json::json!({"principal_id":principal,"redacted_distillate_frame_id":id})
+            }
+            _ => serde_json::json!({"redacted_frame_id":id,"original_kind":target.kind}),
+        };
+        let marker = serde_json::to_vec(&marker)
+            .map_err(|error| AuditError::Serialization(error.to_string()))?;
+        let marker_id = Self::append_erasure_row(
+            &transaction,
+            next_frame_id_counter,
+            *boot_nonce,
+            FrameKind::TaskComplete,
+            if target.kind == 11 {
+                "distillate.redacted"
+            } else {
+                "frame.redacted"
+            },
+            &marker,
+        )?;
+        transaction.commit().map_err(AuditError::SqliteWriteFatal)?;
+        *last_frame_id = marker_id;
+        Ok(ErasureWrite::Redacted)
     }
 
     /// Story 9.2 — return every frame_id in the Transparency Log, sorted.
     pub fn all_frame_ids(&self) -> Result<Vec<[u8; 16]>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let mut stmt = inner
             .conn
             .prepare(
@@ -1597,10 +1741,7 @@ impl TransparencyLogAdapter {
 
     /// Story 9.2 — list distinct principal_ids written by a given spirit pid.
     pub fn principal_ids_for_spirit_pid(&self, spirit_pid: u32) -> Result<Vec<String>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let mut stmt = inner
             .conn
             .prepare(
@@ -1625,7 +1766,12 @@ impl TransparencyLogAdapter {
         &self,
         principal: &str,
     ) -> Result<Vec<ForgetFrame>, AuditError> {
-        self.forget_frames(Some(principal), &std::collections::HashSet::new(), false)
+        self.forget_frames(
+            Some(principal),
+            &std::collections::HashSet::new(),
+            false,
+            (0, self.frame_high_water()?),
+        )
     }
 
     /// Close direct and flattened derivation transitively, including prior tombstones.
@@ -1641,50 +1787,139 @@ impl TransparencyLogAdapter {
         scrubbed: &std::collections::HashSet<String>,
         include_prior: bool,
     ) -> Result<Vec<ForgetFrame>, AuditError> {
-        let mut closure = scrubbed.clone();
-        let mut found = Vec::new();
-        loop {
-            let before = closure.len();
-            for frame in self.forget_frames(None, &closure, include_prior)? {
-                if closure.insert(format!("{:032x}", u128::from_be_bytes(frame.frame_id))) {
-                    found.push(frame);
-                }
-            }
-            if closure.len() == before {
-                return Ok(found);
-            }
-        }
+        self.distillate_closure_at(scrubbed, include_prior, (0, self.frame_high_water()?))
     }
 
-    /// Stable rowid windows bound each forget scan's TL lock hold. Appends
-    /// committed before a later window are included; receipt order is sorted below.
-    /// Callers pin rowid access, directly or through the kind/implicit-rowid
-    /// index: kind/timestamp can rescan the whole kind population per window.
+    fn distillate_closure_at(
+        &self,
+        scrubbed: &std::collections::HashSet<String>,
+        include_prior: bool,
+        range: (i64, i64),
+    ) -> Result<Vec<ForgetFrame>, AuditError> {
+        self.closure_with_prior(
+            scrubbed,
+            include_prior,
+            range,
+            &self.prior_tombstones((0, range.1))?,
+        )
+    }
+
+    fn closure_with_prior(
+        &self,
+        scrubbed: &std::collections::HashSet<String>,
+        include_prior: bool,
+        range: (i64, i64),
+        prior: &std::collections::HashSet<String>,
+    ) -> Result<Vec<ForgetFrame>, AuditError> {
+        if scrubbed.is_empty() && (!include_prior || prior.is_empty()) {
+            return Ok(Vec::new());
+        }
+        // One metadata scan, then O(frames + edges) graph work. Re-imported
+        // direct-parent histories need not be in topological rowid order.
+        let frames = self.forget_candidates(None, None, false, range, prior)?;
+        let mut children: std::collections::HashMap<&str, Vec<usize>> =
+            std::collections::HashMap::new();
+        for (index, frame) in frames.iter().enumerate() {
+            for source in &frame.source_log_ref {
+                children.entry(source).or_default().push(index);
+            }
+        }
+        let mut queue = std::collections::VecDeque::new();
+        for source in scrubbed
+            .iter()
+            .chain(prior.iter().filter(|_| include_prior))
+        {
+            if let Some(indices) = children.get(source.as_str()) {
+                queue.extend(indices.iter().copied());
+            }
+        }
+        let mut reached = vec![0_u8; frames.len()];
+        while let Some(index) = queue.pop_front() {
+            if reached[index] != 0 {
+                continue;
+            }
+            let id = format!("{:032x}", u128::from_be_bytes(frames[index].frame_id));
+            reached[index] = if scrubbed.contains(&id) { 1 } else { 2 };
+            if let Some(indices) = children.get(id.as_str()) {
+                queue.extend(indices.iter().copied());
+            }
+        }
+        drop(children);
+        let mut found = frames;
+        let mut index = 0;
+        found.retain_mut(|frame| {
+            let keep = reached[index] == 2;
+            index += 1;
+            if keep {
+                frame.source_log_ref.retain(|id| !prior.contains(id));
+            }
+            keep
+        });
+        Ok(found)
+    }
+
+    /// Pin entry high-water once. Appends belong to a separate bounded tail
+    /// sweep, never an open-ended extension of this finite scan.
     fn scan_rowid_windows(
         &self,
         sql: &str,
         principal: Option<&str>,
+        each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
+    ) -> Result<(), AuditError> {
+        self.scan_rowid_range(sql, principal, (0, self.frame_high_water()?), each)
+    }
+
+    /// Constant-work presence query, including histories with imported rowids.
+    pub fn has_frames(&self) -> Result<bool, AuditError> {
+        let inner = self.inner.lock();
+        inner
+            .conn
+            .query_row("SELECT EXISTS(SELECT 1 FROM transparency_log)", [], |row| {
+                row.get(0)
+            })
+            .map_err(AuditError::SqliteRead)
+    }
+
+    fn frame_high_water(&self) -> Result<i64, AuditError> {
+        self.inner
+            .lock()
+            .conn
+            .query_row(
+                "SELECT coalesce(max(rowid),0) FROM transparency_log",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(AuditError::SqliteRead)
+    }
+
+    fn scan_rowid_range(
+        &self,
+        sql: &str,
+        principal: Option<&str>,
+        range: (i64, i64),
         mut each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
     ) -> Result<(), AuditError> {
         const FORGET_SCAN_PAGE: i64 = 4096;
-        let mut after = 0_i64;
-        loop {
-            let inner = self
-                .inner
-                .lock()
-                .expect("TransparencyLogAdapter inner poisoned");
-            let last: i64 = inner
-                .conn
-                .query_row(
-                    "SELECT coalesce(max(rowid), 0) FROM transparency_log",
-                    [],
-                    |row| row.get(0),
-                )
+        let mut after = range.0;
+        while after < range.1 {
+            let inner = self.inner.lock();
+            // Count actual rows, not rowid distance: sparse legacy rowids must
+            // not create billions of empty windows or enlarge a lock window.
+            let mut boundary = inner.conn.prepare_cached(
+                "SELECT coalesce(max(rowid),?1) FROM
+                 (SELECT rowid FROM transparency_log WHERE rowid>?1 AND rowid<=?2 ORDER BY rowid LIMIT ?3)",
+            ).map_err(AuditError::SqliteRead)?;
+            let upto: i64 = boundary
+                .query_row(rusqlite::params![after, range.1, FORGET_SCAN_PAGE], |row| {
+                    row.get(0)
+                })
                 .map_err(AuditError::SqliteRead)?;
-            if after >= last {
+            #[cfg(test)]
+            let boundary_steps = boundary.reset_status(rusqlite::StatementStatus::VmStep);
+            drop(boundary);
+            if upto == after {
                 return Ok(());
             }
-            let upto = after.saturating_add(FORGET_SCAN_PAGE);
             let mut stmt = inner
                 .conn
                 .prepare_cached(sql)
@@ -1698,13 +1933,14 @@ impl TransparencyLogAdapter {
             after = upto;
             drop(rows);
             #[cfg(test)]
-            erasure_scan_work::record(&stmt, sql);
+            erasure_scan_work::record(&stmt, sql, boundary_steps);
             drop(stmt);
             drop(inner);
-            // Do not immediately re-contend ahead of a log-before-deliver
-            // writer that was waiting for this window.
-            std::thread::yield_now();
+            #[cfg(test)]
+            erasure_races_20_11::after_window(self, sql, principal);
+            // FairMutex hands the next lock turn to an already-queued writer.
         }
+        Ok(())
     }
 
     fn forget_frames(
@@ -1712,52 +1948,91 @@ impl TransparencyLogAdapter {
         principal: Option<&str>,
         scrubbed: &std::collections::HashSet<String>,
         include_prior: bool,
+        range: (i64, i64),
     ) -> Result<Vec<ForgetFrame>, AuditError> {
+        let prior = self.prior_tombstones((0, range.1))?;
+        self.forget_candidates(principal, Some(scrubbed), include_prior, range, &prior)
+    }
+
+    fn prior_tombstones(
+        &self,
+        range: (i64, i64),
+    ) -> Result<std::collections::HashSet<String>, AuditError> {
         let mut prior = std::collections::HashSet::new();
-        self.scan_rowid_windows(
+        self.scan_rowid_range(
             "SELECT lower(hex(frame_id)) FROM transparency_log NOT INDEXED \
              WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND \
              CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
              THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 \
-             AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' \
+             AND (json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' \
              AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') \
-             AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END",
+             AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3) ELSE 0 END",
             None,
+            range,
             |row| { prior.insert(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?); Ok(()) },
         )?;
+        Ok(prior)
+    }
+
+    fn forget_candidates(
+        &self,
+        principal: Option<&str>,
+        scrubbed: Option<&std::collections::HashSet<String>>,
+        include_prior: bool,
+        range: (i64, i64),
+        prior: &std::collections::HashSet<String>,
+    ) -> Result<Vec<ForgetFrame>, AuditError> {
         let mut found = Vec::new();
-        self.scan_rowid_windows(
-            "SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted, timestamp_ns \
-             FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND \
-             ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) \
-             OR (?1 IS NULL AND kind = 11)) \
-             AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') \
-             AND intent NOT LIKE 'principal.uninstall.%'",
-            principal,
-            |row| {
-                let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
-                if principal.is_some_and(|id| !principal_id_occurs(&body, id)) { return Ok(()); }
-                let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
-                let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
-                    Self::distillate_source_refs(&body).unwrap_or_default()
-                } else { Vec::new() };
-                if principal.is_none() && !source_log_ref.iter().any(|id| scrubbed.contains(id) || (include_prior && prior.contains(id))) {
-                    return Ok(());
+        let sql = if principal.is_none() {
+            "SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns \
+             FROM transparency_log INDEXED BY idx_tlog_distillate_rowid \
+             WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11"
+        } else {
+            "SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns \
+             FROM transparency_log NOT INDEXED WHERE rowid>?2 AND rowid<=?3 \
+             AND instr(payload_redacted,CAST(?1 AS BLOB))>0 \
+             AND intent NOT IN ('principal.forget','principal.forget.held','distillate.redacted') \
+             AND intent NOT LIKE 'principal.uninstall.%'"
+        };
+        self.scan_rowid_range(sql, principal, range, |row| {
+            let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
+            if principal.is_some_and(|id| !principal_id_occurs(&body, id)) {
+                return Ok(());
+            }
+            let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
+            let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
+                Self::distillate_source_refs(&body).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            if principal.is_none()
+                && match scrubbed {
+                    Some(scrubbed) => !source_log_ref
+                        .iter()
+                        .any(|id| scrubbed.contains(id) || (include_prior && prior.contains(id))),
+                    None => source_log_ref.is_empty(),
                 }
+            {
+                return Ok(());
+            }
+            if scrubbed.is_some() {
                 source_log_ref.retain(|id| !prior.contains(id));
-                let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
-                found.push((row.get::<_, i64>(5).map_err(AuditError::SqliteRead)?, ForgetFrame {
-                    frame_id: bytes.try_into().map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?,
-                    kind,
-                    spirit_pid: row.get::<_, i64>(2).map_err(AuditError::SqliteRead)? as u32,
-                    boot_nonce: row.get::<_, i64>(3).map_err(AuditError::SqliteRead)? as u64,
-                    source_log_ref,
-                }));
-                Ok(())
-            },
-        )?;
-        found.sort_by_key(|(timestamp, frame)| (*timestamp, frame.frame_id));
-        Ok(found.into_iter().map(|(_, frame)| frame).collect())
+            }
+            let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
+            found.push(ForgetFrame {
+                timestamp_ns: row.get(5).map_err(AuditError::SqliteRead)?,
+                frame_id: bytes
+                    .try_into()
+                    .map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?,
+                kind,
+                spirit_pid: row.get::<_, i64>(2).map_err(AuditError::SqliteRead)? as u32,
+                boot_nonce: row.get::<_, i64>(3).map_err(AuditError::SqliteRead)? as u64,
+                source_log_ref,
+            });
+            Ok(())
+        })?;
+        found.sort_by_key(|frame| (frame.timestamp_ns, frame.frame_id));
+        Ok(found)
     }
 
     /// Shared first/late sweep; held co-principals protect their entire derivation.
@@ -1774,85 +2049,35 @@ impl TransparencyLogAdapter {
         ),
         AuditError,
     > {
-        let mut holds = self.list_legal_holds()?;
-        let mut protected = self.protected_by_holds(&holds)?;
-        let mut frames = self.principal_bearing_frames(principal)?;
-        let mut scrubbed: std::collections::HashSet<_> = frames
-            .iter()
-            .map(|f| format!("{:032x}", u128::from_be_bytes(f.frame_id)))
-            .collect();
-        for f in self.distillates_citing(&scrubbed)? {
-            if scrubbed.insert(format!("{:032x}", u128::from_be_bytes(f.frame_id))) {
-                frames.push(f);
+        let mut state = ErasureSweep::new(vec![principal.to_owned()], None);
+        let mut settled = false;
+        for _ in 0..8 {
+            self.sweep_erasure(&mut state)?;
+            if state.blocked() || self.certify_frame_scope(&mut state, false)? {
+                settled = true;
+                break;
             }
         }
-        let (mut digests, mut others, mut requests, mut held, mut malformed) =
-            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-        for frame in frames {
-            // Check the complete hold set under the TL lock per mutation,
-            // stronger than once per scan window; placement cannot slip in.
-            let _hold_guard = loop {
-                let guard = self.erasure_holds.lock().unwrap_or_else(|e| e.into_inner());
-                let current = self.list_legal_holds()?;
-                if current == holds {
-                    break guard;
-                }
-                drop(guard);
-                holds = current;
-                protected = self.protected_by_holds(&holds)?;
-            };
-            let id = format!("{:032x}", u128::from_be_bytes(frame.frame_id));
-            if protected.contains(&id) {
-                held.push(id);
-                continue;
-            }
-            if frame.kind == FrameKind::Distillate as i64 {
-                let request = RedistillRequest {
-                    redacted_distillate_frame_id: id.clone(),
-                    writer_spirit_pid: frame.spirit_pid,
-                    writer_boot_nonce: (frame.boot_nonce as u128).to_le_bytes(),
-                    surviving_source_log_ref: frame
-                        .source_log_ref
-                        .into_iter()
-                        .filter(|id| !scrubbed.contains(id))
-                        .collect(),
-                };
-                self.insert_redistill_request(&request)?;
-                self.scrub_distillate_body(frame.frame_id, "gdpr-forget")?;
-                let _ = self.insert_distillate_redaction_marker(principal, frame.frame_id);
-                digests.push(id);
-                requests.push(request);
-            } else {
-                if matches!(frame.kind, 28 | 29) {
-                    self.scrub_principal_bearing_frame(frame.frame_id, principal, "gdpr-forget")?;
-                } else {
-                    self.scrub_frame_body(frame.frame_id, frame.kind, "gdpr-forget")?;
-                }
-                others.push(id);
-            }
+        if !settled {
+            return Err(AuditError::ErasurePending);
         }
-        self.scan_rowid_windows(
-            "SELECT lower(hex(frame_id)), payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_kind_rowid \
-             WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11",
-            None,
-            |row| {
-                let body: Vec<u8> = row.get(1).map_err(AuditError::SqliteRead)?;
-                if Self::distillate_source_refs(&body).is_err() {
-                    malformed.push((
-                        row.get::<_, i64>(2).map_err(AuditError::SqliteRead)?,
-                        row.get::<_, String>(0).map_err(AuditError::SqliteRead)?,
-                    ));
-                }
-                Ok(())
-            },
-        )?;
-        malformed.sort_unstable();
+        if !state.held_principals.is_empty() {
+            return Err(AuditError::ErasurePending);
+        }
+        state.distillates.sort_unstable();
+        state.held.sort_unstable();
+        state.malformed.sort_unstable();
+        state.principal_frames.sort_unstable();
         Ok((
-            digests,
-            others,
-            requests,
-            held,
-            malformed.into_iter().map(|(_, id)| id).collect(),
+            state.distillates.into_iter().map(|(_, id)| id).collect(),
+            state
+                .principal_frames
+                .into_iter()
+                .map(|(_, id)| id)
+                .collect(),
+            state.requests,
+            state.held.into_iter().map(|(_, id)| id).collect(),
+            state.malformed.into_iter().map(|(_, id)| id).collect(),
         ))
     }
 
@@ -1864,7 +2089,7 @@ impl TransparencyLogAdapter {
         let mut found = Vec::new();
         self.scan_rowid_windows(
             "SELECT r.payload_redacted, r.timestamp_ns, r.frame_id \
-             FROM transparency_log r INDEXED BY idx_tlog_intent_rowid \
+             FROM transparency_log r INDEXED BY idx_tlog_redistill_request_rowid \
              WHERE r.rowid > ?2 AND r.rowid <= ?3 AND ?1 IS ?1 \
              AND r.intent = 'distillate.redistill.requested' \
              AND NOT EXISTS (SELECT 1 FROM transparency_log o INDEXED BY idx_tlog_redistill_outcome \
@@ -1950,19 +2175,9 @@ impl TransparencyLogAdapter {
         kind: i64,
         reason: &str,
     ) -> Result<(), AuditError> {
-        let tombstone =
-            serde_json::json!({"redacted": true, "reason": reason, "original_kind": kind});
-        self.replace_frame_body(frame_id, &tombstone)?;
-        let payload = serde_json::json!({"redacted_frame_id": format_frame_id_hex(&frame_id), "original_kind": kind});
-        self.insert_frame_event(
-            FrameKind::TaskComplete,
-            0,
-            None,
-            "frame.redacted",
-            payload.to_string().as_bytes(),
-            FrameOrigin::Kernel,
-        );
-        Ok(())
+        self.scrub_body_unless_held(frame_id, kind, reason)?
+            .then_some(())
+            .ok_or(AuditError::ErasurePending)
     }
 
     // Match DistillateWriter's colon-hex metadata: raw 32-hex ids look like tokens.
@@ -2036,48 +2251,38 @@ impl TransparencyLogAdapter {
         Ok(())
     }
 
-    /// Story 9.3b (SR-3) — scrub a principal-bearing cost/governance frame's
-    /// payload by replacing the principal_id with a redaction tombstone.
-    /// This mirrors `scrub_distillate_body` but for structured payloads.
-    pub fn scrub_principal_bearing_frame(
-        &self,
-        frame_id: [u8; 16],
-        principal_id: &str,
+    fn redacted_principals_body(
+        existing: &[u8],
+        principals: &[String],
         reason: &str,
-    ) -> Result<(), AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        // Preserve dimensional facts, including nested SR-3 principal attribution.
-        let existing: Vec<u8> = inner
-            .conn
-            .query_row(
-                "SELECT payload_redacted FROM transparency_log WHERE frame_id = ?1",
-                rusqlite::params![&frame_id[..]],
-                |row| row.get(0),
-            )
-            .map_err(AuditError::SqliteRead)?;
-        let redacted_bytes = match serde_json::from_slice::<serde_json::Value>(&existing) {
+        frame_id: [u8; 16],
+    ) -> Result<Vec<u8>, AuditError> {
+        let redacted_bytes = match serde_json::from_slice::<serde_json::Value>(existing) {
             Ok(mut val) => {
-                fn scrub(value: &mut serde_json::Value, principal: &str) {
+                fn scrub(value: &mut serde_json::Value, principals: &[String]) {
                     match value {
                         serde_json::Value::String(text)
-                            if principal_id_occurs(text.as_bytes(), principal) =>
+                            if principals.iter().any(|principal| {
+                                principal_id_occurs(text.as_bytes(), principal)
+                            }) =>
                         {
                             *text = "[REDACTED]".into()
                         }
                         serde_json::Value::Array(values) => {
-                            values.iter_mut().for_each(|v| scrub(v, principal))
+                            values.iter_mut().for_each(|v| scrub(v, principals))
                         }
                         serde_json::Value::Object(values) => {
-                            values.retain(|key, _| !principal_id_occurs(key.as_bytes(), principal));
-                            values.values_mut().for_each(|v| scrub(v, principal));
+                            values.retain(|key, _| {
+                                !principals
+                                    .iter()
+                                    .any(|principal| principal_id_occurs(key.as_bytes(), principal))
+                            });
+                            values.values_mut().for_each(|v| scrub(v, principals));
                         }
                         _ => {}
                     }
                 }
-                scrub(&mut val, principal_id);
+                scrub(&mut val, principals);
                 if let Some(obj) = val.as_object_mut() {
                     // Also record redaction metadata
                     obj.insert("redacted".to_string(), serde_json::Value::Bool(true));
@@ -2098,15 +2303,7 @@ impl TransparencyLogAdapter {
                 tombstone.to_string().into_bytes()
             }
         };
-        inner
-            .conn
-            .execute(
-                "UPDATE transparency_log SET payload_redacted = ?1 WHERE frame_id = ?2",
-                rusqlite::params![&redacted_bytes[..], &frame_id[..]],
-            )
-            .map_err(AuditError::SqliteWriteFatal)?;
-
-        Ok(())
+        Ok(redacted_bytes)
     }
 
     /// Keep the principal-global legal-hold table on the Host-global artifact
@@ -2115,10 +2312,15 @@ impl TransparencyLogAdapter {
     /// Legal-hold methods select the attached schema explicitly; an adapter
     /// without this binding returns `LegalHoldAuthorityUnbound`.
     pub fn attach_global_legal_holds(&self, global_path: &Path) -> Result<(), AuditError> {
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let mut inner = self.inner.lock();
+        let same_artifact = inner.conn.path().is_some_and(|main| {
+            matches!((Path::new(main).canonicalize(), global_path.canonicalize()),
+                (Ok(main), Ok(global)) if main == global)
+        });
+        if same_artifact {
+            drop(inner);
+            return self.bind_main_legal_holds();
+        }
         inner
             .conn
             .execute(
@@ -2133,10 +2335,12 @@ impl TransparencyLogAdapter {
                     principal_id TEXT NOT NULL PRIMARY KEY,
                     reason TEXT NOT NULL,
                     case_ref TEXT,
-                    requested_at_ns INTEGER NOT NULL
+                    requested_at_ns INTEGER NOT NULL,
+                    hold_id BLOB NOT NULL DEFAULT (randomblob(16))
                  );",
             )
             .map_err(AuditError::SqliteWriteFatal)?;
+        Self::ensure_hold_identity(&mut inner.conn, LegalHoldAuthority::Attached)?;
         inner.legal_hold_authority = Some(LegalHoldAuthority::Attached);
         Ok(())
     }
@@ -2151,10 +2355,7 @@ impl TransparencyLogAdapter {
         requested_at_ns: u64,
     ) -> Result<(), AuditError> {
         let _hold_guard = self.erasure_holds.lock().unwrap_or_else(|e| e.into_inner());
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let sql = match inner
             .legal_hold_authority
             .ok_or(AuditError::LegalHoldAuthorityUnbound)?
@@ -2182,10 +2383,7 @@ impl TransparencyLogAdapter {
 
     /// Story 9.2 (P29) — is this principal under a durable legal hold?
     pub fn is_under_legal_hold(&self, principal_id: &str) -> Result<bool, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let sql = match inner
             .legal_hold_authority
             .ok_or(AuditError::LegalHoldAuthorityUnbound)?
@@ -2204,39 +2402,66 @@ impl TransparencyLogAdapter {
         Ok(exists > 0)
     }
 
-    /// Story 9.2 (P29) — release a legal hold so the principal may be erased
-    /// again. Returns whether a hold was actually removed.
+    /// Release only the exact hold observed on entry. An independent process
+    /// replacing even identical public fields creates a new identity (ABA-safe).
     pub fn release_legal_hold(&self, principal_id: &str) -> Result<bool, AuditError> {
-        let _hold_guard = self.erasure_holds.lock().unwrap_or_else(|e| e.into_inner());
-        let inner = self
-            .inner
+        let _hold_guard = self
+            .erasure_holds
             .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        let sql = match inner
+            .unwrap_or_else(|error| error.into_inner());
+        let mut inner = self.inner.lock();
+        let (observe, remove) = match inner
             .legal_hold_authority
             .ok_or(AuditError::LegalHoldAuthorityUnbound)?
         {
-            LegalHoldAuthority::Main => "DELETE FROM main.legal_holds WHERE principal_id = ?1",
-            LegalHoldAuthority::Attached => {
-                "DELETE FROM maos_host_global.legal_holds WHERE principal_id = ?1"
-            }
+            LegalHoldAuthority::Main => (
+                "SELECT hold_id FROM main.legal_holds WHERE principal_id=?1",
+                "DELETE FROM main.legal_holds WHERE principal_id=?1 AND hold_id=?2",
+            ),
+            LegalHoldAuthority::Attached => (
+                "SELECT hold_id FROM maos_host_global.legal_holds WHERE principal_id=?1",
+                "DELETE FROM maos_host_global.legal_holds WHERE principal_id=?1 AND hold_id=?2",
+            ),
         };
-        let removed = inner
+        let observed = inner
             .conn
-            .execute(sql, rusqlite::params![principal_id])
+            .query_row(observe, [principal_id], |row| row.get::<_, HoldIdentity>(0))
+            .optional()
+            .map_err(AuditError::SqliteRead)?;
+        let Some(observed) = observed else {
+            return Ok(false);
+        };
+        #[cfg(test)]
+        erasure_races_20_11::before_hold_delete();
+        let transaction = inner
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(AuditError::SqliteWriteFatal)?;
-        Ok(removed > 0)
+        let removed = transaction
+            .execute(
+                remove,
+                rusqlite::params![principal_id, observed.0.as_slice()],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        transaction.commit().map_err(AuditError::SqliteWriteFatal)?;
+        Ok(removed != 0)
     }
 
     pub fn list_legal_holds(&self) -> Result<Vec<PersistedLegalHold>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        let sql = match inner
-            .legal_hold_authority
-            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
-        {
+        let inner = self.inner.lock();
+        Self::read_legal_holds(
+            &inner.conn,
+            inner
+                .legal_hold_authority
+                .ok_or(AuditError::LegalHoldAuthorityUnbound)?,
+        )
+    }
+
+    fn read_legal_holds(
+        conn: &Connection,
+        authority: LegalHoldAuthority,
+    ) -> Result<Vec<PersistedLegalHold>, AuditError> {
+        let sql = match authority {
             LegalHoldAuthority::Main => {
                 "SELECT principal_id, reason, case_ref, requested_at_ns
                  FROM main.legal_holds ORDER BY requested_at_ns, principal_id"
@@ -2246,7 +2471,7 @@ impl TransparencyLogAdapter {
                  FROM maos_host_global.legal_holds ORDER BY requested_at_ns, principal_id"
             }
         };
-        let mut statement = inner.conn.prepare(sql).map_err(AuditError::SqliteRead)?;
+        let mut statement = conn.prepare(sql).map_err(AuditError::SqliteRead)?;
         let rows = statement
             .query_map([], |row| {
                 let requested_at_ns: i64 = row.get(3)?;
@@ -2275,13 +2500,9 @@ impl TransparencyLogAdapter {
         payload: &[u8],
     ) -> [u8; 16] {
         let redacted = self.redaction.redact(payload);
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        let frame_id = Self::next_frame_id(&mut inner);
+        let mut inner = self.inner.lock();
+        let frame_id = Self::next_frame_id(&mut inner.next_frame_id_counter);
         let timestamp_ns = wall_clock_now_ns();
-        inner.last_frame_id = frame_id;
         let result = inner.conn.execute(
             "INSERT INTO transparency_log
                 (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce, capability_token,
@@ -2302,7 +2523,10 @@ impl TransparencyLogAdapter {
             ],
         );
         match result {
-            Ok(_) => frame_id,
+            Ok(_) => {
+                inner.last_frame_id = frame_id;
+                frame_id
+            }
             Err(e) => {
                 panic!(
                     "MAOS I2 binding (Story 9.2 P7): transparency-log write failed for \
@@ -2325,10 +2549,7 @@ impl TransparencyLogAdapter {
     /// At v0.1-β the Approval Manager does not yet emit approval-decision
     /// events; the runtime body ships in Story 1b.3.
     pub fn insert_approval_decision(&self, decision: ApprovalDecision) -> Result<(), AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let timestamp_ns = wall_clock_now_ns();
         inner
             .conn
@@ -2357,10 +2578,7 @@ impl TransparencyLogAdapter {
         &self,
         filter: FrameFilter,
     ) -> Result<Vec<TransparencyLogEntry>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let (sql, params) = Self::frame_query(
             filter,
             "t.rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
@@ -2430,10 +2648,7 @@ impl TransparencyLogAdapter {
         &self,
         filter: FrameFilter,
     ) -> Result<Vec<TransparencyLogMetadata>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         // Story 17-8 AC3.3 — a header-only row the caller only RECEIVED lists
         // with stored length 0 (`payload_available = false`); no blob is read.
         let projection = match filter.participant {
@@ -2497,10 +2712,7 @@ impl TransparencyLogAdapter {
         frame_id: [u8; 16],
         scope: ParticipantScope,
     ) -> Result<Option<ParticipantAccess>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let sql = format!(
             "WITH caller(pid, now_key) AS (VALUES (?1, ?2)) \
              SELECT t.spirit_pid, \
@@ -2639,10 +2851,7 @@ impl TransparencyLogAdapter {
         &self,
         frame_id: [u8; 16],
     ) -> Result<Option<TransparencyLogEntry>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let mut stmt = inner
             .conn
             .prepare(
@@ -2714,10 +2923,7 @@ impl TransparencyLogAdapter {
         &self,
         _spirit_pid: Option<u32>,
     ) -> Result<Vec<ApprovalDecision>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
 
         // Story 9.7 #5 — order by the autoincrement `decision_id` (true
         // insertion order, monotonic) instead of `timestamp_ns`, which is a
@@ -2757,10 +2963,7 @@ impl TransparencyLogAdapter {
         original_frame_id: [u8; 16],
         retract_frame_id: [u8; 16],
     ) -> Result<bool, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let timestamp_ns = wall_clock_now_ns();
         let rows = inner
             .conn
@@ -2788,10 +2991,7 @@ impl TransparencyLogAdapter {
         original_frame_id: [u8; 16],
         retract_frame_id: [u8; 16],
     ) -> Result<Option<[u8; 16]>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         // Check if already retracted
         let row: Option<Vec<u8>> = inner
             .conn
@@ -2835,10 +3035,7 @@ impl TransparencyLogAdapter {
         &self,
         original_frame_id: [u8; 16],
     ) -> Result<Option<[u8; 16]>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let row: Option<Vec<u8>> = inner
             .conn
             .query_row(
@@ -2876,89 +3073,57 @@ impl TransparencyLogAdapter {
                 rusqlite::Error::InvalidParameterName("ratified_by must not be empty".into()),
             ));
         }
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
-        // Atomic: registry append + frame emission in one SQLite transaction.
-        // Manual BEGIN/COMMIT to avoid borrow conflicts with Transaction<'_>.
-        inner
-            .conn
-            .execute_batch("BEGIN;")
-            .map_err(AuditError::SqliteWriteFatal)?;
-        let commit_or_rollback =
-            |conn: &Connection, result: Result<(), AuditError>| -> Result<(), AuditError> {
-                match result {
-                    Ok(()) => conn
-                        .execute_batch("COMMIT;")
-                        .map_err(AuditError::SqliteWriteFatal),
-                    Err(e) => {
-                        let _ = conn.execute_batch("ROLLBACK;");
-                        Err(e)
-                    }
-                }
-            };
-        let result = (|| -> Result<(), AuditError> {
-            inner.conn.execute(
-                "INSERT INTO schema_lifecycle_registry
-                    (schema_id, version, effective_at_ns, supersedes_hash, ratified_by, recorded_at_ns, schema_content_hash)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                rusqlite::params![
-                    entry.schema_id,
-                    entry.version as i64,
-                    entry.effective_at_ns as i64,
-                    entry.supersedes_hash.as_deref(),
-                    entry.ratified_by,
-                    entry.recorded_at_ns as i64,
-                    entry.schema_content_hash,
-                ],
-            ).map_err(|e| {
-                panic!("MAOS kernel panic — schema_lifecycle_registry write failed: {e}. I2.");
-            }).unwrap();
-            // Build governance frame payload
-            let payload = maos_domain::governance::GovernanceEventPayload {
-                recorded_at_ns: entry.recorded_at_ns,
-                effective_at_ns: entry.effective_at_ns,
-                event: maos_domain::governance::GovernanceEventKind::SchemaLifecycle(
-                    maos_domain::governance::SchemaLifecyclePayload {
-                        schema_id: entry.schema_id.clone(),
-                        schema_content_hash: entry.schema_content_hash.clone(),
-                        supersedes: entry.supersedes_hash.clone(),
-                        version: entry.version,
-                        ratified_by: entry.ratified_by.clone(),
-                    },
-                ),
-            };
-            let payload_bytes = serde_json::to_vec(&payload)
-                .map_err(|e| AuditError::Serialization(e.to_string()))?;
-            let redacted = self.redaction.redact(&payload_bytes);
-            let frame_id_val = Self::next_frame_id(&mut inner);
-            let timestamp_ns = wall_clock_now_ns();
-            inner.last_frame_id = frame_id_val;
-            inner.conn.execute(
-                "INSERT INTO transparency_log
-                    (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce, capability_token,
-                     kind, intent, payload_redacted, origin)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                rusqlite::params![
-                    &frame_id_val[..],
-                    timestamp_ns as i64,
-                    0i64,
-                    "",
-                    "",
-                    inner.boot_nonce as i64,
-                    Option::<&[u8]>::None,
-                    FrameKind::GovernanceEvent as i64,
-                    "governance:schema-lifecycle",
-                    &redacted[..],
-                    FrameOrigin::Kernel as i64,
-                ],
-            ).map_err(|e| {
-                panic!("MAOS kernel panic — Transparency Log write failed: {e}. I2.");
-            }).unwrap();
-            Ok(())
-        })();
-        commit_or_rollback(&inner.conn, result)?;
+        let payload = maos_domain::governance::GovernanceEventPayload {
+            recorded_at_ns: entry.recorded_at_ns,
+            effective_at_ns: entry.effective_at_ns,
+            event: maos_domain::governance::GovernanceEventKind::SchemaLifecycle(
+                maos_domain::governance::SchemaLifecyclePayload {
+                    schema_id: entry.schema_id.clone(),
+                    schema_content_hash: entry.schema_content_hash.clone(),
+                    supersedes: entry.supersedes_hash.clone(),
+                    version: entry.version,
+                    ratified_by: entry.ratified_by.clone(),
+                },
+            ),
+        };
+        let payload_bytes = serde_json::to_vec(&payload)
+            .map_err(|error| AuditError::Serialization(error.to_string()))?;
+        let redacted = self.redaction.redact(&payload_bytes);
+        let mut inner = self.inner.lock();
+        let TransparencyLogInner {
+            conn,
+            next_frame_id_counter,
+            boot_nonce,
+            last_frame_id,
+            ..
+        } = &mut *inner;
+        // Roll back even when an I2 write panic unwinds, without poisoning.
+        let transaction = conn.transaction().map_err(AuditError::SqliteWriteFatal)?;
+        transaction.execute(
+            "INSERT INTO schema_lifecycle_registry
+                (schema_id, version, effective_at_ns, supersedes_hash, ratified_by, recorded_at_ns, schema_content_hash)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                entry.schema_id, entry.version as i64, entry.effective_at_ns as i64,
+                entry.supersedes_hash.as_deref(), entry.ratified_by,
+                entry.recorded_at_ns as i64, entry.schema_content_hash,
+            ],
+        ).unwrap_or_else(|error| panic!("MAOS kernel panic — schema_lifecycle_registry write failed: {error}. I2."));
+        let frame_id = Self::next_frame_id(next_frame_id_counter);
+        let timestamp_ns = wall_clock_now_ns();
+        transaction.execute(
+            "INSERT INTO transparency_log
+                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce, capability_token,
+                 kind, intent, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![
+                &frame_id[..], timestamp_ns as i64, 0i64, "", "", *boot_nonce as i64,
+                Option::<&[u8]>::None, FrameKind::GovernanceEvent as i64,
+                "governance:schema-lifecycle", &redacted[..], FrameOrigin::Kernel as i64,
+            ],
+        ).unwrap_or_else(|error| panic!("MAOS kernel panic — Transparency Log write failed: {error}. I2."));
+        transaction.commit().map_err(AuditError::SqliteWriteFatal)?;
+        *last_frame_id = frame_id;
         Ok(LogBeforeDeliver::new(()))
     }
 
@@ -2968,10 +3133,7 @@ impl TransparencyLogAdapter {
         &self,
         schema_id: &str,
     ) -> Result<Vec<maos_domain::governance::SchemaRegistryEntry>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let mut stmt = inner
             .conn
             .prepare(
@@ -3005,10 +3167,7 @@ impl TransparencyLogAdapter {
         &self,
         schema_id: &str,
     ) -> Result<Option<maos_domain::governance::SchemaRegistryEntry>, AuditError> {
-        let inner = self
-            .inner
-            .lock()
-            .expect("TransparencyLogAdapter inner poisoned");
+        let inner = self.inner.lock();
         let mut stmt = inner
             .conn
             .prepare(
@@ -3208,576 +3367,9 @@ impl maos_domain::halt::HaltJournal for TransparencyLogAdapter {
 mod erasure_scan_work;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[path = "../../tests/support/erasure_races_20_11.rs"]
+mod erasure_races_20_11;
 
-    #[test]
-    fn recall_metadata_query_projects_only_payload_length_before_limit() {
-        let (sql, params) = TransparencyLogAdapter::frame_query(
-            FrameFilter {
-                boot_nonce: Some(12),
-                spirit_pid: Some(7),
-                disclosable_kinds_only: true,
-                intent: Some("wanted".into()),
-                limit: Some(1025),
-                ..Default::default()
-            },
-            FRAME_METADATA_PROJECTION,
-        );
-        let (projection, predicates) = sql.split_once(" FROM ").unwrap();
-        assert_eq!(projection.matches("payload_redacted").count(), 1);
-        assert!(projection.ends_with("length(payload_redacted)"));
-        assert!(!projection.contains(", payload_redacted"));
-        assert!(predicates.contains("boot_nonce = ?"));
-        assert!(predicates.contains("spirit_pid = ?"));
-        assert!(predicates.contains("kind IN (0,1,2,3,4,5,6,18)"));
-        assert!(predicates.contains("intent = ?"));
-        assert!(predicates.ends_with("ORDER BY timestamp_ns, frame_id ASC LIMIT ?"));
-        assert_eq!(params.len(), 4);
-    }
-
-    #[test]
-    fn open_in_memory_succeeds() {
-        let log = TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF);
-        assert!(log.inner.lock().is_ok());
-    }
-
-    #[test]
-    fn insert_frame_event_creates_one_row() {
-        let log = TransparencyLogAdapter::open_in_memory(0xDEAD_BEEF);
-        let _token = log.insert_frame_event(
-            FrameKind::TaskAssign,
-            7,
-            None,
-            "delegate",
-            b"test payload",
-            FrameOrigin::HumanAuthored,
-        );
-        let entries = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].spirit_pid, 7);
-        assert_eq!(entries[0].kind, FrameKind::TaskAssign);
-        assert_eq!(entries[0].intent, "delegate");
-    }
-
-    #[test]
-    fn cross_team_correlation_requires_both_physical_logs() {
-        let security = maos_domain::team::TeamId::new("security").unwrap();
-        let support = maos_domain::team::TeamId::new("support").unwrap();
-        let security_log = TransparencyLogAdapter::open_in_memory(1);
-        let support_log = TransparencyLogAdapter::open_in_memory(2);
-        let correlation_id = "cross-team-action-01";
-
-        for (log, pid, intent) in [
-            (&security_log, 7, "cross-team-send"),
-            (&support_log, 8, "cross-team-receive"),
-        ] {
-            let _ = log.insert_frame_event_with_correlation(
-                FrameKind::CapabilityInvocation,
-                pid,
-                None,
-                correlation_id,
-                intent,
-                b"redacted",
-                FrameOrigin::Kernel,
-            );
-        }
-
-        let one_path = security_log
-            .query_frames(FrameFilter {
-                correlation_id: Some(correlation_id.to_owned()),
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(
-            one_path.len(),
-            1,
-            "a one-path reader cannot reconcile both team records"
-        );
-
-        let reconciled = reconcile_correlated_frames(
-            &[(&security, &security_log), (&support, &support_log)],
-            correlation_id,
-        )
-        .unwrap();
-        assert_eq!(reconciled.len(), 2);
-        assert_eq!(
-            reconciled[0].entry.correlation_id.as_deref(),
-            Some(correlation_id)
-        );
-        assert_eq!(
-            reconciled[1].entry.correlation_id.as_deref(),
-            Some(correlation_id)
-        );
-        assert_ne!(reconciled[0].team_id, reconciled[1].team_id);
-    }
-
-    #[test]
-    fn correlation_column_migrates_an_existing_transparency_log() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let path = dir.path().join("legacy.sqlite");
-        let conn = rusqlite::Connection::open(&path).unwrap();
-        conn.execute_batch(
-            "CREATE TABLE transparency_log (
-                frame_id BLOB NOT NULL PRIMARY KEY,
-                timestamp_ns INTEGER NOT NULL,
-                spirit_pid INTEGER NOT NULL,
-                from_spirit_id TEXT NOT NULL DEFAULT '',
-                to_spirit_id TEXT NOT NULL DEFAULT '',
-                boot_nonce INTEGER NOT NULL,
-                capability_token BLOB,
-                kind INTEGER NOT NULL,
-                intent TEXT NOT NULL,
-                payload_redacted BLOB NOT NULL,
-                origin INTEGER NOT NULL
-            );",
-        )
-        .unwrap();
-        drop(conn);
-
-        let log = TransparencyLogAdapter::open(&path, 3).unwrap();
-        let _ = log.insert_frame_event_with_correlation(
-            FrameKind::CapabilityInvocation,
-            9,
-            None,
-            "migrated-correlation",
-            "migrated-action",
-            b"redacted",
-            FrameOrigin::Kernel,
-        );
-        let entries = log
-            .query_frames(FrameFilter {
-                correlation_id: Some("migrated-correlation".to_owned()),
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(
-            entries[0].correlation_id.as_deref(),
-            Some("migrated-correlation")
-        );
-    }
-
-    #[test]
-    fn team_shard_keeps_legal_holds_in_global_database() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let team_path = dir.path().join("teams/security/transparency.sqlite");
-        let global_path = dir.path().join("transparency.sqlite");
-        std::fs::create_dir_all(team_path.parent().unwrap()).unwrap();
-
-        let log = TransparencyLogAdapter::open(&team_path, 4).unwrap();
-        log.attach_global_legal_holds(&global_path).unwrap();
-        log.place_legal_hold("principal-1", "legal-hold", Some("case-1"), 10)
-            .unwrap();
-
-        let team = rusqlite::Connection::open(&team_path).unwrap();
-        let team_tables: i64 = team
-            .query_row(
-                "SELECT count(*) FROM sqlite_master
-                 WHERE type = 'table' AND name = 'legal_holds'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(
-            team_tables, 0,
-            "legal_holds must not move into the team shard"
-        );
-
-        let global = rusqlite::Connection::open(&global_path).unwrap();
-        let global_holds: i64 = global
-            .query_row("SELECT count(*) FROM legal_holds", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(global_holds, 1);
-    }
-
-    #[test]
-    fn insert_frame_with_capability_token() {
-        let log = TransparencyLogAdapter::open_in_memory(0xAAAA_BBBB);
-        let token_bytes: [u8; 32] = [0xAA; 32];
-        let _token = log.insert_frame_event(
-            FrameKind::CapabilityInvocation,
-            42,
-            Some(&token_bytes),
-            "file.read",
-            b"/tmp/data",
-            FrameOrigin::SpiritAuto,
-        );
-        let entries = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].capability_token, Some([0xAA; 32]));
-    }
-
-    #[test]
-    fn hundred_sequential_inserts_are_ordered() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        for i in 0..100 {
-            let _token = log.insert_frame_event(
-                FrameKind::TaskAssign,
-                i as u32,
-                None,
-                "seq-test",
-                b"payload",
-                FrameOrigin::HumanAuthored,
-            );
-        }
-        let entries = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(entries.len(), 100);
-        // Verify timestamps are non-decreasing
-        for window in entries.windows(2) {
-            assert!(
-                window[0].timestamp_ns <= window[1].timestamp_ns,
-                "timestamps not ordered: {} > {}",
-                window[0].timestamp_ns,
-                window[1].timestamp_ns,
-            );
-        }
-    }
-
-    #[test]
-    fn insertion_cursor_does_not_skip_a_later_row_after_clock_rollback() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        let _ = log.insert_frame_event(
-            FrameKind::CliSubprocessOutput,
-            1,
-            None,
-            "first",
-            b"{}",
-            FrameOrigin::Kernel,
-        );
-        let first = log.query_frames(FrameFilter::default()).unwrap().remove(0);
-        let _ = log.insert_frame_event(
-            FrameKind::CliSubprocessOutput,
-            2,
-            None,
-            "second",
-            b"{}",
-            FrameOrigin::Kernel,
-        );
-        log.inner
-            .lock()
-            .unwrap()
-            .conn
-            .execute(
-                "UPDATE transparency_log SET timestamp_ns = 0 WHERE spirit_pid = 2",
-                [],
-            )
-            .unwrap();
-
-        let rows = log
-            .query_frames(FrameFilter {
-                kind: Some(FrameKind::CliSubprocessOutput),
-                cursor_insertion_id: Some(first.insertion_id),
-                order_by_insertion: true,
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(
-            rows.iter().map(|row| row.spirit_pid).collect::<Vec<_>>(),
-            vec![2],
-            "a later insert remains visible even when its wall clock moved backward"
-        );
-    }
-
-    #[test]
-    fn query_filter_by_spirit_pid() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        for pid in [7u32, 7, 7, 42, 99] {
-            let _token = log.insert_frame_event(
-                FrameKind::TaskAssign,
-                pid,
-                None,
-                "filter-test",
-                b"payload",
-                FrameOrigin::HumanAuthored,
-            );
-        }
-        let entries = log
-            .query_frames(FrameFilter {
-                spirit_pid: Some(7),
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(entries.len(), 3);
-        assert!(entries.iter().all(|e| e.spirit_pid == 7));
-    }
-
-    #[test]
-    fn query_filter_by_since_ns_excludes_older_frames() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        let _t1 = log.insert_frame_event(
-            FrameKind::TaskComplete,
-            1,
-            None,
-            "old",
-            b"old-payload",
-            FrameOrigin::SpiritAuto,
-        );
-        // Small sleep to ensure timestamps differ (wall-clock granularity).
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        let _t2 = log.insert_frame_event(
-            FrameKind::TaskComplete,
-            1,
-            None,
-            "new",
-            b"new-payload",
-            FrameOrigin::SpiritAuto,
-        );
-
-        let all = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(all.len(), 2);
-
-        // Filter with since_ns after the first frame's timestamp — only the second should match.
-        let since = all[0].timestamp_ns + 1;
-        let filtered = log
-            .query_frames(FrameFilter {
-                since_ns: Some(since),
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].intent, "new");
-    }
-
-    #[test]
-    fn concurrent_inserts_from_threads() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let log = Arc::new(TransparencyLogAdapter::open_in_memory(0x1));
-        let mut handles = Vec::new();
-        for tid in 0..4 {
-            let log_clone = Arc::clone(&log);
-            handles.push(thread::spawn(move || {
-                for i in 0..10 {
-                    let _token = log_clone.insert_frame_event(
-                        FrameKind::TaskAssign,
-                        (tid * 10 + i) as u32,
-                        None,
-                        "concurrent-test",
-                        b"payload",
-                        FrameOrigin::SpiritAuto,
-                    );
-                }
-            }));
-        }
-        for h in handles {
-            h.join().expect("thread panicked");
-        }
-        let entries = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(
-            entries.len(),
-            40,
-            "expected 40 rows from 4 threads × 10 inserts"
-        );
-    }
-
-    #[test]
-    fn insert_approval_decision_creates_row() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        log.insert_approval_decision(ApprovalDecision {
-            actor: "user-1".into(),
-            target: "spirit-butler".into(),
-            capability: "calendar.read".into(),
-            intent: "morning-digest".into(),
-            decision: true,
-            reasoning: Some("user grants calendar read for digest spirit".into()),
-        })
-        .unwrap();
-
-        let approvals = log.query_approvals(None).unwrap();
-        assert_eq!(approvals.len(), 1);
-        assert_eq!(approvals[0].actor, "user-1");
-        assert_eq!(approvals[0].decision, true);
-        assert_eq!(
-            approvals[0].reasoning.as_deref(),
-            Some("user grants calendar read for digest spirit")
-        );
-    }
-
-    #[test]
-    fn approval_log_is_distinct_table() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-
-        // Insert one row into each table
-        let _token = log.insert_frame_event(
-            FrameKind::TaskAssign,
-            1,
-            None,
-            "schema-test",
-            b"payload",
-            FrameOrigin::HumanAuthored,
-        );
-        log.insert_approval_decision(ApprovalDecision {
-            actor: "actor".into(),
-            target: "target".into(),
-            capability: "cap".into(),
-            intent: "intent".into(),
-            decision: true,
-            reasoning: None,
-        })
-        .unwrap();
-
-        let inner = log.inner.lock().unwrap();
-        let conn = &inner.conn;
-
-        // 1. Verify two audit tables exist (sqlite_sequence is an internal table from AUTOINCREMENT)
-        let mut stmt = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-            .unwrap();
-        let tables: Vec<String> = stmt
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-        assert_eq!(
-            tables,
-            vec![
-                "approval_decision_log",
-                "legal_holds",
-                // Story 9.3b (commit 3041fec) added the schema-lifecycle registry
-                // table at open; this exhaustive list was left stale until the
-                // Story 9.4b AC-6 regression caught it.
-                "schema_lifecycle_registry",
-                "transparency_log",
-                // Story 17-8 — participant recall side tables.
-                "transparency_log_consent",
-                "transparency_log_consent_ruptures",
-                "transparency_log_recipients",
-                "transparency_log_retractions"
-            ],
-            "expected exactly eight tables"
-        );
-
-        // 2. No foreign keys on transparency_log
-        let mut stmt = conn
-            .prepare("PRAGMA foreign_key_list(transparency_log)")
-            .unwrap();
-        let fk_tlog: Vec<String> = stmt
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-        assert!(fk_tlog.is_empty(), "transparency_log has foreign keys");
-
-        // 3. No foreign keys on approval_decision_log
-        let mut stmt = conn
-            .prepare("PRAGMA foreign_key_list(approval_decision_log)")
-            .unwrap();
-        let fk_adl: Vec<String> = stmt
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-        assert!(fk_adl.is_empty(), "approval_decision_log has foreign keys");
-
-        // 4. Each table has exactly 1 row
-        let tlog_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM transparency_log", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        let adl_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM approval_decision_log", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        assert_eq!(tlog_count, 1);
-        assert_eq!(adl_count, 1);
-
-        // 5. Deleting from one table does not affect the other (test-only DELETE)
-        conn.execute("DELETE FROM transparency_log", []).unwrap();
-        let adl_after: i64 = conn
-            .query_row("SELECT COUNT(*) FROM approval_decision_log", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        assert_eq!(
-            adl_after, 1,
-            "approval row affected by transparency_log DELETE"
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "MAOS kernel panic — Transparency Log write failed")]
-    fn insert_frame_panics_on_write_failure() {
-        // Create an in-memory adapter, then corrupt the connection
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        // Drop the inner connection by replacing it with a broken one
-        {
-            let mut inner = log.inner.lock().unwrap();
-            // Close the connection to force failure on next write
-            let old_conn =
-                std::mem::replace(&mut inner.conn, Connection::open_in_memory().unwrap());
-            drop(old_conn);
-            // The new connection doesn't have the schema, so INSERT will fail
-            // Actually let's just force a failure by dropping and not recreating
-        }
-        // Try to insert — should panic because the new connection has no table
-        let _ = log.insert_frame_event(
-            FrameKind::TaskAssign,
-            1,
-            None,
-            "panic-test",
-            b"payload",
-            FrameOrigin::HumanAuthored,
-        );
-    }
-
-    #[test]
-    fn iac_bus_port_enqueue_writes_and_routes() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        let _token = log.enqueue_frame(b"test-frame-data", FrameOrigin::HumanAuthored);
-        let entries = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(entries.len(), 1, "enqueue should write one row");
-        let mailbox_frames = log.mailbox().drain_pending();
-        assert_eq!(mailbox_frames.len(), 1, "enqueue should route to mailbox");
-    }
-
-    #[test]
-    fn iac_bus_port_broadcast_writes_and_routes() {
-        let log = TransparencyLogAdapter::open_in_memory(0x1);
-        let _token = log.broadcast_frame(b"broadcast-data", FrameOrigin::SpiritAuto);
-        let entries = log.query_frames(FrameFilter::default()).unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].kind, FrameKind::TelemetryEvent);
-    }
-
-    // ---- Story 5.3 — FrameKind variant tests ----
-
-    #[test]
-    fn frame_kind_task_stalled_from_i64() {
-        assert_eq!(FrameKind::from_i64(15), Some(FrameKind::TaskStalled));
-    }
-
-    #[test]
-    fn frame_kind_silent_failure_suspect_from_i64() {
-        assert_eq!(
-            FrameKind::from_i64(16),
-            Some(FrameKind::SilentFailureSuspect)
-        );
-    }
-
-    #[test]
-    fn frame_kind_non_exhaustive_match() {
-        let kind = FrameKind::TaskStalled;
-        let _name = match kind {
-            FrameKind::TaskStalled => "stalled",
-            FrameKind::SilentFailureSuspect => "silent_failure",
-            // All other variants — the #[non_exhaustive] on the enum means
-            // downstream crates need a wildcard, but within the defining crate
-            // we can match exhaustively.
-            _ => "other",
-        };
-    }
-
-    #[test]
-    fn frame_kind_spirit_revoked_from_i64() {
-        assert_eq!(FrameKind::from_i64(17), Some(FrameKind::SpiritRevoked));
-    }
-
-    #[test]
-    fn frame_kind_spirit_revoked_discriminant() {
-        assert_eq!(FrameKind::SpiritRevoked as i64, 17);
-    }
-}
+#[cfg(test)]
+#[path = "../../tests/support/transparency_log_unit.rs"]
+mod tests;

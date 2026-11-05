@@ -547,13 +547,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
-        // Story 9.2's redaction marker — the distillate frame id as a hex
-        // STRING (`format_frame_id_hex`).
-        site: (
-            "transparency_log.rs",
-            "insert_distillate_redaction_marker",
-            0,
-        ),
+        // Atomic body/request/marker writer; historical subject marker shape.
+        site: ("transparency_log.rs", "write_erasure_body", 1),
         kind: 1,
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("distillate.redacted"),
@@ -563,8 +558,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
-        // Spirit-owned erasure uses the stable owner, not a principal.
-        site: ("transparency_log.rs", "scrub_uninstalled_distillate", 0),
+        // The same transaction's stable-Spirit lineage marker.
+        site: ("transparency_log.rs", "write_erasure_body", 1),
         kind: 1,
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("distillate.redacted"),
@@ -574,7 +569,7 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
-        site: ("transparency_log.rs", "scrub_frame_body", 0),
+        site: ("transparency_log.rs", "write_erasure_body", 1),
         kind: 1,
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("frame.redacted"),
@@ -582,6 +577,23 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("redacted_frame_id", PayloadType::Str),
             ("original_kind", PayloadType::Num),
         ]),
+    },
+    WriterShapeEntry {
+        site: ("transparency_log.rs", "write_erasure_body", 1),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redacted"),
+        shape: Some(&[
+            ("redacted_frame_id", PayloadType::Str),
+            ("original_kind", PayloadType::Num),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("transparency_log.rs", "write_erasure_body", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redistill.requested"),
+        shape: Some(&[("request", PayloadType::RedistillRequest)]),
     },
     WriterShapeEntry {
         site: ("transparency_log.rs", "insert_redistill_request", 0),

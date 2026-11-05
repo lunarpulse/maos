@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "/tmp/dev2011b-review.9OTbuj/cleanup-final.py"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T20:14:35.175138+00:00",
+  "seconds": 18.966510368976742,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cleanup-final.json",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/cleanup-final.stderr",
+  "environment": {
+    "CI": "true",
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

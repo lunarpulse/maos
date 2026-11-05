@@ -1,0 +1,21 @@
+{
+  "command": [
+    "node",
+    "scripts/gate-glossary-lock.js"
+  ],
+  "exit_code": 1,
+  "started": "2026-11-05T20:01:52.557756+00:00",
+  "seconds": 0.0913046490168199,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/docs-glossary-repaired.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/docs-glossary-repaired.stderr",
+  "environment": {
+    "CI": "true",
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": null,
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

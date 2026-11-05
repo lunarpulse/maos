@@ -1,0 +1,10 @@
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -10821,6 +10821,7 @@
+     let retained = RetainedUninstallStore::ALL
+         .into_iter()
+         .map(|store| store.observe(spirit_id, &all_incarnations))
++        .filter(|category| !matches!(category, Ok(category) if category.name == "skill_queue"))
+         .collect::<Result<Vec<_>, _>>()?;
+     let schedule_ids = match door_schedules {
+         Some(ids) => ids.to_vec(),

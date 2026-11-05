@@ -5493,6 +5493,7 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/provision-erasure-verifier
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -6301,8 +6302,8 @@ jobs:
         run: |
           cargo fetch --locked
           cargo run --locked -p xtask -- build-test-fixtures
-      - name: Install python Ed25519 for the two-host reconcile suite
-        run: python3 -c "import cryptography" || python3 -m pip install --user cryptography
+      - name: Provision the declared offline erasure and two-host Ed25519 backend
+        uses: ./.github/actions/provision-erasure-verifier
       - name: Install tokei
         run: |
           # kloc_check unit tests measure the real workspace through tokei

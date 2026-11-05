@@ -1,0 +1,48 @@
+{
+  "baseline": {
+    "head": "93d39cc7ca185f513dee2d97bed2058f11554d9a",
+    "src": 8551,
+    "tests": 2315,
+    "inline_unit_body": 506,
+    "scan_work_body": 138,
+    "authority": "Prior archived-HEAD measurement, reproduced in accounting-transfer-measurements.json."
+  },
+  "final": {
+    "crates/maos-iac/src": 8622,
+    "crates/maos-iac/tests": 3577,
+    "crates/maos-iac/tests/support/transparency_log_unit.rs": 504,
+    "crates/maos-iac/src/adapter/erasure_scan_work.rs": 168
+  },
+  "narrowing": {
+    "checkpoint_source_with_both_transfers": 8446,
+    "returned_scan_work_body": 168,
+    "final_source_with_unit_transfer_only": 8622,
+    "source_delta": 71,
+    "test_delta": 1262,
+    "subsequent_constant_work_presence_query_growth": 9,
+    "subsequent_partial_redaction_predicate_delta": -1
+  },
+  "counterfactual": {
+    "source_if_unit_body_stayed_inline": 9126,
+    "source_delta_before_accounting_transfer": 575,
+    "unit_body_code_moved": 504,
+    "note": "Counted-src counterfactual, not a claim that every added line executes in production; VM test/helper changes remain counted in src. Inline cfg/mod/open-close lines and the external cfg/path/mod header each occupy three counted lines."
+  },
+  "ceilings": {
+    "iac": 8630,
+    "aggregate": 195404
+  },
+  "aggregate": {
+    "measured": 194740,
+    "hardfail": 194741,
+    "if_unit_body_stayed_counted": 195244
+  },
+  "proof": {
+    "body_transfer": "Original unit body copied verbatim; only the subsequently approved four FairMutex caller adaptations changed it (506 -> 504). Scan module returned verbatim with SHA bcdc2d004abb4c92fe70b366f352afacd09e823984eb075f8a90ba462cf01e73.",
+    "test_identities": "narrow-transfer-identities.json: 114 before/after, identical names/count. fair-test-identities.json: 111 names/count identical before/after the approved lock adaptation. Three explicit unwind tests were then added.",
+    "executed": "safety-root-final: 118/118; narrow-recovery-python-final: 118/118, including all 114 IAC tests. Preservation checkpoint333/333; final partial-redaction repair346/346, including all114 IAC cases, all26 original13.5b cases and all13 unchanged kernel cascade cases.",
+    "gate_exclusion": "xtask/src/kloc_check.rs:294-318 explicitly excludes tests directories; no exclusion or ceiling was changed."
+  },
+  "disclosure": "ACCOUNTING TRANSFER, NOT A CEILING RELIEF. Only the original unit module remains outside src; the VM module is back in src because RAII cleanup made that narrower relocation fit.",
+  "final_measurement_authority": "exact-source-partial-redaction.json; after fmt-partial-redaction-final; the genuine workspace cost-redaction regression is repaired in IAC only, without a kernel source/test edit."
+}

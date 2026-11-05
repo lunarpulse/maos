@@ -153,15 +153,29 @@ dry run과 receipt는 각 형제 팀 로그를 row 개수와 함께 표시합니
 JSON 결과에는 지워진 프레임 id, redaction된 distillate id, 살아남은 source
 reference가 있는 재증류 요청, 각 요청의 결과가 포함됩니다.
 
-실행 중인 daemon은 일반 hook이 quarantine된 경우에도 live compiled-in Spirit에
-forget notice를 전달합니다. Researcher는 캐시된 claim과 마지막 출력을 비우고,
-캐시 id를 로그와 대조한 뒤 governed recall로 가져온 현재의 살아남은 로그
-payload만으로 요약을 재생성합니다. root는 결과를 검증하고 다시 검사하며,
-진행 중이던 pass가 쓴 프레임도 마지막으로 지운 뒤 완료합니다. 중단된 cascade의
-미완료 요청은 재시도 시 복구됩니다. 전달하지 못한 purge와 재생성 오류는 typed
-결과로 남으며, 이미 끝난 삭제를 재생성 오류만으로 실패라고 보고하지 않습니다.
-offline 또는 부재 중인 작성자는 조용히 생략되지 않고 typed pending으로 기록됩니다.
-pending은 다음 boot에서 자동 재개하지 않습니다.
+실행 중인 daemon에서 live compiled-in Spirits는 일반 hook 전달이 quarantine된
+경우에도 forget notice를 받습니다. Researcher는 캐시된 claim과 마지막 출력을
+비우고, 캐시 id를 로그와 대조한 뒤 governed recall로 가져온 현재의 살아남은
+로그 payload만으로 요약을 재생성합니다. root는 결과를 검증하고 다시 검사한 뒤
+유한한 tail sweep을 수행합니다. 프레임 삭제의 완료 경계는 handler 반환 시점이
+아니라 **durable transactional TL marker**입니다. 마커 전에 커밋된 삭제 대상
+프레임의 본문은 남지 않습니다. scope/forget/hold/redaction 감사 metadata,
+IAC lineage 배열, 구조화된 수치 사실은 보존 대상으로 명시합니다. 마커 뒤에
+커밋된 행은 완료 후 데이터이며 삭제했다고 주장하지 않습니다. 처리 중이거나,
+hold가 있거나, 귀속을 검증할 수 없는 범위는 pending/retained로 명시합니다.
+소유한 malformed kind-11 본문은 boot/pid/Spirit 귀속이 검증된 경우에만
+삭제할 수 있습니다. 증명에는 실제 id가 들어가며, 최종 마커가 있어야 앞서
+관찰한 malformed gap을 해소합니다. 귀속이 모호한 malformed 바이트는 보존합니다.
+보존된 수치 사실은 계속 인용할 수 있습니다. 부분 cost/governance redaction은
+전체 본문 tombstone이 아니므로 무관한 forget 때문에 중립적인 파생 프레임까지
+삭제되지 않습니다.
+HTTP503 `handler_still_running`은 기존 deadline을 유지하며 진행 중인 handler를
+취소하지 않습니다. 나중의 결과를 확인하거나 같은 요청을 다시 보내십시오.
+pending을 삭제 또는 완료로 읽으면 안 됩니다. 재생성만 pending인 경우는 별도입니다.
+프레임 삭제가 끝나도 사용할 수 없는 작성자의 재생성은 pending으로 남을 수 있습니다.
+기록된 결과가 없는 journal 요청만 이후 forget/pump pass에서 복구합니다.
+이미 기록된 Pending 결과는 자동으로 재시도하지 않으며, 요청은 다음 boot에서
+자동 재개하지 않습니다.
 
 `maosctl forget --principal <id> --reason legal-hold`는 durable hold를 기록하고
 삭제나 재생성 없이 종료 코드 3을 반환합니다. 기존 hold도 삭제를 차단합니다.
@@ -171,6 +185,62 @@ typed skip으로 보고합니다. Shared와 Loom의 non-principal 조정 데이�
 경계입니다. 따라서 공백 없이 CJK 텍스트에 바로 붙은 id는 감지되지 않을 수 있습니다.
 감지는 의미가 아닌 id 기준이므로 id 없는 복사본, 변환되거나 escape된 id,
 외부 source에서 나중에 다시 수집된 데이터는 이 보장의 범위 밖입니다.
+
+### Spirit 제거와 inventory 증명 보관
+
+`maosctl uninstall <id>`는 해당 Spirit에 SCB가 있으면 live door를 사용합니다.
+SCB 없이 거절된 설치 패키지는 서비스 중인 root를 중지하고 잠금이 있는
+offline 경로를 사용하십시오. 검색은 재사용된 pid가 아니라 stable owner identity와
+admission으로 검증한 lineage를 사용합니다. legacy numeric owner는 이름이 있는
+coverage gap입니다. Held/Failed 결과는 설치 generation 전체를 보존하고 사용 가능한
+서명된 부분 증명의 경로를 제공합니다. 명시적인 복구 오류는 운영자가 처리해야 합니다.
+패키지 rollback이 이미 수행한 삭제까지 되돌리지는 않습니다.
+
+되돌릴 수 없는 변경 전에 서명된 잠정 gap receipt를 만듭니다. 정상적인 최종화에서는
+terminal inventory와 함께 보관하지만 게시 실패 후에는 앞선 부분 receipt만 남을 수
+있습니다. 첫 디렉터리 항목이나 파일명 순서가 아니라 반환 JSON의 `proof_path`를
+사용하십시오. 잠정 receipt는 완료를 증명하지 않습니다. 읽을 수 없는 held 값은
+보존되지만, 그 hold로 별도의 unindexed private namespace까지 덮을 수는 없습니다.
+그러한 namespace가 남으면 uninstall 결과는 Failed입니다.
+
+증명 검증은 서명뿐 아니라 정확히 열여섯 category와 typed evidence의 합계를
+확인합니다. 유효한 부분 inventory가 모든 substrate의 삭제를 증명하지는 않습니다.
+L1에는 명시된 AC3/KS/O4, watchdog, `kernel_private_index_hold_lease` gap이
+남습니다. 프레임 마커만 마커 이전 TL 범위를 증명합니다. 같은 UID의 독립 작성자가
+마커 뒤에 데이터를 다시 넣는 것을 막는 barrier는 없으며, 감사 scope/lifecycle
+metadata는 보존합니다.
+
+**최종 tail 재생성의 한계.** uninstall tail은 실제 요청을
+`Pending/Refused("late-frame")`으로 기록하고, durable `redistillation` 결과에
+실제 개수와 원래 id를 담습니다. 다른 실행 중인 Spirit으로 요청을 전달하지 않습니다.
+서명된 프레임 증명의 본문 삭제 개수는 재생성 완료를 뜻하지 않습니다.
+uninstall 반복이나 일반 forget은 기록된 Pending 요청을 자동으로 다시 구동하지
+않습니다. L1에는 운영자용 재시도 명령이 없습니다.
+권한이 있는 API embedding은 uninstall 밖에서 명시적으로 재시도할 수 있습니다.
+알려진 subject에 `memory.forget_with_reason`을 호출하여 실제
+`ForgetOutcome::Erased`를 얻고, 변경하지 않은 durable 요청을 그 결과의
+`redistill` 목록에 추가한 다음
+`HookPump::finish_forget(tl, &outcome, Some(live_pump))`를 호출합니다.
+실제 receipt/개수를 보존하고 작성자 incarnation을 검증하십시오. subject, receipt,
+id를 만들어 내거나 Suspended hold를 우회하면 안 됩니다. 알 수 없는 subject나
+사용할 수 없거나 모호한 incarnation은 pending으로 남습니다. 운영자용
+redistill-retry 표면은 명시적으로 ownerless/open이며 그 표면을 처음 추가하는
+story가 trigger owner가 됩니다. 자동 복구를 주장하지 않습니다.
+
+독립 verifier에는 선언된 hash-pinned Ed25519 backend가 있습니다. 지원되는
+Linux CPython runner의 checkout에서 격리된 환경에 설치하십시오.
+
+```sh
+python3 -m venv .venv-erasure-verify
+.venv-erasure-verify/bin/python -m pip install --require-hashes -r tools/verify-erasure/requirements.txt
+.venv-erasure-verify/bin/python tools/verify-erasure/verify.py <bundle> --pubkey-file <pinned-public-key>
+```
+
+CI는 두 소비 job에 같은 backend를 제공합니다. 의존성이 없으면 vector를 skip하지
+않고 실패합니다. bundle은 128 MiB 제한, owner-only, no-replace이며 subject
+commitment는 signer-secret입니다. identity/timing/frame-id의 상관관계는 여전히
+드러납니다. 반환된 증명을 안전하게 보관하십시오. 별도의 보관 정책이 결정되기
+전에는 제품 purge가 보존된 증명을 삭제할 수 있습니다.
 
 ## 운영
 

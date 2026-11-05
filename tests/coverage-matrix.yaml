@@ -929,6 +929,10 @@ coverage:
       Story 20-11 landing 1: erasure_inventory_20_11 witnesses principal-free
       proofs, all-boot lineage/pid isolation, installed-package removal, named
       retained stores and Rust/Python category-evidence rejection.
+      Review corrections add stable-owner cross-boot/same-boot-after-exit and
+      legacy-numeric fail-closed vectors, real partial-delete/index-recovery
+      and late-journal failures with retained signed partial proofs, and
+      pending-repeat recovery from durable uninstall subject scope.
       shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload
       drives the real SCB/door snapshot boundary; erasure_live_20_11 drives
       the real live cascade. AC6's T3 Worker leg is hosted-only and uses the
@@ -1004,11 +1008,20 @@ coverage:
       and shell_host_16_2 exercise intervening holds, serialized door release
       and 100k/1M-frame writer latency. The IAC erasure_scan_work module also
       measures the actual production predicates' SQLite VM work, including
-      restart recovery and malformed-receipt scans; its unbounded-page plant
-      reds both sizes without weakening the quarter-scan bound. A route503
-      handler_still_running is pending, never an erased/complete result.
+      recovery, malformed records and the boundary query. Its two in-memory
+      fixtures use 100k physical rows each (the sparse case reaches 1M rowid);
+      real disk/WAL door fixtures still use 100k/1M rows with 1 KiB payloads
+      and an independent unchanged 25% wall-latency assertion. The unbounded
+      page plant must red without enlarging its own budget. A route503
+      handler_still_running is pending, never erased/complete; its in-flight
+      durable marker and an identical repeat are separate completion witnesses.
       Pending halt receipts and watchdog cleanup remain final-kernel
       dependencies; hosted proof is owed.
+      erasure_review_20_11 tests the complete typed sixteen-category evidence
+      language in both verifiers. IAC erasure_races_20_11 covers final-partial
+      appends, reverse-import closure/order, sustained writers, cross-process
+      hold ABA/body ordering and pre-/post-marker independent writer commits.
+      kernel_private_index_hold_lease remains an explicit final-kernel gap.
   NFR-Aud-13:
     gates: []
     enforcement: advisory-until-engagement

@@ -1,0 +1,8 @@
+  error: operator didn't match any binary names
+   ╭────
+ 1 │ (package(maos-iac) & kind(lib)) | (package(maos-audit) & kind(lib)) | binary(erasure_review_20_11) | binary(erasure_smoke_test) | binary(fr4) | binary(erasure_inventory_20_11) | test(uninstall_review_20_11) | binary(erasure_index_20_11) | binary(erasure_scan_20_11) | binary(erasure_verifier_runner_20_11) | binary(erasure_uninstall_13_5b) | binary(forget_floors_18_6) | binary(hook_pump_17_4) | test(ac4_door_snapshots_real_scb_schedules_before_unload) | test(ac5_door_hold_release_waits_for_inflight_forget)
+   ·                                                                                                                                          ─┬─
+   ·                                                                                                                                           ╰── no binary names matched this
+   ╰────
+
+error: failed to parse filterset

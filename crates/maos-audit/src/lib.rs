@@ -1681,18 +1681,30 @@ pub fn resolve_spirit_name(
     name: &str,
     all_boots: bool,
 ) -> Result<Vec<(u64, u32)>, String> {
+    let resolved = resolve_spirit_name_optional(db_path, name, all_boots)?;
+    if resolved.is_empty() {
+        return Err(format!(
+            "unknown spirit '{name}' — no admission or load row names it in this Transparency Log"
+        ));
+    }
+    Ok(resolved)
+}
+
+/// Absence is an empty inventory; open, schema and row-decode errors remain
+/// errors. Erasure must never mistake an unreadable identity for absence.
+pub fn resolve_spirit_name_optional(
+    db_path: &Path,
+    name: &str,
+    all_boots: bool,
+) -> Result<Vec<(u64, u32)>, String> {
     // Story 16-2 / D-16-2-F — the `hello-spirit → pid 0` wildcard is
     // DELETED: it answered "every pid-0 kernel row of every boot", which is
     // the defect `deferred-work.md:926` names. hello-spirit resolves through
     // the identity rows like every Spirit (the one-shot evaluator run now
     // writes one; the shell boots load it at a real pid).
     if !db_path.exists() {
-        return Err(format!(
-            "unknown spirit '{name}' — no Transparency Log at {}",
-            db_path.display()
-        ));
+        return Ok(Vec::new());
     }
-
     let conn = open_transparency_log_readonly(db_path)?;
 
     // D-16-1-K: kind 19 (SpiritAdmitted, name in `intent`) and kind 7
@@ -1750,9 +1762,7 @@ pub fn resolve_spirit_name(
         // row"): no identity row names this Spirit in this Transparency Log.
         // Pre-16-2 hello-spirit rows with no identity row stay reachable by
         // `--boot <nonce>` and erasable by 16-4's `maos purge`.
-        return Err(format!(
-            "unknown spirit '{name}' — no admission or load row names it in this Transparency Log"
-        ));
+        return Ok(Vec::new());
     }
 
     let latest_boot = (!all_boots).then(|| matches.last().map(|(boot, _, _)| *boot).unwrap_or(0));
@@ -1788,6 +1798,59 @@ fn open_transparency_log_readonly(db_path: &Path) -> Result<rusqlite::Connection
             | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(|e| format!("failed to open TL: {e}"))
+}
+
+/// Numeric/empty legacy owners cannot be attributed through a recycled pid.
+/// Return the real ambiguity inventory, never candidates for destructive forget.
+pub fn legacy_numeric_principal_owners(db_path: &Path) -> Result<Vec<String>, String> {
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+    let connection = open_transparency_log_readonly(db_path)?;
+    let mut statement=connection.prepare("SELECT DISTINCT principal_id FROM principal_index WHERE substr(writer_owner,1,3)<>'id-' ORDER BY principal_id")
+        .map_err(|error|format!("legacy owner query failed: {error}"))?;
+    let rows = statement
+        .query_map([], |row| row.get(0))
+        .map_err(|error| error.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())
+}
+
+/// Durable operator scope survives a pending forget deleting its live index.
+/// This is retained audit metadata, not a claim that the subjects are erased.
+pub fn uninstall_principal_scope(db_path: &Path, spirit: &str) -> Result<Vec<String>, String> {
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+    let connection = open_transparency_log_readonly(db_path)?;
+    let mut statement=connection.prepare("SELECT payload_redacted FROM transparency_log WHERE kind=10 AND origin=?1 AND intent='principal.uninstall.scope'").map_err(|error|error.to_string())?;
+    let rows = statement
+        .query_map(
+            [maos_domain::invariants::i3::FrameOrigin::Kernel as i64],
+            |row| row.get::<_, Vec<u8>>(0),
+        )
+        .map_err(|error| error.to_string())?;
+    let mut subjects = std::collections::BTreeSet::new();
+    for row in rows {
+        let payload: serde_json::Value =
+            serde_json::from_slice(&row.map_err(|error| error.to_string())?)
+                .map_err(|error| error.to_string())?;
+        if payload["spirit_id"] != spirit {
+            continue;
+        }
+        for subject in payload["principal_ids"]
+            .as_array()
+            .ok_or("malformed durable uninstall scope")?
+        {
+            subjects.insert(
+                subject
+                    .as_str()
+                    .ok_or("malformed scope principal")?
+                    .to_owned(),
+            );
+        }
+    }
+    Ok(subjects.into_iter().collect())
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -2010,22 +2073,71 @@ pub fn private_directory_identity(path: &Path) -> Result<Option<String>, AuditEr
 /// Missing roots and non-store files are zero; unreadable or mismatched hashed
 /// namespaces fail closed rather than minting emptiness from a partial scan.
 pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, AuditError> {
+    count_private_principals(memory_root, None, &[]).map(|(total, _)| total)
+}
+
+/// Include this stable owner's orphan namespaces and the known subjects in ANY
+/// owner. Other stable owners' unrelated principals are outside this uninstall.
+pub fn private_tier_principal_row_count_for_spirit(
+    memory_root: &Path,
+    spirit: &str,
+    subjects: &[String],
+) -> Result<u64, AuditError> {
+    private_tier_principal_row_counts_for_spirit(memory_root, spirit, subjects, &[])
+        .map(|(total, _)| total)
+}
+
+/// Return (scoped values, values in held principal namespaces) in one walk.
+/// Namespace/identity metadata, never payload readability, attributes held rows.
+pub fn private_tier_principal_row_counts_for_spirit(
+    memory_root: &Path,
+    spirit: &str,
+    subjects: &[String],
+    held_principals: &[String],
+) -> Result<(u64, u64), AuditError> {
+    count_private_principals(memory_root, Some((spirit, subjects)), held_principals)
+}
+
+fn count_private_principals(
+    memory_root: &Path,
+    scope: Option<(&str, &[String])>,
+    held_principals: &[String],
+) -> Result<(u64, u64), AuditError> {
+    let scoped_owner = scope.map(|(spirit, _)| format!("id-{}", hex::encode(spirit)));
+    let subjects = scope.map(|(_, subjects)| {
+        subjects
+            .iter()
+            .map(String::as_str)
+            .collect::<std::collections::HashSet<_>>()
+    });
     // Guarded owners and namespaces share the interrupted-creation rule.
     if !memory_root.exists() {
-        return Ok(0);
+        return Ok((0, 0));
     }
+    let held = held_principals
+        .iter()
+        .map(String::as_str)
+        .collect::<std::collections::HashSet<_>>();
 
     let mut count = 0_u64;
+    let mut held_count = 0_u64;
     for spirit_dir in std::fs::read_dir(memory_root)? {
         let spirit_dir = spirit_dir?;
         if !spirit_dir.file_type()?.is_dir() {
             continue;
         }
-        if spirit_dir.file_name().to_string_lossy().starts_with("h-")
-            && private_directory_identity(&spirit_dir.path())?.is_none()
-        {
-            continue;
-        }
+        let name = spirit_dir.file_name().to_string_lossy().into_owned();
+        let owner = if name.starts_with("h-") {
+            let Some(owner) = private_directory_identity(&spirit_dir.path())? else {
+                continue;
+            };
+            owner
+        } else {
+            name
+        };
+        let foreign = scoped_owner
+            .as_ref()
+            .is_some_and(|expected| owner.starts_with("id-") && &owner != expected);
         for namespace_dir in std::fs::read_dir(spirit_dir.path())? {
             let namespace_dir = namespace_dir?;
             if !namespace_dir.file_type()?.is_dir() {
@@ -2040,13 +2152,21 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
             } else {
                 name
             };
-            let Ok(maos_domain::memory::MemoryNamespace::Principal { .. }) = hex::decode(identity)
-                .ok()
-                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-                .ok_or(())
+            let Ok(maos_domain::memory::MemoryNamespace::Principal { principal_id, .. }) =
+                hex::decode(identity)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                    .ok_or(())
             else {
                 continue;
             };
+            if foreign
+                && subjects
+                    .as_ref()
+                    .is_some_and(|subjects| !subjects.contains(principal_id.as_str()))
+            {
+                continue;
+            }
             for value in std::fs::read_dir(namespace_dir.path())? {
                 let value = value?;
                 if !value.file_type()?.is_file() {
@@ -2059,11 +2179,16 @@ pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, Audit
                     count = count.checked_add(1).ok_or_else(|| {
                         AuditError::Row("private-tier principal row count overflow".to_string())
                     })?;
+                    if held.contains(principal_id.as_str()) {
+                        held_count = held_count.checked_add(1).ok_or_else(|| {
+                            AuditError::Row("held private-tier principal row count overflow".into())
+                        })?;
+                    }
                 }
             }
         }
     }
-    Ok(count)
+    Ok((count, held_count))
 }
 
 /// Provenance type for subject-access enrichment (Decision D: Direct/Distilled).

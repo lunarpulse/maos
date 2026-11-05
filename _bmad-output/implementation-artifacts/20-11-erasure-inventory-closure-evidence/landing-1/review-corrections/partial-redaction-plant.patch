@@ -1,0 +1,15 @@
+--- /tmp/dev2011b-review.9OTbuj/partial-redaction-after.rs	2026-11-05 19:16:40.517141116 +0000
++++ crates/maos-iac/src/adapter/transparency_log.rs	2026-11-05 19:16:53.808980038 +0000
+@@ -1964,9 +1964,10 @@
+              WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND \
+              CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
+              THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 \
+-             AND (json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' \
++             AND ((json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' \
+              AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') \
+-             AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3) ELSE 0 END",
++             AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3) \
++             OR (kind IN (28,29) AND json_extract(CAST(payload_redacted AS TEXT),'$.redaction_reason')='gdpr-forget')) ELSE 0 END",
+             None,
+             range,
+             |row| { prior.insert(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?); Ok(()) },

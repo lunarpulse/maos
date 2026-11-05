@@ -1,0 +1,37 @@
+{
+  "all_targets": {
+    "file": "workspace-binaries-metadata.json",
+    "counts": {
+      "lib": 56,
+      "test": 596,
+      "proc-macro": 2,
+      "bin": 15,
+      "bench": 8,
+      "example": 1
+    },
+    "total": 678
+  },
+  "default_workspace_test_targets": {
+    "file": "workspace-test-binaries-metadata.json",
+    "counts": {
+      "lib": 56,
+      "test": 596,
+      "proc-macro": 2,
+      "bin": 15
+    },
+    "total": 669
+  },
+  "setup_observations": [
+    {
+      "command_record": "focused-final.stdout.command.json",
+      "exit_code": 94,
+      "result": "Filter rejected nonexistent exact binary name fr4; no tests scheduled."
+    },
+    {
+      "command_record": "focused-final-2.stdout.command.json",
+      "exit_code": 104,
+      "result": "all-targets metadata included custom cap_token_verify_p99 benchmark whose MAOS-PERF lines are not libtest listing output."
+    }
+  ],
+  "correction": "Use the normal cargo nextest list --workspace producer, without --all-targets. This is the ordinary workspace test target set, not a test exclusion/filter to hide a failure. All-targets clippy and compilation remain separately recorded."
+}

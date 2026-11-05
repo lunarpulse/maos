@@ -1,0 +1,36 @@
+{
+  "command": [
+    "env",
+    "CARGO_BUILD_JOBS=8",
+    "cargo",
+    "nextest",
+    "run",
+    "--locked",
+    "-p",
+    "maos-kernel-core",
+    "--test",
+    "forget_cascade_18_6",
+    "--retries",
+    "0",
+    "--no-fail-fast",
+    "--success-output",
+    "immediate",
+    "--failure-output",
+    "immediate"
+  ],
+  "exit_code": 0,
+  "started": "2026-11-05T19:19:52.925092+00:00",
+  "seconds": 43.373779251938686,
+  "stdout": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-restored.stdout",
+  "stderr": "_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/review-corrections/partial-redaction-restored.stderr",
+  "environment": {
+    "CI": null,
+    "GITHUB_ACTIONS": null,
+    "CARGO_TARGET_DIR": "/mnt/build/cargo-maos",
+    "CARGO_MANIFEST_DIR": null,
+    "NEXTEST_TEST_THREADS": null,
+    "NEXTEST_RETRIES": null,
+    "PYTHONPATH": "/tmp/dev2011b-review.9OTbuj/python/lib/python3.13/site-packages",
+    "MAOS_17_2_CGROUP_MODE": null
+  }
+}

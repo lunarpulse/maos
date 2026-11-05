@@ -81,7 +81,16 @@ impl Fixture {
         command.output().expect("run one-shot uninstall")
     }
 
+    fn stable_owner_root(&self) -> PathBuf {
+        self.memory_root
+            .join(format!("id-{}", hex::encode("hello-spirit")))
+    }
+
     fn seed_named_principal(&self, principal: &str, held: bool) {
+        self.seed_named_principal_for_owner(principal, held, Some("hello-spirit"));
+    }
+
+    fn seed_named_principal_for_owner(&self, principal: &str, held: bool, identity: Option<&str>) {
         let audit_db = self.audit_db();
         std::fs::create_dir_all(audit_db.parent().expect("audit parent"))
             .expect("create audit parent");
@@ -99,6 +108,11 @@ impl Fixture {
             principal_index,
             Arc::clone(&transparency_log),
         );
+        if let Some(identity) = identity {
+            memory
+                .bind_storage_identity(0, identity)
+                .expect("bind admitted stable fixture owner");
+        }
         let namespace = MemoryNamespace::Principal {
             principal_id: principal.into(),
             schema: "profile".into(),
@@ -159,6 +173,9 @@ impl Fixture {
             principal_index,
             Arc::clone(&transparency_log),
         );
+        memory
+            .bind_storage_identity(0, "hello-spirit")
+            .expect("bind admitted stable fixture owner");
         memory
             .write(
                 0,
@@ -283,6 +300,66 @@ fn terminal(output: &Output) -> serde_json::Value {
     })
 }
 
+/// L1 retains the signed pre-mutation receipt as well as the final inventory.
+/// Authenticate both; inspect the explicit terminal path, never directory order.
+fn signed_terminal_proof(
+    fixture: &Fixture,
+    terminal: &serde_json::Value,
+) -> maos_audit::erasure::proof::ErasureProof {
+    use maos_audit::erasure::proof::{verify_erasure_proof, CategoryStatus, ErasureProof};
+    let bundles: Vec<_> = std::fs::read_dir(fixture.proof_dir())
+        .expect("read proof directory")
+        .map(|entry| entry.expect("read proof entry").path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "bundle")
+        })
+        .collect();
+    assert_eq!(
+        bundles.len(),
+        2,
+        "provisional and terminal receipts must both survive"
+    );
+    assert_eq!(
+        regular_files(&fixture.proof_dir()),
+        2,
+        "no temporary/teardown artifact may remain"
+    );
+    let terminal_path = PathBuf::from(
+        terminal["proof_path"]
+            .as_str()
+            .expect("truthful terminal proof path"),
+    );
+    let mut selected = None;
+    for path in bundles {
+        let proof: ErasureProof =
+            serde_json::from_slice(&std::fs::read(&path).expect("read proof"))
+                .unwrap_or_else(|error| panic!("decode published proof: {error}"));
+        verify_erasure_proof(
+            &proof,
+            &maos_audit::sealed_export::derive_pubkey(&[0x5b; 32]),
+        )
+        .expect("every retained receipt must authenticate");
+        if path == terminal_path {
+            assert!(selected.is_none(), "one terminal path");
+            selected = Some(proof);
+        } else {
+            assert!(
+                proof.frame_sweep_completion.is_none(),
+                "provisional receipt cannot certify completion"
+            );
+            assert!(
+                proof
+                    .categories
+                    .iter()
+                    .all(|category| matches!(category.status, CategoryStatus::CoverageGap { .. })),
+                "pre-mutation receipt must make no completed-store claim"
+            );
+        }
+    }
+    selected.expect("terminal must reference one of the actual authenticated receipts")
+}
+
 /// AC9 / D5.3 — plaintext erasure does not revoke a derivable signing key.
 /// The real region-pinned uninstall must sign the coverage gap, retain its
 /// HOME seed, and never emit a successful two-phase regional receipt.
@@ -296,15 +373,7 @@ fn regional_uninstall_signs_key_coverage_gap() {
 
     // Read the actual signed artifact before checking the terminal: the gap
     // must be covered by the signature, not appended after proof construction.
-    let bundles: Vec<_> = std::fs::read_dir(fixture.proof_dir())
-        .expect("read proof dir")
-        .map(|entry| entry.expect("read proof entry").path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "bundle"))
-        .collect();
-    assert_eq!(bundles.len(), 1, "one signed partial proof expected");
-    let proof: maos_audit::erasure::proof::ErasureProof =
-        serde_json::from_slice(&std::fs::read(&bundles[0]).expect("read proof"))
-            .expect("decode proof");
+    let proof = signed_terminal_proof(&fixture, &terminal);
     let key = proof
         .categories
         .iter()
@@ -411,20 +480,8 @@ fn regional_uninstall_refuses_to_attest_pre_partition_shared_residue() {
     );
 
     // The proof bundle still lands, and reports the residue honestly.
-    let bundles: Vec<PathBuf> = std::fs::read_dir(fixture.proof_dir())
-        .expect("read proof dir")
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "bundle"))
-        .collect();
-    assert_eq!(
-        bundles.len(),
-        1,
-        "expected one proof bundle, got {bundles:?}"
-    );
-    let proof: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&bundles[0]).expect("read proof bundle"))
-            .expect("decode proof bundle");
+    let proof = serde_json::to_value(signed_terminal_proof(&fixture, &terminal(&output)))
+        .unwrap_or_else(|error| panic!("proof value: {error}"));
     let shared = proof["categories"]
         .as_array()
         .expect("categories array")
@@ -466,11 +523,7 @@ fn non_regional_uninstall_rejects_pre_partition_shared_residue() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(terminal(&output)["outcome"], "failed");
-    assert_eq!(
-        regular_files(&fixture.proof_dir()),
-        1,
-        "the failed terminal must retain the signed partial proof"
-    );
+    let _proof = signed_terminal_proof(&fixture, &terminal(&output));
 }
 
 /// A pre-partition Shared write did not create a `principal_index` row.
@@ -488,11 +541,7 @@ fn shared_only_pre_partition_residue_is_reported() {
         result["outcome"], "failed",
         "Shared-only residue must not disappear behind NotFound: {result}"
     );
-    assert_eq!(
-        regular_files(&fixture.proof_dir()),
-        1,
-        "Shared-only residue must be recorded in a signed partial proof"
-    );
+    let _proof = signed_terminal_proof(&fixture, &result);
 }
 
 #[test]
@@ -505,17 +554,21 @@ fn held_uninstall_is_non_success_and_writes_no_complete_proof() {
     let terminal = terminal(&output);
     assert_eq!(terminal["outcome"], "held");
     assert_eq!(terminal["held_principal_ids"][0], PRINCIPAL);
-    // Nothing was destroyed, so there is nothing to attest.
+    // Nothing was destroyed; neither receipt may claim completed erasure.
     assert!(terminal["erased_principal_ids"]
         .as_array()
         .expect("erased_principal_ids array")
         .is_empty());
-    assert!(terminal["proof_path"].is_null());
-    assert_eq!(
-        regular_files(&fixture.proof_dir()),
-        0,
-        "held uninstall must not sign a complete proof"
-    );
+    let proof = signed_terminal_proof(&fixture, &terminal);
+    assert!(proof.frame_sweep_completion.is_none());
+    assert!(proof
+        .categories
+        .iter()
+        .any(|category| category.name == "legal_hold"
+            && matches!(
+                category.status,
+                maos_audit::erasure::proof::CategoryStatus::CoverageGap { .. }
+            )));
 }
 
 /// Story 13.5b review, D2 (party-mode consensus, option (b)).
@@ -560,12 +613,8 @@ fn mixed_held_uninstall_writes_partial_proof() {
     );
 
     // A partial proof exists and is explicit about the hold.
-    let proof_path = terminal["proof_path"]
-        .as_str()
-        .expect("a run that destroyed data must attest it");
-    let proof: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
-            .expect("decode proof bundle");
+    let proof = serde_json::to_value(signed_terminal_proof(&fixture, &terminal))
+        .unwrap_or_else(|error| panic!("proof value: {error}"));
     let hold = proof["categories"]
         .as_array()
         .expect("categories array")
@@ -681,11 +730,7 @@ fn unknown_spirit_on_populated_log_with_shared_residue_writes_partial_proof() {
         "unidentified rows exist, so `not_found` would be a signed lie: {result}"
     );
     assert_eq!(result["spirit_id"], "ghost-spirit");
-    assert_eq!(
-        regular_files(&fixture.proof_dir()),
-        1,
-        "the failed terminal must retain the signed partial proof"
-    );
+    let _proof = signed_terminal_proof(&fixture, &result);
 }
 
 /// Story 16-2 / D-16-2-F — branch 3: an unknown Spirit name on a populated
@@ -752,7 +797,7 @@ fn unknown_spirit_on_populated_log_without_residue_fails_without_proof() {
 #[test]
 fn unknown_spirit_with_small_durable_principal_residue_writes_partial_proof() {
     let fixture = Fixture::new();
-    fixture.seed_unheld_principal();
+    fixture.seed_named_principal_for_owner(PRINCIPAL, false, None);
     assert_eq!(
         maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
         1
@@ -766,7 +811,7 @@ fn unknown_spirit_with_small_durable_principal_residue_writes_partial_proof() {
     let result = terminal(&output);
     assert_eq!(result["outcome"], "failed");
     assert!(result["error"].as_str().unwrap().contains("private tier"));
-    assert_eq!(regular_files(&fixture.proof_dir()), 1);
+    let _proof = signed_terminal_proof(&fixture, &result);
     assert_eq!(
         maos_audit::private_tier_principal_row_count(&fixture.memory_root).unwrap(),
         1,
@@ -789,7 +834,7 @@ fn held_principal_does_not_hide_unindexed_private_residue() {
     assert_eq!(output.status.code(), Some(5));
     let result = terminal(&output);
     assert_eq!(result["outcome"], "failed");
-    assert_eq!(regular_files(&fixture.proof_dir()), 1);
+    let _proof = signed_terminal_proof(&fixture, &result);
     assert!(result["error"]
         .as_str()
         .unwrap()
@@ -814,7 +859,7 @@ fn erased_uninstall_is_success_with_machine_receipt() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(terminal(&output)["outcome"], "erased");
-    assert_eq!(regular_files(&fixture.proof_dir()), 1);
+    let _proof = signed_terminal_proof(&fixture, &terminal(&output));
 }
 
 #[test]
@@ -1124,7 +1169,8 @@ fn redistillation_failure_after_erasure_does_not_skip_the_signed_uninstall_proof
     assert_eq!(
         output.status.code(),
         Some(0),
-        "{}",
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
     let terminal = terminal(&output);
@@ -1153,8 +1199,7 @@ fn unreadable_held_value_still_writes_signed_partial_proof_after_other_erasure()
     fixture.seed_named_markdown_principal(ERASED);
     let namespace = MemoryNamespace::principal(PRINCIPAL, "profile").unwrap();
     let spill = fixture
-        .memory_root
-        .join("0")
+        .stable_owner_root()
         .join(hex::encode(serde_json::to_vec(&namespace).unwrap()))
         .join(format!("{}.txt", hex::encode("record")));
     std::fs::write(&spill, [0xff]).expect("make only the held value unreadable");
@@ -1162,16 +1207,7 @@ fn unreadable_held_value_still_writes_signed_partial_proof_after_other_erasure()
     let result = terminal(&output);
     assert_eq!(result["outcome"], "held", "{result}");
     assert_eq!(result["deleted_entries"], 1);
-    let path = result["proof_path"]
-        .as_str()
-        .expect("post-erasure proof is mandatory");
-    let proof: maos_audit::erasure::proof::ErasureProof =
-        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-    maos_audit::erasure::proof::verify_erasure_proof(
-        &proof,
-        &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
-    )
-    .expect("coverage gap must be signed");
+    let proof = signed_terminal_proof(&fixture, &result);
     let private = proof
         .categories
         .iter()
@@ -1196,7 +1232,7 @@ fn unreadable_held_value_still_writes_signed_partial_proof_after_other_erasure()
 #[test]
 fn uninstall_discovers_stable_owner_after_readmission_at_a_new_pid() {
     let fixture = Fixture::new();
-    fixture.seed_unheld_principal();
+    fixture.seed_named_principal_for_owner(PRINCIPAL, false, None);
     let owner = format!("id-{}", hex::encode("hello-spirit"));
     std::fs::rename(
         fixture.memory_root.join("0"),
@@ -1307,13 +1343,12 @@ fn audit_counts_hashed_namespaces_but_not_identity_or_key_sidecars() {
 
 #[test]
 fn unreadable_held_value_cannot_cover_an_unrelated_unindexed_private_value() {
-    for orphan in [false, true] {
+    for orphan in [true, false] {
         let fixture = Fixture::new();
         fixture.seed_held_principal();
         let held_ns = MemoryNamespace::principal(PRINCIPAL, "profile").unwrap();
         let held = fixture
-            .memory_root
-            .join("0")
+            .stable_owner_root()
             .join(hex::encode(serde_json::to_vec(&held_ns).unwrap()))
             .join(format!("{}.txt", hex::encode("record")));
         std::fs::write(&held, [0xff]).unwrap();
@@ -1340,20 +1375,7 @@ fn unreadable_held_value_cannot_cover_an_unrelated_unindexed_private_value() {
                 .unwrap()
                 .contains("1 other value(s)"));
         }
-        assert_eq!(regular_files(&fixture.proof_dir()), 1);
-        let proof_path = std::fs::read_dir(fixture.proof_dir())
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
-        let proof: maos_audit::erasure::proof::ErasureProof =
-            serde_json::from_slice(&std::fs::read(proof_path).unwrap()).unwrap();
-        maos_audit::erasure::proof::verify_erasure_proof(
-            &proof,
-            &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
-        )
-        .unwrap();
+        let proof = signed_terminal_proof(&fixture, &result);
         let private = proof
             .categories
             .iter()
@@ -1376,16 +1398,14 @@ fn interrupted_identity_debris_does_not_block_uninstall_or_held_attribution() {
         let fixture = Fixture::new();
         fixture.seed_principal(held);
         let debris = fixture
-            .memory_root
-            .join("0")
+            .stable_owner_root()
             .join(format!("h-{}", "a".repeat(64)));
         std::fs::create_dir_all(&debris).unwrap();
         std::fs::write(debris.join(".identity-tmp.1.0"), "interrupted").unwrap();
         if held {
             let ns = MemoryNamespace::principal(PRINCIPAL, "profile").unwrap();
             let value = fixture
-                .memory_root
-                .join("0")
+                .stable_owner_root()
                 .join(hex::encode(serde_json::to_vec(&ns).unwrap()))
                 .join(format!("{}.txt", hex::encode("record")));
             std::fs::write(value, [0xff]).unwrap();
