@@ -9,12 +9,15 @@ import sys
 
 def outbound(text):
     attempts = [line for line in text.splitlines()
-                if re.search(r"\b(connect|sendto|sendmsg)\(", line)]
+                if re.search(r"\b(connect|sendto|sendmsg|sendmmsg|io_uring_enter)\(", line)]
     inet = [line for line in attempts
             if re.search(r"\bAF_INET6?\b|<(?:TCP|UDP)(?:v6)?:", line)]
     other = collections.Counter()
     for line in attempts:
-        if line not in inet:
+        if "io_uring_enter(" in line:
+            # strace cannot decode submission queue entries: no clean proof.
+            other["io_uring_enter"] += 1
+        elif line not in inet:
             match = re.search(r"AF_[A-Z0-9_]+", line)
             other[match[0] if match else "other/connected-fd"] += 1
     return inet, dict(other)
@@ -42,6 +45,8 @@ def main():
         if not inet:
             raise SystemExit("canary not detected")
     elif mode == "workload":
+        if other.get("io_uring_enter"):
+            raise SystemExit("uninspectable io_uring submission: no clean outbound witness")
         if inet:
             raise SystemExit("STOP: NFR-Ops-12 product defect; no outbound allowlist permitted")
     else:

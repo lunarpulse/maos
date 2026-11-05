@@ -9,64 +9,94 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: write
-      id-token: write
     env:
       PUBLISH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-      HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-      GH_TOKEN: ${{ github.token }}
       MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: Wait for the signed tag release (never build from an unsigned download)
+        id: release
         env:
           TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 180); do
-            state=$(gh run list --workflow release.yml --commit "$GITHUB_SHA" --event push --json status,conclusion --jq '.[0] | .status + ":" + .conclusion')
-            if [ "$state" = 'completed:success' ]; then break; fi
-            if [[ "$state" == completed:* ]]; then echo "release failed: $state"; exit 1; fi
-            sleep 20
-          done
-          test "$state" = 'completed:success'
+          packaging/wait-release.sh "$GITHUB_SHA" "$TAG"
+          test -n "$MAOS_RELEASE_PUBKEY"
+          cargo build --locked -p maos-cli -p xtask
+          pubkey=$(target/debug/maosctl release-pubkey)
+          test "$pubkey" != bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7
           mkdir -p dist
-          gh release download "$TAG" --dir dist --pattern 'maos-linux-*' --pattern SHA256SUMS --pattern SHA256SUMS.sig
-          cargo build --locked -p maos-cli
-          echo "pubkey=$(target/debug/maosctl release-pubkey)" >> "$GITHUB_ENV"
+          gh release download "$TAG" --dir dist
+          target/debug/xtask release-verify --verify --sha256sums dist/SHA256SUMS --sig dist/SHA256SUMS.sig --artifacts-dir dist
+          target/debug/xtask release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
+          echo "pubkey=$pubkey" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@v3
       - name: Always build and smoke without logging in
         run: |
           docker buildx build --load --platform linux/amd64 --build-arg RELEASE_PUBKEY="$pubkey" --build-arg SOURCE_SHA="$GITHUB_SHA" -t maos:tag .
           docker run --rm maos:tag --version
           docker run --rm maos:tag --help
+          docker run --rm maos:tag init --plain
       - name: Publication unavailable
         if: env.PUBLISH != 'true'
         run: |
           echo 'SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-container-release
+          path: dist/
+          retention-days: 1
+  publication:
+    needs: build-and-push
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      PUBLISH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+      HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+      pubkey: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-container-release
+          path: dist
+      - uses: docker/setup-buildx-action@v3
+        if: env.PUBLISH == 'true'
+      - uses: docker/setup-qemu-action@v3
+        if: env.PUBLISH == 'true'
       - name: Log in to GHCR
         if: env.PUBLISH == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Log in to Docker Hub
         if: env.PUBLISH == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-qemu-action@v3
-        if: env.PUBLISH == 'true'
       - name: Publish the verified multi-platform image
         if: env.PUBLISH == 'true'
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -77,7 +107,7 @@ jobs:
           build-args: |
             RELEASE_PUBKEY=${{ env.pubkey }}
             SOURCE_SHA=${{ github.sha }}
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
         if: env.PUBLISH == 'true'
       - name: Sign both published digests
         if: env.PUBLISH == 'true'

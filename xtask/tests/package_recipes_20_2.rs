@@ -29,6 +29,10 @@ fn ac2_versions_preserve_prerelease_ordering_shape() {
         "1.0.0+meta",
         "1.0.0-rc/1",
         "1.0.0-rc';exit",
+        "1.0.0-1",
+        "1.0.0-.",
+        "1.0.0-rc..1",
+        "1.0.0-rc.",
     ] {
         assert!(versions(bad).is_err(), "{bad}");
     }

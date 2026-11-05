@@ -58,11 +58,16 @@ This trust model is **substrate-as-substrate by construction**: the operator own
 
 ### 4. Air-gap-compatible anchoring and rotation
 
-The anchoring mechanism satisfies NFR-Ops-12 (zero outbound network calls):
+The local anchoring/rotation mechanism is air-gap-compatible; that alone does
+**not** establish NFR-Ops-12 for a deployed process. Story 20-2's authored netns
+leg can establish only **no outbound attempts in the witnessed replay session**,
+not absence of all possible network behaviour. Hosted execution is unverified.
+It traces `sendmmsg` as well as connect/send calls and refuses a clean witness
+when `io_uring_enter` submissions cannot be inspected:
 
 - **Key derivation:** HKDF-SHA256 with operator-local seed + region tag. No key server, no CA, no OCSP responder.
 - **Rotation:** Operator rotates the seed locally; re-derivation produces new per-region signing keys. In-flight TL entries signed under the old key remain verifiable (the old seed is retained for verification, not signing). No certificate-revocation-list fetch.
-- **Boot:** The substrate boots and produces TL entries with the operator's local seed. No network handshake, no license check, no external authority contact.
+- **Boot TL anchoring:** The local signing path uses the operator's seed, without a key-service handshake. This says nothing about other boot/session components; those require the scoped runtime witness above.
 
 ### 5. Explicit v1.0 scope
 

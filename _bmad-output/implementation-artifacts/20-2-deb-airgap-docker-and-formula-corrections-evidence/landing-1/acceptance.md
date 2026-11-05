@@ -1,5 +1,11 @@
 # 20-2 landing-1 acceptance evidence
 
+**Historical pre-review record.** Source line references, counts and results
+below describe the initial cbed4dad landing only. Current 88c7277c review
+corrections, exact rebase, current size and witness lines are in
+[review-corrections/record.md](review-corrections/record.md); no original result
+has been overwritten or promoted to hosted proof.
+
 Baseline `cbed4dad`; uncommitted implementation. Commands and exit codes are in
 neighboring `.log` files. `runlog` removes CI/GITHUB_ACTIONS from local commands;
 standard gates additionally set `CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask`.

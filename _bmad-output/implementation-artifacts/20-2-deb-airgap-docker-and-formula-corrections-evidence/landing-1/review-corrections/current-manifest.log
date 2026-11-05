@@ -1,0 +1,1 @@
+{"passed":true,"manifest_only":true,"dist_dir":"/tmp/maos-20-2-review-dev202/dist","targets":["x86_64-unknown-linux-gnu"],"artifact_count":4,"artifacts":["maos-linux-amd64","maos-registry-server-linux-amd64","maos-spirit-linux-amd64","maosctl-linux-amd64"],"manifest":"/tmp/maos-20-2-review-dev202/dist/SHA256SUMS"}

@@ -1,0 +1,295 @@
+{
+  "baseline": "88c7277c0967d2abb8bb89f5f52e4e5a7ffe46e8",
+  "resolution_only_not_execution": true,
+  "base_images": {
+    "library/debian:trixie-slim": {
+      "exit": 0,
+      "digest": "sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4",
+      "computed_digest": "sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4",
+      "platforms": [
+        {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "arm",
+          "os": "linux",
+          "variant": "v5"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "arm",
+          "os": "linux",
+          "variant": "v7"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "arm64",
+          "os": "linux",
+          "variant": "v8"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "386",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "ppc64le",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "riscv64",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "s390x",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        }
+      ],
+      "digest_matches": true
+    },
+    "library/ubuntu:24.04": {
+      "exit": 0,
+      "digest": "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852",
+      "computed_digest": "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852",
+      "platforms": [
+        {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "arm",
+          "os": "linux",
+          "variant": "v7"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "arm64",
+          "os": "linux",
+          "variant": "v8"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "ppc64le",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "riscv64",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "s390x",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        }
+      ],
+      "digest_matches": true
+    },
+    "library/fedora:43": {
+      "exit": 0,
+      "digest": "sha256:f01112b9a1f1d0504ad962d9adfa401425033f8ab067e0a821904ebdde5b8ca5",
+      "computed_digest": "sha256:f01112b9a1f1d0504ad962d9adfa401425033f8ab067e0a821904ebdde5b8ca5",
+      "platforms": [
+        {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "arm64",
+          "os": "linux",
+          "variant": "v8"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "ppc64le",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        {
+          "architecture": "s390x",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        }
+      ],
+      "digest_matches": true
+    },
+    "library/archlinux:base-devel": {
+      "exit": 0,
+      "digest": "sha256:767de6eaa40dcfeda5263a48737ea03a782caabdf3a403b6e6a203c7fd333681",
+      "computed_digest": "sha256:767de6eaa40dcfeda5263a48737ea03a782caabdf3a403b6e6a203c7fd333681",
+      "platforms": [
+        {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        {
+          "architecture": "unknown",
+          "os": "unknown"
+        }
+      ],
+      "digest_matches": true
+    },
+    "gcr.io/distroless/cc-debian13:nonroot": {
+      "exit": 0,
+      "digest": "sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1",
+      "computed_digest": "sha256:08476c244888bfb425bae1ae4dd7c17f093e972aab8426883d97f3c6f280f7c1",
+      "platforms": [
+        {
+          "os": "linux",
+          "architecture": "amd64"
+        },
+        {
+          "os": "linux",
+          "architecture": "arm64",
+          "variant": "v8"
+        },
+        {
+          "os": "linux",
+          "architecture": "arm",
+          "variant": "v7"
+        },
+        {
+          "os": "linux",
+          "architecture": "s390x"
+        },
+        {
+          "os": "linux",
+          "architecture": "ppc64le"
+        },
+        {
+          "os": "linux",
+          "architecture": "riscv64"
+        }
+      ],
+      "digest_matches": true
+    }
+  },
+  "actions": {
+    "softprops/action-gh-release": {
+      "commit": "3bb12739c298aeb8a4eeaf626c5b8d85266b0e65",
+      "version_membership": "v2.6.2"
+    },
+    "docker/build-push-action": {
+      "commit": "10e90e3645eae34f1e60eeb005ba3a3d33f178e8",
+      "version_membership": "v6.19.2"
+    },
+    "docker/login-action": {
+      "commit": "c94ce9fb468520275223c153574b00df6fe4bcc9",
+      "version_membership": "v3.7.0"
+    },
+    "sigstore/cosign-installer": {
+      "commit": "398d4b0eeef1380460a10c8013a76f728fb906ac",
+      "version_membership": "v3.9.1",
+      "annotated_v3_tag_object": "f713795cb21599bc4e5c4b58cbad1da852d7eeb9"
+    }
+  },
+  "action_lookup_method": "Observed gh api git/ref/tags/vN; dereference annotated git/tags object; tags?per_page=100 commit membership. All calls exit0.",
+  "image_lookup_method": "Observed curl registry API manifest indexes; Docker-Content-Digest exactly equals sha256(response bytes); public token held only in memory; all curl calls exit0.",
+  "environment_lookup": {
+    "command": [
+      "gh",
+      "api",
+      "repos/lunarpulse/maos/environments/release",
+      "--jq",
+      "{name,protection_rules,deployment_branch_policy}"
+    ],
+    "exit_code": 1,
+    "result": "HTTP404; absent versus unavailable visibility unresolved"
+  },
+  "public_repo_lookup": {
+    "command": [
+      "gh",
+      "api",
+      "repos/lunarpulse/maos",
+      "--jq",
+      "{private,visibility}"
+    ],
+    "exit_code": 0,
+    "result": {
+      "private": false,
+      "visibility": "public"
+    }
+  },
+  "historical_release_attempt_lookup": {
+    "command": [
+      "gh",
+      "api",
+      "repos/lunarpulse/maos/actions/runs/36094027381/attempts/1",
+      "--jq",
+      "{id,run_attempt,head_sha,head_branch,status,conclusion,event}"
+    ],
+    "exit_code": 0,
+    "result": {
+      "id": 36094027381,
+      "run_attempt": 1,
+      "head_sha": "0c66199548fc595d317526fe9c26336a63175e37",
+      "head_branch": "v0.1.0-alpha.1",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "push"
+    }
+  }
+}

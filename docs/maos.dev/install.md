@@ -10,12 +10,13 @@ execution is not part of the Linux discipline matrix.
 ## Signed binary
 
 Download all four binaries for one suffix (`linux-amd64`, `linux-arm64`, or
-`darwin-arm64`), `SHA256SUMS`, `SHA256SUMS.sig` and `verify-release.py`. Obtain the
-release public key through the trusted release-key channel, not a key supplied
-alongside an untrusted binary. With Python 3 and `cryptography` installed:
+`darwin-arm64`), `SHA256SUMS` and `SHA256SUMS.sig`. Obtain the release public key
+through the trusted release-key channel. Bootstrap verification from an
+**already trusted source checkout**, not a verifier downloaded beside the
+untrusted release. With Python 3 and `cryptography` installed:
 
 ```bash
-python3 verify-release.py --directory ./dist --pubkey "$RELEASE_PUBKEY" \
+python3 /path/to/trusted-maos-checkout/packaging/verify-release.py --directory ./dist --pubkey "$RELEASE_PUBKEY" \
   maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64
 chmod +x dist/*-linux-amd64
 ./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only
@@ -24,26 +25,34 @@ for bin in maos maosctl maos-spirit maos-registry-server; do
 done
 ```
 
-Do not execute a downloaded verifier binary until the independent signature and
-exact-name SHA-256 checks pass. Signatures are Ed25519 over SHA256(SHA256SUMS).
-The shared Python verifier rejects malformed/duplicate manifest entries,
-missing exact filenames, changed bytes and incorrect signatures.
+Do not execute any downloaded verifier until its bytes have been authenticated
+by trusted tooling. The release's `verify-release.py` and rendered recipes are
+covered by the second signed manifest below; it cannot authenticate itself.
+Signatures are Ed25519 over SHA256(SHA256SUMS). The trusted Python verifier
+rejects malformed/duplicate entries, missing exact names, changed bytes and
+incorrect signatures.
 
 ## Debian and RPM
 
-Download the native `.deb`/`.rpm` plus `SHA256SUMS-packages` and
-`SHA256SUMS-packages.sig`. Verify that second signed manifest **before installing**
-(the package metadata and maintainer scripts are covered, not just binaries).
+Download **every asset listed in `SHA256SUMS-packages`**, together with
+`SHA256SUMS-packages.sig`: both architectures' deb/RPM packages, `maos.rb`,
+`PKGBUILD`, `maos.spec`, `verify-release.py` and `debian-recipes.tar.gz`.
+Verify that second signed manifest **before installing or executing recipes**.
 Use trusted locally built `xtask release-verify --verify --sha256sums
-SHA256SUMS-packages --sig SHA256SUMS-packages.sig --artifacts-dir .`, with every
-listed package downloaded and the release public key compiled into the tool.
+SHA256SUMS-packages --sig SHA256SUMS-packages.sig --artifacts-dir .`, with the
+release public key compiled into that trusted tool. This authenticates package
+metadata/payloads and the exact attached verifier/recipe bytes.
 Then `sudo dpkg -i <native.deb>` or `sudo rpm -i <native.rpm>`.
-The recipes themselves also verify the original binary manifest at build time,
-and disable stripping/debug rewriting so installed bytes equal signed bytes.
+Deb/RPM recipes verify the original binary manifest **at package build time**.
+There are no install-time signature-verifying maintainer scripts; native
+package installation does not independently reverify that original manifest.
+End-user pre-install verification of the signed packaging manifest is required.
+The recipes disable stripping/debug rewriting to preserve signed bytes.
 
 ## Homebrew and AUR
 
-Use **rendered recipes attached to that release**, never the committed templates.
+Use **rendered recipes attached to that release**, never the committed templates,
+and authenticate them with the second signed manifest before execution.
 Tap/AUR publication is operator-owned and remains unavailable until
 `ops-brew-tap-and-aur-publication` provisions and publishes those accounts.
 A local Homebrew tap can place `maos.rb` in `Formula/`, then
@@ -51,8 +60,10 @@ A local Homebrew tap can place `maos.rb` in `Formula/`, then
 runs with `makepkg -si` as a non-root user. Both verify the signed original
 manifest using Python `cryptography` before installing all four exact binaries.
 The formula depends on actual `python@3.14` and `cryptography` formulae; the
-PKGBUILD needs `python-cryptography`, not a Rust compiler. Homebrew does not
-strip these binaries; the hosted Linux identity check catches any relocation.
+PKGBUILD needs `python-cryptography`, not a Rust compiler. Homebrew byte
+preservation is **claimed, not verified**: targeted `skip_clean` is configured,
+but no hosted install/relocation/installed-hash proof has run. The authored
+Linux witness compares all four installed binaries; it remains unverified.
 
 ## Cargo source route
 
@@ -76,6 +87,9 @@ registry secrets. Tag builds always run; **all publication and keyless cosign
 signing wait for both Docker Hub credentials**. If absent, the job says
 `SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)` after build.
 No published image or signing result is claimed until the operator lane runs.
+Publication jobs reference the `release` environment, but a reference does not
+prove protection is configured. An administrator must provision required
+reviewers and tag/deployment protections per the provisioning checklist first.
 After publication, verify its digest with `cosign verify --certificate-identity
 <release-workflow-identity> --certificate-oidc-issuer https://token.actions.githubusercontent.com
 <registry-image>@sha256:<digest>` before running it. Use the real tag workflow

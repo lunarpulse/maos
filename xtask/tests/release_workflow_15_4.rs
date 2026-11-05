@@ -202,9 +202,10 @@ fn release_workflow_flattens_and_publishes_the_explicit_artifact_set() {
             "dist/*.rpm",
             "dist/SHA256SUMS-packages",
             "dist/SHA256SUMS-packages.sig",
-            "dist/recipes/maos.rb",
-            "dist/recipes/PKGBUILD",
-            "dist/recipes/maos.spec",
+            "dist/maos.rb",
+            "dist/PKGBUILD",
+            "dist/maos.spec",
+            "dist/debian-recipes.tar.gz",
             "dist/verify-release.py",
         ]
         .into_iter()

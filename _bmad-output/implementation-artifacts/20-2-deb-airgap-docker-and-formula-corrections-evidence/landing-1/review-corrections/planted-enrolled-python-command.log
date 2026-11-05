@@ -1,0 +1,122 @@
+test_ac1_ac2_signed_bytes_pass (__main__.ReleaseControls.test_ac1_ac2_signed_bytes_pass) ... verified signature and exact artifact hashes: maos-linux-amd64
+ok
+test_ac1_exact_filename_not_regex_substring (__main__.ReleaseControls.test_ac1_exact_filename_not_regex_substring) ... ok
+test_ac1_forged_signature_refused (__main__.ReleaseControls.test_ac1_forged_signature_refused) ... verified signature and exact artifact hashes: maos-linux-amd64
+FAIL
+test_ac2_duplicate_manifest_entry_refused (__main__.ReleaseControls.test_ac2_duplicate_manifest_entry_refused) ... ok
+test_ac3_outbound_canary_and_unix_exclusion (__main__.ReleaseControls.test_ac3_outbound_canary_and_unix_exclusion) ... ok
+test_ac5_changed_byte_refused (__main__.ReleaseControls.test_ac5_changed_byte_refused) ... ok
+test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) ... verified signature and exact artifact hashes: amd64.deb, amd64.rpm, arm64.deb, arm64.rpm
+verified signature and exact artifact hashes: amd64.deb, amd64.rpm, arm64.deb, arm64.rpm
+
+  test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='verify-release.py') ... FAIL
+verified signature and exact artifact hashes: amd64.deb, amd64.rpm, arm64.deb, arm64.rpm
+  test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='maos.rb') ... FAIL
+verified signature and exact artifact hashes: amd64.deb, amd64.rpm, arm64.deb, arm64.rpm
+  test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='PKGBUILD') ... FAIL
+verified signature and exact artifact hashes: amd64.deb, amd64.rpm, arm64.deb, arm64.rpm
+  test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='maos.spec') ... FAIL
+verified signature and exact artifact hashes: amd64.deb, amd64.rpm, arm64.deb, arm64.rpm
+  test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='debian-recipes.tar.gz') ... FAIL
+test_review_f6_io_uring_is_uninspectable_not_a_clean_witness (__main__.ReleaseControls.test_review_f6_io_uring_is_uninspectable_not_a_clean_witness) ... ok
+test_review_f6_sendmmsg_cannot_hide_an_outbound_attempt (__main__.ReleaseControls.test_review_f6_sendmmsg_cannot_hide_an_outbound_attempt) ... ok
+test_review_f9_exact_tag_and_sha_excludes_another_successful_run (__main__.ReleaseControls.test_review_f9_exact_tag_and_sha_excludes_another_successful_run) ... FAIL
+test_review_f9_stale_attempt_and_failed_current_attempt_are_refused (__main__.ReleaseControls.test_review_f9_stale_attempt_and_failed_current_attempt_are_refused) ... FAIL
+test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key (__main__.ReleaseControls.test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key) ... FAIL
+
+======================================================================
+FAIL: test_ac1_forged_signature_refused (__main__.ReleaseControls.test_ac1_forged_signature_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 55, in test_ac1_forged_signature_refused
+    with self.assertRaises(Exception):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+AssertionError: Exception not raised
+
+======================================================================
+FAIL: test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='verify-release.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 112, in test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe
+    with self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='maos.rb')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 112, in test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe
+    with self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='PKGBUILD')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 112, in test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe
+    with self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='maos.spec')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 112, in test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe
+    with self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) (asset='debian-recipes.tar.gz')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 112, in test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe
+    with self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_review_f9_exact_tag_and_sha_excludes_another_successful_run (__main__.ReleaseControls.test_review_f9_exact_tag_and_sha_excludes_another_successful_run)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 133, in test_review_f9_exact_tag_and_sha_excludes_another_successful_run
+    self.assertEqual(release_run.select([good, unrelated], 'abc', 'v1'), (10, 2))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: (20, 2) != (10, 2)
+
+First differing element 0:
+20
+10
+
+- (20, 2)
+?  ^
+
++ (10, 2)
+?  ^
+
+
+======================================================================
+FAIL: test_review_f9_stale_attempt_and_failed_current_attempt_are_refused (__main__.ReleaseControls.test_review_f9_stale_attempt_and_failed_current_attempt_are_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 139, in test_review_f9_stale_attempt_and_failed_current_attempt_are_refused
+    with self.assertRaisesRegex(ValueError, 'identity/attempt'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key (__main__.ReleaseControls.test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 126, in test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key
+    self.assertNotIn(old_hash, (recipes/name).read_text())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'd9d13463e65da850818428dea78e972f6fa9ca7b6c87c9545dd23d98e1e85281' unexpectedly found in '# Render with xtask render-packages. install uses the independent Python\n# verifier before installing any downloaded executable, not maosctl itself.\nclass Maos < Formula\n  desc "Minimal Agentic Operating System"\n  homepage "https://github.com/lunarpulse/maos"\n  version "@VERSION@"\n  license any_of: ["Apache-2.0", "MIT"]\n  depends_on "python@3.14" => :build\n  depends_on "cryptography" => :build\n  # Preserve the signed binaries; :all is deprecated and does not match paths.\n  skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", "bin/maos-registry-server"\n\n  RELEASES = {\n@BREW_RELEASES@\n  }.freeze\n  SUFFIX = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}".freeze\n  odie "This release has no binaries for #{SUFFIX}" unless RELEASES.key?(SUFFIX)\n  url "@BASE_URL@/maos-#{SUFFIX}", using: :nounzip\n  sha256 RELEASES.fetch(SUFFIX).fetch(0)\n\n  %w[maosctl maos-spirit maos-registry-server].each_with_index do |binary, index|\n    resource binary do\n      url "@BASE_URL@/#{binary}-#{SUFFIX}", using: :nounzip\n      sha256 RELEASES.fetch(SUFFIX).fetch(index + 1)\n    end\n  end\n  resource "manifest" do\n    url "@BASE_URL@/SHA256SUMS", using: :nounzip\n    sha256 "@SHA256SUMS_HASH@"\n  end\n  resource "signature" do\n    url "@BASE_URL@/SHA256SUMS.sig", using: :nounzip\n    sha256 "d9d13463e65da850818428dea78e972f6fa9ca7b6c87c9545dd23d98e1e85281"\n  end\n  resource "verifier" do\n    url "@BASE_URL@/verify-release.py", using: :nounzip\n    sha256 "@VERIFIER_HASH@"\n  end\n\n  def install\n    resources.each do |resource|\n      resource.stage { buildpath.install Dir["*"] }\n    end\n    # Homebrew\'s cryptography and cffi formulae link into this site-packages.\n    ENV.prepend_path "PYTHONPATH", HOMEBREW_PREFIX/"lib/python3.14/site-packages"\n    names = %w[maos maosctl maos-spirit maos-registry-server]\n    system Formula["python@3.14"].opt_bin/"python3.14", "verify-release.py",\n           "--pubkey", "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8", *names.map { |name| "#{name}-#{SUFFIX}" }\n    names.each { |name| bin.install "#{name}-#{SUFFIX}" => name }\n  end\n\n  test do\n    assert_match "maos", shell_output("#{bin}/maos --version")\n  end\nend\n'
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.017s
+
+FAILED (failures=9)

@@ -1,0 +1,656 @@
+{
+  "cwd": "/home/lunarpulse/dev_ws",
+  "cargo_target_dir_env": null,
+  "target_realpath": "/mnt/build/cargo-maos",
+  "commands": [
+    {
+      "name": "python-venv",
+      "command": [
+        "python3",
+        "-m",
+        "venv",
+        "/tmp/maos-20-2-review-dev202/venv"
+      ],
+      "exit_code": 0,
+      "seconds": 1.167
+    },
+    {
+      "name": "python-cryptography",
+      "command": [
+        "/tmp/maos-20-2-review-dev202/venv/bin/pip",
+        "install",
+        "cryptography"
+      ],
+      "exit_code": 0,
+      "seconds": 0.615
+    },
+    {
+      "name": "before-python-controls",
+      "command": [
+        "/tmp/maos-20-2-review-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py"
+      ],
+      "exit_code": 1,
+      "seconds": 0.064
+    },
+    {
+      "name": "before-rust-controls",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "xtask",
+        "--test",
+        "package_recipes_20_2",
+        "--test",
+        "package_workflows_20_2"
+      ],
+      "exit_code": 101,
+      "seconds": 50.804
+    },
+    {
+      "name": "before-workflow-controls",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "xtask",
+        "--test",
+        "package_workflows_20_2"
+      ],
+      "exit_code": 101,
+      "seconds": 0.665
+    },
+    {
+      "name": "backup-assemble-release-packaging",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/packaging/assemble-release-packaging.py",
+        "/tmp/maos-20-2-review-dev202/assemble-release-packaging.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.008
+    },
+    {
+      "name": "backup-release-run",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/packaging/release-run.py",
+        "/tmp/maos-20-2-review-dev202/release-run.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "backup-forge-recipe-signature",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/packaging/forge-recipe-signature.py",
+        "/tmp/maos-20-2-review-dev202/forge-recipe-signature.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "backup-verify-release",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/packaging/verify-release.py",
+        "/tmp/maos-20-2-review-dev202/verify-release.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "planted-enrolled-python-command",
+      "command": [
+        "python3",
+        "packaging/test_release_20_2.py",
+        "-v"
+      ],
+      "exit_code": 1,
+      "seconds": 0.114,
+      "extra_env": {
+        "PATH": "/tmp/maos-20-2-review-dev202/venv/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      }
+    },
+    {
+      "name": "restore-assemble-release-packaging",
+      "command": [
+        "bash",
+        "-c",
+        "cp /tmp/maos-20-2-review-dev202/assemble-release-packaging.py /home/lunarpulse/dev_ws/packaging/assemble-release-packaging.py && cmp /tmp/maos-20-2-review-dev202/assemble-release-packaging.py /home/lunarpulse/dev_ws/packaging/assemble-release-packaging.py && touch /home/lunarpulse/dev_ws/packaging/assemble-release-packaging.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.007
+    },
+    {
+      "name": "restore-release-run",
+      "command": [
+        "bash",
+        "-c",
+        "cp /tmp/maos-20-2-review-dev202/release-run.py /home/lunarpulse/dev_ws/packaging/release-run.py && cmp /tmp/maos-20-2-review-dev202/release-run.py /home/lunarpulse/dev_ws/packaging/release-run.py && touch /home/lunarpulse/dev_ws/packaging/release-run.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.003
+    },
+    {
+      "name": "restore-forge-recipe-signature",
+      "command": [
+        "bash",
+        "-c",
+        "cp /tmp/maos-20-2-review-dev202/forge-recipe-signature.py /home/lunarpulse/dev_ws/packaging/forge-recipe-signature.py && cmp /tmp/maos-20-2-review-dev202/forge-recipe-signature.py /home/lunarpulse/dev_ws/packaging/forge-recipe-signature.py && touch /home/lunarpulse/dev_ws/packaging/forge-recipe-signature.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.003
+    },
+    {
+      "name": "restore-verify-release",
+      "command": [
+        "bash",
+        "-c",
+        "cp /tmp/maos-20-2-review-dev202/verify-release.py /home/lunarpulse/dev_ws/packaging/verify-release.py && cmp /tmp/maos-20-2-review-dev202/verify-release.py /home/lunarpulse/dev_ws/packaging/verify-release.py && touch /home/lunarpulse/dev_ws/packaging/verify-release.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.003
+    },
+    {
+      "name": "final-python-controls",
+      "command": [
+        "/tmp/maos-20-2-review-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "seconds": 0.064
+    },
+    {
+      "name": "cargo-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0,
+      "seconds": 2.868
+    },
+    {
+      "name": "final-focused-rust",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "package_recipes_20_2",
+        "--test",
+        "package_workflows_20_2",
+        "--test",
+        "release_workflow_15_4",
+        "--test",
+        "decision_adrs_and_provisioning"
+      ],
+      "exit_code": 0,
+      "seconds": 10.381
+    },
+    {
+      "name": "affected-build",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xtask",
+        "-p",
+        "maos-bin",
+        "-p",
+        "maos-cli"
+      ],
+      "exit_code": 0,
+      "seconds": 10.231
+    },
+    {
+      "name": "kloc-measure",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "kloc-check",
+        "--json"
+      ],
+      "exit_code": 1,
+      "seconds": 0.069
+    },
+    {
+      "name": "clippy-delta",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "xtask",
+        "-p",
+        "maos-bin",
+        "-p",
+        "maos-cli",
+        "--all-targets",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "seconds": 380.006
+    },
+    {
+      "name": "tree-bound-nextest",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "d11_xtask_ceiling_ratchet",
+        "--test",
+        "recovery_lane_ceiling_rule"
+      ],
+      "exit_code": 0,
+      "seconds": 11.383
+    },
+    {
+      "name": "gate-check-kernel-baseline",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-kernel-baseline",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.065
+    },
+    {
+      "name": "gate-kloc-check",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "kloc-check",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.064
+    },
+    {
+      "name": "gate-check-ship-gate-completeness",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-ship-gate-completeness",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.064
+    },
+    {
+      "name": "gate-check-exit-commands",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-exit-commands",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.414
+    },
+    {
+      "name": "gate-check-decision-register",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-decision-register",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.012
+    },
+    {
+      "name": "gate-check-dev-record-completeness",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-dev-record-completeness",
+        "--json"
+      ],
+      "exit_code": 1,
+      "seconds": 0.114
+    },
+    {
+      "name": "gate-check-epic-close-coherence",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-epic-close-coherence",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.032
+    },
+    {
+      "name": "gate-check-coverage-matrix",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-coverage-matrix",
+        "--json"
+      ],
+      "exit_code": 2,
+      "seconds": 0.008
+    },
+    {
+      "name": "gate-check-test-cost",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-test-cost",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.364
+    },
+    {
+      "name": "final-deferred-owner-gate",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-dev-record-completeness",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.166
+    },
+    {
+      "name": "final-coverage-matrix",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "coverage-matrix",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.016
+    },
+    {
+      "name": "shell-syntax",
+      "command": [
+        "bash",
+        "-c",
+        "for file in packaging/build-packages.sh packaging/witness-recipe.sh packaging/wait-release.sh tests/air-gap-netns-corroborate.sh; do bash -n \"$file\" || exit; done"
+      ],
+      "exit_code": 0,
+      "seconds": 0.01
+    },
+    {
+      "name": "final-provisioning-contract",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "decision_adrs_and_provisioning"
+      ],
+      "exit_code": 0,
+      "seconds": 0.816
+    },
+    {
+      "name": "current-release-build",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "maos-bin",
+        "-p",
+        "maos-cli",
+        "-p",
+        "maos-spirit-cli",
+        "-p",
+        "maos-registry"
+      ],
+      "exit_code": 0,
+      "seconds": 70.756
+    },
+    {
+      "name": "size-copy",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maos",
+        "/tmp/maos-20-2-review-dev202/size/target/release/maos"
+      ],
+      "exit_code": 0,
+      "seconds": 0.017
+    },
+    {
+      "name": "current-size",
+      "command": [
+        "bash",
+        "-euc",
+        "# Step 5: Binary size gate \u2014 stripped maos-bin \u226432MiB (AC4) \u2014 blocking, deterministic\necho \"--- Checking binary size ---\"\nstrip target/release/maos\nbin_size=$(stat -c%s target/release/maos)\n# Limit raised 10MiB \u2192 16MiB (2026-06-11), 16MiB \u2192 24MiB (Epic-12 retro\n# 2026-07-14), 24MiB \u2192 28MiB (Story 15-1 review, 2026-09-08), then\n# 28MiB \u2192 32MiB (Epic-16 retrospective, 2026-09-20 \u2014 MEASURED re-base, below).\n# The single `maos` binary now statically links the full Epic-8 surface (6 reference\n# Spirits, 4 MCP driver sets, and the a2a TCP/mTLS stack) plus the v2.0/v2.2 additions\n# from the Epic 11+12 line: the wasmtime WASM host closure, the enterprise SSO/KMS/SIEM\n# adapters (maos-sso/secrets/siem), the cohort A2A mesh, and Postgres/pgvector\n# Loom-lite. Story 15-1 measured 26,473,608 bytes (25.25MiB) with the repository's\n# pinned stable toolchain; 28MiB restored 2.75MiB of explicit growth headroom.\n#\n# \u2500\u2500 2026-09-20 RE-BASE 28MiB \u2192 32MiB. Measured at both ends, same toolchain,\n#    same --release profile, `strip` then `stat -c%s`:\n#      843d5365 (Epic-15 close) = 26,222,192 B (25.01 MiB)\n#      cc3e7089 (Epic-16 close) = 30,574,448 B (29.16 MiB)   \u2190 breaches 28MiB\n#    Epic 16 spent +4,352,256 B (+16.6%). This is a re-base and NOT a shrink\n#    because the growth was ATTRIBUTED before the number moved, and what it\n#    bought is a shipped capability rather than bloat. Attribution by ELF\n#    section (`size -A`) and by symbol (`nm -C --print-size`, aggregated on the\n#    demangled crate root):\n#\n#      .text  +3,143,008 \u00b7 .gcc_except_table +442,816 \u00b7 .eh_frame +370,016\n#      .rodata +128,568 \u00b7 .rela.dyn +125,520 \u00b7 .data.rel.ro +87,368 \u00b7 rest <56K\n#\n#      crates present at HEAD and ABSENT at Epic-15 close \u2014 1,372,591 B total:\n#        zbus 636,949 \u00b7 zvariant 352,354 \u00b7 num_bigint 45,496 \u00b7 secret_service\n#        41,690 \u00b7 async_task 37,998 \u00b7 zvariant_utils 32,400 \u00b7 async_broadcast\n#        24,770 \u00b7 ordered_stream 23,943 \u00b7 zbus_secret_service_keyring_store\n#        23,450 \u00b7 aes 22,136 \u00b7 async_executor 18,599 \u00b7 async_io 18,060\n#      core+std+alloc monomorphisation  +1,044,083  (driven by that same\n#        async/D-Bus generic closure; .eh_frame and .gcc_except_table track it)\n#      maos_bin's own code                +321,436  (Epic 16's five new modules:\n#        admission.rs, supervision.rs, purge.rs, operator_door.rs, shell_host.rs)\n#      maos_kernel_core                    \u2212106,763  (it SHRANK, despite +449\n#        physical lines \u2014 pin 24474 \u2192 24922)\n#\n#    So the dominant cost is ONE ratified feature: Story 16-4's OS-keyring\n#    secret store pulls the whole D-Bus stack (`zbus_secret_service_keyring_store`\n#    names it). ~2.3\u20132.4 MiB of the 4.15 MiB is that closure and its\n#    monomorphisation. Refusing it is refusing the keyring, which is an\n#    operator-facing security posture, not a size decision.\n#\n#    New ceiling follows the SAME rule the 28MiB re-base used: measured value\n#    plus explicit growth headroom of ~2.75\u20133 MiB. 29.16 + 2.84 = 32 MiB exactly.\n#    33,554,432 \u2212 30,574,448 = 2,979,984 B (2.84 MiB) of headroom for Epics\n#    17\u201321, whose only new default-on binary surface is `maos-egress` (17-1);\n#    `wasm-host` stays OFF by default (export-control precondition).\n#\n#    \u26a0 The next story to breach this MUST attribute before it re-bases. A raise\n#    with no `nm`/`size` attribution is the silent raise this comment chain has\n#    refused four times.\n# Slimming still requires opt-level=\"z\"/fat-LTO (which regresses the \u00a713.1 latency\n# benches) or splitting reference Spirits out of the default binary.\n# 2026-10-26: 18-4 landing run 40251998973 breached this unchanged ceiling:\n# 33,666,176 B > 33,554,432 B. Growth is attributed to Butler behavior and its\n# serialization/collection monomorphisations, not a new dependency; see\n# _bmad-output/implementation-artifacts/18-4-evidence/binary-size-attribution.md.\n# No re-base: use the maos-bin-only release codegen-units=1 override instead.\nmax_size=33554432  # 32 MiB \u2014 Epic-16 retrospective measured re-baseline (2026-09-20)\necho \"maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})\"\nif [ \"$bin_size\" -gt \"$max_size\" ]; then\n    echo \"ERROR: AC4 binary size violation: ${bin_size} bytes > ${max_size} bytes limit\"\n    exit 1\nfi"
+      ],
+      "cwd": "/tmp/maos-20-2-review-dev202/size",
+      "exit_code": 0,
+      "seconds": 0.057,
+      "source": "tests/integration/onb_nfr2_timing.sh:115-181"
+    },
+    {
+      "name": "current-glibc-symbols",
+      "command": [
+        "readelf",
+        "--dyn-syms",
+        "--wide",
+        "/tmp/maos-20-2-review-dev202/size/target/release/maos"
+      ],
+      "exit_code": 0,
+      "seconds": 0.004
+    },
+    {
+      "name": "current-copy-maos",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maos",
+        "/tmp/maos-20-2-review-dev202/dist/maos-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.016
+    },
+    {
+      "name": "current-copy-maosctl",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maosctl",
+        "/tmp/maos-20-2-review-dev202/dist/maosctl-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.003
+    },
+    {
+      "name": "current-copy-maos-spirit",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maos-spirit",
+        "/tmp/maos-20-2-review-dev202/dist/maos-spirit-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.003
+    },
+    {
+      "name": "current-copy-maos-registry-server",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maos-registry-server",
+        "/tmp/maos-20-2-review-dev202/dist/maos-registry-server-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.003
+    },
+    {
+      "name": "current-manifest",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "release-dry-run",
+        "--manifest-only",
+        "--dist-dir",
+        "/tmp/maos-20-2-review-dev202/dist",
+        "--targets",
+        "x86_64-unknown-linux-gnu",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114
+    },
+    {
+      "name": "current-sign",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "release-verify",
+        "--sign",
+        "--key-env",
+        "RELEASE_SIGNING_KEY",
+        "--sha256sums",
+        "/tmp/maos-20-2-review-dev202/dist/SHA256SUMS",
+        "--output",
+        "/tmp/maos-20-2-review-dev202/dist/SHA256SUMS.sig",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.008,
+      "extra_env": {
+        "RELEASE_SIGNING_KEY": "794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d"
+      }
+    },
+    {
+      "name": "current-render",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "render-packages",
+        "--dist-dir",
+        "/tmp/maos-20-2-review-dev202/dist",
+        "--output",
+        "/tmp/maos-20-2-review-dev202/dist/recipes",
+        "--maosctl",
+        "/home/lunarpulse/dev_ws/target/debug/maosctl",
+        "--base-url",
+        "file:///tmp/maos-20-2-review-dev202/dist"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114
+    },
+    {
+      "name": "current-independent-verifier",
+      "command": [
+        "/tmp/maos-20-2-review-dev202/venv/bin/python",
+        "packaging/verify-release.py",
+        "--directory",
+        "/tmp/maos-20-2-review-dev202/dist",
+        "--pubkey",
+        "bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7",
+        "maos-linux-amd64",
+        "maosctl-linux-amd64",
+        "maos-spirit-linux-amd64",
+        "maos-registry-server-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114
+    },
+    {
+      "name": "current-rendered-debian-order",
+      "command": [
+        "dpkg",
+        "--compare-versions",
+        "0.1.0~alpha.1-1",
+        "lt",
+        "0.1.0-1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.004
+    }
+  ]
+}

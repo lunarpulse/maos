@@ -1,0 +1,52 @@
+{
+  "baseline": "88c7277c0967d2abb8bb89f5f52e4e5a7ffe46e8",
+  "before": {
+    "maos-bin": 34914,
+    "maos-iac": 8622,
+    "maos-audit": 8174,
+    "maos-registry": 4412,
+    "xtask": 44673,
+    "aggregate": 194740,
+    "aggregate_hardfail": 194741,
+    "kernel_physical": 26841,
+    "kernel_tokei": 21042
+  },
+  "after": {
+    "maos-bin": 34914,
+    "maos-iac": 8622,
+    "maos-audit": 8174,
+    "maos-registry": 4412,
+    "xtask": 44676,
+    "aggregate": 194743,
+    "aggregate_hardfail": 194744,
+    "kernel_physical": 26841,
+    "kernel_tokei": 21042
+  },
+  "correction_delta": {
+    "xtask": 3,
+    "maos-bin": 0,
+    "kernel": 0,
+    "aggregate": 3,
+    "all_other_crates": 0
+  },
+  "rebased_ceiling": {
+    "maos-bin": 34969,
+    "xtask": 44920,
+    "aggregate": 195042,
+    "aggregate_hardfail_bound": 195043
+  },
+  "rebase": "Carry only unrelated drift since initial 20-2 pins: bin+91, aggregate+641, xtask0. No allowance renewal. Original D02 A measured x2/unmeasured x3 retained.",
+  "release": {
+    "stripped_maos_bytes": 31936280,
+    "limit_bytes": 33554432,
+    "size_oracle": "exact onb_nfr2_timing.sh lines115-181 on a copy; full script not run because it cargo-cleans",
+    "size_exit_code": 0,
+    "glibc_floor": "2.39"
+  },
+  "clippy": {
+    "exit_code": 0,
+    "warning_events": 690,
+    "changed_renderer_primary_diagnostics": [],
+    "not_hosted_and_not_warning_free": true
+  }
+}

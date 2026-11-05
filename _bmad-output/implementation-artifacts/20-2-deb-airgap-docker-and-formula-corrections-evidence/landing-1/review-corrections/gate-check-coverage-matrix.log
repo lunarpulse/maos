@@ -1,0 +1,7 @@
+error: unrecognized subcommand 'check-coverage-matrix'
+
+  tip: some similar subcommands exist: 'check-perf-counts', 'check-enterprise-pdp', 'check-export-control', 'check-release-precondition', 'check-rotation-real-timing', 'check-reza-production-path', 'check-cert-rotation-trigger', 'check-decision-register', 'check-mock-not-in-release', 'check-model-currency', 'check-security-md', 'check-breaking-md', 'check-env-contract', 'check-perf-verdict', 'check-escape-detector', 'check-corpus', 'check-loom', 'check-vetting-attestation', 'check-air-gap', 'check-dev-model-tier', 'check-j1-loopback-delegation', 'check-service-boundary', 'check-red-team-gate', 'check-cohort-mesh', 'check-rto-gate', 'check-migration-merkle', 'coverage-matrix', 'check-coverage-matrix-completeness'
+
+Usage: xtask <COMMAND>
+
+For more information, try '--help'.

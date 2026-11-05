@@ -43,6 +43,149 @@ jobs:
         with:
           name: signed-20-2-${{ matrix.suffix }}
           path: dist
+  native-packaging:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, suffix: linux-amd64}
+          - {os: ubuntu-24.04-arm, suffix: linux-arm64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-20-2-${{ matrix.suffix }}
+          path: dist
+      - name: P1 Ubuntu RPM database refusal before explicit apt mode; P2 runner ownership
+        run: |
+          mkdir -p evidence dist/packages
+          test "$(stat -c %u dist/packages)" = "$(id -u)"
+          docker run --rm -v "$PWD:$PWD" -w "$PWD" ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 bash -euc '
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y rpm python3-cryptography debhelper
+            set +e
+            packaging/build-packages.sh dist rpm /tmp/before-rpm > evidence/ubuntu-rpm-before.log 2>&1
+            rc=$?
+            set -e
+            cat evidence/ubuntu-rpm-before.log
+            test "$rc" -ne 0
+            grep -F "python3-cryptography is needed" evidence/ubuntu-rpm-before.log
+            mkdir dist/root-owned-before
+            printf fixture > dist/root-owned-before/fixture
+            packaging/build-packages.sh dist deb dist/packages
+            packaging/build-packages.sh dist rpm-ubuntu dist/packages
+          '
+          python3 - <<'PY'
+          import pathlib
+          source=pathlib.Path('dist/root-owned-before/fixture')
+          try:
+              source.replace('dist/should-not-move')
+          except PermissionError:
+              print('P2 before: ordinary runner cannot rename from root-owned 0755 directory')
+          else:
+              raise SystemExit('ownership witness did not exercise ordinary-runner failure')
+          PY
+          # The actual fixed native packages are readable and movable by runner.
+          python3 - <<'PY'
+          import pathlib
+          packages=pathlib.Path('dist/packages')
+          files=list(packages.iterdir()); assert len(files)==2, files
+          for file in files:
+              temporary=file.with_suffix(file.suffix+'.runner')
+              file.replace(temporary); temporary.replace(file)
+          print('P2 final: runner renamed both real native package outputs')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-packages-${{ matrix.suffix }}
+          path: dist/packages/
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: native-packaging-evidence-${{ matrix.suffix }}
+          path: evidence
+  packaging-assembly:
+    needs: [build, native-packaging]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-20-2-linux-amd64
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-packages-*
+          merge-multiple: true
+          path: dist/packages
+      - name: P2/F1 move four real outputs, authenticate recipes/verifier and sign second denominator
+        env:
+          RELEASE_SIGNING_KEY: 794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d
+        run: |
+          python3 packaging/assemble-release-packaging.py dist
+          cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS-packages --output dist/SHA256SUMS-packages.sig
+          cargo run --locked -p xtask -- release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packaging-second-denominator
+          path: dist/
+  version-ordering:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-20-2-linux-amd64
+          path: dist
+      - name: P3 real vercmp/dpkg over renderer output for rc.1 and alpha.1
+        run: |
+          cargo build --locked -p xtask -p maos-cli
+          mkdir -p evidence
+          cp Cargo.toml "$RUNNER_TEMP/version-correct.toml"
+          trap 'cp "$RUNNER_TEMP/version-correct.toml" Cargo.toml; cmp "$RUNNER_TEMP/version-correct.toml" Cargo.toml; touch Cargo.toml' EXIT
+          for version in 1.0.0-rc.1 0.1.0-alpha.1; do
+            python3 - "$version" <<'PY'
+          import pathlib,sys,tomllib
+          p=pathlib.Path('Cargo.toml'); text=p.read_text()
+          old=tomllib.loads(text)['workspace']['package']['version']
+          before=f'version = "{old}"'
+          assert text.count(before)==1
+          p.write_text(text.replace(before,f'version = "{sys.argv[1]}"',1))
+          PY
+            target/debug/xtask render-packages --dist-dir dist --output "dist/version-$version" --maosctl target/debug/maosctl --base-url "file://$PWD/dist"
+            ga=${version%%-*}
+            docker run --rm -v "$PWD:$PWD" -w "$PWD" archlinux:base-devel@sha256:767de6eaa40dcfeda5263a48737ea03a782caabdf3a403b6e6a203c7fd333681 bash -euc '
+              source "$1"
+              comparison=$(vercmp "$pkgver" "$2")
+              printf "rendered Arch %s vs GA %s = %s\n" "$pkgver" "$2" "$comparison"
+              test "$comparison" -lt 0
+            ' bash "dist/version-$version/PKGBUILD" "$ga" | tee -a evidence/version-ordering.log
+            deb=$(python3 -c 'import pathlib,re,sys; print(re.search(r"\(([^)]+)\)",pathlib.Path(sys.argv[1]).read_text())[1])' "dist/version-$version/debian/changelog")
+            dpkg --compare-versions "$deb" lt "$ga-1"
+            echo "rendered Debian $deb < $ga-1" | tee -a evidence/version-ordering.log
+            cp "$RUNNER_TEMP/version-correct.toml" Cargo.toml
+            cmp "$RUNNER_TEMP/version-correct.toml" Cargo.toml
+            touch Cargo.toml
+          done
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: rendered-version-ordering
+          path: evidence
   deb:
     needs: build
     strategy:
@@ -116,7 +259,9 @@ jobs:
         with:
           name: signed-20-2-linux-amd64
           path: dist
-      - run: sudo apt-get update && sudo apt-get install -y strace
+      - run: sudo apt-get update && sudo apt-get install -y strace python3-cryptography
+      - name: Authenticate downloaded binaries before any netns execution
+        run: python3 packaging/verify-release.py --directory dist --pubkey bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7 maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64
       - name: AC3 baseline green-skip or version-only result is not a witness
         run: |
           mkdir -p evidence
@@ -182,9 +327,32 @@ jobs:
           touch dist/maos-linux-amd64
           test "$rc" -ne 0
           grep -F 'SHA256 mismatch: maos-linux-amd64' evidence/image-plant.log
+          # F10 real default-volume refusal without the owned state directory.
+          cp Dockerfile "$RUNNER_TEMP/Dockerfile-correct"
+          trap 'cp "$RUNNER_TEMP/Dockerfile-correct" Dockerfile; cmp "$RUNNER_TEMP/Dockerfile-correct" Dockerfile; touch Dockerfile' EXIT
+          python3 - <<'PY'
+          import pathlib
+          p=pathlib.Path('Dockerfile'); text=p.read_text()
+          line='COPY --from=verify --chown=65532:65532 /state /var/lib/maos\n'
+          assert text.count(line)==1
+          p.write_text(text.replace(line,'',1))
+          PY
+          docker buildx build --load --build-arg RELEASE_PUBKEY="$pubkey" -t maos:state-plant .
+          set +e
+          docker run --rm maos:state-plant init --plain > evidence/image-state-before.log 2>&1
+          rc=$?
+          set -e
+          cp "$RUNNER_TEMP/Dockerfile-correct" Dockerfile
+          cmp "$RUNNER_TEMP/Dockerfile-correct" Dockerfile
+          touch Dockerfile
+          trap - EXIT
+          cat evidence/image-state-before.log
+          test "$rc" -ne 0
+          grep -i 'permission denied' evidence/image-state-before.log
           docker buildx build --load --build-arg RELEASE_PUBKEY="$pubkey" --build-arg SOURCE_SHA="$GITHUB_SHA" -t maos:ci .
           docker run --rm maos:ci --version
           docker run --rm maos:ci --help
+          docker run --rm maos:ci init --plain
           docker image inspect maos:ci --format '{{.Size}}' | tee evidence/image-size
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -205,6 +373,33 @@ jobs:
         with:
           name: signed-20-2-linux-amd64
           path: dist
+      - run: sudo apt-get update && sudo apt-get install -y python3-cryptography
+      - name: P5 remove the recipe verifier and prove the negative lane notices acceptance
+        env:
+          ROUTE: ${{ matrix.route }}
+        run: |
+          mkdir -p evidence
+          case "$ROUTE" in rpm) recipe=maos.spec ;; arch) recipe=PKGBUILD ;; brew) recipe=maos.rb ;; esac
+          cp "dist/recipes/$recipe" "$RUNNER_TEMP/recipe-correct"
+          python3 - "$ROUTE" "dist/recipes/$recipe" <<'PY'
+          import pathlib,re,sys
+          route, filename=sys.argv[1:]
+          p=pathlib.Path(filename); text=p.read_text()
+          pattern = r'^.*system Formula\["python@3.14"\].*\n.*"verify-release.py".*\n' if route=='brew' else r'^.*python3 verify-release.py .*\n'
+          text, count=re.subn(pattern, '', text, flags=re.M)
+          assert count==1, (route,count)
+          p.write_text(text)
+          PY
+          set +e
+          packaging/witness-recipe.sh "$ROUTE" "$PWD/dist" > evidence/recipe-verifier-bypass.log 2>&1
+          rc=$?
+          set -e
+          cp "$RUNNER_TEMP/recipe-correct" "dist/recipes/$recipe"
+          cmp "$RUNNER_TEMP/recipe-correct" "dist/recipes/$recipe"
+          touch "dist/recipes/$recipe"
+          cat evidence/recipe-verifier-bypass.log
+          test "$rc" -ne 0
+          grep -F 'accepted forged signature' evidence/recipe-verifier-bypass.log
       - name: AC2 real package-manager execution and comparator measurements
         run: |
           set -o pipefail
@@ -262,56 +457,90 @@ jobs:
         with:
           name: cargo-symbols-20-2
           path: evidence
-  operator-publication:
-    # Never runs merely because the verify branch was pushed.
+  operator-prepare:
+    # Never checks out/builds publish_tag. Only the reviewed workflow's own ref.
     if: github.event_name == 'workflow_dispatch' && inputs.publish_tag != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      source_sha: ${{ steps.prepare.outputs.source_sha }}
+    env:
+      MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build trusted tooling from workflow ref and authenticate tag assets
+        id: prepare
+        env:
+          TAG: ${{ inputs.publish_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "$MAOS_RELEASE_PUBKEY"
+          cargo build --locked -p maos-cli -p xtask
+          pubkey=$(target/debug/maosctl release-pubkey)
+          test "$pubkey" != bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7
+          mkdir -p dist
+          gh release download "$TAG" --dir dist
+          target/debug/xtask release-verify --verify --sha256sums dist/SHA256SUMS --sig dist/SHA256SUMS.sig --artifacts-dir dist
+          target/debug/xtask release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
+          source_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-operator-release
+          path: dist/
+          retention-days: 1
+  operator-publication:
+    needs: operator-prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: release
     permissions:
       contents: read
       packages: write
       id-token: write
     env:
       PUBLISH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-      TAG: ${{ inputs.publish_tag }}
-      GH_TOKEN: ${{ github.token }}
       HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-      MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+      pubkey: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+      source_sha: ${{ needs.operator-prepare.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.publish_tag }}
-      - uses: dtolnay/rust-toolchain@v1
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: stable
+          name: authenticated-operator-release
+          path: dist
       - name: Absent credentials do not pretend publication happened
         if: env.PUBLISH != 'true'
         run: |
           echo 'SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)'
-      - name: Obtain signed release and trusted verifier key
-        if: env.PUBLISH == 'true'
-        run: |
-          mkdir -p dist
-          gh release download "$TAG" --dir dist --pattern 'maos-linux-*' --pattern SHA256SUMS --pattern SHA256SUMS.sig
-          cargo build --locked -p maos-cli
-          echo "pubkey=$(target/debug/maosctl release-pubkey)" >> "$GITHUB_ENV"
-          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - uses: docker/setup-qemu-action@v3
         if: env.PUBLISH == 'true'
       - uses: docker/setup-buildx-action@v3
         if: env.PUBLISH == 'true'
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         if: env.PUBLISH == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         if: env.PUBLISH == 'true'
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         id: image
         if: env.PUBLISH == 'true'
         with:
@@ -324,7 +553,7 @@ jobs:
           build-args: |
             RELEASE_PUBKEY=${{ env.pubkey }}
             SOURCE_SHA=${{ env.source_sha }}
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
         if: env.PUBLISH == 'true'
       - name: Sign and verify both registry digests using this operator workflow identity
         if: env.PUBLISH == 'true'

@@ -105,6 +105,7 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: release
     permissions:
       contents: write
       checks: read
@@ -160,27 +161,17 @@ jobs:
       - name: Build deb and RPM for both Linux architectures without rewriting binaries
         run: |
           set -euo pipefail
+          # The runner must own the source directory for later atomic renames.
+          mkdir -p dist/packages
           for arch in amd64 arm64; do
-            docker run --rm --platform "linux/$arch" -v "$PWD:$PWD" -w "$PWD" ubuntu:24.04 bash -euc '
+            docker run --rm --platform "linux/$arch" -v "$PWD:$PWD" -w "$PWD" ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 bash -euc '
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y debhelper python3-cryptography rpm
               packaging/build-packages.sh dist deb dist/packages
-              packaging/build-packages.sh dist rpm dist/packages
+              packaging/build-packages.sh dist rpm-ubuntu dist/packages
             '
           done
-          python3 - <<'PY'
-          import hashlib, pathlib
-          dist = pathlib.Path('dist')
-          files = sorted((dist/'packages').glob('*.deb')) + sorted((dist/'packages').glob('*.rpm'))
-          assert len(files) == 4, files
-          lines = []
-          for source in files:
-              target = dist/source.name
-              source.replace(target)
-              with target.open('rb') as f:
-                  lines.append(f'{hashlib.file_digest(f, "sha256").hexdigest()}  {target.name}\n')
-          (dist/'SHA256SUMS-packages').write_text(''.join(sorted(lines)))
-          PY
+          python3 packaging/assemble-release-packaging.py dist
       - name: Sign and self-verify package metadata and payloads
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
@@ -189,7 +180,7 @@ jobs:
           cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS-packages --output dist/SHA256SUMS-packages.sig
           cargo run --locked -p xtask -- release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             dist/maos-linux-amd64
@@ -210,9 +201,10 @@ jobs:
             dist/*.rpm
             dist/SHA256SUMS-packages
             dist/SHA256SUMS-packages.sig
-            dist/recipes/maos.rb
-            dist/recipes/PKGBUILD
-            dist/recipes/maos.spec
+            dist/maos.rb
+            dist/PKGBUILD
+            dist/maos.spec
+            dist/debian-recipes.tar.gz
             dist/verify-release.py
           fail_on_unmatched_files: true
           generate_release_notes: true

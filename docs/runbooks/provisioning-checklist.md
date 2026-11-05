@@ -29,9 +29,10 @@ than inherited from planning prose.
 | `RELEASE_SIGNING_KEY` | `.github/workflows/release.yml:93,95` | hard fail once artifact assembly reaches `release-verify --sign` | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RTO_LEDGER_WRITE_TOKEN` | `.github/workflows/rpo-rto-cadence.yml`, collector checkout | falls back to auto-provided `GITHUB_TOKEN`; the collector hard-fails if that token cannot push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN has already produced the live rto-ledger history)` |
 | `GitHub OIDC for cosign` | `.github/workflows/container.yml` permission `id-token: write`, step `Sign both published digests` | only runs after credential-gated push; no operator signing secret is required | `ops-provisioning-secrets-and-accounts` | `present` |
+| `release environment protection evidence` | `release.yml` `sign-and-publish`, `container.yml` `publication`, operator recipe `operator-publication` reference `environment: release` | required before publication: configure required reviewers, prevent self-review/admin bypass, restrict deployment tags to protected `v*` tags, and protect tag creation/update/deletion; operator verify-branch deployment needs explicit approval | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `macOS/aarch64 release build` | `.github/workflows/release.yml:10-60`; `.github/workflows/discipline.yml` `release-dry-run` | partial: Linux aarch64 is blocking per commit; macOS arm64 remains a required manual pre-tag dispatch and tagged-release leg | `ops-provisioning-secrets-and-accounts` | `present` |
-| `lunarpulse/homebrew-maos` | rendered `dist/recipes/maos.rb` attached by `release.yml` | publication unavailable until the tap exists; never publish the committed template | `ops-brew-tap-and-aur-publication` | `absent` |
-| `AUR account and package publication` | rendered `dist/recipes/PKGBUILD` attached by `release.yml` | publication unavailable until the account exists; recipes are rendered per signed release | `ops-brew-tap-and-aur-publication` | `absent` |
+| `lunarpulse/homebrew-maos` | authenticated rendered `dist/maos.rb` attached by `release.yml` | publication unavailable until the tap exists; authenticate the signed packaging manifest first, never publish the committed template | `ops-brew-tap-and-aur-publication` | `absent` |
+| `AUR account and package publication` | authenticated rendered `dist/PKGBUILD` attached by `release.yml` | publication unavailable until the account exists; authenticate the signed packaging manifest first | `ops-brew-tap-and-aur-publication` | `absent` |
 | `rto-ledger branch permission` | `.github/workflows/rpo-rto-cadence.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; collectors never create a branch | `ops-provisioning-secrets-and-accounts` | `present` |
 | `fuzz-ledger branch permission` | `.github/workflows/fuzz-cadence.yml`, `fuzz-prerelease.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; operators must provision the branch, initial ledger, and write access | `ops-provisioning-secrets-and-accounts` | `present` |
 | `self-hosted fuzz runner` | `.github/workflows/fuzz-cadence.yml` and `fuzz-prerelease.yml` | not required: both workflows use GitHub-hosted Ubuntu runners | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (hosted runners execute both fuzz tiers)` |
@@ -46,9 +47,18 @@ than inherited from planning prose.
 
 ## Evidence and blockers
 
-- The repository secret, variable, and runner inventories were all empty when
-  measured for Story 15-5. No workflow contains `vars.`, `environment:`, or
-  `runs-on: self-hosted`.
+- Historical Story 15-5 inventory: secrets, variables and runners were empty;
+  workflows then had no `vars.`, `environment:` or self-hosted-runner reference.
+  That is not the present configuration inventory.
+  Story 20-2 now references `release`. Its protection **evidence** is absent:
+  `gh api repos/lunarpulse/maos/environments/release` returned HTTP 404/exit 1;
+  absence versus API visibility cannot be distinguished, so configuration is
+  **unverified**, not asserted absent or protected. GitHub auto-creates unknown
+  referenced environments without protection rules. Repository visibility was
+  observed `public`. An administrator must configure/inspect required reviewers,
+  prevent self-review/bypass, selected branch/tag deployment policies and tag
+  rulesets before production publication; the YAML reference is not proof.
+  See <https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments>.
 - `rto-ledger` is present and operational: eight weekly appends existed since
   2026-07-19 when measured. Its success proves the default `GITHUB_TOKEN`
   permission; a dedicated write token is optional, not missing provisioning.

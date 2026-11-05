@@ -45,10 +45,10 @@ out=${2:-$(mktemp -d /tmp/maos-netns.XXXXXX)}
 mkdir -p "$out"; out=$(realpath "$out")
 # Only namespace creation is privileged. Tracer, canary and MAOS run as runner uid.
 prefix=(sudo -n unshare -n -- setpriv --reuid="$(id -u)" --regid="$(id -g)" --clear-groups)
-"${prefix[@]}" strace -f -yy -s 2048 -e trace=network -o "$out/canary.trace" \
+"${prefix[@]}" strace -f -yy -s 2048 -e trace=network,sendmmsg,io_uring_enter -o "$out/canary.trace" \
   python3 -c 'import socket; s=socket.socket(); s.settimeout(1); s.connect_ex(("198.51.100.1",443)); s.close()'
 python3 "$root/tests/air-gap-trace.py" canary "$out/canary.trace"
-"${prefix[@]}" strace -f -yy -s 2048 -e trace=network -o "$out/workload.trace" \
+"${prefix[@]}" strace -f -yy -s 2048 -e trace=network,sendmmsg,io_uring_enter -o "$out/workload.trace" \
   bash "$0" --workload "$binary" "$cassette" "$out" "${3:-}"
 python3 "$root/tests/air-gap-trace.py" workload "$out/workload.trace"
-echo "PASS: real session, journal growth, zero AF_INET/AF_INET6 outbound attempts; traces $out"
+echo "PASS: no outbound attempts in the witnessed replay session; journal grew; traces $out"

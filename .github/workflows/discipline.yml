@@ -5847,6 +5847,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y debhelper python3-cryptography
+      - name: Execute real signature and trace adversarial controls
+        run: python3 packaging/test_release_20_2.py
       - name: Run release dry-run
         run: cargo run --locked -p xtask -- release-dry-run --targets ${{ matrix.target }} --json
       - name: Sign staged manifest with development seed
@@ -5904,9 +5906,10 @@ jobs:
         with:
           name: release-dry-run-x86_64-unknown-linux-gnu
           path: dist
-      - run: sudo apt-get update && sudo apt-get install -y strace
+      - run: sudo apt-get update && sudo apt-get install -y strace python3-cryptography
       - name: Boot and replay inside an isolated network namespace
         run: |
+          python3 packaging/verify-release.py --directory dist --pubkey bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7 maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64
           chmod +x dist/maos-linux-amd64
           bash tests/air-gap-netns-corroborate.sh "$PWD/dist/maos-linux-amd64" "$RUNNER_TEMP/netns"
       - uses: actions/upload-artifact@v4
@@ -5961,6 +5964,7 @@ jobs:
           docker buildx build --load --build-arg RELEASE_PUBKEY="$pubkey" --build-arg SOURCE_SHA="$GITHUB_SHA" -t maos:ci .
           docker run --rm maos:ci --version
           docker run --rm maos:ci --help
+          docker run --rm maos:ci init --plain
           docker image inspect maos:ci --format '{{.Size}}'
 
   package-recipes:

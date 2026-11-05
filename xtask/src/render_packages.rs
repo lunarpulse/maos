@@ -7,12 +7,15 @@ const BINS: [&str; 4] = ["maos", "maosctl", "maos-spirit", "maos-registry-server
 
 pub fn versions(version: &str) -> Result<(String, String), String> {
     let (core, pre) = version.split_once('-').unwrap_or((version, ""));
-    let parts: Vec<_> = core.split('.').collect();
-    if parts.len() != 3
-        || parts
-            .iter()
+    if core.split('.').count() != 3
+        || core
+            .split('.')
             .any(|p| p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit()))
-        || !pre.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.')
+        || (!pre.is_empty()
+            && (!pre.as_bytes()[0].is_ascii_alphabetic()
+                || pre
+                    .split('.')
+                    .any(|p| p.is_empty() || !p.bytes().all(|b| b.is_ascii_alphanumeric()))))
         || version.ends_with('-')
     {
         return Err(format!("unsupported release version: {version}"));
