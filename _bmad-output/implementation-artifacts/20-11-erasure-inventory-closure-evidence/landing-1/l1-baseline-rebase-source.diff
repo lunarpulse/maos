@@ -1,0 +1,21 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 2c10f4c7..072e1f83 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -16799,6 +16799,7 @@ const GEMINI_DEFAULTS: (&str, &str) = (
+ const KIMI_DEFAULTS: (&str, &str) = ("https://api.moonshot.ai", "kimi-k3.1-pro");
+ const OLLAMA_DEFAULTS: (&str, &str) = ("http://localhost:11434", "llama3.1:8b");
+ 
++#[cfg(feature = "network")]
+ fn configured_provider_catalog(ollama_url: &str) -> maos_bin::admission::ProviderCatalog {
+     [
+         ("anthropic", ANTHROPIC_DEFAULTS),
+@@ -16821,7 +16822,7 @@ fn configured_provider_catalog(ollama_url: &str) -> maos_bin::admission::Provide
+     .collect()
+ }
+ 
+-#[cfg(test)]
++#[cfg(all(test, feature = "network"))]
+ mod provider_config_review {
+     use super::*;
+     use maos_domain::ports::io_subsystem::{HttpExchange, IoError};

@@ -273,8 +273,8 @@ def main():
               file=sys.stderr)
         sys.exit(1)
 
-    # 3. Erased-frame pre-inclusion proofs (each scrubbed frame WAS in pre-tree).
-    for efp in erased_frame_proofs:
+    # 3. Both erased-distillate and redacted-principal pre-inclusion proofs.
+    for efp in erased_frame_proofs + bundle.get("redacted_principal_frame_proofs", []):
         try:
             fid = _parse_frame_id_hex(efp["frame_id"])
             proof = efp["pre_inclusion"]
@@ -301,14 +301,28 @@ def main():
             print("FAIL — subject exclusion proof invalid", file=sys.stderr)
             sys.exit(1)
 
-    # 5. Reject empty proof sets when the bundle claims erasure.
-    claims_removal = any(
-        c.get("status", {}).get("status") == "Removed" and c["status"].get("count", 0) > 0
-        for c in bundle.get("categories", [])
-    )
-    if claims_removal and not erased_frame_proofs and not subject_exclusion_proofs:
-        print("FAIL — bundle claims erasure but carries no inclusion or exclusion proofs",
-              file=sys.stderr)
+    # 5. Every claimed category has distinct post-tree evidence, including empty
+    # and gap observations; non-frame stores do not borrow another store's proof.
+    categories = bundle.get("categories", [])
+    evidence = bundle.get("category_evidence", [])
+    if bundle.get("schema_version") != "maos.erasure-proof.v2" or len(evidence) != len(categories):
+        print("FAIL — schema/category evidence mismatch", file=sys.stderr)
+        sys.exit(1)
+    names, frame_ids = set(), set()
+    try:
+        for category, observed in zip(categories, evidence):
+            fid = _parse_frame_id_hex(observed["frame_id"])
+            name = category["name"]
+            if (name in names or fid in frame_ids
+                    or observed["spirit_id"] != bundle["spirit_id"]
+                    or observed["category"] != category
+                    or observed["frame_id"] not in post_leaves
+                    or not _verify_merkle_proof(post_root, _hash_leaf(fid), observed["post_inclusion"])):
+                raise ValueError("invalid per-category evidence")
+            names.add(name)
+            frame_ids.add(fid)
+    except (ValueError, KeyError, TypeError) as error:
+        print(f"FAIL — category evidence: {error}", file=sys.stderr)
         sys.exit(1)
 
     print("OK — proof-of-erasure signature and Merkle proofs verified")

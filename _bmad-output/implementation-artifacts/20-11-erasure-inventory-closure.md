@@ -3,7 +3,7 @@ story_id: '20.11'
 story_key: 20-11-erasure-inventory-closure
 created: 2026-11-02
 context_commit: a8af3215
-baseline_commit: a8af3215
+baseline_commit: cb0abc06e6b085cb63db1be60d4addbeb2963811
 security_sensitive: true
 kernel_grant: >-
   RULED 2026-11-02 (ask s2011; KS) and 2026-11-04 (ask halt_grant; D-20-11-11 A = O4).
@@ -14,12 +14,12 @@ kernel_grant: >-
   expected cumulative 21203 + 12 = 21215; ADR-069 alarm 22000 / envelope 23000 unchanged.
 kloc_grant: >-
   RULED asks s2011 and halt_grant; D02 A ×2 measured / ×3 unmeasured.
-  At 73e7afbc re-base: kernel ceiling 26893/21078; maos-iac 8630; maos-audit 8261;
-  maos-bin L1 35704 (34504 + 1200); maos-registry 4368; maos-domain 10115 (10107 + 2×4, O4 at L2).
-  Aggregate ceiling 195404 = current measured 193140 + original allowance 2232 + O4 allowance 32
-  (24 kernel tokei + 8 domain); original creation ceiling 194058 is historical.
+  L1 re-based 2026-11-04 onto cb0abc06: kernel pins 26841/21042 unchanged; maos-iac 8270,
+  maos-audit 7721, maos-bin 34552, maos-registry 4248, domain 10107, xtask 44466,
+  aggregate 193202 / hardfail 193203. Retain the stricter assigned ceilings: IAC 8630,
+  audit 8261, bin L1 35704, registry 4368, aggregate 195404; final-kernel ceilings unchanged.
   Exact pins and aggregate hardfail = measured + 1 at landing; re-base again onto then-landed pins.
-  Every other crate 0. No pin or source change is authorized by this recording pass.
+  Every other crate 0. L1 changes consume only the ruled non-kernel allowances; no kernel grant is consumed.
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:57-71`): an attesting control (a signed proof-of-erasure, rule 11), cross-Spirit isolation (pid reuse across boots, legal holds), concurrency (EC-13 lock windows, forget/hold serialization) and, if ruled, a kernel FLAG-Winston row. Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC2.4, AC3, AC5.3 and the proof format (D-20-11-09), Test Infrastructure on glm-5.3 (standing policy; any session substitution recorded at review). Creation anthropic/claude-opus-5-5."
 ---
 
@@ -263,6 +263,16 @@ removal literal. L1's plant drops snapshot enumeration; the final kernel plant d
    deterministic; reviewed structurally.
 5. **Plant (local):** window size `i64::MAX` ⇒ AC5.2 reds.
 
+**Execution clarification (Main's implementation instruction after profiling).** Keep the 25% bound
+and raw continuous-writer wall timings; on the loaded shared host, also bind the same quarter-scan
+fraction to SQLite VM work of the actual production statements, independent of descheduling/fsync.
+The page-size plant must still red. The companion work fixture isolates SQL work in memory; the
+real door vectors retain 100k/1M rows with 1 KiB payloads on disk/WAL. An unchanged-deadline HTTP503
+`handler_still_running` is only **pending**, never erased; its handler must finish, its completion
+receipt be observed, and an identical subsequent request return a completed report with original
+tombstone/unrelated bytes intact. No new refusal type or wider route/observation deadline.
+
+
 ### AC6 — a running spawned Spirit (epic AC2's T3 clause)
 
 **Placement:** L1 observes the live categories it implements (AC2/AC4) and labels both pending halt receipts
@@ -301,20 +311,24 @@ L1 must not claim that kernel-dependent proof or borrow a hosted run from an anc
 - [ ] **T0 — Preflight.** Rulings recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured
   here" 1–7; re-inventory per-Spirit stores (AC7); re-measure every cite this story touches (rule 9). A figure above
   the ruled envelope or a result contradicting a ruled option is STOP + D-row.
-- [ ] **T1 — Proof format (AC1, D-09).** Evidence frames, per-category verification in `proof.rs` and `verify.py`,
+- [x] **T1 — Proof format (AC1, D-09).** Evidence frames, per-category verification in `proof.rs` and `verify.py`,
   `NotFound` rule; failing-before + plant.
-- [ ] **T2 — Intent lineage (AC2).** `distillates_written_by`, scrub + marker, all-boot incarnations; witnesses + plant.
+- [x] **T2 — Intent lineage (AC2).** `distillates_written_by`, scrub + marker, all-boot incarnations; witnesses + plant.
 - [ ] **T3 — Pending halts (AC3, final kernel landing only).** Door count + post-verify, offline orphan query and
   receipts, O4 late-invocation refusal / in-flight / crash witnesses and plants; no AC3 implementation in L1.
 - [ ] **T4 — Schedules and package (AC4).** L1 SCB/manifest snapshot enumeration, retained-watchdog reason,
   `uninstall_package`, CLI doc and snapshot plant; `forget_spirit` and its plant at the final KS landing.
-- [ ] **T5 — EC-13 (AC5).** Rowid windows, per-window hold re-check, off-worker forget, serialized door release;
-  witnesses + plant.
-- [ ] **T6 — Inventory (AC7).** Typed store list, named categories, vector + plant.
+  - [x] L1 snapshot/package implementation and restored pre-unload plant.
+  - [ ] Final KS watchdog cleanup and its plant (explicitly outside this assignment).
+- [x] **T5 — EC-13 (AC5).** Rowid windows, per-window hold re-check, off-worker forget, serialized door release;
+  genuine red controls and restored page plant; final focused wall/work and preservation witnesses pass.
+- [x] **T6 — Inventory (AC7).** Typed store list, named categories, vector + plant.
 - [ ] **T7 — T3 leg (AC6).** Hosted branch run under `provision-t3-test-substrate`; run id.
 - [ ] **T8 — L1 landing (kernel-free).** Exact pins inside the ruled envelope; `check-kernel-baseline` unchanged;
   `kloc-check`, `check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`;
   one hosted discipline run on the final tree. No commit or push without the operator.
+  - [x] Local source/focused/structural gates, exact pins, final clippy delta, one standalone workspace execution and once-only final prepush recorded.
+  - [ ] Hosted signed-T3/discipline run id (unavailable locally; no hosted pass claimed).
 - [ ] **T9 — Final kernel landing (L2).** Granted KS + O4 last, together with AC3 halt counts/receipt category;
   re-base onto then-current pins, obey shared measured STOP 21250; FLAG-Winston record, exact pins/content hashes,
   single HaltRegistry surface-hash refresh under ADR-066, O4 domain variant and AC8. KH/KF are not granted.
@@ -503,20 +517,258 @@ final kernel KS + O4 carries AC3. Story/tracker stay `ready-for-dev`. Shared-STO
 historical pricing/rulings in pending stories, FLAG-Winston records, epic, preflight and tracker.
 No cargo, tests or gates ran for this docs-only recording pass; Dev2010 owns the cargo slot.
 
+### Landing 1 continuation and priority park — 2026-11-04, Dev2011b
+
+Model: `openai-codex/gpt-6.1-sol`. Initial baseline `76efc19d`; inherited proof/IAC/registry/Python
+hunks were adopted only after preserving their diff and observing original-HEAD witnesses.
+The initial source restore used exact `git show HEAD:<path>` bytes, not an assumed prior result.
+Evidence and the re-read inventory are in
+[L1 current-tree cites](20-11-erasure-inventory-closure-evidence/landing-1/l1-head-cites.md).
+
+**Priority park (operator/Main request).** All 14 owned tracked paths and 28 new files were saved to
+`/tmp/2011-wip/{tracked.patch,new-files.tar.gz,SHA256SUMS,MANIFEST,runtime-state.json}`.
+Tar members and every working-file SHA256 were checked before reverting only that owned work.
+`git status --short && git rev-parse HEAD` exited 0 with empty status at `76efc19d`.
+No cargo ran while parked. The park's Dev Agent Record lived only in the requested `/tmp` MANIFEST.
+Main then granted the slot and supplied new exact pins at **`cb0abc06`**: bin **34552**,
+xtask **44466**, aggregate **193202** / hardfail **193203**. The saved patch passed
+`git apply --check`, reapplied without conflict, and all new files were extracted. The priority
+network gate/model-currency hotfix was not reverted or overwritten.
+
+**Boundary preserved.** No kernel, domain variant, kernel baseline/content hash or kernel surface hash
+is changed. AC3, O4 and KS remain the final landing. L1 signs an explicit pending-kernel halt gap,
+not a count or successful receipt-erasure claim; live schedules name retained watchdog state.
+The original T0 race witness and its red log remain unchanged.
+
+**T0 schedule finding.** Both production admission bundles currently default SCB schedules. A real
+serving root accepted the schedule-bearing manifest but never fired. This is already owned by
+`20-9` AC3 / D-20-9-08 A, not repaired by L1. Per AC6.3, the real live cascade uses a canonical
+principal-free distillate seeded at the running Spirit's actual boot/pid. The separate AC4 boundary
+oracle supplies a genuinely scheduled SCB to the real door and captures the ids before unload.
+The hosted Worker test adds existing owned-CID teardown; signed T3 substrate is absent locally.
+
+**Package failure witness.** Before the retention repair, forcing proof-directory failure returned
+Failed after deleting the installed generation (`l1-before-failed-package-proof.log`, exit 101).
+Removal now stages generation ownership and active inventory under a serialized, rollback-on-drop
+guard; proof failure restores the package, and only proof persistence permits final deletion.
+Cross-store crash atomicity remains the existing ADR-044 limitation, not a new recovery claim.
+
+**Plant quality correction.** The first combined control run produced four intended reds but the
+AC5 `i64::MAX` control was green: whole-door wall time includes several scans and diluted the
+largest lock hold. That output is retained, never labelled a red or a flaky retry. The same vector
+now also instruments one real constituent query, preserving the door's unchanged 25% threshold.
+The same page mutation then reded at both calibrated sizes; all planted source files were
+restored with explicit copy-back, `cmp`, and `touch`. No plant remains applied.
+
+**Superseded interim handoff, not landing approval.** A harness wrap-up notice interrupted the step;
+Main subsequently clarified that it was not an operator wrap-up request and instructed continuation.
+The following interim observations remain historical evidence, not the final landing disposition.
+The failed-proof retention repair is complete: the genuine before witness exits 101 and the final
+inventory test passes. The live recovery witness now uses a plain serving root (the actual installed-boot
+surface), with a package id distinct from compiled-in `hello-spirit`; it observes admission refusal,
+live `spirit_not_loaded`, then successful offline removal and signed proof after root exit.
+The negative verifier vector recursively sorts the unsigned envelope before re-signing and requires
+both verifiers to reject specifically for the missing category evidence, not a stale signature.
+
+**Observed final focused result:** `l1-current-step-focused.log`, cargo exit **101**.
+Inventory **9/9**, local live lineage/refused-boot recovery **1/1**, late-held sweep **1/1** passed.
+The T3 test returned its explicit missing-substrate skip; it is not hosted evidence.
+Shell-host **11/13** passed; the unchanged REPL clarification timing family failed and the AC5
+latency witness failed at 100k / remained `HandlerStillRunning` at 1M. The observed ratios are
+**0.651344 door / 1.050325 constituent**, not compliant with 25%. No retry, timeout increase,
+threshold weakening or claim of AC5 completion. Same-line rule-10 records are in `deferred-work.md`.
+
+**Exact post-format pins:** bin **34845** (+293), IAC **8373** (+103), audit **7775** (+54),
+registry **4320** (+72), xtask **44466** (+0), aggregate **193724** (+522), hardfail **193725**.
+All remain inside the stricter L1 ceilings (**35704 / 8630 / 8261 / 4368 / 44466 / 195404**).
+The kernel is unchanged at **26841 physical / 21042 tokei**, 95 files, identical set/content hash;
+domain remains **10107**. `xtask/kloc.toml` rows move together and the xtask first HISTORY segment
+cites this live story with `44466 -> 44466`, preserving the priority hotfix.
+
+**Observed structural checks:** prescribed prebuilt `check-kernel-baseline`, `kloc-check`,
+`check-service-boundary`, `check-dev-record-completeness`, `check-epic-close-coherence`,
+`check-decision-register`, `check-exit-commands` all exit **0**; raw `l1-current-step-*.log`.
+Earlier affected binary build and workspace clippy each exit **0**, but preceded the final
+package guard and are not final-tree certification. Final fixture-builder/build/metadata-reuse
+workspace nextest, formal final clippy delta, and the once-only prepush have **not run**.
+Hosted T3, delegated cgroup/network and hosted discipline legs remain **unverified**.
+This is **not** a merge-ready L1; AC5/EC-13 and landing verification remain open.
+
+**Last cargo control and cleanup:** `cargo test -p maos-bin --no-default-features --test verb_table_15_3`
+exits **0, 7/7** (`l1-final-no-default-control.log`); no subsequent cargo run.
+Before any integration suite, rebuild default-feature binaries after the registered fixture builder.
+A `/proc` scan found no cargo/rustc before cleanup. Own scratch/park files and **622** stale incremental
+sessions were removed while retaining newest-per-crate and all sessions touched within 2h;
+deps/build/fingerprint were untouched. **3223033786 logical bytes removed**, observed filesystem
+free-space increase **2865713152 bytes** (`l1-cleanup.json`); custody records preserved in evidence.
+
+**Continuation after Main's clarification.** Cargo ownership resumed at unchanged `cb0abc06`.
+Profiling before further source repair found a genuine boundedness defect: SQLite chooses
+`idx_tlog_kind` for `kind=11`, re-examining the whole kind population inside each nominal rowid
+window. At 100k rows the first page takes **724600 VM steps**; at 1M, **7024500**.
+Forcing rowid access on the same 1M data takes **45000–45100 steps** per 4096-row page.
+Raw plans, VM counts and wall/CPU times: `l1-ac5-resume-profile-before.json`,
+`l1-ac5-resume-profile-1m.json`. Wall scheduling/fsync is separately retained, not mistaken
+for work under the scan lock. The binding work oracle keeps the quarter-scan bound and
+independently limits actual production-statement VM steps, so the `i64::MAX` plant must still red.
+Main accepts the existing typed HTTP503 only as **pending**, provided its handler completes
+and an identical subsequent request succeeds without state corruption; no route deadline changes.
+
+The superseded interim witness table remains in `l1-wrapup.md`; the final AC5 repair evidence
+and current cites are in `l1-ac5-repair-evidence.md` and `l1-final-cites.md`.
+
+### Landing 1 profiled repair and final focused verification — 2026-11-04, Dev2011b
+
+**Actual bounded work, not a nominal SQL window.** The kind/timestamp plan revisited the
+whole kind population inside each rowid range. Kind-only indexing now pins the rowid-ordered
+access path; general predicates pin primary rowid access. Recovery's previously missed full-TL
+anti-join is also paged, with indexed request/outcome lookups and off-worker invocation.
+Receipt vectors retain timestamp/frame-id ordering. A guarded JSON expression index preserves
+opaque outcome writes, JSON5 extraction semantics and explicit corrupt-recovery errors.
+Genuine before controls caught the full recovery scan, incorrect ordering and unguarded index;
+none was hidden behind a fallback. Raw outputs and exact plants remain in landing-1 evidence.
+
+**AC5 final restored source.** Test-only instrumentation meters the actual production statements,
+not a substitute implementation: four new boundary/work vectors pass, followed by the complete
+IAC unit suite **103/103**, exit0. The final `i64::MAX` plant reds both100k/1M at the quarter-scan
+assertion, exit101, then explicit copy-back + cmp + touch exits0. Fixed pages stay below0.25
+and below the independent4096×128 VM-step cap across all five predicates. No kernel,
+route deadline, timeout, observation budget or latency threshold was increased.
+
+**Real disk/WAL door, full writer interval.** Final100k wall1.070610323s / max insert232.483050ms
+gives0.217150017; final1M wall8.480294334s / max insert2.000848329s gives0.235940906.
+Both satisfy the literal25% bound. The writer remains active until actual handler completion.
+An earlier separately prescribed repaired run exercised real1M `handler_still_running`:
+the response was **pending**, the original handler durably completed, and an identical request
+then returned the completed report without rescan corruption. The final stricter run completed
+inside the unchanged10s route deadline and also passed the repeat. No pending response is
+called an erased report or proof.
+
+**Final focused/preservation observations.** `l1-final-focused-and-preservation.log`, exit0:
+inventory9, live local1 plus explicit hosted-T3 skip1, late-hold1,13.5b26,18-6 floors1,
+shell14. Thus53 reported successful cases,52 exercised locally and one unavailable-substrate
+runtime skip. `l1-final-kernel-audit-registry-preservation.log`, exit0: kernel cascade13,
+audit smoke3, registry58 plus2 ignored. Earlier timing failures remain same-line rule-10
+records under20-7; no retry-to-green or budget widening is claimed.
+
+**AC5-stage exact formatted pins (before FR4 closure below).** bin **34842** (+290), IAC **8550** (+280), audit **7775** (+54),
+registry **4322** (+74), xtask **44466** (+0), aggregate **193900** (+698), hardfail **193901**.
+All remain inside **35704 / 8630 / 8261 / 4368 / 44466 / 195404** respectively.
+Kernel remains **26841 physical /21042 tokei**,95 files, identical set/content hash;
+domain remains10107. Exact rows and HISTORY move together; kernel grant consumption is zero.
+`l1-final-cites.md` re-measures the resumed immutable HEAD and final working-tree entry points.
+
+**AC5-stage preparation and clippy (before FR4 closure below).** Registered fixture builder exits0 (16 artifacts), then genuine
+default-feature `cargo build --locked -p maos-bin -p maos-cli` exits0. Workspace/all-target clippy
+exits0; the formal unchanged-baseline ratchet exits0 at **1329 occurrences /870 distinct**
+versus **1383 /897**, a delta **-54 /-27**. Hosted-toolchain results remain unverified.
+Source/structural gates exit0, including unchanged kernel baseline, exact KLOC, boundaries,
+serde handling, env contract, composition roots, constructors, test cost, epic coherence,
+decisions and exit commands. Deferred-owner parser ambiguity was fixed only by explicit
+short20-7 aliases alongside the same existing owner, with no ownership/status changes;
+the resulting record gate exits0 at199 done stories,180 owner assertions and zero violations.
+
+### Full-workspace observation and final writer-inventory closure — 2026-11-05, Dev2011b
+
+**One actual standalone workspace execution, no retry.** Locked full-workspace producers
+exported58 workspace members /663 binary targets; the consumer reused both metadata files
+at default concurrency, with no retry override. Nextest rejects `--workspace`/`--locked`
+on a metadata consumer: the retained CLI-only control exits2 before any test. Dropping only
+those incompatible build flags does not narrow the producer's full-workspace scope.
+The actual run exits **100**: **5640 run,5639 passed,1 failed,138 skipped**,46.919s,
+run id `16ed5fb9-66a1-4774-a94d-3e94c2321a0f`. Same-run JUnit is preserved.
+All L1 witnesses pass, including actual100k/1M writer ratios **0.198724650 /0.207434044**;
+the hosted T3 case remains its explicit unavailable-substrate runtime skip.
+
+**The sole failure was actionable, not deferred as a flake.** FR4's source inventory
+found the new `scrub_uninstalled_distillate` writer without a disposition. Its actual
+kind1, pid0, absent-token `distillate.redacted` event carries exactly stable Spirit id
+and redacted frame id. The production `WRITER_SHAPES` row and independently measured
+fixture now classify that maintenance marker as NonCall, following existing redaction
+conventions. The first repaired focused run then exposed the scanner treating the
+external test-only VM module as production. An explicit leading file-level `cfg(test)`
+and scanner support for that actual compilation guard fix the boundary; a genuine
+red-before control and production-only `cfg(not(test))` inclusion control prevent a
+basename exemption or blanket production suppression. Complete classifier target:
+**20/20, exit0**. No second standalone workspace execution was used to erase its red.
+
+**Final current exact pins after formatting/closure:** bin **34842** (+290), IAC **8551**
+(+281), audit **7785** (+64), registry **4322** (+74), xtask **44466** (+0),
+aggregate **193911** (+709), strict hardfail **193912**. All original stricter ceilings
+are unchanged. Kernel26841 physical/21042 tokei and domain10107 remain unchanged.
+`l1-fr4-complete-counts.json` records the pre-repin measurement; exact synchronized
+rows/HISTORY yield `l1-fr4-final-kloc-check.json`, exit0. No kernel grant is consumed.
+
+**Post-closure control and genuine binaries.** The explicitly requested final
+`cargo test -p maos-bin --no-default-features --test verb_table_15_3` exits0, **7/7**.
+After that feature-mode control, IAC's complete lib target passes **103/103**, and
+a genuine `cargo build --locked -p maos-bin -p maos-cli` restores default binaries:
+the sequential group exits0. No stale no-default executable is left for final prepush.
+
+Metadata compilation's3000s cell timeout and a separate Eval30s interruption are
+retained with no invented child exit code; each was followed by an empty cargo/rustc
+process scan before cached compilation continued. The successful metadata cell exits0.
+These were build/CLI repairs, not flaky-test retries. Exact provenance and scope:
+`l1-metadata-execution-record.json`; raw final workspace stdout/stderr and JUnit remain.
+
+
+
+**Final-source clippy refresh after both writer-boundary fixes.** Workspace/all-target
+clippy exits0 (`l1-fr4-final-clippy.jsonl`); the formal unchanged-baseline ratchet exits0
+at1329 occurrences/870 distinct versus1383/897, delta-54/-27. The final exact KLOC gate
+also exits0. Hosted toolchain/discipline and signed-T3 execution remain unverified.
+
+### L1 local landing disposition — 2026-11-05, Dev2011b
+
+The prescribed final prepush ran **once**, with undelegated cgroup mode and no tracked
+edits in flight: **exit0**,1186.646s. Raw92 records: **83 pass /8 skip /1 advisory**.
+Final-tree workspace nextest, kernel-core lib, workspace doctests, fixture builder,
+source/structural gates and exact kernel/KLOC checks pass. Correct same-run default-profile
+JUnit is `l1-final-prepush-default-junit.xml`, UUID `ad63b740-ae30-44f2-8c68-1aee1df88f31`:
+**5640 cases,0 failures/errors**,46.635s. Earlier standalone CI-profile red/JUnit remain
+separate; its deterministic writer-inventory failure is fixed, not retried away.
+
+The aggregate test-budget subcheck is honestly **advisory exit1**, not green: hook-pump32.528s,
+one-door33.478s, shell-host48.677s and participant-recall42.116s each exceed unchanged30s
+per-binary sums. All functional cases pass; shell includes this landing's required1M vector,
+so it is not labelled an unchanged target. Same-line rule-10 records under owner20-7 retain
+all four findings. No retry, threshold/budget increase or new exception. EC-13's kernel-free
+bounded-work/hold repair is closed separately; FR65/NFR-Aud-12, hosted AC6/discipline and
+final-kernel AC3/KS/O4 remain partial/open as applicable. Story/tracker status is not flipped.
+
+Final full AC name:line / before / plant table, exact envelopes, commands/exits, advisory
+dispositions and limitations: `20-11-erasure-inventory-closure-evidence/landing-1/l1-final-report.md`
+and `l1-final-witnesses.md`. No commit, push, kernel/source hash refresh or hosted proof claim.
+
+**Final record checks and cleanup.** After advisory/EC-13 dispositions, the prescribed
+`check-dev-record-completeness`, `check-decision-register` and `check-exit-commands`
+each exit0 (`l1-final-records-*.json`). No prepush rerun. Guarded cleanup then exits0:
+empty cargo/rustc `/proc` scan, owned scratch/runner deleted,976 stale incremental sessions
+removed while newest-per-crate and all last2h touches are retained; deps/build/fingerprint
+and other worktrees untouched. Final pass removes11,480,789,636 logical bytes and observes
+8,119,390,208 bytes more free space. Including the earlier explicit pass:1,598 sessions,
+14,703,823,422 logical bytes; summed observed free-space increases10,985,103,360 bytes.
+Accounting/paths are in `l1-final-cleanup.json` and the final report; no cargo/check after cleanup.
+
 ### Agent Model Used
 
 anthropic/claude-opus-5-5 (creation).
 
-openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation).
+openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation and Dev2011b L1 continuation).
 
 ### Debug Log References
 
 - [T0 STOP report and command ledger](20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md)
 - [Full failing-before output](20-11-erasure-inventory-closure-evidence/landing-1/t0-unload-race-cargo-test.log)
+- [Superseded interim observations](20-11-erasure-inventory-closure-evidence/landing-1/l1-wrapup.md)
+- [Final restored-source AC witness table](20-11-erasure-inventory-closure-evidence/landing-1/l1-final-witnesses.md)
+- [Final exact measurements, commands/exits, once-only prepush and advisory dispositions](20-11-erasure-inventory-closure-evidence/landing-1/l1-final-report.md)
+- [Profiled AC5 repair and actual wall/work observations](20-11-erasure-inventory-closure-evidence/landing-1/l1-ac5-repair-evidence.md)
+- [Rebased immutable HEAD and final source citations](20-11-erasure-inventory-closure-evidence/landing-1/l1-final-cites.md)
 
 ### Completion Notes List
 
-- Initial T0 STOP preserved; operator asks `halt_grant` / `halt_landing` now recorded. No L1 AC is yet complete.
+- Kernel-free L1 source and local AC1/AC2/AC4/AC5/AC7 focused/preservation witnesses pass after the profiled repair and restored plants. Broad landing-command outcomes are recorded in the final continuation; hosted AC6/discipline remains unverified. AC3, KS and O4 are final-kernel work, not implemented here. Original T0 STOP and all historical failures/rulings are preserved; no tracker flip.
 
 ### File List
 
@@ -536,6 +788,10 @@ openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation).
   `../planning-artifacts/epic-20-preflight-2026-10-30.md` — cumulative ledger and 20-11 landing amendment.
 - `20-11-erasure-inventory-closure-evidence/landing-1/late-halt-repair-pricing.md`,
   `20-11-erasure-inventory-closure-evidence/landing-1/t0-stop.md` — dated subsequent rulings above preserved evidence.
+- L1 continuation source/tests: `crates/maos-audit/src/erasure/proof.rs`, `crates/maos-audit/tests/erasure_smoke_test.rs`, `crates/maos-iac/src/adapter/transparency_log.rs`, `crates/maos-registry/src/storage.rs`, `crates/maos-bin/src/{main,operator_door,hook_pump}.rs`, `crates/maos-cli/src/cli.rs`, `tools/verify-erasure/verify.py`, `crates/maos-bin/tests/{erasure_inventory_20_11,erasure_live_20_11,erasure_scan_20_11,shell_host_16_2}.rs`, `crates/maos-bin/tests/support/worker_revoke_root.rs`.
+- L1 profiled scan companion: `crates/maos-iac/src/adapter/erasure_scan_work.rs` — test-only actual SQLite VM-work meter,100k/1M predicates, ordering and opaque-outcome contract vectors.
+- L1 writer-inventory closure: `crates/maos-audit/src/fr4_classifier.rs`, `crates/maos-audit/tests/fr4_classifier_16_2.rs` — measured production redaction marker disposition and explicit external test-file compilation boundary.
+- L1 continuation records/pins: this story, `deferred-work.md`, `docs/adr/ADR-044-gdpr-article-17-distillate-redaction.md`, `tests/coverage-matrix.yaml`, `xtask/kloc.toml`, and `20-11-erasure-inventory-closure-evidence/landing-1/l1-*` (original T0 artifacts retained).
 
 ## Change Log
 
@@ -551,3 +807,5 @@ openai-codex/gpt-6.1-sol (landing-1 T0 STOP investigation).
   to **21250**; KS + O4 measured 26867/21060, binding D02 A ×2 ceiling 26893/21078, domain ceiling 10115.
   Ask `halt_landing` moves AC3 to final kernel KS + O4; L1 AC1, AC2, AC4–AC7 remains kernel-free.
   T0 STOP history/red preserved; status stays ready-for-dev; no source, pins, cargo or gates in this recording pass.
+- 2026-11-04: Dev2011b adopted inherited L1 work, established original-HEAD reds and restored plants, parked/rebased onto `cb0abc06` for the priority hotfix, and implemented kernel-free inventory/proof/scan/package changes. The interim harness wrap-up notice was not an operator stop; Main instructed continuation. Profiling then repaired the actual kind access path and missed recovery scan; final focused/preservation and literal100k/1M wall/work witnesses pass, exact pins remain within grant. Historical reds are retained; hosted T3 and final-kernel work remain unverified/untouched. No tracker flip, commit, push or kernel change.
+- 2026-11-05: Final default-concurrency standalone workspace observed one real FR4 inventory failure; measured production disposition and guarded external-test scanner boundary fixed with red-before controls and20/20 focused verification. Exact current pins193911/hardfail193912, kernel/domain unchanged; final clippy delta-54/-27. Once-only final prepush exits0 with5640/5640 final-tree cases and four unchanged-budget aggregate advisories explicitly owned20-7. Hosted/final-kernel proof remains owed; no tracker flip or commit.

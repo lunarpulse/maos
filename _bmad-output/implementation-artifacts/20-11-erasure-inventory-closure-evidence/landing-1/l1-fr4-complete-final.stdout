@@ -1,0 +1,25 @@
+
+running 20 tests
+test a_call_shaped_writer_stays_a_violation_at_a_spirit_pid ... ok
+test attributed_and_tokenless_recall_fetch_rows_remain_calls ... ok
+test every_never_call_kind_is_a_non_call ... ok
+test cfg_test_items_are_skipped ... ok
+test lifecycle_bogus_is_a_violation_the_prefix_is_refused ... ok
+test lifecycle_start_with_foreign_pid_is_a_violation ... ok
+test lifecycle_load_without_spirit_id_is_a_violation ... ok
+test forget_tombstones_are_typed_redacted_rows_not_fr4_schema_failures ... ok
+test plain_fr4_renders_every_row_with_its_intent ... ok
+test plain_table_gains_the_trailing_intent_column ... ok
+test scanner_inventories_optional_capability_tokens_not_only_literal_none ... ok
+test ndjson_over_a_mixed_set_emits_exactly_the_call_rows ... ok
+test every_noncall_writer_shape_classifies_from_its_measured_payload ... ok
+test the_scanner_reds_on_an_unlisted_scratch_site ... ok
+test tokenless_inference_call_is_a_violation ... ok
+test tokenless_shell_turn_is_a_violation ... ok
+test tokenless_task_assign_is_a_non_call_and_a_token_bearing_one_still_projects ... ok
+test shared_recall_fetch_writers_have_call_dispositions ... ok
+test every_writer_site_demanding_a_disposition_has_one ... ok
+test real_forget_tombstones_survive_replay_sealed_and_trajectory_export ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+

@@ -919,7 +919,16 @@ coverage:
     - gdpr-cascade-probe-v0
     phase: v1.0
     valid_until: '2027-06-12'
-    notes: Story 9.2 ships signed Merkle inclusion/exclusion proof-of-erasure on uninstall + standalone Python verifier; corpus replayed by gdpr-cascade-v0
+    notes: |
+      Story 20-11 landing 1: erasure_inventory_20_11 witnesses principal-free
+      proofs, all-boot lineage/pid isolation, installed-package removal, named
+      retained stores and Rust/Python category-evidence rejection.
+      shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload
+      drives the real SCB/door snapshot boundary; erasure_live_20_11 drives
+      the real live cascade. AC6's T3 Worker leg is hosted-only and uses the
+      AC2 fallback because admission currently defaults SCB schedules.
+      AC3 halt receipts and KS watchdog cleanup remain final-kernel work;
+      no registered gate or full-story closure is claimed.
   FR7:
     gates: []
     corpora: []
@@ -981,7 +990,19 @@ coverage:
     - gdpr-cascade-v0
     phase: v1.0
     valid_until: '2027-06-12'
-    notes: Story 9.2 Merkle inclusion/exclusion proof over TL frame_ids; signed ErasureProof bundle verified by in-tree tests and tools/verify-erasure
+    notes: |
+      Story 20-11 landing 1 emits maos.erasure-proof.v2: one signed
+      principal.uninstall.category observation and post-inclusion proof per
+      category, including empty/gap statuses. erasure_inventory_20_11 checks
+      both verifiers reject re-signed missing evidence. erasure_scan_20_11
+      and shell_host_16_2 exercise intervening holds, serialized door release
+      and 100k/1M-frame writer latency. The IAC erasure_scan_work module also
+      measures the actual production predicates' SQLite VM work, including
+      restart recovery and malformed-receipt scans; its unbounded-page plant
+      reds both sizes without weakening the quarter-scan bound. A route503
+      handler_still_running is pending, never an erased/complete result.
+      Pending halt receipts and watchdog cleanup remain final-kernel
+      dependencies; hosted proof is owed.
   NFR-Aud-13:
     gates: []
     enforcement: advisory-until-engagement

@@ -1,0 +1,38 @@
+error: the argument '--binaries-metadata <PATH>' cannot be used with:
+  --package <PACKAGES>
+  --workspace
+  --exclude <EXCLUDE>
+  --all
+  --lib
+  --bin <BIN>
+  --bins
+  --example <EXAMPLE>
+  --examples
+  --test <TEST>
+  --tests
+  --bench <BENCH>
+  --benches
+  --all-targets
+  --features <FEATURES>
+  --all-features
+  --no-default-features
+  --build-jobs <N>
+  --release
+  --cargo-profile <NAME>
+  --target <TRIPLE>
+  --target-dir <DIR>
+  --unit-graph
+  --timings[=<FMTS>]
+  --frozen
+  --locked
+  --offline
+  --cargo-message-format <FMT>
+  --cargo-quiet...
+  --cargo-verbose...
+  --ignore-rust-version
+  --future-incompat-report
+  -Z <FLAG>
+
+Usage: cargo nextest run --no-fail-fast --profile <PROFILE> --cargo-metadata <PATH> --binaries-metadata <PATH> --success-output <WHEN> --failure-output <WHEN> [FILTERS]... [-- <FILTERS_AND_ARGS>...]
+
+For more information, try '--help'.

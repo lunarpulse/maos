@@ -1,0 +1,451 @@
+diff --git a/crates/maos-audit/src/erasure/proof.rs b/crates/maos-audit/src/erasure/proof.rs
+index 3f58b4e2..2cb1408c 100644
+--- a/crates/maos-audit/src/erasure/proof.rs
++++ b/crates/maos-audit/src/erasure/proof.rs
+@@ -51,6 +51,16 @@ pub struct ErasedFrameProof {
+     pub pre_inclusion: MerkleProof,
+ }
+ 
++/// A category observation journaled before post-tree capture. Both its
++/// identity/status and the post-inclusion proof are covered by the signature.
++#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
++pub struct CategoryEvidence {
++    pub spirit_id: String,
++    pub category: ErasureCategory,
++    pub frame_id: String,
++    pub post_inclusion: MerkleProof,
++}
++
+ /// Signed proof-of-erasure bundle.
+ ///
+ /// # Security model (AC3, Decision D2)
+@@ -83,6 +93,7 @@ pub struct ErasureProof {
+     pub redacted_principal_frame_proofs: Vec<ErasedFrameProof>,
+     pub subject_exclusion_proofs: Vec<MerkleProof>,
+     pub categories: Vec<ErasureCategory>,
++    pub category_evidence: Vec<CategoryEvidence>,
+     pub signature_block: SignatureBlock,
+ }
+ 
+@@ -101,6 +112,7 @@ struct ErasureProofForSigning {
+     pub redacted_principal_frame_proofs: Vec<ErasedFrameProof>,
+     pub subject_exclusion_proofs: Vec<MerkleProof>,
+     pub categories: Vec<ErasureCategory>,
++    pub category_evidence: Vec<CategoryEvidence>,
+ }
+ 
+ #[derive(Debug, thiserror::Error)]
+@@ -173,6 +185,7 @@ pub fn build_erasure_proof(
+     erased_frame_ids: &[[u8; 16]],
+     erased_principal_ids: &[String],
+     redacted_principal_frame_ids: &[[u8; 16]],
++    category_frame_ids: &[[u8; 16]],
+     categories: Vec<ErasureCategory>,
+     signing_seed: &[u8; 32],
+ ) -> Result<ErasureProof, ErasureProofError> {
+@@ -231,9 +244,22 @@ pub fn build_erasure_proof(
+ 
+     let pre_leaves = pre_frame_ids.iter().map(format_frame_id).collect();
+     let post_leaves = post_frame_ids.iter().map(format_frame_id).collect();
++    if category_frame_ids.len() != categories.len() {
++        return Err(ErasureProofError::VerificationFailed("one evidence frame per category required".into()));
++    }
++    let category_evidence = categories.iter().zip(category_frame_ids).map(|(category, fid)| {
++        Ok(CategoryEvidence {
++            spirit_id: spirit_id.clone(),
++            category: category.clone(),
++            frame_id: format_frame_id(fid),
++            post_inclusion: prove_inclusion(&post_tree, hash_leaf(fid)).ok_or_else(|| {
++                ErasureProofError::VerificationFailed("category evidence absent from post-tree".into())
++            })?,
++        })
++    }).collect::<Result<Vec<_>, ErasureProofError>>()?;
+ 
+     let unsigned = ErasureProofForSigning {
+-        schema_version: "maos.erasure-proof.v1".to_string(),
++        schema_version: "maos.erasure-proof.v2".to_string(),
+         spirit_id: spirit_id.clone(),
+         spirit_pid,
+         uninstalled_at_ns,
+@@ -245,6 +271,7 @@ pub fn build_erasure_proof(
+         redacted_principal_frame_proofs,
+         subject_exclusion_proofs,
+         categories,
++        category_evidence,
+     };
+ 
+     let canonical = canonicalize(&unsigned)?;
+@@ -266,6 +293,7 @@ pub fn build_erasure_proof(
+         redacted_principal_frame_proofs: unsigned.redacted_principal_frame_proofs,
+         subject_exclusion_proofs: unsigned.subject_exclusion_proofs,
+         categories: unsigned.categories,
++        category_evidence: unsigned.category_evidence,
+         signature_block: SignatureBlock {
+             algorithm: "Ed25519".to_string(),
+             attester_pubkey: hex::encode(pubkey_bytes),
+@@ -298,6 +326,7 @@ pub fn verify_erasure_proof(
+         redacted_principal_frame_proofs: proof.redacted_principal_frame_proofs.clone(),
+         subject_exclusion_proofs: proof.subject_exclusion_proofs.clone(),
+         categories: proof.categories.clone(),
++        category_evidence: proof.category_evidence.clone(),
+     };
+ 
+     let canonical = canonicalize(&unsigned)?;
+@@ -380,19 +409,22 @@ pub fn verify_erasure_proof(
+         }
+     }
+ 
+-    // Reject empty proof sets on a bundle that claims erasure (P18).
+-    let claims_removal = proof
+-        .categories
+-        .iter()
+-        .any(|c| matches!(c.status, CategoryStatus::Removed { count } if count > 0));
+-    if claims_removal
+-        && proof.erased_frame_proofs.is_empty()
+-        && proof.redacted_principal_frame_proofs.is_empty()
+-        && proof.subject_exclusion_proofs.is_empty()
+-    {
+-        return Err(ErasureProofError::VerificationFailed(
+-            "bundle claims erasure but carries no inclusion or exclusion proofs".to_string(),
+-        ));
++    if proof.schema_version != "maos.erasure-proof.v2" || proof.categories.len() != proof.category_evidence.len() {
++        return Err(ErasureProofError::VerificationFailed("schema/category evidence mismatch".into()));
++    }
++    let mut names = std::collections::BTreeSet::new();
++    let mut evidence_ids = std::collections::BTreeSet::new();
++    for (category, evidence) in proof.categories.iter().zip(&proof.category_evidence) {
++        let fid = parse_frame_id_hex(&evidence.frame_id).ok_or_else(|| {
++            ErasureProofError::VerificationFailed("malformed category frame id".into())
++        })?;
++        if !names.insert(&category.name) || !evidence_ids.insert(fid)
++            || evidence.spirit_id != proof.spirit_id || &evidence.category != category
++            || !post_fids.contains(&fid)
++            || !super::merkle::verify_proof(proof.post_root, hash_leaf(&fid), &evidence.post_inclusion)
++        {
++            return Err(ErasureProofError::VerificationFailed("invalid per-category evidence".into()));
++        }
+     }
+ 
+     Ok(())
+@@ -512,6 +544,7 @@ mod tests {
+             &erased,
+             &principals,
+             &[],
++            &post[..2],
+             vec![
+                 ErasureCategory {
+                     name: "memory_namespace".into(),
+@@ -552,6 +585,7 @@ mod tests {
+             &[never_existed],
+             &[],
+             &[],
++            &[],
+             vec![],
+             &seed,
+         );
+@@ -575,6 +609,7 @@ mod tests {
+             &[pre[0]],
+             &["bob@example.org".to_string()],
+             &[],
++            &post[..1],
+             vec![ErasureCategory {
+                 name: "memory_namespace".into(),
+                 status: CategoryStatus::Removed { count: 1 },
+@@ -607,6 +642,7 @@ mod tests {
+             &[pre[0]],
+             &["carol@example.org".to_string()],
+             &[],
++            &post[..1],
+             vec![ErasureCategory {
+                 name: "memory_namespace".into(),
+                 status: CategoryStatus::Removed { count: 1 },
+diff --git a/crates/maos-audit/tests/erasure_smoke_test.rs b/crates/maos-audit/tests/erasure_smoke_test.rs
+index b704a192..5dc71dcf 100644
+--- a/crates/maos-audit/tests/erasure_smoke_test.rs
++++ b/crates/maos-audit/tests/erasure_smoke_test.rs
+@@ -167,6 +167,10 @@ fn headline_erasure_demo_produces_verifiable_proof() {
+     );
+ 
+     // 4. Build + sign the proof-of-erasure.
++    let category_frame_ids: Vec<_> = ["memory_namespace", "principal_frames"].into_iter().map(|name| {
++        tl.insert_kernel_event_returning_id(7, FrameKind::Decision, None,
++            "principal.uninstall.category", format!("{{\"category\":\"{name}\"}}").as_bytes())
++    }).collect();
+     let post_frame_ids = tl.all_frame_ids().unwrap();
+     let erased_frame_ids: Vec<[u8; 16]> = erased_distillate_frame_ids
+         .iter()
+@@ -202,6 +206,7 @@ fn headline_erasure_demo_produces_verifiable_proof() {
+         &erased_frame_ids,
+         &[PRINCIPAL.to_string()],
+         &erased_principal_frame_ids,
++        &category_frame_ids,
+         vec![
+             ErasureCategory {
+                 name: "memory_namespace".into(),
+diff --git a/crates/maos-iac/src/adapter/transparency_log.rs b/crates/maos-iac/src/adapter/transparency_log.rs
+index a44bba7f..8a04105c 100644
+--- a/crates/maos-iac/src/adapter/transparency_log.rs
++++ b/crates/maos-iac/src/adapter/transparency_log.rs
+@@ -1552,84 +1552,81 @@ impl TransparencyLogAdapter {
+         }
+     }
+ 
++    /// Stable rowid windows bound each forget scan's TL lock hold. Appends
++    /// committed before a later window are included; receipt order is sorted below.
++    fn scan_rowid_windows(
++        &self,
++        sql: &str,
++        principal: Option<&str>,
++        mut each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
++    ) -> Result<(), AuditError> {
++        const FORGET_SCAN_PAGE: i64 = 4096;
++        let mut after = 0_i64;
++        loop {
++            let inner = self.inner.lock().expect("TransparencyLogAdapter inner poisoned");
++            let last: i64 = inner.conn.query_row(
++                "SELECT coalesce(max(rowid), 0) FROM transparency_log", [], |row| row.get(0),
++            ).map_err(AuditError::SqliteRead)?;
++            if after >= last { return Ok(()); }
++            let upto = after.saturating_add(FORGET_SCAN_PAGE);
++            let mut stmt = inner.conn.prepare_cached(sql).map_err(AuditError::SqliteRead)?;
++            let mut rows = stmt.query(rusqlite::params![principal, after, upto]).map_err(AuditError::SqliteRead)?;
++            while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? { each(row)?; }
++            after = upto;
++        }
++    }
++
+     fn forget_frames(
+         &self,
+         principal: Option<&str>,
+         scrubbed: &std::collections::HashSet<String>,
+         include_prior: bool,
+     ) -> Result<Vec<ForgetFrame>, AuditError> {
+-        let inner = self
+-            .inner
+-            .lock()
+-            .expect("TransparencyLogAdapter inner poisoned");
+-        // A failed earlier cascade may already have scrubbed a raw source.
+-        // Flattened references still close that derivation on the re-run.
+-        let mut tombstones = inner
+-            .conn
+-            .prepare(
+-                "SELECT lower(hex(frame_id)) FROM transparency_log \
+-             WHERE CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
++        let mut prior = std::collections::HashSet::new();
++        self.scan_rowid_windows(
++            "SELECT lower(hex(frame_id)) FROM transparency_log \
++             WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND \
++             CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) \
+              THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 \
+              AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' \
+              AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') \
+              AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END",
+-            )
+-            .map_err(AuditError::SqliteRead)?;
+-        let prior = tombstones
+-            .query_map([], |row| row.get::<_, String>(0))
+-            .map_err(AuditError::SqliteRead)?
+-            .collect::<Result<std::collections::HashSet<_>, _>>()
+-            .map_err(AuditError::SqliteRead)?;
+-        let mut stmt = inner.conn.prepare(
+-            "SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted \
+-             FROM transparency_log WHERE \
++            None,
++            |row| { prior.insert(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?); Ok(()) },
++        )?;
++        let mut found = Vec::new();
++        self.scan_rowid_windows(
++            "SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted, timestamp_ns \
++             FROM transparency_log WHERE rowid > ?2 AND rowid <= ?3 AND \
+              ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) \
+              OR (?1 IS NULL AND kind = 11)) \
+              AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') \
+-             AND intent NOT LIKE 'principal.uninstall.%' \
+-             ORDER BY timestamp_ns ASC, frame_id ASC"
+-        ).map_err(AuditError::SqliteRead)?;
+-        let mut rows = stmt
+-            .query(rusqlite::params![principal])
+-            .map_err(AuditError::SqliteRead)?;
+-        let mut found = Vec::new();
+-        while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
+-            let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
+-            if let Some(id) = principal {
+-                if !principal_id_occurs(&body, id) {
+-                    continue;
+-                }
+-            }
+-            let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
+-            let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
+-                match Self::distillate_source_refs(&body) {
+-                    Ok(refs) => refs,
+-                    Err(_) => Vec::new(),
++             AND intent NOT LIKE 'principal.uninstall.%'",
++            principal,
++            |row| {
++                let body: Vec<u8> = row.get(4).map_err(AuditError::SqliteRead)?;
++                if principal.is_some_and(|id| !principal_id_occurs(&body, id)) { return Ok(()); }
++                let kind: i64 = row.get(1).map_err(AuditError::SqliteRead)?;
++                let mut source_log_ref = if kind == FrameKind::Distillate as i64 {
++                    Self::distillate_source_refs(&body).unwrap_or_default()
++                } else { Vec::new() };
++                if principal.is_none() && !source_log_ref.iter().any(|id| scrubbed.contains(id) || (include_prior && prior.contains(id))) {
++                    return Ok(());
+                 }
+-            } else {
+-                Vec::new()
+-            };
+-            if principal.is_none()
+-                && !source_log_ref
+-                    .iter()
+-                    .any(|id| scrubbed.contains(id) || (include_prior && prior.contains(id)))
+-            {
+-                continue;
+-            }
+-            source_log_ref.retain(|id| !prior.contains(id));
+-            let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
+-            let frame_id = bytes
+-                .try_into()
+-                .map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?;
+-            found.push(ForgetFrame {
+-                frame_id,
+-                kind,
+-                spirit_pid: row.get::<_, i64>(2).map_err(AuditError::SqliteRead)? as u32,
+-                boot_nonce: row.get::<_, i64>(3).map_err(AuditError::SqliteRead)? as u64,
+-                source_log_ref,
+-            });
+-        }
+-        Ok(found)
++                source_log_ref.retain(|id| !prior.contains(id));
++                let bytes: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
++                found.push((row.get::<_, i64>(5).map_err(AuditError::SqliteRead)?, ForgetFrame {
++                    frame_id: bytes.try_into().map_err(|v: Vec<u8>| AuditError::MalformedFrameId(v.len()))?,
++                    kind,
++                    spirit_pid: row.get::<_, i64>(2).map_err(AuditError::SqliteRead)? as u32,
++                    boot_nonce: row.get::<_, i64>(3).map_err(AuditError::SqliteRead)? as u64,
++                    source_log_ref,
++                }));
++                Ok(())
++            },
++        )?;
++        found.sort_by(|a, b| (a.0, a.1.frame_id).cmp(&(b.0, b.1.frame_id)));
++        Ok(found.into_iter().map(|(_, frame)| frame).collect())
+     }
+ 
+     /// Shared first/late sweep; held co-principals protect their entire derivation.
+@@ -1700,21 +1697,18 @@ impl TransparencyLogAdapter {
+                 others.push(id);
+             }
+         }
+-        let inner = self
+-            .inner
+-            .lock()
+-            .expect("TransparencyLogAdapter inner poisoned");
+-        let mut stmt = inner
+-            .conn
+-            .prepare("SELECT lower(hex(frame_id)), payload_redacted FROM transparency_log WHERE kind = 11")
+-            .map_err(AuditError::SqliteRead)?;
+-        let mut rows = stmt.query([]).map_err(AuditError::SqliteRead)?;
+-        while let Some(row) = rows.next().map_err(AuditError::SqliteRead)? {
+-            let body: Vec<u8> = row.get(1).map_err(AuditError::SqliteRead)?;
+-            if Self::distillate_source_refs(&body).is_err() {
+-                malformed.push(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?);
+-            }
+-        }
++        self.scan_rowid_windows(
++            "SELECT lower(hex(frame_id)), payload_redacted FROM transparency_log \
++             WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11",
++            None,
++            |row| {
++                let body: Vec<u8> = row.get(1).map_err(AuditError::SqliteRead)?;
++                if Self::distillate_source_refs(&body).is_err() {
++                    malformed.push(row.get::<_, String>(0).map_err(AuditError::SqliteRead)?);
++                }
++                Ok(())
++            },
++        )?;
+         Ok((digests, others, requests, held, malformed))
+     }
+ 
+diff --git a/crates/maos-registry/src/storage.rs b/crates/maos-registry/src/storage.rs
+index 55d530b7..88526a8f 100644
+--- a/crates/maos-registry/src/storage.rs
++++ b/crates/maos-registry/src/storage.rs
+@@ -164,6 +164,26 @@ impl LocalFsRegistryStorage {
+             .collect()
+     }
+ 
++    /// Remove the operator-installed generation inventory, not registry inbox
++    /// publications. A missing package is observed empty without creating a root.
++    pub fn uninstall_package(spirit_id: &str) -> Result<bool, StorageError> {
++        path_segment(spirit_id)?;
++        let root = Self::default_root();
++        let mut installs = Self::load_installs(&root)?;
++        if !installs.contains_key(spirit_id) { return Ok(false); }
++        // Validate the stored generation path before any filesystem mutation.
++        Self::installed_manifests_at(&root)?;
++        let directory = root.join("installed").join(spirit_id);
++        match fs::remove_dir_all(&directory) {
++            Ok(()) => {}
++            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
++            Err(error) => return Err(StorageError::Io(error.to_string())),
++        }
++        installs.remove(spirit_id);
++        write_json_atomic(&root.join("installed-index.json"), &installs)?;
++        Ok(true)
++    }
++
+     fn load_installs(root: &Path) -> Result<BTreeMap<String, String>, StorageError> {
+         match fs::read(root.join("installed-index.json")) {
+             Ok(bytes) => {
+diff --git a/tools/verify-erasure/verify.py b/tools/verify-erasure/verify.py
+index 35b10b29..78dacf9e 100755
+--- a/tools/verify-erasure/verify.py
++++ b/tools/verify-erasure/verify.py
+@@ -273,8 +273,8 @@ def main():
+               file=sys.stderr)
+         sys.exit(1)
+ 
+-    # 3. Erased-frame pre-inclusion proofs (each scrubbed frame WAS in pre-tree).
+-    for efp in erased_frame_proofs:
++    # 3. Both erased-distillate and redacted-principal pre-inclusion proofs.
++    for efp in erased_frame_proofs + bundle.get("redacted_principal_frame_proofs", []):
+         try:
+             fid = _parse_frame_id_hex(efp["frame_id"])
+             proof = efp["pre_inclusion"]
+@@ -301,14 +301,28 @@ def main():
+             print("FAIL — subject exclusion proof invalid", file=sys.stderr)
+             sys.exit(1)
+ 
+-    # 5. Reject empty proof sets when the bundle claims erasure.
+-    claims_removal = any(
+-        c.get("status", {}).get("status") == "Removed" and c["status"].get("count", 0) > 0
+-        for c in bundle.get("categories", [])
+-    )
+-    if claims_removal and not erased_frame_proofs and not subject_exclusion_proofs:
+-        print("FAIL — bundle claims erasure but carries no inclusion or exclusion proofs",
+-              file=sys.stderr)
++    # 5. Every claimed category has distinct post-tree evidence, including empty
++    # and gap observations; non-frame stores do not borrow another store's proof.
++    categories = bundle.get("categories", [])
++    evidence = bundle.get("category_evidence", [])
++    if bundle.get("schema_version") != "maos.erasure-proof.v2" or len(evidence) != len(categories):
++        print("FAIL — schema/category evidence mismatch", file=sys.stderr)
++        sys.exit(1)
++    names, frame_ids = set(), set()
++    try:
++        for category, observed in zip(categories, evidence):
++            fid = _parse_frame_id_hex(observed["frame_id"])
++            name = category["name"]
++            if (name in names or fid in frame_ids
++                    or observed["spirit_id"] != bundle["spirit_id"]
++                    or observed["category"] != category
++                    or observed["frame_id"] not in post_leaves
++                    or not _verify_merkle_proof(post_root, _hash_leaf(fid), observed["post_inclusion"])):
++                raise ValueError("invalid per-category evidence")
++            names.add(name)
++            frame_ids.add(fid)
++    except (ValueError, KeyError, TypeError) as error:
++        print(f"FAIL — category evidence: {error}", file=sys.stderr)
+         sys.exit(1)
+ 
+     print("OK — proof-of-erasure signature and Merkle proofs verified")

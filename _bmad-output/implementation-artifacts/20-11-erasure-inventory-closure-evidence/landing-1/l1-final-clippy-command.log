@@ -1,0 +1,3 @@
+{"command": ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--message-format=json"], "exit_code": 0, "seconds": 470.78126249299385, "stdout": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/l1-final-clippy.jsonl", "stderr": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/l1-final-clippy.stderr"}
+
+COMMAND_EXIT_CODE=0

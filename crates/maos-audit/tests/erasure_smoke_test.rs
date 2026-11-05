@@ -167,6 +167,18 @@ fn headline_erasure_demo_produces_verifiable_proof() {
     );
 
     // 4. Build + sign the proof-of-erasure.
+    let category_frame_ids: Vec<_> = ["memory_namespace", "principal_frames"]
+        .into_iter()
+        .map(|name| {
+            tl.insert_kernel_event_returning_id(
+                7,
+                FrameKind::Decision,
+                None,
+                "principal.uninstall.category",
+                format!("{{\"category\":\"{name}\"}}").as_bytes(),
+            )
+        })
+        .collect();
     let post_frame_ids = tl.all_frame_ids().unwrap();
     let erased_frame_ids: Vec<[u8; 16]> = erased_distillate_frame_ids
         .iter()
@@ -202,6 +214,7 @@ fn headline_erasure_demo_produces_verifiable_proof() {
         &erased_frame_ids,
         &[PRINCIPAL.to_string()],
         &erased_principal_frame_ids,
+        &category_frame_ids,
         vec![
             ErasureCategory {
                 name: "memory_namespace".into(),

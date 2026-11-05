@@ -1,0 +1,17 @@
+{
+  "rows": 1000000,
+  "payload_bytes": 1024,
+  "plan": [
+    [
+      4,
+      0,
+      0,
+      "SEARCH transparency_log USING INDEX idx_tlog_kind_rowid (kind=? AND rowid>? AND rowid<?)"
+    ]
+  ],
+  "vm_steps_rounded_100": 36800,
+  "returned": 4096,
+  "wall_seconds": 0.05477033497299999,
+  "cpu_seconds": 0.012610804999999559,
+  "explanation": "A kind-only index stores implicit rowid as its second key; kind,timestamp,rowid cannot seek rowid without a timestamp constraint."
+}

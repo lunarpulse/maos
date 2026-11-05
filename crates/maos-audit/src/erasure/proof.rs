@@ -51,6 +51,16 @@ pub struct ErasedFrameProof {
     pub pre_inclusion: MerkleProof,
 }
 
+/// A category observation journaled before post-tree capture. Both its
+/// identity/status and the post-inclusion proof are covered by the signature.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CategoryEvidence {
+    pub spirit_id: String,
+    pub category: ErasureCategory,
+    pub frame_id: String,
+    pub post_inclusion: MerkleProof,
+}
+
 /// Signed proof-of-erasure bundle.
 ///
 /// # Security model (AC3, Decision D2)
@@ -83,6 +93,7 @@ pub struct ErasureProof {
     pub redacted_principal_frame_proofs: Vec<ErasedFrameProof>,
     pub subject_exclusion_proofs: Vec<MerkleProof>,
     pub categories: Vec<ErasureCategory>,
+    pub category_evidence: Vec<CategoryEvidence>,
     pub signature_block: SignatureBlock,
 }
 
@@ -101,6 +112,7 @@ struct ErasureProofForSigning {
     pub redacted_principal_frame_proofs: Vec<ErasedFrameProof>,
     pub subject_exclusion_proofs: Vec<MerkleProof>,
     pub categories: Vec<ErasureCategory>,
+    pub category_evidence: Vec<CategoryEvidence>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -173,6 +185,7 @@ pub fn build_erasure_proof(
     erased_frame_ids: &[[u8; 16]],
     erased_principal_ids: &[String],
     redacted_principal_frame_ids: &[[u8; 16]],
+    category_frame_ids: &[[u8; 16]],
     categories: Vec<ErasureCategory>,
     signing_seed: &[u8; 32],
 ) -> Result<ErasureProof, ErasureProofError> {
@@ -231,9 +244,30 @@ pub fn build_erasure_proof(
 
     let pre_leaves = pre_frame_ids.iter().map(format_frame_id).collect();
     let post_leaves = post_frame_ids.iter().map(format_frame_id).collect();
+    if category_frame_ids.len() != categories.len() {
+        return Err(ErasureProofError::VerificationFailed(
+            "one evidence frame per category required".into(),
+        ));
+    }
+    let category_evidence = categories
+        .iter()
+        .zip(category_frame_ids)
+        .map(|(category, fid)| {
+            Ok(CategoryEvidence {
+                spirit_id: spirit_id.clone(),
+                category: category.clone(),
+                frame_id: format_frame_id(fid),
+                post_inclusion: prove_inclusion(&post_tree, hash_leaf(fid)).ok_or_else(|| {
+                    ErasureProofError::VerificationFailed(
+                        "category evidence absent from post-tree".into(),
+                    )
+                })?,
+            })
+        })
+        .collect::<Result<Vec<_>, ErasureProofError>>()?;
 
     let unsigned = ErasureProofForSigning {
-        schema_version: "maos.erasure-proof.v1".to_string(),
+        schema_version: "maos.erasure-proof.v2".to_string(),
         spirit_id: spirit_id.clone(),
         spirit_pid,
         uninstalled_at_ns,
@@ -245,6 +279,7 @@ pub fn build_erasure_proof(
         redacted_principal_frame_proofs,
         subject_exclusion_proofs,
         categories,
+        category_evidence,
     };
 
     let canonical = canonicalize(&unsigned)?;
@@ -266,6 +301,7 @@ pub fn build_erasure_proof(
         redacted_principal_frame_proofs: unsigned.redacted_principal_frame_proofs,
         subject_exclusion_proofs: unsigned.subject_exclusion_proofs,
         categories: unsigned.categories,
+        category_evidence: unsigned.category_evidence,
         signature_block: SignatureBlock {
             algorithm: "Ed25519".to_string(),
             attester_pubkey: hex::encode(pubkey_bytes),
@@ -298,6 +334,7 @@ pub fn verify_erasure_proof(
         redacted_principal_frame_proofs: proof.redacted_principal_frame_proofs.clone(),
         subject_exclusion_proofs: proof.subject_exclusion_proofs.clone(),
         categories: proof.categories.clone(),
+        category_evidence: proof.category_evidence.clone(),
     };
 
     let canonical = canonicalize(&unsigned)?;
@@ -380,19 +417,34 @@ pub fn verify_erasure_proof(
         }
     }
 
-    // Reject empty proof sets on a bundle that claims erasure (P18).
-    let claims_removal = proof
-        .categories
-        .iter()
-        .any(|c| matches!(c.status, CategoryStatus::Removed { count } if count > 0));
-    if claims_removal
-        && proof.erased_frame_proofs.is_empty()
-        && proof.redacted_principal_frame_proofs.is_empty()
-        && proof.subject_exclusion_proofs.is_empty()
+    if proof.schema_version != "maos.erasure-proof.v2"
+        || proof.categories.len() != proof.category_evidence.len()
     {
         return Err(ErasureProofError::VerificationFailed(
-            "bundle claims erasure but carries no inclusion or exclusion proofs".to_string(),
+            "schema/category evidence mismatch".into(),
         ));
+    }
+    let mut names = std::collections::BTreeSet::new();
+    let mut evidence_ids = std::collections::BTreeSet::new();
+    for (category, evidence) in proof.categories.iter().zip(&proof.category_evidence) {
+        let fid = parse_frame_id_hex(&evidence.frame_id).ok_or_else(|| {
+            ErasureProofError::VerificationFailed("malformed category frame id".into())
+        })?;
+        if !names.insert(&category.name)
+            || !evidence_ids.insert(fid)
+            || evidence.spirit_id != proof.spirit_id
+            || &evidence.category != category
+            || !post_fids.contains(&fid)
+            || !super::merkle::verify_proof(
+                proof.post_root,
+                hash_leaf(&fid),
+                &evidence.post_inclusion,
+            )
+        {
+            return Err(ErasureProofError::VerificationFailed(
+                "invalid per-category evidence".into(),
+            ));
+        }
     }
 
     Ok(())
@@ -512,6 +564,7 @@ mod tests {
             &erased,
             &principals,
             &[],
+            &post[..2],
             vec![
                 ErasureCategory {
                     name: "memory_namespace".into(),
@@ -552,6 +605,7 @@ mod tests {
             &[never_existed],
             &[],
             &[],
+            &[],
             vec![],
             &seed,
         );
@@ -575,6 +629,7 @@ mod tests {
             &[pre[0]],
             &["bob@example.org".to_string()],
             &[],
+            &post[..1],
             vec![ErasureCategory {
                 name: "memory_namespace".into(),
                 status: CategoryStatus::Removed { count: 1 },
@@ -607,6 +662,7 @@ mod tests {
             &[pre[0]],
             &["carol@example.org".to_string()],
             &[],
+            &post[..1],
             vec![ErasureCategory {
                 name: "memory_namespace".into(),
                 status: CategoryStatus::Removed { count: 1 },

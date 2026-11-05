@@ -1,0 +1,3 @@
+{"command": ["cargo", "metadata", "--locked", "--format-version", "1"], "exit_code": 0, "seconds": 14.239801482995972, "stdout": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/l1-final-cargo-metadata.json", "stderr": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/l1-final-cargo-metadata.stderr"}
+
+COMMAND_EXIT_CODE=0

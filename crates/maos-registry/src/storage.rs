@@ -103,6 +103,56 @@ pub struct LocalFsRegistryStorage {
     yanks: Mutex<Vec<YankEntry>>,
 }
 
+static INSTALLED_UNINSTALL: Mutex<()> = Mutex::new(());
+
+/// Roll back boot inventory and generation ownership unless the erasure proof
+/// has been persisted. The caller holds the canonical offline/live store locks.
+pub struct PendingPackageUninstall {
+    index_path: PathBuf,
+    directory: PathBuf,
+    staged: Option<PathBuf>,
+    installs: BTreeMap<String, String>,
+    removed: Option<(String, String)>,
+    _serializer: std::sync::MutexGuard<'static, ()>,
+}
+
+impl PendingPackageUninstall {
+    /// Only after proof persistence succeeds may the generation bytes go away.
+    pub fn commit(mut self) -> Result<(), StorageError> {
+        if let Some(path) = &self.staged {
+            fs::remove_dir_all(path).map_err(|error| StorageError::Io(error.to_string()))?;
+        }
+        self.removed = None;
+        Ok(())
+    }
+}
+
+impl Drop for PendingPackageUninstall {
+    fn drop(&mut self) {
+        let Some((name, generation)) = self.removed.take() else {
+            return;
+        };
+        if let Err(error) = self
+            .staged
+            .as_ref()
+            .map_or(Ok(()), |path| fs::rename(path, &self.directory))
+        {
+            eprintln!(
+                "maos-registry: uninstall rollback could not restore {}: {error}",
+                self.directory.display()
+            );
+            return;
+        }
+        self.installs.insert(name, generation);
+        if let Err(error) = write_json_atomic(&self.index_path, &self.installs) {
+            eprintln!(
+                "maos-registry: uninstall rollback could not restore {}: {error}",
+                self.index_path.display()
+            );
+        }
+    }
+}
+
 impl LocalFsRegistryStorage {
     /// Construct storage rooted at `~/.local/share/maos/registry/`.
     pub fn new() -> Result<Self, io::Error> {
@@ -162,6 +212,40 @@ impl LocalFsRegistryStorage {
                 ))
             })
             .collect()
+    }
+
+    /// Remove active inventory while retaining recoverable bytes until the
+    /// caller persists its proof. A failed proof restores the package on drop.
+    pub fn uninstall_package(
+        spirit_id: &str,
+    ) -> Result<Option<PendingPackageUninstall>, StorageError> {
+        path_segment(spirit_id)?;
+        let serializer = INSTALLED_UNINSTALL
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let root = Self::default_root();
+        let mut installs = Self::load_installs(&root)?;
+        let Some(generation) = installs.remove(spirit_id) else {
+            return Ok(None);
+        };
+        Self::installed_manifests_at(&root)?;
+        let directory = root.join("installed").join(spirit_id);
+        let staged = root.join(format!(".uninstall-{spirit_id}-{}", unique_suffix()));
+        let staged = match fs::rename(&directory, &staged) {
+            Ok(()) => Some(staged),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(StorageError::Io(error.to_string())),
+        };
+        let pending = PendingPackageUninstall {
+            index_path: root.join("installed-index.json"),
+            directory,
+            staged,
+            installs,
+            removed: Some((spirit_id.to_owned(), generation)),
+            _serializer: serializer,
+        };
+        write_json_atomic(&pending.index_path, &pending.installs)?;
+        Ok(Some(pending))
     }
 
     fn load_installs(root: &Path) -> Result<BTreeMap<String, String>, StorageError> {

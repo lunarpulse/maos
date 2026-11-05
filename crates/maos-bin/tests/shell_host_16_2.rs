@@ -10,6 +10,7 @@
 use std::io::Write as _;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
+use std::time::Duration;
 
 use maos_bin::shell_host::{ShellHost, AMBIGUITY_TAG};
 use maos_domain::frame::EpistemicHaltPayload;
@@ -26,7 +27,7 @@ use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
 use maos_kernel_core::capability::{CapabilityRegistryAdapter, WorkingMemoryStore};
 use maos_kernel_core::halt::terminate_spirit;
 use maos_kernel_core::halt::HaltRegistry;
-use maos_kernel_core::iac::TransparencyLogAdapter;
+use maos_kernel_core::iac::{FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::memory::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
@@ -495,6 +496,14 @@ use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 /// A real scheduler with a real loaded hello-spirit — the object `main`
 /// drives, so `finish_shell_session` runs exactly the path production runs.
 fn scheduler_with_hello(world: &KernelWorld, boot_nonce: u64) -> Arc<SpiritSchedulerAdapter> {
+    scheduler_with_bundle(world, boot_nonce, Default::default())
+}
+
+fn scheduler_with_bundle(
+    world: &KernelWorld,
+    boot_nonce: u64,
+    bundle: maos_kernel_core::scheduler::SpiritManifestBundle,
+) -> Arc<SpiritSchedulerAdapter> {
     let iac = IacBusAdapter::new(
         Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new()))),
         Arc::clone(&world.transparency_log),
@@ -513,7 +522,6 @@ fn scheduler_with_hello(world: &KernelWorld, boot_nonce: u64) -> Arc<SpiritSched
         None,
         None,
     ));
-    let bundle = maos_kernel_core::scheduler::SpiritManifestBundle::default();
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -893,7 +901,10 @@ use maos_kernel_core::scheduler::HookDispatcher;
 /// The bin-private ops, unwired — they back uninstall/upgrade/migration, none
 /// of which the halt-resolve race below drives, so every method is
 /// unreachable by construction of that vector.
-struct UnwiredBinOps;
+#[derive(Default)]
+struct UnwiredBinOps {
+    schedule_capture: Option<Arc<std::sync::Mutex<Vec<String>>>>,
+}
 
 #[async_trait]
 impl BinPrivateOps for UnwiredBinOps {
@@ -915,8 +926,17 @@ impl BinPrivateOps for UnwiredBinOps {
     async fn run_uninstall_cascade(
         &self,
         _spirit_id: &str,
+        schedule_ids: Vec<String>,
     ) -> maos_bin::operator_door::UninstallOutcome {
-        unreachable!("the halt-resolve race never touches the bin-private ops");
+        let capture = self
+            .schedule_capture
+            .as_ref()
+            .expect("only the snapshot oracle reaches this fixture spy");
+        *capture.lock().expect("snapshot") = schedule_ids;
+        maos_bin::operator_door::UninstallOutcome {
+            body: serde_json::json!({"fixture_snapshot_only":true}),
+            terminal_code: 0,
+        }
     }
 
     async fn enforce_vetted_upgrade_precondition(
@@ -989,57 +1009,7 @@ fn both_surfaces_resolving_one_halt_journal_one_approval_and_type_the_loser_409(
         .enable_all()
         .build()
         .expect("door runtime");
-    let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
-    let iac = Arc::new(IacBusAdapter::new(
-        Arc::clone(&mailbox),
-        Arc::clone(&world.transparency_log),
-    ));
-    let door = Arc::new(OperatorDoor::new(
-        Arc::clone(&scheduler),
-        Arc::clone(&world.policy),
-        Arc::clone(&world.halt_registry),
-        Arc::new(OutputMarkerRegistry::new()),
-        Arc::new(OrchestratorBufferRegistry::new()),
-        Arc::new(RevocationApplier::new(
-            scheduler.scbs(),
-            Arc::clone(&world.capability),
-            Arc::clone(&scheduler),
-            Arc::clone(&iac),
-            Arc::clone(&world.halt_registry),
-            Arc::clone(&world.transparency_log),
-            Arc::clone(&world.journal),
-            Arc::new(IacRtMetrics::new()),
-        )),
-        Arc::new(HotSwapCoordinator::new(
-            scheduler.scbs(),
-            Arc::clone(&world.journal),
-            Arc::clone(&world.transparency_log),
-            Arc::clone(&world.halt_registry),
-            Arc::clone(&world.capability),
-            Arc::clone(&iac),
-            Arc::new(HookDispatcher::new(
-                Arc::clone(&world.transparency_log),
-                Arc::new(IacRtMetrics::new()),
-            )),
-            Arc::new(IacRtMetrics::new()),
-            world.dir.path().join("hot-swap-archive"),
-        )),
-        Arc::clone(&world.capability),
-        Arc::clone(&world.memory),
-        Arc::new(WorkingMemoryOrchestrator::new(
-            Arc::clone(&world.capability),
-            Arc::clone(&world.halt_registry),
-        )),
-        mailbox,
-        Arc::new(NotificationDispatcher::new()),
-        Arc::clone(&world.transparency_log),
-        Arc::new(RingCryptoProvider),
-        None, // crl_trust_anchor — no CRL verification on this path
-        boot_nonce,
-        rt.handle().clone(),
-        Arc::new(UnwiredBinOps),
-        SuccessorManifestSlot::default(),
-    ));
+    let door = regression_door(&world, &scheduler, &rt, boot_nonce);
 
     // The shell host over the SAME world with the REAL door as its port —
     // exactly the production wiring (D-16-2-C): the REPL clarification and
@@ -1345,5 +1315,384 @@ fn shell_boot_then_butler_boot_on_one_tl_never_mix() {
         stopped.status.success(),
         "butler's view must exit 0 against a STOPPED root; stderr:\n{}",
         String::from_utf8_lossy(&stopped.stderr)
+    );
+}
+
+fn regression_door(
+    world: &KernelWorld,
+    scheduler: &Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
+    rt: &tokio::runtime::Runtime,
+    boot_nonce: u64,
+) -> Arc<OperatorDoor> {
+    regression_door_with_ops(
+        world,
+        scheduler,
+        rt,
+        boot_nonce,
+        Arc::new(UnwiredBinOps::default()),
+    )
+}
+
+fn regression_door_with_ops(
+    world: &KernelWorld,
+    scheduler: &Arc<SpiritSchedulerAdapter>,
+    rt: &tokio::runtime::Runtime,
+    boot_nonce: u64,
+    ops: Arc<dyn BinPrivateOps>,
+) -> Arc<OperatorDoor> {
+    let mailbox = Arc::new(Mailbox::new(Arc::new(IacRtMetrics::new())));
+    let iac = Arc::new(IacBusAdapter::new(
+        Arc::clone(&mailbox),
+        Arc::clone(&world.transparency_log),
+    ));
+    let door = Arc::new(OperatorDoor::new(
+        Arc::clone(scheduler),
+        Arc::clone(&world.policy),
+        Arc::clone(&world.halt_registry),
+        Arc::new(OutputMarkerRegistry::new()),
+        Arc::new(OrchestratorBufferRegistry::new()),
+        Arc::new(RevocationApplier::new(
+            scheduler.scbs(),
+            Arc::clone(&world.capability),
+            Arc::clone(scheduler),
+            Arc::clone(&iac),
+            Arc::clone(&world.halt_registry),
+            Arc::clone(&world.transparency_log),
+            Arc::clone(&world.journal),
+            Arc::new(IacRtMetrics::new()),
+        )),
+        Arc::new(HotSwapCoordinator::new(
+            scheduler.scbs(),
+            Arc::clone(&world.journal),
+            Arc::clone(&world.transparency_log),
+            Arc::clone(&world.halt_registry),
+            Arc::clone(&world.capability),
+            Arc::clone(&iac),
+            Arc::new(HookDispatcher::new(
+                Arc::clone(&world.transparency_log),
+                Arc::new(IacRtMetrics::new()),
+            )),
+            Arc::new(IacRtMetrics::new()),
+            world.dir.path().join("hot-swap-archive"),
+        )),
+        Arc::clone(&world.capability),
+        Arc::clone(&world.memory),
+        Arc::new(WorkingMemoryOrchestrator::new(
+            Arc::clone(&world.capability),
+            Arc::clone(&world.halt_registry),
+        )),
+        mailbox,
+        Arc::new(NotificationDispatcher::new()),
+        Arc::clone(&world.transparency_log),
+        Arc::new(RingCryptoProvider),
+        None, // crl_trust_anchor — no CRL verification on this path
+        boot_nonce,
+        rt.handle().clone(),
+        ops,
+        SuccessorManifestSlot::default(),
+    ));
+    door
+}
+
+#[derive(Debug)]
+struct PauseForget20_11 {
+    entered: std::sync::mpsc::SyncSender<()>,
+    resume: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+}
+impl maos_iac::adapter::redaction::RedactionPolicy for PauseForget20_11 {
+    fn redact<'a>(&self, bytes: &'a [u8]) -> std::borrow::Cow<'a, [u8]> {
+        let row = serde_json::from_slice::<serde_json::Value>(bytes).ok();
+        if row
+            .as_ref()
+            .is_some_and(|row| row.get("deleted_entries").is_some())
+        {
+            self.entered.send(()).expect("forget entered");
+            self.resume
+                .lock()
+                .expect("resume lock")
+                .recv_timeout(Duration::from_secs(10))
+                .expect("resume");
+        }
+        maos_iac::adapter::redaction::CorpusBackedRedactionPolicy::new().redact(bytes)
+    }
+}
+
+#[test]
+fn ac5_door_hold_release_waits_for_inflight_forget() {
+    let boot = 0x20_11;
+    let mut world = kernel_world(boot);
+    let (entered_tx, entered_rx) = std::sync::mpsc::sync_channel(1);
+    let (resume_tx, resume_rx) = std::sync::mpsc::sync_channel(1);
+    let db = world.dir.path().join("hold-race.sqlite");
+    let tl = Arc::new(
+        TransparencyLogAdapter::open_with_policy(
+            &db,
+            boot,
+            Box::new(PauseForget20_11 {
+                entered: entered_tx,
+                resume: std::sync::Mutex::new(resume_rx),
+            }),
+        )
+        .expect("TL seam"),
+    );
+    tl.attach_global_legal_holds(&db).expect("hold authority");
+    world.memory = Arc::new(MemoryManagerAdapter::new(
+        Arc::new(PrivateMemoryStore::new(
+            world.dir.path().join("hold-memory"),
+            4096,
+        )),
+        Arc::new(SharedMemoryStore::open(&db).expect("shared")),
+        Arc::new(PrincipalNamespaceIndex::open(&db).expect("index")),
+        Arc::clone(&tl),
+    ));
+    world.transparency_log = tl;
+    world
+        .transparency_log
+        .place_legal_hold("release@example.org", "litigation", None, 1)
+        .expect("hold");
+    let scheduler = scheduler_with_hello(&world, boot);
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let door = regression_door(&world, &scheduler, &rt, boot);
+    let memory = Arc::clone(&world.memory);
+    let forget = std::thread::spawn(move || memory.forget_with_reason("erase@example.org", None));
+    entered_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("real forget holds serializer");
+    let (finished_tx, finished_rx) = std::sync::mpsc::sync_channel(1);
+    let release = std::thread::spawn(move || {
+        let result = submit_and_wait(
+            door.as_ref(),
+            OperatorCommand::ReleaseLegalHold {
+                principal: "release@example.org".into(),
+            },
+        );
+        finished_tx.send(result).expect("release result");
+    });
+    let premature = finished_rx.recv_timeout(Duration::from_millis(100));
+    resume_tx.send(()).expect("resume real forget");
+    forget
+        .join()
+        .expect("forget thread")
+        .expect("forget succeeds");
+    release.join().expect("release task");
+    assert!(
+        premature.is_err(),
+        "door released a hold while real forget held the serializer: {premature:?}"
+    );
+    let result = finished_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("release completes after forget");
+    assert!(
+        matches!(
+            result,
+            SubmitOutcome::Completed(OperatorOutcome::Completed(_))
+        ),
+        "{result:?}"
+    );
+    assert!(!world
+        .transparency_log
+        .is_under_legal_hold("release@example.org")
+        .expect("query hold"));
+}
+
+#[test]
+fn ac5_door_bounded_scan_admits_continuous_writer() {
+    door_scan_with_continuous_writer(100_000);
+}
+
+#[test]
+fn ac5_million_row_pending_forget_finishes_and_repeats_without_corruption() {
+    door_scan_with_continuous_writer(1_000_000);
+}
+
+fn door_scan_with_continuous_writer(count: u64) {
+    use rusqlite::OptionalExtension as _;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Instant;
+    struct StopOnDrop<'a>(&'a AtomicBool);
+    impl Drop for StopOnDrop<'_> {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::Release);
+        }
+    }
+    let world = kernel_world(2011);
+    let scheduler = scheduler_with_hello(&world, 2011);
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let door = regression_door(&world, &scheduler, &rt, 2011);
+    let mut db = rusqlite::Connection::open(world.dir.path().join("transparency.sqlite"))
+        .expect("seed connection");
+    let tx = db.transaction().expect("seed transaction");
+    let body = vec![b'x'; 1024];
+    let target_id = [0u8; 16];
+    {
+        let mut insert = tx.prepare("INSERT INTO transparency_log (frame_id, timestamp_ns, kind, spirit_pid, boot_nonce, capability_token, intent, payload_redacted, origin, correlation_id) VALUES (?1,?2,1,7,2011,NULL,'scan.filler',?3,0,NULL)").expect("seed statement");
+        for i in 1..=count {
+            insert
+                .execute(rusqlite::params![
+                    i.to_be_bytes().repeat(2),
+                    i as i64,
+                    &body
+                ])
+                .expect("seed row");
+        }
+        insert
+            .execute(rusqlite::params![
+                &target_id[..],
+                0,
+                br#"{"principal_id":"scan-target@example.org"}"#.as_slice()
+            ])
+            .expect("real principal-bearing frame");
+    }
+    tx.commit().expect("seed commit");
+    let tl = Arc::clone(&world.transparency_log);
+    let stop = Arc::new(AtomicBool::new(false));
+    let _stop_guard = StopOnDrop(stop.as_ref());
+    let running = Arc::clone(&stop);
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let ready = Arc::clone(&barrier);
+    let writer = std::thread::spawn(move || {
+        let mut delays = Vec::new();
+        ready.wait();
+        while !running.load(Ordering::Acquire) {
+            let start = Instant::now();
+            tl.insert_frame_event(
+                FrameKind::TaskAssign,
+                8,
+                None,
+                "continuous.writer",
+                b"concurrent",
+                FrameOrigin::Kernel,
+            );
+            delays.push(start.elapsed());
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        delays
+    });
+    let forget = || OperatorCommand::ForgetMemory {
+        principal: "scan-target@example.org".into(),
+        reason: None,
+    };
+    barrier.wait();
+    let start = Instant::now();
+    let result = submit_and_wait(door.as_ref(), forget());
+    eprintln!(
+        "EC-13 route rows={count} wall={:?} response={result:?}",
+        start.elapsed()
+    );
+    match result {
+        SubmitOutcome::Completed(OperatorOutcome::Completed(ref report)) => {
+            assert_eq!(report["outcome"], "erased");
+            assert_eq!(report["terminal_code"], 0);
+        }
+        SubmitOutcome::HandlerStillRunning { ref operation_id } => {
+            // The shipped route deadline is unchanged. This response is only
+            // pending, never an erased report; its durable completion must be
+            // observable within one further unchanged route-budget interval.
+            eprintln!("EC-13 pending rows={count} operation_id={operation_id}");
+            let deadline = Instant::now() + forget().route_budget();
+            let intent = format!("operator.forget.{operation_id}:completed");
+            loop {
+                let completed: Option<Vec<u8>> = db
+                    .query_row(
+                        "SELECT payload_redacted FROM transparency_log WHERE kind=?1 AND intent=?2",
+                        rusqlite::params![FrameKind::TelemetryEvent as i64, intent],
+                        |row| row.get(0),
+                    )
+                    .optional()
+                    .expect("completion lookup");
+                if let Some(bytes) = completed {
+                    let receipt: serde_json::Value = serde_json::from_slice(&bytes)
+                        .unwrap_or_else(|error| panic!("completion receipt: {error}"));
+                    assert_eq!(receipt["operation_id"], operation_id.as_str());
+                    assert_eq!(receipt["outcome"], "completed");
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "pending operation did not finish: {operation_id}"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        other => panic!("forget failed rather than completing or reporting pending: {other:?}"),
+    }
+    let elapsed = start.elapsed();
+    stop.store(true, Ordering::Release);
+    let delays = writer.join().expect("writer");
+    let max = delays.iter().copied().max().expect("writer attempted");
+    let ratio = max.as_secs_f64() / elapsed.as_secs_f64();
+    // Scheduling/fsync can exceed a page's CPU work on a loaded host. Keep
+    // these raw timings; the binding unchanged <25% work oracle measures the
+    // actual production statements in erasure_scan_work, including the plant.
+    eprintln!("EC-13 door rows={count} wall={elapsed:?} max_insert={max:?} writes={} wall_ratio={ratio} response={result:?}", delays.len());
+    let read_body = |id: &[u8]| {
+        db.query_row(
+            "SELECT payload_redacted FROM transparency_log WHERE frame_id=?1",
+            [id],
+            |row| row.get::<_, Vec<u8>>(0),
+        )
+        .expect("frame body")
+    };
+    let tombstone = read_body(&target_id);
+    let redacted: serde_json::Value =
+        serde_json::from_slice(&tombstone).unwrap_or_else(|error| panic!("tombstone: {error}"));
+    assert_eq!(redacted["redacted"], true);
+    let repeated = submit_and_wait(door.as_ref(), forget());
+    assert!(
+        matches!(&repeated, SubmitOutcome::Completed(OperatorOutcome::Completed(report))
+            if report["outcome"] == "erased" && report["terminal_code"] == 0),
+        "identical request must return its completed report after the prior handler finishes: {repeated:?}"
+    );
+    assert_eq!(read_body(&target_id), tombstone);
+    assert_eq!(read_body(&count.to_be_bytes().repeat(2)), body);
+}
+
+#[test]
+fn ac4_door_snapshots_real_scb_schedules_before_unload() {
+    let world = kernel_world(2011);
+    let bundle = maos_kernel_core::scheduler::SpiritManifestBundle {
+        schedules: maos_manifest::SchedulesSection::from_toml_str(
+            "[[schedule]]\nid='daily'\ncadence_secs=1\n",
+        )
+        .expect("schedule"),
+        ..Default::default()
+    };
+    let scheduler = scheduler_with_bundle(&world, 2011, bundle);
+    let pid = scheduler.resolve_pid("hello-spirit").expect("real SCB");
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let capture = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let ops = Arc::new(UnwiredBinOps {
+        schedule_capture: Some(Arc::clone(&capture)),
+    });
+    let door = regression_door_with_ops(&world, &scheduler, &rt, 2011, ops);
+    let result = submit_and_wait(
+        door.as_ref(),
+        OperatorCommand::Uninstall {
+            spirit_id: "hello-spirit".into(),
+        },
+    );
+    assert!(
+        matches!(
+            result,
+            SubmitOutcome::Completed(OperatorOutcome::Completed(_))
+        ),
+        "{result:?}"
+    );
+    assert_eq!(*capture.lock().expect("snapshot"), ["daily"]);
+    assert!(
+        !scheduler.scbs().read().expect("SCBs").contains_key(&pid),
+        "unloaded SCB remains"
     );
 }

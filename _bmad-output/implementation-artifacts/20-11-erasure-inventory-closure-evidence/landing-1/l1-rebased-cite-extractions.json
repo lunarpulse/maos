@@ -1,0 +1,57 @@
+{
+  "base": "cb0abc06e6b085cb63db1be60d4addbeb2963811",
+  "initial_before_witness_base": "76efc19d3ffd36a1b897724704d76f94fba3d9eb",
+  "extractions": [
+    {
+      "command": "git show cb0abc06e6b085cb63db1be60d4addbeb2963811:crates/maos-bin/src/main.rs",
+      "exit_code": 0,
+      "source": "crates/maos-bin/src/main.rs",
+      "snapshot": "/tmp/dev2011b-resume-1l82gyty/baseline/main.rs",
+      "sha256": "e651de167ea83aabc45a9d138ebc598aa9c837b4f4ad6d80f1afd92332ac0feb"
+    },
+    {
+      "command": "git show cb0abc06e6b085cb63db1be60d4addbeb2963811:crates/maos-bin/src/operator_door.rs",
+      "exit_code": 0,
+      "source": "crates/maos-bin/src/operator_door.rs",
+      "snapshot": "/tmp/dev2011b-resume-1l82gyty/baseline/operator_door.rs",
+      "sha256": "da65af7d6c39812fb14cb6df046588b33c957bfe179809b7885d005c8d4f275f"
+    },
+    {
+      "command": "git show cb0abc06e6b085cb63db1be60d4addbeb2963811:crates/maos-bin/src/hook_pump.rs",
+      "exit_code": 0,
+      "source": "crates/maos-bin/src/hook_pump.rs",
+      "snapshot": "/tmp/dev2011b-resume-1l82gyty/baseline/hook_pump.rs",
+      "sha256": "d21c132735ff3bd9eec14a9d0bcc9d666cd80785c740e534e9c2331288e9e2d0"
+    },
+    {
+      "command": "git show cb0abc06e6b085cb63db1be60d4addbeb2963811:crates/maos-iac/src/adapter/transparency_log.rs",
+      "exit_code": 0,
+      "source": "crates/maos-iac/src/adapter/transparency_log.rs",
+      "snapshot": "/tmp/dev2011b-resume-1l82gyty/baseline/transparency_log.rs",
+      "sha256": "57949f102ccaf0cb0466c33d758300c4eeec91f390e2da15026988b0c36fdd0f"
+    },
+    {
+      "command": "git show cb0abc06e6b085cb63db1be60d4addbeb2963811:crates/maos-audit/src/erasure/proof.rs",
+      "exit_code": 0,
+      "source": "crates/maos-audit/src/erasure/proof.rs",
+      "snapshot": "/tmp/dev2011b-resume-1l82gyty/baseline/proof.rs",
+      "sha256": "bb10eae45e16e30bc7de7e44dff585abb5f71b07d882105ee747fd6c2e28b6a1"
+    },
+    {
+      "command": "git show cb0abc06e6b085cb63db1be60d4addbeb2963811:crates/maos-registry/src/storage.rs",
+      "exit_code": 0,
+      "source": "crates/maos-registry/src/storage.rs",
+      "snapshot": "/tmp/dev2011b-resume-1l82gyty/baseline/storage.rs",
+      "sha256": "93e91c501705a7a5680910e64c81b1cf41bb0e67c062d6af221385e2f480862c"
+    },
+    {
+      "command": "git show cb0abc06e6b085cb63db1be60d4addbeb2963811:crates/maos-cli/src/cli.rs",
+      "exit_code": 0,
+      "source": "crates/maos-cli/src/cli.rs",
+      "snapshot": "/tmp/dev2011b-resume-1l82gyty/baseline/cli.rs",
+      "sha256": "8bd3d90b2280feeede3592fa2f2a5e3e03f4be44e0fb1bfa32cd8fae385d7949"
+    }
+  ],
+  "rebase_diff_command": "git diff --no-ext-diff 76efc19d3ffd36a1b897724704d76f94fba3d9eb cb0abc06e6b085cb63db1be60d4addbeb2963811 -- crates/maos-bin/src/main.rs crates/maos-bin/src/operator_door.rs crates/maos-bin/src/hook_pump.rs crates/maos-iac/src/adapter/transparency_log.rs crates/maos-audit/src/erasure/proof.rs crates/maos-registry/src/storage.rs crates/maos-cli/src/cli.rs",
+  "rebase_diff_exit_code": 0
+}

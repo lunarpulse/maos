@@ -1,0 +1,247 @@
+   Compiling ring v0.17.14
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib test) generated 3 warnings (run `cargo fix --lib -p maos-iac --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.32s
+     Running unittests src/lib.rs (/mnt/build/cargo-maos/debug/deps/maos_iac-a5d44970fcecaea4)
+
+running 103 tests
+test adapter::channels::tests::all_iac_frame_kinds_are_routable ... ok
+test adapter::channels::tests::audit_frame_kinds_reject_router ... ok
+test adapter::channels::tests::channel_classes_match_addendum ... ok
+test adapter::decision_logger::tests::decorate_decision_frame_attaches_digest_refs ... ok
+test adapter::decision_logger::tests::decorate_decision_frame_does_not_mutate_non_decision_frames ... ok
+test adapter::decision_logger::tests::decorate_decision_frame_passes_spirit_id_to_provider ... ok
+test adapter::decision_logger::tests::frame_carries_i12_refs_empty_decision_frame_false ... ok
+test adapter::decision_logger::tests::frame_carries_i12_refs_nonempty_decision_frame_true ... ok
+test adapter::decision_logger::tests::frame_carries_i12_refs_non_decision_frame_true ... ok
+test adapter::decision_audit_tests::lineage_human_authored_non_empty_lineage_not_overwritten ... ok
+
+thread 'adapter::distillate::tests::direct_distillate_insert_is_rejected' (1247151) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1110:13:
+MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows may only be inserted via DistillateWriter (insert_distillate_frame); a direct insert_frame_event(FrameKind::Distillate, …) bypasses the I11 audit-chain + citer-authorization checks and is forbidden.
+stack backtrace:
+test adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_non_empty_lineage_succeeds ... ok
+test adapter::decision_audit_tests::lineage_same_spirit_empty_lineage_spirit_auto_succeeds ... ok
+test adapter::log_recall::tests::cross_wall_recall_without_injected_consent_fails_closed ... ok
+test adapter::decision_audit_tests::i12_non_decision_frames_not_decorated ... ok
+test adapter::decision_audit_tests::lineage_broadcast_empty_to_succeeds ... ok
+test adapter::distillate::tests::admit_for_consumer_denies_non_matching_lineage ... ok
+test adapter::log_recall::tests::cross_wall_recall_no_grant_is_observable ... ok
+test adapter::decision_audit_tests::lineage_spirit_auto_cross_spirit_empty_lineage_rejected ... ok
+test adapter::log_recall::tests::cross_wall_recall_wrong_direction_is_observable ... ok
+test adapter::mailbox::tests::cross_host_addressing_rejected_when_no_router_configured ... ok
+test adapter::mailbox::tests::cross_host_routes_through_installed_a2a_router ... ok
+test adapter::mailbox::tests::broadcast_slow_subscriber_sees_lagged ... ok
+test adapter::mailbox::tests::deliver_and_receive_round_trip ... ok
+test adapter::mailbox::tests::deliver_to_unregistered_spirit_fails ... ok
+test adapter::mailbox::tests::register_spirit_creates_channels ... ok
+test adapter::mailbox::tests::register_spirit_rejects_double_registration ... ok
+test adapter::metrics::tests::exact_buckets_equality ... ok
+test adapter::mailbox::tests::telemetry_event_uses_broadcast ... ok
+test adapter::decision_audit_tests::lineage_human_authored_cross_spirit_auto_populates ... ok
+test adapter::metrics::tests::histogram_observation_in_correct_bucket ... ok
+test adapter::metrics::tests::label_strings_are_snake_case ... ok
+test adapter::metrics::tests::inflight_guard_decrements_on_early_return ... ok
+test adapter::metrics::tests::inflight_guard_increments_and_decrements ... ok
+test adapter::metrics::tests::pending_frames_gauge_saturates_at_zero ... ok
+test adapter::log_recall::tests::cross_wall_recall_granted_without_read_port_fails_closed ... ok
+test adapter::log_recall::tests::cross_wall_recall_journals_refusal ... ok
+test adapter::payload::tests::schedule_fire_record_optional_compliance_claim_round_trip ... ok
+test adapter::distillate::tests::write_distillate_rejects_empty_source ... ok
+test adapter::payload::tests::schedule_fire_record_round_trip ... ok
+test adapter::redaction::tests::clause_source_frame_refs_survive_without_exempting_other_hex_or_secrets ... ok
+test adapter::metrics::tests::pending_frames_no_increment_on_error_path ... ok
+test adapter::redaction::tests::detect_credential_flags_prefix_secrets_but_not_hex_refs ... ok
+test adapter::redaction::tests::redaction_detects_anthropic_key ... ok
+test adapter::redaction::tests::redaction_detects_github_token ... ok
+test adapter::redaction::tests::redaction_detects_aws_key ... ok
+test adapter::metrics::tests::render_prometheus_has_required_lines ... ok
+test adapter::redaction::tests::redaction_detects_hex_token ... ok
+test adapter::redaction::tests::redaction_detects_private_key ... ok
+test adapter::metrics::tests::pending_frames_gauge_increment_decrement_round_trip ... ok
+test adapter::redaction::tests::redaction_preserves_surrounding_text ... ok
+test adapter::redaction::tests::redaction_filter_zero_alloc_on_clean_payload ... ok
+test adapter::distillate::tests::write_distillate_rejects_depth_zero ... ok
+test adapter::log_recall::tests::cross_wall_recall_journals_failure_when_remote_read_fails ... ok
+test adapter::distillate::tests::admit_for_consumer_allows_matching_lineage ... ok
+test adapter::transparency_log::tests::frame_kind_non_exhaustive_match ... ok
+test adapter::transparency_log::tests::frame_kind_silent_failure_suspect_from_i64 ... ok
+test adapter::transparency_log::tests::frame_kind_spirit_revoked_discriminant ... ok
+test adapter::transparency_log::tests::frame_kind_spirit_revoked_from_i64 ... ok
+test adapter::log_recall::tests::cross_wall_recall_stale_state_is_observable ... ok
+test adapter::transparency_log::tests::frame_kind_task_stalled_from_i64 ... ok
+test adapter::log_recall::tests::cross_wall_recall_unavailable_state_is_observable ... ok
+test adapter::distillate::tests::cross_principal_citation_is_rejected_and_writes_no_row ... ok
+test adapter::distillate::tests::same_principal_citation_still_succeeds ... ok
+test adapter::log_recall::tests::cross_wall_recall_journals_disclosure_before_remote_read ... ok
+test adapter::distillate::tests::write_distillate_rejects_empty_intent_lineage ... ok
+test adapter::distillate::tests::write_distillate_source_frame_not_found ... ok
+test adapter::distillate::tests::write_distillate_emits_capability_invocation ... ok
+test adapter::distillate::tests::two_hop_flattening_to_original_raw ... ok
+test adapter::distillate::tests::write_distillate_single_hop_returns_receipt ... ok
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_id
+             at ./src/adapter/transparency_log.rs:1110:13
+   3: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_sender
+             at ./src/adapter/transparency_log.rs:1059:18
+   4: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event
+             at ./src/adapter/transparency_log.rs:984:14
+   5: maos_iac::adapter::distillate::tests::direct_distillate_insert_is_rejected
+             at ./src/adapter/distillate.rs:818:20
+   6: maos_iac::adapter::distillate::tests::direct_distillate_insert_is_rejected::{closure#0}
+             at ./src/adapter/distillate.rs:815:46
+test adapter::decision_audit_tests::i12_10_decision_frames_100_percent_carry_refs ... ok
+test adapter::transparency_log::tests::recall_metadata_query_projects_only_payload_length_before_limit ... ok
+   7: <maos_iac::adapter::distillate::tests::direct_distillate_insert_is_rejected::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   8: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test adapter::distillate::tests::diamond_dependency_is_not_a_cycle ... ok
+test adapter::distillate::tests::direct_distillate_insert_is_rejected - should panic ... ok
+test adapter::log_recall::tests::cursor_pagination_no_overlap_and_monotonic_order ... ok
+test adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes ... ok
+test adapter::transparency_log::tests::approval_log_is_distinct_table ... ok
+test adapter::log_recall::tests::recall_limit_zero_returns_empty ... ok
+test adapter::log_recall::tests::fetch_nonexistent_frame_returns_not_found ... ok
+test adapter::transparency_log::tests::insert_frame_event_creates_one_row ... ok
+test adapter::transparency_log::tests::insert_approval_decision_creates_row ... ok
+test adapter::log_recall::tests::recall_emits_capability_invocation ... ok
+test adapter::transparency_log::tests::iac_bus_port_broadcast_writes_and_routes ... ok
+test adapter::transparency_log::tests::insert_frame_with_capability_token ... ok
+test adapter::transparency_log::tests::iac_bus_port_enqueue_writes_and_routes ... ok
+test adapter::transparency_log::tests::open_in_memory_succeeds ... ok
+test adapter::transparency_log::erasure_scan_work::ac5_opaque_outcome_payload_is_storable_but_bad_recovery_is_reported ... ok
+
+thread 'adapter::transparency_log::tests::insert_frame_panics_on_write_failure' (1247225) panicked at crates/maos-iac/src/adapter/transparency_log.rs:1358:17:
+MAOS kernel panic — Transparency Log write failed: no such table: transparency_log. Architecture §7.3 I2: log-before-deliver guarantee broken; kernel halts. Audit the SQLite file for corruption.
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row_with_correlation
+             at ./src/adapter/transparency_log.rs:1358:17
+   3: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_row
+             at ./src/adapter/transparency_log.rs:1177:14
+   4: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_id
+             at ./src/adapter/transparency_log.rs:1117:36
+   5: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event_with_sender
+             at ./src/adapter/transparency_log.rs:1059:18
+   6: <maos_iac::adapter::transparency_log::TransparencyLogAdapter>::insert_frame_event
+             at ./src/adapter/transparency_log.rs:984:14
+   7: insert_frame_panics_on_write_failure
+             at ./src/adapter/transparency_log.rs:3717:21
+   8: maos_iac::adapter::transparency_log::tests::insert_frame_panics_on_write_failure::{closure#0}
+             at ./src/adapter/transparency_log.rs:3703:46
+   9: <maos_iac::adapter::transparency_log::tests::insert_frame_panics_on_write_failure::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  10: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test adapter::log_recall::tests::fetch_cross_spirit_rejected ... ok
+test adapter::transparency_log::tests::insert_frame_panics_on_write_failure - should panic ... ok
+test adapter::transparency_log::tests::insertion_cursor_does_not_skip_a_later_row_after_clock_rollback ... ok
+test adapter::transparency_log::tests::query_filter_by_spirit_pid ... ok
+test adapter::log_recall::tests::fetch_returns_owned_frame ... ok
+test adapter::log_recall::tests::fetch_emits_capability_invocation ... ok
+test adapter::log_recall::tests::recall_emitter_scope_only_returns_own_frames ... ok
+test adapter::log_recall::tests::cursor_pagination_three_page_walk ... ok
+test adapter::transparency_log::erasure_scan_work::ac5_rowid_scans_restore_timestamp_and_frame_id_order ... ok
+test adapter::transparency_log::tests::concurrent_inserts_from_threads ... ok
+test adapter::transparency_log::tests::cross_team_correlation_requires_both_physical_logs ... ok
+test adapter::transparency_log::tests::query_filter_by_since_ns_excludes_older_frames ... ok
+test adapter::transparency_log::tests::hundred_sequential_inserts_are_ordered ... ok
+test adapter::transparency_log::tests::correlation_column_migrates_an_existing_transparency_log ... ok
+test adapter::transparency_log::tests::team_shard_keeps_legal_holds_in_global_database ... ok
+EC-13 work rows=100000 windows=25 max_steps=36881 total_steps=900424 ratio=0.04095959236981689 sql=SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_kind_rowid WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+EC-13 work rows=100000 windows=125 max_steps=110619 total_steps=9702815 ratio=0.011400712061396616 sql=SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted, timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) OR (?1 IS NULL AND kind = 11)) AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') AND intent NOT LIKE 'principal.uninstall.%'
+EC-13 work rows=100000 windows=125 max_steps=36885 total_steps=4502615 ratio=0.008191906258918429 sql=SELECT lower(hex(frame_id)) FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END
+EC-13 work rows=100000 windows=25 max_steps=36881 total_steps=900424 ratio=0.04095959236981689 sql=SELECT lower(hex(frame_id)), payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_kind_rowid WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+EC-13 work rows=100000 windows=25 max_steps=19 total_steps=475 ratio=0.04 sql=SELECT r.payload_redacted, r.timestamp_ns, r.frame_id FROM transparency_log r INDEXED BY idx_tlog_intent_rowid WHERE r.rowid > ?2 AND r.rowid <= ?3 AND ?1 IS ?1 AND r.intent = 'distillate.redistill.requested' AND NOT EXISTS (SELECT 1 FROM transparency_log o INDEXED BY idx_tlog_redistill_outcome WHERE o.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(o.payload_redacted AS TEXT),2) THEN json_extract(CAST(o.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = json_extract(CAST(r.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') UNION ALL SELECT 1 FROM transparency_log bad INDEXED BY idx_tlog_redistill_outcome WHERE bad.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(bad.payload_redacted AS TEXT),2) THEN json_extract(CAST(bad.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = X'' AND json_extract(CAST(bad.payload_redacted AS TEXT),'$') IS NULL)
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k ... ok
+EC-13 work rows=1000000 windows=245 max_steps=36881 total_steps=9004164 ratio=0.004095993809086551 sql=SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_kind_rowid WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+EC-13 work rows=1000000 windows=1225 max_steps=110619 total_steps=97027675 ratio=0.0011400767873702014 sql=SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted, timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) OR (?1 IS NULL AND kind = 11)) AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') AND intent NOT LIKE 'principal.uninstall.%'
+EC-13 work rows=1000000 windows=1225 max_steps=36885 total_steps=45025715 ratio=0.0008191985402119656 sql=SELECT lower(hex(frame_id)) FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END
+EC-13 work rows=1000000 windows=245 max_steps=36881 total_steps=9004164 ratio=0.004095993809086551 sql=SELECT lower(hex(frame_id)), payload_redacted, timestamp_ns FROM transparency_log INDEXED BY idx_tlog_kind_rowid WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+EC-13 work rows=1000000 windows=245 max_steps=19 total_steps=4655 ratio=0.004081632653061225 sql=SELECT r.payload_redacted, r.timestamp_ns, r.frame_id FROM transparency_log r INDEXED BY idx_tlog_intent_rowid WHERE r.rowid > ?2 AND r.rowid <= ?3 AND ?1 IS ?1 AND r.intent = 'distillate.redistill.requested' AND NOT EXISTS (SELECT 1 FROM transparency_log o INDEXED BY idx_tlog_redistill_outcome WHERE o.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(o.payload_redacted AS TEXT),2) THEN json_extract(CAST(o.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = json_extract(CAST(r.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') UNION ALL SELECT 1 FROM transparency_log bad INDEXED BY idx_tlog_redistill_outcome WHERE bad.intent IN ('distillate.redistilled','distillate.redistill.pending') AND CASE WHEN json_valid(CAST(bad.payload_redacted AS TEXT),2) THEN json_extract(CAST(bad.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') ELSE X'' END = X'' AND json_extract(CAST(bad.payload_redacted AS TEXT),'$') IS NULL)
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m ... ok
+
+test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.17s
+
+
+COMMAND_EXIT_CODE=0

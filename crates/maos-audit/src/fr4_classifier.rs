@@ -563,6 +563,17 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
+        // Spirit-owned erasure uses the stable owner, not a principal.
+        site: ("transparency_log.rs", "scrub_uninstalled_distillate", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redacted"),
+        shape: Some(&[
+            ("spirit_id", PayloadType::Str),
+            ("redacted_distillate_frame_id", PayloadType::Str),
+        ]),
+    },
+    WriterShapeEntry {
         site: ("transparency_log.rs", "scrub_frame_body", 0),
         kind: 1,
         token: TokenColumn::Absent,

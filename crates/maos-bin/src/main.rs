@@ -7444,7 +7444,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &transparency_log,
                 &audit_db_path,
                 &memory_db_path,
-                None,
+                UninstallContext {
+                    pump: None,
+                    door_schedules: None,
+                },
             )
             .await;
             // ADR-059 Decision 6 — only a successful erase writes the
@@ -10134,6 +10137,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
     async fn run_uninstall_cascade(
         &self,
         spirit_id: &str,
+        schedule_ids: Vec<String>,
     ) -> maos_bin::operator_door::UninstallOutcome {
         let (terminal, redistillation) = run_uninstall_cascade(
             spirit_id,
@@ -10142,7 +10146,10 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             &self.transparency_log,
             &self.audit_db_path,
             &self.memory_db_path,
-            Some(&self.hooks),
+            UninstallContext {
+                pump: Some(&self.hooks),
+                door_schedules: Some(&schedule_ids),
+            },
         )
         .await;
         let terminal_code = terminal.exit_code();
@@ -10492,6 +10499,133 @@ fn append_lifecycle_journal(
 }
 
 #[cfg(feature = "network")]
+#[derive(Clone, Copy)]
+enum RetainedUninstallStore {
+    ManifestArchive,
+    SkillQueue,
+    LifecycleJournal,
+    WorkerWorkspaces,
+}
+
+#[cfg(feature = "network")]
+impl RetainedUninstallStore {
+    const ALL: [Self; 4] = [
+        Self::ManifestArchive,
+        Self::SkillQueue,
+        Self::LifecycleJournal,
+        Self::WorkerWorkspaces,
+    ];
+
+    fn observe(
+        self,
+        spirit_id: &str,
+        incarnations: &[(u64, u32)],
+    ) -> Result<maos_audit::erasure::proof::ErasureCategory, Box<dyn std::error::Error>> {
+        use maos_audit::erasure::proof::{CategoryStatus, ErasureCategory};
+        use maos_skill::SkillQueueStore as _;
+        use std::io::BufRead as _;
+        let (name, count, reason) = match self {
+            Self::ManifestArchive => {
+                let path = maos_audit::default_archive_dir().join(spirit_id);
+                let mut count = 0;
+                if path.exists() {
+                    for version in std::fs::read_dir(path)? {
+                        if version?.path().join("manifest.toml").is_file() {
+                            count += 1;
+                        }
+                    }
+                }
+                (
+                    "manifest_archive",
+                    count,
+                    "FR11 admission/migration archive retained",
+                )
+            }
+            Self::SkillQueue => {
+                let entries = maos_skill::LocalFsSkillQueueStore::new()?.load()?;
+                let count = entries
+                    .iter()
+                    .filter(|entry| {
+                        entry.author.as_ref().is_some_and(|author| {
+                            author.class == spirit_id
+                                && incarnations.iter().any(|(boot, pid)| {
+                                    *pid == author.pid && author.boot_nonce == boot.to_string()
+                                })
+                        })
+                    })
+                    .count();
+                (
+                    "skill_queue",
+                    count,
+                    "authored skill queue provenance/payload retained",
+                )
+            }
+            Self::LifecycleJournal => {
+                let path = maos_audit::default_journal_path();
+                let mut count = 0;
+                if path.exists() {
+                    for line in std::io::BufReader::new(std::fs::File::open(path)?).lines() {
+                        let line = line?;
+                        if line.trim().is_empty() {
+                            continue;
+                        }
+                        let row: serde_json::Value = serde_json::from_str(&line)?;
+                        if row["spirit_id"] == spirit_id {
+                            count += 1;
+                        }
+                    }
+                }
+                (
+                    "lifecycle_journal",
+                    count,
+                    "append-only Lifecycle Journal retained",
+                )
+            }
+            Self::WorkerWorkspaces => {
+                let root = maos_bin::worker_workspace::resolve_workspaces_root()?;
+                let prefix = format!("maos-{spirit_id}-");
+                let mut count = 0;
+                if root.exists() {
+                    for entry in std::fs::read_dir(root)? {
+                        let entry = entry?;
+                        if entry.file_type()?.is_dir()
+                            && entry
+                                .file_name()
+                                .to_str()
+                                .and_then(|name| name.strip_prefix(&prefix))
+                                .is_some_and(|nonce| nonce.parse::<u64>().is_ok())
+                        {
+                            count += 1;
+                        }
+                    }
+                }
+                (
+                    "worker_workspaces",
+                    count,
+                    "Worker output workspaces retained under the 19-3 work-product contract",
+                )
+            }
+        };
+        Ok(ErasureCategory {
+            name: name.into(),
+            status: if count == 0 {
+                CategoryStatus::VerifiedEmpty
+            } else {
+                CategoryStatus::CoverageGap {
+                    reason: format!("{count} row(s); {reason}"),
+                }
+            },
+        })
+    }
+}
+
+#[cfg(feature = "network")]
+struct UninstallContext<'a> {
+    pump: Option<&'a maos_bin::hook_pump::HookPump>,
+    door_schedules: Option<&'a [String]>,
+}
+
+#[cfg(feature = "network")]
 async fn run_uninstall_cascade(
     spirit_id: &str,
     memory: &maos_kernel_core::memory::MemoryManagerAdapter,
@@ -10499,7 +10633,7 @@ async fn run_uninstall_cascade(
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
     memory_db_path: &std::path::Path,
-    pump: Option<&maos_bin::hook_pump::HookPump>,
+    context: UninstallContext<'_>,
 ) -> (UninstallCascadeTerminal, serde_json::Value) {
     let mut redistillation = Vec::new();
     let terminal = match run_uninstall_cascade_inner(
@@ -10509,7 +10643,7 @@ async fn run_uninstall_cascade(
         transparency_log,
         audit_db_path,
         memory_db_path,
-        pump,
+        context,
         &mut redistillation,
     )
     .await
@@ -10561,13 +10695,17 @@ async fn run_uninstall_cascade_inner(
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
     memory_db_path: &std::path::Path,
-    pump: Option<&maos_bin::hook_pump::HookPump>,
+    context: UninstallContext<'_>,
     redistillation: &mut Vec<serde_json::Value>,
 ) -> Result<UninstallCascadeTerminal, Box<dyn std::error::Error>> {
     use maos_audit::erasure::proof::{
         build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
     };
     use maos_domain::ports::MemoryManagerPort as _;
+    let UninstallContext {
+        pump,
+        door_schedules,
+    } = context;
 
     // Capture pre-erasure tree leaves.
     let pre_frame_ids = transparency_log
@@ -10591,6 +10729,9 @@ async fn run_uninstall_cascade_inner(
     let private_principal_rows = maos_audit::private_tier_principal_row_count(&memory_root)
         .map_err(|e| format!("failed to verify private-tier principal emptiness: {e}"))?;
 
+    let installed = maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
+        .into_iter()
+        .find(|(name, _)| name == spirit_id);
     let incarnations = if !audit_db_path.exists()
         || (pre_frame_ids.is_empty() && shared_principal_rows == 0 && private_principal_rows == 0)
     {
@@ -10600,6 +10741,7 @@ async fn run_uninstall_cascade_inner(
     } else {
         match maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false) {
             Ok(v) => v,
+            Err(_) if installed.is_some() => Vec::new(),
             Err(error) if shared_principal_rows > 0 || private_principal_rows > 0 => {
                 eprintln!(
                     "maos: uninstall — spirit '{spirit_id}' resolved to no incarnation \
@@ -10612,6 +10754,36 @@ async fn run_uninstall_cascade_inner(
             }
         }
     };
+    // New categories use every boot; existing principal/token discovery
+    // retains latest-incarnation semantics (D-20-11-02 B).
+    let all_incarnations = if incarnations.is_empty() {
+        Vec::new()
+    } else {
+        maos_audit::resolve_spirit_name(audit_db_path, spirit_id, true)?
+    };
+    let lineage = transparency_log.distillates_written_by(&all_incarnations)?;
+    let schedule_ids = match door_schedules {
+        Some(ids) => ids.to_vec(),
+        None => match &installed {
+            Some((_, path)) => {
+                let document: toml::Value = toml::from_str(&std::fs::read_to_string(path)?)?;
+                let mut section = toml::Table::new();
+                if let Some(entries) = document.get("schedule") {
+                    section.insert("schedule".into(), entries.clone());
+                }
+                maos_manifest::SchedulesSection::from_toml_str(&toml::to_string(&section)?)?
+                    .entries
+                    .into_iter()
+                    .map(|entry| entry.id)
+                    .collect()
+            }
+            None => Vec::new(),
+        },
+    };
+    let retained_categories = RetainedUninstallStore::ALL
+        .into_iter()
+        .map(|store| store.observe(spirit_id, &all_incarnations))
+        .collect::<Result<Vec<_>, _>>()?;
     // An EMPTY incarnation set is decided BELOW, together with the shared
     // residue check — shared-only pre-partition residue must reach its
     // failed partial proof, not disappear behind `not_found`.
@@ -10643,7 +10815,8 @@ async fn run_uninstall_cascade_inner(
         })
         .collect();
     for principal_id in &principal_ids {
-        let forgotten = memory.forget_with_reason(principal_id, None);
+        let forgotten =
+            tokio::task::block_in_place(|| memory.forget_with_reason(principal_id, None));
         if let Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) = &forgotten {
             let report =
                 maos_bin::hook_pump::HookPump::finish_forget(transparency_log, outcome, pump).await;
@@ -10700,6 +10873,19 @@ async fn run_uninstall_cascade_inner(
         .iter()
         .map(|(_, pid)| capability.revoke_all_for_pid(*pid))
         .sum::<usize>();
+    let mut held_lineage = Vec::new();
+    for frame in &lineage {
+        let removed = tokio::task::block_in_place(|| {
+            transparency_log.scrub_uninstalled_distillate(spirit_id, frame.frame_id)
+        })?;
+        if removed {
+            erased_distillate_frame_ids.push(frame.frame_id);
+        } else {
+            held_lineage.push(hex::encode(frame.frame_id));
+        }
+    }
+    erased_distillate_frame_ids.sort();
+    erased_distillate_frame_ids.dedup();
 
     held_principal_ids.sort();
     held_principal_ids.dedup();
@@ -10762,6 +10948,13 @@ async fn run_uninstall_cascade_inner(
     if all_principal_ids.is_empty()
         && shared_principal_rows == 0
         && Some(private_principal_rows) == held_private_rows
+        && lineage.is_empty()
+        && installed.is_none()
+        && schedule_ids.is_empty()
+        && total_revoked_tokens == 0
+        && retained_categories
+            .iter()
+            .all(|category| matches!(category.status, CategoryStatus::VerifiedEmpty))
     {
         if held_principal_ids.is_empty() {
             return Ok(UninstallCascadeTerminal::NotFound {
@@ -10783,11 +10976,6 @@ async fn run_uninstall_cascade_inner(
     // Past this point the cascade either destroyed principal data or found
     // pre-partition Shared residue that requires a signed CoverageGap. Every
     // exit below must therefore produce a signed artifact describing reality.
-
-    // Capture post-erasure tree leaves.
-    let post_frame_ids = transparency_log
-        .all_frame_ids()
-        .map_err(|e| format!("failed to read post-erasure frame ids: {e}"))?;
 
     // Build and sign the proof bundle.
     let uninstalled_at_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
@@ -10885,18 +11073,28 @@ async fn run_uninstall_cascade_inner(
         },
         ErasureCategory {
             name: "intent_lineage".into(),
-            status: CategoryStatus::VerifiedEmpty,
+            status: if !held_lineage.is_empty() {
+                CategoryStatus::CoverageGap { reason: format!("{} held distillate(s): {}; IAC-frame intent_lineage audit arrays retained", held_lineage.len(), held_lineage.join(", ")) }
+            } else if lineage.is_empty() {
+                CategoryStatus::VerifiedEmpty
+            } else {
+                CategoryStatus::Removed { count: lineage.len() as u64 }
+            },
         },
         ErasureCategory {
             name: "pending_halts".into(),
             status: CategoryStatus::CoverageGap {
-                reason: "no per-Spirit halt enumeration API at v1.0".into(),
+                reason: "AC3 pending final kernel landing (KS + O4 late-halt fence); no halt count or receipt-erasure claim in landing 1; IAC-frame intent_lineage audit arrays retained (NFR-Aud-14)".into(),
             },
         },
         ErasureCategory {
             name: "scheduled_invocations".into(),
             status: CategoryStatus::CoverageGap {
-                reason: "no per-Spirit schedule enumeration API at v1.0".into(),
+                reason: format!("{} schedule id(s) observed: {}; {}; watchdog buckets/stamps retained until root exit pending KS; IAC-frame intent_lineage audit arrays retained",
+                    schedule_ids.len(), schedule_ids.join(", "),
+                    if door_schedules.is_some() { "SCB unloaded; firing stopped" }
+                    else if installed.is_some() { "installed manifest queried" }
+                    else { "compiled-in Spirit may be re-admitted by the binary at next boot" }),
             },
         },
     ];
@@ -10933,6 +11131,62 @@ async fn run_uninstall_cascade_inner(
                 });
                 reason.to_string()
             });
+    categories.extend(retained_categories);
+    let mut package_removal = None;
+    let package_status = if installed.is_none() {
+        CategoryStatus::VerifiedEmpty
+    } else if !held_principal_ids.is_empty()
+        || !held_lineage.is_empty()
+        || shared_failure.is_some()
+        || private_failure.is_some()
+        || regional_failure.is_some()
+    {
+        CategoryStatus::CoverageGap {
+            reason: "1 installed package retained on Held/Failed terminal".into(),
+        }
+    } else {
+        package_removal =
+            maos_registry::storage::LocalFsRegistryStorage::uninstall_package(spirit_id)?;
+        CategoryStatus::Removed { count: 1 }
+    };
+    if door_schedules.is_none()
+        && installed.is_some()
+        && matches!(package_status, CategoryStatus::Removed { .. })
+    {
+        if let Some(category) = categories
+            .iter_mut()
+            .find(|category| category.name == "scheduled_invocations")
+        {
+            category.status = if schedule_ids.is_empty() {
+                CategoryStatus::VerifiedEmpty
+            } else {
+                CategoryStatus::Removed {
+                    count: schedule_ids.len() as u64,
+                }
+            };
+        }
+    }
+    categories.push(ErasureCategory {
+        name: "installed_package".into(),
+        status: package_status,
+    });
+    // Journal one distinct row per observed status before capturing the post-tree.
+    let category_frame_ids = categories
+        .iter()
+        .map(|category| {
+            let payload = serde_json::to_vec(
+                &serde_json::json!({"spirit_id": spirit_id, "category": category}),
+            )?;
+            Ok(transparency_log.insert_kernel_event_returning_id(
+                0,
+                maos_iac::adapter::transparency_log::FrameKind::Decision,
+                None,
+                "principal.uninstall.category",
+                &payload,
+            ))
+        })
+        .collect::<Result<Vec<_>, serde_json::Error>>()?;
+    let post_frame_ids = transparency_log.all_frame_ids()?;
 
     // P23: stamp the proof with the LATEST incarnation's pid (the current
     // boot).  `resolve_spirit_name(all_boots=false)` returns only the latest
@@ -10947,6 +11201,7 @@ async fn run_uninstall_cascade_inner(
         &erased_distillate_frame_ids,
         &all_principal_ids,
         &erased_principal_frame_ids,
+        &category_frame_ids,
         categories,
         &signing_seed,
     )
@@ -10955,6 +11210,22 @@ async fn run_uninstall_cascade_inner(
     let proof_dir = maos_audit::default_erasure_proofs_dir();
     let proof_path = write_proof_bundle(&proof, &proof_dir)
         .map_err(|e| format!("failed to write erasure proof: {e}"))?;
+    if let Err(error) = package_removal.map_or(Ok(()), |removal| removal.commit()) {
+        std::fs::remove_file(&proof_path).map_err(|cleanup| {
+            format!("package deletion failed: {error}; discard proof failed: {cleanup}")
+        })?;
+        return Err(format!("package deletion failed: {error}").into());
+    }
+    if !held_lineage.is_empty() && held_principal_ids.is_empty() {
+        return Ok(UninstallCascadeTerminal::Failed {
+            spirit_id: spirit_id.into(),
+            error: format!(
+                "{} held lineage derivation(s) retained; partial erasure proof: {}",
+                held_lineage.len(),
+                proof_path.display()
+            ),
+        });
+    }
 
     // Memory residue or an undecommissioned regional key is an incomplete
     // uninstall. Retain the HOME seed and signed partial proof for recovery;

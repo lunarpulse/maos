@@ -584,8 +584,10 @@ impl HookPump {
                         {
                             "legal-hold"
                         }
-                        Ok(_) => match tl.scrub_distillate_body(row.frame_id, "gdpr-forget") {
-                            Ok(()) => "principal-resurrected",
+                        Ok(_) => match tl.scrub_distillate_unless_held(row.frame_id, "gdpr-forget")
+                        {
+                            Ok(true) => "principal-resurrected",
+                            Ok(false) => "legal-hold",
                             Err(_) => "scrub-failed",
                         },
                         Err(_) => "hold-check-failed",
@@ -655,8 +657,7 @@ impl HookPump {
             return Ok(serde_json::json!({}));
         };
         let mut redistill = redistill.clone();
-        for request in tl
-            .outstanding_redistill_requests()
+        for request in tokio::task::block_in_place(|| tl.outstanding_redistill_requests())
             .map_err(|e| e.to_string())?
         {
             if !redistill
@@ -790,9 +791,9 @@ impl HookPump {
             rows.push(serde_json::json!({"request":request,"outcome":outcome}));
         }
         // An in-flight pass can commit after the initial kernel scan, before purge.
-        let (late_distillates, late_frames, late_requests, held, gaps) = tl
-            .scrub_forget_frames(&receipt.principal_id)
-            .map_err(|e| e.to_string())?;
+        let (late_distillates, late_frames, late_requests, held, gaps) =
+            tokio::task::block_in_place(|| tl.scrub_forget_frames(&receipt.principal_id))
+                .map_err(|e| e.to_string())?;
         for request in &late_requests {
             let outcome = RedistillOutcome::Pending {
                 reason: Pending::Refused("late-frame".into()),

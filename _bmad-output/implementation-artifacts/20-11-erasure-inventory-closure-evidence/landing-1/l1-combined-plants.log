@@ -1,0 +1,794 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+   Compiling maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:487:21
+    |
+487 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+   |
+23 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:13:17
+   |
+13 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+   Compiling maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+   Compiling maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+   |
+29 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+    |
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+    |
+401 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:46:5
+   |
+44 | struct DiskCandidate {
+   |        ------------- field in this struct
+45 |     name: String,
+46 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-cohort` (lib) generated 1 warning
+   Compiling maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+warning: `maos-kernel-core` (lib) generated 37 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 21 suggestions)
+   Compiling maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+   Compiling maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+    --> crates/maos-control/src/lib.rs:1064:28
+     |
+1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-control` (lib) generated 2 warnings
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+warning: unused import: `maos_mcp::McpClient`
+    --> crates/maos-bin/src/main.rs:1445:9
+     |
+1445 |     use maos_mcp::McpClient as _;
+     |         ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `ManifestArchive` is never constructed
+     --> crates/maos-bin/src/main.rs:10500:5
+      |
+10499 | enum RetainedUninstallStore {
+      |      ---------------------- variant in this enum
+10500 |     ManifestArchive,
+      |     ^^^^^^^^^^^^^^^
+      |
+      = note: `RetainedUninstallStore` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+      = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `EnvVar` is never constructed
+ --> crates/maos-bin/src/env_contract.rs:1:12
+  |
+1 | pub struct EnvVar {
+  |            ^^^^^^
+
+warning: enum `EnvStability` is never used
+ --> crates/maos-bin/src/env_contract.rs:8:10
+  |
+8 | pub enum EnvStability {
+  |          ^^^^^^^^^^^^
+
+warning: constant `MAOS_ENV_REGISTRY` is never used
+  --> crates/maos-bin/src/env_contract.rs:13:11
+   |
+13 | pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+   |           ^^^^^^^^^^^^^^^^^
+
+warning: function `lookup` is never used
+   --> crates/maos-bin/src/env_contract.rs:658:8
+    |
+658 | pub fn lookup(name: &str) -> Option<&'static EnvVar> {
+    |        ^^^^^^
+
+warning: `maos-bin` (bin "maos") generated 6 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.90s
+────────────
+ Nextest run ID 2e321b7a-36dc-48dc-ad00-f98eb3148be0 with nextest profile: default
+    Starting 5 tests across 2 binaries (16 tests skipped)
+        FAIL [   0.430s] (1/5) maos-bin::erasure_inventory_20_11 ac1_principal_free_distillate_gets_a_signed_proof
+  stdout ───
+
+    running 1 test
+    test ac1_principal_free_distillate_gets_a_signed_proof ... FAILED
+
+    failures:
+
+    failures:
+        ac1_principal_free_distillate_gets_a_signed_proof
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.42s
+
+  stderr ───
+
+    thread 'ac1_principal_free_distillate_gets_a_signed_proof' (975314) panicked at crates/maos-bin/tests/erasure_inventory_20_11.rs:155:5:
+    assertion `left == right` failed: {"outcome":"not_found","spirit_id":"hello-spirit","redistillation":{"pending_count":0,"redistilled_count":0,"redistill_outcomes":[]}}
+     maos 0.1.0-alpha.1 (v0.1-β scaffold; worker_threads target = 32)
+    maos: no daemon holds /tmp/.tmpOKZzsL /tmp/.tmpOKZzsL/archive /tmp/.tmpOKZzsL/data /tmp/.tmpOKZzsL/data/maos /tmp/.tmpOKZzsL/data/maos/erasure-proofs /tmp/.tmpOKZzsL/home /tmp/.tmpOKZzsL/home/audit /tmp/.tmpOKZzsL/home/journal /tmp/.tmpOKZzsL/memory; running offline
+    maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)
+    maos: capability registry initialized (Story 1b.2)
+    maos: enterprise PDP not configured — set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)
+    maos: enterprise identity/at-rest/SIEM NOT configured — set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)
+    maos: orchestrator buffer registry initialized (Story 3.4)
+    maos: Transparency Log opened on-disk at /tmp/.tmpOKZzsL/home/audit/transparency.sqlite
+    maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable
+    maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)
+    maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)
+    maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)
+    maos: Mailbox TL installer wired (Story 6.4)
+    maos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)
+    maos: Spirit Scheduler wired (Story 5.1)
+    maos: CrashDetector wired (Story 5.3)
+    maos: telemetry hook pump wired (Story 17-4)
+    maos: KernelLifecycleResolver wired (Story 5.1)
+    maos: HotSwapCoordinator wired (Story 5.2)
+    maos: RevocationApplier + RevocationPoller wired (Story 5.4)
+    maos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false
+    maos: UpgradeOrchestrator wired (Story 5.4)
+    maos: Approval Manager initialized (v0.3-β auto-allow)
+    maos: Ollama provider registered
+    maos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)
+    maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)
+
+      left: Some(4)
+     right: Some(0)
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::assert_failed_inner
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:434:23
+       3: core::panicking::assert_failed::<core::option::Option<i32>, core::option::Option<i32>>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+       4: erasure_inventory_20_11::ac1_principal_free_distillate_gets_a_signed_proof
+                 at ./tests/erasure_inventory_20_11.rs:155:5
+       5: erasure_inventory_20_11::ac1_principal_free_distillate_gets_a_signed_proof::{closure#0}
+                 at ./tests/erasure_inventory_20_11.rs:151:55
+       6: <erasure_inventory_20_11::ac1_principal_free_distillate_gets_a_signed_proof::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.454s] (2/5) maos-bin::shell_host_16_2 ac4_door_snapshots_real_scb_schedules_before_unload
+  stdout ───
+
+    running 1 test
+    test ac4_door_snapshots_real_scb_schedules_before_unload ... FAILED
+
+    failures:
+
+    failures:
+        ac4_door_snapshots_real_scb_schedules_before_unload
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.45s
+
+  stderr ───
+
+    thread 'ac4_door_snapshots_real_scb_schedules_before_unload' (975318) panicked at crates/maos-bin/tests/shell_host_16_2.rs:1624:5:
+    assertion `left == right` failed
+      left: []
+     right: ["daily"]
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::assert_failed_inner
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17
+       3: core::panicking::assert_failed::<alloc::vec::Vec<alloc::string::String>, [&str; 1]>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+       4: shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload
+                 at ./tests/shell_host_16_2.rs:1624:5
+       5: shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload::{closure#0}
+                 at ./tests/shell_host_16_2.rs:1590:57
+       6: <shell_host_16_2::ac4_door_snapshots_real_scb_schedules_before_unload::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.734s] (3/5) maos-bin::erasure_inventory_20_11 ac2_principal_and_principal_free_lineage_are_both_erased
+  stdout ───
+
+    running 1 test
+    test ac2_principal_and_principal_free_lineage_are_both_erased ... FAILED
+
+    failures:
+
+    failures:
+        ac2_principal_and_principal_free_lineage_are_both_erased
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.73s
+
+  stderr ───
+
+    thread 'ac2_principal_and_principal_free_lineage_are_both_erased' (975316) panicked at crates/maos-bin/tests/erasure_inventory_20_11.rs:361:5:
+    assertion `left == right` failed
+      left: Null
+     right: 1
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: core::panicking::assert_failed_inner
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17
+       3: core::panicking::assert_failed::<serde_json::value::Value, i32>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+       4: erasure_inventory_20_11::ac2_principal_and_principal_free_lineage_are_both_erased
+                 at ./tests/erasure_inventory_20_11.rs:361:5
+       5: erasure_inventory_20_11::ac2_principal_and_principal_free_lineage_are_both_erased::{closure#0}
+                 at ./tests/erasure_inventory_20_11.rs:355:62
+       6: <erasure_inventory_20_11::ac2_principal_and_principal_free_lineage_are_both_erased::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        FAIL [   0.740s] (4/5) maos-bin::erasure_inventory_20_11 ac7_archive_and_authored_skill_are_named_and_counted
+  stdout ───
+
+    running 1 test
+    test ac7_archive_and_authored_skill_are_named_and_counted ... FAILED
+
+    failures:
+
+    failures:
+        ac7_archive_and_authored_skill_are_named_and_counted
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.74s
+
+  stderr ───
+
+    thread 'ac7_archive_and_authored_skill_are_named_and_counted' (975315) panicked at crates/maos-bin/tests/erasure_inventory_20_11.rs:139:28:
+    missing manifest_archive: {"schema_version":"maos.erasure-proof.v2","spirit_id":"hello-spirit","spirit_pid":7,"uninstalled_at_ns":1793791549896143591,"pre_root":[24,76,155,22,171,2,126,9,168,39,121,73,71,37,85,22,25,61,246,229,34,17,61,50,34,139,135,26,37,13,30,145],"post_root":[187,204,51,155,16,87,69,89,172,75,176,103,243,78,181,247,16,63,89,47,204,197,123,11,149,52,219,7,135,50,126,200],"pre_leaves":["01a1:a64e:e092:6545:6f00:e87c:30f8:fc0b","01a1:a64e:e09c:149a:519c:ff76:3aa4:cdff","01a1:a64e:e0a6:7927:3971:e835:a650:22b5","01a1:a64e:e0b1:a4c0:e4af:df3a:28bc:497e"],"post_leaves":["01a1:a64e:e092:6545:6f00:e87c:30f8:fc0b","01a1:a64e:e09c:149a:519c:ff76:3aa4:cdff","01a1:a64e:e0a6:7927:3971:e835:a650:22b5","01a1:a64e:e0b1:a4c0:e4af:df3a:28bc:497e","01a1:a64e:e1a0:ec3e:631f:c9fe:5cf3:6d6e","01a1:a64e:e1ab:42c5:44a7:13a1:01db:c8e9","01a1:a64e:e1be:39d4:1749:c7d7:1c35:a241","01a1:a64e:e1c8:c21f:2aae:3677:e421:cd5e","01a1:a64e:e1d1:1f62:cd3b:4ada:e3a9:f022","01a1:a64e:e1db:e4c1:91a2:fece:7e9f:279d","01a1:a64e:e1e5:42b1:7235:3fe5:ae06:b91a","01a1:a64e:e1f2:95bf:aa5d:3ec0:8ce3:01c1","01a1:a64e:e1fc:dd55:1aab:4e7a:d62a:02d9","01a1:a64e:e205:788f:72fd:271e:c6de:c374","01a1:a64e:e20f:5fbc:f0b6:4bb1:b709:e2a8","01a1:a64e:e219:1568:41a6:9c27:1ad6:9ed8","01a1:a64e:e223:788c:6086:d36c:53e6:c36e","01a1:a64e:e22d:aa3d:b79a:afd3:ece1:6155","01a1:a64e:e237:454f:05db:3f96:367b:eebf","01a1:a64e:e240:3a4a:8a78:d5c7:69a5:7299"],"erased_frame_proofs":[{"frame_id":"01a1:a64e:e0b1:a4c0:e4af:df3a:28bc:497e","pre_inclusion":{"leaf":[185,21,81,210,235,253,65,194,50,147,252,63,185,190,22,129,130,224,6,199,63,199,141,229,215,122,82,46,83,132,218,42],"adjacent_leaf":null,"leaf_index":2,"siblings":[[240,241,9,241,185,52,15,78,233,244,239,93,152,157,81,110,215,100,185,173,149,70,93,119,186,234,55,46,56,35,35,241],[171,39,161,131,53,152,150,77,49,128,131,221,255,17,126,255,57,25,84,188,1,204,150,132,238,58,188,53,46,49,53,231]],"directions":[false,true]}}],"redacted_principal_frame_proofs":[],"subject_exclusion_proofs":[{"leaf":[23,209,206,134,222,92,137,160,99,48,244,81,93,249,7,133,147,15,139,96,103,14,46,84,95,45,15,250,117,67,238,13],"adjacent_leaf":[53,82,192,145,223,171,190,101,70,144,219,72,14,162,234,63,127,68,77,17,148,133,244,122,39,103,43,23,178,89,2,185],"leaf_index":0,"siblings":[[63,49,57,122,198,92,43,191,181,238,155,79,171,146,139,211,85,155,37,54,108,201,226,199,21,34,129,2,190,107,217,78],[72,123,149,213,80,216,114,55,48,211,115,237,20,34,145,110,246,197,137,87,169,181,38,233,29,203,62,44,135,98,8,182],[173,221,39,190,227,24,127,75,225,57,199,148,6,122,57,239,219,238,104,212,244,49,38,113,158,235,120,11,122,184,50,166],[204,219,37,153,65,214,105,152,121,113,159,89,237,205,162,82,185,196,150,242,62,83,34,175,17,106,48,169,13,211,66,149],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[false,false,false,false,false]}],"categories":[{"name":"memory_namespace","status":{"status":"Removed","count":1}},{"name":"principal_index","status":{"status":"Removed","count":1}},{"name":"capability_tokens","status":{"status":"Removed","count":0}},{"name":"shared","status":{"status":"VerifiedEmpty"}},{"name":"private","status":{"status":"VerifiedEmpty"}},{"name":"principal_frames","status":{"status":"Removed","count":0}},{"name":"intent_lineage","status":{"status":"VerifiedEmpty"}},{"name":"pending_halts","status":{"status":"CoverageGap","reason":"AC3 pending final kernel landing (KS + O4 late-halt fence); no halt count or receipt-erasure claim in landing 1; IAC-frame intent_lineage audit arrays retained (NFR-Aud-14)"}},{"name":"scheduled_invocations","status":{"status":"CoverageGap","reason":"0 schedule id(s) observed: ; compiled-in Spirit may be re-admitted by the binary at next boot; watchdog buckets/stamps retained until root exit pending KS; IAC-frame intent_lineage audit arrays retained"}},{"name":"skill_queue","status":{"status":"CoverageGap","reason":"1 row(s); authored skill queue provenance/payload retained"}},{"name":"lifecycle_journal","status":{"status":"VerifiedEmpty"}},{"name":"worker_workspaces","status":{"status":"VerifiedEmpty"}},{"name":"installed_package","status":{"status":"VerifiedEmpty"}}],"category_evidence":[{"spirit_id":"hello-spirit","category":{"name":"memory_namespace","status":{"status":"Removed","count":1}},"frame_id":"01a1:a64e:e1c8:c21f:2aae:3677:e421:cd5e","post_inclusion":{"leaf":[196,163,65,250,168,103,168,114,5,234,242,183,195,218,95,189,23,34,80,211,184,137,132,20,190,181,124,210,34,64,104,10],"adjacent_leaf":null,"leaf_index":12,"siblings":[[197,110,179,141,155,104,7,57,77,240,213,1,43,48,42,160,179,243,229,90,29,232,121,21,177,12,217,210,200,148,40,187],[154,148,97,232,175,17,105,187,82,112,119,147,209,64,125,153,200,186,123,89,6,56,165,122,171,132,151,36,67,33,251,170],[117,197,185,6,13,109,40,148,142,59,12,131,70,135,186,226,170,179,103,8,236,92,81,73,70,164,20,71,103,131,115,10],[28,98,195,63,112,122,207,69,212,187,136,237,110,126,215,140,158,61,142,148,99,23,97,49,53,87,51,52,12,215,113,96],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[false,false,true,true,false]}},{"spirit_id":"hello-spirit","category":{"name":"principal_index","status":{"status":"Removed","count":1}},"frame_id":"01a1:a64e:e1d1:1f62:cd3b:4ada:e3a9:f022","post_inclusion":{"leaf":[255,59,153,48,58,76,143,71,5,53,147,20,173,197,34,188,21,9,72,28,239,17,176,188,80,9,89,216,72,72,148,106],"adjacent_leaf":null,"leaf_index":19,"siblings":[[247,194,7,166,109,181,15,194,12,54,106,40,216,29,4,166,7,114,191,190,13,141,42,196,211,72,33,46,222,34,248,178],[201,141,157,161,112,140,211,2,143,11,118,217,146,60,226,144,180,212,242,236,110,42,198,78,42,171,112,25,51,157,135,254],[126,131,178,229,81,171,37,48,35,101,205,79,73,74,113,207,43,213,173,93,15,233,126,68,178,244,234,240,173,149,134,213],[129,254,154,40,247,131,202,141,131,206,9,114,134,137,86,94,243,78,76,148,122,63,21,101,1,7,84,85,67,67,23,190],[87,206,244,147,155,99,172,55,2,161,24,228,177,138,140,5,9,215,165,187,55,219,75,147,227,80,131,22,96,172,176,67]],"directions":[true,true,false,false,true]}},{"spirit_id":"hello-spirit","category":{"name":"capability_tokens","status":{"status":"Removed","count":0}},"frame_id":"01a1:a64e:e1db:e4c1:91a2:fece:7e9f:279d","post_inclusion":{"leaf":[94,26,171,221,22,33,25,64,223,124,215,84,202,60,156,30,250,212,218,169,33,212,179,226,207,152,75,30,68,76,128,61],"adjacent_leaf":null,"leaf_index":2,"siblings":[[99,126,209,183,62,133,197,118,121,112,9,122,58,31,48,2,28,194,42,254,162,252,253,71,207,129,45,223,186,140,4,229],[35,227,8,204,156,74,38,16,223,26,196,115,164,213,152,184,141,143,35,61,116,1,97,244,235,246,158,226,17,217,252,231],[173,221,39,190,227,24,127,75,225,57,199,148,6,122,57,239,219,238,104,212,244,49,38,113,158,235,120,11,122,184,50,166],[204,219,37,153,65,214,105,152,121,113,159,89,237,205,162,82,185,196,150,242,62,83,34,175,17,106,48,169,13,211,66,149],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[false,true,false,false,false]}},{"spirit_id":"hello-spirit","category":{"name":"shared","status":{"status":"VerifiedEmpty"}},"frame_id":"01a1:a64e:e1e5:42b1:7235:3fe5:ae06:b91a","post_inclusion":{"leaf":[247,194,7,166,109,181,15,194,12,54,106,40,216,29,4,166,7,114,191,190,13,141,42,196,211,72,33,46,222,34,248,178],"adjacent_leaf":null,"leaf_index":18,"siblings":[[255,59,153,48,58,76,143,71,5,53,147,20,173,197,34,188,21,9,72,28,239,17,176,188,80,9,89,216,72,72,148,106],[201,141,157,161,112,140,211,2,143,11,118,217,146,60,226,144,180,212,242,236,110,42,198,78,42,171,112,25,51,157,135,254],[126,131,178,229,81,171,37,48,35,101,205,79,73,74,113,207,43,213,173,93,15,233,126,68,178,244,234,240,173,149,134,213],[129,254,154,40,247,131,202,141,131,206,9,114,134,137,86,94,243,78,76,148,122,63,21,101,1,7,84,85,67,67,23,190],[87,206,244,147,155,99,172,55,2,161,24,228,177,138,140,5,9,215,165,187,55,219,75,147,227,80,131,22,96,172,176,67]],"directions":[false,true,false,false,true]}},{"spirit_id":"hello-spirit","category":{"name":"private","status":{"status":"VerifiedEmpty"}},"frame_id":"01a1:a64e:e1f2:95bf:aa5d:3ec0:8ce3:01c1","post_inclusion":{"leaf":[193,230,251,210,176,4,155,103,9,208,205,1,188,60,184,209,124,98,94,104,115,163,5,92,153,153,189,0,10,92,121,102],"adjacent_leaf":null,"leaf_index":10,"siblings":[[194,160,67,78,236,90,39,238,238,163,180,225,11,223,206,32,98,168,110,77,116,243,156,67,39,112,103,18,25,94,112,177],[247,37,224,227,206,13,168,159,129,232,128,70,182,4,206,251,83,195,34,188,78,154,98,61,246,153,10,113,137,211,2,169],[87,181,129,6,70,58,31,235,219,222,193,89,107,96,163,87,231,156,71,151,99,245,171,62,116,178,156,168,30,96,129,144],[28,98,195,63,112,122,207,69,212,187,136,237,110,126,215,140,158,61,142,148,99,23,97,49,53,87,51,52,12,215,113,96],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[false,true,false,true,false]}},{"spirit_id":"hello-spirit","category":{"name":"principal_frames","status":{"status":"Removed","count":0}},"frame_id":"01a1:a64e:e1fc:dd55:1aab:4e7a:d62a:02d9","post_inclusion":{"leaf":[204,26,254,149,170,140,161,131,84,166,254,92,140,100,185,76,186,251,84,78,118,112,80,181,237,145,240,245,13,191,34,246],"adjacent_leaf":null,"leaf_index":14,"siblings":[[209,1,187,201,10,10,40,45,233,174,197,29,204,254,144,249,248,253,59,199,215,31,140,15,245,83,249,105,61,169,232,181],[193,143,136,10,109,14,31,91,25,191,122,42,162,102,209,185,88,56,13,109,57,130,52,177,171,191,51,224,123,43,149,102],[117,197,185,6,13,109,40,148,142,59,12,131,70,135,186,226,170,179,103,8,236,92,81,73,70,164,20,71,103,131,115,10],[28,98,195,63,112,122,207,69,212,187,136,237,110,126,215,140,158,61,142,148,99,23,97,49,53,87,51,52,12,215,113,96],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[false,true,true,true,false]}},{"spirit_id":"hello-spirit","category":{"name":"intent_lineage","status":{"status":"VerifiedEmpty"}},"frame_id":"01a1:a64e:e205:788f:72fd:271e:c6de:c374","post_inclusion":{"leaf":[172,171,50,121,226,113,18,252,182,6,138,187,246,35,112,202,120,234,218,252,148,193,174,99,38,224,163,159,121,72,193,72],"adjacent_leaf":null,"leaf_index":8,"siblings":[[185,21,81,210,235,253,65,194,50,147,252,63,185,190,22,129,130,224,6,199,63,199,141,229,215,122,82,46,83,132,218,42],[48,142,243,183,185,76,201,36,190,79,238,115,145,57,96,62,46,119,17,191,56,145,143,213,16,92,3,125,237,186,82,65],[87,181,129,6,70,58,31,235,219,222,193,89,107,96,163,87,231,156,71,151,99,245,171,62,116,178,156,168,30,96,129,144],[28,98,195,63,112,122,207,69,212,187,136,237,110,126,215,140,158,61,142,148,99,23,97,49,53,87,51,52,12,215,113,96],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[false,false,false,true,false]}},{"spirit_id":"hello-spirit","category":{"name":"pending_halts","status":{"status":"CoverageGap","reason":"AC3 pending final kernel landing (KS + O4 late-halt fence); no halt count or receipt-erasure claim in landing 1; IAC-frame intent_lineage audit arrays retained (NFR-Aud-14)"}},"frame_id":"01a1:a64e:e20f:5fbc:f0b6:4bb1:b709:e2a8","post_inclusion":{"leaf":[104,255,255,9,181,214,220,30,168,133,153,77,53,216,251,21,38,116,38,239,119,27,142,80,227,164,15,124,63,107,216,29],"adjacent_leaf":null,"leaf_index":5,"siblings":[[100,224,30,142,1,246,142,139,44,111,210,61,7,220,129,124,182,20,186,106,35,216,209,246,96,167,82,24,26,146,240,53],[99,150,147,123,136,249,170,90,149,44,43,7,205,96,249,41,5,41,209,134,33,149,98,27,90,202,159,146,88,2,41,25],[26,37,138,148,218,129,203,201,55,145,17,118,241,52,151,184,109,237,244,46,65,7,45,19,77,28,160,108,64,207,125,21],[204,219,37,153,65,214,105,152,121,113,159,89,237,205,162,82,185,196,150,242,62,83,34,175,17,106,48,169,13,211,66,149],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[true,false,true,false,false]}},{"spirit_id":"hello-spirit","category":{"name":"scheduled_invocations","status":{"status":"CoverageGap","reason":"0 schedule id(s) observed: ; compiled-in Spirit may be re-admitted by the binary at next boot; watchdog buckets/stamps retained until root exit pending KS; IAC-frame intent_lineage audit arrays retained"}},"frame_id":"01a1:a64e:e219:1568:41a6:9c27:1ad6:9ed8","post_inclusion":{"leaf":[99,126,209,183,62,133,197,118,121,112,9,122,58,31,48,2,28,194,42,254,162,252,253,71,207,129,45,223,186,140,4,229],"adjacent_leaf":null,"leaf_index":3,"siblings":[[94,26,171,221,22,33,25,64,223,124,215,84,202,60,156,30,250,212,218,169,33,212,179,226,207,152,75,30,68,76,128,61],[35,227,8,204,156,74,38,16,223,26,196,115,164,213,152,184,141,143,35,61,116,1,97,244,235,246,158,226,17,217,252,231],[173,221,39,190,227,24,127,75,225,57,199,148,6,122,57,239,219,238,104,212,244,49,38,113,158,235,120,11,122,184,50,166],[204,219,37,153,65,214,105,152,121,113,159,89,237,205,162,82,185,196,150,242,62,83,34,175,17,106,48,169,13,211,66,149],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[true,true,false,false,false]}},{"spirit_id":"hello-spirit","category":{"name":"skill_queue","status":{"status":"CoverageGap","reason":"1 row(s); authored skill queue provenance/payload retained"}},"frame_id":"01a1:a64e:e223:788c:6086:d36c:53e6:c36e","post_inclusion":{"leaf":[53,82,192,145,223,171,190,101,70,144,219,72,14,162,234,63,127,68,77,17,148,133,244,122,39,103,43,23,178,89,2,185],"adjacent_leaf":null,"leaf_index":0,"siblings":[[63,49,57,122,198,92,43,191,181,238,155,79,171,146,139,211,85,155,37,54,108,201,226,199,21,34,129,2,190,107,217,78],[72,123,149,213,80,216,114,55,48,211,115,237,20,34,145,110,246,197,137,87,169,181,38,233,29,203,62,44,135,98,8,182],[173,221,39,190,227,24,127,75,225,57,199,148,6,122,57,239,219,238,104,212,244,49,38,113,158,235,120,11,122,184,50,166],[204,219,37,153,65,214,105,152,121,113,159,89,237,205,162,82,185,196,150,242,62,83,34,175,17,106,48,169,13,211,66,149],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[false,false,false,false,false]}},{"spirit_id":"hello-spirit","category":{"name":"lifecycle_journal","status":{"status":"VerifiedEmpty"}},"frame_id":"01a1:a64e:e22d:aa3d:b79a:afd3:ece1:6155","post_inclusion":{"leaf":[161,182,19,129,177,188,88,103,31,65,11,177,251,72,90,198,124,183,3,107,224,106,196,170,33,80,69,191,28,84,153,210],"adjacent_leaf":null,"leaf_index":7,"siblings":[[139,2,153,163,149,53,38,142,243,237,27,126,73,231,51,183,15,65,188,209,155,215,39,184,107,130,245,25,48,190,68,179],[139,53,41,68,115,109,191,57,217,189,55,6,34,182,89,153,18,36,151,33,37,120,172,87,240,21,162,105,56,7,27,77],[26,37,138,148,218,129,203,201,55,145,17,118,241,52,151,184,109,237,244,46,65,7,45,19,77,28,160,108,64,207,125,21],[204,219,37,153,65,214,105,152,121,113,159,89,237,205,162,82,185,196,150,242,62,83,34,175,17,106,48,169,13,211,66,149],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[true,true,true,false,false]}},{"spirit_id":"hello-spirit","category":{"name":"worker_workspaces","status":{"status":"VerifiedEmpty"}},"frame_id":"01a1:a64e:e237:454f:05db:3f96:367b:eebf","post_inclusion":{"leaf":[63,49,57,122,198,92,43,191,181,238,155,79,171,146,139,211,85,155,37,54,108,201,226,199,21,34,129,2,190,107,217,78],"adjacent_leaf":null,"leaf_index":1,"siblings":[[53,82,192,145,223,171,190,101,70,144,219,72,14,162,234,63,127,68,77,17,148,133,244,122,39,103,43,23,178,89,2,185],[72,123,149,213,80,216,114,55,48,211,115,237,20,34,145,110,246,197,137,87,169,181,38,233,29,203,62,44,135,98,8,182],[173,221,39,190,227,24,127,75,225,57,199,148,6,122,57,239,219,238,104,212,244,49,38,113,158,235,120,11,122,184,50,166],[204,219,37,153,65,214,105,152,121,113,159,89,237,205,162,82,185,196,150,242,62,83,34,175,17,106,48,169,13,211,66,149],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[true,false,false,false,false]}},{"spirit_id":"hello-spirit","category":{"name":"installed_package","status":{"status":"VerifiedEmpty"}},"frame_id":"01a1:a64e:e240:3a4a:8a78:d5c7:69a5:7299","post_inclusion":{"leaf":[209,1,187,201,10,10,40,45,233,174,197,29,204,254,144,249,248,253,59,199,215,31,140,15,245,83,249,105,61,169,232,181],"adjacent_leaf":null,"leaf_index":15,"siblings":[[204,26,254,149,170,140,161,131,84,166,254,92,140,100,185,76,186,251,84,78,118,112,80,181,237,145,240,245,13,191,34,246],[193,143,136,10,109,14,31,91,25,191,122,42,162,102,209,185,88,56,13,109,57,130,52,177,171,191,51,224,123,43,149,102],[117,197,185,6,13,109,40,148,142,59,12,131,70,135,186,226,170,179,103,8,236,92,81,73,70,164,20,71,103,131,115,10],[28,98,195,63,112,122,207,69,212,187,136,237,110,126,215,140,158,61,142,148,99,23,97,49,53,87,51,52,12,215,113,96],[98,42,51,177,121,134,180,248,103,97,43,150,13,27,24,227,157,126,151,253,161,244,180,199,145,120,130,128,21,197,75,159]],"directions":[true,true,true,true,false]}}],"signature_block":{"algorithm":"Ed25519","attester_pubkey":"af06a3e3291714e4f356c19c9b15cd1951ec6e6662aa77be07547f289383341d","signature":"9aceca097524971fd1c08bd26df33bfa6a6ae8877a9f5c31216b1b8c4116c387b903afda7d9c5f3fd3e75bd0d1d402deb555868a830cec0c0f8cb95b229f0a02"}}
+    stack backtrace:
+       0: __rustc::rust_begin_unwind
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+       1: core::panicking::panic_fmt
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+       2: erasure_inventory_20_11::category::{closure#1}
+                 at ./tests/erasure_inventory_20_11.rs:139:28
+       3: <core::option::Option<&serde_json::value::Value>>::unwrap_or_else::<erasure_inventory_20_11::category::{closure#1}>
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1065:21
+       4: erasure_inventory_20_11::category
+                 at ./tests/erasure_inventory_20_11.rs:139:10
+       5: erasure_inventory_20_11::ac7_archive_and_authored_skill_are_named_and_counted
+                 at ./tests/erasure_inventory_20_11.rs:233:17
+       6: erasure_inventory_20_11::ac7_archive_and_authored_skill_are_named_and_counted::{closure#0}
+                 at ./tests/erasure_inventory_20_11.rs:204:58
+       7: <erasure_inventory_20_11::ac7_archive_and_authored_skill_are_named_and_counted::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+                 at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+       8: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+                 at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+        PASS [  22.584s] (5/5) maos-bin::shell_host_16_2 ac5_door_bounded_scan_admits_continuous_writer
+────────────
+     Summary [  22.585s] 5 tests run: 1 passed, 4 failed, 16 skipped
+        FAIL [   0.430s] (1/5) maos-bin::erasure_inventory_20_11 ac1_principal_free_distillate_gets_a_signed_proof
+        FAIL [   0.454s] (2/5) maos-bin::shell_host_16_2 ac4_door_snapshots_real_scb_schedules_before_unload
+        FAIL [   0.734s] (3/5) maos-bin::erasure_inventory_20_11 ac2_principal_and_principal_free_lineage_are_both_erased
+        FAIL [   0.740s] (4/5) maos-bin::erasure_inventory_20_11 ac7_archive_and_authored_skill_are_named_and_counted
+error: test run failed

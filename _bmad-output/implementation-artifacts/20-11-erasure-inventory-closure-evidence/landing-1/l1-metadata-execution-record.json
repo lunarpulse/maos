@@ -1,0 +1,54 @@
+{
+  "baseline_commit": "cb0abc06e6b085cb63db1be60d4addbeb2963811",
+  "inherited_cargo_target_dir": "/mnt/build/cargo-maos",
+  "fixture_preparation": {
+    "builder_log": "l1-final-fixture-builder.log",
+    "builder_command": "cargo run --locked -p xtask -- build-test-fixtures",
+    "builder_exit_code": 0,
+    "registered_artifacts": 16,
+    "default_binary_log": "l1-final-default-binaries.log",
+    "default_binary_command": "cargo build --locked -p maos-bin -p maos-cli",
+    "default_binary_exit_code": 0
+  },
+  "cargo_metadata": {
+    "command": ["cargo", "metadata", "--locked", "--format-version", "1"],
+    "exit_code": 0,
+    "seconds": 14.239801482995972,
+    "stdout": "l1-final-cargo-metadata.json",
+    "stderr": "l1-final-cargo-metadata.stderr",
+    "workspace_members": 58,
+    "resolved_packages": 625
+  },
+  "binary_metadata_compilation_cells": [
+    {
+      "command": ["cargo", "nextest", "list", "--workspace", "--locked", "--message-format", "json", "--list-type", "binaries-only"],
+      "state": "tool deadline at3000s; no child exit code observed; no tests executed",
+      "stdout": "l1-final-binaries-metadata.json",
+      "stderr": "l1-final-binaries-metadata.stderr"
+    },
+    {
+      "command": ["cargo", "nextest", "list", "--workspace", "--locked", "--message-format", "json", "--list-type", "binaries-only"],
+      "state": "Eval30s interruption cancelled the Bash child; no child exit code observed; no tests executed",
+      "stdout": "l1-final-binaries-metadata-resumed.json",
+      "stderr": "l1-final-binaries-metadata-resumed.stderr",
+      "namespace_loss": "Eval reported kernel remained running, but retained root/scratch/run/gate/resume_ledger variables were subsequently absent; reported to xd://report_issue. Existing files and installed temporary Python packages were preserved."
+    },
+    {
+      "command": ["cargo", "nextest", "list", "--workspace", "--locked", "--message-format", "json", "--list-type", "binaries-only"],
+      "exit_code": 0,
+      "seconds": 2361.9433861449943,
+      "stdout": "l1-final-binaries-metadata-cell3.json",
+      "stderr": "l1-final-binaries-metadata-cell3.stderr",
+      "binary_count": 663
+    }
+  ],
+  "process_ownership": "After each interrupted compilation, /usr/bin/ps -C cargo,rustc -o pid,ppid,etimes,stat,args exited1 with only its header (no cargo/rustc) before starting the next cell. The first unqualified ps attempt exited1 because the tool's ps shim does not support -C. No simultaneous cargo process was started.",
+  "workspace_consumer_cli_control": {
+    "command": ["cargo", "nextest", "run", "--workspace", "--locked", "--no-fail-fast", "--profile", "ci", "--cargo-metadata", "l1-final-cargo-metadata.json", "--binaries-metadata", "l1-final-binaries-metadata-cell3.json", "--success-output", "immediate", "--failure-output", "final"],
+    "exit_code": 2,
+    "seconds": 0.042757274000905454,
+    "stderr": "l1-final-workspace-nextest.stderr",
+    "observed": "CLI rejected build-selection --workspace/--locked with --binaries-metadata before any test ran. The corrected consumer drops only incompatible build flags: all58 workspace members/663 targets remain supplied by the locked full-workspace producer metadata. This is a CLI repair, not a failed-test retry."
+  },
+  "execution_environment": "CI and GITHUB_ACTIONS unset; temporary cryptography dependency supplied through PYTHONPATH without replacing the host Python interpreter. Actual workspace consumer also unsets NEXTEST_TEST_THREADS and NEXTEST_RETRIES: default concurrency, no retry overrides. No CARGO_TARGET_DIR assignment or --target-dir is used."
+}

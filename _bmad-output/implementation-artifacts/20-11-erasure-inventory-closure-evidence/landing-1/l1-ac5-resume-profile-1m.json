@@ -1,0 +1,107 @@
+{
+  "rows": 1000000,
+  "payload_bytes": 1024,
+  "loadavg": [
+    478.06982421875,
+    410.57177734375,
+    223.99169921875
+  ],
+  "measurements": [
+    {
+      "access": "original",
+      "after": 0,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 7024500,
+      "rows": 4096,
+      "wall_seconds": 0.19957369496114552,
+      "cpu_seconds": 0.09937265800000006
+    },
+    {
+      "access": "original",
+      "after": 499712,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 6025200,
+      "rows": 4096,
+      "wall_seconds": 0.06227667897474021,
+      "cpu_seconds": 0.061595990999999906
+    },
+    {
+      "access": "original",
+      "after": 995328,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 5033900,
+      "rows": 4096,
+      "wall_seconds": 0.05860883998684585,
+      "cpu_seconds": 0.05787196200000011
+    },
+    {
+      "access": "forced_rowid",
+      "after": 0,
+      "plan": [
+        [
+          3,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 45000,
+      "rows": 4096,
+      "wall_seconds": 0.004701693018432707,
+      "cpu_seconds": 0.00460337200000005
+    },
+    {
+      "access": "forced_rowid",
+      "after": 499712,
+      "plan": [
+        [
+          3,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 45100,
+      "rows": 4096,
+      "wall_seconds": 0.0042703759972937405,
+      "cpu_seconds": 0.004257061999999756
+    },
+    {
+      "access": "forced_rowid",
+      "after": 995328,
+      "plan": [
+        [
+          3,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 45100,
+      "rows": 4096,
+      "wall_seconds": 0.004178393981419504,
+      "cpu_seconds": 0.004169507999999489
+    }
+  ]
+}

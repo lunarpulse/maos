@@ -1,0 +1,11 @@
+--- /tmp/dev2011b-resume-1l82gyty/transparency-log-guarded-restore.rs	2026-11-04 22:42:16.812003705 +0000
++++ /home/lunarpulse/dev_ws/crates/maos-iac/src/adapter/transparency_log.rs	2026-11-04 22:42:22.172944478 +0000
+@@ -1666,7 +1666,7 @@
+         principal: Option<&str>,
+         mut each: impl FnMut(&rusqlite::Row<'_>) -> Result<(), AuditError>,
+     ) -> Result<(), AuditError> {
+-        const FORGET_SCAN_PAGE: i64 = 4096;
++        const FORGET_SCAN_PAGE: i64 = i64::MAX;
+         let mut after = 0_i64;
+         loop {
+             let inner = self

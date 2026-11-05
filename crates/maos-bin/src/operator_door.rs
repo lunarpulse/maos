@@ -65,7 +65,11 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     /// The real erasure cascade (proof bundle, principal teardown, token
     /// revocation), after the door already unloaded the SCB. The terminal
     /// carries the preserved one-shot exit contract: 0/3/4/5.
-    async fn run_uninstall_cascade(&self, spirit_id: &str) -> UninstallOutcome;
+    async fn run_uninstall_cascade(
+        &self,
+        spirit_id: &str,
+        schedule_ids: Vec<String>,
+    ) -> UninstallOutcome;
 
     /// Vetted-target upgrade precondition. `attestation`/`vetter_keyring` are
     /// PARAMETERS (D-16-1-W(4)) — never re-read from the daemon's
@@ -1610,6 +1614,22 @@ impl DoorInner {
         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
         };
+        let schedule_ids = self
+            .scheduler
+            .scbs()
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&pid)
+            .map(|scb| {
+                scb.runtime_snapshot()
+                    .manifest
+                    .schedules
+                    .entries
+                    .iter()
+                    .map(|entry| entry.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
         let transitioned = self.scheduler.unload(pid).await;
         self.stop_worker_after_unload(pid).await;
         if let Err(error) = transitioned {
@@ -1618,7 +1638,10 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
-        let outcome = self.private_ops.run_uninstall_cascade(spirit_id).await;
+        let outcome = self
+            .private_ops
+            .run_uninstall_cascade(spirit_id, schedule_ids)
+            .await;
         OperatorOutcome::Completed(outcome.body)
     }
 
@@ -2043,7 +2066,7 @@ impl DoorInner {
                 detail: "principal must not be empty".into(),
             };
         }
-        match self.memory.forget_with_reason(principal, reason) {
+        match tokio::task::block_in_place(|| self.memory.forget_with_reason(principal, reason)) {
             Err(error) => OperatorOutcome::Failed {
                 code: "forget_failed".into(),
                 detail: error.to_string(),
@@ -2087,7 +2110,7 @@ impl DoorInner {
                 detail: "principal must not be empty".into(),
             };
         }
-        match self.transparency_log.release_legal_hold(principal.trim()) {
+        match tokio::task::block_in_place(|| self.memory.release_legal_hold(principal.trim())) {
             Err(error) => OperatorOutcome::Failed {
                 code: "legal_hold_release_failed".into(),
                 detail: error.to_string(),

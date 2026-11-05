@@ -1,0 +1,142 @@
+20-11 landing 1 — Dev Agent Record: priority park, 2026-11-04
+Agent: Dev2011b (openai-codex/gpt-6.1-sol)
+Baseline: 76efc19d3ffd36a1b897724704d76f94fba3d9eb
+Reason: Main requested a clean checkout and the cargo slot for a priority hotfix.
+No commit/push/tracker transition has occurred. No cargo runs after parking.
+
+BACKUP
+- tracked.patch: binary-safe git diff HEAD for all 14 owned tracked paths.
+- new-files.tar.gz: all 28 owned untracked files, using repository-relative names.
+- runtime-state.json: exact path lists, SHA256 of every working file, command
+  ledger captured since the run helper was introduced, scratch location and
+  restoration metadata. Initial inherited hunks were explicitly adopted at
+  Main's direction; inherited-wip.diff is archived with the new evidence files.
+- SHA256SUMS: backup artifact checksums. Reapply only when Main grants permission
+  on the new HEAD; preserve any priority-hotfix edits during conflict resolution.
+- Scratch /tmp/dev2011b-8n8sp4f9 is intentionally retained for restoration copies,
+  initial source snapshots, plant byte controls and an isolated Python venv.
+  It still needs removal at final cleanup. No incremental pruning in this run yet.
+
+SCOPE / IMPLEMENTATION STATE
+The entire story, long ruled D rows, flag decision, T0 STOP evidence and creation
+measurements were read. L1 is kernel-free: AC1, AC2, AC4, AC5, AC6 and AC7. AC3,
+O4, KS, kernel/domain baselines and kernel surface hashes remain untouched.
+
+Implemented working source (not committed, not yet a complete landing):
+- v2 proof schema, distinct per-category TL observation/post-inclusion evidence;
+  Rust/Python verification checks one-to-one evidence and principal inclusions.
+- principal-free proof path, all-boot lineage enumeration keyed boot/pid,
+  ADR-044 spirit-uninstall tombstones and Spirit-named markers; held derivation
+  preservation; explicit pending-kernel halt/watchdog limitations.
+- real SCB schedule snapshot propagated through BinPrivateOps; installed manifest
+  schedule queries and package removal; CLI wording corrected.
+- typed retained-store enumeration: manifest archive, authored skill queue,
+  Lifecycle Journal and Worker workspaces (the latter found during re-inventory).
+- 4096-rowid-window scans, sorted timestamp/frame-id results; yield after releasing
+  each scan lock; per-mutation hold-set rechecks serialized with hold writes,
+  including the late sweep and regenerated-body validation. Door release uses
+  the existing Memory Manager forget serializer. Blocking scans leave workers.
+- ADR-044, coverage matrix and deferred owner rows updated without closure claims.
+- Last lint fixes introduced a borrowed UninstallContext rather than an extra
+  8th wrapper argument, fixed the new sort lint and two test-helper needless
+  borrows. These last fixes have not yet received the final clippy run.
+
+IMPORTANT DISCOVERY / EXISTING OWNER
+Production GatedManifest::bundle and CLI Worker bundle currently default SCB
+schedules. The live root accepted a schedule-bearing manifest and ran, but never
+fired. This is already explicitly owned by 20-9 AC3 / D-20-9-08 A (story lines
+39,73,97,268-276), NOT 20-8. Do not expand L1 into that admission repair.
+AC6.3's allowed fallback is implemented: a canonical principal-free distillate
+is seeded at a running Spirit's actual boot/pid and erased through the real door.
+The hosted Worker oracle adds owned-CID teardown. Local signed T3 substrate is
+absent; it skips by name, and hosted proof remains unverified. A separate AC4
+real-SCB/real-door boundary oracle captures scheduled ids using a fixture spy
+only at the unrelated private cascade boundary (not a fabricated proof).
+The live fallback test was last extended to measure refused-installed recovery:
+boot refuses a real installed entry lacking signed_package.json; live uninstall
+must say spirit_not_loaded; after root stop, offline uninstall removes it. That
+last extension is not yet run.
+
+LATEST OBSERVED RED — MUST REPAIR BEFORE LANDING
+l1-before-failed-package-proof.log: cargo test --locked -p maos-bin
+--test erasure_inventory_20_11 ac4_failed_proof_write_keeps_installed_package
+-- --exact --nocapture exited 101. The inherited registry removal deletes a
+package before write_proof_bundle; forcing proof-directory failure therefore
+returns Failed after deleting the package, violating AC4.3's Failed-keeps-it.
+The test is saved; no repair has yet been applied.
+Derived repair direction: stage the generation directory by same-filesystem
+rename and remove its active index entry under a rollback-on-drop guard; only
+commit deletion after proof persistence succeeds. On earlier proof failure,
+restore generation and active index. Keep registry growth within ceiling4368
+(original pin4248, initial implementation measured4266). No kernel change needed.
+Cross-store crash atomicity remains the existing ADR-044 limitation; do not add
+an unrelated retry/recovery subsystem.
+
+OBSERVED VERIFICATION / EVIDENCE (ALL SAVED IN NEW-FILES ARCHIVE)
+- Original tracked source was restored via git show HEAD for genuine baseline
+  witnesses, then implementation restored. Initial inventory run: five reds,
+  exit101, principally NotFound over principal-free residue.
+- Correct-key baseline run l1-before-corrected-key.log: 7 reds, exit101; exact
+  principal+principal-free vector sees lineage VerifiedEmpty/count Null, and
+  archive/skill vector's signed v1 bundle lacks manifest_archive. Earlier
+  l1-before-populated.log had a fixture key mistake, not a qualifying AC red.
+- Original 100k real-store scan: wall438.214496ms, max insert200.031006ms,
+  ratio0.4564682543 (red). Original loop stopped before 1M. Late-hold frame
+  preservation also red at original HEAD. l1-before-scan.log, exit101.
+- Real door hold-release old path reds while a real forget holds its serializer,
+  exit101 in l1-before-door-release.log; copy-back + cmp + touch all exit0.
+- l1-focused-local-shape.log: all then-current local tests green, including
+  8 inventory tests, 1 late-hold test, real live lineage fallback, real schedule
+  snapshot and real door release/latency; hosted T3 skipped by explicit reason.
+  Door latency samples100k ratio0.2182180948, 1M0.2278967773. Test source later
+  gained the constituent-query oracle and refused-package/proof-failure vectors.
+- l1-combined-plants.log: one mutation each for AC1/AC2/AC4/AC7 reds as intended;
+  AC5 i64::MAX unexpectedly GREEN. Honest result retained (exit100, 4 fail/1pass).
+  Diagnosis: total door wall spans multiple initial/late scans and can dilute a
+  single unbounded lock. Strengthened SAME latency vector to additionally
+  measure one real constituent principal-bearing query, retaining the door's
+  unchanged25% threshold. Not a flaky-test retry or budget widening.
+- l1-ac5-constituent-plant.log: same i64::MAX page mutation now reds, exit101,
+  both100k/1M iterations measured before asserting. All 3 planted source files
+  restored with explicit cp + cmp + touch, exit0. No production plant remains.
+  AC6's preservation control uses the AC4 snapshot plant per story; no separate
+  hosted plant/run claimed.
+- cargo build --locked -p maos-bin -p maos-cli exit0, l1-affected-binaries.log.
+- cargo fmt --all ran several times, exit0; latest source/test edits still need
+  final fmt. No pin movement has happened.
+- Workspace clippy --workspace --all-targets --locked --message-format=json
+  exited0 in384.23s. l1-clippy.jsonl is clean JSON, l1-clippy-stream.log captures
+  output. New diagnostics identified/fixed afterward: IAC unnecessary_sort_by,
+  2 shell helper needless_borrows, new main wrapper8/7 arguments. Existing
+  too-many-arguments warnings in proof builder/inner cascade are pre-existing.
+  Formal clippy-ratchet/delta has not run; baseline is1383/897.
+- Interim KLOC measure (not final fmt, before recent additions): aggregate193580,
+  bin34783, IAC8359, audit7775, registry4266, kernel21042, xtask44452, domain10107.
+  It exited1 only on old exact pins, l1-measure-kloc-check.log. Kernel physical
+  pin remains26841. Assignment envelopes: bin35704, IAC8630, audit8261,
+  registry4368, aggregate195404. Exact baselineaggregate193187/hardfail193188.
+
+REMAINING LANDING REQUIREMENTS (STATE, NOT A COMPLETION CLAIM)
+Package Failed retention repair and its saved failing-before; final source fmt;
+final focused tests (bin/IAC/audit/registry plus13.5b/18-6 holds); real affected
+binary build; final clippy delta; exact KLOC pins/HISTORY including live-key
+first xtask HISTORY segment with ->; standard structural gates; registered
+fixture builder then genuine bin/CLI build; one workspace nextest at default
+concurrency with --cargo-metadata/--binaries-metadata reuse; prepush exactly once
+at end with prescribed environment; final Dev Agent Record / AC table / evidence
+ledger and EC-13 disposition; cleanup own scratch and permitted stale incremental
+sessions with /proc safety scan, record allocated bytes freed. No workspace
+nextest, fixture rebuild, prepush, hosted run, final exact re-pin, final gates,
+cleanup or full-story closure has yet happened.
+
+The last cargo command completed exit101 before this park request was handled.
+Main's priority request authorizes reverting only this owned snapshot to HEAD.
+The final clean-status observation is appended after restoration.
+
+PARK COMPLETED
+`git status --short && git rev-parse HEAD` exited0 after restoration. The status
+portion emitted no output; HEAD was exactly76efc19d3ffd36a1b897724704d76f94fba3d9eb.
+All tar members and working-file SHA256 values were checked before removal;
+`git apply --reverse --check /tmp/2011-wip/tracked.patch` exited0 before restoring.
+The checkout is clean. The cargo slot is released. Awaiting Main's explicit
+resume message; no cargo after parking.

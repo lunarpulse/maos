@@ -60,10 +60,10 @@ pub enum Subcommand {
     /// Journal entry and exits (v0.1-β, Story 1b.5c). Graceful shutdown
     /// with mailbox drain lands at Epic 5 (Story 5.1).
     Unload(UnloadArgs),
-    /// Uninstall a Spirit — removes the Spirit from the registry and emits
-    /// a proof-of-erasure record enumerating all removed substrate state
-    /// (Story 6.5 / FR65 v0.5 structural stub; full Merkle proof lands at
-    /// Story 9.2).
+    /// Uninstall a Spirit: erase its principal data and intent-lineage bodies,
+    /// remove an installed package only on an Erased terminal, and emit a
+    /// signed, per-store proof naming retained state and pending-kernel gaps.
+    /// If boot refused the package, stop the root first to run offline.
     Uninstall(UninstallArgs),
     /// Run a one-shot Spirit invocation (Story 1b.5a / 1b.5b).
     Run(RunArgs),

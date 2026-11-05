@@ -1,0 +1,390 @@
+[
+  {
+    "label": "l1-compile-more",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_scan_20_11 --test erasure_live_20_11 --test shell_host_16_2 --no-run",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 34123.4510320425,
+      "exitCode": 101
+    },
+    "hasError": true
+  },
+  {
+    "label": "l1-focused-implemented",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_scan_20_11 --test erasure_live_20_11 -- --nocapture",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 3101.607591032982,
+      "exitCode": 101
+    },
+    "hasError": true
+  },
+  {
+    "label": "l1-focused-backend-ready",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_scan_20_11 --test erasure_live_20_11 -- --nocapture",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 1291.769594013691,
+      "exitCode": 101
+    },
+    "hasError": true
+  },
+  {
+    "label": "l1-before-door-release",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test shell_host_16_2 ac5_door_hold_release_waits_for_inflight_forget -- --exact --nocapture",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 21598.659627974033,
+      "exitCode": 101
+    },
+    "hasError": true
+  },
+  {
+    "label": "l1-affected-binaries",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo build --locked -p maos-bin -p maos-cli",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 31238.513858020306
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-focused-complete",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_scan_20_11 --test erasure_live_20_11 --test shell_host_16_2 -- --nocapture",
+    "result": {
+      "async": {
+        "state": "running",
+        "jobId": "bg_283",
+        "type": "bash"
+      },
+      "timeoutSeconds": 3000
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-focused-fallback",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_scan_20_11 --test erasure_live_20_11 --test shell_host_16_2 -- --nocapture",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 3285.1735260486603,
+      "exitCode": 101
+    },
+    "hasError": true
+  },
+  {
+    "label": "l1-fmt-final-shape",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 2759.063594996929
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-focused-local-shape",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_scan_20_11 --test erasure_live_20_11 --test shell_host_16_2 -- --nocapture",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 43737.74734699726
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-fmt-before-plants",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 2572.8268240094185
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-combined-plants",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo nextest run --locked -p maos-bin --test erasure_inventory_20_11 --test shell_host_16_2 --no-fail-fast -E \"test(ac1_principal_free_distillate_gets_a_signed_proof) or test(ac2_principal_and_principal_free_lineage_are_both_erased) or test(ac7_archive_and_authored_skill_are_named_and_counted) or test(ac4_door_snapshots_real_scb_schedules_before_unload) or test(ac5_door_bounded_scan_admits_continuous_writer)\"",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 41315.24032700062,
+      "exitCode": 100,
+      "meta": {
+        "limits": {
+          "columnTruncated": {
+            "maxColumn": 768,
+            "unit": "bytes",
+            "artifactId": "13358",
+            "lines": {
+              "first": 765,
+              "last": 765
+            }
+          }
+        }
+      }
+    },
+    "hasError": true
+  },
+  {
+    "command": "cp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-bin/src/main.rs crates/maos-bin/src/main.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "cmp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-bin/src/main.rs crates/maos-bin/src/main.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "touch crates/maos-bin/src/main.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "cp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-bin/src/operator_door.rs crates/maos-bin/src/operator_door.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "cmp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-bin/src/operator_door.rs crates/maos-bin/src/operator_door.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "touch crates/maos-bin/src/operator_door.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "cp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-iac/src/adapter/transparency_log.rs crates/maos-iac/src/adapter/transparency_log.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "cmp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-iac/src/adapter/transparency_log.rs crates/maos-iac/src/adapter/transparency_log.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "touch crates/maos-iac/src/adapter/transparency_log.rs",
+    "exit_code": 0
+  },
+  {
+    "label": "l1-ac5-constituent-plant",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test shell_host_16_2 ac5_door_bounded_scan_admits_continuous_writer -- --exact --nocapture",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 41598.516495049,
+      "exitCode": 101
+    },
+    "hasError": true
+  },
+  {
+    "command": "cp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-iac/src/adapter/transparency_log.rs crates/maos-iac/src/adapter/transparency_log.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "cmp /tmp/dev2011b-8n8sp4f9/plants/crates/maos-iac/src/adapter/transparency_log.rs crates/maos-iac/src/adapter/transparency_log.rs",
+    "exit_code": 0
+  },
+  {
+    "command": "touch crates/maos-iac/src/adapter/transparency_log.rs",
+    "exit_code": 0
+  },
+  {
+    "label": "l1-clippy-stream",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo clippy --workspace --all-targets --locked --message-format=json | tee _bmad-output/implementation-artifacts/20-11-erasure-inventory-closure-evidence/landing-1/l1-clippy.jsonl",
+    "result": {
+      "async": {
+        "state": "running",
+        "jobId": "bg_284",
+        "type": "bash"
+      },
+      "timeoutSeconds": 3000,
+      "meta": {
+        "truncation": {
+          "direction": "middle",
+          "truncatedBy": "middle",
+          "totalLines": 77,
+          "totalBytes": 51574,
+          "outputLines": 62,
+          "outputBytes": 40343,
+          "maxBytes": 40960,
+          "headRange": {
+            "start": 1,
+            "end": 33
+          },
+          "tailRange": {
+            "start": 50,
+            "end": 77
+          },
+          "elidedLines": 16,
+          "elidedBytes": 11252,
+          "artifactId": "13364"
+        }
+      }
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-before-failed-package-proof",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 ac4_failed_proof_write_keeps_installed_package -- --exact --nocapture",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 3000,
+      "wallTimeMs": 20105.13639497757,
+      "exitCode": 101
+    },
+    "hasError": true
+  },
+  {
+    "command": "git status --short && git rev-parse HEAD && git apply --check /tmp/2011-wip/tracked.patch",
+    "exit_code": 0,
+    "head": "cb0abc06e6b085cb63db1be60d4addbeb2963811"
+  },
+  {
+    "command": "git apply /tmp/2011-wip/tracked.patch && tar -xzf /tmp/2011-wip/new-files.tar.gz",
+    "exit_code": 0
+  },
+  {
+    "label": "l1-resume-fmt",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 3179.8869910240173
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-package-retention-fixed",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_live_20_11 --test erasure_scan_20_11 --test shell_host_16_2 -- --nocapture",
+    "result": {
+      "async": {
+        "state": "running",
+        "jobId": "bg_300",
+        "type": "bash"
+      },
+      "timeoutSeconds": 3000
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-wrapup-fmt",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 3427.5287339687347
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-wrapup-focused",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_live_20_11 --test erasure_scan_20_11 --test shell_host_16_2 -- --nocapture",
+    "result": {
+      "async": {
+        "state": "running",
+        "jobId": "bg_301",
+        "type": "bash"
+      },
+      "timeoutSeconds": 3000
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-wrapup-no-default-features",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test -p maos-bin --no-default-features --test verb_table_15_3",
+    "result": {
+      "async": {
+        "state": "running",
+        "jobId": "bg_302",
+        "type": "bash"
+      },
+      "timeoutSeconds": 3000
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-current-step-fmt",
+    "command": "env -u CI -u GITHUB_ACTIONS cargo fmt --all",
+    "result": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 2956.9605780243874
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-current-step-focused",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test --locked -p maos-bin --test erasure_inventory_20_11 --test erasure_live_20_11 --test erasure_scan_20_11 --test shell_host_16_2 -- --nocapture",
+    "result": {
+      "async": {
+        "state": "running",
+        "jobId": "bg_303",
+        "type": "bash"
+      },
+      "timeoutSeconds": 3000
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-final-no-default-control",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test -p maos-bin --no-default-features --test verb_table_15_3",
+    "result": {
+      "async": {
+        "state": "running",
+        "jobId": "bg_304",
+        "type": "bash"
+      },
+      "timeoutSeconds": 3000
+    },
+    "hasError": null
+  },
+  {
+    "label": "l1-package-retention-fixed",
+    "exit_code": 101,
+    "observed": "9 inventory passed; refused-boot fixture used standalone run that does not enumerate installed packages"
+  },
+  {
+    "label": "l1-wrapup-focused",
+    "exit_code": 101,
+    "observed": "9 inventory passed; plain serving fixture collided with compiled-in hello-spirit"
+  },
+  {
+    "label": "l1-current-step-focused",
+    "exit_code": 101,
+    "observed": "9 inventory, local live recovery and late-hold passed; hosted skipped; shell 11 passed/2 failed (REPL timing and bounded scan)"
+  },
+  {
+    "label": "l1-wrapup-no-default-features",
+    "state": "cancelled before verification",
+    "observed": "helper backgrounded prior cargo; queued second process cancelled immediately to preserve cargo slot; no test result"
+  },
+  {
+    "label": "l1-current-step-structural",
+    "commands": [
+      "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json",
+      "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask kloc-check --json",
+      "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-service-boundary --json",
+      "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json",
+      "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json",
+      "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-decision-register --json",
+      "env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask /mnt/build/cargo-maos/debug/xtask check-exit-commands --json"
+    ],
+    "exit_codes": {
+      "check-kernel-baseline": 0,
+      "kloc-check": 0,
+      "check-service-boundary": 0,
+      "check-dev-record-completeness": 0,
+      "check-epic-close-coherence": 0,
+      "check-decision-register": 0,
+      "check-exit-commands": 0
+    }
+  },
+  {
+    "label": "l1-final-no-default-control",
+    "command": "env -u CI -u GITHUB_ACTIONS PATH=/tmp/dev2011b-8n8sp4f9/python/bin:$PATH cargo test -p maos-bin --no-default-features --test verb_table_15_3",
+    "exit_code": 0,
+    "observed": "7 passed; finished test build3m15s; no subsequent cargo runs"
+  }
+]

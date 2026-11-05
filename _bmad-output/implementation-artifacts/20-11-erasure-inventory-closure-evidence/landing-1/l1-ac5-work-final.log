@@ -1,0 +1,94 @@
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-iac` (lib test) generated 3 warnings (run `cargo fix --lib -p maos-iac --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 17s
+     Running unittests src/lib.rs (/mnt/build/cargo-maos/debug/deps/maos_iac-a5d44970fcecaea4)
+
+running 2 tests
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k has been running for over 60 seconds
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m has been running for over 60 seconds
+EC-13 work rows=100000 windows=25 max_steps=45069 total_steps=1100323 ratio=0.04095979089776366 sql=SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+EC-13 work rows=100000 windows=125 max_steps=110619 total_steps=9702815 ratio=0.011400712061396616 sql=SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted, timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) OR (?1 IS NULL AND kind = 11)) AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') AND intent NOT LIKE 'principal.uninstall.%'
+EC-13 work rows=100000 windows=125 max_steps=36885 total_steps=4502615 ratio=0.008191906258918429 sql=SELECT lower(hex(frame_id)) FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END
+EC-13 work rows=100000 windows=25 max_steps=40973 total_steps=1000323 ratio=0.04095976999429184 sql=SELECT lower(hex(frame_id)), payload_redacted FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_100k ... ok
+EC-13 work rows=1000000 windows=245 max_steps=45069 total_steps=11003183 ratio=0.004095996585715243 sql=SELECT frame_id, boot_nonce, spirit_pid, payload_redacted, timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+EC-13 work rows=1000000 windows=1225 max_steps=110619 total_steps=97027675 ratio=0.0011400767873702014 sql=SELECT frame_id, kind, spirit_pid, boot_nonce, payload_redacted, timestamp_ns FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ((?1 IS NOT NULL AND instr(payload_redacted, CAST(?1 AS BLOB)) > 0) OR (?1 IS NULL AND kind = 11)) AND intent NOT IN ('principal.forget', 'principal.forget.held', 'distillate.redacted') AND intent NOT LIKE 'principal.uninstall.%'
+EC-13 work rows=1000000 windows=1225 max_steps=36885 total_steps=45025715 ratio=0.0008191985402119656 sql=SELECT lower(hex(frame_id)) FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND CASE WHEN json_valid(CAST(payload_redacted AS TEXT)) THEN json_extract(CAST(payload_redacted AS TEXT), '$.redacted') = 1 AND json_type(CAST(payload_redacted AS TEXT), '$.reason') = 'text' AND (json_type(CAST(payload_redacted AS TEXT), '$.original_kind') = 'integer' OR json_extract(CAST(payload_redacted AS TEXT), '$.original_kind') = 'Distillate') AND (SELECT count(*) FROM json_each(CAST(payload_redacted AS TEXT))) = 3 ELSE 0 END
+EC-13 work rows=1000000 windows=245 max_steps=40973 total_steps=10003183 ratio=0.004095996244395409 sql=SELECT lower(hex(frame_id)), payload_redacted FROM transparency_log NOT INDEXED WHERE rowid > ?2 AND rowid <= ?3 AND ?1 IS ?1 AND kind = 11
+test adapter::transparency_log::erasure_scan_work::ac5_every_scan_has_bounded_sqlite_work_at_1m ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 99 filtered out; finished in 491.26s
+
+
+COMMAND_EXIT_CODE=0

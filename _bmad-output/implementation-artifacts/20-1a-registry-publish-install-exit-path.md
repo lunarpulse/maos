@@ -12,7 +12,7 @@ review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (
 
 # Story 20.1a: Registry publish, install and exit path
 
-Status: ready-for-dev
+Status: done
 
 <!-- Split 2026-11-01/02 under operator ruling D-20-1-01 B (ask split201): Part B (AC6–AC13) and Tasks T6–T10 moved unchanged to `20-1b-vetting-yank-policy-and-quarantine.md`. 20-1 is retired; shared evidence stays in `20-1-registry-client-install-verb-vetter-and-yank-evidence/`. -->
 
@@ -543,7 +543,15 @@ code, timing findings and `/tmp/cold-swap-*` evidence are in the linked
 20-10 incident matrix. No hosted rerun/real T3 proof, commit, push,
 `.devcontainer` edit, kernel edit or target override/clean is claimed.
 
+**Done — landing record (2026-11-04):** landing commits `850e4c00`, `8143326b`, `03ee4a4e`, `47631284`, `d3e3f586`, `ac1fc12a` verified through GitHub. Hosted verify run [41521253027](https://github.com/lunarpulse/maos/actions/runs/41521253027) on `ci/20-1a-verify` is fully green: `epic-20-exit` (release `maos` runner with `wasm-host`) and `ac5-no-server-plant`.
+
+- Main discipline [41910498869](https://github.com/lunarpulse/maos/actions/runs/41910498869) @ `cb0abc06` is **not fully green**: 188 successful jobs; `workspace-test-suite` failed on the known 20-7-owned `teardown_waits_for_a_stalled_snapshot_owner_then_removes_the_container_20_7` (`t3_terminal_helpers_17_7.rs:564`, **instance 11: observer never entered inspect**, 5619/5620 passed). The verified job log says instance 11, not the supplied instance 16. `v1-0-ship-gate`, `v1-5-ship-gate` and `aggregate` are cascades of that failure; this is not a new registry failure. Existing flake ownership remains `20-7-stable-runner-perf-gates` in `deferred-work.md`.
+- **Not closed by 20-1a:** F4 same-key overwrite/version immutability, F5 first-contact trust-root pinning/TLS, F6 yanked-install refusal, and publish/deprecate authentication remain open under `20-1b-vetting-yank-policy-and-quarantine` (the inherited security rows in `deferred-work.md`). Internal-key hosted proof does not establish an independent accredited-vetter ecosystem or operator publication.
+- The earlier local/hosted-pending bullets are historical landing-time records, superseded only to the extent of the named hosted proof above. No gates were rerun for this documentation close.
+
 ### File List
+
+- Done flip (2026-11-04): this story, `_bmad-output/implementation-artifacts/sprint-status.yaml`, and `_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md` story-table closure mirror.
 
 - Creation: this story file; `20-1-…-evidence/creation/*`; `sprint-status.yaml:296`.
 - Landing production: `Cargo.lock`; `crates/maos-registry/Cargo.toml`, `src/{bin/server.rs,server.rs,http.rs,client.rs,install.rs,lib.rs,origin.rs,storage.rs}`; `crates/maos-domain/src/ports/registry.rs`; `crates/maos-spirit-cli/src/{publish.rs,signing.rs}`; `crates/maos-cli/src/{cli.rs,subcommands.rs}`; `crates/maos-bin/src/{lib.rs,main.rs,installed_spirits.rs,shell_host.rs,spirit_session.rs}`; `crates/maos-shell/src/lib.rs`; `xtask/src/release_dry_run.rs`, `xtask/{gate-registry.toml,kloc.toml}`.
@@ -562,3 +570,4 @@ code, timing findings and `/tmp/cold-swap-*` evidence are in the linked
 - Review corrections after `850e4c00`: independent review findings patched with real failing-before vectors and byte-identically restored crypto/resolver plants; initial +417 and final +430 exact re-pins within the existing envelope; executable WASM component leg enrolled while hosted P7/T3 proof remains explicitly owed. No status flip.
 - 2026-11-02: Hosted binary publish incident reproduced at realistic component size; buffered atomic storage and bounded complete HTTP responses repaired, rejection classes and real binary publish witnessed red→green. Hosted lint/FF-J6/fixture setup causes repaired. Final5549/5549 serial/default,serial budget,static gates,clippy ratchet,deny and prescribed prepush passed; unrelated local hook timing red and unavailable T3/hosted rerun remain explicit. No status flip.
 - 2026-11-02: Diagnosed hosted/loaded cold-swap failure as an over-strict cross-writer journal oracle under ADR-030; recorded-order red-before vector, causal oracle and audit-drained snapshot added; loaded-run deferred row resolved. No kernel or production change.
+- 2026-11-04: Done; GitHub-verified landings and hosted verify 41521253027 recorded above. Main discipline 41910498869 has 188 green jobs and the known 20-7 snapshot-owner flake plus three dependent failures, not a fully green aggregate. 20-1b security deferrals remain open.

@@ -86,6 +86,79 @@ deletions, and a retry recovers outstanding requests as well as remaining
 scrubs, but mutation and audit still do not form a cross-store transaction.
 Large-log locking/paging is owned by `20-11-erasure-inventory-closure`.
 
+## Story 20-11 landing 1 — Spirit inventory
+
+Uninstall also queries kind-11 writers at every admitted `(boot_nonce, pid)`
+incarnation, including principal-free distillates. It uses the same body-scrub
+primitive with reason `spirit-uninstall` and appends `distillate.redacted` with
+`spirit_id` and `redacted_distillate_frame_id`. A derivation protected by a durable
+hold is retained and named by id. IAC-frame lineage audit arrays remain retained;
+cost/governance numerical facts keep the existing structured-redaction contract.
+
+The proof format is `maos.erasure-proof.v2`. Every category, including
+`VerifiedEmpty` and `CoverageGap`, gets a distinct `principal.uninstall.category`
+TL observation containing its Spirit and complete category status before the
+post-tree is captured. The signed envelope carries the corresponding post-tree
+inclusion proofs. Both verifiers require a one-to-one category/evidence match,
+distinct names and evidence ids, the matching Spirit/status and valid inclusion.
+The existing frame-id Merkle model still does not independently authenticate
+payload contents or prove a supplied leaf set exhaustive without TL access.
+
+The cascade names memory namespace, principal index, tokens, shared/private
+tiers, principal frames, intent lineage, pending halts, schedules and installed
+package, plus a typed retained-store inventory: FR11 manifests, authored skill
+queue entries, Lifecycle Journal and Worker output workspaces. Only an otherwise
+Erased uninstall removes the installed package. A refused installed package is
+removed offline after stopping the serving root; the live door cannot unload an
+SCB that admission refused.
+
+Installed removal uses a serialized, same-filesystem staging guard. The active
+index and generation are restored on proof-write failure; final deletion is
+committed only after proof persistence. This is an in-process failure guarantee,
+not cross-store crash atomicity. Rollback IO failures remain explicit errors in
+the diagnostic log, not unconditional claims that restoration succeeded.
+
+L1 remains kernel-free: pending halts explicitly name AC3's final KS + O4 landing,
+and the live schedule category names the observed ids plus retained watchdog
+buckets/stamps until root exit. No empty fresh registry is evidence of halt
+erasure. Offline package removal removes its schedule admission source; a
+compiled-in Spirit may be admitted again by the binary.
+
+The serving admission paths currently default the SCB's schedule section, even
+when the input manifest declares schedules. AC6.3 therefore uses a live
+principal-free lineage witness for the hosted Worker, not an invented firing
+schedule. The separate AC4 boundary witness supplies an actual scheduled SCB to
+the real door; schedule parsing/admission itself is not repaired by L1.
+
+Forget scans use stable 4096-rowid windows and release the TL lock between
+windows, sorting results back into `(timestamp, frame_id)` order. Before each
+body mutation, the complete durable hold set is re-read under the TL lock and
+serialized with placement/release; a changed set rebuilds protected derivations
+using bounded scans. This also protects a hold placed between initial forget and
+the late sweep. The live door releases holds through the Memory Manager's
+existing forget serializer. Blocking cascade/door scans leave Tokio workers.
+
+The access path is part of that bound: a kind-only index has an implicit rowid
+tail and supports `(kind, rowid range)` seeks. The older kind/timestamp index
+cannot seek rowid without a timestamp constraint; merely adding a rowid WHERE
+clause can therefore rescan all kind-11 rows per nominal window. Kind scans pin
+the bounded index; general scans pin direct rowid access. Test-only SQLite VM
+accounting observes the actual statements and keeps the <25% per-window work
+bound independent of scheduler stalls and fsync latency. Raw wall timing is
+retained rather than represented as compliant when the host is loaded.
+Recovery of outstanding redistillation requests is paged too. An intent/rowid
+index bounds the outer scan; a partial outcome-frame-id expression index turns
+each anti-join into a point lookup, not a rescan per request. The hook-pump
+recovery query also leaves the async worker. Recovery results retain
+`(timestamp, frame_id)` ordering and the existing typed metadata conversion.
+
+A shipped `handler_still_running` HTTP503 is **pending**, not an erased result.
+The route deadline is unchanged; completion is recorded durably before the
+handler sends its final report. The 1M-row witness requires completion and an
+identical successful subsequent forget without changing the original tombstone
+or unrelated bytes. This does not turn a pending response into a signed proof.
+
+
 ## Compliance
 
 - `xtask check-kernel-baseline` re-pinned from 21197 to 21276 lines.

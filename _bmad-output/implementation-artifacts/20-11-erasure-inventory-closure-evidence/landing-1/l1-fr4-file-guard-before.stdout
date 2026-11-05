@@ -1,0 +1,11 @@
+
+running 1 test
+test cfg_test_items_are_skipped ... FAILED
+
+failures:
+
+failures:
+    cfg_test_items_are_skipped
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.04s
+

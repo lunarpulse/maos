@@ -101,7 +101,11 @@ impl BinPrivateOps for RevokeOnlyOps {
         unreachable!("revoke-token does not use bin-private lifecycle operations")
     }
 
-    async fn run_uninstall_cascade(&self, _: &str) -> maos_bin::operator_door::UninstallOutcome {
+    async fn run_uninstall_cascade(
+        &self,
+        _: &str,
+        _: Vec<String>,
+    ) -> maos_bin::operator_door::UninstallOutcome {
         unreachable!("revoke-token does not uninstall")
     }
 

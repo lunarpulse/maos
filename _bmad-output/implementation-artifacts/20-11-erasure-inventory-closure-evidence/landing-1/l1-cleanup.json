@@ -1,0 +1,19 @@
+{
+  "proc_scan_cargo_rustc": [],
+  "removed_scratch": [
+    "/tmp/dev2011b-8n8sp4f9",
+    "/tmp/2011-wip"
+  ],
+  "removed_incremental_sessions": 622,
+  "kept_newest_sessions": 5929,
+  "kept_recent_sessions": 19,
+  "logical_removed_bytes": 3223033786,
+  "exclusive_allocated_removed_bytes": 3056676864,
+  "observed_filesystem_free_delta_bytes": 2865713152,
+  "retention_hours": 2,
+  "untouched": [
+    "deps",
+    "build",
+    "fingerprint"
+  ]
+}

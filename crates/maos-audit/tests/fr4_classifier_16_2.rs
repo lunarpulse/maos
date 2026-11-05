@@ -375,6 +375,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         (
             "task.complete",
             None,
+            "distillate.redacted",
+            r#"{"spirit_id":"hello-spirit","redacted_distillate_frame_id":"01ab01ab01ab01ab01ab01ab01ab01ab"}"#,
+            0,
+            "Spirit-owned uninstall redaction (20-11)",
+        ),
+        (
+            "task.complete",
+            None,
             "frame.redacted",
             r#"{"redacted_frame_id":"01ab:01ab:01ab:01ab:01ab:01ab:01ab:01ab","original_kind":18}"#,
             0,
@@ -637,6 +645,10 @@ fn token_arg_position(method: &str) -> Option<usize> {
 /// token-bearing included), or the lifecycle `DecisionDispatch` writer — the
 /// sites that demand a disposition.
 fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
+    // External test-only modules carry the compilation guard on their file.
+    if src.trim_start().starts_with("#![cfg(test)]") {
+        return Vec::new();
+    }
     // Compute #[cfg(test)] line spans (item start to its closing brace, approximated
     // by the next top-level closing brace at column 0).
     let lines: Vec<&str> = src.lines().collect();
@@ -1021,6 +1033,15 @@ mod tests {
     let sites = scan_source(src, "x.rs");
     assert_eq!(sites.len(), 1, "only the prod site counts");
     assert_eq!(sites[0].f, "prod");
+    assert!(
+        scan_source(&format!("#![cfg(test)]\n{src}"), "test_only.rs").is_empty(),
+        "an explicitly test-only external module has no production writer"
+    );
+    assert_eq!(
+        scan_source(&format!("#![cfg(not(test))]\n{src}"), "production.rs").len(),
+        1,
+        "a production-only file guard must not hide the production writer"
+    );
 }
 
 #[test]

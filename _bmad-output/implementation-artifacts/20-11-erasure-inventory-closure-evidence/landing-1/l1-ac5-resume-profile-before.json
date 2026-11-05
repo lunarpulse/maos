@@ -1,0 +1,255 @@
+{
+  "sqlite_version": "3.46.1",
+  "rows": 100000,
+  "payload_bytes": 1024,
+  "loadavg": [
+    18.22021484375,
+    8.40966796875,
+    4.16455078125
+  ],
+  "queries": {
+    "max_rowid": "SELECT coalesce(max(rowid),0) FROM transparency_log",
+    "principal": "SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns FROM transparency_log WHERE rowid>?2 AND rowid<=?3 AND ((?1 IS NOT NULL AND instr(payload_redacted,CAST(?1 AS BLOB))>0) OR (?1 IS NULL AND kind=11)) AND intent NOT IN ('principal.forget','principal.forget.held','distillate.redacted') AND intent NOT LIKE 'principal.uninstall.%'",
+    "kind11": "SELECT frame_id,boot_nonce,spirit_pid,payload_redacted,timestamp_ns FROM transparency_log WHERE rowid>?2 AND rowid<=?3 AND ?1 IS ?1 AND kind=11"
+  },
+  "measurements": [
+    {
+      "distribution": "all_filler",
+      "query": "max_rowid",
+      "after": 0,
+      "plan": [
+        [
+          3,
+          0,
+          0,
+          "SEARCH transparency_log"
+        ]
+      ],
+      "vm_steps_rounded_100": 0,
+      "rows": 1,
+      "wall_seconds": 3.4163997042924166e-05,
+      "cpu_seconds": 3.898299999999244e-05
+    },
+    {
+      "distribution": "all_filler",
+      "query": "principal",
+      "after": 0,
+      "plan": [
+        [
+          2,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 32700,
+      "rows": 0,
+      "wall_seconds": 0.004425388004165143,
+      "cpu_seconds": 0.004403955999999987
+    },
+    {
+      "distribution": "all_filler",
+      "query": "principal",
+      "after": 49152,
+      "plan": [
+        [
+          2,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 32800,
+      "rows": 0,
+      "wall_seconds": 0.0039812769973650575,
+      "cpu_seconds": 0.0039721050000000035
+    },
+    {
+      "distribution": "all_filler",
+      "query": "principal",
+      "after": 94208,
+      "plan": [
+        [
+          2,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 32800,
+      "rows": 0,
+      "wall_seconds": 0.004039496008772403,
+      "cpu_seconds": 0.0040328400000000375
+    },
+    {
+      "distribution": "all_filler",
+      "query": "kind11",
+      "after": 0,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 0,
+      "rows": 0,
+      "wall_seconds": 3.1187955755740404e-05,
+      "cpu_seconds": 3.224099999998842e-05
+    },
+    {
+      "distribution": "all_filler",
+      "query": "kind11",
+      "after": 49152,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 0,
+      "rows": 0,
+      "wall_seconds": 7.373979315161705e-06,
+      "cpu_seconds": 8.165000000004419e-06
+    },
+    {
+      "distribution": "all_filler",
+      "query": "kind11",
+      "after": 94208,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 0,
+      "rows": 0,
+      "wall_seconds": 6.842019502073526e-06,
+      "cpu_seconds": 7.623999999983866e-06
+    },
+    {
+      "distribution": "all_distillate",
+      "query": "max_rowid",
+      "after": 0,
+      "plan": [
+        [
+          3,
+          0,
+          0,
+          "SEARCH transparency_log"
+        ]
+      ],
+      "vm_steps_rounded_100": 0,
+      "rows": 1,
+      "wall_seconds": 3.2871030271053314e-05,
+      "cpu_seconds": 3.6268000000116984e-05
+    },
+    {
+      "distribution": "all_distillate",
+      "query": "principal",
+      "after": 0,
+      "plan": [
+        [
+          2,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 32800,
+      "rows": 0,
+      "wall_seconds": 0.004065755987539887,
+      "cpu_seconds": 0.0040540200000001025
+    },
+    {
+      "distribution": "all_distillate",
+      "query": "principal",
+      "after": 49152,
+      "plan": [
+        [
+          2,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 32800,
+      "rows": 0,
+      "wall_seconds": 0.0038874309975653887,
+      "cpu_seconds": 0.0038538249999999774
+    },
+    {
+      "distribution": "all_distillate",
+      "query": "principal",
+      "after": 94208,
+      "plan": [
+        [
+          2,
+          0,
+          0,
+          "SEARCH transparency_log USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 32800,
+      "rows": 0,
+      "wall_seconds": 0.004044545989017934,
+      "cpu_seconds": 0.0039271709999999516
+    },
+    {
+      "distribution": "all_distillate",
+      "query": "kind11",
+      "after": 0,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 724600,
+      "rows": 4096,
+      "wall_seconds": 0.011894520022906363,
+      "cpu_seconds": 0.011861160000000037
+    },
+    {
+      "distribution": "all_distillate",
+      "query": "kind11",
+      "after": 49152,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 626300,
+      "rows": 4096,
+      "wall_seconds": 0.010991700983140618,
+      "cpu_seconds": 0.01096015100000014
+    },
+    {
+      "distribution": "all_distillate",
+      "query": "kind11",
+      "after": 94208,
+      "plan": [
+        [
+          4,
+          0,
+          0,
+          "SEARCH transparency_log USING INDEX idx_tlog_kind (kind=?)"
+        ]
+      ],
+      "vm_steps_rounded_100": 536100,
+      "rows": 4096,
+      "wall_seconds": 0.009155836014542729,
+      "cpu_seconds": 0.009132307000000006
+    }
+  ]
+}

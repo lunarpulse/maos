@@ -1,0 +1,29 @@
+{
+  "rows": 1000000,
+  "payload_bytes": 1024,
+  "plan": [
+    [
+      4,
+      0,
+      0,
+      "SEARCH r USING INDEX idx_tlog_intent_rowid (intent=? AND rowid>? AND rowid<?)"
+    ],
+    [
+      16,
+      0,
+      0,
+      "CORRELATED SCALAR SUBQUERY 1"
+    ],
+    [
+      21,
+      16,
+      0,
+      "SEARCH o USING INDEX idx_tlog_redistill_outcome (<expr>=?)"
+    ]
+  ],
+  "vm_steps": 33,
+  "returned": 0,
+  "wall_seconds": 0.023226549034006894,
+  "cpu_seconds": 0.006207262999999408,
+  "sql": "SELECT r.payload_redacted,r.timestamp_ns,r.frame_id FROM transparency_log r INDEXED BY idx_tlog_intent_rowid WHERE r.rowid>?2 AND r.rowid<=?3 AND ?1 IS ?1 AND r.intent='distillate.redistill.requested' AND NOT EXISTS (SELECT 1 FROM transparency_log o INDEXED BY idx_tlog_redistill_outcome WHERE o.intent IN ('distillate.redistilled','distillate.redistill.pending') AND json_extract(CAST(o.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id')=json_extract(CAST(r.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id'))"
+}
