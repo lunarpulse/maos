@@ -1,0 +1,8 @@
+$ /mnt/build/cargo-maos/debug/xtask check-mock-not-in-release --binary /tmp/maos-20-2-dev202/maos-compile-shape --json
+{
+  "passed": true,
+  "binary-path": "/tmp/maos-20-2-dev202/maos-compile-shape",
+  "forbidden-symbols-found": []
+}
+
+EXIT 0; elapsed 0.14s

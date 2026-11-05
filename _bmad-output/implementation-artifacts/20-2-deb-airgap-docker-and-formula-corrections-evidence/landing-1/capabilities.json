@@ -1,0 +1,16 @@
+{
+  "cargo": "/home/lunarpulse/.cargo/bin/cargo",
+  "dpkg-buildpackage": "/usr/bin/dpkg-buildpackage",
+  "dh": null,
+  "strace": null,
+  "unshare": "/usr/bin/unshare",
+  "setpriv": "/usr/bin/setpriv",
+  "docker": null,
+  "brew": null,
+  "rpmbuild": null,
+  "vercmp": null,
+  "tokei": "/home/lunarpulse/.cargo/bin/tokei",
+  "cargo_target_dir": null,
+  "systemd_bus": false,
+  "docker_socket": false
+}

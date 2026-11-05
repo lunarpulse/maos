@@ -1,0 +1,8 @@
+$ /usr/bin/python3 -c import cryptography; print(cryptography.__version__)
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import cryptography; print(cryptography.__version__)
+    ^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'cryptography'
+
+EXIT 1; elapsed 0.01s

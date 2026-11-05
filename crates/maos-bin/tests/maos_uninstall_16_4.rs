@@ -306,6 +306,23 @@ fn purge_dry_run_is_inert_then_removes_only_maos_owned_state() {
     // `absent:`, and the operator-authored leftovers under the surviving
     // config tree must be named by `left behind:`.
     let purge_stdout = String::from_utf8_lossy(&purge.stdout);
+    for hint in [
+        "dpkg -r maos",
+        "rpm -e maos",
+        "pacman -R maos",
+        "brew uninstall maos",
+        "cargo uninstall maos-bin maos-cli maos-spirit-cli maos-registry",
+    ] {
+        assert!(
+            purge_stdout.contains(hint),
+            "missing installer hint {hint}: {purge_stdout}"
+        );
+        let receipt_text = std::fs::read_to_string(&receipt).expect("read receipt");
+        assert!(
+            receipt_text.contains(hint),
+            "receipt misses installer hint {hint}"
+        );
+    }
     for line in [
         "maos purge: removed: MAOS home (maos-home)",
         "maos purge: removed: Transparency Log (transparency.sqlite)",

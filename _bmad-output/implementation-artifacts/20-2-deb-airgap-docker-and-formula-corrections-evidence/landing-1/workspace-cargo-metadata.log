@@ -1,0 +1,3 @@
+$ cargo metadata --locked --format-version 1
+
+EXIT 0; elapsed 0.21s

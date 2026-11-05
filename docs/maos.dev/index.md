@@ -13,6 +13,9 @@
 | ▶️ **Run MAOS** | stand up and operate the MAOS kernel | [run-maos.md](./run-maos.md) |
 | 📚 **Understand MAOS** | learn the architecture, invariants, and trust model | [understand-maos.md](./understand-maos.md) |
 
+**Installing first?** See [install and remove MAOS](./install.md) for signed
+binaries, deb/rpm, Homebrew/AUR, Cargo and container routes.
+
 ---
 
 > **Status (v0.3):** This page is **functional**, not polished. WCAG-AA

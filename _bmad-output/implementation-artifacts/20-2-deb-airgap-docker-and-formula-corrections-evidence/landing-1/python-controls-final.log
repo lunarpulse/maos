@@ -1,0 +1,15 @@
+$ /tmp/maos-20-2-dev202/venv/bin/python packaging/test_release_20_2.py -v
+test_ac1_ac2_signed_bytes_pass (__main__.ReleaseControls.test_ac1_ac2_signed_bytes_pass) ... verified signature and exact artifact hashes: maos-linux-amd64
+ok
+test_ac1_exact_filename_not_regex_substring (__main__.ReleaseControls.test_ac1_exact_filename_not_regex_substring) ... ok
+test_ac1_forged_signature_refused (__main__.ReleaseControls.test_ac1_forged_signature_refused) ... ok
+test_ac2_duplicate_manifest_entry_refused (__main__.ReleaseControls.test_ac2_duplicate_manifest_entry_refused) ... ok
+test_ac3_outbound_canary_and_unix_exclusion (__main__.ReleaseControls.test_ac3_outbound_canary_and_unix_exclusion) ... ok
+test_ac5_changed_byte_refused (__main__.ReleaseControls.test_ac5_changed_byte_refused) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.010s
+
+OK
+
+EXIT 0; elapsed 0.10s

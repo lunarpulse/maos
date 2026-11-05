@@ -196,6 +196,20 @@ fn release_workflow_flattens_and_publishes_the_explicit_artifact_set() {
     let mut expected_files = declared_release_files();
     expected_files.push("dist/SHA256SUMS".to_string());
     expected_files.push("dist/SHA256SUMS.sig".to_string());
+    expected_files.extend(
+        [
+            "dist/*.deb",
+            "dist/*.rpm",
+            "dist/SHA256SUMS-packages",
+            "dist/SHA256SUMS-packages.sig",
+            "dist/recipes/maos.rb",
+            "dist/recipes/PKGBUILD",
+            "dist/recipes/maos.spec",
+            "dist/verify-release.py",
+        ]
+        .into_iter()
+        .map(str::to_owned),
+    );
     assert_eq!(
         files,
         expected_files
@@ -288,11 +302,11 @@ fn discipline_runs_both_linux_release_targets_in_the_aggregate_only() {
         key(key(dry_run, "strategy"), "fail-fast").as_bool(),
         Some(false)
     );
-    let targets: Vec<&str> = key(key(key(dry_run, "strategy"), "matrix"), "target")
+    let targets: Vec<&str> = key(key(key(dry_run, "strategy"), "matrix"), "include")
         .as_sequence()
-        .expect("target matrix")
+        .expect("native target matrix")
         .iter()
-        .map(|target| target.as_str().expect("target string"))
+        .map(|row| key(row, "target").as_str().expect("target string"))
         .collect();
     assert_eq!(
         targets,
@@ -311,17 +325,18 @@ fn discipline_runs_both_linux_release_targets_in_the_aggregate_only() {
         Some("794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d")
     );
     let verify = named_step(dry_run, "Verify with shipped maosctl");
-    assert_eq!(
-        key(verify, "if").as_str(),
-        Some("matrix.target != 'aarch64-unknown-linux-gnu'")
+    assert!(
+        get(verify, "if").is_none(),
+        "both native targets execute verification"
     );
     // The SHIPPED binary must do the verifying (D-15-4-E leg 1). A workspace
     // `cargo run -p maos-cli` would pass a containment check while never executing
     // the artifact the release publishes.
     let verify_command = key(verify, "run").as_str().expect("verify command");
     assert!(
-        verify_command
-            .contains("./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only"),
+        verify_command.contains(
+            "./dist/maosctl-${{ matrix.suffix }} install --from-local ./dist --verify-only"
+        ),
         "verify must exec the staged binary: {verify_command}"
     );
     let wrong_key = named_step(dry_run, "Reject signature from different seed");
@@ -344,7 +359,7 @@ fn discipline_runs_both_linux_release_targets_in_the_aggregate_only() {
     assert_eq!(key(key(upload, "with"), "retention-days").as_u64(), Some(7));
 
     // AC2 / D-15-4-F: `aggregate.needs` and NOWHERE ELSE. `release-dry-run` is a
-    // non-registered build job with no `gate-registry.toml` disposition and no
+    // a build job with no `[[ship_gate]]` disposition and no
     // `EXPECTED_GATES` row (the `check-mock-not-in-release` / `maosctl-smoke`
     // pattern), so enrolling it in `v1-0-ship-gate` would make the ship gate block
     // on an unregistered job — and `check_ship_gate_completeness` iterates

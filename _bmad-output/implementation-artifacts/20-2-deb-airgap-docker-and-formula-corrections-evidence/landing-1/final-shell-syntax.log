@@ -1,0 +1,3 @@
+$ bash -n packaging/build-packages.sh packaging/witness-deb.sh packaging/witness-recipe.sh tests/air-gap-netns-corroborate.sh
+
+EXIT 0; elapsed 0.00s

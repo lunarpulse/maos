@@ -171,8 +171,10 @@ with the provider keys.
 root and credential before removal, leaves operator-authored signing and
 configuration files intact, refuses while a live daemon or offline durable
 operation holds a store, and writes a JSON receipt outside the deleted roots.
-After a successful purge, remove the Cargo-owned binary with
-`cargo uninstall maos`.
+After purging data, let the installer remove its binaries: `dpkg -r maos`,
+`rpm -e maos`, `pacman -R maos`, `brew uninstall maos`, or
+`cargo uninstall maos-bin maos-cli maos-spirit-cli maos-registry`.
+See [install and remove MAOS](./install.md); purge never deletes package-owned binaries.
 
 On Linux, confirmed purge first removes this home's T3 containers: both MAOS
 identity labels, their matching name, and a `/workspace` mount under this

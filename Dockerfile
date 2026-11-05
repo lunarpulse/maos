@@ -1,40 +1,18 @@
-# Story 9.4 AC-2 — Container image for MAOS.
-#
-# Multi-stage build: Rust builder → minimal runtime image.
-# Push to Docker Hub + GHCR with cosign signing for verification
-# parity with AC-1 binary signing.
-#
-# Build: docker build -t maos:v0.5.0 .
-# Run:   docker run --rm maos:v0.5.0 --help
-#
-# The container image uses a distroless base for minimal attack surface.
-# The MAOS binary is the sole entrypoint — no shell, no package manager.
+# Story 20-2: runtime contains exactly the signed release binary.
+FROM debian:trixie-slim AS verify
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-cryptography && rm -rf /var/lib/apt/lists/*
+WORKDIR /verify
+ARG TARGETARCH
+ARG RELEASE_PUBKEY
+COPY packaging/verify-release.py ./verify-release.py
+COPY dist/SHA256SUMS dist/SHA256SUMS.sig ./
+COPY dist/maos-linux-${TARGETARCH} ./maos-linux-${TARGETARCH}
+RUN python3 verify-release.py --pubkey "$RELEASE_PUBKEY" "maos-linux-${TARGETARCH}" && cp "maos-linux-${TARGETARCH}" maos && chmod 755 maos
 
-# ── Builder stage ───────────────────────────────────────────────────────
-FROM rust:1.88-bookworm AS builder
-
-WORKDIR /build
-
-# Cache dependencies by copying manifests first.
-COPY Cargo.toml Cargo.lock ./
-COPY crates/ crates/
-COPY spirits/ spirits/
-COPY examples/ examples/
-COPY xtask/ xtask/
-COPY templates/ templates/
-
-# Build release binary with locked deps.
-RUN cargo build --release -p maos-bin --locked
-
-# ── Runtime stage ───────────────────────────────────────────────────────
-FROM gcr.io/distroless/cc-debian12:nonroot
-
-COPY --from=builder /build/target/release/maos /usr/local/bin/maos
-
-# Default data directory for Transparency Log + state.
+FROM gcr.io/distroless/cc-debian13:nonroot
+ARG SOURCE_SHA
+LABEL org.opencontainers.image.revision=$SOURCE_SHA
+COPY --from=verify /verify/maos /usr/local/bin/maos
 ENV MAOS_HOME=/var/lib/maos
-
-# The TL + journal directories are created at runtime by the binary.
 VOLUME ["/var/lib/maos"]
-
 ENTRYPOINT ["/usr/local/bin/maos"]

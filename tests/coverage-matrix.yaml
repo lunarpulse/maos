@@ -341,13 +341,19 @@ coverage:
   FR1:
     gates:
     - reproducible-build
+    - release-dry-run
+    - package-recipes
+    - cargo-install
+    - container-build
     corpora: []
     phase: v0.1
     valid_until: '2027-05-12'
-    notes: 1a.1 ships maos-bin; 1a.4 ships maosctl via `cargo install --path
-      crates/maos-cli --locked`; `maosctl --version` reports the workspace
-      version; full install workflow (Spirit registry fetch + signature
-      verify) lands at v0.5+
+    notes: Story 20-2 builds signed-byte-identical native deb packages (install,
+      init, purge, removal), executes RPM/Fedora, PKGBUILD/Arch and Homebrew/Linux
+      recipes, and witnesses temporary-root cargo install/uninstall maos-bin.
+      Rendered recipes carry the release version, signed hashes and built key;
+      tap/AUR and image publication remain operator-owned. Hosted results are
+      unverified until the ci/20-2-verify recipe runs.
   FR10:
     gates: []
     corpora: []
@@ -1355,11 +1361,18 @@ coverage:
       explicitly absent; inverters are 11.4b (escape anomaly) and 13.5b
       (collective erase/legal-hold fan-out).
   NFR-Ops-12:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - air-gap-netns-witness
+    - check-air-gap
+    enforcement: blocking
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: Shipped default build boots and journals a real replay session under
+      unshare -n; AF_INET/AF_INET6 outbound attempts are forbidden and a TCP
+      canary must detect. air-gap-netns-witness is blocking; check-air-gap is
+      advisory only under D-20-2-02 C (TcpListener/getaddrinfo measured at cbed4dad).
+      Hosted behavior and plants remain unverified pending ci/20-2-verify.
   NFR-Ops-2:
     gates: []
     enforcement: advisory-until-engagement

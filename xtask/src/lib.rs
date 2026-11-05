@@ -40,6 +40,7 @@ pub mod check_perf_verdict;
 pub mod perf_budgets;
 pub mod perf_ledger;
 pub mod release_dry_run;
+pub mod render_packages;
 // corpus_types + gate_common exposed so the lib-compiled gate modules
 // (check_fkcs, check_trial_attestation) can resolve `crate::gate_common`
 // (Option C leg-binding, Epic 12 retro B1). corpus_types is self-contained;

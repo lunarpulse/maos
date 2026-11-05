@@ -140,6 +140,7 @@ mod prepush;
 mod rebaseline_check;
 mod release_dry_run;
 mod release_verify;
+mod render_packages;
 mod sprint_status;
 mod stability_matrix;
 mod templates_regen;
@@ -787,6 +788,19 @@ enum Commands {
         targets: Vec<String>,
         #[arg(long)]
         json: bool,
+    },
+    /// Story 20-2: render recipes from a verified signed release.
+    #[command(name = "render-packages")]
+    RenderPackages {
+        #[arg(long, default_value = "dist")]
+        dist_dir: String,
+        #[arg(long, default_value = "dist/recipes")]
+        output: String,
+        /// Trusted locally built maosctl, never an unverified download.
+        #[arg(long)]
+        maosctl: String,
+        #[arg(long)]
+        base_url: Option<String>,
     },
     /// Story 15-4 AC3 — require a successful discipline aggregate before publication.
     #[command(name = "check-release-precondition")]
@@ -1458,6 +1472,12 @@ fn main() {
             targets,
             json,
         } => release_dry_run::run(manifest_only, &dist_dir, &targets, json),
+        Commands::RenderPackages {
+            dist_dir,
+            output,
+            maosctl,
+            base_url,
+        } => render_packages::run(&dist_dir, &output, &maosctl, base_url.as_deref()),
         Commands::CheckReleasePrecondition { check_runs, json } => {
             check_release_precondition::run(check_runs.as_deref(), json)
         }

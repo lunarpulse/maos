@@ -224,7 +224,7 @@ fn mentions(value: &Value, needle: &str) -> bool {
 }
 
 #[test]
-fn macos_check_is_the_only_macos_job_and_the_release_dry_run_matrix_is_unchanged() {
+fn macos_check_is_the_only_macos_job_and_release_dry_run_remains_linux_only() {
     let discipline = load("discipline.yml");
     let jobs = key(&discipline, "jobs").as_mapping().expect("jobs");
     // A job runs on macOS if its `runs-on` names it directly, or is an
@@ -248,10 +248,16 @@ fn macos_check_is_the_only_macos_job_and_the_release_dry_run_matrix_is_unchanged
         key(job(&discipline, "release-dry-run"), "strategy"),
         "matrix",
     );
+    let targets: Vec<&str> = key(matrix, "include")
+        .as_sequence()
+        .expect("native Linux matrix")
+        .iter()
+        .map(|row| key(row, "target").as_str().expect("target"))
+        .collect();
     assert_eq!(
-        strings(key(matrix, "target")),
+        targets,
         ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"],
-        "D-15-4-F stands for the release-dry-run matrix"
+        "D-15-4-F still excludes macOS; 20-2 uses native Linux runners"
     );
 }
 

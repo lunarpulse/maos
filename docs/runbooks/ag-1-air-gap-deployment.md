@@ -1,122 +1,81 @@
-# AG-1: Air-Gap Deployment Runbook
+# AG-1: Air-gap deployment
 
-> Story 9.4 — deploying MAOS in network-isolated (air-gapped) environments.
+## Deployment model (20-2, D-20-2-01 A)
 
-## Overview
+Deploy the **shipped default build** in a host-enforced network namespace with
+no external interfaces. Transfer the signed release, Spirit bundles and replay
+cassettes from a connected staging host. Verify them before installation; see
+[install MAOS](../maos.dev/install.md). Network isolation, not a feature flag,
+is the security boundary. A live remote inference provider cannot work offline.
 
-An **air-gap deployment** runs the MAOS Host binary with all network surface
-compiled out at build time (`--features air-gap`). The resulting binary contains
-zero networking code — no HTTP clients, no TCP listeners, no DNS resolvers.
+`--no-default-features --features air-gap` is a **compile-shape control only**.
+It is not a release artifact or a bootable offline runtime. Its `run` refuses
+with `BuildShapeUnsupported` (exit 2), without writing a fake Transparency-Log
+entry. Older binaries' `transparency.airgap-stub.log` is still removed by purge.
+The closure includes `ureq`, `tokio-postgres`, rustls and Tokio networking.
+At cbed4dad, the symbol scan also found `TcpListener` and `getaddrinfo`; therefore
+`check-air-gap` is advisory under the operator's conditional D-20-2-02 C.
+There is no claim of “zero networking code”.
 
-## Prerequisites
+## Behavioral witness
 
-| Item | Detail |
-|------|--------|
-| Rust toolchain | stable ≥ 1.88 |
-| Build flags | `--no-default-features --features air-gap` |
-| CI gate | `xtask check-air-gap` passes on the produced binary |
-| Host access | No outbound network required |
-
-## Build Procedure
-
-```bash
-# 1. Build the air-gap binary
-cargo build -p maos-bin --release --no-default-features --features air-gap
-
-# 2. Verify no network symbols leaked
-cargo xtask check-air-gap \
-  --binary target/release/maos \
-  --dirty-fixture target/debug/dirty-network-fixture
-
-# 3. (Optional) Run the netns corroborating harness (requires root/CAP_SYS_ADMIN)
-sudo bash tests/air-gap-netns-corroborate.sh target/release/maos
-```
-
-## Host-Level Network Enforcement
-
-Even with compile-time network surface removal, defense-in-depth mandates
-host-level enforcement:
-
-### Option A: Network Namespace Isolation
+The blocking discipline job `air-gap-netns-witness` consumes the dev-signed
+`release-dry-run` default binary. It calls:
 
 ```bash
-# Run the daemon inside a network namespace with no interfaces
-unshare --net -- ./target/release/maos init
+bash tests/air-gap-netns-corroborate.sh "$PWD/dist/maos-linux-amd64" /tmp/maos-netns-proof
 ```
 
-### Option B: Firewall Rules (iptables / nftables)
+Prerequisites: Linux, `sudo -n`, util-linux (`unshare`, `setpriv`), `strace`,
+Python 3, the default executable and the committed J0 shell-intro cassette.
+Run as an ordinary user, **not by putting sudo around the entire script**.
+Only namespace creation is privileged; `setpriv` drops uid/gid/groups before
+strace or the workload runs. HOME and XDG roots are isolated.
 
-```bash
-# Block all outbound traffic from the maos user
-iptables -A OUTPUT -m owner --uid-owner maos -j DROP
-iptables -A INPUT  -m owner --uid-owner maos -j DROP
-```
+The witness performs `maos init`, an actual `maos shell` replay session, checks
+the expected hello-spirit response and increases in SQLite Transparency-Log
+row count, and follows all children with `strace -f -yy -e trace=network`.
+`connect`, `sendto` and `sendmsg` involving AF_INET/AF_INET6 (including annotated
+connected TCP/UDP descriptors) must be zero. AF_UNIX and other families are
+printed separately, not mistaken for outbound networking. A TCP canary in the
+same namespace must be observed. An empty trace is a failure.
 
-### Option C: SELinux / AppArmor
+Declared CI fails on every missing prerequisite. A local missing prerequisite
+returns 77 and prints `NOT RUN`; it is **not passing evidence**. Any real outbound
+attempt by the final workload is a product defect: STOP and record a decision
+with its trace, never add an allowlist. `--plant-outbound` as the third argument
+injects a real TCP attempt into the traced session process tree and must fail.
 
-Confine the `maos` binary to a profile that denies `network` access class.
+The operator-only branch recipe is
+`_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml`.
+It belongs under `.github/workflows/` only on `ci/20-2-verify`, never on main.
+The hosted netns result and plant remain **unverified** until its run artifacts
+are recorded. Wiring a job is not evidence that the product passes it.
 
-## Spirit Import (Offline)
+## Spirit-author capability guidance
 
-Air-gapped environments cannot pull Spirits from a registry. Use the offline
-import flow (Story 7.2):
+The default build does not stop issuing networking scopes merely because the
+host is isolated. Use the actual scopes in
+`crates/maos-domain/src/invariants/i1.rs`: `NetHttps { domain }`,
+`ProviderInfer { provider }`, `FsRead { subtree }`, `FsWrite { subtree }`,
+`MemRead { scope }`, `MemWrite { scope }` and `McpCall { server, tool }`.
+There are no `NetworkOutbound` or `RegistryPoll` variants. Declare only needed
+capabilities. Omit `net.https` and remote MCP transports for offline Spirits;
+`provider.complete`/`ProviderInfer` can still be issued to the replay provider
+(the shell host issues its selected provider token). A token is authorization,
+not a transport or a promise that the network exists. Never put provider secrets
+into replay fixtures. Import signed Spirit bundles offline using the documented
+`maosctl install --source <bundle>` flow; do not attempt registry polling.
 
-```bash
-# On a networked machine: export a signed Spirit bundle
-maosctl export --spirit hello-spirit --output hello-spirit.tar.gz
+## Journaling and limitations
 
-# Transfer to air-gapped host via removable media
+The default build records real session, lifecycle and governance entries in
+`$MAOS_HOME/audit/transparency.sqlite`. Preserve the log for external review;
+`maos purge --keep-log --yes` is the explicit retention option. The compile-shape
+build's `run` does not boot and does not provide TL parity.
 
-# On the air-gapped host: import and verify
-maosctl install --source ./hello-spirit.tar.gz
-```
-
-The import verifies:
-- Ed25519 signature over the SHA-256 manifest
-- Bundle integrity (all listed files present, hashes match)
-- Trust-tier floor (operator policy enforced)
-
-## Capability-Token Guidance
-
-In air-gap mode:
-- `Scope::NetworkOutbound` tokens are **never issued** (no network surface exists)
-- `Scope::RegistryPoll` tokens are **never issued** (no registry client)
-- Local-only scopes (`Scope::MemoryRead`, `Scope::FileRead`, etc.) work normally
-- Spirit scheduling, journaling, and audit continue unchanged
-
-## Transparency Log
-
-The Transparency Log (SQLite) operates identically in air-gap mode. All frame
-emissions, governance events, and audit proofs are recorded locally. The log
-can be extracted via `maos audit query` for external review.
-
-## Limitations & Honest-Risk Acknowledgment (R8-AG)
-
-> **Honest-risk disclosure**: The air-gap build removes the network *surface*
-> at compile time. It does NOT guarantee that a compromised Spirit (or a
-> malicious dependency pulled at build time) cannot attempt I/O through
-> non-network channels (e.g., filesystem, IPC, signals). The air-gap feature
-> is a **layer** in a defense-in-depth strategy, not a standalone security
-> boundary.
-
-Specific limitations:
-1. **No live registry sync** — Spirits must be imported offline
-2. **No remote inference** — LLM providers are unreachable; Spirits requiring
-   inference will receive `ProviderError::Unconfigured`
-3. **No MCP over HTTP** — MCP servers must use stdio transport or be unavailable
-4. **No A2A cross-Host** — TCP/mTLS transport is compiled out; only in-process
-   loopback (if compiled) is available
-5. **No mobile push** — Halt notifications cannot reach mobile devices
-
-## Verification
-
-The `xtask check-air-gap` gate (R-AG1) runs in CI and:
-1. Builds the air-gap binary
-2. Scans symbol table with `nm --demangle` for network-related symbols
-3. Fails if any are found
-4. Validates a dirty fixture (a binary that DOES link `TcpStream::connect`)
-   is correctly rejected — proving the gate is not vacuous
-
-The `tests/air-gap-netns-corroborate.sh` script (R-AG3) provides a
-corroborating runtime check under `unshare -n`, but is **not merge-blocking**
-(requires root/CAP_SYS_ADMIN, environment-fragile).
+Namespace isolation blocks external communication, not filesystem/IPC abuse.
+Retain capability checks and sandbox policy. Live registry sync, remote LLMs,
+HTTP MCP, cross-host A2A and mobile push are unavailable offline; local replay
+and local-only activities are the witnessed deployment model, not replacements
+for those online services.

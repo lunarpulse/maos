@@ -1,0 +1,2 @@
+$ cargo nextest list --workspace --locked --message-format json --list-type binaries-only
+TIMEOUT after 2900 seconds before test execution; no nextest test result was produced. Captured stderr was not retained by subprocess.run on the timeout exception. See metadata-timeout-processes.json for the observed surviving compile children.

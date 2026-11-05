@@ -149,6 +149,45 @@ jobs:
         run: cargo run -p xtask -- release-verify --verify --sha256sums dist/SHA256SUMS --sig dist/SHA256SUMS.sig --artifacts-dir dist
         env:
           MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+      - name: Render recipes from signed artifacts and the trusted built maosctl
+        env:
+          MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+        run: |
+          cargo build --locked -p maos-cli
+          cargo run --locked -p xtask -- render-packages --maosctl target/debug/maosctl
+          cp dist/recipes/verify-release.py dist/
+      - uses: docker/setup-qemu-action@v3
+      - name: Build deb and RPM for both Linux architectures without rewriting binaries
+        run: |
+          set -euo pipefail
+          for arch in amd64 arm64; do
+            docker run --rm --platform "linux/$arch" -v "$PWD:$PWD" -w "$PWD" ubuntu:24.04 bash -euc '
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y debhelper python3-cryptography rpm
+              packaging/build-packages.sh dist deb dist/packages
+              packaging/build-packages.sh dist rpm dist/packages
+            '
+          done
+          python3 - <<'PY'
+          import hashlib, pathlib
+          dist = pathlib.Path('dist')
+          files = sorted((dist/'packages').glob('*.deb')) + sorted((dist/'packages').glob('*.rpm'))
+          assert len(files) == 4, files
+          lines = []
+          for source in files:
+              target = dist/source.name
+              source.replace(target)
+              with target.open('rb') as f:
+                  lines.append(f'{hashlib.file_digest(f, "sha256").hexdigest()}  {target.name}\n')
+          (dist/'SHA256SUMS-packages').write_text(''.join(sorted(lines)))
+          PY
+      - name: Sign and self-verify package metadata and payloads
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+          MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+        run: |
+          cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS-packages --output dist/SHA256SUMS-packages.sig
+          cargo run --locked -p xtask -- release-verify --verify --sha256sums dist/SHA256SUMS-packages --sig dist/SHA256SUMS-packages.sig --artifacts-dir dist
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -167,6 +206,14 @@ jobs:
             dist/maos-spirit-darwin-arm64
             dist/SHA256SUMS
             dist/SHA256SUMS.sig
+            dist/*.deb
+            dist/*.rpm
+            dist/SHA256SUMS-packages
+            dist/SHA256SUMS-packages.sig
+            dist/recipes/maos.rb
+            dist/recipes/PKGBUILD
+            dist/recipes/maos.spec
+            dist/verify-release.py
           fail_on_unmatched_files: true
           generate_release_notes: true
           # SemVer: a hyphenated tag (v0.1.0-alpha.1) is a pre-release and must never

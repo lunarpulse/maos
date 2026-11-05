@@ -1,0 +1,3 @@
+$ bash -c cp /tmp/maos-20-2-dev202/purge.final.rs crates/maos-bin/src/purge.rs && cmp /tmp/maos-20-2-dev202/purge.final.rs crates/maos-bin/src/purge.rs && touch crates/maos-bin/src/purge.rs
+
+EXIT 0; elapsed 0.01s

@@ -1,0 +1,4 @@
+$ /home/lunarpulse/dev_ws/target/debug/maos run spirits/hello-spirit/manifest.toml
+air-gap run: offline inference is stubbed; TL stub written to /tmp/maos-20-2-dev202/before-home/audit/transparency.airgap-stub.log
+
+EXIT 0; elapsed 0.01s

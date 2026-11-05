@@ -1,0 +1,4 @@
+$ /home/lunarpulse/dev_ws/target/debug/maos run spirits/hello-spirit/manifest.toml
+maos: run refused (BuildShapeUnsupported): this no-default-features build is a compile-shape control, not a deployment artifact. Use the shipped default build with network isolation; see docs/runbooks/ag-1-air-gap-deployment.md
+
+EXIT 2; elapsed 0.00s

@@ -1,0 +1,3 @@
+$ bash -c cp /tmp/maos-20-2-dev202/maos.final.rb packaging/homebrew/maos.rb && cmp /tmp/maos-20-2-dev202/maos.final.rb packaging/homebrew/maos.rb && touch packaging/homebrew/maos.rb
+
+EXIT 0; elapsed 0.00s

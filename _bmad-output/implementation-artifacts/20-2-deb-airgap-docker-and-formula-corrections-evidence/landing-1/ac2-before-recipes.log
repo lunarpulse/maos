@@ -1,0 +1,17 @@
+$ python3 -c import subprocess,sys
+bad=[]
+for path in ['packaging/deb/rules','packaging/rpm/maos.spec','packaging/aur/PKGBUILD','packaging/homebrew/maos.rb']:
+ p=subprocess.run(['git','show','cbed4dad:'+path],capture_output=True,text=True); assert p.returncode==0
+ defects=[s for s in ['SCAFFOLD','PLACEHOLDER_','0.5.0','bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7'] if s in p.stdout]
+ print(path, defects)
+ if defects: bad.append(path)
+print('baseline recipe check refused',len(bad),'recipes')
+sys.exit(1 if bad else 0)
+
+packaging/deb/rules ['bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7']
+packaging/rpm/maos.spec ['SCAFFOLD', '0.5.0', 'bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7']
+packaging/aur/PKGBUILD ['SCAFFOLD', 'PLACEHOLDER_', '0.5.0', 'bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7']
+packaging/homebrew/maos.rb ['SCAFFOLD', 'PLACEHOLDER_', '0.5.0', 'bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7']
+baseline recipe check refused 4 recipes
+
+EXIT 1; elapsed 0.02s

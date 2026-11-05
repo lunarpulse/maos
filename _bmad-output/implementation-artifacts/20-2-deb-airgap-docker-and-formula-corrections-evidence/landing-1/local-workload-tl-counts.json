@@ -1,0 +1,6 @@
+{
+  "before": 0,
+  "after": 13,
+  "isolated": false,
+  "network_observation": "NOT RUN (strace/netns unavailable)"
+}

@@ -5823,14 +5823,14 @@ jobs:
           cargo run -p xtask -- check-escape-detector --json 2>&1 | tee /tmp/escape-detector-gate.json
   # Story 15-4 AC2 — secret-free release artifact build on both supported Linux targets.
   release-dry-run:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
+        include:
+          - {target: x86_64-unknown-linux-gnu, os: ubuntu-24.04, suffix: linux-amd64}
+          - {target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm, suffix: linux-arm64}
           # - aarch64-apple-darwin # excluded by D-15-4-F: macOS bills ~10x with zero precedent in 177 Linux jobs, and `aggregate` is the branch-protection check — linux first. Kept in place, never deleted: release.yml still ships this artifact on a native macOS runner (packaging/homebrew/maos.rb:24 downloads it), and tag-procedure.md carries the pre-tag rehearsal that gives the target its first build. ⚠ AMENDED 2026-09-12 (Epic-15 retrospective, operator-ratified): that rehearsal is now a LABEL-GATED `pull_request` run of release.yml (`release-rehearsal`), not only a post-merge `workflow_dispatch` — `workflow_dispatch` is unusable until the workflow reaches the default branch, which is the very merge the rehearsal exists to de-risk. The COST RULING IS UNCHANGED: macOS stays out of this matrix and off unlabelled PRs.
           # Story 20-6 (operator ruling 2026-09-25): macOS COMPILE coverage is the path-filtered `macos-check` job below, not this matrix — D-15-4-F stands for this release-dry-run matrix.
     steps:
@@ -5842,11 +5842,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-dry-run-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install cross-compile deps (aarch64-linux)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+      - name: Install native package prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y debhelper python3-cryptography
       - name: Run release dry-run
         run: cargo run --locked -p xtask -- release-dry-run --targets ${{ matrix.target }} --json
       - name: Sign staged manifest with development seed
@@ -5854,12 +5853,10 @@ jobs:
           RELEASE_SIGNING_KEY: 794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d
         run: cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
       - name: Verify with shipped maosctl
-        if: matrix.target != 'aarch64-unknown-linux-gnu'
         run: |
-          chmod +x ./dist/maosctl-linux-amd64
-          ./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only
+          chmod +x ./dist/maosctl-${{ matrix.suffix }}
+          ./dist/maosctl-${{ matrix.suffix }} install --from-local ./dist --verify-only
       - name: Reject signature from different seed
-        if: matrix.target != 'aarch64-unknown-linux-gnu'
         env:
           # QUOTED ON PURPOSE. Unquoted, 64 zeros is a YAML plain scalar that
           # resolves to the INTEGER 0, so the runner exported "0" (1 byte) and
@@ -5871,17 +5868,136 @@ jobs:
         run: |
           cp dist/SHA256SUMS.sig /tmp/maos-release-correct.sig
           cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
-          if ./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only; then
+          if ./dist/maosctl-${{ matrix.suffix }} install --from-local ./dist --verify-only; then
             echo "forged-signature control failed: maosctl accepted a signature from a different key"
             exit 1
           fi
-          mv /tmp/maos-release-correct.sig dist/SHA256SUMS.sig
+          cp /tmp/maos-release-correct.sig dist/SHA256SUMS.sig
+          cmp /tmp/maos-release-correct.sig dist/SHA256SUMS.sig
+          touch dist/SHA256SUMS.sig
+      - name: Render verified recipes with trusted locally built tooling
+        run: |
+          cargo build --locked -p maos-cli
+          cargo run --locked -p xtask -- render-packages --maosctl target/debug/maosctl --base-url "file://$PWD/dist"
+          cp dist/recipes/verify-release.py dist/
+      - name: Build, install, compare signed bytes, purge and remove deb
+        run: |
+          packaging/build-packages.sh dist deb dist/packages
+          packaging/witness-deb.sh dist "$(find dist/packages -name '*.deb' -print -quit)" '${{ matrix.suffix }}'
       - name: Upload dry-run artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-dry-run-${{ matrix.target }}
           path: dist/
           retention-days: 7
+
+  air-gap-netns-witness:
+    needs: release-dry-run
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dry-run-x86_64-unknown-linux-gnu
+          path: dist
+      - run: sudo apt-get update && sudo apt-get install -y strace
+      - name: Boot and replay inside an isolated network namespace
+        run: |
+          chmod +x dist/maos-linux-amd64
+          bash tests/air-gap-netns-corroborate.sh "$PWD/dist/maos-linux-amd64" "$RUNNER_TEMP/netns"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: air-gap-netns-traces
+          path: ${{ runner.temp }}/netns
+
+  check-air-gap:
+    # D-20-2-02 C: T0 at cbed4dad found TcpListener/getaddrinfo.
+    # This is an advisory observation, NOT the NFR-Ops-12 witness.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Observe compile-shape network symbols (advisory, status recorded)
+        run: |
+          cargo build --locked -p maos-bin
+          cp target/debug/maos "$RUNNER_TEMP/default-maos"
+          set +e
+          cargo run --locked -p xtask -- check-air-gap --build-first --binary target/debug/maos --dirty-fixture "$RUNNER_TEMP/default-maos" --json > "$RUNNER_TEMP/air-gap-symbols.log" 2>&1
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/air-gap-symbols.log"
+          echo "ADVISORY ONLY: check-air-gap exit=$rc; default-build netns behavior binds"
+          test "$rc" -le 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: air-gap-symbols-advisory
+          path: ${{ runner.temp }}/air-gap-symbols.log
+
+  container-build:
+    needs: release-dry-run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dry-run-x86_64-unknown-linux-gnu
+          path: dist
+      - uses: docker/setup-buildx-action@v3
+      - name: Build signed bytes without secrets, login or push
+        run: |
+          pubkey=$(python3 -c 'import pathlib,re; print(re.search(r"RELEASE_PUBKEY := ([0-9a-f]{64})",pathlib.Path("dist/recipes/debian/rules").read_text())[1])')
+          docker buildx build --load --build-arg RELEASE_PUBKEY="$pubkey" --build-arg SOURCE_SHA="$GITHUB_SHA" -t maos:ci .
+          docker run --rm maos:ci --version
+          docker run --rm maos:ci --help
+          docker image inspect maos:ci --format '{{.Size}}'
+
+  package-recipes:
+    needs: release-dry-run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        route: [rpm, arch, brew]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dry-run-x86_64-unknown-linux-gnu
+          path: dist
+      - name: Execute recipe and assert installed identity/removal
+        run: packaging/witness-recipe.sh '${{ matrix.route }}' "$PWD/dist"
+
+  cargo-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install the actual Cargo package and remove it
+        run: |
+          root=$(mktemp -d)
+          /usr/bin/time -p cargo install --locked --path crates/maos-bin --root "$root"
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["workspace"]["package"]["version"])')
+          "$root/bin/maos" --version | tee "$RUNNER_TEMP/cargo-version"
+          grep -F "$version" "$RUNNER_TEMP/cargo-version"
+          cargo uninstall --root "$root" maos-bin
+          test ! -e "$root/bin/maos"
+          rm -rf "$root"
 
   # ── Story 20-6 — path-filtered macOS compile guard ──────────────────────────
   # WHY (measured 2026-09-25): no push ever compiled for macOS, so the first
@@ -6418,6 +6534,7 @@ jobs:
       - check-test-budget
       - check-perf-runner-policy
       - check-perf-counts
+      - air-gap-netns-witness
       - one-daemon-one-door
       - j0-scene
       - maosctl-load-over-the-door
@@ -6648,6 +6765,10 @@ jobs:
       - check-test-budget
       - expensive-tests
       - release-dry-run
+      - air-gap-netns-witness
+      - container-build
+      - package-recipes
+      - cargo-install
       - macos-scope
       - macos-check
       - cgroup-ceiling-delegated

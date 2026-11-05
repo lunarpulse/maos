@@ -1,0 +1,4 @@
+$ /mnt/build/cargo-maos/debug/xtask render-packages --dist-dir /tmp/maos-20-2-dev202/dist --output /tmp/maos-20-2-dev202/plant-recipes --maosctl /home/lunarpulse/dev_ws/target/debug/maosctl
+unrendered package token survived
+
+EXIT 1; elapsed 0.08s

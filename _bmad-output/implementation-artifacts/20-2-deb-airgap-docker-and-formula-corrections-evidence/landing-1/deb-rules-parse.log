@@ -1,0 +1,4 @@
+$ make -f /tmp/maos-20-2-dev202/dist/recipes/debian/rules -n override_dh_auto_configure
+python3 verify-release.py --pubkey bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7 maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64
+
+EXIT 0; elapsed 0.54s

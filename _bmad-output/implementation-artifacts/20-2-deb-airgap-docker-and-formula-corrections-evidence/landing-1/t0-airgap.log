@@ -1,0 +1,1272 @@
+$ /mnt/build/cargo-maos/debug/xtask check-air-gap --build-first --binary /home/lunarpulse/dev_ws/target/debug/maos --dirty-fixture /tmp/maos-20-2-dev202/maos-default --json
+check-air-gap: building air-gap binary...
+   Compiling rustls v0.23.46
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1431:21
+     |
+1431 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-mcp` (lib) generated 1 warning (run `cargo fix --lib -p maos-mcp` to apply 1 suggestion)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+   Compiling maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+   Compiling worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+   Compiling maos-corpus-gen v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-corpus-gen)
+   Compiling maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+   Compiling maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+   Compiling maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+   Compiling maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+   Compiling ureq v2.12.1
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:179:27
+    |
+179 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+   Compiling maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: `maos-iac` (lib) generated 3 warnings (run `cargo fix --lib -p maos-iac` to apply 3 suggestions)
+   Compiling maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:487:21
+    |
+487 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:23:5
+   |
+23 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:13:17
+   |
+13 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+   Compiling maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:29:5
+   |
+29 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: `maos-cohort` (lib) generated 1 warning
+warning: variable does not need to be mutable
+   --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:622:9
+    |
+622 |     let mut child = spawn_child(&mut spec, &argv)?;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:196:13
+    |
+196 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: value assigned to `owned_guard` is never read
+   --> crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:401:27
+    |
+401 |     let mut owned_guard = None;
+    |                           ^^^^ this value is reassigned later and never used
+...
+455 |     owned_guard = Some(SandboxedContainerChild::own(
+    |     ----------- `owned_guard` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:82:5
+   |
+77 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+82 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:665:8
+    |
+115 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+665 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:46:5
+   |
+44 | struct DiskCandidate {
+   |        ------------- field in this struct
+45 |     name: String,
+46 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:141:8
+    |
+ 70 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+141 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+   Compiling maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+   Compiling maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+warning: `maos-kernel-core` (lib) generated 37 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 21 suggestions)
+   Compiling maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+    --> crates/maos-control/src/lib.rs:1064:28
+     |
+1064 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-control` (lib) generated 2 warnings
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+warning: unused variable: `pread`
+   --> crates/maos-bin/src/operator_door.rs:682:9
+    |
+682 |         pread: Option<Arc<String>>,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_pread`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+warning: unused imports: `InferenceModeError` and `ResolvedInferenceMode`
+  --> crates/maos-bin/src/main.rs:59:32
+   |
+59 | use maos_bin::inference_mode::{InferenceModeError, ResolvedInferenceMode};
+   |                                ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `worker_thread_count` is never used
+   --> crates/maos-bin/src/main.rs:104:4
+    |
+104 | fn worker_thread_count() -> usize {
+    |    ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: type alias `AdmittedManifests` is never used
+     --> crates/maos-bin/src/main.rs:10066:6
+      |
+10066 | type AdmittedManifests = Arc<std::sync::RwLock<std::collections::BTreeMap<String, Arc<String>>>>;
+      |      ^^^^^^^^^^^^^^^^^
+
+warning: function `record_admitted_manifest` is never used
+     --> crates/maos-bin/src/main.rs:10068:4
+      |
+10068 | fn record_admitted_manifest(map: &AdmittedManifests, spirit_id: &str, text: &str) {
+      |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `ANTHROPIC_DEFAULTS` is never used
+     --> crates/maos-bin/src/main.rs:17064:7
+      |
+17064 | const ANTHROPIC_DEFAULTS: (&str, &str) = ("https://api.anthropic.com", "claude-haiku-4-5-20251001");
+      |       ^^^^^^^^^^^^^^^^^^
+
+warning: constant `OPENAI_DEFAULTS` is never used
+     --> crates/maos-bin/src/main.rs:17065:7
+      |
+17065 | const OPENAI_DEFAULTS: (&str, &str) = ("https://api.openai.com", "gpt-4o-mini");
+      |       ^^^^^^^^^^^^^^^
+
+warning: constant `GEMINI_DEFAULTS` is never used
+     --> crates/maos-bin/src/main.rs:17066:7
+      |
+17066 | const GEMINI_DEFAULTS: (&str, &str) = (
+      |       ^^^^^^^^^^^^^^^
+
+warning: constant `KIMI_DEFAULTS` is never used
+     --> crates/maos-bin/src/main.rs:17070:7
+      |
+17070 | const KIMI_DEFAULTS: (&str, &str) = ("https://api.moonshot.ai", "kimi-k3.1-pro");
+      |       ^^^^^^^^^^^^^
+
+warning: constant `OLLAMA_DEFAULTS` is never used
+     --> crates/maos-bin/src/main.rs:17071:7
+      |
+17071 | const OLLAMA_DEFAULTS: (&str, &str) = ("http://localhost:11434", "llama3.1:8b");
+      |       ^^^^^^^^^^^^^^^
+
+warning: struct `EnvVar` is never constructed
+ --> crates/maos-bin/src/env_contract.rs:1:12
+  |
+1 | pub struct EnvVar {
+  |            ^^^^^^
+
+warning: enum `EnvStability` is never used
+ --> crates/maos-bin/src/env_contract.rs:8:10
+  |
+8 | pub enum EnvStability {
+  |          ^^^^^^^^^^^^
+
+warning: constant `MAOS_ENV_REGISTRY` is never used
+  --> crates/maos-bin/src/env_contract.rs:13:11
+   |
+13 | pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+   |           ^^^^^^^^^^^^^^^^^
+
+warning: function `lookup` is never used
+   --> crates/maos-bin/src/env_contract.rs:658:8
+    |
+658 | pub fn lookup(name: &str) -> Option<&'static EnvVar> {
+    |        ^^^^^^
+
+warning: function `resolve_one_shot_mode` is never used
+   --> crates/maos-bin/src/verbs.rs:238:8
+    |
+238 | pub fn resolve_one_shot_mode(requested: &str) -> Option<OneShotMode> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-bin` (bin "maos") generated 14 warnings (run `cargo fix --bin "maos" -p maos-bin` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.91s
+{
+  "passed": false,
+  "binary-path": "/home/lunarpulse/dev_ws/target/debug/maos",
+  "network-symbols-found": [
+    "0000000000a79490 T <std::net::tcp::TcpListener>::bind::<(core::net::ip_addr::Ipv4Addr, u16)>",
+    "0000000000a6c9c0 T core::ptr::drop_glue::<std::net::tcp::TcpListener>",
+    "0000000000a6ca70 T core::ptr::drop_glue::<std::sys::net::connection::socket::TcpListener>",
+    "0000000000a79530 T std::sys::net::connection::each_addr::<(core::net::ip_addr::Ipv4Addr, u16), <std::sys::net::connection::socket::TcpListener>::bind::inner, std::sys::net::connection::socket::TcpListener>",
+    "0000000000aeba50 T <std::net::tcp::TcpListener>::local_addr",
+    "0000000000aeba70 T <std::net::tcp::TcpListener>::take_error",
+    "0000000000aebb40 T <std::net::tcp::TcpListener>::set_nonblocking",
+    "0000000000b0cc70 T <std::sys::net::connection::socket::TcpListener>::bind::inner",
+    "0000000000a68700 T <core::result::Result<std::net::tcp::TcpListener, core::io::error::Error> as core::ops::try_trait::Try>::branch",
+    "0000000000a6ced0 t <<std::sys::net::connection::socket::TcpListener>::bind::inner as core::ops::function::FnMut<(&core::net::socket_addr::SocketAddr,)>>::call_mut",
+    "                 U getaddrinfo"
+  ],
+  "dirty-fixture-result": {
+    "fixture-path": "/tmp/maos-20-2-dev202/maos-default",
+    "correctly-rejected": true,
+    "symbols-found": [
+      "0000000003769ff0 T <mio::io_source::IoSource<std::net::tcp::TcpListener>>::do_io::<<mio::net::tcp::listener::TcpListener>::accept::{closure#0}, (mio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr)>",
+      "0000000001445f10 T <core::option::Option<alloc::vec::Vec<alloc::vec::Vec<u8>>>>::unwrap_or_else::<<tokio_rustls::client::TlsConnector>::connect_impl<tokio::net::tcp::stream::TcpStream, <tokio_rustls::client::TlsConnector>::connect<tokio::net::tcp::stream::TcpStream>::{closure#0}>::{closure#0}>",
+      "0000000001445f80 T <core::option::Option<std::sync::poison::mutex::MutexGuard<core::option::Option<(u64, u64)>>>>::and_then::<(u64, u64), <maos_a2a_tcp::transport::TcpA2ATransport>::last_intake_observed::{closure#0}>",
+      "0000000002e3cd60 T <core::option::Option<alloc::string::String>>::map::<alloc::string::String, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::new::{closure#0}>",
+      "00000000014462f0 T <core::option::Option<core::io::error::Error>>::unwrap_or_else::<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}::{closure#0}>",
+      "0000000002835b10 T <core::option::Option<core::io::error::Error>>::unwrap_or_else::<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}::{closure#0}>",
+      "0000000001163b60 t <core::option::Option<core::io::error::Error>>::unwrap_or_else::<<tokio::net::tcp::listener::TcpListener>::bind<core::net::socket_addr::SocketAddr>::{closure#0}::{closure#0}>",
+      "0000000001446340 T <core::option::Option<&mut core::io::io_slice::IoSliceMut>>::map_or::<&mut [u8], std::io::default_read_vectored<<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_vectored::{closure#0}>::{closure#1}>",
+      "0000000001446540 T <core::option::Option<&str>>::ok_or_else::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::dial_addr::{closure#0}>",
+      "0000000002e3d5e0 T <core::option::Option<&str>>::map::<alloc::string::String, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#1}>",
+      "0000000002e3d6e0 T <core::option::Option<&str>>::map::<(&str, &str), <maos_mcp::transport::streamable_http::StreamableHttpTransport>::legacy_post::{closure#0}>",
+      "0000000002e3d770 T <core::option::Option<&str>>::map::<(&str, &str), <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#2}>",
+      "00000000014465e0 T <core::option::Option<(alloc::vec::Vec<rustls_pki_types::CertificateDer>, rustls_pki_types::PrivateKeyDer)>>::ok_or_else::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::scoped_client_config::{closure#0}>",
+      "0000000001449070 T <core::result::Result<core::option::Option<bytes::bytes_mut::BytesMut>, core::io::error::Error>>::map_err::<core::io::error::Error, <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#0}>",
+      "0000000001449120 T <core::result::Result<core::option::Option<bytes::bytes_mut::BytesMut>, core::io::error::Error>>::map_err::<core::io::error::Error, <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#1}>",
+      "0000000001354db0 t <core::result::Result<core::option::Option<bytes::bytes_mut::BytesMut>, core::io::error::Error>>::map_err::<core::io::error::Error, <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#0}>",
+      "0000000001354e60 t <core::result::Result<core::option::Option<bytes::bytes_mut::BytesMut>, core::io::error::Error>>::map_err::<core::io::error::Error, <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#1}>",
+      "0000000002e23390 T <core::result::Result<alloc::vec::Vec<u8>, serde_json::error::Error>>::map_err::<maos_mcp::transport::McpTransportError, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#3}>",
+      "00000000013578f0 t <core::result::Result<alloc::vec::Vec<u8>, serde_json::error::Error>>::map_err::<maos_a2a_tcp::error::TcpTransportError, maos_a2a_tcp::transport::send_response<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::{closure#0}::{closure#0}>",
+      "0000000001449350 T <core::result::Result<alloc::vec::Vec<u8>, serde_json::error::Error>>::map_err::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::dial_once::{closure#0}::{closure#0}>",
+      "000000000135f010 t <core::result::Result<maos_a2a_core::router::A2ARouterCore, maos_a2a_core::error::A2AError>>::map_err::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#1}>",
+      "00000000013603f0 t <core::result::Result<maos_a2a_tcp::transport::TcpA2ATransport, maos_a2a_tcp::error::TcpTransportError>>::map_err::<alloc::string::String, maos::build_a2a_tcp_daemon_router::{closure#0}::{closure#0}>",
+      "0000000001360520 t <core::result::Result<maos_a2a_tcp::transport::TcpA2ATransport, maos_a2a_tcp::error::TcpTransportError>>::map_err::<alloc::string::String, maos::build_cohort_a2a_daemon_runtime::{closure#0}::{closure#1}>",
+      "0000000001360650 t <core::result::Result<maos_a2a_tcp::transport::TcpA2ATransport, maos_a2a_tcp::error::TcpTransportError>>::map_err::<alloc::string::String, maos::main::{closure#0}::{closure#34}>",
+      "0000000001449bb0 T <core::result::Result<rustls::common_state::IoState, rustls::error::Error>>::map_err::<core::io::error::Error, <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::read_io::{closure#0}>",
+      "00000000013636c0 t <core::result::Result<rustls::common_state::IoState, rustls::error::Error>>::map_err::<core::io::error::Error, <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::read_io::{closure#0}>",
+      "0000000001449c90 T <core::result::Result<core::net::socket_addr::SocketAddr, core::net::parser::AddrParseError>>::map_err::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::dial_addr::{closure#1}>",
+      "0000000001363ea0 t <core::result::Result<core::net::socket_addr::SocketAddr, core::io::error::Error>>::map_err::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#3}>",
+      "0000000002e236a0 T <core::result::Result<maos_domain::ports::io_subsystem::HttpExchange, maos_domain::ports::io_subsystem::IoError>>::map_err::<maos_mcp::transport::McpTransportError, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#4}>",
+      "0000000001449fe0 T <core::result::Result<maos_a2a_core::transport::json_rpc::A2AJsonRpcResponse, serde_json::error::Error>>::map_err::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::dial_once::{closure#0}::{closure#1}>",
+      "00000000013665d0 t <core::result::Result<std::net::tcp::TcpListener, core::io::error::Error>>::map_err::<alloc::string::String, <maos_registry::server::SpiritRegistryServer>::run::{closure#0}::{closure#0}>",
+      "0000000001366dd0 t <core::result::Result<tokio::net::tcp::listener::TcpListener, core::io::error::Error>>::map_err::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#2}>",
+      "000000000376a4e0 T <core::result::Result<(std::net::tcp::TcpStream, core::net::socket_addr::SocketAddr), core::io::error::Error>>::map::<(mio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr), <mio::net::tcp::listener::TcpListener>::accept::{closure#0}::{closure#0}>",
+      "0000000001369f40 t <core::result::Result<(), maos_a2a_core::error::A2AError>>::map_err::<maos_a2a_tcp::error::TcpTransportError, <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#0}>",
+      "000000000136b4b0 t <core::result::Result<(), core::io::error::Error>>::map_err::<maos_a2a_tcp::error::TcpTransportError, maos_a2a_tcp::transport::send_response<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::{closure#0}::{closure#1}>",
+      "0000000001486b50 T <tokio_rustls::client::TlsConnector>::connect_impl::<tokio::net::tcp::stream::TcpStream, <tokio_rustls::client::TlsConnector>::connect<tokio::net::tcp::stream::TcpStream>::{closure#0}>",
+      "0000000001486ff0 T <tokio_rustls::client::TlsConnector>::connect::<tokio::net::tcp::stream::TcpStream>",
+      "00000000014785c0 T <core::task::poll::Poll<tokio::time::error::Elapsed>>::map::<core::result::Result<core::result::Result<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>, core::result::Result<core::result::Result<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>::Err>",
+      "00000000013a1d90 t <core::task::poll::Poll<tokio::time::error::Elapsed>>::map::<core::result::Result<core::result::Result<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>, core::result::Result<core::result::Result<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>::Err>",
+      "0000000002855060 T <core::task::poll::Poll<tokio::time::error::Elapsed>>::map::<core::result::Result<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>, core::result::Result<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>::Err>",
+      "0000000001478630 T <core::task::poll::Poll<tokio::time::error::Elapsed>>::map::<core::result::Result<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>, core::result::Result<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>::Err>",
+      "000000000147b0e0 T <tokio::net::tcp::stream::TcpStream>::connect::<core::net::socket_addr::SocketAddr>",
+      "0000000002851a90 T <tokio::net::tcp::stream::TcpStream>::connect::<(core::net::ip_addr::IpAddr, u16)>",
+      "0000000001107c20 t <tokio::net::tcp::listener::TcpListener>::bind::<core::net::socket_addr::SocketAddr>",
+      "000000000376a750 T <mio::sys::unix::selector::stateless_io_source::IoSourceState>::do_io::<std::net::tcp::TcpListener, <mio::net::tcp::listener::TcpListener>::accept::{closure#0}, (mio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr)>",
+      "0000000003714560 T <tokio::runtime::io::registration::Registration>::deregister::<mio::net::tcp::listener::TcpListener>",
+      "0000000003714770 T <tokio::runtime::io::registration::Registration>::new_with_interest_and_handle::<mio::net::tcp::listener::TcpListener>",
+      "0000000001136270 t <tokio::runtime::io::registration::Registration>::async_io::<(mio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr), <tokio::net::tcp::listener::TcpListener>::accept::{closure#0}::{closure#0}>",
+      "00000000036f5370 T <tokio::runtime::io::driver::Handle>::add_source::<mio::net::tcp::listener::TcpListener>",
+      "00000000036f5c20 T <tokio::runtime::io::driver::Handle>::deregister_source::<mio::net::tcp::listener::TcpListener>",
+      "00000000036e7810 T <mio::poll::Registry>::deregister::<mio::net::tcp::listener::TcpListener>",
+      "00000000036e7870 T <mio::poll::Registry>::register::<mio::net::tcp::listener::TcpListener>",
+      "000000000148bdf0 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>>::poll_with::<usize, <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write_vectored::{closure#0}>",
+      "000000000148bef0 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>>::poll_with::<usize, <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write::{closure#0}>",
+      "000000000148bff0 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>>::poll_with::<(), <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::flush::{closure#0}>",
+      "0000000002816fa0 T <std::net::tcp::TcpListener>::bind::<core::net::socket_addr::SocketAddr>",
+      "0000000001066fb0 t <std::net::tcp::TcpListener>::bind::<&alloc::string::String>",
+      "0000000002e48be0 T <std::net::tcp::TcpListener>::bind::<&str>",
+      "0000000003856d40 T <std::net::tcp::TcpListener>::bind::<(core::net::ip_addr::Ipv4Addr, u16)>",
+      "0000000001137260 t <tokio_rustls::server::TlsAcceptor>::accept_with::<tokio::net::tcp::stream::TcpStream, <tokio_rustls::server::TlsAcceptor>::accept<tokio::net::tcp::stream::TcpStream>::{closure#0}>",
+      "00000000011375f0 t <tokio_rustls::server::TlsAcceptor>::accept::<tokio::net::tcp::stream::TcpStream>",
+      "0000000001478740 T <core::task::poll::Poll<core::result::Result<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, (core::io::error::Error, tokio::net::tcp::stream::TcpStream)>>>::map_err::<core::io::error::Error, <tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream> as core::future::future::Future>::poll::{closure#0}>",
+      "00000000013a1e70 t <core::task::poll::Poll<core::result::Result<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, (core::io::error::Error, tokio::net::tcp::stream::TcpStream)>>>::map_err::<core::io::error::Error, <tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream> as core::future::future::Future>::poll::{closure#0}>",
+      "0000000001478860 T <core::task::poll::Poll<core::result::Result<usize, core::io::error::Error>>>::map_err::<core::io::error::Error, <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#2}>",
+      "00000000013a1f90 t <core::task::poll::Poll<core::result::Result<usize, core::io::error::Error>>>::map_err::<core::io::error::Error, <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#2}>",
+      "000000000289ddd0 T tokio_postgres::connect_socket::connect_with_timeout::<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}, tokio::net::tcp::stream::TcpStream>",
+      "000000000144d2e0 T std::io::append_to_string::<std::io::default_read_to_string<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream>>::{closure#0}>",
+      "000000000144d7d0 T std::io::default_read_buf::<<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_buf::{closure#0}>",
+      "000000000144d940 T std::io::default_write_fmt::<tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>>",
+      "000000000144da30 T std::io::default_read_exact::<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream>>",
+      "000000000144dcf0 T std::io::default_read_to_end::<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream>>",
+      "000000000144e3a0 T std::io::default_read_vectored::<<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_vectored::{closure#0}>",
+      "000000000144e460 T std::io::default_read_buf_exact::<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream>>",
+      "000000000145c6c0 T futures_util::future::assert_future::<core::option::Option<core::result::Result<bytes::bytes_mut::BytesMut, core::io::error::Error>>, futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>",
+      "00000000011b1130 t futures_util::future::assert_future::<core::option::Option<core::result::Result<bytes::bytes_mut::BytesMut, core::io::error::Error>>, futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>",
+      "000000000145c6d0 T futures_util::future::assert_future::<core::result::Result<(), core::io::error::Error>, futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>",
+      "00000000011b1160 t futures_util::future::assert_future::<core::result::Result<(), core::io::error::Error>, futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>",
+      "000000000104b1c0 t maos_a2a_tcp::transport::send_response::<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>",
+      "00000000011d8da0 t core::mem::drop::<alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport>>",
+      "0000000001488870 T core::mem::replace::<tokio_rustls::common::handshake::MidHandshake<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>>>",
+      "00000000011d9730 t core::mem::replace::<tokio_rustls::common::handshake::MidHandshake<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>>",
+      "000000000372ab60 T core::ptr::drop_glue::<core::option::Option<mio::net::tcp::listener::TcpListener>>",
+      "0000000001083220 t core::ptr::drop_glue::<core::result::Result<(tokio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr), core::io::error::Error>>",
+      "0000000001083ab0 t core::ptr::drop_glue::<alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport>>",
+      "0000000001083de0 t core::ptr::drop_glue::<alloc::sync::Weak<maos_a2a_tcp::transport::TcpA2ATransport, &alloc::alloc::Global>>",
+      "0000000001084340 t core::ptr::drop_glue::<alloc::sync::ArcInner<maos_a2a_tcp::transport::TcpA2ATransport>>",
+      "00000000019ff910 T core::ptr::drop_glue::<alloc::sync::ArcInner<maos_mcp::transport::streamable_http::StreamableHttpTransport>>",
+      "000000000376d0b0 T core::ptr::drop_glue::<mio::io_source::IoSource<std::net::tcp::TcpListener>>",
+      "00000000014516c0 T core::ptr::drop_glue::<tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>>",
+      "00000000014516d0 T core::ptr::drop_glue::<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>>",
+      "0000000001086460 t core::ptr::drop_glue::<tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>>",
+      "0000000001086470 t core::ptr::drop_glue::<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>",
+      "0000000001451780 T core::ptr::drop_glue::<tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames>>",
+      "0000000001086c10 t core::ptr::drop_glue::<tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames>>",
+      "00000000014517e0 T core::ptr::drop_glue::<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>",
+      "0000000001086c70 t core::ptr::drop_glue::<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>",
+      "0000000001451850 T core::ptr::drop_glue::<futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>",
+      "0000000001086d10 t core::ptr::drop_glue::<futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>",
+      "0000000001451860 T core::ptr::drop_glue::<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>",
+      "0000000001086d20 t core::ptr::drop_glue::<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>",
+      "000000000372c280 T core::ptr::drop_glue::<tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener>>",
+      "0000000001451890 T core::ptr::drop_glue::<tokio::time::timeout::Timeout<tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>>>",
+      "0000000001086d30 t core::ptr::drop_glue::<tokio::time::timeout::Timeout<tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>>>",
+      "00000000014518f0 T core::ptr::drop_glue::<tokio::time::timeout::Timeout<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>>",
+      "0000000001451950 T core::ptr::drop_glue::<tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>>",
+      "0000000001086eb0 t core::ptr::drop_glue::<tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>>",
+      "0000000001451960 T core::ptr::drop_glue::<tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}>>",
+      "0000000002874340 T core::ptr::drop_glue::<tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}>>",
+      "00000000014519c0 T core::ptr::drop_glue::<tokio_rustls::common::handshake::MidHandshake<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>>>",
+      "0000000001086f20 t core::ptr::drop_glue::<tokio_rustls::common::handshake::MidHandshake<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>>",
+      "0000000001451bb0 T core::ptr::drop_glue::<std::io::default_write_fmt::Adapter<tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>>>",
+      "0000000001451c10 T core::ptr::drop_glue::<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}>",
+      "00000000028749d0 T core::ptr::drop_glue::<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}>",
+      "000000000108b980 t core::ptr::drop_glue::<<tokio::net::tcp::listener::TcpListener>::bind<core::net::socket_addr::SocketAddr>::{closure#0}>",
+      "000000000108ba10 t core::ptr::drop_glue::<<tokio::runtime::io::registration::Registration>::async_io<(mio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr), <tokio::net::tcp::listener::TcpListener>::accept::{closure#0}::{closure#0}>::{closure#0}>",
+      "0000000002875c20 T core::ptr::drop_glue::<tokio_postgres::connect_socket::connect_with_timeout<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}, tokio::net::tcp::stream::TcpStream>::{closure#0}>",
+      "000000000108bd80 t core::ptr::drop_glue::<maos_a2a_tcp::transport::send_response<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::{closure#0}>",
+      "0000000002876a50 T core::ptr::drop_glue::<<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}>",
+      "0000000001452660 T core::ptr::drop_glue::<<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}>",
+      "0000000002876ae0 T core::ptr::drop_glue::<<tokio::net::tcp::stream::TcpStream>::connect_addr::{closure#0}>",
+      "00000000014526f0 T core::ptr::drop_glue::<<tokio::net::tcp::stream::TcpStream>::connect_addr::{closure#0}>",
+      "000000000109bba0 t core::ptr::drop_glue::<<tokio::net::tcp::listener::TcpListener>::accept::{closure#0}>",
+      "000000000109bc00 t core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}>",
+      "000000000109c710 t core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring::{closure#0}>",
+      "0000000001452760 T core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}>",
+      "000000000109c880 t core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_manifest_gate::{closure#0}>",
+      "000000000109c9c0 t core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_digest::{closure#0}>",
+      "000000000109cba0 t core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_crossing::{closure#0}>",
+      "000000000109cdc0 t core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::bind::{closure#0}>",
+      "0000000001452a90 T core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport>::dial_once::{closure#0}>",
+      "0000000001452fb0 T core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport as maos_a2a_core::router::A2APeerRouter>::handle_intake::{closure#0}>",
+      "0000000001453050 T core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport as maos_a2a_core::router::A2APeerRouter>::route_outbound::{closure#0}>",
+      "00000000014530e0 T core::ptr::drop_glue::<<maos_a2a_tcp::transport::TcpA2ATransport as maos_domain::ports::a2a::A2ARouter>::route_outbound::{closure#0}>",
+      "00000000010a4cc0 t core::ptr::drop_glue::<maos_a2a_tcp::transport::TcpA2ATransport>",
+      "0000000001a00eb0 T core::ptr::drop_glue::<maos_mcp::transport::streamable_http::StreamableHttpTransport>",
+      "000000000382e4a0 T core::ptr::drop_glue::<std::net::tcp::TcpListener>",
+      "000000000376d160 T core::ptr::drop_glue::<std::net::tcp::TcpListener>",
+      "0000000002e73f50 T core::ptr::drop_glue::<std::net::tcp::TcpListener>",
+      "000000000376d1d0 T core::ptr::drop_glue::<mio::net::tcp::listener::TcpListener>",
+      "000000000372e110 T core::ptr::drop_glue::<tokio::net::tcp::stream::TcpStream>",
+      "00000000010a6b00 t core::ptr::drop_glue::<tokio::net::tcp::listener::TcpListener>",
+      "000000000382e560 T core::ptr::drop_glue::<std::sys::net::connection::socket::TcpListener>",
+      "000000000376d220 T core::ptr::drop_glue::<std::sys::net::connection::socket::TcpListener>",
+      "0000000002e740d0 T core::ptr::drop_glue::<std::sys::net::connection::socket::TcpListener>",
+      "00000000010a7b70 t core::ptr::drop_glue::<(tokio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr)>",
+      "0000000001463590 T tokio_util::util::poll_buf::poll_read_buf::<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, bytes::bytes_mut::BytesMut>",
+      "000000000134c710 t tokio_util::util::poll_buf::poll_read_buf::<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, bytes::bytes_mut::BytesMut>",
+      "00000000014636e0 T tokio_util::util::poll_buf::poll_write_buf::<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, bytes::bytes_mut::BytesMut>",
+      "000000000134c860 t tokio_util::util::poll_buf::poll_write_buf::<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, bytes::bytes_mut::BytesMut>",
+      "000000000148ae20 T tokio::time::timeout::timeout::<tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>>",
+      "00000000013395d0 t tokio::time::timeout::timeout::<tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>>",
+      "000000000148b0b0 T tokio::time::timeout::timeout::<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>",
+      "000000000148b340 T tokio::time::timeout::timeout::<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>",
+      "0000000001339f70 t tokio::time::timeout::timeout::<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>",
+      "000000000148b5a0 T tokio::time::timeout::timeout::<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}>",
+      "00000000028a0220 T tokio::time::timeout::timeout::<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}>",
+      "0000000002860f70 T core::future::poll_fn::poll_fn::<core::result::Result<tokio::runtime::io::driver::ReadyEvent, core::io::error::Error>, <tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}>",
+      "000000000147c0e0 T core::future::poll_fn::poll_fn::<core::result::Result<tokio::runtime::io::driver::ReadyEvent, core::io::error::Error>, <tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}>",
+      "0000000002817000 T std::sys::net::connection::each_addr::<core::net::socket_addr::SocketAddr, <std::sys::net::connection::socket::TcpListener>::bind::inner, std::sys::net::connection::socket::TcpListener>",
+      "00000000010bcca0 t std::sys::net::connection::each_addr::<&alloc::string::String, <std::sys::net::connection::socket::TcpListener>::bind::inner, std::sys::net::connection::socket::TcpListener>",
+      "0000000002e63300 T std::sys::net::connection::each_addr::<&str, <std::sys::net::connection::socket::TcpListener>::bind::inner, std::sys::net::connection::socket::TcpListener>",
+      "0000000003856de0 T std::sys::net::connection::each_addr::<(core::net::ip_addr::Ipv4Addr, u16), <std::sys::net::connection::socket::TcpListener>::bind::inner, std::sys::net::connection::socket::TcpListener>",
+      "000000000144e6e0 T std::io::default_read_to_end::small_probe_read::<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream>>",
+      "000000000148e2d0 T <core::slice::iter::Iter<core::io::io_slice::IoSlice> as core::iter::traits::iterator::Iterator>::all::<<tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection> as tokio::io::async_write::AsyncWrite>::poll_write_vectored::{closure#0}>",
+      "0000000001043aa0 t <core::slice::iter::Iter<core::io::io_slice::IoSlice> as core::iter::traits::iterator::Iterator>::all::<<tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection> as tokio::io::async_write::AsyncWrite>::poll_write_vectored::{closure#0}>",
+      "000000000148e380 T <core::slice::iter::IterMut<core::io::io_slice::IoSliceMut> as core::iter::traits::iterator::Iterator>::find::<std::io::default_read_vectored<<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_vectored::{closure#0}>::{closure#0}>",
+      "0000000002e3b470 T <core::str::iter::Bytes as core::iter::traits::iterator::Iterator>::all::<<maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#0}>",
+      "0000000002e3cc70 T <core::iter::adapters::copied::Copied<core::slice::iter::Iter<u8>> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::all::check<u8, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+      "0000000002e3f990 T <core::slice::iter::Iter<u8> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::adapters::copied::copy_try_fold<u8, (), core::ops::control_flow::ControlFlow<()>, core::iter::traits::iterator::Iterator::all::check<u8, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#0}>::{closure#0}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>",
+      "0000000002e3cc80 T <core::iter::adapters::copied::Copied<core::slice::iter::Iter<u8>> as core::iter::traits::iterator::Iterator>::all::<<maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#0}>",
+      "0000000001487080 T <tokio_rustls::client::TlsConnector>::connect_impl::<tokio::net::tcp::stream::TcpStream, <tokio_rustls::client::TlsConnector>::connect<tokio::net::tcp::stream::TcpStream>::{closure#0}>::{closure#0}",
+      "00000000014870c0 T <tokio_rustls::client::TlsConnector>::connect::<tokio::net::tcp::stream::TcpStream>::{closure#0}",
+      "000000000147b110 T <tokio::net::tcp::stream::TcpStream>::connect::<core::net::socket_addr::SocketAddr>::{closure#0}",
+      "0000000002851ab0 T <tokio::net::tcp::stream::TcpStream>::connect::<(core::net::ip_addr::IpAddr, u16)>::{closure#0}",
+      "0000000001107c50 t <tokio::net::tcp::listener::TcpListener>::bind::<core::net::socket_addr::SocketAddr>::{closure#0}",
+      "0000000001136290 t <tokio::runtime::io::registration::Registration>::async_io::<(mio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr), <tokio::net::tcp::listener::TcpListener>::accept::{closure#0}::{closure#0}>::{closure#0}",
+      "0000000001137640 t <tokio_rustls::server::TlsAcceptor>::accept::<tokio::net::tcp::stream::TcpStream>::{closure#0}",
+      "000000000289de70 T tokio_postgres::connect_socket::connect_with_timeout::<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}, tokio::net::tcp::stream::TcpStream>::{closure#0}",
+      "000000000144e8d0 T std::io::default_read_to_end::<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream>>::{closure#0}",
+      "000000000144e9e0 T std::io::default_read_vectored::<<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_vectored::{closure#0}>::{closure#0}",
+      "000000000144ea30 T std::io::default_read_vectored::<<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_vectored::{closure#0}>::{closure#1}",
+      "000000000144ea80 T std::io::default_read_to_string::<tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream>>::{closure#0}",
+      "000000000104b230 t maos_a2a_tcp::transport::send_response::<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::{closure#0}",
+      "0000000002e3ccb0 T core::iter::adapters::copied::copy_try_fold::<u8, (), core::ops::control_flow::ControlFlow<()>, core::iter::traits::iterator::Iterator::all::check<u8, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#0}>::{closure#0}>::{closure#0}",
+      "0000000002e36500 T core::iter::traits::iterator::Iterator::all::check::<u8, <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#0}>::{closure#0}",
+      "000000000147b840 T <tokio::net::tcp::stream::TcpStream>::connect::<core::net::socket_addr::SocketAddr>::{closure#0}::{closure#0}",
+      "00000000028521e0 T <tokio::net::tcp::stream::TcpStream>::connect::<(core::net::ip_addr::IpAddr, u16)>::{closure#0}::{closure#0}",
+      "0000000001108260 t <tokio::net::tcp::listener::TcpListener>::bind::<core::net::socket_addr::SocketAddr>::{closure#0}::{closure#0}",
+      "000000000104b970 t maos_a2a_tcp::transport::send_response::<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::{closure#0}::{closure#0}",
+      "000000000104ba80 t maos_a2a_tcp::transport::send_response::<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::{closure#0}::{closure#1}",
+      "000000000376d6a0 t <mio::net::tcp::listener::TcpListener>::accept::{closure#0}::{closure#0}",
+      "0000000002852200 T <tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}",
+      "000000000147b860 T <tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}",
+      "0000000001108280 t <tokio::net::tcp::listener::TcpListener>::accept::{closure#0}::{closure#0}",
+      "000000000104bb90 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#0}",
+      "000000000104bc30 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#2}",
+      "000000000104bd70 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#3}",
+      "000000000104be80 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}::{closure#1}",
+      "0000000001455260 T <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::{closure#0}",
+      "0000000001455280 T <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::{closure#2}",
+      "00000000014552a0 T <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::{closure#1}",
+      "00000000014552c0 T <maos_a2a_tcp::transport::TcpA2ATransport>::dial_once::{closure#0}::{closure#0}",
+      "00000000014553d0 T <maos_a2a_tcp::transport::TcpA2ATransport>::dial_once::{closure#0}::{closure#1}",
+      "0000000002e2e240 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::legacy_post::{closure#0}",
+      "0000000002e2e260 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::new::{closure#0}",
+      "0000000002e2e300 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#0}",
+      "0000000002e2e320 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#2}",
+      "0000000002e2e340 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#3}",
+      "0000000002e2e450 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#4}",
+      "0000000002e2e550 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post::{closure#1}",
+      "000000000376d800 t <mio::net::tcp::listener::TcpListener>::accept::{closure#0}",
+      "0000000002852240 T <tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}",
+      "000000000147b8a0 T <tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}",
+      "00000000028526a0 T <tokio::net::tcp::stream::TcpStream>::connect_addr::{closure#0}",
+      "000000000147bd00 T <tokio::net::tcp::stream::TcpStream>::connect_addr::{closure#0}",
+      "00000000011082b0 t <tokio::net::tcp::listener::TcpListener>::accept::{closure#0}",
+      "00000000014554e0 t <maos_a2a_tcp::transport::TcpA2ATransport>::last_intake_observed::{closure#0}",
+      "0000000001455580 t <maos_a2a_tcp::transport::TcpA2ATransport>::scoped_client_config::{closure#0}",
+      "000000000104c8e0 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0}",
+      "0000000001050740 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring::{closure#0}",
+      "00000000014555f0 T <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}",
+      "0000000001050bc0 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_manifest_gate::{closure#0}",
+      "0000000001050ff0 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_digest::{closure#0}",
+      "00000000010514a0 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_crossing::{closure#0}",
+      "0000000001051990 t <maos_a2a_tcp::transport::TcpA2ATransport>::bind::{closure#0}",
+      "0000000001457800 t <maos_a2a_tcp::transport::TcpA2ATransport>::dial_addr::{closure#0}",
+      "00000000014578b0 t <maos_a2a_tcp::transport::TcpA2ATransport>::dial_addr::{closure#1}",
+      "0000000001457990 T <maos_a2a_tcp::transport::TcpA2ATransport>::dial_once::{closure#0}",
+      "000000000148c0c0 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::read_io::{closure#0}",
+      "00000000011d3220 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::read_io::{closure#0}",
+      "00000000014870d0 T <tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream> as core::future::future::Future>::poll::{closure#0}",
+      "000000000148c1b0 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection> as tokio::io::async_write::AsyncWrite>::poll_write_vectored::{closure#0}",
+      "00000000011d3300 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection> as tokio::io::async_write::AsyncWrite>::poll_write_vectored::{closure#0}",
+      "0000000001137650 t <tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream> as core::future::future::Future>::poll::{closure#0}",
+      "000000000148c1e0 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write_vectored::{closure#0}",
+      "000000000148c210 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::flush::{closure#0}",
+      "000000000148c220 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write::{closure#0}",
+      "000000000144f320 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#0}",
+      "000000000144f330 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#2}",
+      "000000000144f340 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#1}",
+      "00000000010bbc50 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#0}",
+      "00000000010bbc60 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#2}",
+      "00000000010bbc70 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next::{closure#1}",
+      "0000000001459d20 t <maos_a2a_tcp::transport::TcpA2ATransport as maos_a2a_core::router::A2APeerRouter>::handle_intake::{closure#0}",
+      "000000000145a100 t <maos_a2a_tcp::transport::TcpA2ATransport as maos_a2a_core::router::A2APeerRouter>::route_outbound::{closure#0}",
+      "000000000145a5d0 t <maos_a2a_tcp::transport::TcpA2ATransport as maos_domain::ports::a2a::A2ARouter>::route_outbound::{closure#0}",
+      "000000000144eaa0 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_vectored::{closure#0}",
+      "000000000144eab0 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_buf::{closure#0}",
+      "000000000144ac60 T core::result::Result::<core::result::Result<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>::Err",
+      "000000000136be60 t core::result::Result::<core::result::Result<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>::Err",
+      "0000000002895450 T core::result::Result::<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>::Err",
+      "000000000144ac70 T core::result::Result::<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>::Err",
+      "000000000376ad50 t <mio::io_source::IoSource<std::net::tcp::TcpListener>>::new",
+      "00000000037262a0 T <core::option::Option<mio::net::tcp::listener::TcpListener>>::take",
+      "00000000037262d0 T <core::option::Option<mio::net::tcp::listener::TcpListener>>::as_ref",
+      "0000000002e24290 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::initialize",
+      "0000000002e25c50 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::legacy_call",
+      "0000000002e26220 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::legacy_post",
+      "0000000002e26480 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::modern_call",
+      "0000000002e268c0 T <maos_mcp::transport::streamable_http::StreamableHttpTransport>::new",
+      "0000000002e26a20 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::post",
+      "0000000002e27620 t <maos_mcp::transport::streamable_http::StreamableHttpTransport>::cache",
+      "000000000145c2a0 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>::new",
+      "0000000001075350 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>::new",
+      "0000000003709620 T <tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener>>::registration",
+      "0000000003709630 t <tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener>>::new_with_interest",
+      "00000000037096f0 t <tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener>>::new_with_interest_and_handle",
+      "0000000003709870 t <tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener>>::new",
+      "000000000148b830 T <tokio::time::timeout::Timeout<tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>>>::new_with_delay",
+      "000000000133a460 t <tokio::time::timeout::Timeout<tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>>>::new_with_delay",
+      "000000000148b870 T <tokio::time::timeout::Timeout<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>>::new_with_delay",
+      "000000000148b8b0 T <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>>::new_with_delay",
+      "000000000133a560 t <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>>::new_with_delay",
+      "000000000148b8f0 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}>>::new_with_delay",
+      "00000000028a1c20 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}>>::new_with_delay",
+      "000000000376e1d0 T <mio::net::tcp::listener::TcpListener>::local_addr",
+      "000000000376e210 T <mio::net::tcp::listener::TcpListener>::bind",
+      "000000000376e530 T <mio::net::tcp::listener::TcpListener>::accept",
+      "000000000376e550 T <mio::net::tcp::listener::TcpListener>::from_std",
+      "0000000003702270 T <tokio::net::tcp::stream::TcpStream>::connect_mio",
+      "0000000003702290 T <tokio::net::tcp::stream::TcpStream>::set_nodelay",
+      "00000000037022c0 T <tokio::net::tcp::stream::TcpStream>::connect_addr",
+      "00000000037022f0 t <tokio::net::tcp::stream::TcpStream>::shutdown_std",
+      "0000000003702410 t <tokio::net::tcp::stream::TcpStream>::poll_read_priv",
+      "0000000003702420 t <tokio::net::tcp::stream::TcpStream>::poll_write_priv",
+      "0000000003702430 t <tokio::net::tcp::stream::TcpStream>::poll_write_vectored_priv",
+      "0000000003702440 T <tokio::net::tcp::stream::TcpStream>::new",
+      "0000000003702520 T <tokio::net::tcp::stream::TcpStream>::peer_addr",
+      "0000000003715a50 T <tokio::net::tcp::listener::TcpListener>::local_addr",
+      "0000000003715a90 t <tokio::net::tcp::listener::TcpListener>::new",
+      "0000000003715b70 T <tokio::net::tcp::listener::TcpListener>::accept",
+      "0000000003715b80 T <tokio::net::tcp::listener::TcpListener>::bind_addr",
+      "000000000144f350 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames>>::project",
+      "00000000010bbc80 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames>>::project",
+      "000000000145c3d0 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>::project",
+      "0000000001075480 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>::project",
+      "000000000148b930 T <tokio::time::timeout::Timeout<tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>>>::project",
+      "000000000133a5e0 t <tokio::time::timeout::Timeout<tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>>>::project",
+      "000000000148b940 T <tokio::time::timeout::Timeout<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>>::project",
+      "000000000148b950 T <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>>::project",
+      "000000000133a620 t <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>>::project",
+      "000000000148b960 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}>>::project",
+      "00000000028a1ea0 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}>>::project",
+      "0000000001442da0 T <maos_a2a_tcp::transport::TcpA2ATransport>::last_intake_observed",
+      "0000000001442e00 T <maos_a2a_tcp::transport::TcpA2ATransport>::scoped_client_config",
+      "0000000001443380 T <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink",
+      "00000000014435a0 T <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring",
+      "0000000001443720 T <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed",
+      "0000000001443780 T <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_manifest_gate",
+      "00000000014438d0 T <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_digest",
+      "0000000001443a90 T <maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_crossing",
+      "0000000001443c90 T <maos_a2a_tcp::transport::TcpA2ATransport>::bind",
+      "0000000001443da0 T <maos_a2a_tcp::transport::TcpA2ATransport>::core",
+      "0000000001443db0 T <maos_a2a_tcp::transport::TcpA2ATransport>::pins",
+      "0000000001443dc0 T <maos_a2a_tcp::transport::TcpA2ATransport>::dial_addr",
+      "0000000001443f10 T <maos_a2a_tcp::transport::TcpA2ATransport>::dial_once",
+      "0000000001463580 T <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::get_ref",
+      "000000000391f910 T <std::net::tcp::TcpListener>::local_addr",
+      "000000000391f930 T <std::net::tcp::TcpListener>::take_error",
+      "000000000391ffd0 T <std::net::tcp::TcpListener>::set_nonblocking",
+      "000000000392c300 T <std::net::tcp::TcpListener>::accept",
+      "0000000002e50bc0 t <std::net::tcp::TcpListener>::incoming",
+      "0000000003920300 T <std::net::tcp::TcpListener>::try_clone",
+      "000000000148c250 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::as_mut_pin",
+      "000000000148c260 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::poll_fill_buf",
+      "000000000148c5d0 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::set_need_flush",
+      "000000000148c600 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::new",
+      "000000000148c620 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::read_io",
+      "000000000148c840 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::set_eof",
+      "000000000148c870 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::write_io",
+      "000000000148c980 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>>::handshake",
+      "00000000011d3330 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::as_mut_pin",
+      "00000000011d3340 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::poll_fill_buf",
+      "00000000011d36a0 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::set_need_flush",
+      "00000000011d36d0 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::new",
+      "00000000011d36f0 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::read_io",
+      "00000000011d3910 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::set_eof",
+      "00000000011d3940 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::write_io",
+      "00000000011d3a50 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>>::handshake",
+      "000000000146d5e0 T <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::sink_pin_mut",
+      "000000000146d5f0 T <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::is_item_pending",
+      "000000000146d600 T <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::new",
+      "00000000011accd0 t <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::sink_pin_mut",
+      "00000000011acce0 t <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::is_item_pending",
+      "00000000011accf0 t <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::new",
+      "000000000146d3d0 T <futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::new",
+      "000000000118a050 t <futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>>::new",
+      "000000000147a230 T <futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>::new",
+      "00000000013b3840 t <futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>>::new",
+      "0000000001174a20 t <alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport>>::new",
+      "0000000001aaed10 T <alloc::sync::Arc<maos_mcp::transport::streamable_http::StreamableHttpTransport>>::new",
+      "0000000001178040 t <alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport>>::drop_slow",
+      "0000000003bb6890 D <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::__CALLSITE",
+      "0000000003bb68a8 D <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::__CALLSITE",
+      "0000000003bb68c0 D <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::__CALLSITE",
+      "0000000003946280 T <std::sys::net::connection::socket::TcpListener>::bind::inner",
+      "000000000398a7f8 D <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::__CALLSITE::META",
+      "000000000398a880 D <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::__CALLSITE::META",
+      "000000000398a938 D <maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0}::__CALLSITE::META",
+      "000000000145c3e0 T <&mut tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_ready",
+      "000000000145c420 T <&mut tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::start_send",
+      "0000000001075490 t <&mut tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_ready",
+      "00000000010754c0 t <&mut tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::start_send",
+      "0000000002860fb0 T <core::future::poll_fn::PollFn<<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}> as core::future::into_future::IntoFuture>::into_future",
+      "000000000147c0f0 T <core::future::poll_fn::PollFn<<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}> as core::future::into_future::IntoFuture>::into_future",
+      "00000000014870f0 T <tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream> as core::future::into_future::IntoFuture>::into_future",
+      "0000000001137670 t <tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream> as core::future::into_future::IntoFuture>::into_future",
+      "000000000146d430 T <futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::future::into_future::IntoFuture>::into_future",
+      "000000000118a0b0 t <futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::future::into_future::IntoFuture>::into_future",
+      "000000000148b970 T <tokio::time::timeout::Timeout<tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>> as core::future::into_future::IntoFuture>::into_future",
+      "000000000133a640 t <tokio::time::timeout::Timeout<tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>> as core::future::into_future::IntoFuture>::into_future",
+      "000000000148b990 T <tokio::time::timeout::Timeout<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>> as core::future::into_future::IntoFuture>::into_future",
+      "000000000148b9b0 T <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>> as core::future::into_future::IntoFuture>::into_future",
+      "000000000133a6e0 t <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>> as core::future::into_future::IntoFuture>::into_future",
+      "000000000148b9d0 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}> as core::future::into_future::IntoFuture>::into_future",
+      "00000000028a1f40 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}> as core::future::into_future::IntoFuture>::into_future",
+      "000000000147a240 T <futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::future::into_future::IntoFuture>::into_future",
+      "00000000013b3850 t <futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::future::into_future::IntoFuture>::into_future",
+      "000000000147c000 T <<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "00000000028529a0 T <<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001108730 t <<tokio::net::tcp::listener::TcpListener>::bind<core::net::socket_addr::SocketAddr>::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001136ab0 t <<tokio::runtime::io::registration::Registration>::async_io<(mio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr), <tokio::net::tcp::listener::TcpListener>::accept::{closure#0}::{closure#0}>::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "000000000289f6d0 T <tokio_postgres::connect_socket::connect_with_timeout<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}, tokio::net::tcp::stream::TcpStream>::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001055af0 t <maos_a2a_tcp::transport::send_response<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>>::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "00000000028529c0 T <<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "000000000147c020 T <<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "00000000028529e0 T <<tokio::net::tcp::stream::TcpStream>::connect_addr::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "000000000147c040 T <<tokio::net::tcp::stream::TcpStream>::connect_addr::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001108750 t <<tokio::net::tcp::listener::TcpListener>::accept::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001055b30 t <<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_intake_sink::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001055b50 t <<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "000000000145ac00 T <<maos_a2a_tcp::transport::TcpA2ATransport>::route_outbound_observed::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001055b70 t <<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_manifest_gate::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001055b90 t <<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_digest::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001055bb0 t <<maos_a2a_tcp::transport::TcpA2ATransport>::bind_with_cohort_wiring_and_crossing::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001055bd0 t <<maos_a2a_tcp::transport::TcpA2ATransport>::bind::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "000000000145ac20 T <<maos_a2a_tcp::transport::TcpA2ATransport>::dial_once::{closure#0} as core::future::into_future::IntoFuture>::into_future",
+      "0000000001487a70 T <tokio_rustls::common::handshake::MidHandshake<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>> as core::future::future::Future>::poll",
+      "000000000137b6d0 t <tokio_rustls::common::handshake::MidHandshake<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>> as core::future::future::Future>::poll",
+      "0000000003705970 T <tokio::net::tcp::stream::TcpStream as std::os::fd::raw::AsRawFd>::as_raw_fd",
+      "000000000144eae0 T <std::io::default_write_fmt::Adapter<tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>> as core::fmt::Write>::write_str",
+      "000000000145c4e0 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_flush",
+      "000000000145c500 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_ready",
+      "000000000145c520 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::start_send",
+      "0000000001075590 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_flush",
+      "00000000010755b0 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_ready",
+      "00000000010755d0 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_sink::Sink<bytes::bytes::Bytes>>::start_send",
+      "000000000146d650 T <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::future::future::Future>::poll",
+      "00000000011acd90 t <futures_util::sink::feed::Feed<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::future::future::Future>::poll",
+      "000000000146d450 T <futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::future::future::Future>::poll",
+      "000000000118a0d0 t <futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::future::future::Future>::poll",
+      "000000000145ad40 T <core::pin::Pin<&mut tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>> as tokio::io::async_write::AsyncWrite>::is_write_vectored",
+      "000000000101f450 t <core::pin::Pin<&mut tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>> as tokio::io::async_write::AsyncWrite>::is_write_vectored",
+      "0000000001487110 T <&mut tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as core::ops::deref::Deref>::deref",
+      "000000000148cf10 T <&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection> as core::ops::deref::Deref>::deref",
+      "00000000011d3fe0 t <&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection> as core::ops::deref::Deref>::deref",
+      "0000000001137690 t <&mut tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as core::ops::deref::Deref>::deref",
+      "000000000144f380 T <&mut tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as core::ops::deref::Deref>::deref",
+      "00000000010bbcb0 t <&mut tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as core::ops::deref::Deref>::deref",
+      "00000000037059f0 T <&mut tokio::net::tcp::stream::TcpStream as core::ops::deref::Deref>::deref",
+      "0000000002861010 T <core::future::poll_fn::PollFn<<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}> as core::future::future::Future>::poll",
+      "000000000147c100 T <core::future::poll_fn::PollFn<<tokio::net::tcp::stream::TcpStream>::connect_mio::{closure#0}::{closure#0}> as core::future::future::Future>::poll",
+      "0000000003705a00 T <tokio::net::tcp::stream::TcpStream as tokio::io::async_read::AsyncRead>::poll_read",
+      "000000000376c660 T <mio::io_source::IoSource<std::net::tcp::TcpListener> as mio::event::source::Source>::deregister",
+      "000000000376c6f0 T <mio::io_source::IoSource<std::net::tcp::TcpListener> as mio::event::source::Source>::register",
+      "000000000370c550 T <tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener> as core::ops::deref::Deref>::deref",
+      "0000000001487120 T <&mut tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream> as core::ops::deref::DerefMut>::deref_mut",
+      "0000000001487130 T <&mut tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000148cf20 T <&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection> as core::ops::deref::DerefMut>::deref_mut",
+      "00000000011d3ff0 t <&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection> as core::ops::deref::DerefMut>::deref_mut",
+      "00000000011376a0 t <&mut tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream> as core::ops::deref::DerefMut>::deref_mut",
+      "00000000011376b0 t <&mut tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000144f390 T <&mut tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as core::ops::deref::DerefMut>::deref_mut",
+      "00000000010bbcc0 t <&mut tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000146d5d0 T <&mut futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000118a240 t <&mut futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000147a250 T <&mut futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::ops::deref::DerefMut>::deref_mut",
+      "00000000013b3860 t <&mut futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000145c5c0 T <&mut &mut tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as core::ops::deref::DerefMut>::deref_mut",
+      "0000000001075670 t <&mut &mut tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000147c060 T <&mut &mut tokio::net::tcp::stream::TcpStream as core::ops::deref::DerefMut>::deref_mut",
+      "000000000147a260 T <futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::future::future::Future>::poll",
+      "00000000013b3870 t <futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::future::future::Future>::poll",
+      "00000000029006e0 t <tokio::net::tcp::stream::TcpStream as tokio::io::async_write::AsyncWrite>::poll_flush",
+      "00000000014925a0 t <tokio::net::tcp::stream::TcpStream as tokio::io::async_write::AsyncWrite>::poll_flush",
+      "0000000003705e30 T <tokio::net::tcp::stream::TcpStream as tokio::io::async_write::AsyncWrite>::poll_write",
+      "0000000003705e80 T <tokio::net::tcp::stream::TcpStream as tokio::io::async_write::AsyncWrite>::poll_shutdown",
+      "0000000003705f10 T <tokio::net::tcp::stream::TcpStream as tokio::io::async_write::AsyncWrite>::poll_write_vectored",
+      "0000000001487140 T <tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream> as core::future::future::Future>::poll",
+      "000000000148cf30 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection> as tokio::io::async_write::AsyncWrite>::poll_flush",
+      "000000000148d0d0 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection> as tokio::io::async_write::AsyncWrite>::poll_write",
+      "000000000148d340 T <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection> as tokio::io::async_write::AsyncWrite>::poll_write_vectored",
+      "00000000011d4000 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection> as tokio::io::async_write::AsyncWrite>::poll_flush",
+      "00000000011d41a0 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection> as tokio::io::async_write::AsyncWrite>::poll_write",
+      "00000000011d4410 t <tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection> as tokio::io::async_write::AsyncWrite>::poll_write_vectored",
+      "0000000003770830 t <std::net::tcp::TcpListener as std::os::fd::raw::FromRawFd>::from_raw_fd",
+      "000000000148d5b0 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read",
+      "000000000370c700 T <tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener> as core::ops::drop::Drop>::drop",
+      "00000000037708d0 T <mio::net::tcp::listener::TcpListener as std::os::fd::raw::FromRawFd>::from_raw_fd",
+      "00000000011376c0 t <tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream> as core::future::future::Future>::poll",
+      "0000000001445bd0 T <maos_a2a_tcp::transport::TcpA2ATransport as maos_a2a_core::router::A2ATransport>::local_addr",
+      "000000000148d680 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write_vectored",
+      "000000000148d690 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::flush",
+      "000000000148d6a0 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write",
+      "00000000014871a0 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio_rustls::common::handshake::IoSession>::skip_handshake",
+      "00000000014871c0 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio_rustls::common::handshake::IoSession>::get_mut",
+      "0000000001487200 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio_rustls::common::handshake::IoSession>::into_io",
+      "000000000144f3a0 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next",
+      "00000000010bbcd0 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_core::stream::Stream>::poll_next",
+      "0000000001487240 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_read::AsyncRead>::poll_read",
+      "0000000001137720 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio_rustls::common::handshake::IoSession>::skip_handshake",
+      "0000000001137730 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio_rustls::common::handshake::IoSession>::get_mut",
+      "0000000001137770 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio_rustls::common::handshake::IoSession>::into_io",
+      "000000000144f8d0 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_flush",
+      "000000000144fa80 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_ready",
+      "000000000144fb30 T <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_sink::Sink<bytes::bytes::Bytes>>::start_send",
+      "00000000010bc200 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_flush",
+      "00000000010bc3b0 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_sink::Sink<bytes::bytes::Bytes>>::poll_ready",
+      "00000000010bc450 t <tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames> as futures_sink::Sink<bytes::bytes::Bytes>>::start_send",
+      "00000000014873d0 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_buf_read::AsyncBufRead>::poll_fill_buf",
+      "00000000014877e0 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_buf_read::AsyncBufRead>::consume",
+      "00000000011377b0 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_read::AsyncRead>::poll_read",
+      "0000000001487830 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::poll_flush",
+      "00000000014878e0 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::poll_write",
+      "00000000014879a0 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::is_write_vectored",
+      "00000000014879b0 T <tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::poll_write_vectored",
+      "0000000001137940 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_buf_read::AsyncBufRead>::poll_fill_buf",
+      "0000000001137d40 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_buf_read::AsyncBufRead>::consume",
+      "00000000010ad560 t <alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport> as core::ops::drop::Drop>::drop",
+      "00000000010af570 t <alloc::sync::Weak<maos_a2a_tcp::transport::TcpA2ATransport, &alloc::alloc::Global> as core::ops::drop::Drop>::drop",
+      "00000000036f4d50 T <socket2::sockref::SockRef as core::convert::From<&tokio::net::tcp::stream::TcpStream>>::from",
+      "000000000376cab0 T <mio::io_source::IoSource<std::net::tcp::TcpListener> as core::ops::deref::Deref>::deref",
+      "0000000002e29a20 T <maos_mcp::transport::streamable_http::StreamableHttpTransport as maos_mcp::transport::McpTransport>::id",
+      "0000000002e29a30 T <maos_mcp::transport::streamable_http::StreamableHttpTransport as maos_mcp::transport::McpTransport>::invoke",
+      "000000000145c5d0 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_core::stream::Stream>::poll_next",
+      "0000000001075720 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_core::stream::Stream>::poll_next",
+      "000000000147c070 T <&mut tokio::net::tcp::stream::TcpStream as tokio::io::async_read::AsyncRead>::poll_read",
+      "000000000147c0b0 T <&mut tokio::net::tcp::stream::TcpStream as tokio::io::async_write::AsyncWrite>::poll_flush",
+      "000000000148b9f0 T <tokio::time::timeout::Timeout<tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>> as core::future::future::Future>::poll",
+      "000000000133a720 t <tokio::time::timeout::Timeout<tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>> as core::future::future::Future>::poll",
+      "000000000148baf0 T <tokio::time::timeout::Timeout<futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>> as core::future::future::Future>::poll",
+      "000000000148bba0 T <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>> as core::future::future::Future>::poll",
+      "000000000133abc0 t <tokio::time::timeout::Timeout<futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>> as core::future::future::Future>::poll",
+      "000000000148bca0 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<core::net::socket_addr::SocketAddr>::{closure#0}> as core::future::future::Future>::poll",
+      "00000000028a2080 T <tokio::time::timeout::Timeout<<tokio::net::tcp::stream::TcpStream>::connect<(core::net::ip_addr::IpAddr, u16)>::{closure#0}> as core::future::future::Future>::poll",
+      "0000000003770a70 t <std::net::tcp::TcpListener as std::os::fd::raw::AsRawFd>::as_raw_fd",
+      "0000000003770a80 T <mio::net::tcp::listener::TcpListener as mio::event::source::Source>::deregister",
+      "0000000003770a90 T <mio::net::tcp::listener::TcpListener as mio::event::source::Source>::register",
+      "00000000037068c0 T <tokio::net::tcp::stream::TcpStream as std::os::fd::owned::AsFd>::as_fd",
+      "000000000144eb70 T <&mut std::io::default_write_fmt::Adapter<tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>> as core::fmt::Write::write_fmt::SpecWriteFmt>::spec_write_fmt",
+      "0000000001137d90 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::poll_flush",
+      "0000000001137e00 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::poll_write",
+      "0000000001137e90 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::is_write_vectored",
+      "0000000001137ea0 t <tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream> as tokio::io::async_write::AsyncWrite>::poll_write_vectored",
+      "000000000145ae50 T <core::pin::Pin<&mut tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>> as core::ops::deref::Deref>::deref",
+      "000000000145ae60 T <core::pin::Pin<&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>> as core::ops::deref::Deref>::deref",
+      "000000000101f760 t <core::pin::Pin<&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>> as core::ops::deref::Deref>::deref",
+      "000000000101f770 t <core::pin::Pin<&mut tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>> as core::ops::deref::Deref>::deref",
+      "000000000145ae70 T <core::pin::Pin<&mut tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames>> as core::ops::deref::Deref>::deref",
+      "000000000101f780 t <core::pin::Pin<&mut tokio_util::codec::framed_impl::FramedImpl<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec, tokio_util::codec::framed_impl::RWFrames>> as core::ops::deref::Deref>::deref",
+      "0000000003732c20 T <core::pin::Pin<&mut tokio::net::tcp::stream::TcpStream> as core::ops::deref::Deref>::deref",
+      "000000000145ae80 T <core::pin::Pin<&mut tokio_rustls::client::Connect<tokio::net::tcp::stream::TcpStream>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000145ae90 T <core::pin::Pin<&mut tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000145aea0 T <core::pin::Pin<&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::client::client_conn::connection::ClientConnection>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000101f7f0 t <core::pin::Pin<&mut tokio_rustls::common::Stream<tokio::net::tcp::stream::TcpStream, rustls::server::server_conn::connection::ServerConnection>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000101f800 t <core::pin::Pin<&mut tokio_rustls::server::Accept<tokio::net::tcp::stream::TcpStream>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000101f810 t <core::pin::Pin<&mut tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000145aeb0 T <core::pin::Pin<&mut futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000101f820 t <core::pin::Pin<&mut futures_util::sink::send::Send<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>, bytes::bytes::Bytes>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000145aec0 T <core::pin::Pin<&mut futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000101f830 t <core::pin::Pin<&mut futures_util::stream::stream::next::Next<tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000145aed0 T <core::pin::Pin<&mut &mut tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000101f980 t <core::pin::Pin<&mut &mut tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec>> as core::ops::deref::DerefMut>::deref_mut",
+      "000000000145aee0 T <core::pin::Pin<&mut &mut tokio::net::tcp::stream::TcpStream> as core::ops::deref::DerefMut>::deref_mut",
+      "0000000001445c70 T <maos_a2a_tcp::transport::TcpA2ATransport as maos_a2a_core::router::A2APeerRouter>::handle_intake",
+      "0000000001445d10 T <maos_a2a_tcp::transport::TcpA2ATransport as maos_a2a_core::router::A2APeerRouter>::route_outbound",
+      "0000000001445de0 T <maos_a2a_tcp::transport::TcpA2ATransport as maos_domain::ports::a2a::A2ARouter>::route_outbound",
+      "0000000001370950 t <core::result::Result<alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport>, alloc::boxed::Box<dyn core::error::Error>> as core::ops::try_trait::Try>::branch",
+      "000000000371aef0 T <core::result::Result<tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener>, core::io::error::Error> as core::ops::try_trait::Try>::branch",
+      "00000000013743b0 t <core::result::Result<maos_a2a_tcp::transport::TcpA2ATransport, alloc::string::String> as core::ops::try_trait::Try>::branch",
+      "0000000001376bf0 t <core::result::Result<std::net::tcp::TcpListener, alloc::string::String> as core::ops::try_trait::Try>::branch",
+      "0000000003826480 T <core::result::Result<std::net::tcp::TcpListener, core::io::error::Error> as core::ops::try_trait::Try>::branch",
+      "000000000371b360 T <core::result::Result<mio::net::tcp::listener::TcpListener, core::io::error::Error> as core::ops::try_trait::Try>::branch",
+      "00000000028981d0 T <core::result::Result<tokio::net::tcp::stream::TcpStream, tokio_postgres::error::Error> as core::ops::try_trait::Try>::branch",
+      "000000000371b3e0 T <core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error> as core::ops::try_trait::Try>::branch",
+      "0000000001377170 t <core::result::Result<tokio::net::tcp::listener::TcpListener, maos_a2a_tcp::error::TcpTransportError> as core::ops::try_trait::Try>::branch",
+      "00000000013793b0 t <core::result::Result<alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport>, alloc::boxed::Box<dyn core::error::Error>> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible, alloc::string::String>>>::from_residual",
+      "000000000371b950 T <core::result::Result<tokio::io::poll_evented::PollEvented<mio::net::tcp::listener::TcpListener>, core::io::error::Error> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible, core::io::error::Error>>>::from_residual",
+      "000000000137a140 t <core::result::Result<maos_a2a_tcp::transport::TcpA2ATransport, maos_a2a_tcp::error::TcpTransportError> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible, maos_a2a_tcp::error::TcpTransportError>>>::from_residual",
+      "000000000376ce50 T <core::result::Result<mio::net::tcp::listener::TcpListener, core::io::error::Error> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible, core::io::error::Error>>>::from_residual",
+      "000000000371b9c0 T <core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible, core::io::error::Error>>>::from_residual",
+      "000000000371b9d0 T <core::result::Result<tokio::net::tcp::listener::TcpListener, core::io::error::Error> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible, core::io::error::Error>>>::from_residual",
+      "000000000137ab80 t <core::result::Result<(tokio::net::tcp::stream::TcpStream, core::net::socket_addr::SocketAddr), core::io::error::Error> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible, core::io::error::Error>>>::from_residual",
+      "000000000117a1f0 t <alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport> as core::clone::Clone>::clone",
+      "000000000117aa40 t <alloc::sync::Arc<maos_a2a_tcp::transport::TcpA2ATransport> as core::ops::deref::Deref>::deref",
+      "000000000148d6b0 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_exact",
+      "000000000148d6c0 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_to_end",
+      "000000000148d6e0 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_vectored",
+      "000000000148d6f0 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_buf_exact",
+      "000000000148d700 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_to_string",
+      "000000000148d740 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::is_read_vectored",
+      "000000000148d750 T <tokio_rustls::common::SyncReadAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Read>::read_buf",
+      "000000000148d760 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::is_write_vectored",
+      "000000000148d770 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write_all_vectored",
+      "000000000148d890 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write_all",
+      "000000000148d9f0 T <tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream> as std::io::Write>::write_fmt",
+      "000000000145c620 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_util::sink::SinkExt<bytes::bytes::Bytes>>::send",
+      "000000000145c680 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_util::stream::stream::StreamExt>::poll_next_unpin",
+      "000000000145c6a0 T <tokio_util::codec::framed::Framed<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_util::stream::stream::StreamExt>::next",
+      "00000000010757c0 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_util::sink::SinkExt<bytes::bytes::Bytes>>::send",
+      "0000000001075820 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_util::stream::stream::StreamExt>::poll_next_unpin",
+      "0000000001075840 t <tokio_util::codec::framed::Framed<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, tokio_util::codec::length_delimited::LengthDelimitedCodec> as futures_util::stream::stream::StreamExt>::next",
+      "000000000144ec00 T <std::io::default_write_fmt::Adapter<tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>> as core::fmt::Write>::write_char",
+      "000000000144ec50 T <std::io::default_write_fmt::Adapter<tokio_rustls::common::SyncWriteAdapter<tokio::net::tcp::stream::TcpStream>> as core::fmt::Write>::write_fmt",
+      "0000000001454e30 t <core::result::Result<core::result::Result<tokio_rustls::client::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>::Err as core::ops::function::FnOnce<(tokio::time::error::Elapsed,)>>::call_once",
+      "00000000010b5640 t <core::result::Result<core::result::Result<tokio_rustls::server::TlsStream<tokio::net::tcp::stream::TcpStream>, core::io::error::Error>, tokio::time::error::Elapsed>::Err as core::ops::function::FnOnce<(tokio::time::error::Elapsed,)>>::call_once",
+      "000000000287b900 t <core::result::Result<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>::Err as core::ops::function::FnOnce<(tokio::time::error::Elapsed,)>>::call_once",
+      "0000000001454e50 t <core::result::Result<core::result::Result<tokio::net::tcp::stream::TcpStream, core::io::error::Error>, tokio::time::error::Elapsed>::Err as core::ops::function::FnOnce<(tokio::time::error::Elapsed,)>>::call_once",
+      "000000000382f4b0 t <<std::sys::net::connection::socket::TcpListener>::bind::inner as core::ops::function::FnMut<(&core::net::socket_addr::SocketAddr,)>>::call_mut",
+      "00000000010b5ac0 t <<std::sys::net::connection::socket::TcpListener>::bind::inner as core::ops::function::FnMut<(&core::net::socket_addr::SocketAddr,)>>::call_mut",
+      "0000000002e78eb0 t <<std::sys::net::connection::socket::TcpListener>::bind::inner as core::ops::function::FnMut<(&core::net::socket_addr::SocketAddr,)>>::call_mut",
+      "0000000002816910 t <<std::sys::net::connection::socket::TcpListener>::bind::inner as core::ops::function::FnMut<(&core::net::socket_addr::SocketAddr,)>>::call_mut",
+      "                 U getaddrinfo"
+    ]
+  }
+}
+network symbols in air-gap binary: ["0000000000a79490 T <std::net::tcp::TcpListener>::bind::<(core::net::ip_addr::Ipv4Addr, u16)>", "0000000000a6c9c0 T core::ptr::drop_glue::<std::net::tcp::TcpListener>", "0000000000a6ca70 T core::ptr::drop_glue::<std::sys::net::connection::socket::TcpListener>", "0000000000a79530 T std::sys::net::connection::each_addr::<(core::net::ip_addr::Ipv4Addr, u16), <std::sys::net::connection::socket::TcpListener>::bind::inner, std::sys::net::connection::socket::TcpListener>", "0000000000aeba50 T <std::net::tcp::TcpListener>::local_addr", "0000000000aeba70 T <std::net::tcp::TcpListener>::take_error", "0000000000aebb40 T <std::net::tcp::TcpListener>::set_nonblocking", "0000000000b0cc70 T <std::sys::net::connection::socket::TcpListener>::bind::inner", "0000000000a68700 T <core::result::Result<std::net::tcp::TcpListener, core::io::error::Error> as core::ops::try_trait::Try>::branch", "0000000000a6ced0 t <<std::sys::net::connection::socket::TcpListener>::bind::inner as core::ops::function::FnMut<(&core::net::socket_addr::SocketAddr,)>>::call_mut", "                 U getaddrinfo"]
+
+EXIT 1; elapsed 23.78s

@@ -1,0 +1,4 @@
+$ bash tests/air-gap-netns-corroborate.sh /home/lunarpulse/dev_ws/target/release/maos
+NOT RUN: strace unavailable
+
+EXIT 1; elapsed 0.00s

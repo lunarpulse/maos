@@ -1,0 +1,7 @@
+{
+  "command": "cargo clippy --locked -p xtask -p maos-bin --all-targets --message-format json",
+  "exit": 0,
+  "warning_events": 664,
+  "changed_production_range_diagnostics": [],
+  "method": "primary spans intersect changed production ranges; unrelated warnings not suppressed; not a hosted-toolchain proof"
+}

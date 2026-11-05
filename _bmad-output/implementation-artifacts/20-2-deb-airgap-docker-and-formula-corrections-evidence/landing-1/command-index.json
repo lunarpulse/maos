@@ -1,0 +1,513 @@
+[
+  {
+    "log": "ac2-before-recipes.log",
+    "command_header": "$ python3 -c import subprocess,sys",
+    "exit": 1,
+    "elapsed_seconds": 0.02,
+    "note": ""
+  },
+  {
+    "log": "ac2-render-restored.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask render-packages --dist-dir /tmp/maos-20-2-dev202/dist --output /tmp/maos-20-2-dev202/dist/recipes --maosctl /home/lunarpulse/dev_ws/target/debug/maosctl",
+    "exit": 0,
+    "elapsed_seconds": 0.07,
+    "note": ""
+  },
+  {
+    "log": "ac2-restore.log",
+    "command_header": "$ bash -c cp /tmp/maos-20-2-dev202/maos.final.rb packaging/homebrew/maos.rb && cmp /tmp/maos-20-2-dev202/maos.final.rb packaging/homebrew/maos.rb && touch packaging/homebrew/maos.rb",
+    "exit": 0,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "ac2-token-plant.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask render-packages --dist-dir /tmp/maos-20-2-dev202/dist --output /tmp/maos-20-2-dev202/plant-recipes --maosctl /home/lunarpulse/dev_ws/target/debug/maosctl",
+    "exit": 1,
+    "elapsed_seconds": 0.08,
+    "note": ""
+  },
+  {
+    "log": "ac3-before-stub.log",
+    "command_header": "$ /home/lunarpulse/dev_ws/target/debug/maos run spirits/hello-spirit/manifest.toml",
+    "exit": 0,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "ac3-final-refusal.log",
+    "command_header": "$ /home/lunarpulse/dev_ws/target/debug/maos run spirits/hello-spirit/manifest.toml",
+    "exit": 2,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "ac3-local-workload-only.log",
+    "command_header": "$ bash tests/air-gap-netns-corroborate.sh --workload /home/lunarpulse/dev_ws/target/release/maos /home/lunarpulse/dev_ws/crates/maos-journey-test/cassettes/j0/shell-intro.json /tmp/maos-20-2-dev202/session-local",
+    "exit": 0,
+    "elapsed_seconds": 0.31,
+    "note": ""
+  },
+  {
+    "log": "ac4-before-enrolment.log",
+    "command_header": "$ git grep -n check-air-gap cbed4dad -- .github xtask/gate-registry.toml tests/coverage-matrix.yaml xtask/src/prepush.rs",
+    "exit": 1,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "ac6-ac7-old-hint-plant.log",
+    "command_header": "$ cargo test --locked -p maos-bin --test maos_uninstall_16_4 purge_dry_run_is_inert_then_removes_only_maos_owned_state -- --exact --nocapture",
+    "exit": 101,
+    "elapsed_seconds": 45.96,
+    "note": ""
+  },
+  {
+    "log": "ac6-restore.log",
+    "command_header": "$ bash -c cp /tmp/maos-20-2-dev202/purge.final.rs crates/maos-bin/src/purge.rs && cmp /tmp/maos-20-2-dev202/purge.final.rs crates/maos-bin/src/purge.rs && touch crates/maos-bin/src/purge.rs",
+    "exit": 0,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "ac7-before-route.log",
+    "command_header": "$ git grep -n cargo install --locked --git.*maos-bin cbed4dad -- docs/maos.dev",
+    "exit": 1,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "ac8-onb-size-leg.log",
+    "command_header": "$ bash -c # Step 5: Binary size gate \u2014 stripped maos-bin \u226432MiB (AC4) \u2014 blocking, deterministic",
+    "exit": 0,
+    "elapsed_seconds": 0.04,
+    "note": ""
+  },
+  {
+    "log": "ac8-strip.log",
+    "command_header": "$ strip /tmp/maos-20-2-dev202/maos-size",
+    "exit": 0,
+    "elapsed_seconds": 0.06,
+    "note": ""
+  },
+  {
+    "log": "baseline-kernel.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json",
+    "exit": 0,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "baseline-kloc.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit": 0,
+    "elapsed_seconds": 0.04,
+    "note": ""
+  },
+  {
+    "log": "baseline-recipe-source.log",
+    "command_header": "$ git show cbed4dad:packaging/homebrew/maos.rb",
+    "exit": 0,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "build-release-affected.log",
+    "command_header": "$ cargo build --release --locked -p maos-bin -p maos-cli -p maos-registry -p maos-spirit-cli",
+    "exit": 0,
+    "elapsed_seconds": 86.55,
+    "note": ""
+  },
+  {
+    "log": "build-test-fixtures.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask build-test-fixtures",
+    "exit": 0,
+    "elapsed_seconds": 26.49,
+    "note": ""
+  },
+  {
+    "log": "clippy-affected.log",
+    "command_header": "$ cargo clippy --locked -p xtask -p maos-bin --all-targets --message-format json",
+    "exit": 0,
+    "elapsed_seconds": 789.59,
+    "note": ""
+  },
+  {
+    "log": "compile-shape-verbs.log",
+    "command_header": "$ cargo test --locked -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1",
+    "exit": 0,
+    "elapsed_seconds": 29.57,
+    "note": ""
+  },
+  {
+    "log": "deb-rules-parse.log",
+    "command_header": "$ make -f /tmp/maos-20-2-dev202/dist/recipes/debian/rules -n override_dh_auto_configure",
+    "exit": 0,
+    "elapsed_seconds": 0.54,
+    "note": ""
+  },
+  {
+    "log": "final-compile-shape-build.log",
+    "command_header": "$ cargo build --locked -p maos-bin --no-default-features --features air-gap",
+    "exit": 0,
+    "elapsed_seconds": 254.15,
+    "note": ""
+  },
+  {
+    "log": "final-compile-shape-mock-scan.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-mock-not-in-release --binary /tmp/maos-20-2-dev202/maos-compile-shape --json",
+    "exit": 0,
+    "elapsed_seconds": 0.14,
+    "note": ""
+  },
+  {
+    "log": "final-default-debug-build.log",
+    "command_header": "$ cargo build --locked -p maos-bin -p maos-cli",
+    "exit": 0,
+    "elapsed_seconds": 7.04,
+    "note": ""
+  },
+  {
+    "log": "final-feature-closure.log",
+    "command_header": "$ cargo tree --locked --offline -p maos-bin --no-default-features --features air-gap",
+    "exit": 0,
+    "elapsed_seconds": 9.71,
+    "note": ""
+  },
+  {
+    "log": "final-shell-syntax.log",
+    "command_header": "$ bash -n packaging/build-packages.sh packaging/witness-deb.sh packaging/witness-recipe.sh tests/air-gap-netns-corroborate.sh",
+    "exit": 0,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "final-symbol-advisory.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-air-gap --binary /tmp/maos-20-2-dev202/maos-compile-shape --dirty-fixture /tmp/maos-20-2-dev202/maos-default --json",
+    "exit": 1,
+    "elapsed_seconds": 0.84,
+    "note": ""
+  },
+  {
+    "log": "final-workflow-and-recipe-vectors.log",
+    "command_header": "$ cargo test --locked -p xtask --test package_workflows_20_2 --test package_recipes_20_2",
+    "exit": 0,
+    "elapsed_seconds": 0.69,
+    "note": ""
+  },
+  {
+    "log": "fmt-after-enrolment-callers.log",
+    "command_header": "$ cargo fmt --all",
+    "exit": 0,
+    "elapsed_seconds": 3.47,
+    "note": ""
+  },
+  {
+    "log": "fmt-final.log",
+    "command_header": "$ cargo fmt --all",
+    "exit": 0,
+    "elapsed_seconds": 2.62,
+    "note": ""
+  },
+  {
+    "log": "fmt.log",
+    "command_header": "$ cargo fmt --all",
+    "exit": 0,
+    "elapsed_seconds": 2.78,
+    "note": ""
+  },
+  {
+    "log": "focused-enrolment-corrections.log",
+    "command_header": "$ cargo test --locked -p xtask --test ship_gate_binding_20_3a --test macos_compile_guard_20_6 --test coverage_matrix_20_3b",
+    "exit": 0,
+    "elapsed_seconds": 158.89,
+    "note": ""
+  },
+  {
+    "log": "focused-enrolment-unit.log",
+    "command_header": "$ cargo test --locked -p xtask --bin xtask expected_gates_and_registry_are_one_set_of_48",
+    "exit": 0,
+    "elapsed_seconds": 166.1,
+    "note": ""
+  },
+  {
+    "log": "focused-renderer-final.log",
+    "command_header": "$ cargo test --locked -p xtask --test package_recipes_20_2",
+    "exit": 0,
+    "elapsed_seconds": 22.12,
+    "note": ""
+  },
+  {
+    "log": "focused-renderer.log",
+    "command_header": "$ cargo test --locked -p xtask --test package_recipes_20_2",
+    "exit": 101,
+    "elapsed_seconds": 6.63,
+    "note": ""
+  },
+  {
+    "log": "focused-runtime-final.log",
+    "command_header": "$ cargo test --locked -p maos-bin --test maos_uninstall_16_4",
+    "exit": 0,
+    "elapsed_seconds": 8.32,
+    "note": ""
+  },
+  {
+    "log": "focused-workflow-regressions-final.log",
+    "command_header": "$ cargo test --locked -p xtask --test release_workflow_15_4 --test package_workflows_20_2 --test package_recipes_20_2 --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule",
+    "exit": 0,
+    "elapsed_seconds": 3.68,
+    "note": ""
+  },
+  {
+    "log": "focused-workflow-regressions.log",
+    "command_header": "$ cargo test --locked -p xtask --test release_workflow_15_4 --test package_workflows_20_2 --test package_recipes_20_2",
+    "exit": 101,
+    "elapsed_seconds": 11.2,
+    "note": ""
+  },
+  {
+    "log": "formatted-measurement.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit": 1,
+    "elapsed_seconds": 0.05,
+    "note": ""
+  },
+  {
+    "log": "genuine-default-debug-build.log",
+    "command_header": "$ cargo build --locked -p maos-bin -p maos-cli",
+    "exit": 0,
+    "elapsed_seconds": 11.88,
+    "note": ""
+  },
+  {
+    "log": "manifest-final.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask release-dry-run --manifest-only --dist-dir /tmp/maos-20-2-dev202/dist --targets x86_64-unknown-linux-gnu",
+    "exit": 0,
+    "elapsed_seconds": 0.09,
+    "note": ""
+  },
+  {
+    "log": "netns-declared-ci-refusal.log",
+    "command_header": "$ bash tests/air-gap-netns-corroborate.sh /home/lunarpulse/dev_ws/target/release/maos",
+    "exit": 1,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "netns-local-not-run.log",
+    "command_header": "$ bash tests/air-gap-netns-corroborate.sh /home/lunarpulse/dev_ws/target/release/maos",
+    "exit": 77,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "prepush.log",
+    "command_header": "$ env -u CI -u GITHUB_ACTIONS CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask MAOS_17_2_CGROUP_MODE=undelegated /mnt/build/cargo-maos/debug/xtask prepush --json",
+    "exit": 124,
+    "elapsed_seconds": 2900.02,
+    "note": ""
+  },
+  {
+    "log": "python-controls-final.log",
+    "command_header": "$ /tmp/maos-20-2-dev202/venv/bin/python packaging/test_release_20_2.py -v",
+    "exit": 0,
+    "elapsed_seconds": 0.1,
+    "note": ""
+  },
+  {
+    "log": "python-controls.log",
+    "command_header": "$ python3 packaging/test_release_20_2.py -v",
+    "exit": 1,
+    "elapsed_seconds": 0.06,
+    "note": ""
+  },
+  {
+    "log": "python-system-cryptography.log",
+    "command_header": "$ /usr/bin/python3 -c import cryptography; print(cryptography.__version__)",
+    "exit": 1,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "python-verifier-dependency.log",
+    "command_header": "$ /tmp/maos-20-2-dev202/venv/bin/python -m pip install cryptography",
+    "exit": 0,
+    "elapsed_seconds": 1.09,
+    "note": ""
+  },
+  {
+    "log": "python-verifier-venv.log",
+    "command_header": "$ python3 -m venv /tmp/maos-20-2-dev202/venv",
+    "exit": 0,
+    "elapsed_seconds": 2.04,
+    "note": ""
+  },
+  {
+    "log": "release-library-floor.log",
+    "command_header": "$ ldd /home/lunarpulse/dev_ws/target/release/maos",
+    "exit": 0,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "render-final.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask render-packages --dist-dir /tmp/maos-20-2-dev202/dist --output /tmp/maos-20-2-dev202/dist/recipes --maosctl /home/lunarpulse/dev_ws/target/debug/maosctl --base-url file:///tmp/maos-20-2-dev202/dist",
+    "exit": 0,
+    "elapsed_seconds": 0.17,
+    "note": ""
+  },
+  {
+    "log": "renderer-build.log",
+    "command_header": "$ cargo build --locked -p xtask -p maos-cli",
+    "exit": 0,
+    "elapsed_seconds": 314.38,
+    "note": ""
+  },
+  {
+    "log": "sign-final.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums /tmp/maos-20-2-dev202/dist/SHA256SUMS --output /tmp/maos-20-2-dev202/dist/SHA256SUMS.sig",
+    "exit": 0,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "standard-check-decision-register.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-decision-register --json",
+    "exit": 0,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "standard-check-dev-record-completeness.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-dev-record-completeness --json",
+    "exit": 0,
+    "elapsed_seconds": 0.06,
+    "note": ""
+  },
+  {
+    "log": "standard-check-epic-close-coherence.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json",
+    "exit": 0,
+    "elapsed_seconds": 0.02,
+    "note": ""
+  },
+  {
+    "log": "standard-check-exit-commands.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-exit-commands --json",
+    "exit": 0,
+    "elapsed_seconds": 0.68,
+    "note": ""
+  },
+  {
+    "log": "standard-check-ship-gate-completeness.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-ship-gate-completeness --json",
+    "exit": 0,
+    "elapsed_seconds": 0.03,
+    "note": ""
+  },
+  {
+    "log": "standard-check-test-cost.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-test-cost --json",
+    "exit": 0,
+    "elapsed_seconds": 0.32,
+    "note": ""
+  },
+  {
+    "log": "standard-coverage-matrix.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask coverage-matrix --json",
+    "exit": 0,
+    "elapsed_seconds": 0.01,
+    "note": ""
+  },
+  {
+    "log": "standard-kernel.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-kernel-baseline --json",
+    "exit": 0,
+    "elapsed_seconds": 0.23,
+    "note": ""
+  },
+  {
+    "log": "standard-kloc.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask kloc-check --json",
+    "exit": 0,
+    "elapsed_seconds": 0.07,
+    "note": ""
+  },
+  {
+    "log": "syntax-shell.log",
+    "command_header": "$ bash -n packaging/build-packages.sh packaging/witness-deb.sh packaging/witness-recipe.sh tests/air-gap-netns-corroborate.sh",
+    "exit": 0,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "t0-airgap.log",
+    "command_header": "$ /mnt/build/cargo-maos/debug/xtask check-air-gap --build-first --binary /home/lunarpulse/dev_ws/target/debug/maos --dirty-fixture /tmp/maos-20-2-dev202/maos-default --json",
+    "exit": 1,
+    "elapsed_seconds": 23.78,
+    "note": ""
+  },
+  {
+    "log": "t0-default-build.log",
+    "command_header": "$ cargo build --locked -p maos-bin",
+    "exit": 0,
+    "elapsed_seconds": 46.05,
+    "note": ""
+  },
+  {
+    "log": "t0-netns-prerequisite.log",
+    "command_header": "$ unshare -n true",
+    "exit": 1,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "tree-bound-nextest.log",
+    "command_header": "$ cargo nextest run --locked -p xtask --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule",
+    "exit": 0,
+    "elapsed_seconds": 3.04,
+    "note": ""
+  },
+  {
+    "log": "version-comparator.log",
+    "command_header": "$ dpkg --compare-versions 1.0.0~rc.1-1 lt 1.0.0-1",
+    "exit": 0,
+    "elapsed_seconds": 0.0,
+    "note": ""
+  },
+  {
+    "log": "workspace-binaries-metadata-resumed.log",
+    "command_header": "$ cargo nextest list --workspace --locked --message-format json --list-type binaries-only",
+    "exit": 0,
+    "elapsed_seconds": 27.27,
+    "note": ""
+  },
+  {
+    "log": "workspace-cargo-metadata.log",
+    "command_header": "$ cargo metadata --locked --format-version 1",
+    "exit": 0,
+    "elapsed_seconds": 0.21,
+    "note": ""
+  },
+  {
+    "log": "workspace-metadata-timeout.log",
+    "command_header": "$ cargo nextest list --workspace --locked --message-format json --list-type binaries-only",
+    "exit": null,
+    "elapsed_seconds": null,
+    "note": "Full transcript retains multiline command bodies where present; metadata-timeout log explicitly records missing diagnostic capture."
+  },
+  {
+    "log": "workspace-nextest-executed.log",
+    "command_header": "$ env MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --binaries-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/binaries-metadata.json --cargo-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/cargo-metadata.json --no-fail-fast --profile ci --success-output never --failure-output final",
+    "exit": 100,
+    "elapsed_seconds": 138.49,
+    "note": ""
+  },
+  {
+    "log": "workspace-nextest.log",
+    "command_header": "$ env MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --binaries-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/binaries-metadata.json --cargo-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/cargo-metadata.json --workspace --locked --no-fail-fast --profile ci --success-output never --failure-output final",
+    "exit": 2,
+    "elapsed_seconds": 0.31,
+    "note": ""
+  }
+]

@@ -1,0 +1,3 @@
+$ git grep -n cargo install --locked --git.*maos-bin cbed4dad -- docs/maos.dev
+
+EXIT 1; elapsed 0.00s

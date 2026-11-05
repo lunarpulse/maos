@@ -1,0 +1,3 @@
+$ cargo fmt --all
+
+EXIT 0; elapsed 2.78s

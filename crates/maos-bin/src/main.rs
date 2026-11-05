@@ -1538,7 +1538,7 @@ fn run_purge(args: &[String]) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Air-gap build: minimal main with no network surface (R-AG2).
+// Compile-shape control only; deploy the shipped build in an isolated network namespace.
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(not(feature = "network"))]
 fn main() {
@@ -1587,7 +1587,7 @@ fn print_air_gap_usage() {
     // Story 15-3 AC4 — the usage page renders its rows from `verbs::VERBS`
     // (one table, one truth); it is no longer a second, hand-written copy.
     print!(
-        "maos {} (air-gap build — network surface compiled out)\n\n\
+        "maos {} (compile-shape control — not a deployment artifact)\n\n\
          Usage: maos <COMMAND>\n\n\
          Commands:\n",
         env!("CARGO_PKG_VERSION")
@@ -1608,37 +1608,12 @@ fn air_gap_init() {
 
 #[cfg(not(feature = "network"))]
 fn air_gap_run(_args: &[String]) {
-    // AC-4: the substrate boots, runs, and produces a Transparency Log entry
-    // even with networking compiled out. Real offline inference is a v1.0/9.4b
-    // follow-up; at v0.5 we write a no-op TL entry and emit a clear diagnostic.
-    let tl_path = resolved_transparency_log_path();
-    if let Some(parent) = tl_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    // Best-effort offline entry: append a sentinel line to a plain-text stub file
-    // next to the TL so the operator can observe that the substrate attempted to
-    // boot. The real TL is SQLite and may not exist yet in an air-gap install.
-    let stub = tl_path.with_extension("airgap-stub.log");
-    let entry = format!(
-        "{} air-gap boot stub\n",
-        std::time::SystemTime::UNIX_EPOCH
-            .elapsed()
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
-    );
-    if let Err(e) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&stub)
-        .and_then(|mut f| std::io::Write::write_all(&mut f, entry.as_bytes()))
-    {
-        eprintln!("air-gap run: failed to write TL stub: {e}");
-        std::process::exit(1);
-    }
     eprintln!(
-        "air-gap run: offline inference is stubbed; TL stub written to {}",
-        stub.display()
+        "maos: run refused (BuildShapeUnsupported): this no-default-features build \
+         is a compile-shape control, not a deployment artifact. Use the shipped \
+         default build with network isolation; see docs/runbooks/ag-1-air-gap-deployment.md"
     );
+    std::process::exit(2);
 }
 
 #[cfg(not(feature = "network"))]

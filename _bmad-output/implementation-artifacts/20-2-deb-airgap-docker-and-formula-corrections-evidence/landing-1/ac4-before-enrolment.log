@@ -1,0 +1,3 @@
+$ git grep -n check-air-gap cbed4dad -- .github xtask/gate-registry.toml tests/coverage-matrix.yaml xtask/src/prepush.rs
+
+EXIT 1; elapsed 0.01s

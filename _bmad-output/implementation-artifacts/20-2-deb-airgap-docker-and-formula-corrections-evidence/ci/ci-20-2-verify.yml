@@ -1,0 +1,339 @@
+name: ci-20-2-verify
+# OPERATOR LANE ONLY. Copy to .github/workflows on ci/20-2-verify, never on main.
+# All legs below are UNVERIFIED until an operator records hosted run ids/logs.
+on:
+  push:
+    branches: ['ci/20-2-verify']
+  workflow_dispatch:
+    inputs:
+      publish_tag:
+        description: Explicit existing signed release tag for operator-only push/sign proof (empty means do not publish)
+        required: false
+        type: string
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: never
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, suffix: linux-amd64}
+          - {os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, suffix: linux-arm64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build genuine default release binaries once and sign with development seed
+        env:
+          RELEASE_SIGNING_KEY: 794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d
+        run: |
+          /usr/bin/time -p cargo run --locked -p xtask -- release-dry-run --targets '${{ matrix.target }}'
+          cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
+          cargo build --locked -p maos-cli
+          cargo run --locked -p xtask -- render-packages --maosctl target/debug/maosctl --base-url "file://$PWD/dist"
+          cp dist/recipes/verify-release.py dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-20-2-${{ matrix.suffix }}
+          path: dist
+  deb:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, suffix: linux-amd64}
+          - {os: ubuntu-24.04-arm, suffix: linux-arm64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-20-2-${{ matrix.suffix }}
+          path: dist
+      - run: sudo apt-get update && sudo apt-get install -y debhelper python3-cryptography
+      - name: AC1 baseline build fails before verification (cbed4dad)
+        run: |
+          mkdir -p evidence "$RUNNER_TEMP/baseline/debian"
+          git show cbed4dad:packaging/deb/control > "$RUNNER_TEMP/baseline/debian/control"
+          git show cbed4dad:packaging/deb/rules > "$RUNNER_TEMP/baseline/debian/rules"
+          set +e
+          (cd "$RUNNER_TEMP/baseline" && dpkg-buildpackage -us -uc -b) > evidence/deb-before.log 2>&1
+          rc=$?
+          set -e
+          cat evidence/deb-before.log
+          test "$rc" -ne 0
+          grep -F 'debian/changelog' evidence/deb-before.log
+      - name: AC1 wrong-key plant, real build rejection, byte restore
+        run: |
+          cp dist/SHA256SUMS.sig "$RUNNER_TEMP/correct.sig"
+          python3 - <<'PY'
+          import hashlib,pathlib
+          from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+          p=pathlib.Path('dist')
+          (p/'SHA256SUMS.sig').write_bytes(Ed25519PrivateKey.from_private_bytes(bytes(32)).sign(hashlib.sha256((p/'SHA256SUMS').read_bytes()).digest()))
+          PY
+          set +e
+          packaging/build-packages.sh dist deb "$RUNNER_TEMP/plant-deb" > evidence/deb-plant.log 2>&1
+          rc=$?
+          set -e
+          cp "$RUNNER_TEMP/correct.sig" dist/SHA256SUMS.sig
+          cmp "$RUNNER_TEMP/correct.sig" dist/SHA256SUMS.sig
+          touch dist/SHA256SUMS.sig
+          cat evidence/deb-plant.log
+          test "$rc" -ne 0
+          grep -F 'release verification refused: InvalidSignature' evidence/deb-plant.log
+      - name: AC1/AC6 final install, signed identity, init, purge, package removal
+        run: |
+          set -o pipefail
+          packaging/build-packages.sh dist deb dist/packages 2>&1 | tee evidence/deb-build.log
+          packaging/witness-deb.sh dist "$(find dist/packages -name '*.deb' -print -quit)" '${{ matrix.suffix }}' 2>&1 | tee evidence/deb-final.log
+          dpkg --compare-versions 1.0.0~rc.1-1 lt 1.0.0-1
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: deb-20-2-${{ matrix.suffix }}
+          path: evidence
+  netns:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-20-2-linux-amd64
+          path: dist
+      - run: sudo apt-get update && sudo apt-get install -y strace
+      - name: AC3 baseline green-skip or version-only result is not a witness
+        run: |
+          mkdir -p evidence
+          chmod +x dist/maos-linux-amd64
+          git show cbed4dad:tests/air-gap-netns-corroborate.sh > "$RUNNER_TEMP/before.sh"
+          CI=true bash "$RUNNER_TEMP/before.sh" "$PWD/dist/maos-linux-amd64" > evidence/netns-before.log 2>&1
+          cat evidence/netns-before.log
+          if grep -q 'new Transparency Log entries' evidence/netns-before.log; then exit 1; fi
+      - name: AC3 injected outbound attempt is caught and restored
+        run: |
+          cp tests/air-gap-netns-corroborate.sh "$RUNNER_TEMP/netns-correct.sh"
+          set +e
+          bash tests/air-gap-netns-corroborate.sh "$PWD/dist/maos-linux-amd64" "$RUNNER_TEMP/netns-plant" --plant-outbound > evidence/netns-plant.log 2>&1
+          rc=$?
+          set -e
+          # The knob changes only the traced process tree, not source/cassette bytes.
+          cp "$RUNNER_TEMP/netns-correct.sh" tests/air-gap-netns-corroborate.sh
+          cmp "$RUNNER_TEMP/netns-correct.sh" tests/air-gap-netns-corroborate.sh
+          touch tests/air-gap-netns-corroborate.sh
+          cat evidence/netns-plant.log
+          test "$rc" -ne 0
+          grep -F 'STOP: NFR-Ops-12 product defect' evidence/netns-plant.log
+      - name: AC3 final real boot/replay/TL witness (outbound means STOP, not an allowlist)
+        run: |
+          set -o pipefail
+          bash tests/air-gap-netns-corroborate.sh "$PWD/dist/maos-linux-amd64" "$RUNNER_TEMP/netns-final" 2>&1 | tee evidence/netns-final.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: netns-20-2
+          path: |
+            evidence
+            ${{ runner.temp }}/netns-plant
+            ${{ runner.temp }}/netns-final
+  container:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-20-2-linux-amd64
+          path: dist
+      - uses: docker/setup-buildx-action@v3
+      - name: AC5 changed binary rejected in Docker verify stage, restore, final smoke
+        run: |
+          mkdir -p evidence
+          pubkey=$(python3 -c 'import pathlib,re; print(re.search(r"RELEASE_PUBKEY := ([0-9a-f]{64})",pathlib.Path("dist/recipes/debian/rules").read_text())[1])')
+          cp dist/maos-linux-amd64 "$RUNNER_TEMP/correct-maos"
+          python3 - <<'PY'
+          import pathlib
+          p=pathlib.Path('dist/maos-linux-amd64')
+          with p.open('r+b') as f:
+              b=f.read(1); f.seek(0); f.write(bytes([b[0]^1]))
+          PY
+          set +e
+          docker buildx build --load --progress plain --build-arg RELEASE_PUBKEY="$pubkey" -t maos:plant . > evidence/image-plant.log 2>&1
+          rc=$?
+          set -e
+          cp "$RUNNER_TEMP/correct-maos" dist/maos-linux-amd64
+          cmp "$RUNNER_TEMP/correct-maos" dist/maos-linux-amd64
+          touch dist/maos-linux-amd64
+          test "$rc" -ne 0
+          grep -F 'SHA256 mismatch: maos-linux-amd64' evidence/image-plant.log
+          docker buildx build --load --build-arg RELEASE_PUBKEY="$pubkey" --build-arg SOURCE_SHA="$GITHUB_SHA" -t maos:ci .
+          docker run --rm maos:ci --version
+          docker run --rm maos:ci --help
+          docker image inspect maos:ci --format '{{.Size}}' | tee evidence/image-size
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: container-20-2
+          path: evidence
+  recipes:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        route: [rpm, arch, brew]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-20-2-linux-amd64
+          path: dist
+      - name: AC2 real package-manager execution and comparator measurements
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          /usr/bin/time -p packaging/witness-recipe.sh '${{ matrix.route }}' "$PWD/dist" 2>&1 | tee evidence/recipe.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: recipe-20-2-${{ matrix.route }}
+          path: evidence
+  cargo-and-symbols:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: AC7 cargo install/uninstall and AC4 advisory subject plant
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          scratch=$(mktemp -d)
+          /usr/bin/time -p cargo install --locked --path crates/maos-bin --root "$scratch" 2> evidence/cargo-time.log
+          "$scratch/bin/maos" --version | tee evidence/cargo-version.log
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["workspace"]["package"]["version"])')
+          grep -F "$version" evidence/cargo-version.log
+          cargo uninstall --root "$scratch" maos-bin
+          test ! -e "$scratch/bin/maos"
+          cargo build --locked -p maos-bin
+          cp target/debug/maos "$scratch/default-maos"
+          cargo build --locked -p maos-bin --no-default-features --features air-gap
+          cargo build --locked -p xtask
+          cp target/debug/maos "$scratch/compile-shape-maos"
+          cp "$scratch/default-maos" target/debug/maos
+          set +e
+          target/debug/xtask check-air-gap --binary target/debug/maos --json > evidence/symbol-plant.log 2>&1
+          rc=$?
+          set -e
+          cp "$scratch/compile-shape-maos" target/debug/maos
+          cmp "$scratch/compile-shape-maos" target/debug/maos
+          touch target/debug/maos
+          set +e
+          target/debug/xtask check-air-gap --binary target/debug/maos --dirty-fixture "$scratch/default-maos" --json > evidence/symbol-final-advisory.log 2>&1
+          advisory=$?
+          set -e
+          test "$rc" -eq 1
+          grep -F 'network symbols' evidence/symbol-plant.log
+          echo "D-02 C: advisory exit=$advisory, not an air-gap deployment claim" | tee evidence/disposition
+          target/debug/xtask check-mock-not-in-release --binary target/debug/maos --json
+          rm -rf "$scratch"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: cargo-symbols-20-2
+          path: evidence
+  operator-publication:
+    # Never runs merely because the verify branch was pushed.
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_tag != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      PUBLISH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+      TAG: ${{ inputs.publish_tag }}
+      GH_TOKEN: ${{ github.token }}
+      HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+      MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.publish_tag }}
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Absent credentials do not pretend publication happened
+        if: env.PUBLISH != 'true'
+        run: |
+          echo 'SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)'
+      - name: Obtain signed release and trusted verifier key
+        if: env.PUBLISH == 'true'
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --dir dist --pattern 'maos-linux-*' --pattern SHA256SUMS --pattern SHA256SUMS.sig
+          cargo build --locked -p maos-cli
+          echo "pubkey=$(target/debug/maosctl release-pubkey)" >> "$GITHUB_ENV"
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+        if: env.PUBLISH == 'true'
+      - uses: docker/setup-buildx-action@v3
+        if: env.PUBLISH == 'true'
+      - uses: docker/login-action@v3
+        if: env.PUBLISH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        if: env.PUBLISH == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        id: image
+        if: env.PUBLISH == 'true'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ inputs.publish_tag }}
+            ${{ env.HUB_USER }}/maos:${{ inputs.publish_tag }}
+          build-args: |
+            RELEASE_PUBKEY=${{ env.pubkey }}
+            SOURCE_SHA=${{ env.source_sha }}
+      - uses: sigstore/cosign-installer@v3
+        if: env.PUBLISH == 'true'
+      - name: Sign and verify both registry digests using this operator workflow identity
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+          REPOSITORY: ${{ github.repository }}
+          IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/ci-20-2-verify.yml@refs/heads/ci/20-2-verify
+        run: |
+          for image in "ghcr.io/$REPOSITORY" "$HUB_USER/maos"; do
+            cosign sign --yes "$image@$DIGEST"
+            cosign verify --certificate-identity "$IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com "$image@$DIGEST"
+          done

@@ -1,0 +1,41 @@
+$ env MAOS_17_2_CGROUP_MODE=undelegated cargo nextest run --binaries-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/binaries-metadata.json --cargo-metadata /home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/cargo-metadata.json --workspace --locked --no-fail-fast --profile ci --success-output never --failure-output final
+error: the argument '--binaries-metadata <PATH>' cannot be used with:
+  --package <PACKAGES>
+  --workspace
+  --exclude <EXCLUDE>
+  --all
+  --lib
+  --bin <BIN>
+  --bins
+  --example <EXAMPLE>
+  --examples
+  --test <TEST>
+  --tests
+  --bench <BENCH>
+  --benches
+  --all-targets
+  --features <FEATURES>
+  --all-features
+  --no-default-features
+  --build-jobs <N>
+  --release
+  --cargo-profile <NAME>
+  --target <TRIPLE>
+  --target-dir <DIR>
+  --unit-graph
+  --timings[=<FMTS>]
+  --frozen
+  --locked
+  --offline
+  --cargo-message-format <FMT>
+  --cargo-quiet...
+  --cargo-verbose...
+  --ignore-rust-version
+  --future-incompat-report
+  -Z <FLAG>
+
+Usage: cargo nextest run --binaries-metadata <PATH> --cargo-metadata <PATH> --no-fail-fast --profile <PROFILE> --success-output <WHEN> --failure-output <WHEN> [FILTERS]... [-- <FILTERS_AND_ARGS>...]
+
+For more information, try '--help'.
+
+EXIT 2; elapsed 0.31s

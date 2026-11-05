@@ -91,8 +91,12 @@ explicit `WrittenBy::Operator` entry so removal behavior is reviewable at the
 same boundary.
 
 `maos init` names `maos purge` rather than reconstructing or printing paths.
-Documentation describes the two-stage removal: purge MAOS-owned state, then run
-`cargo uninstall maos` for the Cargo-owned executable.
+Documentation describes two-stage removal: purge MAOS-owned state, then let the
+installer remove its binaries: `dpkg -r maos`, `rpm -e maos`, `pacman -R maos`,
+`brew uninstall maos`, or
+`cargo uninstall maos-bin maos-cli maos-spirit-cli maos-registry`.
+Purge prints the same route-neutral hint in stdout and the receipt's `next_step`;
+it does not guess the installer from the executable path or remove executables.
 
 ACP sockets have no cleanup entry because MAOS uses NDJSON over stdio. Purge
 enumerates podman containers with `maos.spirit_id`, then checks both that label

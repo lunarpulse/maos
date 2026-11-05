@@ -3,6 +3,13 @@
 # renaming a gate is a breaking change that requires invariant-lock review.
 
 gates = [
+    # 20-2 D-02 C: measured network symbols; advisory compile shape only.
+    "check-air-gap",
+    "air-gap-netns-witness",
+    "package-recipes",
+    "container-build",
+    "cargo-install",
+    "release-dry-run",
     # 20-3b: existing controls previously referenced but not enrolled here.
     "check-kernel-baseline",
     # workspace-test-suite: maos-kernel-core integration binaries.
@@ -648,6 +655,11 @@ binding = "blocking"
 # to every human while its deadline had passed four stories earlier.
 [[ship_gate]]
 name = "check-decision-register"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
+
+[[ship_gate]]
+name = "air-gap-netns-witness"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 binding = "blocking"
 

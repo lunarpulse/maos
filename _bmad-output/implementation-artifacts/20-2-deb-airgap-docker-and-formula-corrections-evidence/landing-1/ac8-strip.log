@@ -1,0 +1,3 @@
+$ strip /tmp/maos-20-2-dev202/maos-size
+
+EXIT 0; elapsed 0.06s

@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 //! Story 20-3a AC4 — ship-gate enrolment and binding drift:
-//! 1. The 46 expected names and required-binding registry rows are one set.
+//! 1. The 48 expected names and required-binding registry rows are one set.
 //! 2. Each name resolves exactly once: a per-commit `v1-0-ship-gate.needs`
 //!    entry or an explicitly mapped cadence job key.
 //! 3. `aggregate.needs` reaches `v1-0-ship-gate` directly.
@@ -127,6 +127,7 @@ const EXPECTED_GATES: &[&str] = &[
     // the same change.
     "check-perf-runner-policy",
     "check-perf-counts",
+    "air-gap-netns-witness",
 ];
 
 /// Explicit cadence enrolments: (registry name, workflow filename, job key).
@@ -558,7 +559,7 @@ jobs:
     /// Real-tree reconciliation includes the formerly exempt infrastructure
     /// gates and the previously registry-only fuzz gates, with no legacy list.
     #[test]
-    fn expected_gates_and_registry_are_one_set_of_47() {
+    fn expected_gates_and_registry_are_one_set_of_48() {
         // Unit tests run with CWD = the crate root, not the workspace root.
         let registry_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml");
         let registry: crate::corpus_types::ShipGateRegistry =
@@ -569,9 +570,9 @@ jobs:
             .map(|e| e.name.as_str())
             .collect();
         let expected: std::collections::HashSet<&str> = EXPECTED_GATES.iter().copied().collect();
-        assert_eq!(EXPECTED_GATES.len(), 47);
-        assert_eq!(expected.len(), 47, "duplicate expected gate");
-        assert_eq!(registry.ship_gates.len(), 47, "duplicate registry gate");
+        assert_eq!(EXPECTED_GATES.len(), 48);
+        assert_eq!(expected.len(), 48, "duplicate expected gate");
+        assert_eq!(registry.ship_gates.len(), 48, "duplicate registry gate");
         assert_eq!(names, expected);
     }
 }

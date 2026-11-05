@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 #[path = "purge_runtime.rs"]
 mod runtime_residue;
 
+const BINARY_REMOVAL_HINT: &str = "Remove package-owned binaries with your installer: dpkg -r maos; rpm -e maos; pacman -R maos; brew uninstall maos; or cargo uninstall maos-bin maos-cli maos-spirit-cli maos-registry";
+
 /// Who authored a root entry. Purge may remove only [`WrittenBy::Maos`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -828,7 +830,7 @@ impl ReceiptFile {
             signature: None,
             proof: None,
             next_step: format!(
-                "{}. Remove the Cargo-owned binary with: cargo uninstall maos",
+                "{}. {BINARY_REMOVAL_HINT}",
                 purge_summary(status, residue_count(roots))
             ),
         };
@@ -1071,7 +1073,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
     }
     println!("maos purge: receipt: {}", receipt_path.display());
     print_report_only_residue(&workspace_residue);
-    println!("maos purge: remove the Cargo-owned binary with: cargo uninstall maos");
+    println!("maos purge: {BINARY_REMOVAL_HINT}");
     println!("maos purge: {}", purge_summary(status, left));
     if let Some(error) = finalize_error {
         return Err(error);

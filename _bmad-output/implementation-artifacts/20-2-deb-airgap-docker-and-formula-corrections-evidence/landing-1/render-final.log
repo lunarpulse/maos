@@ -1,0 +1,4 @@
+$ /mnt/build/cargo-maos/debug/xtask render-packages --dist-dir /tmp/maos-20-2-dev202/dist --output /tmp/maos-20-2-dev202/dist/recipes --maosctl /home/lunarpulse/dev_ws/target/debug/maosctl --base-url file:///tmp/maos-20-2-dev202/dist
+render-packages: verified and rendered 0.1.0-alpha.1 from /tmp/maos-20-2-dev202/dist
+
+EXIT 0; elapsed 0.17s

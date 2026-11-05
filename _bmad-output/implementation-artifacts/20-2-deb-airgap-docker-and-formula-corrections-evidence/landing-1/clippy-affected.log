@@ -1,0 +1,101 @@
+$ cargo clippy --locked -p xtask -p maos-bin --all-targets --message-format json
+    Checking ring v0.17.14
+    Checking tokio v1.53.3
+    Checking futures-util v0.3.32
+   Compiling serde v1.0.228
+    Checking smallvec v1.15.1
+    Checking toml_edit v0.22.27
+    Checking rand_chacha v0.9.0
+    Checking serde_yaml v0.9.34+deprecated
+    Checking serde_with v3.21.0
+    Checking landlock v0.4.4
+    Checking maos-exec-deps v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-exec-deps)
+    Checking simple_asn1 v0.6.4
+   Compiling maos-corpus-gen v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-corpus-gen)
+    Checking wit-parser v0.254.2
+    Checking rand v0.9.4
+    Checking maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+    Checking parking_lot_core v0.9.12
+    Checking rusqlite v0.31.0
+    Checking icu_normalizer v2.2.0
+    Checking tracing-subscriber v0.3.23
+   Compiling zvariant_utils v4.2.0
+   Compiling zcheapstr v1.1.0
+   Compiling enumflags2 v0.7.12
+    Checking toml v0.8.23
+    Checking cedar-policy-core v4.11.2
+    Checking rustls-webpki v0.103.16
+    Checking jsonwebtoken v9.3.1
+    Checking rcgen v0.13.2
+    Checking tokio-util v0.7.18
+    Checking deadpool-runtime v0.1.4
+    Checking deadpool v0.12.3
+    Checking parking_lot v0.12.5
+    Checking dashmap v6.2.1
+    Checking rustls v0.23.46
+    Checking maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk)
+    Checking ulid v1.2.1
+    Checking idna_adapter v1.2.2
+   Compiling zvariant_derive v5.15.0
+    Checking cedar-policy-formatter v4.11.2
+    Checking idna v1.1.0
+    Checking tokio-postgres v0.7.18
+    Checking cedar-policy v4.11.2
+    Checking tokio-rustls v0.26.4
+   Compiling zvariant v5.15.0
+    Checking maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+    Checking maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit)
+    Checking maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp)
+    Checking maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest)
+    Checking maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+    Checking maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill)
+    Checking maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+    Checking maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello)
+    Checking maos-egress v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-egress)
+    Checking orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator)
+    Checking maos-sso v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-sso)
+    Checking architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect)
+    Checking reviewer v0.1.0 (/home/lunarpulse/dev_ws/spirits/reviewer)
+    Checking mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira)
+    Checking observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer)
+    Checking nash v1.5.0 (/home/lunarpulse/dev_ws/spirits/nash)
+    Checking maos-escape-detector v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-escape-detector)
+    Checking url v2.5.8
+    Checking zbus_names v4.3.4
+    Checking deadpool-postgres v0.14.1
+    Checking maos-pdp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-pdp)
+    Checking maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+    Checking maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+    Checking maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+    Checking worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+    Checking researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+    Checking maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+    Checking maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+    Checking butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler)
+    Checking maos-siem v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-siem)
+    Checking ureq v2.12.1
+    Checking maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite)
+   Compiling zbus_macros v5.19.0
+    Checking maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+    Checking maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+    Checking maos-fkcs v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-fkcs)
+    Checking maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+    Checking maos-a2a v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a)
+    Checking maos-a2a-tcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-tcp)
+    Checking maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+    Checking maos-notify-push v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-notify-push)
+    Checking maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+    Checking maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+    Checking maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+    Checking maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+    Checking maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+    Checking zbus v5.19.0
+    Checking secret-service v5.2.0
+    Checking zbus-secret-service-keyring-store v1.0.1
+    Checking keyring v4.2.0
+    Checking maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+    Checking maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    Checking xtask v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/xtask)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13m 08s
+
+EXIT 0; elapsed 789.59s

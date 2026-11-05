@@ -1,0 +1,10 @@
+$ /mnt/build/cargo-maos/debug/xtask check-epic-close-coherence --json
+{
+  "gate": "check-epic-close-coherence",
+  "passed": true,
+  "epics-checked": 21,
+  "authoritative-src-lines": 26841,
+  "violations": []
+}
+
+EXIT 0; elapsed 0.02s

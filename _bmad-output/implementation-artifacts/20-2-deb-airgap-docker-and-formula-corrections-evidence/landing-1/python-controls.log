@@ -1,0 +1,7 @@
+$ python3 packaging/test_release_20_2.py -v
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 9, in <module>
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+ModuleNotFoundError: No module named 'cryptography'
+
+EXIT 1; elapsed 0.06s

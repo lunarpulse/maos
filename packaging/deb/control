@@ -2,7 +2,7 @@ Source: maos
 Section: devel
 Priority: optional
 Maintainer: Lunarpulse <lunarpulse@users.noreply.github.com>
-Build-Depends: debhelper-compat (= 13), cargo, rustc (>= 1.88), python3-cryptography
+Build-Depends: debhelper-compat (= 13), python3-cryptography
 Standards-Version: 4.6.0
 Homepage: https://github.com/lunarpulse/maos
 Vcs-Git: https://github.com/lunarpulse/maos.git

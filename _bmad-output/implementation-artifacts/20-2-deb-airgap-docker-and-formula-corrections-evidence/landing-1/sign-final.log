@@ -1,0 +1,4 @@
+$ /mnt/build/cargo-maos/debug/xtask release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums /tmp/maos-20-2-dev202/dist/SHA256SUMS --output /tmp/maos-20-2-dev202/dist/SHA256SUMS.sig
+release-verify: signed 4 entries from /tmp/maos-20-2-dev202/dist/SHA256SUMS → /tmp/maos-20-2-dev202/dist/SHA256SUMS.sig
+
+EXIT 0; elapsed 0.01s

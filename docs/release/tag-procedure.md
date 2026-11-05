@@ -144,18 +144,24 @@ git push origin refs/tags/v0.1.0-alpha.1
 ```
 
 Follow the linked canonical runbook for signing, artifact verification, and key
-rotation. Acceptance requires `release.yml` to finish green and publish the six
-binaries plus `SHA256SUMS` and `SHA256SUMS.sig`.
+rotation. Acceptance requires `release.yml` to finish green and publish all four
+binaries for each of the three targets, the original `SHA256SUMS`/signature,
+amd64/arm64 `.deb` and `.rpm`, and the independently signed
+`SHA256SUMS-packages`/signature. It also attaches rendered `maos.rb`, `PKGBUILD`,
+`maos.spec` and the shared `verify-release.py`; never copy committed templates
+to the tap/AUR. Packages disable stripping and carry exactly the signed bytes.
 
 ## Expected boundary conditions
 
-- `container.yml` also runs on `v*` and is expected to be red until Story 20-2
-  splits image build from registry publication and its Docker Hub/cosign secrets
-  are provisioned. That known red run does not invalidate a green
-  `release.yml` for this pre-release.
-- The Homebrew, AUR, Debian, and RPM recipes remain publication scaffolds.
-  Do not claim package-manager availability for `v0.1.0-alpha.1`; ownership and
-  the normalized-version mechanism are recorded in `RELEASE-HOLDS.md` boundary
-  19.
+- `container.yml` waits for the signed release, always builds and smokes the
+  verified runtime image, then publishes/signs only with both Docker Hub
+  credentials present. Otherwise it explicitly skips publication, not building.
+- Before the rc tag, the operator must run the 20-2 branch-only verify recipe
+  from the story's evidence `ci/ci-20-2-verify.yml` on `ci/20-2-verify`, recording
+  native deb, Fedora/Arch/Homebrew, netns, container and Cargo results and
+  restored negative controls. These hosted results are unverified locally.
+- The first alpha release did not ship working package recipes. Only a release
+  produced by the corrected pipeline can claim the rendered package routes;
+  tap/AUR accounts remain `ops-brew-tap-and-aur-publication`.
 - This procedure does not authorize a GA tag. GA remains blocked until both
   holds in `RELEASE-HOLDS.md` are clear.

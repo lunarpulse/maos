@@ -1,0 +1,1190 @@
+$ cargo tree --locked --offline -p maos-bin --no-default-features --features air-gap
+maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+├── architect v0.1.0 (/home/lunarpulse/dev_ws/spirits/architect)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+│   │   ├── async-trait v0.1.89 (proc-macro)
+│   │   │   ├── proc-macro2 v1.0.106
+│   │   │   │   └── unicode-ident v1.0.24
+│   │   │   ├── quote v1.0.45
+│   │   │   │   └── proc-macro2 v1.0.106 (*)
+│   │   │   └── syn v2.0.117
+│   │   │       ├── proc-macro2 v1.0.106 (*)
+│   │   │       ├── quote v1.0.45 (*)
+│   │   │       └── unicode-ident v1.0.24
+│   │   ├── ed25519-dalek v2.2.0
+│   │   │   ├── curve25519-dalek v4.1.3
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   ├── cpufeatures v0.2.17
+│   │   │   │   ├── curve25519-dalek-derive v0.1.1 (proc-macro)
+│   │   │   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   │   │   ├── quote v1.0.45 (*)
+│   │   │   │   │   └── syn v2.0.117 (*)
+│   │   │   │   ├── digest v0.10.7
+│   │   │   │   │   ├── block-buffer v0.10.4
+│   │   │   │   │   │   └── generic-array v0.14.7
+│   │   │   │   │   │       └── typenum v1.20.0
+│   │   │   │   │   │       [build-dependencies]
+│   │   │   │   │   │       └── version_check v0.9.5
+│   │   │   │   │   ├── crypto-common v0.1.7
+│   │   │   │   │   │   ├── generic-array v0.14.7 (*)
+│   │   │   │   │   │   └── typenum v1.20.0
+│   │   │   │   │   └── subtle v2.6.1
+│   │   │   │   ├── subtle v2.6.1
+│   │   │   │   └── zeroize v1.8.2
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── rustc_version v0.4.1
+│   │   │   │       └── semver v1.0.28
+│   │   │   ├── ed25519 v2.2.3
+│   │   │   │   └── signature v2.2.0
+│   │   │   ├── sha2 v0.10.9
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   ├── cpufeatures v0.2.17
+│   │   │   │   └── digest v0.10.7 (*)
+│   │   │   ├── subtle v2.6.1
+│   │   │   └── zeroize v1.8.2
+│   │   ├── getrandom v0.3.4
+│   │   │   ├── cfg-if v1.0.4
+│   │   │   └── libc v0.2.186
+│   │   ├── hex v0.4.3
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi)
+│   │   │   └── serde v1.0.228
+│   │   │       ├── serde_core v1.0.228
+│   │   │       └── serde_derive v1.0.228 (proc-macro)
+│   │   │           ├── proc-macro2 v1.0.106 (*)
+│   │   │           ├── quote v1.0.45 (*)
+│   │   │           └── syn v2.0.117 (*)
+│   │   ├── rustix v1.1.4
+│   │   │   ├── bitflags v2.11.1
+│   │   │   └── linux-raw-sys v0.12.1
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149
+│   │   │   ├── indexmap v2.14.0
+│   │   │   │   ├── equivalent v1.0.2
+│   │   │   │   ├── hashbrown v0.17.1
+│   │   │   │   │   └── foldhash v0.2.0
+│   │   │   │   └── serde_core v1.0.228
+│   │   │   ├── itoa v1.0.18
+│   │   │   ├── memchr v2.8.0
+│   │   │   ├── serde_core v1.0.228
+│   │   │   └── zmij v1.0.21
+│   │   ├── sha2 v0.10.9 (*)
+│   │   ├── smallvec v1.15.1
+│   │   │   └── serde v1.0.228 (*)
+│   │   └── thiserror v2.0.18
+│   │       └── thiserror-impl v2.0.18 (proc-macro)
+│   │           ├── proc-macro2 v1.0.106 (*)
+│   │           ├── quote v1.0.45 (*)
+│   │           └── syn v2.0.117 (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── maos-spirit-derive v0.1.0-alpha.1 (proc-macro) (/home/lunarpulse/dev_ws/crates/maos-spirit-derive)
+│   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   ├── quote v1.0.45 (*)
+│   │   │   └── syn v2.0.117 (*)
+│   │   └── tokio-util v0.7.18
+│   │       ├── bytes v1.11.1
+│   │       ├── futures-core v0.3.32
+│   │       ├── futures-sink v0.3.32
+│   │       ├── futures-util v0.3.32
+│   │       │   ├── futures-core v0.3.32
+│   │       │   ├── futures-macro v0.3.32 (proc-macro)
+│   │       │   │   ├── proc-macro2 v1.0.106 (*)
+│   │       │   │   ├── quote v1.0.45 (*)
+│   │       │   │   └── syn v2.0.117 (*)
+│   │       │   ├── futures-sink v0.3.32
+│   │       │   ├── futures-task v0.3.32
+│   │       │   ├── pin-project-lite v0.2.17
+│   │       │   └── slab v0.4.12
+│   │       ├── pin-project-lite v0.2.17
+│   │       └── tokio v1.53.3
+│   │           ├── bytes v1.11.1
+│   │           ├── libc v0.2.186
+│   │           ├── mio v1.2.0
+│   │           │   └── libc v0.2.186
+│   │           ├── pin-project-lite v0.2.17
+│   │           ├── signal-hook-registry v1.4.8
+│   │           │   ├── errno v0.3.14
+│   │           │   │   └── libc v0.2.186
+│   │           │   └── libc v0.2.186
+│   │           ├── socket2 v0.6.3
+│   │           │   └── libc v0.2.186
+│   │           └── tokio-macros v2.7.0 (proc-macro)
+│   │               ├── proc-macro2 v1.0.106 (*)
+│   │               ├── quote v1.0.45 (*)
+│   │               └── syn v2.0.117 (*)
+│   ├── serde v1.0.228 (*)
+│   └── serde_json v1.0.149 (*)
+├── async-trait v0.1.89 (proc-macro) (*)
+├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler)
+│   ├── async-trait v0.1.89 (proc-macro) (*)
+│   ├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit)
+│   │   ├── ed25519-dalek v2.2.0 (*)
+│   │   ├── hex v0.4.3
+│   │   ├── hkdf v0.12.4
+│   │   │   └── hmac v0.12.1
+│   │   │       └── digest v0.10.7 (*)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── rusqlite v0.31.0
+│   │   │   ├── bitflags v2.11.1
+│   │   │   ├── fallible-iterator v0.3.0
+│   │   │   ├── fallible-streaming-iterator v0.1.9
+│   │   │   ├── hashlink v0.9.1
+│   │   │   │   └── hashbrown v0.14.5
+│   │   │   │       └── ahash v0.8.12
+│   │   │   │           ├── cfg-if v1.0.4
+│   │   │   │           ├── once_cell v1.21.4
+│   │   │   │           └── zerocopy v0.8.48
+│   │   │   │               └── zerocopy-derive v0.8.48 (proc-macro)
+│   │   │   │                   ├── proc-macro2 v1.0.106 (*)
+│   │   │   │                   ├── quote v1.0.45 (*)
+│   │   │   │                   └── syn v2.0.117 (*)
+│   │   │   │           [build-dependencies]
+│   │   │   │           └── version_check v0.9.5
+│   │   │   ├── libsqlite3-sys v0.28.0
+│   │   │   │   [build-dependencies]
+│   │   │   │   ├── cc v1.2.62
+│   │   │   │   │   ├── find-msvc-tools v0.1.9
+│   │   │   │   │   └── shlex v1.3.0
+│   │   │   │   ├── pkg-config v0.3.33
+│   │   │   │   └── vcpkg v0.2.15
+│   │   │   └── smallvec v1.15.1 (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── sha2 v0.10.9 (*)
+│   │   └── thiserror v2.0.18 (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   ├── parking_lot v0.12.5
+│   │   ├── lock_api v0.4.14
+│   │   │   └── scopeguard v1.2.0
+│   │   └── parking_lot_core v0.9.12
+│   │       ├── cfg-if v1.0.4
+│   │       ├── libc v0.2.186
+│   │       └── smallvec v1.15.1 (*)
+│   ├── serde v1.0.228 (*)
+│   ├── serde_json v1.0.149 (*)
+│   └── thiserror v2.0.18 (*)
+├── crossbeam-channel v0.5.15
+│   └── crossbeam-utils v0.8.22
+├── getrandom v0.3.4 (*)
+├── hex v0.4.3
+├── maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core)
+│   ├── async-trait v0.1.89 (proc-macro) (*)
+│   ├── dashmap v6.2.1
+│   │   ├── cfg-if v1.0.4
+│   │   ├── crossbeam-utils v0.8.22
+│   │   ├── hashbrown v0.14.5 (*)
+│   │   ├── lock_api v0.4.14 (*)
+│   │   ├── once_cell v1.21.4
+│   │   └── parking_lot_core v0.9.12 (*)
+│   ├── hex v0.4.3
+│   ├── maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability)
+│   │   ├── dashmap v6.2.1 (*)
+│   │   ├── maos-attrs v0.1.0-alpha.1 (proc-macro) (/home/lunarpulse/dev_ws/crates/maos-attrs)
+│   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   ├── quote v1.0.45 (*)
+│   │   │   └── syn v2.0.117 (*)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── parking_lot v0.12.5 (*)
+│   │   ├── ring v0.17.14
+│   │   │   ├── cfg-if v1.0.4
+│   │   │   ├── getrandom v0.2.17
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   └── libc v0.2.186
+│   │   │   └── untrusted v0.9.0
+│   │   │   [build-dependencies]
+│   │   │   └── cc v1.2.62 (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── subtle v2.6.1
+│   │   ├── thiserror v2.0.18 (*)
+│   │   └── tokio v1.53.3 (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── rustls v0.23.46
+│   │   ├── log v0.4.29
+│   │   ├── once_cell v1.21.4
+│   │   ├── ring v0.17.14 (*)
+│   │   ├── rustls-pki-types v1.14.1
+│   │   │   └── zeroize v1.8.2
+│   │   ├── rustls-webpki v0.103.16
+│   │   │   ├── ring v0.17.14 (*)
+│   │   │   ├── rustls-pki-types v1.14.1 (*)
+│   │   │   └── untrusted v0.9.0
+│   │   ├── subtle v2.6.1
+│   │   └── zeroize v1.8.2
+│   ├── serde v1.0.228 (*)
+│   ├── serde_json v1.0.149 (*)
+│   ├── sha2 v0.10.9 (*)
+│   ├── thiserror v2.0.18 (*)
+│   ├── tokio v1.53.3 (*)
+│   ├── tracing v0.1.44
+│   │   ├── pin-project-lite v0.2.17
+│   │   ├── tracing-attributes v0.1.31 (proc-macro)
+│   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   ├── quote v1.0.45 (*)
+│   │   │   └── syn v2.0.117 (*)
+│   │   └── tracing-core v0.1.36
+│   │       └── once_cell v1.21.4
+│   └── ulid v1.2.1
+│       └── rand v0.9.4
+│           ├── rand_chacha v0.9.0
+│           │   ├── ppv-lite86 v0.2.21
+│           │   │   └── zerocopy v0.8.48 (*)
+│           │   └── rand_core v0.9.5
+│           │       └── getrandom v0.3.4 (*)
+│           └── rand_core v0.9.5 (*)
+├── maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp)
+│   ├── crossbeam-channel v0.5.15 (*)
+│   ├── maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability) (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── serde v1.0.228 (*)
+│   ├── serde_json v1.0.149 (*)
+│   └── thiserror v2.0.18 (*)
+├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit) (*)
+├── maos-bench v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bench)
+│   ├── butler v0.1.0 (/home/lunarpulse/dev_ws/spirits/butler) (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval)
+│   │   ├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit) (*)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── sha2 v0.10.9 (*)
+│   │   ├── thiserror v2.0.18 (*)
+│   │   └── walkdir v2.5.0
+│   │       └── same-file v1.0.6
+│   ├── maos-frame-codec v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-frame-codec)
+│   ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core)
+│   │   ├── arc-swap v1.9.1
+│   │   │   └── rustversion v1.0.22 (proc-macro)
+│   │   ├── ciborium v0.2.2
+│   │   │   ├── ciborium-io v0.2.2
+│   │   │   ├── ciborium-ll v0.2.2
+│   │   │   │   ├── ciborium-io v0.2.2
+│   │   │   │   └── half v2.7.1
+│   │   │   │       ├── cfg-if v1.0.4
+│   │   │   │       └── zerocopy v0.8.48 (*)
+│   │   │   └── serde v1.0.228 (*)
+│   │   ├── dashmap v6.2.1 (*)
+│   │   ├── hex v0.4.3
+│   │   ├── landlock v0.4.4
+│   │   │   ├── enumflags2 v0.7.12
+│   │   │   │   ├── enumflags2_derive v0.7.12 (proc-macro)
+│   │   │   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   │   │   ├── quote v1.0.45 (*)
+│   │   │   │   │   └── syn v2.0.117 (*)
+│   │   │   │   └── serde v1.0.228 (*)
+│   │   │   ├── libc v0.2.186
+│   │   │   └── thiserror v2.0.18 (*)
+│   │   ├── libc v0.2.186
+│   │   ├── maos-attrs v0.1.0-alpha.1 (proc-macro) (/home/lunarpulse/dev_ws/crates/maos-attrs) (*)
+│   │   ├── maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability) (*)
+│   │   ├── maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface)
+│   │   │   ├── maos-acp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-acp) (*)
+│   │   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   │   ├── serde v1.0.228 (*)
+│   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   ├── thiserror v2.0.18 (*)
+│   │   │   └── tokio v1.53.3 (*)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval) (*)
+│   │   ├── maos-exec-deps v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-exec-deps)
+│   │   │   └── libc v0.2.186
+│   │   ├── maos-frame-codec v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-frame-codec)
+│   │   ├── maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac)
+│   │   │   ├── arc-swap v1.9.1 (*)
+│   │   │   ├── dashmap v6.2.1 (*)
+│   │   │   ├── maos-attrs v0.1.0-alpha.1 (proc-macro) (/home/lunarpulse/dev_ws/crates/maos-attrs) (*)
+│   │   │   ├── maos-capability v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-capability) (*)
+│   │   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   ├── ring v0.17.14 (*)
+│   │   │   ├── rusqlite v0.31.0 (*)
+│   │   │   ├── serde v1.0.228 (*)
+│   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   ├── thiserror v2.0.18 (*)
+│   │   │   ├── tokio v1.53.3 (*)
+│   │   │   └── ulid v1.2.1 (*)
+│   │   ├── maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest)
+│   │   │   ├── maos-attrs v0.1.0-alpha.1 (proc-macro) (/home/lunarpulse/dev_ws/crates/maos-attrs) (*)
+│   │   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   │   ├── serde v1.0.228 (*)
+│   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   ├── thiserror v2.0.18 (*)
+│   │   │   ├── toml v0.8.23
+│   │   │   │   ├── serde v1.0.228 (*)
+│   │   │   │   ├── serde_spanned v0.6.9
+│   │   │   │   │   └── serde v1.0.228 (*)
+│   │   │   │   ├── toml_datetime v0.6.11
+│   │   │   │   │   └── serde v1.0.228 (*)
+│   │   │   │   └── toml_edit v0.22.27
+│   │   │   │       ├── indexmap v2.14.0 (*)
+│   │   │   │       ├── serde v1.0.228 (*)
+│   │   │   │       ├── serde_spanned v0.6.9 (*)
+│   │   │   │       ├── toml_datetime v0.6.11 (*)
+│   │   │   │       ├── toml_write v0.1.2
+│   │   │   │       └── winnow v0.7.15
+│   │   │   └── tracing v0.1.44 (*)
+│   │   ├── maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp)
+│   │   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   │   ├── serde v1.0.228 (*)
+│   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   └── thiserror v2.0.18 (*)
+│   │   ├── maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers)
+│   │   │   ├── dashmap v6.2.1 (*)
+│   │   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   │   ├── serde v1.0.228 (*)
+│   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   ├── sha2 v0.10.9 (*)
+│   │   │   └── thiserror v2.0.18 (*)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── parking_lot v0.12.5 (*)
+│   │   ├── ring v0.17.14 (*)
+│   │   ├── rusqlite v0.31.0 (*)
+│   │   ├── rustix v1.1.4 (*)
+│   │   ├── rustls v0.23.46 (*)
+│   │   ├── seccompiler v0.4.0
+│   │   │   └── libc v0.2.186
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── sha2 v0.10.9 (*)
+│   │   ├── subtle v2.6.1
+│   │   ├── thiserror v2.0.18 (*)
+│   │   ├── tokio v1.53.3 (*)
+│   │   ├── tokio-util v0.7.18 (*)
+│   │   ├── toml v0.8.23 (*)
+│   │   ├── ulid v1.2.1 (*)
+│   │   └── ureq v2.12.1
+│   │       ├── base64 v0.22.1
+│   │       ├── flate2 v1.1.9
+│   │       │   ├── crc32fast v1.5.0
+│   │       │   │   └── cfg-if v1.0.4
+│   │       │   └── miniz_oxide v0.8.9
+│   │       │       ├── adler2 v2.0.1
+│   │       │       └── simd-adler32 v0.3.9
+│   │       ├── log v0.4.29
+│   │       ├── once_cell v1.21.4
+│   │       ├── rustls v0.23.46 (*)
+│   │       ├── rustls-pki-types v1.14.1 (*)
+│   │       ├── url v2.5.8
+│   │       │   ├── form_urlencoded v1.2.2
+│   │       │   │   └── percent-encoding v2.3.2
+│   │       │   ├── idna v1.1.0
+│   │       │   │   ├── idna_adapter v1.2.2
+│   │       │   │   │   ├── icu_normalizer v2.2.0
+│   │       │   │   │   │   ├── icu_collections v2.2.0
+│   │       │   │   │   │   │   ├── displaydoc v0.2.5 (proc-macro)
+│   │       │   │   │   │   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │       │   │   │   │   │   │   ├── quote v1.0.45 (*)
+│   │       │   │   │   │   │   │   └── syn v2.0.117 (*)
+│   │       │   │   │   │   │   ├── potential_utf v0.1.5
+│   │       │   │   │   │   │   │   └── zerovec v0.11.6
+│   │       │   │   │   │   │   │       ├── yoke v0.8.2
+│   │       │   │   │   │   │   │       │   ├── stable_deref_trait v1.2.1
+│   │       │   │   │   │   │   │       │   ├── yoke-derive v0.8.2 (proc-macro)
+│   │       │   │   │   │   │   │       │   │   ├── proc-macro2 v1.0.106 (*)
+│   │       │   │   │   │   │   │       │   │   ├── quote v1.0.45 (*)
+│   │       │   │   │   │   │   │       │   │   ├── syn v2.0.117 (*)
+│   │       │   │   │   │   │   │       │   │   └── synstructure v0.13.2
+│   │       │   │   │   │   │   │       │   │       ├── proc-macro2 v1.0.106 (*)
+│   │       │   │   │   │   │   │       │   │       ├── quote v1.0.45 (*)
+│   │       │   │   │   │   │   │       │   │       └── syn v2.0.117 (*)
+│   │       │   │   │   │   │   │       │   └── zerofrom v0.1.8
+│   │       │   │   │   │   │   │       │       └── zerofrom-derive v0.1.7 (proc-macro)
+│   │       │   │   │   │   │   │       │           ├── proc-macro2 v1.0.106 (*)
+│   │       │   │   │   │   │   │       │           ├── quote v1.0.45 (*)
+│   │       │   │   │   │   │   │       │           ├── syn v2.0.117 (*)
+│   │       │   │   │   │   │   │       │           └── synstructure v0.13.2 (*)
+│   │       │   │   │   │   │   │       ├── zerofrom v0.1.8 (*)
+│   │       │   │   │   │   │   │       └── zerovec-derive v0.11.3 (proc-macro)
+│   │       │   │   │   │   │   │           ├── proc-macro2 v1.0.106 (*)
+│   │       │   │   │   │   │   │           ├── quote v1.0.45 (*)
+│   │       │   │   │   │   │   │           └── syn v2.0.117 (*)
+│   │       │   │   │   │   │   ├── utf8_iter v1.0.4
+│   │       │   │   │   │   │   ├── yoke v0.8.2 (*)
+│   │       │   │   │   │   │   ├── zerofrom v0.1.8 (*)
+│   │       │   │   │   │   │   └── zerovec v0.11.6 (*)
+│   │       │   │   │   │   ├── icu_normalizer_data v2.2.0
+│   │       │   │   │   │   ├── icu_provider v2.2.0
+│   │       │   │   │   │   │   ├── displaydoc v0.2.5 (proc-macro) (*)
+│   │       │   │   │   │   │   ├── icu_locale_core v2.2.0
+│   │       │   │   │   │   │   │   ├── displaydoc v0.2.5 (proc-macro) (*)
+│   │       │   │   │   │   │   │   ├── litemap v0.8.2
+│   │       │   │   │   │   │   │   ├── tinystr v0.8.3
+│   │       │   │   │   │   │   │   │   ├── displaydoc v0.2.5 (proc-macro) (*)
+│   │       │   │   │   │   │   │   │   └── zerovec v0.11.6 (*)
+│   │       │   │   │   │   │   │   ├── writeable v0.6.3
+│   │       │   │   │   │   │   │   └── zerovec v0.11.6 (*)
+│   │       │   │   │   │   │   ├── writeable v0.6.3
+│   │       │   │   │   │   │   ├── yoke v0.8.2 (*)
+│   │       │   │   │   │   │   ├── zerofrom v0.1.8 (*)
+│   │       │   │   │   │   │   ├── zerotrie v0.2.4
+│   │       │   │   │   │   │   │   ├── displaydoc v0.2.5 (proc-macro) (*)
+│   │       │   │   │   │   │   │   ├── yoke v0.8.2 (*)
+│   │       │   │   │   │   │   │   └── zerofrom v0.1.8 (*)
+│   │       │   │   │   │   │   └── zerovec v0.11.6 (*)
+│   │       │   │   │   │   ├── smallvec v1.15.1 (*)
+│   │       │   │   │   │   └── zerovec v0.11.6 (*)
+│   │       │   │   │   └── icu_properties v2.2.0
+│   │       │   │   │       ├── icu_collections v2.2.0 (*)
+│   │       │   │   │       ├── icu_locale_core v2.2.0 (*)
+│   │       │   │   │       ├── icu_properties_data v2.2.0
+│   │       │   │   │       ├── icu_provider v2.2.0 (*)
+│   │       │   │   │       ├── zerotrie v0.2.4 (*)
+│   │       │   │   │       └── zerovec v0.11.6 (*)
+│   │       │   │   ├── smallvec v1.15.1 (*)
+│   │       │   │   └── utf8_iter v1.0.4
+│   │       │   └── percent-encoding v2.3.2
+│   │       └── webpki-roots v0.26.11
+│   │           └── webpki-roots v1.0.11
+│   │               └── rustls-pki-types v1.14.1 (*)
+│   ├── maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   └── smallvec v1.15.1 (*)
+│   ├── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill)
+│   │   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   │   ├── semver v1.0.28
+│   │   │   ├── serde v1.0.228 (*)
+│   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   ├── serde_yaml v0.9.34+deprecated
+│   │   │   │   ├── indexmap v2.14.0 (*)
+│   │   │   │   ├── itoa v1.0.18
+│   │   │   │   ├── ryu v1.0.23
+│   │   │   │   ├── serde v1.0.228 (*)
+│   │   │   │   └── unsafe-libyaml v0.2.11
+│   │   │   ├── sha2 v0.10.9 (*)
+│   │   │   ├── thiserror v2.0.18 (*)
+│   │   │   ├── toml v0.8.23 (*)
+│   │   │   └── tracing v0.1.44 (*)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── thiserror v2.0.18 (*)
+│   │   └── unicode-segmentation v1.13.3
+│   ├── serde v1.0.228 (*)
+│   ├── serde_json v1.0.149 (*)
+│   ├── tempfile v3.27.0
+│   │   ├── fastrand v2.4.1
+│   │   ├── getrandom v0.4.2
+│   │   │   ├── cfg-if v1.0.4
+│   │   │   ├── libc v0.2.186
+│   │   │   └── rand_core v0.10.1
+│   │   ├── once_cell v1.21.4
+│   │   └── rustix v1.1.4 (*)
+│   ├── thiserror v2.0.18 (*)
+│   └── toml v0.8.23 (*)
+├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli)
+│   ├── chrono v0.4.44
+│   │   ├── iana-time-zone v0.1.65
+│   │   └── num-traits v0.2.19
+│   │       [build-dependencies]
+│   │       └── autocfg v1.5.0
+│   ├── clap v4.6.1
+│   │   ├── clap_builder v4.6.0
+│   │   │   ├── anstream v1.0.0
+│   │   │   │   ├── anstyle v1.0.14
+│   │   │   │   ├── anstyle-parse v1.0.0
+│   │   │   │   │   └── utf8parse v0.2.2
+│   │   │   │   ├── anstyle-query v1.1.5
+│   │   │   │   ├── colorchoice v1.0.5
+│   │   │   │   ├── is_terminal_polyfill v1.70.2
+│   │   │   │   └── utf8parse v0.2.2
+│   │   │   ├── anstyle v1.0.14
+│   │   │   ├── clap_lex v1.1.0
+│   │   │   └── strsim v0.11.1
+│   │   └── clap_derive v4.6.1 (proc-macro)
+│   │       ├── heck v0.5.0
+│   │       ├── proc-macro2 v1.0.106 (*)
+│   │       ├── quote v1.0.45 (*)
+│   │       └── syn v2.0.117 (*)
+│   ├── ed25519-dalek v2.2.0 (*)
+│   ├── hex v0.4.3
+│   ├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit) (*)
+│   ├── maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort)
+│   │   ├── ed25519-dalek v2.2.0 (*)
+│   │   ├── hex v0.4.3
+│   │   ├── maos-a2a-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-a2a-core) (*)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac) (*)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── sha2 v0.10.9 (*)
+│   │   ├── smallvec v1.15.1 (*)
+│   │   ├── thiserror v2.0.18 (*)
+│   │   └── toml v0.8.23 (*)
+│   ├── maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance)
+│   │   ├── hex v0.4.3
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── ring v0.17.14 (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_cbor v0.11.2
+│   │   │   ├── half v1.8.3
+│   │   │   └── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── sha2 v0.10.9 (*)
+│   │   ├── thiserror v2.0.18 (*)
+│   │   └── tracing v0.1.44 (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval) (*)
+│   ├── maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac) (*)
+│   ├── maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite)
+│   │   ├── deadpool-postgres v0.14.1
+│   │   │   ├── async-trait v0.1.89 (proc-macro) (*)
+│   │   │   ├── deadpool v0.12.3
+│   │   │   │   ├── deadpool-runtime v0.1.4
+│   │   │   │   │   └── tokio v1.53.3 (*)
+│   │   │   │   ├── lazy_static v1.5.0
+│   │   │   │   ├── num_cpus v1.17.0
+│   │   │   │   │   └── libc v0.2.186
+│   │   │   │   └── tokio v1.53.3 (*)
+│   │   │   ├── tokio v1.53.3 (*)
+│   │   │   ├── tokio-postgres v0.7.18
+│   │   │   │   ├── async-trait v0.1.89 (proc-macro) (*)
+│   │   │   │   ├── byteorder v1.5.0
+│   │   │   │   ├── bytes v1.11.1
+│   │   │   │   ├── fallible-iterator v0.2.0
+│   │   │   │   ├── futures-channel v0.3.32
+│   │   │   │   │   ├── futures-core v0.3.32
+│   │   │   │   │   └── futures-sink v0.3.32
+│   │   │   │   ├── futures-util v0.3.32 (*)
+│   │   │   │   ├── log v0.4.29
+│   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   ├── percent-encoding v2.3.2
+│   │   │   │   ├── phf v0.13.1
+│   │   │   │   │   └── phf_shared v0.13.1
+│   │   │   │   │       └── siphasher v1.0.3
+│   │   │   │   ├── pin-project-lite v0.2.17
+│   │   │   │   ├── postgres-protocol v0.6.12
+│   │   │   │   │   ├── base64 v0.22.1
+│   │   │   │   │   ├── byteorder v1.5.0
+│   │   │   │   │   ├── bytes v1.11.1
+│   │   │   │   │   ├── fallible-iterator v0.2.0
+│   │   │   │   │   ├── hmac v0.13.0
+│   │   │   │   │   │   └── digest v0.11.3
+│   │   │   │   │   │       ├── block-buffer v0.12.1
+│   │   │   │   │   │       │   └── hybrid-array v0.4.12
+│   │   │   │   │   │       │       └── typenum v1.20.0
+│   │   │   │   │   │       ├── const-oid v0.10.2
+│   │   │   │   │   │       ├── crypto-common v0.2.2
+│   │   │   │   │   │       │   └── hybrid-array v0.4.12 (*)
+│   │   │   │   │   │       └── ctutils v0.4.5
+│   │   │   │   │   │           └── cmov v0.5.4
+│   │   │   │   │   ├── md-5 v0.11.0
+│   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   └── digest v0.11.3 (*)
+│   │   │   │   │   ├── memchr v2.8.0
+│   │   │   │   │   ├── rand v0.10.1
+│   │   │   │   │   │   ├── chacha20 v0.10.2
+│   │   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │   ├── cpufeatures v0.3.0
+│   │   │   │   │   │   │   └── rand_core v0.10.1
+│   │   │   │   │   │   ├── getrandom v0.4.2 (*)
+│   │   │   │   │   │   └── rand_core v0.10.1
+│   │   │   │   │   ├── sha2 v0.11.0
+│   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   ├── cpufeatures v0.3.0
+│   │   │   │   │   │   └── digest v0.11.3 (*)
+│   │   │   │   │   └── stringprep v0.1.5
+│   │   │   │   │       ├── unicode-bidi v0.3.18
+│   │   │   │   │       ├── unicode-normalization v0.1.25
+│   │   │   │   │       │   └── tinyvec v1.11.0
+│   │   │   │   │       │       └── tinyvec_macros v0.1.1
+│   │   │   │   │       └── unicode-properties v0.1.4
+│   │   │   │   ├── postgres-types v0.2.14
+│   │   │   │   │   ├── bytes v1.11.1
+│   │   │   │   │   ├── fallible-iterator v0.2.0
+│   │   │   │   │   └── postgres-protocol v0.6.12 (*)
+│   │   │   │   ├── rand v0.10.1 (*)
+│   │   │   │   ├── socket2 v0.6.3 (*)
+│   │   │   │   ├── tokio v1.53.3 (*)
+│   │   │   │   ├── tokio-util v0.7.18 (*)
+│   │   │   │   └── whoami v2.1.2
+│   │   │   │       └── libc v0.2.186
+│   │   │   └── tracing v0.1.44 (*)
+│   │   ├── ed25519-dalek v2.2.0 (*)
+│   │   ├── hex v0.4.3
+│   │   ├── hkdf v0.12.4 (*)
+│   │   ├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit) (*)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── pgvector v0.4.2
+│   │   │   ├── bytes v1.11.1
+│   │   │   └── postgres-types v0.2.14 (*)
+│   │   ├── rusqlite v0.31.0 (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── sha2 v0.10.9 (*)
+│   │   ├── thiserror v2.0.18 (*)
+│   │   ├── tokio v1.53.3 (*)
+│   │   ├── tokio-postgres v0.7.18 (*)
+│   │   └── tracing v0.1.44 (*)
+│   ├── maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry)
+│   │   ├── hex v0.4.3
+│   │   ├── maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance) (*)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest) (*)
+│   │   ├── maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp) (*)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── ring v0.17.14 (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_cbor v0.11.2 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── sha2 v0.10.9 (*)
+│   │   ├── tar v0.4.46
+│   │   │   ├── filetime v0.2.29
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   └── libc v0.2.186
+│   │   │   └── libc v0.2.186
+│   │   ├── thiserror v2.0.18 (*)
+│   │   ├── tokio v1.53.3 (*)
+│   │   └── toml v0.8.23 (*)
+│   ├── maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill) (*)
+│   ├── rusqlite v0.31.0 (*)
+│   ├── rustix v1.1.4 (*)
+│   ├── serde v1.0.228 (*)
+│   ├── serde_cbor v0.11.2 (*)
+│   ├── serde_json v1.0.149 (*)
+│   ├── thiserror v2.0.18 (*)
+│   ├── tokio v1.53.3 (*)
+│   ├── tokio-postgres v0.7.18 (*)
+│   └── toml v0.8.23 (*)
+├── maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance) (*)
+├── maos-control v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-control)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   ├── ring v0.17.14 (*)
+│   └── serde_json v1.0.149 (*)
+├── maos-corpus-gen v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-corpus-gen)
+│   ├── clap v4.6.1 (*)
+│   ├── hex v0.4.3
+│   ├── maos-compliance v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-compliance) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── ring v0.17.14 (*)
+│   ├── serde v1.0.228 (*)
+│   ├── serde_cbor v0.11.2 (*)
+│   ├── serde_json v1.0.149 (*)
+│   ├── sha2 v0.10.9 (*)
+│   ├── toml v0.8.23 (*)
+│   └── walkdir v2.5.0 (*)
+│   [build-dependencies]
+│   └── sha2 v0.10.9 (*)
+├── maos-digest v0.1.0 (/home/lunarpulse/dev_ws/spirits/digest)
+│   ├── maos-cohort v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cohort) (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   ├── serde v1.0.228 (*)
+│   └── serde_json v1.0.149 (*)
+├── maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface) (*)
+├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+├── maos-escape-detector v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-escape-detector)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── rusqlite v0.31.0 (*)
+│   ├── serde v1.0.228 (*)
+│   ├── serde_json v1.0.149 (*)
+│   └── thiserror v2.0.18 (*)
+├── maos-frame-codec v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-frame-codec)
+├── maos-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-host)
+│   └── thiserror v2.0.18 (*)
+├── maos-iac v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-iac) (*)
+├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+├── maos-loom-lite v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-loom-lite) (*)
+├── maos-manifest v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-manifest) (*)
+├── maos-pdp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-pdp)
+│   ├── cedar-policy v4.11.2
+│   │   ├── cedar-policy-core v4.11.2
+│   │   │   ├── chrono v0.4.44 (*)
+│   │   │   ├── educe v0.6.0 (proc-macro)
+│   │   │   │   ├── enum-ordinalize v4.4.1
+│   │   │   │   │   └── enum-ordinalize-derive v4.4.1 (proc-macro)
+│   │   │   │   │       ├── proc-macro2 v1.0.106 (*)
+│   │   │   │   │       ├── quote v1.0.45 (*)
+│   │   │   │   │       └── syn v2.0.117 (*)
+│   │   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   │   ├── quote v1.0.45 (*)
+│   │   │   │   └── syn v2.0.117 (*)
+│   │   │   ├── either v1.15.0
+│   │   │   ├── itertools v0.14.0
+│   │   │   │   └── either v1.15.0
+│   │   │   ├── lalrpop-util v0.22.2
+│   │   │   │   ├── regex-automata v0.4.14
+│   │   │   │   │   ├── aho-corasick v1.1.4
+│   │   │   │   │   │   └── memchr v2.8.0
+│   │   │   │   │   ├── memchr v2.8.0
+│   │   │   │   │   └── regex-syntax v0.8.10
+│   │   │   │   └── rustversion v1.0.22 (proc-macro)
+│   │   │   ├── linked-hash-map v0.5.6
+│   │   │   │   └── serde v1.0.228 (*)
+│   │   │   ├── linked_hash_set v0.1.6
+│   │   │   │   └── linked-hash-map v0.5.6 (*)
+│   │   │   ├── miette v7.6.0
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   ├── miette-derive v7.6.0 (proc-macro)
+│   │   │   │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   │   │   ├── quote v1.0.45 (*)
+│   │   │   │   │   └── syn v2.0.117 (*)
+│   │   │   │   ├── serde v1.0.228 (*)
+│   │   │   │   └── unicode-width v0.1.14
+│   │   │   ├── nonempty v0.12.0
+│   │   │   │   └── serde v1.0.228 (*)
+│   │   │   ├── ref-cast v1.0.25
+│   │   │   │   └── ref-cast-impl v1.0.25 (proc-macro)
+│   │   │   │       ├── proc-macro2 v1.0.106 (*)
+│   │   │   │       ├── quote v1.0.45 (*)
+│   │   │   │       └── syn v2.0.117 (*)
+│   │   │   ├── regex v1.12.3
+│   │   │   │   ├── aho-corasick v1.1.4 (*)
+│   │   │   │   ├── memchr v2.8.0
+│   │   │   │   ├── regex-automata v0.4.14 (*)
+│   │   │   │   └── regex-syntax v0.8.10
+│   │   │   ├── rustc-literal-escaper v0.0.7
+│   │   │   ├── serde v1.0.228 (*)
+│   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   ├── serde_with v3.21.0
+│   │   │   │   ├── serde_core v1.0.228
+│   │   │   │   ├── serde_json v1.0.149 (*)
+│   │   │   │   └── serde_with_macros v3.21.0 (proc-macro)
+│   │   │   │       ├── darling v0.23.0
+│   │   │   │       │   ├── darling_core v0.23.0
+│   │   │   │       │   │   ├── ident_case v1.0.1
+│   │   │   │       │   │   ├── proc-macro2 v1.0.106 (*)
+│   │   │   │       │   │   ├── quote v1.0.45 (*)
+│   │   │   │       │   │   ├── strsim v0.11.1
+│   │   │   │       │   │   └── syn v2.0.117 (*)
+│   │   │   │       │   └── darling_macro v0.23.0 (proc-macro)
+│   │   │   │       │       ├── darling_core v0.23.0 (*)
+│   │   │   │       │       ├── quote v1.0.45 (*)
+│   │   │   │       │       └── syn v2.0.117 (*)
+│   │   │   │       ├── proc-macro2 v1.0.106 (*)
+│   │   │   │       ├── quote v1.0.45 (*)
+│   │   │   │       └── syn v2.0.117 (*)
+│   │   │   ├── smol_str v0.3.6
+│   │   │   │   └── serde_core v1.0.228
+│   │   │   ├── stacker v0.1.24
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   ├── libc v0.2.186
+│   │   │   │   └── psm v0.1.31
+│   │   │   │       [build-dependencies]
+│   │   │   │       ├── ar_archive_writer v0.5.2
+│   │   │   │       │   └── object v0.37.3
+│   │   │   │       │       └── memchr v2.8.0
+│   │   │   │       └── cc v1.2.62 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── cc v1.2.62 (*)
+│   │   │   ├── thiserror v2.0.18 (*)
+│   │   │   └── unicode-security v0.1.2
+│   │   │       ├── unicode-normalization v0.1.25 (*)
+│   │   │       └── unicode-script v0.5.8
+│   │   │   [build-dependencies]
+│   │   │   └── lalrpop v0.22.2
+│   │   │       ├── ascii-canvas v4.0.0
+│   │   │       │   └── term v1.2.1
+│   │   │       ├── bit-set v0.8.0
+│   │   │       │   └── bit-vec v0.8.0
+│   │   │       ├── ena v0.14.4
+│   │   │       │   └── log v0.4.29
+│   │   │       ├── itertools v0.14.0
+│   │   │       │   └── either v1.15.0
+│   │   │       ├── lalrpop-util v0.22.2
+│   │   │       │   ├── regex-automata v0.4.14
+│   │   │       │   │   ├── aho-corasick v1.1.4 (*)
+│   │   │       │   │   ├── memchr v2.8.0
+│   │   │       │   │   └── regex-syntax v0.8.10
+│   │   │       │   └── rustversion v1.0.22 (proc-macro)
+│   │   │       ├── petgraph v0.7.1
+│   │   │       │   ├── fixedbitset v0.5.7
+│   │   │       │   └── indexmap v2.14.0
+│   │   │       │       ├── equivalent v1.0.2
+│   │   │       │       └── hashbrown v0.17.1
+│   │   │       ├── pico-args v0.5.0
+│   │   │       ├── regex v1.12.3
+│   │   │       │   ├── regex-automata v0.4.14 (*)
+│   │   │       │   └── regex-syntax v0.8.10
+│   │   │       ├── regex-syntax v0.8.10
+│   │   │       ├── sha3 v0.10.9
+│   │   │       │   ├── digest v0.10.7
+│   │   │       │   │   ├── block-buffer v0.10.4 (*)
+│   │   │       │   │   └── crypto-common v0.1.7 (*)
+│   │   │       │   └── keccak v0.1.6
+│   │   │       ├── string_cache v0.8.9
+│   │   │       │   ├── new_debug_unreachable v1.0.6
+│   │   │       │   ├── parking_lot v0.12.5 (*)
+│   │   │       │   ├── phf_shared v0.11.3
+│   │   │       │   │   └── siphasher v1.0.3
+│   │   │       │   └── precomputed-hash v0.1.1
+│   │   │       ├── term v1.2.1
+│   │   │       ├── unicode-xid v0.2.6
+│   │   │       └── walkdir v2.5.0 (*)
+│   │   ├── cedar-policy-formatter v4.11.2
+│   │   │   ├── cedar-policy-core v4.11.2 (*)
+│   │   │   ├── itertools v0.14.0 (*)
+│   │   │   ├── logos v0.16.1
+│   │   │   │   └── logos-derive v0.16.1 (proc-macro)
+│   │   │   │       └── logos-codegen v0.16.1
+│   │   │   │           ├── fnv v1.0.7
+│   │   │   │           ├── proc-macro2 v1.0.106 (*)
+│   │   │   │           ├── quote v1.0.45 (*)
+│   │   │   │           ├── regex-automata v0.4.14 (*)
+│   │   │   │           ├── regex-syntax v0.8.10
+│   │   │   │           └── syn v2.0.117 (*)
+│   │   │   ├── miette v7.6.0 (*)
+│   │   │   ├── pretty v0.12.5
+│   │   │   │   ├── arrayvec v0.5.2
+│   │   │   │   ├── typed-arena v2.0.2
+│   │   │   │   └── unicode-width v0.2.2
+│   │   │   ├── regex v1.12.3 (*)
+│   │   │   └── smol_str v0.3.6 (*)
+│   │   ├── itertools v0.14.0 (*)
+│   │   ├── linked-hash-map v0.5.6 (*)
+│   │   ├── miette v7.6.0 (*)
+│   │   ├── ref-cast v1.0.25 (*)
+│   │   ├── semver v1.0.28
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serde_json v1.0.149 (*)
+│   │   ├── serde_with v3.21.0 (*)
+│   │   ├── smol_str v0.3.6 (*)
+│   │   └── thiserror v2.0.18 (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── thiserror v2.0.18 (*)
+│   └── tracing v0.1.44 (*)
+├── maos-secrets v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-secrets)
+│   ├── getrandom v0.3.4 (*)
+│   ├── keyring v4.2.0
+│   │   ├── keyring-core v1.0.0
+│   │   │   └── log v0.4.29
+│   │   └── zbus-secret-service-keyring-store v1.0.1
+│   │       ├── keyring-core v1.0.0 (*)
+│   │       ├── secret-service v5.2.0
+│   │       │   ├── aes v0.9.3
+│   │       │   │   ├── cipher v0.5.2
+│   │       │   │   │   ├── crypto-common v0.2.2 (*)
+│   │       │   │   │   └── inout v0.2.2
+│   │       │   │   │       ├── block-padding v0.4.2
+│   │       │   │   │       │   └── hybrid-array v0.4.12 (*)
+│   │       │   │   │       └── hybrid-array v0.4.12 (*)
+│   │       │   │   ├── cpubits v0.1.1
+│   │       │   │   └── cpufeatures v0.3.0
+│   │       │   ├── cbc v0.2.1
+│   │       │   │   └── cipher v0.5.2 (*)
+│   │       │   ├── futures-util v0.3.32 (*)
+│   │       │   ├── getrandom v0.4.2 (*)
+│   │       │   ├── hkdf v0.13.0
+│   │       │   │   └── hmac v0.13.0 (*)
+│   │       │   ├── hybrid-array v0.4.12 (*)
+│   │       │   ├── num v0.4.3
+│   │       │   │   ├── num-bigint v0.4.8
+│   │       │   │   │   ├── num-integer v0.1.46
+│   │       │   │   │   │   └── num-traits v0.2.19 (*)
+│   │       │   │   │   └── num-traits v0.2.19 (*)
+│   │       │   │   ├── num-complex v0.4.6
+│   │       │   │   │   └── num-traits v0.2.19 (*)
+│   │       │   │   ├── num-integer v0.1.46 (*)
+│   │       │   │   ├── num-iter v0.1.46
+│   │       │   │   │   ├── num-integer v0.1.46 (*)
+│   │       │   │   │   └── num-traits v0.2.19 (*)
+│   │       │   │   ├── num-rational v0.4.2
+│   │       │   │   │   ├── num-bigint v0.4.8 (*)
+│   │       │   │   │   ├── num-integer v0.1.46 (*)
+│   │       │   │   │   └── num-traits v0.2.19 (*)
+│   │       │   │   └── num-traits v0.2.19 (*)
+│   │       │   ├── once_cell v1.21.4
+│   │       │   ├── serde v1.0.228 (*)
+│   │       │   ├── sha2 v0.11.0 (*)
+│   │       │   └── zbus v5.19.0
+│   │       │       ├── async-broadcast v0.7.2
+│   │       │       │   ├── event-listener v5.4.2
+│   │       │       │   │   ├── parking v2.2.1
+│   │       │       │   │   └── pin-project-lite v0.2.17
+│   │       │       │   ├── event-listener-strategy v0.5.4
+│   │       │       │   │   ├── event-listener v5.4.2 (*)
+│   │       │       │   │   └── pin-project-lite v0.2.17
+│   │       │       │   ├── futures-core v0.3.32
+│   │       │       │   └── pin-project-lite v0.2.17
+│   │       │       ├── async-executor v1.14.0
+│   │       │       │   ├── async-task v4.7.1
+│   │       │       │   ├── concurrent-queue v2.5.0
+│   │       │       │   │   └── crossbeam-utils v0.8.22
+│   │       │       │   ├── fastrand v2.4.1
+│   │       │       │   ├── futures-lite v2.6.1
+│   │       │       │   │   ├── fastrand v2.4.1
+│   │       │       │   │   ├── futures-core v0.3.32
+│   │       │       │   │   ├── futures-io v0.3.32
+│   │       │       │   │   ├── parking v2.2.1
+│   │       │       │   │   └── pin-project-lite v0.2.17
+│   │       │       │   ├── pin-project-lite v0.2.17
+│   │       │       │   └── slab v0.4.12
+│   │       │       ├── async-io v2.6.0
+│   │       │       │   ├── cfg-if v1.0.4
+│   │       │       │   ├── concurrent-queue v2.5.0 (*)
+│   │       │       │   ├── futures-io v0.3.32
+│   │       │       │   ├── futures-lite v2.6.1 (*)
+│   │       │       │   ├── parking v2.2.1
+│   │       │       │   ├── polling v3.11.0
+│   │       │       │   │   ├── cfg-if v1.0.4
+│   │       │       │   │   └── rustix v1.1.4 (*)
+│   │       │       │   ├── rustix v1.1.4 (*)
+│   │       │       │   └── slab v0.4.12
+│   │       │       │   [build-dependencies]
+│   │       │       │   └── autocfg v1.5.0
+│   │       │       ├── async-lock v3.4.2
+│   │       │       │   ├── event-listener v5.4.2 (*)
+│   │       │       │   ├── event-listener-strategy v0.5.4 (*)
+│   │       │       │   └── pin-project-lite v0.2.17
+│   │       │       ├── async-process v2.5.0
+│   │       │       │   ├── async-channel v2.5.0
+│   │       │       │   │   ├── concurrent-queue v2.5.0 (*)
+│   │       │       │   │   ├── event-listener-strategy v0.5.4 (*)
+│   │       │       │   │   ├── futures-core v0.3.32
+│   │       │       │   │   └── pin-project-lite v0.2.17
+│   │       │       │   ├── async-io v2.6.0 (*)
+│   │       │       │   ├── async-lock v3.4.2 (*)
+│   │       │       │   ├── async-signal v0.2.14
+│   │       │       │   │   ├── async-io v2.6.0 (*)
+│   │       │       │   │   ├── cfg-if v1.0.4
+│   │       │       │   │   ├── futures-core v0.3.32
+│   │       │       │   │   ├── futures-io v0.3.32
+│   │       │       │   │   ├── rustix v1.1.4 (*)
+│   │       │       │   │   └── signal-hook-registry v1.4.8 (*)
+│   │       │       │   ├── async-task v4.7.1
+│   │       │       │   ├── cfg-if v1.0.4
+│   │       │       │   ├── event-listener v5.4.2 (*)
+│   │       │       │   ├── futures-lite v2.6.1 (*)
+│   │       │       │   └── rustix v1.1.4 (*)
+│   │       │       ├── async-recursion v1.1.1 (proc-macro)
+│   │       │       │   ├── proc-macro2 v1.0.106 (*)
+│   │       │       │   ├── quote v1.0.45 (*)
+│   │       │       │   └── syn v2.0.117 (*)
+│   │       │       ├── async-task v4.7.1
+│   │       │       ├── async-trait v0.1.89 (proc-macro) (*)
+│   │       │       ├── blocking v1.7.0
+│   │       │       │   ├── async-channel v2.5.0 (*)
+│   │       │       │   ├── async-task v4.7.1
+│   │       │       │   ├── futures-io v0.3.32
+│   │       │       │   ├── futures-lite v2.6.1 (*)
+│   │       │       │   └── piper v0.2.5
+│   │       │       │       ├── atomic-waker v1.1.2
+│   │       │       │       ├── fastrand v2.4.1
+│   │       │       │       └── futures-io v0.3.32
+│   │       │       ├── enumflags2 v0.7.12 (*)
+│   │       │       ├── event-listener v5.4.2 (*)
+│   │       │       ├── futures-core v0.3.32
+│   │       │       ├── futures-lite v2.6.1 (*)
+│   │       │       ├── hex v0.4.3
+│   │       │       ├── libc v0.2.186
+│   │       │       ├── ordered-stream v0.2.0
+│   │       │       │   ├── futures-core v0.3.32
+│   │       │       │   └── pin-project-lite v0.2.17
+│   │       │       ├── rustix v1.1.4 (*)
+│   │       │       ├── serde v1.0.228 (*)
+│   │       │       ├── serde_repr v0.1.21 (proc-macro)
+│   │       │       │   ├── proc-macro2 v1.0.106 (*)
+│   │       │       │   ├── quote v1.0.45 (*)
+│   │       │       │   └── syn v3.0.6
+│   │       │       │       ├── proc-macro2 v1.0.106 (*)
+│   │       │       │       ├── quote v1.0.45 (*)
+│   │       │       │       └── unicode-ident v1.0.24
+│   │       │       ├── tracing v0.1.44 (*)
+│   │       │       ├── uuid v1.23.4
+│   │       │       │   └── serde_core v1.0.228
+│   │       │       ├── winnow v1.0.3
+│   │       │       ├── zbus_macros v5.19.0 (proc-macro)
+│   │       │       │   ├── proc-macro-crate v3.5.0
+│   │       │       │   │   └── toml_edit v0.25.13+spec-1.1.0
+│   │       │       │   │       ├── indexmap v2.14.0 (*)
+│   │       │       │   │       ├── toml_datetime v1.1.1+spec-1.1.0
+│   │       │       │   │       ├── toml_parser v1.1.2+spec-1.1.0
+│   │       │       │   │       │   └── winnow v1.0.3
+│   │       │       │   │       └── winnow v1.0.3
+│   │       │       │   ├── proc-macro2 v1.0.106 (*)
+│   │       │       │   ├── quote v1.0.45 (*)
+│   │       │       │   ├── syn v3.0.6 (*)
+│   │       │       │   ├── zbus_names v4.3.4
+│   │       │       │   │   ├── serde v1.0.228
+│   │       │       │   │   │   ├── serde_core v1.0.228
+│   │       │       │   │   │   └── serde_derive v1.0.228 (proc-macro) (*)
+│   │       │       │   │   ├── winnow v1.0.3
+│   │       │       │   │   └── zvariant v5.15.0
+│   │       │       │   │       ├── endi v1.1.1
+│   │       │       │   │       ├── enumflags2 v0.7.12 (*)
+│   │       │       │   │       ├── serde v1.0.228 (*)
+│   │       │       │   │       ├── winnow v1.0.3
+│   │       │       │   │       ├── zcheapstr v1.1.0
+│   │       │       │   │       │   └── serde v1.0.228 (*)
+│   │       │       │   │       ├── zvariant_derive v5.15.0 (proc-macro)
+│   │       │       │   │       │   ├── proc-macro-crate v3.5.0 (*)
+│   │       │       │   │       │   ├── proc-macro2 v1.0.106 (*)
+│   │       │       │   │       │   ├── quote v1.0.45 (*)
+│   │       │       │   │       │   ├── syn v3.0.6 (*)
+│   │       │       │   │       │   └── zvariant_utils v4.2.0
+│   │       │       │   │       │       ├── proc-macro2 v1.0.106 (*)
+│   │       │       │   │       │       ├── quote v1.0.45 (*)
+│   │       │       │   │       │       ├── serde v1.0.228 (*)
+│   │       │       │   │       │       ├── syn v3.0.6 (*)
+│   │       │       │   │       │       └── winnow v1.0.3
+│   │       │       │   │       └── zvariant_utils v4.2.0 (*)
+│   │       │       │   ├── zvariant v5.15.0 (*)
+│   │       │       │   └── zvariant_utils v4.2.0 (*)
+│   │       │       ├── zbus_names v4.3.4 (*)
+│   │       │       └── zvariant v5.15.0 (*)
+│   │       └── zbus v5.19.0 (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── ring v0.17.14 (*)
+│   ├── sha2 v0.10.9 (*)
+│   └── tempfile v3.27.0 (*)
+├── maos-shell v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-shell)
+│   ├── maos-audit v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-audit) (*)
+│   ├── maos-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-cli) (*)
+│   ├── maos-director-surface v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-director-surface) (*)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-kernel-core v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-kernel-core) (*)
+│   ├── maos-providers v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-providers) (*)
+│   ├── maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello)
+│   │   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   │   ├── maos-frame-codec v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-frame-codec)
+│   │   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   │   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   └── serde_json v1.0.149 (*)
+│   ├── serde v1.0.228 (*)
+│   ├── serde_json v1.0.149 (*)
+│   └── tokio v1.53.3 (*)
+├── maos-skill v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-skill) (*)
+├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+├── maos-spirit-cli v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-cli)
+│   ├── anyhow v1.0.103
+│   ├── base64 v0.22.1
+│   ├── clap v4.6.1 (*)
+│   ├── hex v0.4.3
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-mcp v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-mcp) (*)
+│   ├── maos-registry v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-registry) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── ring v0.17.14 (*)
+│   ├── serde v1.0.228 (*)
+│   ├── serde_cbor v0.11.2 (*)
+│   ├── serde_json v1.0.149 (*)
+│   ├── sha2 v0.10.9 (*)
+│   ├── thiserror v2.0.18 (*)
+│   ├── tokio v1.53.3 (*)
+│   ├── toml v0.8.23 (*)
+│   ├── tracing v0.1.44 (*)
+│   └── tracing-subscriber v0.3.23
+│       ├── matchers v0.2.0
+│       │   └── regex-automata v0.4.14 (*)
+│       ├── nu-ansi-term v0.50.3
+│       ├── once_cell v1.21.4
+│       ├── regex-automata v0.4.14 (*)
+│       ├── sharded-slab v0.1.7
+│       │   └── lazy_static v1.5.0
+│       ├── smallvec v1.15.1 (*)
+│       ├── thread_local v1.1.9
+│       │   └── cfg-if v1.0.4
+│       ├── tracing v0.1.44 (*)
+│       ├── tracing-core v0.1.36 (*)
+│       └── tracing-log v0.2.0
+│           ├── log v0.4.29
+│           ├── once_cell v1.21.4
+│           └── tracing-core v0.1.36 (*)
+├── maos-spirit-hello v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-hello) (*)
+├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+├── mira v1.5.0 (/home/lunarpulse/dev_ws/spirits/mira)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   ├── serde v1.0.228 (*)
+│   └── serde_json v1.0.149 (*)
+├── nash v1.5.0 (/home/lunarpulse/dev_ws/spirits/nash)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   ├── serde v1.0.228 (*)
+│   └── serde_json v1.0.149 (*)
+├── observer v0.1.0 (/home/lunarpulse/dev_ws/spirits/observer)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   ├── serde v1.0.228 (*)
+│   └── serde_json v1.0.149 (*)
+├── orchestrator v0.1.0 (/home/lunarpulse/dev_ws/spirits/orchestrator) (*)
+├── parking_lot v0.12.5 (*)
+├── researcher v0.1.0 (/home/lunarpulse/dev_ws/spirits/researcher) (*)
+├── reviewer v0.1.0 (/home/lunarpulse/dev_ws/spirits/reviewer)
+│   ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+│   ├── maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi) (*)
+│   ├── maos-spirit-sdk v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-sdk) (*)
+│   ├── serde v1.0.228 (*)
+│   └── serde_json v1.0.149 (*)
+├── ring v0.17.14 (*)
+├── rusqlite v0.31.0 (*)
+├── rustix v1.1.4 (*)
+├── semver v1.0.28
+├── serde v1.0.228 (*)
+├── serde_cbor v0.11.2 (*)
+├── serde_json v1.0.149 (*)
+├── sha2 v0.10.9 (*)
+├── smallvec v1.15.1 (*)
+├── tar v0.4.46 (*)
+├── thiserror v2.0.18 (*)
+├── tokio v1.53.3 (*)
+├── tokio-util v0.7.18 (*)
+├── toml v0.8.23 (*)
+├── ulid v1.2.1 (*)
+└── worker v0.1.0 (/home/lunarpulse/dev_ws/spirits/worker)
+    ├── maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain) (*)
+    ├── maos-egress v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-egress)
+    ├── serde v1.0.228 (*)
+    ├── serde_json v1.0.149 (*)
+    └── toml v0.8.23 (*)
+[dev-dependencies]
+├── ed25519-dalek v2.2.0 (*)
+├── futures-util v0.3.32 (*)
+├── maos-eval v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-eval) (*)
+├── rustls v0.23.46 (*)
+├── tempfile v3.27.0 (*)
+├── time v0.3.47
+│   ├── deranged v0.5.8
+│   │   └── powerfmt v0.2.0
+│   ├── num-conv v0.2.2
+│   ├── powerfmt v0.2.0
+│   └── time-core v0.1.8
+├── tokio v1.53.3 (*)
+├── tokio-postgres v0.7.18 (*)
+├── tokio-rustls v0.26.4
+│   ├── rustls v0.23.46 (*)
+│   └── tokio v1.53.3 (*)
+└── wit-parser v0.254.2
+    ├── anyhow v1.0.103
+    ├── hashbrown v0.17.1 (*)
+    ├── id-arena v2.3.0
+    ├── indexmap v2.14.0 (*)
+    ├── log v0.4.29
+    ├── semver v1.0.28
+    ├── serde v1.0.228 (*)
+    ├── serde_derive v1.0.228 (proc-macro) (*)
+    ├── serde_json v1.0.149 (*)
+    ├── unicode-ident v1.0.24
+    └── wasmparser v0.254.2
+        ├── bitflags v2.11.1
+        └── semver v1.0.28
+
+EXIT 0; elapsed 9.71s

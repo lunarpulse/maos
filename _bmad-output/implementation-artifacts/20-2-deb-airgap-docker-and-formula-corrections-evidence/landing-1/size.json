@@ -1,0 +1,6 @@
+{
+  "binary": "cargo build --release --locked -p maos-bin -p maos-cli -p maos-registry -p maos-spirit-cli",
+  "stripped_bytes": 31677432,
+  "limit": 33554432,
+  "passed": true
+}

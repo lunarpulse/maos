@@ -1,0 +1,4 @@
+$ /mnt/build/cargo-maos/debug/xtask release-dry-run --manifest-only --dist-dir /tmp/maos-20-2-dev202/dist --targets x86_64-unknown-linux-gnu
+release-dry-run: PASS — 4 artifact(s), 1 target(s), manifest /tmp/maos-20-2-dev202/dist/SHA256SUMS
+
+EXIT 0; elapsed 0.09s

@@ -1,0 +1,4 @@
+$ unshare -n true
+unshare: unshare failed: Operation not permitted
+
+EXIT 1; elapsed 0.00s

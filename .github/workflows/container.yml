@@ -1,80 +1,89 @@
-# Story 9.4 AC-2 — Container image build and push.
-#
-# Builds the MAOS container image and pushes to Docker Hub + GHCR
-# with cosign signing for verification parity with AC-1 binary signing.
-#
-# NOTE: At v0.5 this workflow is a SCAFFOLD. Container registry
-# credentials and cosign signing must be configured before enabling.
-
 name: container
-
 on:
   push:
-    tags:
-      - 'v*'
-
-env:
-  REGISTRY_GHCR: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
+    tags: ['v*']
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
     permissions:
       contents: read
+      actions: read
       packages: write
-      id-token: write  # cosign keyless signing
+      id-token: write
+    env:
+      PUBLISH: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+      HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+      GH_TOKEN: ${{ github.token }}
+      MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
     steps:
       - uses: actions/checkout@v5
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Wait for the signed tag release (never build from an unsigned download)
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 180); do
+            state=$(gh run list --workflow release.yml --commit "$GITHUB_SHA" --event push --json status,conclusion --jq '.[0] | .status + ":" + .conclusion')
+            if [ "$state" = 'completed:success' ]; then break; fi
+            if [[ "$state" == completed:* ]]; then echo "release failed: $state"; exit 1; fi
+            sleep 20
+          done
+          test "$state" = 'completed:success'
+          mkdir -p dist
+          gh release download "$TAG" --dir dist --pattern 'maos-linux-*' --pattern SHA256SUMS --pattern SHA256SUMS.sig
+          cargo build --locked -p maos-cli
+          echo "pubkey=$(target/debug/maosctl release-pubkey)" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - name: Always build and smoke without logging in
+        run: |
+          docker buildx build --load --platform linux/amd64 --build-arg RELEASE_PUBKEY="$pubkey" --build-arg SOURCE_SHA="$GITHUB_SHA" -t maos:tag .
+          docker run --rm maos:tag --version
+          docker run --rm maos:tag --help
+      - name: Publication unavailable
+        if: env.PUBLISH != 'true'
+        run: |
+          echo 'SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)'
       - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY_GHCR }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Log in to Docker Hub
+        if: env.PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/maos
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
-      - name: Build and push
-        id: build
+      - uses: docker/setup-qemu-action@v3
+        if: env.PUBLISH == 'true'
+      - name: Publish the verified multi-platform image
+        if: env.PUBLISH == 'true'
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Cosign signing for OCI signature verification parity with AC-1.
-      # Sign both GHCR and Docker Hub digests; metadata-action does not emit
-      # `digest`, so we use the build-push-action output instead.
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
-
-      - name: Sign GHCR container image
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ${{ env.HUB_USER }}/maos:${{ github.ref_name }}
+          build-args: |
+            RELEASE_PUBKEY=${{ env.pubkey }}
+            SOURCE_SHA=${{ github.sha }}
+      - uses: sigstore/cosign-installer@v3
+        if: env.PUBLISH == 'true'
+      - name: Sign both published digests
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          GHCR_IMAGE: ghcr.io/${{ github.repository }}
         run: |
-          cosign sign --yes ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
-
-      - name: Sign Docker Hub container image
-        run: |
-          cosign sign --yes ${{ secrets.DOCKERHUB_USERNAME }}/maos@${{ steps.build.outputs.digest }}
+          cosign sign --yes "$GHCR_IMAGE@$DIGEST"
+          cosign sign --yes "$HUB_USER/maos@$DIGEST"

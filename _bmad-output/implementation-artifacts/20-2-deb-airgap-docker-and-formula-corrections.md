@@ -2,11 +2,11 @@
 story_id: '20.2'
 story_key: 20-2-deb-airgap-docker-and-formula-corrections
 created: 2026-11-02
-context_commit: a8af3215
-baseline_commit: a8af3215
+context_commit: cbed4dad
+baseline_commit: cbed4dad
 security_sensitive: true
-kernel_grant: "RULED 2026-11-02 (ask s202): kernel-Δ 0 under the recommended D-row set; no kernel grant. Pins measured at a8af3215: 26841 physical / 21042 tokei."
-kloc_grant: "RULED 2026-11-02 (ask s202; D-20-2-13 A; D02 A ×2 measured / ×3 unmeasured). Ceilings (STOP above; pins re-fixed exactly at landing; aggregate hardfail = measured + 1): maos-bin ≤ 33534; xtask ≤ 44860; aggregate ≤ 192316. Every other crate 0."
+kernel_grant: "RULED 2026-11-02 (ask s202): kernel-Δ 0; re-measured cbed4dad at 26841 physical / 21042 tokei. No kernel grant or pin change."
+kloc_grant: "RULED ask s202, D-20-2-13 A; REBASED 2026-11-05 onto exact cbed4dad pins: maos-bin 34842 + 2×18 = ceiling 34878; xtask 44466 + 2×2 + 3×150 = ceiling 44920; aggregate 193911 + 36 + 454 = ceiling 194401. Original creation ceilings 33534/44860/192316 are historical. Exact landing pins, aggregate hardfail = measured + 1. Every other crate delta 0."
 review: "bmad-code-review under docs/testing/proof-contract.md. DIFFICULT tier (`proof-contract.md:63-71`): a security-critical control — Ed25519 release-signature verification in four package recipes and the container signing path (supply chain) — and a privileged CI job (`sudo unshare -n`). Blind and Edge on opus-5.5, Acceptance on opus-5.5, a Security reading on AC1, AC2, AC3 and AC5, Test Infrastructure on glm-5.3 (standing policy). Under D-20-2-01 B add the FLAG-Winston kernel reading. Creation anthropic/claude-opus-5-5."
 ---
 
@@ -125,6 +125,16 @@ of +2×2. D-08 B or C — xtask renderer 0 (ceiling 44410).
 
 **Rulings 2026-11-02 (ask s202):** The operator ruled every D-20-2-01…14 row exactly as recommended, including D-20-2-02 A conditional on T0 measurement 1, with C if red, and confirmed preflight D09 A. D01 A, D02 A and D11 A remain in force. The grants and ceilings are recorded in frontmatter.
 
+**Landing-1 T0 (2026-11-05, cbed4dad):** the required `check-air-gap --build-first
+--dirty-fixture <default build>` exited 1 and detected `TcpListener` and
+`getaddrinfo` in the no-default-features subject; the default fixture was
+correctly rejected. The already-ruled conditional **D-20-2-02 C applies**:
+advisory symbol observation, not a ship badge. The default-build netns witness
+is blocking. Local `unshare -n` exits 1 (`Operation not permitted`), `strace`,
+debhelper, Docker, Homebrew and rpmbuild are absent and no user bus exists.
+Those hosted proofs are authored, not claimed run. A hosted outbound result
+remains STOP under AC3.8. No tracker/story status flip is made by this agent.
+
 | ID | Question | Options | Recommendation and evidence | Status |
 |---|---|---|---|---|
 | **D-20-2-01** | What NFR-Ops-12 is witnessed on, and what "the air-gap variant" ships as | **A** witness the **shipped default build** inside `unshare -n` (behaviour: boot, replay session, TL entries, zero `AF_INET`/`AF_INET6` traffic); the `--no-default-features` build is a compile-shape control only — not a release artifact — and its stub `run` becomes a typed refusal (−20 measured); ops-rc acceptance amended · **B** make the variant genuinely network-free and bootable and ship `maos-airgap-linux-{amd64,arm64}`: KA kernel row (+38/+32 measured, FLAG-Winston), default-features plumbing in 13 crates + 7 Spirits, `tokio-postgres` gated, a substrate boot path (+300…+800 bin, +40…+150 cli/loom-lite, +20…+40 xtask [INFERENCE]); witness on that binary · **C** ship the variant as is with its stub `run` labelled, witness on the default build | **A.** NFR-Ops-12 asks that the *substrate* boot, run and journal with zero outbound calls (`non-functional-requirements.md:167`); only the default build has a substrate (W10). B is a product feature the PRD does not require, with kernel bytes and an unmeasured boot path; C ships a binary whose `run` writes a file that reads like a boot record (rule 11). | RULED 2026-11-02: **A** (ask s202) |
@@ -214,17 +224,24 @@ clauses marked with its row. **local** = dev host; **hosted** = GitHub-hosted ru
 ## Tasks / Subtasks
 
 - [ ] **T0 — Preflight.** Operator rulings on D-20-2-01…14 and the D09 confirmation recorded; tracker → `in-progress`. Run `creation/measurements.md` "Not measured here" 1–11 (hosted items on a `ci/20-2-verify` branch-only workflow, never merged). Re-measure every cite touched (rule 9). STOP + D-row on any figure above the ruled envelope or any result contradicting a ruled option (AC3.8, AC4.1).
-- [ ] **T1 — Verifier + deb (AC1.1, AC1.4).** `packaging/verify-release.py`; debian directory; exact-name lookup; no strip; four binaries.
-- [ ] **T2 — Renderer (AC2.1, AC2.6–2.7; D-08).** Templates + render; token-survival check + plant; version mapping vectors.
+- [x] **T1 — Verifier + deb (AC1.1, AC1.4).** Shared fail-closed verifier, buildable rendered debian directory, exact names, no strip, four binaries; local signature vectors and rendered make parse pass. Real deb build remains operator-hosted.
+- [x] **T2 — Renderer (AC2.1, AC2.6–2.7; D-08).** Signed manifest verification, trusted built maosctl key, per-format version vectors, exact four-binary sets, token-survival refusal; actual unrendered-token plant red and byte-restored.
 - [ ] **T3 — Recipes (AC2.2–2.5).** rpm, PKGBUILD, formula corrected; hosted witnesses per D-10.
 - [ ] **T4 — Discipline legs (AC1.2, AC1.5, AC6.2).** deb build/install/identity/purge/remove in `release-dry-run` (amd64 + arm64); forged-signature plant.
 - [ ] **T5 — Release integration (AC1.3, AC2.5; D-09, D-14).** `sign-and-publish`: packages, `SHA256SUMS-packages` + sig, self-verify, attachments; `release-rehearsal` label run recorded (no tag).
 - [ ] **T6 — NFR-Ops-12 (AC3).** netns job, canary, TL assertion, fail-closed prerequisites; air-gap `run` refusal; runbook; hosted failing-before + plant.
-- [ ] **T7 — `check-air-gap` (AC4)** per T0 #1 and D-02.
+- [x] **T7 — `check-air-gap` (AC4).** T0 measured RED; already-ruled D-02 C applied, advisory job/registry/coverage; blocking netns gate enrolled at all three sites and cardinality readers updated.
 - [ ] **T8 — Container (AC5).** Dockerfile, `container-build` job, `container.yml` split, provisioning checklist; hosted plant.
-- [ ] **T9 — Purge hint, cargo route, install page (AC6.1, AC6.3–6.4, AC7, AC8.1).**
+- [x] **T9 — Purge hint, cargo route, install page (AC6.1, AC6.3–6.4, AC7, AC8.1).** Route-neutral stdout/receipt hints, old-hint plant red/restored, package ownership docs and complete install page; hosted Cargo execution authored.
 - [ ] **T10 — Close (AC8.2–8.4).** Coverage rows; exact pins inside the ruled envelope (xtask HISTORY first segment cites this key with `->`); `check-kernel-baseline`, `kloc-check`, `check-ship-gate-completeness`, `check-exit-commands`, `check-decision-register`, `check-dev-record-completeness`, `check-epic-close-coherence`, `prepush`; `cargo nextest run -p xtask --locked --test d11_xtask_ceiling_ratchet --test recovery_lane_ceiling_rule` before the `done` flip (`proof-contract.md:43-48`); one hosted discipline run on the final tree + the `ci/20-2-verify` plant runs; known 20-7 flakes recorded by name and run id (D13 A). Revert `intent-lineage-coverage-report.md` if a run modifies it. No commit or push without the operator.
 - *Under D-01 B:* L1 = T0–T10 kernel-free; L2 = KA + feature plumbing + variant boot + `maos-airgap-*` artifact, FLAG-Winston decision record (precedent `20-3c-flag-winston-decision.md`), landing last.
+
+**Landing-1 checkbox interpretation:** T0/T3–T6/T8/T10 remain unchecked because
+their hosted execution/rehearsal/discipline proof clauses have not run, not
+because implementation is missing. Every specified implementation and operator
+proof leg is authored; hosted execution is explicitly operator-only in this
+assignment. No status is flipped. See the Dev Agent Record and evidence for
+the separation of local results from unverified hosted acceptance.
 
 ## Dev Notes
 
@@ -361,15 +378,45 @@ CARGO_MANIFEST_DIR=…/xtask`, `--json`, in-tree; `creation/gates/*.json`): `che
 
 ### Agent Model Used
 
-anthropic/claude-opus-5-5 (creation).
+anthropic/claude-opus-5-5 (creation); openai-codex/gpt-6.1-sol (Dev202, landing 1 implementation).
 
 ### Debug Log References
 
+- [Landing-1 preflight, re-base and limitations](20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/preflight-decisions.md).
+- [Remeasured baseline citations](20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/cites-cbed4dad.md).
+- [Operator-only hosted verification recipe](20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml); never install this workflow on main.
+- Local command transcripts under `20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/` retain command, exit and elapsed time. The required final prepush transcript is `prepush.log`/`prepush.stdout`; it is not presumed green.
+
+
 ### Completion Notes List
 
+- Implemented all four signed-byte-preserving package recipes and the shared independent Python verifier. No unverified downloaded executable verifies itself in a recipe. `xtask render-packages` verifies the original manifest/files, reads the trusted built maosctl key and renders version/URL/hash/key tokens; a surviving token is fatal.
+- Default-build air-gap workload is init + real J0 replay + expected response + real TL growth. Locally the workload passes without isolation; netns proof is **unverified** because namespace creation is denied and strace is absent. The no-default-features `run` refuses with `BuildShapeUnsupported`, exit 2; no fake TL entry remains. Legacy stub cleanup is preserved.
+- D-20-2-02's conditional C applies: both baseline and final compile-shape symbol scans exit 1 on `TcpListener`/`getaddrinfo`, while dirty default fixtures are correctly rejected. Final same-binary mock-not-in-release scan passes. The netns job, not the symbol scan, is the blocking deployment control.
+- Container builds verify signed release bytes on Debian 13, run independently of credentials, and gate **all** login/push/cosign on both Docker Hub secrets. Tag publication and the verify recipe's explicit operator publication dispatch are authored, not executed.
+- Local plants: **two**: AC2 unrendered SHA token (**0.08 s**, renderer exit 1; restored render exit 0) and AC6/AC7 old hint (**45.96 s**, real purge assertion exit 101; restored full 23-test suite exit 0). Both restore with copy-back + cmp + touch (`ac2-restore.log`, `ac6-restore.log`). Hosted AC1/AC3/AC4/AC5 plants are authored and **not counted as run**.
+- Local verification: 6 Python crypto/trace tests, 3 renderer vectors, 3 workflow vectors, 23 purge tests, 7 no-default-features verb tests, 21 tree-bound nextest tests pass. Release workflow vectors, 27 macOS-guard vectors, 8 ship-gate-binding vectors, coverage tests and the internal 48-gate assertion pass after updating every affected enrollment/matrix reader. No unrelated failed test was retried to green.
+- Standard gates observed exit 0: kernel baseline, kloc, ship-gate completeness, exit commands, decision register, dev-record completeness, epic-close coherence, coverage matrix and test cost. Affected release binaries and genuine default debug maos/maosctl build. `cargo fmt --all` passes. Affected all-target clippy exits 0; 664 warning events in total, **0 diagnostics intersect changed production ranges** (span-based delta, local compiler, not a hosted-toolchain or warning-free proof).
+- One explicit workspace execution reused workspace cargo/binaries metadata: run `24d43741-bd54-4575-943f-6c2fea571c5d`, **5646 run / 5640 pass / 6 fail / 138 skipped**, exit 100. Four enrollment/matrix/coverage failures introduced by this landing were fixed and their focused suites passed. The other two were missing system-Python cryptography in protected 20-11's verifier test and an unclassified cold-swap predecessor refusal in `one_daemon_one_door_16_1`; neither is called a known flake or suppressed. The metadata compile first exceeded its 2900-second cell deadline; its surviving compile completed, then metadata capture resumed in 27.27 s. An incompatible nextest CLI invocation exited 2 before tests; corrected metadata-only execution is the one run above.
+- Exact formatted pins after `cargo fmt --all`: **maos-bin 34842 -> 34823**, **xtask 44466 -> 44673**, **aggregate 193911 -> 194099**, hardfail **193912 -> 194100**. Rebased ceilings **34878 / 44920 / 194401** under D02 A ×2 measured / ×3 unmeasured. Kernel **26841 physical / 21042 tokei**, set hash unchanged; every other crate unchanged.
+- Final release maos stripped **31,677,432 B < 33,554,432 B**. The original onb-nfr2 size leg passes on a copy; the full script was not run because it invokes forbidden cargo clean. Final ELF dynamic-symbol glibc floor is **2.39**. Deferred compile/size rows are CLOSED with uncommitted-tree provenance; outstanding hosted NFR-Ops-12 proof is re-owned under rule 10 to `ops-rc-signed-tag` with the local capability reason.
+- No hosted run, release-rehearsal, macOS formula execution, native arm64 install, Docker build/push/sign, netns zero-outbound result or added CI job-minute measurement is claimed. Independent DIFFICULT/security review remains the orchestrator's responsibility; no review agent was available to this implementation agent.
+- **Prescribed prepush invoked once, incomplete:** exact command in `landing-1/prepush.log`; 2900.02 s deadline, wrapper **124**, process group terminated before buffered final JSON appeared. `prepush.stdout` is empty; no per-stage or green prepush result is claimed, and no retry ran. No tracked edit occurred while it ran. Main notified; this is an outstanding verification limitation, not a waived gate.
+- **Cleanup:** /proc/open-descriptor scan found no active compiler; removed 515 stale incremental snapshots while preserving 6465 (newest per crate folder + touched in last 2 h), never deps/build/fingerprint. Own /tmp scratch and Python caches removed. Removed allocated-file-block accounting **6,895,853,568 B**; observed filesystem available-space increase **5,301,002,240 B** (compression/reflinks/concurrent host activity may differ). Generated intent-lineage report remained byte-identical. See `landing-1/cleanup.json` and `generated-report-preservation.json`.
+
+
 ### File List
+
+- Packaging: `packaging/verify-release.py`, `build-packages.sh`, `check-installed.py`, `witness-deb.sh`, `witness-recipe.sh`, `test_release_20_2.py`; `packaging/deb/{control,rules,changelog,source/format}`, `packaging/rpm/maos.spec`, `packaging/aur/PKGBUILD`, `packaging/homebrew/maos.rb`.
+- Release/container integration: `.github/workflows/{discipline,release,container}.yml`, `Dockerfile`, `.dockerignore`.
+- Production Rust: `xtask/src/{render_packages,main,lib,check_ship_gate_completeness}.rs`, `crates/maos-bin/src/{main,purge}.rs`; enrollment/pins `xtask/{gate-registry,kloc}.toml`. No new maos-bin source file or environment variable was introduced.
+- Tests: `xtask/tests/{package_recipes_20_2,package_workflows_20_2,release_workflow_15_4,ship_gate_binding_20_3a,macos_compile_guard_20_6}.rs`, `crates/maos-bin/tests/maos_uninstall_16_4.rs`, `tests/air-gap-netns-corroborate.sh`, `tests/air-gap-trace.py`, `tests/coverage-matrix.yaml`.
+- Docs: `docs/maos.dev/{install,index,run-maos}.md`, `docs/runbooks/{ag-1-air-gap-deployment,provisioning-checklist}.md`, `docs/adr/ADR-067-maos-data-root-layout-and-purge.md`, `docs/release/tag-procedure.md`.
+- Records: this story; `deferred-work.md`; `20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/` command logs, measurements and acceptance record; `.../ci/ci-20-2-verify.yml`. Tracker and protected 20-11 files intentionally unchanged.
+
 
 ### Change Log
 
 - 2026-11-02: Story created at `a8af3215` (ready-for-dev; D-20-2-01…14 PROPOSED; D09 A applied, confirmation asked). Measured at creation: the `.deb` has never been buildable (no changelog; `rules:29` missing separator); all four recipes embed the dev key and `v0.5.0` while the only release verifies under the production key; no container image ever built in CI (run 36094027288); the air-gap variant's `run` is a stub and its closure links `ureq`/`tokio-postgres`; `maos purge`'s `cargo uninstall maos` hint fails (rc 101). Kernel-Δ 0 under the recommended set; D-20-2-01 B priced +38 / +32 by reverted prototype.
 - 2026-11-02: Operator rulings recorded (ask s202): D-20-2-01…14 as recommended and preflight D09 A confirmed; kernel-Δ 0 and kloc ceilings per frontmatter. Status remains ready-for-dev.
+- 2026-11-05: Landing-1 implementation at cbed4dad working tree; current-pin re-base recorded, conditional D-02 C applied, all operator proof legs authored, local plants/tests/gates recorded, no commit/push/status flip. Hosted acceptance remains explicitly unverified.
