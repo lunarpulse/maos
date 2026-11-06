@@ -20,7 +20,11 @@ if [[ ${3:-} != --inside ]]; then
         packaging/witness-recipe.sh arch "$1" --inside
       ' bash "$dist"
       exit ;;
-    brew) eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" ;;
+    brew)
+      eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+      export GIT_AUTHOR_NAME=maos-witness GIT_AUTHOR_EMAIL=witness@invalid
+      export GIT_COMMITTER_NAME=maos-witness GIT_COMMITTER_EMAIL=witness@invalid
+      ;;
     *) echo "unknown route: $route" >&2; exit 2 ;;
   esac
 fi

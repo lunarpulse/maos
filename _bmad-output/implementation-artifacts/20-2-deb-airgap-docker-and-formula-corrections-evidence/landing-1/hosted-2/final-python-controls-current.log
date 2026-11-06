@@ -1,0 +1,28 @@
+test_ac1_ac2_signed_bytes_pass (__main__.ReleaseControls.test_ac1_ac2_signed_bytes_pass) ... verified signature and exact artifact hashes: maos-linux-amd64
+ok
+test_ac1_exact_filename_not_regex_substring (__main__.ReleaseControls.test_ac1_exact_filename_not_regex_substring) ... ok
+test_ac1_forged_signature_refused (__main__.ReleaseControls.test_ac1_forged_signature_refused) ... ok
+test_ac2_duplicate_manifest_entry_refused (__main__.ReleaseControls.test_ac2_duplicate_manifest_entry_refused) ... ok
+test_ac3_outbound_canary_and_unix_exclusion (__main__.ReleaseControls.test_ac3_outbound_canary_and_unix_exclusion) ... ok
+test_ac5_changed_byte_refused (__main__.ReleaseControls.test_ac5_changed_byte_refused) ... ok
+test_hosted_1_arch_raw_ed25519_signature_is_not_openpgp (__main__.ReleaseControls.test_hosted_1_arch_raw_ed25519_signature_is_not_openpgp) ... ok
+test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit (__main__.ReleaseControls.test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit) ... ok
+test_hosted_1_brew_plant_removes_exact_actual_two_line_verifier (__main__.ReleaseControls.test_hosted_1_brew_plant_removes_exact_actual_two_line_verifier) ... ok
+test_hosted_2_arch_prepare_materializes_all_symlinked_binaries (__main__.ReleaseControls.test_hosted_2_arch_prepare_materializes_all_symlinked_binaries) ... verified signature and exact artifact hashes: maos-linux-amd64, maosctl-linux-amd64, maos-spirit-linux-amd64, maos-registry-server-linux-amd64
+ok
+test_hosted_2_brew_helpers_do_not_define_class_constants (__main__.ReleaseControls.test_hosted_2_brew_helpers_do_not_define_class_constants) ... ok
+test_hosted_2_brew_identity_is_process_local_and_complete (__main__.ReleaseControls.test_hosted_2_brew_identity_is_process_local_and_complete) ... ok
+test_hosted_2_brew_metadata_and_dependencies_follow_audit_order (__main__.ReleaseControls.test_hosted_2_brew_metadata_and_dependencies_follow_audit_order) ... ok
+test_hosted_2_brew_resource_urls_hashes_and_verification_order_stay_bound (__main__.ReleaseControls.test_hosted_2_brew_resource_urls_hashes_and_verification_order_stay_bound) ... ok
+test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) ... verified signature and exact artifact hashes: PKGBUILD, amd64.deb, amd64.rpm, arm64.deb, arm64.rpm, debian-recipes.tar.gz, maos.rb, maos.spec, verify-release.py
+ok
+test_review_f6_io_uring_is_uninspectable_not_a_clean_witness (__main__.ReleaseControls.test_review_f6_io_uring_is_uninspectable_not_a_clean_witness) ... ok
+test_review_f6_sendmmsg_cannot_hide_an_outbound_attempt (__main__.ReleaseControls.test_review_f6_sendmmsg_cannot_hide_an_outbound_attempt) ... ok
+test_review_f9_exact_tag_and_sha_excludes_another_successful_run (__main__.ReleaseControls.test_review_f9_exact_tag_and_sha_excludes_another_successful_run) ... ok
+test_review_f9_stale_attempt_and_failed_current_attempt_are_refused (__main__.ReleaseControls.test_review_f9_stale_attempt_and_failed_current_attempt_are_refused) ... ok
+test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key (__main__.ReleaseControls.test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.373s
+
+OK

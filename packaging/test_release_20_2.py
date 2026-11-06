@@ -3,12 +3,14 @@
 import ast
 import hashlib
 import importlib.util
+import os
 import pathlib
 import tempfile
 import shutil
 import shlex
 import re
 import subprocess
+import sys
 import unittest
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -187,6 +189,88 @@ class ReleaseControls(unittest.TestCase):
                                  'bash', str(self.dist/'PKGBUILD')],
                                 cwd=self.dist, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+
+    def test_hosted_2_arch_prepare_materializes_all_symlinked_binaries(self):
+        names = [name+'-linux-amd64' for name in
+                 ['maos', 'maosctl', 'maos-spirit', 'maos-registry-server']]
+        cache = self.dist/'cache'
+        stage = self.dist/'src'
+        cache.mkdir()
+        stage.mkdir()
+        manifest = []
+        for name in names:
+            content = ('signed source '+name).encode()
+            (cache/name).write_bytes(content)
+            (stage/name).symlink_to(cache/name)
+            manifest.append(f'{hashlib.sha256(content).hexdigest()}  {name}\n')
+        data = ''.join(manifest).encode()
+        signature = self.key.sign(hashlib.sha256(data).digest())
+        (stage/'SHA256SUMS').write_bytes(data)
+        (stage/'SHA256SUMS.sig').write_bytes(signature)
+        (stage/'SHA256SUMS.ed25519').write_bytes(signature)
+        with self.assertRaisesRegex(ValueError, 'not a regular artifact'):
+            verifier.verify(stage, self.pubkey, names)
+        recipe = (ROOT/'packaging/aur/PKGBUILD').read_text()
+        (stage/'PKGBUILD').write_text(recipe.replace('@ARCH_SOURCES@', '').replace('@PUBKEY@', self.pubkey))
+        shutil.copyfile(ROOT/'packaging/verify-release.py', stage/'verify-release.py')
+        environment = os.environ.copy()
+        environment['PATH'] = str(pathlib.Path(sys.executable).parent)+':'+environment['PATH']
+        result = subprocess.run(['bash', '-euc', 'source "$1"; CARCH=x86_64; prepare',
+                                 'bash', str(stage/'PKGBUILD')], cwd=stage,
+                                env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertTrue(all((stage/name).is_file() and not (stage/name).is_symlink()
+                            for name in names))
+        verifier.verify(stage, self.pubkey, names)
+        regular = subprocess.run(['bash', '-euc', 'source "$1"; CARCH=x86_64; prepare',
+                                  'bash', str(stage/'PKGBUILD')], cwd=stage,
+                                 env=environment, capture_output=True, text=True)
+        self.assertEqual(regular.returncode, 0, regular.stdout+regular.stderr)
+
+    def test_hosted_2_brew_identity_is_process_local_and_complete(self):
+        witness = (ROOT/'packaging/witness-recipe.sh').read_text()
+        prelude = witness.split('brew)', 1)[1].split(';;', 1)[0]
+        exports = '\n'.join(line.strip() for line in prelude.splitlines()
+                            if line.strip().startswith('export GIT_'))
+        environment = {key: value for key, value in os.environ.items()
+                       if not key.startswith('GIT_') and key != 'EMAIL'}
+        environment.update(HOME=str(self.dist), GIT_CONFIG_GLOBAL=os.devnull,
+                           GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM='1')
+        result = subprocess.run(['bash', '-euc', exports+'\n'
+                                 'git -c user.useConfigOnly=true var GIT_AUTHOR_IDENT\n'
+                                 'git -c user.useConfigOnly=true var GIT_COMMITTER_IDENT'],
+                                cwd=self.dist, env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertEqual(result.stdout.count('maos-witness <witness@invalid>'), 2)
+        self.assertNotIn('git config --global', witness)
+        self.assertIn('brew audit --strict maos/verify/maos', witness)
+
+    def test_hosted_2_brew_metadata_and_dependencies_follow_audit_order(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        components = re.findall(r'^  (desc|homepage|url|version|sha256|license|depends_on|skip_clean)\b',
+                                formula, flags=re.M)
+        self.assertEqual(components, ['desc', 'homepage', 'url', 'version', 'sha256',
+                                      'license', 'depends_on', 'depends_on', 'skip_clean'])
+        dependencies = re.findall(r'^  depends_on "([^"]+)"', formula, flags=re.M)
+        self.assertEqual(dependencies, sorted(dependencies))
+
+    def test_hosted_2_brew_helpers_do_not_define_class_constants(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        self.assertNotRegex(formula, re.compile(r'^  (?:RELEASES|SUFFIX)\s*=', re.M))
+
+    def test_hosted_2_brew_resource_urls_hashes_and_verification_order_stay_bound(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        self.assertIn('url "@BASE_URL@/#{binary}-#{suffix}", using: :nounzip', formula)
+        self.assertIn('sha256 hashes.fetch(index + 1)', formula)
+        for name, filename, token in [('manifest', 'SHA256SUMS', 'SHA256SUMS_HASH'),
+                                      ('signature', 'SHA256SUMS.sig', 'SIGNATURE_HASH'),
+                                      ('verifier', 'verify-release.py', 'VERIFIER_HASH')]:
+            block = re.search(r'  resource "'+name+r'" do\n(.*?)\n  end', formula, flags=re.S)
+            self.assertIsNotNone(block, name)
+            self.assertIn('url "@BASE_URL@/'+filename+'", using: :nounzip', block[1])
+            self.assertIn('sha256 "@'+token+'@"', block[1])
+        self.assertLess(formula.index('system Formula["python@3.14"]'),
+                        formula.index('names.each { |name| bin.install'))
 
 
 if __name__ == '__main__':

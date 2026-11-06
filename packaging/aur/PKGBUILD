@@ -16,6 +16,12 @@ prepare() {
     cp SHA256SUMS.ed25519 SHA256SUMS.sig
     local suffix=linux-amd64
     [[ "$CARCH" = aarch64 ]] && suffix=linux-arm64
+    local f
+    for f in "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix"; do
+        if [[ -L "$f" ]]; then
+            cp --remove-destination "$(readlink -f "$f")" "$f"
+        fi
+    done
     python3 verify-release.py --pubkey '@PUBKEY@' "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix"
 }
 package() {

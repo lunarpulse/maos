@@ -1,0 +1,122 @@
+{
+  "baseline": "063c13cfca5b67f8e0b9229bff2f917143d981b3",
+  "cargo_owner": "Dev201b",
+  "cargo_commands_run": 0,
+  "ruby_brew_rubocop_available": false,
+  "commands": [
+    {
+      "name": "python-venv",
+      "command": [
+        "python3",
+        "-m",
+        "venv",
+        "/tmp/maos-20-2-hosted2-dev202/venv"
+      ],
+      "exit_code": 0,
+      "seconds": 4.621,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "python-cryptography",
+      "command": [
+        "/tmp/maos-20-2-hosted2-dev202/venv/bin/pip",
+        "install",
+        "cryptography"
+      ],
+      "exit_code": 0,
+      "seconds": 13.136,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "baseline-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "before-python-controls",
+      "command": [
+        "/tmp/maos-20-2-hosted2-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py",
+        "-v"
+      ],
+      "exit_code": 1,
+      "seconds": 0.18,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "final-python-controls",
+      "command": [
+        "/tmp/maos-20-2-hosted2-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "seconds": 0.271,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "shell-syntax",
+      "command": [
+        "bash",
+        "-c",
+        "for script in packaging/aur/PKGBUILD packaging/witness-recipe.sh; do bash -n \"$script\" || exit; done"
+      ],
+      "exit_code": 0,
+      "seconds": 0.005,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "hosted-run-provenance",
+      "command": [
+        "gh",
+        "api",
+        "repos/lunarpulse/maos/actions/runs/42293312694",
+        "--jq",
+        "{id,run_attempt,head_sha,head_branch,event,status,conclusion,html_url}"
+      ],
+      "exit_code": 0,
+      "seconds": 0.467,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "final-python-controls-current",
+      "command": [
+        "/tmp/maos-20-2-hosted2-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "seconds": 0.464,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "final-shell-syntax",
+      "command": [
+        "bash",
+        "-c",
+        "for script in packaging/aur/PKGBUILD packaging/witness-recipe.sh; do bash -n \"$script\" || exit; done"
+      ],
+      "exit_code": 0,
+      "seconds": 0.008,
+      "cwd": "/home/lunarpulse/dev_ws"
+    },
+    {
+      "name": "hosted-job-results",
+      "command": [
+        "gh",
+        "api",
+        "repos/lunarpulse/maos/actions/runs/42293312694/jobs?per_page=100",
+        "--jq",
+        ".jobs[] | {id,name,conclusion,steps:[.steps[]|{name,conclusion}]}"
+      ],
+      "exit_code": 0,
+      "output": "hosted-job-results.jsonl"
+    }
+  ]
+}

@@ -194,3 +194,67 @@ are recorded above, not discarded; unexecuted native install/identity/assembly,
 arm64 container runtime, production registry publication/signing and environment
 protection settings are not claimed verified. This fix pass performs no push,
 status flip or retry-to-green of the original hosted/workspace/prepush runs.
+
+## hosted-2 (2026-11-06; non-cargo repair phase)
+
+Run [42293312694](https://github.com/lunarpulse/maos/actions/runs/42293312694),
+attempt1, push `ci/20-2-verify`, head
+`f0c4c91796eae8147e758d5cebe24fd65b2878e8`: completed/failure with
+**12 green,2 unintended reds,2 operator skips**. Read-only job/step metadata
+and the full `Diag202Verify2` diagnosis were read; no hosted check was rerun.
+
+| Green leg | Job id | What this run proved, with scope |
+|---|---:|---|
+| build amd64 |128152034757| Four real native default artifacts, development manifest signing and verified rendering; not production-key publication |
+| build arm64 |128152035192| Same native artifact/sign/render path on arm64 |
+| native-packaging amd64 |128160782831| Correct Ubuntu RPM dependency-refusal reason, real deb/RPM builds, root-owned-directory failure and runner-owned-output renames |
+| native-packaging arm64 |128160782712| Same native package/ownership path on arm64 |
+| deb amd64 |128160783669| Baseline missing-changelog refusal, wrong-key build rejection/restoration, signed installed-byte identity, init/purge and package removal |
+| deb arm64 |128160782853| Same Debian negative/final install/identity/removal path on arm64 |
+| recipes rpm |128160782906| Bypass acceptance oracle, independent wrong-key rejection, restored valid RPM installation/identity/removal and comparator check |
+| packaging-assembly |128163020684| Four real package outputs assembled with verifier/recipes/archive; second denominator signed and self-verified using development fixture key |
+| version-ordering |128160782788| Actual renderer outputs for rc.1/alpha.1 compare below GA with Arch vercmp and Debian dpkg |
+| netns |128160782813| Download verification, outbound-attempt plant detection, restored replay/TL growth and no outbound attempts in that session; not universal network absence |
+| container |128160782932| amd64 changed-byte and owned-state controls plus restored version/help/init; not arm64 runtime or registry/cosign proof |
+| cargo-and-symbols |128152035092| Temporary-root maos-bin install/version/removal and subject/mock controls; network-symbol scan remains an advisory, not a clean-network proof |
+
+operator-prepare128152036861 and operator-publication128152037237 were
+excluded by the push/dispatch gate. These are not demonstrated credential skips.
+
+**Arch red:** job128160782826 passed P5 acceptance detection and then correctly
+rejected the wrong key (log469). Its good prepare failed at log523–529:
+`not a regular artifact: maos-linux-amd64` (exit4). The source files staged as
+symlinks had not been materialized. `PKGBUILD` now copies each of the four
+binary links to a regular file before verification; already-regular files are
+left intact. The verifier's symlink guard remains unchanged.
+
+**Brew red:** job128160783009 failed before install at log215–228/244:
+`Author identity unknown`, tap-new git commit exit128. The common witness now
+exports all four GIT_AUTHOR/GIT_COMMITTER name/email variables after shellenv,
+covering both verify and discipline without persistent git configuration.
+
+Preempted the formula's metadata/dependency ordering issue while keeping
+`brew audit --strict`: url/version/sha256 precede license/dependencies/skip_clean;
+checksums/platform are lexical locals rather than class constants, and install
+computes its own platform suffix. Resource URL/hash associations and the exact
+two-line verifier call are preserved. Current upstream nounzip extraction uses
+`FileUtils.cp`, not symlinks, so original resource staging is retained rather
+than adding an unsupported copy workaround. See the cited upstream sources and
+limits in [hosted-2/record.md](../hosted-2/record.md).
+
+Non-cargo regressions: actual Arch signed symlink fixture failed before the fix,
+then passed with all four regular files and also on a second regular-file prepare;
+Git identity failed128 before the export and now passes readonly `git var`
+checks. Layout/class-constant checks red before restructuring. Final Python
+controls20/20 and shell syntax pass. Both P5 regexes still match exactly one
+verifier call. Ruby, Homebrew and RuboCop are absent locally: actual formula load,
+strict audit, staging/install/relocation and installed identity remain unverified.
+
+**Cargo remains explicitly deferred to Main's handoff:** no cargo, formatter,
+compiled renderer, Rust contract, KLOC gate, shared-target cleanup or rendered
+evidence regeneration ran while Dev201b owns the slot. No Rust source/token
+interface changed: `render_packages.rs` still supplies the existing BREW_RELEASES
+map. After handoff, run trusted renderer/build + package Rust contracts and
+refresh rendered/hash evidence; remeasure/re-pin only if counted Rust moves.
+Precise pending commands/steps are in hosted-2/record.md. No commit/push/flip.
+

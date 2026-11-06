@@ -1,0 +1,109 @@
+test_ac1_ac2_signed_bytes_pass (__main__.ReleaseControls.test_ac1_ac2_signed_bytes_pass) ... verified signature and exact artifact hashes: maos-linux-amd64
+ok
+test_ac1_exact_filename_not_regex_substring (__main__.ReleaseControls.test_ac1_exact_filename_not_regex_substring) ... ok
+test_ac1_forged_signature_refused (__main__.ReleaseControls.test_ac1_forged_signature_refused) ... ok
+test_ac2_duplicate_manifest_entry_refused (__main__.ReleaseControls.test_ac2_duplicate_manifest_entry_refused) ... ok
+test_ac3_outbound_canary_and_unix_exclusion (__main__.ReleaseControls.test_ac3_outbound_canary_and_unix_exclusion) ... ok
+test_ac5_changed_byte_refused (__main__.ReleaseControls.test_ac5_changed_byte_refused) ... ok
+test_hosted_1_arch_raw_ed25519_signature_is_not_openpgp (__main__.ReleaseControls.test_hosted_1_arch_raw_ed25519_signature_is_not_openpgp) ... ok
+test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit (__main__.ReleaseControls.test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit) ... ok
+test_hosted_1_brew_plant_removes_exact_actual_two_line_verifier (__main__.ReleaseControls.test_hosted_1_brew_plant_removes_exact_actual_two_line_verifier) ... ok
+test_hosted_2_arch_prepare_materializes_all_symlinked_binaries (__main__.ReleaseControls.test_hosted_2_arch_prepare_materializes_all_symlinked_binaries) ... FAIL
+test_hosted_2_brew_copies_resources_before_stage_cleanup_and_verification (__main__.ReleaseControls.test_hosted_2_brew_copies_resources_before_stage_cleanup_and_verification) ... FAIL
+test_hosted_2_brew_helpers_do_not_define_class_constants (__main__.ReleaseControls.test_hosted_2_brew_helpers_do_not_define_class_constants) ... FAIL
+test_hosted_2_brew_identity_is_process_local_and_complete (__main__.ReleaseControls.test_hosted_2_brew_identity_is_process_local_and_complete) ... FAIL
+test_hosted_2_brew_metadata_and_dependencies_follow_audit_order (__main__.ReleaseControls.test_hosted_2_brew_metadata_and_dependencies_follow_audit_order) ... FAIL
+test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe (__main__.ReleaseControls.test_review_f1_packaging_manifest_covers_executable_verifier_and_every_recipe) ... verified signature and exact artifact hashes: PKGBUILD, amd64.deb, amd64.rpm, arm64.deb, arm64.rpm, debian-recipes.tar.gz, maos.rb, maos.spec, verify-release.py
+ok
+test_review_f6_io_uring_is_uninspectable_not_a_clean_witness (__main__.ReleaseControls.test_review_f6_io_uring_is_uninspectable_not_a_clean_witness) ... ok
+test_review_f6_sendmmsg_cannot_hide_an_outbound_attempt (__main__.ReleaseControls.test_review_f6_sendmmsg_cannot_hide_an_outbound_attempt) ... ok
+test_review_f9_exact_tag_and_sha_excludes_another_successful_run (__main__.ReleaseControls.test_review_f9_exact_tag_and_sha_excludes_another_successful_run) ... ok
+test_review_f9_stale_attempt_and_failed_current_attempt_are_refused (__main__.ReleaseControls.test_review_f9_stale_attempt_and_failed_current_attempt_are_refused) ... ok
+test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key (__main__.ReleaseControls.test_review_p5_wrong_key_control_updates_outer_hash_not_trusted_key) ... ok
+
+======================================================================
+FAIL: test_hosted_2_arch_prepare_materializes_all_symlinked_binaries (__main__.ReleaseControls.test_hosted_2_arch_prepare_materializes_all_symlinked_binaries)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 221, in test_hosted_2_arch_prepare_materializes_all_symlinked_binaries
+    self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : release verification refused: ValueError: not a regular artifact: maos-linux-amd64
+
+
+======================================================================
+FAIL: test_hosted_2_brew_copies_resources_before_stage_cleanup_and_verification (__main__.ReleaseControls.test_hosted_2_brew_copies_resources_before_stage_cleanup_and_verification)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 258, in test_hosted_2_brew_copies_resources_before_stage_cleanup_and_verification
+    self.assertNotIn('resource.stage { buildpath.install Dir["*"] }', formula)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'resource.stage { buildpath.install Dir["*"] }' unexpectedly found in '# Render with xtask render-packages. install uses the independent Python\n# verifier before installing any downloaded executable, not maosctl itself.\nclass Maos < Formula\n  desc "Minimal Agentic Operating System"\n  homepage "https://github.com/lunarpulse/maos"\n  version "@VERSION@"\n  license any_of: ["Apache-2.0", "MIT"]\n  depends_on "python@3.14" => :build\n  depends_on "cryptography" => :build\n  # Preserve the signed binaries; :all is deprecated and does not match paths.\n  skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", "bin/maos-registry-server"\n\n  RELEASES = {\n@BREW_RELEASES@\n  }.freeze\n  SUFFIX = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}".freeze\n  odie "This release has no binaries for #{SUFFIX}" unless RELEASES.key?(SUFFIX)\n  url "@BASE_URL@/maos-#{SUFFIX}", using: :nounzip\n  sha256 RELEASES.fetch(SUFFIX).fetch(0)\n\n  %w[maosctl maos-spirit maos-registry-server].each_with_index do |binary, index|\n    resource binary do\n      url "@BASE_URL@/#{binary}-#{SUFFIX}", using: :nounzip\n      sha256 RELEASES.fetch(SUFFIX).fetch(index + 1)\n    end\n  end\n  resource "manifest" do\n    url "@BASE_URL@/SHA256SUMS", using: :nounzip\n    sha256 "@SHA256SUMS_HASH@"\n  end\n  resource "signature" do\n    url "@BASE_URL@/SHA256SUMS.sig", using: :nounzip\n    sha256 "@SIGNATURE_HASH@"\n  end\n  resource "verifier" do\n    url "@BASE_URL@/verify-release.py", using: :nounzip\n    sha256 "@VERIFIER_HASH@"\n  end\n\n  def install\n    resources.each do |resource|\n      resource.stage { buildpath.install Dir["*"] }\n    end\n    # Homebrew\'s cryptography and cffi formulae link into this site-packages.\n    ENV.prepend_path "PYTHONPATH", HOMEBREW_PREFIX/"lib/python3.14/site-packages"\n    names = %w[maos maosctl maos-spirit maos-registry-server]\n    system Formula["python@3.14"].opt_bin/"python3.14", "verify-release.py",\n           "--pubkey", "@PUBKEY@", *names.map { |name| "#{name}-#{SUFFIX}" }\n    names.each { |name| bin.install "#{name}-#{SUFFIX}" => name }\n  end\n\n  test do\n    assert_match "maos", shell_output("#{bin}/maos --version")\n  end\nend\n'
+
+======================================================================
+FAIL: test_hosted_2_brew_helpers_do_not_define_class_constants (__main__.ReleaseControls.test_hosted_2_brew_helpers_do_not_define_class_constants)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 254, in test_hosted_2_brew_helpers_do_not_define_class_constants
+    self.assertNotRegex(formula, re.compile(r'^  (?:RELEASES|SUFFIX)\s*=', re.M))
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Regex matched: '  RELEASES =' matches '^  (?:RELEASES|SUFFIX)\\s*=' in '# Render with xtask render-packages. install uses the independent Python\n# verifier before installing any downloaded executable, not maosctl itself.\nclass Maos < Formula\n  desc "Minimal Agentic Operating System"\n  homepage "https://github.com/lunarpulse/maos"\n  version "@VERSION@"\n  license any_of: ["Apache-2.0", "MIT"]\n  depends_on "python@3.14" => :build\n  depends_on "cryptography" => :build\n  # Preserve the signed binaries; :all is deprecated and does not match paths.\n  skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", "bin/maos-registry-server"\n\n  RELEASES = {\n@BREW_RELEASES@\n  }.freeze\n  SUFFIX = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}".freeze\n  odie "This release has no binaries for #{SUFFIX}" unless RELEASES.key?(SUFFIX)\n  url "@BASE_URL@/maos-#{SUFFIX}", using: :nounzip\n  sha256 RELEASES.fetch(SUFFIX).fetch(0)\n\n  %w[maosctl maos-spirit maos-registry-server].each_with_index do |binary, index|\n    resource binary do\n      url "@BASE_URL@/#{binary}-#{SUFFIX}", using: :nounzip\n      sha256 RELEASES.fetch(SUFFIX).fetch(index + 1)\n    end\n  end\n  resource "manifest" do\n    url "@BASE_URL@/SHA256SUMS", using: :nounzip\n    sha256 "@SHA256SUMS_HASH@"\n  end\n  resource "signature" do\n    url "@BASE_URL@/SHA256SUMS.sig", using: :nounzip\n    sha256 "@SIGNATURE_HASH@"\n  end\n  resource "verifier" do\n    url "@BASE_URL@/verify-release.py", using: :nounzip\n    sha256 "@VERIFIER_HASH@"\n  end\n\n  def install\n    resources.each do |resource|\n      resource.stage { buildpath.install Dir["*"] }\n    end\n    # Homebrew\'s cryptography and cffi formulae link into this site-packages.\n    ENV.prepend_path "PYTHONPATH", HOMEBREW_PREFIX/"lib/python3.14/site-packages"\n    names = %w[maos maosctl maos-spirit maos-registry-server]\n    system Formula["python@3.14"].opt_bin/"python3.14", "verify-release.py",\n           "--pubkey", "@PUBKEY@", *names.map { |name| "#{name}-#{SUFFIX}" }\n    names.each { |name| bin.install "#{name}-#{SUFFIX}" => name }\n  end\n\n  test do\n    assert_match "maos", shell_output("#{bin}/maos --version")\n  end\nend\n'
+
+======================================================================
+FAIL: test_hosted_2_brew_identity_is_process_local_and_complete (__main__.ReleaseControls.test_hosted_2_brew_identity_is_process_local_and_complete)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 239, in test_hosted_2_brew_identity_is_process_local_and_complete
+    self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 128 != 0 : Author identity unknown
+
+*** Please tell me who you are.
+
+Run
+
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+
+to set your account's default identity.
+Omit --global to set the identity only in this repository.
+
+fatal: no email was given and auto-detection is disabled
+
+
+======================================================================
+FAIL: test_hosted_2_brew_metadata_and_dependencies_follow_audit_order (__main__.ReleaseControls.test_hosted_2_brew_metadata_and_dependencies_follow_audit_order)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 247, in test_hosted_2_brew_metadata_and_dependencies_follow_audit_order
+    self.assertEqual(components, ['desc', 'homepage', 'url', 'version', 'sha256',
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                  'license', 'depends_on', 'depends_on', 'skip_clean'])
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['desc', 'homepage', 'version', 'license', 'depends_on', 'depen[33 chars]256'] != ['desc', 'homepage', 'url', 'version', 'sha256', 'license', 'de[33 chars]ean']
+
+First differing element 2:
+'version'
+'url'
+
+  ['desc',
+   'homepage',
++  'url',
+   'version',
++  'sha256',
+   'license',
+   'depends_on',
+   'depends_on',
+-  'skip_clean',
+?              ^
+
++  'skip_clean']
+?              ^
+
+-  'url',
+-  'sha256']
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.069s
+
+FAILED (failures=5)

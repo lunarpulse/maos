@@ -1,0 +1,61 @@
+{
+  "proc_scan_first": true,
+  "active_compilers_observed": [
+    {
+      "pid": 3573595,
+      "executable": "cargo"
+    },
+    {
+      "pid": 3573689,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573694,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573699,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573701,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573702,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573703,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573704,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573705,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573707,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573719,
+      "executable": "rustc"
+    },
+    {
+      "pid": 3573720,
+      "executable": "rustc"
+    }
+  ],
+  "proc_unreadable_or_vanished": 0,
+  "own_scratch_removed": "/tmp/maos-20-2-hosted2-dev202",
+  "own_import_cache_files_removed": 5,
+  "allocated_file_blocks_removed_bytes": 30269440,
+  "scratch_filesystem_free_delta_bytes": 0,
+  "incremental_snapshots_removed": 0,
+  "shared_target_prune_skipped": "Main explicitly assigns cargo ownership to Dev201b. No shared target directory inspected/pruned or modified by this non-cargo phase.",
+  "caveat": "Hardlinked blocks count only if all links removed; compression/reflinks and concurrent compiler activity can make filesystem free delta differ."
+}

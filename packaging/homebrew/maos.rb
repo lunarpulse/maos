@@ -3,25 +3,25 @@
 class Maos < Formula
   desc "Minimal Agentic Operating System"
   homepage "https://github.com/lunarpulse/maos"
+
+  releases = {
+@BREW_RELEASES@
+  }.freeze
+  suffix = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}"
+  hashes = releases.fetch(suffix) { odie "This release has no binaries for #{suffix}" }
+  url "@BASE_URL@/maos-#{suffix}", using: :nounzip
   version "@VERSION@"
+  sha256 hashes.fetch(0)
   license any_of: ["Apache-2.0", "MIT"]
-  depends_on "python@3.14" => :build
   depends_on "cryptography" => :build
+  depends_on "python@3.14" => :build
   # Preserve the signed binaries; :all is deprecated and does not match paths.
   skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", "bin/maos-registry-server"
 
-  RELEASES = {
-@BREW_RELEASES@
-  }.freeze
-  SUFFIX = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}".freeze
-  odie "This release has no binaries for #{SUFFIX}" unless RELEASES.key?(SUFFIX)
-  url "@BASE_URL@/maos-#{SUFFIX}", using: :nounzip
-  sha256 RELEASES.fetch(SUFFIX).fetch(0)
-
   %w[maosctl maos-spirit maos-registry-server].each_with_index do |binary, index|
     resource binary do
-      url "@BASE_URL@/#{binary}-#{SUFFIX}", using: :nounzip
-      sha256 RELEASES.fetch(SUFFIX).fetch(index + 1)
+      url "@BASE_URL@/#{binary}-#{suffix}", using: :nounzip
+      sha256 hashes.fetch(index + 1)
     end
   end
   resource "manifest" do
@@ -38,6 +38,7 @@ class Maos < Formula
   end
 
   def install
+    suffix = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}"
     resources.each do |resource|
       resource.stage { buildpath.install Dir["*"] }
     end
@@ -45,8 +46,8 @@ class Maos < Formula
     ENV.prepend_path "PYTHONPATH", HOMEBREW_PREFIX/"lib/python3.14/site-packages"
     names = %w[maos maosctl maos-spirit maos-registry-server]
     system Formula["python@3.14"].opt_bin/"python3.14", "verify-release.py",
-           "--pubkey", "@PUBKEY@", *names.map { |name| "#{name}-#{SUFFIX}" }
-    names.each { |name| bin.install "#{name}-#{SUFFIX}" => name }
+           "--pubkey", "@PUBKEY@", *names.map { |name| "#{name}-#{suffix}" }
+    names.each { |name| bin.install "#{name}-#{suffix}" => name }
   end
 
   test do
