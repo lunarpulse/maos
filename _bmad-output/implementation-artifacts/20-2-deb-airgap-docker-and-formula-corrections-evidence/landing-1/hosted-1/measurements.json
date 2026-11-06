@@ -1,0 +1,49 @@
+{
+  "baseline": "ebf2ab03ac64de5b828d995f72ae8b24199fa9a0",
+  "date_utc": "2026-11-06",
+  "counted_source_delta": 0,
+  "xtask": 44676,
+  "aggregate": 194743,
+  "aggregate_hardfail": 194744,
+  "maos_bin": 34914,
+  "kernel_tokei": 21042,
+  "repin_needed": false,
+  "tool_availability": {
+    "rpmspec": null,
+    "rpmbuild": null,
+    "makepkg": null,
+    "dpkg-buildpackage": "/usr/bin/dpkg-buildpackage"
+  },
+  "native_dpkg_provider_query_exit": 1,
+  "native_dpkg_provider_limitation": "python3-cryptography not found; build-essential12.12 listed; debhelper version blank. No native dependency bypass.",
+  "currency": {
+    "hosted_run": 42224167600,
+    "hosted_sum_seconds": 32.983,
+    "test_count": 26,
+    "green_baseline_commit": "cb0abc06",
+    "green_baseline_sum_seconds": 29.82,
+    "default_budget_unchanged": 30,
+    "suite_total_budget_unchanged": 1100,
+    "helper_before_seconds": 5.92,
+    "helper_reuse_trial_seconds": 5.96,
+    "helper_trial_reverted": true,
+    "local_trial_sum_seconds": 21.989,
+    "local_final_sum_seconds": 12.52,
+    "exception_seconds": 42,
+    "calibration": "ceil(32.983*1.25)",
+    "owner": "20-4-gemini-driver-and-endpoint-pin",
+    "local_timings_not_hosted_speedup_proof": true
+  },
+  "rendered_development_fixture_hashes": {
+    "maos.spec": "ec4ee3ded6e13c3b11046980c4506e787b7f566af06192cd65480db3cc190cf7",
+    "PKGBUILD": "0aeca5140d1f28361efc6d63fdffbee29dccf7dbd42b25ac4d7642271f49be71",
+    "maos.rb": "dab3315a5727cb7240aa3a12b54df4184786c4765cc451b07260e8d530ddb76a",
+    "verify-release.py": "7012f2a432157b3f6d1a0512863b6bdef22d1ee57996d96b9bfad5fdbce6ffad",
+    "SHA256SUMS": "c51b063be82fba78c26f1986daade5689620460305e9bbfd1df5f7e3ee4a10c0",
+    "debian/rules": "5d97c57742c152e91f0ba88983ab9b9411eca3963612bd9ef957fd38bd67ffef",
+    "debian/control": "da7772761bd48b7d7dda9f05e55c080477194be4d5167f5902b15bc047045faa",
+    "debian/changelog": "e554bfa437d59b8943448b2fd24574667910fd2783584e75efd6a79188b8d1b5",
+    "debian/source/format": "1be7080d72e6b566df3e236ce2c55efdfbbb8fa1c972d825e5b672ff8773be1a"
+  },
+  "fixture_note": "Actual trusted cached native release artifacts, freshly manifested/signed with the public dev seed and rendered by trusted built xtask/maosctl. Not production release recipes, not a native package build; file URLs refer to now-disposable local scratch."
+}

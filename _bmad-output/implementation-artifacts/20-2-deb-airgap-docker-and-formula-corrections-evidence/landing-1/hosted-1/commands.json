@@ -1,0 +1,600 @@
+{
+  "cwd": "/home/lunarpulse/dev_ws",
+  "cargo_target_dir_env": null,
+  "target_realpath": "/mnt/build/cargo-maos",
+  "commands": [
+    {
+      "name": "python-venv",
+      "command": [
+        "python3",
+        "-m",
+        "venv",
+        "/tmp/maos-20-2-hosted1-dev202/venv"
+      ],
+      "exit_code": 0,
+      "seconds": 3.269
+    },
+    {
+      "name": "python-cryptography",
+      "command": [
+        "/tmp/maos-20-2-hosted1-dev202/venv/bin/pip",
+        "install",
+        "cryptography"
+      ],
+      "exit_code": 0,
+      "seconds": 9.428
+    },
+    {
+      "name": "baseline-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "before-python-controls",
+      "command": [
+        "/tmp/maos-20-2-hosted1-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py",
+        "-v"
+      ],
+      "exit_code": 1,
+      "seconds": 0.464
+    },
+    {
+      "name": "before-hosted-workflow-controls",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "package_workflows_20_2",
+        "hosted_1_"
+      ],
+      "exit_code": 124,
+      "seconds": 600.025
+    },
+    {
+      "name": "before-hosted-workflow-controls-resume",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "package_workflows_20_2",
+        "hosted_1_"
+      ],
+      "exit_code": 101,
+      "seconds": 176.7
+    },
+    {
+      "name": "currency-helper-before",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "model_currency_gate",
+        "each_retired_or_unknown_pin_reds_naming_its_file_and_line",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 71.387
+    },
+    {
+      "name": "currency-helper-backup",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/xtask/tests/model_currency_gate.rs",
+        "/tmp/maos-20-2-hosted1-dev202/model_currency_gate.rs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.012
+    },
+    {
+      "name": "native-package-database",
+      "command": [
+        "dpkg-query",
+        "-W",
+        "build-essential",
+        "debhelper",
+        "python3-cryptography"
+      ],
+      "exit_code": 1,
+      "seconds": 0.016
+    },
+    {
+      "name": "currency-helper-trial",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "model_currency_gate",
+        "each_retired_or_unknown_pin_reds_naming_its_file_and_line",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 43.085
+    },
+    {
+      "name": "currency-trial-all-26",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "model_currency_gate"
+      ],
+      "exit_code": 0,
+      "seconds": 9.379
+    },
+    {
+      "name": "currency-trial-junit-copy",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/nextest/default/junit.xml",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/hosted-1/currency-trial-junit.xml"
+      ],
+      "exit_code": 0,
+      "seconds": 0.008
+    },
+    {
+      "name": "currency-helper-restore",
+      "command": [
+        "bash",
+        "-c",
+        "cp /tmp/maos-20-2-hosted1-dev202/model_currency_gate.rs /home/lunarpulse/dev_ws/xtask/tests/model_currency_gate.rs && cmp /tmp/maos-20-2-hosted1-dev202/model_currency_gate.rs /home/lunarpulse/dev_ws/xtask/tests/model_currency_gate.rs && touch /home/lunarpulse/dev_ws/xtask/tests/model_currency_gate.rs"
+      ],
+      "exit_code": 0,
+      "seconds": 0.013
+    },
+    {
+      "name": "before-latent-arch-bypass",
+      "command": [
+        "/tmp/maos-20-2-hosted1-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py",
+        "ReleaseControls.test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit",
+        "-v"
+      ],
+      "exit_code": 1,
+      "seconds": 0.12
+    },
+    {
+      "name": "cargo-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0,
+      "seconds": 3.28
+    },
+    {
+      "name": "final-python-controls",
+      "command": [
+        "/tmp/maos-20-2-hosted1-dev202/venv/bin/python",
+        "packaging/test_release_20_2.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "seconds": 0.115
+    },
+    {
+      "name": "final-rust-contracts",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "package_recipes_20_2",
+        "--test",
+        "package_workflows_20_2",
+        "--test",
+        "release_workflow_15_4",
+        "--test",
+        "check_test_budget_proven_red"
+      ],
+      "exit_code": 0,
+      "seconds": 80.643
+    },
+    {
+      "name": "final-model-currency-26",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--locked",
+        "-p",
+        "xtask",
+        "--test",
+        "model_currency_gate"
+      ],
+      "exit_code": 0,
+      "seconds": 94.665
+    },
+    {
+      "name": "final-model-currency-junit-copy",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/nextest/default/junit.xml",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/hosted-1/currency-final-junit.xml"
+      ],
+      "exit_code": 0,
+      "seconds": 0.008
+    },
+    {
+      "name": "unchanged-kloc",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "kloc-check",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.067
+    },
+    {
+      "name": "fixture-copy-maos",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maos",
+        "/tmp/maos-20-2-hosted1-dev202/dist/maos-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 1.216
+    },
+    {
+      "name": "fixture-copy-maosctl",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maosctl",
+        "/tmp/maos-20-2-hosted1-dev202/dist/maosctl-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.264
+    },
+    {
+      "name": "fixture-copy-maos-spirit",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maos-spirit",
+        "/tmp/maos-20-2-hosted1-dev202/dist/maos-spirit-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.064
+    },
+    {
+      "name": "fixture-copy-maos-registry-server",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/target/release/maos-registry-server",
+        "/tmp/maos-20-2-hosted1-dev202/dist/maos-registry-server-linux-amd64"
+      ],
+      "exit_code": 0,
+      "seconds": 0.032
+    },
+    {
+      "name": "fixture-manifest",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "release-dry-run",
+        "--manifest-only",
+        "--dist-dir",
+        "/tmp/maos-20-2-hosted1-dev202/dist",
+        "--targets",
+        "x86_64-unknown-linux-gnu",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.264
+    },
+    {
+      "name": "fixture-sign",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "release-verify",
+        "--sign",
+        "--key-env",
+        "RELEASE_SIGNING_KEY",
+        "--sha256sums",
+        "/tmp/maos-20-2-hosted1-dev202/dist/SHA256SUMS",
+        "--output",
+        "/tmp/maos-20-2-hosted1-dev202/dist/SHA256SUMS.sig",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.016,
+      "extra_env": {
+        "RELEASE_SIGNING_KEY": "794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d"
+      }
+    },
+    {
+      "name": "fixture-render",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "render-packages",
+        "--dist-dir",
+        "/tmp/maos-20-2-hosted1-dev202/dist",
+        "--output",
+        "/tmp/maos-20-2-hosted1-dev202/dist/recipes",
+        "--maosctl",
+        "/home/lunarpulse/dev_ws/target/debug/maosctl",
+        "--base-url",
+        "file:///tmp/maos-20-2-hosted1-dev202/dist"
+      ],
+      "exit_code": 0,
+      "seconds": 0.314
+    },
+    {
+      "name": "arch-fixture-stage",
+      "command": [
+        "cp",
+        "-a",
+        "/tmp/maos-20-2-hosted1-dev202/dist/.",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare"
+      ],
+      "exit_code": 0,
+      "seconds": 0.008
+    },
+    {
+      "name": "arch-fixture-verifier",
+      "command": [
+        "cp",
+        "/home/lunarpulse/dev_ws/packaging/verify-release.py",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare/verify-release.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.002
+    },
+    {
+      "name": "arch-fixture-transport",
+      "command": [
+        "cp",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare/SHA256SUMS.sig",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare/SHA256SUMS.ed25519"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "arch-real-prepare-valid",
+      "command": [
+        "bash",
+        "-euc",
+        "cd \"$1\"; source \"$2\"; CARCH=x86_64; prepare",
+        "bash",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare/recipes/PKGBUILD"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114,
+      "extra_env": {
+        "PATH": "/tmp/maos-20-2-hosted1-dev202/venv/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      }
+    },
+    {
+      "name": "arch-signature-backup",
+      "command": [
+        "cp",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare/SHA256SUMS.sig",
+        "/tmp/maos-20-2-hosted1-dev202/correct.sig"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "arch-wrong-key-plant",
+      "command": [
+        "/tmp/maos-20-2-hosted1-dev202/venv/bin/python",
+        "-c",
+        "import hashlib,pathlib,sys; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; p=pathlib.Path(sys.argv[1]); (p/\"SHA256SUMS.ed25519\").write_bytes(Ed25519PrivateKey.from_private_bytes(bytes(32)).sign(hashlib.sha256((p/\"SHA256SUMS\").read_bytes()).digest()))",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare"
+      ],
+      "exit_code": 0,
+      "seconds": 0.032
+    },
+    {
+      "name": "arch-real-prepare-wrong-key",
+      "command": [
+        "bash",
+        "-euc",
+        "cd \"$1\"; source \"$2\"; CARCH=x86_64; prepare",
+        "bash",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare/recipes/PKGBUILD"
+      ],
+      "exit_code": 1,
+      "seconds": 0.032,
+      "extra_env": {
+        "PATH": "/tmp/maos-20-2-hosted1-dev202/venv/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      }
+    },
+    {
+      "name": "arch-signature-restore",
+      "command": [
+        "bash",
+        "-c",
+        "for name in SHA256SUMS.ed25519 SHA256SUMS.sig; do cp /tmp/maos-20-2-hosted1-dev202/correct.sig /tmp/maos-20-2-hosted1-dev202/arch-prepare/\"$name\" && cmp /tmp/maos-20-2-hosted1-dev202/correct.sig /tmp/maos-20-2-hosted1-dev202/arch-prepare/\"$name\" && touch /tmp/maos-20-2-hosted1-dev202/arch-prepare/\"$name\" || exit; done"
+      ],
+      "exit_code": 0,
+      "seconds": 0.008
+    },
+    {
+      "name": "arch-real-prepare-restored",
+      "command": [
+        "bash",
+        "-euc",
+        "cd \"$1\"; source \"$2\"; CARCH=x86_64; prepare",
+        "bash",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare",
+        "/tmp/maos-20-2-hosted1-dev202/arch-prepare/recipes/PKGBUILD"
+      ],
+      "exit_code": 0,
+      "seconds": 0.064,
+      "extra_env": {
+        "PATH": "/tmp/maos-20-2-hosted1-dev202/venv/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.local/bin:/home/lunarpulse/.cargo/bin:/home/lunarpulse/.local/bin:/opt/agent-clis/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      }
+    },
+    {
+      "name": "preserve-rendered-fixtures",
+      "command": [
+        "cp",
+        "-a",
+        "/tmp/maos-20-2-hosted1-dev202/dist/recipes",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/hosted-1/rendered-dev-fixture"
+      ],
+      "exit_code": 0,
+      "seconds": 0.003
+    },
+    {
+      "name": "preserve-fixture-manifest",
+      "command": [
+        "cp",
+        "/tmp/maos-20-2-hosted1-dev202/dist/SHA256SUMS",
+        "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/hosted-1/rendered-dev-fixture/SHA256SUMS"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "shell-syntax",
+      "command": [
+        "bash",
+        "-n",
+        "/tmp/maos-20-2-hosted1-dev202/dist/recipes/PKGBUILD"
+      ],
+      "exit_code": 0,
+      "seconds": 0.001
+    },
+    {
+      "name": "final-check-kernel-baseline",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-kernel-baseline",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114
+    },
+    {
+      "name": "final-check-test-cost",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-test-cost",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.364
+    },
+    {
+      "name": "final-check-dev-record-completeness",
+      "command": [
+        "env",
+        "-u",
+        "CI",
+        "-u",
+        "GITHUB_ACTIONS",
+        "CARGO_MANIFEST_DIR=/home/lunarpulse/dev_ws/xtask",
+        "/home/lunarpulse/dev_ws/target/debug/xtask",
+        "check-dev-record-completeness",
+        "--json"
+      ],
+      "exit_code": 0,
+      "seconds": 0.114
+    },
+    {
+      "name": "read-hosted-run-42224184744",
+      "command": [
+        "gh",
+        "api",
+        "repos/lunarpulse/maos/actions/runs/42224184744",
+        "--jq",
+        "{id,run_attempt,head_sha,head_branch,event,status,conclusion,html_url}"
+      ],
+      "exit_code": 0,
+      "observed_result": {
+        "id": 42224184744,
+        "run_attempt": 1,
+        "head_sha": "6fda747d9d9733e6b310e201cba6eb5ac367fd5a",
+        "head_branch": "ci/20-2-verify",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    },
+    {
+      "name": "read-hosted-run-42224167600",
+      "command": [
+        "gh",
+        "api",
+        "repos/lunarpulse/maos/actions/runs/42224167600",
+        "--jq",
+        "{id,run_attempt,head_sha,head_branch,event,status,conclusion,html_url}"
+      ],
+      "exit_code": 0,
+      "observed_result": {
+        "id": 42224167600,
+        "run_attempt": 1,
+        "head_sha": "ebf2ab03ac64de5b828d995f72ae8b24199fa9a0",
+        "head_branch": "main",
+        "event": "push",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    }
+  ]
+}

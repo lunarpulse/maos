@@ -1,0 +1,29 @@
+# Render with xtask render-packages; verify before any binary is executed.
+pkgname=maos
+pkgver=0.1.0alpha1
+pkgrel=1
+pkgdesc='Minimal Agentic Operating System'
+arch=('x86_64')
+url='https://github.com/lunarpulse/maos'
+license=('Apache-2.0' 'MIT')
+depends=('glibc')
+makedepends=('python-cryptography')
+options=('!strip' '!debug')
+source=('file:///tmp/maos-20-2-hosted1-dev202/dist/SHA256SUMS' 'SHA256SUMS.ed25519::file:///tmp/maos-20-2-hosted1-dev202/dist/SHA256SUMS.sig' 'file:///tmp/maos-20-2-hosted1-dev202/dist/verify-release.py')
+sha256sums=('c51b063be82fba78c26f1986daade5689620460305e9bbfd1df5f7e3ee4a10c0' 'abdd6311df52324734ba1f0de760f96d0928ee48353e947b24409a394020ac2f' '7012f2a432157b3f6d1a0512863b6bdef22d1ee57996d96b9bfad5fdbce6ffad')
+source_x86_64=('file:///tmp/maos-20-2-hosted1-dev202/dist/maos-linux-amd64' 'file:///tmp/maos-20-2-hosted1-dev202/dist/maosctl-linux-amd64' 'file:///tmp/maos-20-2-hosted1-dev202/dist/maos-spirit-linux-amd64' 'file:///tmp/maos-20-2-hosted1-dev202/dist/maos-registry-server-linux-amd64')
+sha256sums_x86_64=("ff4a9adc11c441f4af6d1bd04c6a0e6d9ae1cf54fb9ed5b693b2c1848854b6ad" "acf6bc69e5c719e0066fee78b9f48f037c7712cb9c8a4467a9fadcb3deb12460" "ca4ad020945405be8f48b822e4b73d061093eac43e967f6d2ea0d9403d3826a2" "ac8e5f70218fc62f976b6e4815996dcbb6aa593d1e471e6b4574632b741165c4")
+
+prepare() {
+    cp SHA256SUMS.ed25519 SHA256SUMS.sig
+    local suffix=linux-amd64
+    [[ "$CARCH" = aarch64 ]] && suffix=linux-arm64
+    python3 verify-release.py --pubkey 'bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7' "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix"
+}
+package() {
+    local suffix=linux-amd64 bin
+    [[ "$CARCH" = aarch64 ]] && suffix=linux-arm64
+    for bin in maos maosctl maos-spirit maos-registry-server; do
+        install -Dm755 "$srcdir/$bin-$suffix" "$pkgdir/usr/bin/$bin"
+    done
+}

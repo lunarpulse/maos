@@ -166,7 +166,7 @@ jobs:
           for arch in amd64 arm64; do
             docker run --rm --platform "linux/$arch" -v "$PWD:$PWD" -w "$PWD" ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 bash -euc '
               apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y debhelper python3-cryptography rpm
+              DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential debhelper python3-cryptography rpm
               packaging/build-packages.sh dist deb dist/packages
               packaging/build-packages.sh dist rpm-ubuntu dist/packages
             '

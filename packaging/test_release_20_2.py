@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Real signatures and adversarial exact-name/trace vectors; no cargo subprocess."""
+import ast
 import hashlib
 import importlib.util
 import pathlib
 import tempfile
 import shutil
+import shlex
+import re
+import subprocess
 import unittest
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -143,6 +147,46 @@ class ReleaseControls(unittest.TestCase):
             release_run.successful(current, 10, 2, 'abc', 'v1')
         current['conclusion'] = 'success'
         self.assertTrue(release_run.successful(current, 10, 2, 'abc', 'v1'))
+
+    def test_hosted_1_arch_raw_ed25519_signature_is_not_openpgp(self):
+        recipe = (ROOT/'packaging/aur/PKGBUILD').read_text()
+        sources = next(line for line in recipe.splitlines() if line.startswith('source=('))
+        names = [source.split('::', 1)[0] if '::' in source else source.rsplit('/', 1)[-1]
+                 for source in shlex.split(sources[len('source=('):-1])]
+        self.assertFalse(any(name.endswith(('.sig', '.asc')) for name in names), names)
+        self.assertIn('SHA256SUMS.ed25519::@BASE_URL@/SHA256SUMS.sig', recipe)
+        self.assertLess(recipe.index('cp SHA256SUMS.ed25519 SHA256SUMS.sig'),
+                        recipe.index('python3 verify-release.py'))
+
+    def test_hosted_1_brew_plant_removes_exact_actual_two_line_verifier(self):
+        workflow = ROOT/'_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml'
+        assignment = next(line.strip() for line in workflow.read_text().splitlines()
+                          if line.strip().startswith('pattern = '))
+        context = {'route': 'brew'}
+        exec(compile(ast.parse(assignment), str(workflow), 'exec'), context)
+        recipe = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        changed, count = re.subn(context['pattern'], '', recipe, flags=re.M)
+        self.assertEqual(count, 1)
+        self.assertNotIn('system Formula["python@3.14"]', changed)
+        self.assertNotIn('"--pubkey"', changed)
+        self.assertIn('names.each { |name| bin.install', changed)
+
+    def test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit(self):
+        workflow = ROOT/'_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml'
+        statements = [line.strip() for line in workflow.read_text().splitlines()
+                      if line.strip().startswith(('pattern = ', 'text, count=re.subn('))]
+        self.assertEqual(len(statements), 2)
+        recipe = (ROOT/'packaging/aur/PKGBUILD').read_text().replace('@ARCH_SOURCES@', '')
+        context = {'route': 'arch', 'text': recipe, 're': re}
+        exec(compile(ast.parse('\n'.join(statements)), str(workflow), 'exec'), context)
+        self.assertEqual(context['count'], 1)
+        self.assertNotIn('python3 verify-release.py', context['text'])
+        (self.dist/'PKGBUILD').write_text(context['text'])
+        (self.dist/'SHA256SUMS.ed25519').write_bytes((self.dist/'SHA256SUMS.sig').read_bytes())
+        result = subprocess.run(['bash', '-euc', 'source "$1"; CARCH=x86_64; prepare',
+                                 'bash', str(self.dist/'PKGBUILD')],
+                                cwd=self.dist, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
 
 
 if __name__ == '__main__':

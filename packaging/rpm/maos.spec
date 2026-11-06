@@ -10,14 +10,14 @@ BuildRequires: python3-cryptography
 %global debug_package %{nil}
 %global __os_install_post %{nil}
 %ifarch x86_64
-%global suffix linux-amd64
+%global maos_artifact_suffix linux-amd64
 %else
-%global suffix linux-arm64
+%global maos_artifact_suffix linux-arm64
 %endif
-Source0: @BASE_URL@/maos-%{suffix}
-Source1: @BASE_URL@/maosctl-%{suffix}
-Source2: @BASE_URL@/maos-spirit-%{suffix}
-Source3: @BASE_URL@/maos-registry-server-%{suffix}
+Source0: @BASE_URL@/maos-%{maos_artifact_suffix}
+Source1: @BASE_URL@/maosctl-%{maos_artifact_suffix}
+Source2: @BASE_URL@/maos-spirit-%{maos_artifact_suffix}
+Source3: @BASE_URL@/maos-registry-server-%{maos_artifact_suffix}
 Source4: @BASE_URL@/SHA256SUMS
 Source5: @BASE_URL@/SHA256SUMS.sig
 Source6: @BASE_URL@/verify-release.py
@@ -27,13 +27,13 @@ MAOS multi-Spirit runtime with append-only audit logging and capability tokens.
 
 %prep
 cd %{_sourcedir}
-python3 verify-release.py --pubkey @PUBKEY@ maos-%{suffix} maosctl-%{suffix} maos-spirit-%{suffix} maos-registry-server-%{suffix}
+python3 verify-release.py --pubkey @PUBKEY@ maos-%{maos_artifact_suffix} maosctl-%{maos_artifact_suffix} maos-spirit-%{maos_artifact_suffix} maos-registry-server-%{maos_artifact_suffix}
 
 %build
 
 %install
 for bin in maos maosctl maos-spirit maos-registry-server; do
-    install -Dm755 %{_sourcedir}/$bin-%{suffix} %{buildroot}%{_bindir}/$bin
+    install -Dm755 %{_sourcedir}/$bin-%{maos_artifact_suffix} %{buildroot}%{_bindir}/$bin
 done
 
 %files

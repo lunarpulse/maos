@@ -9,10 +9,11 @@ license=('Apache-2.0' 'MIT')
 depends=('glibc')
 makedepends=('python-cryptography')
 options=('!strip' '!debug')
-source=('@BASE_URL@/SHA256SUMS' '@BASE_URL@/SHA256SUMS.sig' '@BASE_URL@/verify-release.py')
+source=('@BASE_URL@/SHA256SUMS' 'SHA256SUMS.ed25519::@BASE_URL@/SHA256SUMS.sig' '@BASE_URL@/verify-release.py')
 sha256sums=('@SHA256SUMS_HASH@' '@SIGNATURE_HASH@' '@VERIFIER_HASH@')
 @ARCH_SOURCES@
 prepare() {
+    cp SHA256SUMS.ed25519 SHA256SUMS.sig
     local suffix=linux-amd64
     [[ "$CARCH" = aarch64 ]] && suffix=linux-arm64
     python3 verify-release.py --pubkey '@PUBKEY@' "maos-$suffix" "maosctl-$suffix" "maos-spirit-$suffix" "maos-registry-server-$suffix"

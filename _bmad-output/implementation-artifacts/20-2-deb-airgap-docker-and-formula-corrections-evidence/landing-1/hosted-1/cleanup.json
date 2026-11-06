@@ -1,0 +1,16 @@
+{
+  "proc_scan_first": true,
+  "active_compilers": [],
+  "open_incremental_descriptors": [],
+  "proc_unreadable_or_vanished": 2,
+  "removed_incremental_snapshots": 190,
+  "kept_incremental_snapshots": 7769,
+  "retention": "newest per crate and anything touched in last2h; no deps/build/fingerprint",
+  "allocated_file_blocks_removed_bytes": 2768224256,
+  "own_scratch_allocated_file_blocks_bytes": 154988544,
+  "filesystem_free_delta_bytes": 2442948608,
+  "own_scratch_removed": "/tmp/maos-20-2-hosted1-dev202",
+  "own_import_caches_removed": 5,
+  "seconds": 324.305,
+  "caveat": "Only count hardlinked file blocks when all links removed; compression/reflinks/concurrent host activity mean filesystem free delta differs."
+}

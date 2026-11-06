@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="26" skipped="0" failures="0" errors="0" uuid="a39fbaff-bcb6-4962-a17a-6830f94aa08a" timestamp="2026-11-06T14:23:10.537+00:00" time="5.627">
+    <testsuite name="xtask::model_currency_gate" tests="26" skipped="0" errors="0" failures="0">
+        <testcase name="the_shipped_data_names_a_replacement_for_every_retired_id" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.005"/>
+        <testcase name="the_data_file_is_refused_when_it_would_make_the_guidance_lie" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.005"/>
+        <testcase name="the_data_file_refuses_an_empty_provider_map_and_blank_or_repeated_retired_ids" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.010"/>
+        <testcase name="gemini_unknown_constructor_model_is_governed_20_4" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.396"/>
+        <testcase name="shared_default_scan_skips_unrelated_item_bodies_hosted_1" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.396"/>
+        <testcase name="a_comment_inside_a_constructor_never_stands_in_for_its_model" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.404"/>
+        <testcase name="inactive_default_cannot_hide_an_unknown_live_model_f6" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.409"/>
+        <testcase name="a_host_provider_constructor_that_goes_missing_reds_even_if_the_others_remain" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.410"/>
+        <testcase name="a_dangling_manifest_link_is_a_refusal_not_a_skip" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.425"/>
+        <testcase name="main_rs_constructors_are_read_in_every_layout_and_comments_open_no_call" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.437"/>
+        <testcase name="missing_kimi_constructor_fails_closed_20_4" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.455"/>
+        <testcase name="a_one_line_call_with_a_non_literal_model_refuses_instead_of_reading_past_it" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.484"/>
+        <testcase name="the_api_key_argument_is_never_judged_as_the_model" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.519"/>
+        <testcase name="kimi_k2_constructor_is_refused_as_deprecated_20_4" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.557"/>
+        <testcase name="shared_defaults_remain_governed_at_the_declaration_f6" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.579"/>
+        <testcase name="a_duplicate_on_one_line_names_that_line_not_line_one" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.843"/>
+        <testcase name="a_providers_section_model_id_is_a_pin" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.875"/>
+        <testcase name="an_unparseable_manifest_reds_instead_of_passing_unread" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.879"/>
+        <testcase name="two_price_rows_sharing_a_model_each_name_their_own_line" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.954"/>
+        <testcase name="an_empty_entries_array_is_an_empty_price_book" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.972"/>
+        <testcase name="a_provider_table_reds_on_the_entry_line_through_comments_literals_and_duplicates" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="0.992"/>
+        <testcase name="the_swept_tree_is_green_and_governs_its_pins" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="1.078"/>
+        <testcase name="the_cli_subcommand_is_wired_green_at_head_and_red_on_a_plant" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="1.150"/>
+        <testcase name="a_gate_that_could_scan_nothing_is_a_refusal_not_a_pass" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="1.515"/>
+        <testcase name="a_manifest_that_hides_its_pins_from_the_scan_reds" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="1.614"/>
+        <testcase name="each_retired_or_unknown_pin_reds_naming_its_file_and_line" classname="xtask::model_currency_gate" timestamp="2026-11-06T14:23:10.538+00:00" time="5.626"/>
+    </testsuite>
+</testsuites>

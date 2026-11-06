@@ -65,7 +65,7 @@ jobs:
           test "$(stat -c %u dist/packages)" = "$(id -u)"
           docker run --rm -v "$PWD:$PWD" -w "$PWD" ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 bash -euc '
             apt-get update
-            DEBIAN_FRONTEND=noninteractive apt-get install -y rpm python3-cryptography debhelper
+            DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential rpm python3-cryptography debhelper
             set +e
             packaging/build-packages.sh dist rpm /tmp/before-rpm > evidence/ubuntu-rpm-before.log 2>&1
             rc=$?
@@ -204,7 +204,7 @@ jobs:
         with:
           name: signed-20-2-${{ matrix.suffix }}
           path: dist
-      - run: sudo apt-get update && sudo apt-get install -y debhelper python3-cryptography
+      - run: sudo apt-get update && sudo apt-get install -y build-essential debhelper python3-cryptography
       - name: AC1 baseline build fails before verification (cbed4dad)
         run: |
           mkdir -p evidence "$RUNNER_TEMP/baseline/debian"
@@ -385,8 +385,8 @@ jobs:
           import pathlib,re,sys
           route, filename=sys.argv[1:]
           p=pathlib.Path(filename); text=p.read_text()
-          pattern = r'^.*system Formula\["python@3.14"\].*\n.*"verify-release.py".*\n' if route=='brew' else r'^.*python3 verify-release.py .*\n'
-          text, count=re.subn(pattern, '', text, flags=re.M)
+          pattern = r'^[ \t]*system Formula\["python@3\.14"\][^\n]*"verify-release\.py",[^\n]*\n[ \t]*"--pubkey"[^\n]*\n' if route=='brew' else r'^.*python3 verify-release.py .*\n'
+          text, count=re.subn(pattern, '    : # verifier bypass plant\n' if route=='arch' else '', text, flags=re.M)
           assert count==1, (route,count)
           p.write_text(text)
           PY

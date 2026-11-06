@@ -5846,7 +5846,7 @@ jobs:
       - name: Install native package prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y debhelper python3-cryptography
+          sudo apt-get install -y build-essential debhelper python3-cryptography
       - name: Execute real signature and trace adversarial controls
         run: python3 packaging/test_release_20_2.py
       - name: Run release dry-run

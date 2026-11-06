@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+# Render with xtask render-packages; all four installed files stay byte-identical.
+include /usr/share/dpkg/architecture.mk
+export DH_VERBOSE = 1
+RELEASE_PUBKEY := bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7
+BINS := maos maosctl maos-spirit maos-registry-server
+ifeq ($(DEB_HOST_ARCH),amd64)
+SUFFIX := linux-amd64
+else ifeq ($(DEB_HOST_ARCH),arm64)
+SUFFIX := linux-arm64
+else
+$(error Unsupported Debian architecture: $(DEB_HOST_ARCH))
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	python3 verify-release.py --pubkey $(RELEASE_PUBKEY) $(addsuffix -$(SUFFIX),$(BINS))
+
+override_dh_auto_install:
+	set -e; for bin in $(BINS); do install -Dm755 $$bin-$(SUFFIX) debian/maos/usr/bin/$$bin; done
+
+override_dh_auto_build override_dh_auto_test override_dh_strip override_dh_dwz:
+	:

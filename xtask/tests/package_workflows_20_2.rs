@@ -222,3 +222,37 @@ fn review_f9_container_wait_binds_release_id_and_attempt() {
     let workflow = load(".github/workflows/container.yml");
     assert!(steps(&workflow["jobs"]["build-and-push"]).contains("packaging/wait-release.sh"));
 }
+
+#[test]
+fn hosted_1_rpm_artifact_macro_does_not_redefine_reserved_suffix() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let spec = std::fs::read_to_string(root.join("packaging/rpm/maos.spec")).unwrap();
+    assert!(!spec.lines().any(|line| line.starts_with("%global suffix ")));
+    assert!(!spec.contains("%{suffix}"));
+    assert!(spec.contains("%global maos_artifact_suffix linux-amd64"));
+    assert!(spec.contains("%global maos_artifact_suffix linux-arm64"));
+    assert_eq!(spec.matches("%{maos_artifact_suffix}").count(), 9);
+}
+
+#[test]
+fn hosted_1_every_debian_builder_provisions_build_essential() {
+    for (path, jobs) in [
+        (".github/workflows/discipline.yml", &["release-dry-run"][..]),
+        (".github/workflows/release.yml", &["sign-and-publish"][..]),
+        ("_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml",
+            &["native-packaging", "deb"][..]),
+    ] {
+        let workflow = load(path);
+        for job in jobs {
+            let script = steps(&workflow["jobs"][*job]);
+            let provisioning: Vec<_> = script.lines().filter(|line|
+                line.contains("apt-get install") && line.split_whitespace().any(|word| word == "debhelper")).collect();
+            assert!(!provisioning.is_empty(), "{path}:{job}: missing prerequisite step");
+            for line in provisioning {
+                assert!(line.split_whitespace().any(|word| word == "build-essential"),
+                    "{path}:{job}: {line}");
+            }
+            assert!(!script.contains("dpkg-buildpackage -d"), "{path}:{job}: dependency bypass");
+        }
+    }
+}

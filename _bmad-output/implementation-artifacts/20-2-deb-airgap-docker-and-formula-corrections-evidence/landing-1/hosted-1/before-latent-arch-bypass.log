@@ -1,0 +1,15 @@
+test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit (__main__.ReleaseControls.test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit) ... FAIL
+
+======================================================================
+FAIL: test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit (__main__.ReleaseControls.test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 189, in test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit
+    self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : 
+
+----------------------------------------------------------------------
+Ran 1 test in 0.009s
+
+FAILED (failures=1)
