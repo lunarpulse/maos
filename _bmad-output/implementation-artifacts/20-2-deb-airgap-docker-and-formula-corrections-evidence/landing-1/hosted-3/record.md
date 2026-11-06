@@ -216,3 +216,26 @@ no deps/build/fingerprint deletion. See cleanup.json.
   the scoped development-key branch receipt, retaining ops-rc-signed-tag as open
   owner and requiring matching signed-tag evidence before rc acceptance. No NFR
   acceptance, universal air-gap assertion or tracker status was flipped.
+
+## hosted-4 supersession — 2026-11-06
+
+[Run42305526387](https://github.com/lunarpulse/maos/actions/runs/42305526387),
+attempt1/headc74d49ba, now proves tap creation, P5 bypass detection, actual
+Python/cryptography verifier import, wrong-key refusal and restored successful
+Homebrew installation. It does **not** prove executable installation or signed
+installed identity: brew test fails126 on the0644 installed binaries. The audit
+also reports inverse-condition style, public opt-path helper,132/118 pubkey-line
+width and non-executable bin files. These four findings are unintended defects,
+not an accepted audit result. The EXIT cleanup trap ran.
+
+hosted-4 changes the condition to if/!=, uses source-confirmed formula_opt_bin,
+binds the64-hex pubkey outside the exact two-line verifier call, and chmods all
+four installed binaries0555 after bin.install while retaining skip_clean and
+strict installed-byte comparison. The branch-recipe P5 expression and both
+source-test call references migrate together, keeping exactly-one-match.
+
+See [hosted-4/record.md](../hosted-4/record.md): four real before/plant failures,
+an obsolete-regex count0 plant, cp/cmp/touch restorations, final28 Python passes,
+signed four-file0644→0555 byte-preservation control, CLI version-string source
+proof and hosted limits. No cargo, Rust/pin edit, commit/push/status flip or
+shared incremental pruning. Corrected hosted test/audit/identity remain owed.

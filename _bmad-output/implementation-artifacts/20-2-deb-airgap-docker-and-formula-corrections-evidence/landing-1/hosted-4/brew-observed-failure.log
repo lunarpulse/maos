@@ -1,0 +1,708 @@
+﻿2026-11-06T22:39:39.6862676Z Current runner version: '2.338.2'
+2026-11-06T22:39:39.6886520Z ##[group]Runner Image Provisioner
+2026-11-06T22:39:39.6887391Z Hosted Compute Agent
+2026-11-06T22:39:39.6888109Z Version: 20261028.624
+2026-11-06T22:39:39.6888742Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-06T22:39:39.6889428Z Build Date: 2026-10-28T21:51:42Z
+2026-11-06T22:39:39.6890043Z Worker ID: {a74e6dc3-a849-44f2-8de6-ba11ababeae6}
+2026-11-06T22:39:39.6890724Z Region: westcentralus
+2026-11-06T22:39:39.6891239Z Cloud: Azure
+2026-11-06T22:39:39.6891723Z ##[endgroup]
+2026-11-06T22:39:39.6893448Z ##[group]Operating System
+2026-11-06T22:39:39.6894023Z Ubuntu
+2026-11-06T22:39:39.6894526Z 24.04.5
+2026-11-06T22:39:39.6895009Z LTS
+2026-11-06T22:39:39.6895475Z ##[endgroup]
+2026-11-06T22:39:39.6896342Z ##[group]Runner Image
+2026-11-06T22:39:39.6896889Z Image: ubuntu-24.04
+2026-11-06T22:39:39.6897417Z Version: 20261101.360.1
+2026-11-06T22:39:39.6898761Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-06T22:39:39.6900176Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-06T22:39:39.6901031Z ##[endgroup]
+2026-11-06T22:39:39.6902027Z ##[group]GITHUB_TOKEN Permissions
+2026-11-06T22:39:39.6904214Z Contents: read
+2026-11-06T22:39:39.6904779Z Metadata: read
+2026-11-06T22:39:39.6905303Z ##[endgroup]
+2026-11-06T22:39:39.6907301Z Secret source: Actions
+2026-11-06T22:39:39.6908368Z Cache mode: write
+2026-11-06T22:39:39.6909184Z Prepare workflow directory
+2026-11-06T22:39:39.7288910Z Prepare all required actions
+2026-11-06T22:39:39.7336661Z Getting action download info
+2026-11-06T22:39:40.0097519Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-06T22:39:40.0881015Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+2026-11-06T22:39:40.5933957Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-06T22:39:40.7730513Z Complete job name: recipes (brew)
+2026-11-06T22:39:40.8694792Z ##[group]Run actions/checkout@v5
+2026-11-06T22:39:40.8695788Z with:
+2026-11-06T22:39:40.8696308Z   repository: lunarpulse/maos
+2026-11-06T22:39:40.8700725Z   token: ***
+2026-11-06T22:39:40.8701232Z   ssh-strict: true
+2026-11-06T22:39:40.8701725Z   ssh-user: git
+2026-11-06T22:39:40.8702226Z   persist-credentials: true
+2026-11-06T22:39:40.8702776Z   clean: true
+2026-11-06T22:39:40.8703279Z   sparse-checkout-cone-mode: true
+2026-11-06T22:39:40.8703868Z   fetch-depth: 1
+2026-11-06T22:39:40.8704375Z   fetch-tags: false
+2026-11-06T22:39:40.8704873Z   show-progress: true
+2026-11-06T22:39:40.8705385Z   lfs: false
+2026-11-06T22:39:40.8705864Z   submodules: false
+2026-11-06T22:39:40.8706374Z   set-safe-directory: true
+2026-11-06T22:39:40.8706968Z   allow-unsafe-pr-checkout: false
+2026-11-06T22:39:40.8707971Z env:
+2026-11-06T22:39:40.8708462Z   CARGO_TERM_COLOR: never
+2026-11-06T22:39:40.8708998Z ##[endgroup]
+2026-11-06T22:39:41.1564969Z Syncing repository: lunarpulse/maos
+2026-11-06T22:39:41.1567974Z ##[group]Getting Git version info
+2026-11-06T22:39:41.1569150Z Working directory is '/home/runner/work/maos/maos'
+2026-11-06T22:39:41.1570819Z [command]/usr/bin/git version
+2026-11-06T22:39:41.1666589Z git version 2.56.0
+2026-11-06T22:39:41.1687264Z ##[endgroup]
+2026-11-06T22:39:41.1701639Z Temporarily overriding HOME='/home/runner/work/_temp/3213075a-8650-40d1-9acd-c04096747da3' before making global git config changes
+2026-11-06T22:39:41.1706047Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-06T22:39:41.1708158Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-06T22:39:41.1767377Z Deleting the contents of '/home/runner/work/maos/maos'
+2026-11-06T22:39:41.1769381Z ##[group]Initializing the repository
+2026-11-06T22:39:41.1770937Z [command]/usr/bin/git init /home/runner/work/maos/maos
+2026-11-06T22:39:41.1881280Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-06T22:39:41.1884127Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-06T22:39:41.1886099Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-06T22:39:41.1887643Z hint: call:
+2026-11-06T22:39:41.1888874Z hint:
+2026-11-06T22:39:41.1890030Z hint: 	git config --global init.defaultBranch <name>
+2026-11-06T22:39:41.1891350Z hint:
+2026-11-06T22:39:41.1892618Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-06T22:39:41.1894670Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-06T22:39:41.1896333Z hint:
+2026-11-06T22:39:41.1897341Z hint: 	git branch -m <name>
+2026-11-06T22:39:41.1898706Z hint:
+2026-11-06T22:39:41.1900136Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-06T22:39:41.1902278Z Initialized empty Git repository in /home/runner/work/maos/maos/.git/
+2026-11-06T22:39:41.1919614Z [command]/usr/bin/git remote add origin https://github.com/lunarpulse/maos
+2026-11-06T22:39:41.1949137Z ##[endgroup]
+2026-11-06T22:39:41.1950472Z ##[group]Disabling automatic garbage collection
+2026-11-06T22:39:41.1953592Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-06T22:39:41.1981502Z ##[endgroup]
+2026-11-06T22:39:41.1983074Z ##[group]Setting up auth
+2026-11-06T22:39:41.1985826Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-06T22:39:41.2018290Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-06T22:39:41.2369203Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-06T22:39:41.2404178Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-06T22:39:41.2593121Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-06T22:39:41.2624181Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-06T22:39:41.2801917Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-06T22:39:41.2837231Z ##[endgroup]
+2026-11-06T22:39:41.2838976Z ##[group]Fetching the repository
+2026-11-06T22:39:41.2851746Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c74d49bad4bf032d7c274e8c5b5bbf0c8eadfffc:refs/remotes/origin/ci/20-2-verify
+2026-11-06T22:39:55.1542683Z From https://github.com/lunarpulse/maos
+2026-11-06T22:39:55.1543679Z  * [new ref]         c74d49bad4bf032d7c274e8c5b5bbf0c8eadfffc -> origin/ci/20-2-verify
+2026-11-06T22:39:55.1546506Z ##[endgroup]
+2026-11-06T22:39:55.1547473Z ##[group]Determining the checkout info
+2026-11-06T22:39:55.1549844Z ##[endgroup]
+2026-11-06T22:39:55.1555810Z [command]/usr/bin/git sparse-checkout disable
+2026-11-06T22:39:55.1602873Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-06T22:39:55.1629372Z ##[group]Checking out the ref
+2026-11-06T22:39:55.1633478Z [command]/usr/bin/git checkout --progress --force -B ci/20-2-verify refs/remotes/origin/ci/20-2-verify
+2026-11-06T22:39:56.1770521Z Updating files:  77% (7812/10125)
+2026-11-06T22:39:56.1790914Z Updating files:  78% (7898/10125)
+2026-11-06T22:39:56.1810154Z Updating files:  79% (7999/10125)
+2026-11-06T22:39:56.1864257Z Updating files:  80% (8100/10125)
+2026-11-06T22:39:56.1922798Z Updating files:  81% (8202/10125)
+2026-11-06T22:39:56.1969670Z Updating files:  82% (8303/10125)
+2026-11-06T22:39:56.1992863Z Updating files:  83% (8404/10125)
+2026-11-06T22:39:56.2037923Z Updating files:  84% (8505/10125)
+2026-11-06T22:39:56.2115839Z Updating files:  85% (8607/10125)
+2026-11-06T22:39:56.2158695Z Updating files:  86% (8708/10125)
+2026-11-06T22:39:56.2200955Z Updating files:  87% (8809/10125)
+2026-11-06T22:39:56.2248077Z Updating files:  88% (8910/10125)
+2026-11-06T22:39:56.2280447Z Updating files:  89% (9012/10125)
+2026-11-06T22:39:56.2349884Z Updating files:  90% (9113/10125)
+2026-11-06T22:39:56.2418768Z Updating files:  91% (9214/10125)
+2026-11-06T22:39:56.2473836Z Updating files:  92% (9315/10125)
+2026-11-06T22:39:56.2543073Z Updating files:  93% (9417/10125)
+2026-11-06T22:39:56.2602812Z Updating files:  94% (9518/10125)
+2026-11-06T22:39:56.2754743Z Updating files:  95% (9619/10125)
+2026-11-06T22:39:56.2820068Z Updating files:  96% (9720/10125)
+2026-11-06T22:39:56.2905533Z Updating files:  97% (9822/10125)
+2026-11-06T22:39:56.2942406Z Updating files:  98% (9923/10125)
+2026-11-06T22:39:56.2989567Z Updating files:  99% (10024/10125)
+2026-11-06T22:39:56.2990118Z Updating files: 100% (10125/10125)
+2026-11-06T22:39:56.2990713Z Updating files: 100% (10125/10125), done.
+2026-11-06T22:39:56.3110898Z Switched to a new branch 'ci/20-2-verify'
+2026-11-06T22:39:56.3111976Z branch 'ci/20-2-verify' set up to track 'origin/ci/20-2-verify'.
+2026-11-06T22:39:56.3189941Z ##[endgroup]
+2026-11-06T22:39:56.3236003Z [command]/usr/bin/git log -1 --format=%H
+2026-11-06T22:39:56.3260198Z c74d49bad4bf032d7c274e8c5b5bbf0c8eadfffc
+2026-11-06T22:39:56.3479184Z ##[group]Run actions/download-artifact@v4
+2026-11-06T22:39:56.3479502Z with:
+2026-11-06T22:39:56.3479712Z   name: signed-20-2-linux-amd64
+2026-11-06T22:39:56.3479956Z   path: dist
+2026-11-06T22:39:56.3480162Z   merge-multiple: false
+2026-11-06T22:39:56.3480399Z   repository: lunarpulse/maos
+2026-11-06T22:39:56.3480633Z   run-id: 42305526387
+2026-11-06T22:39:56.3480828Z env:
+2026-11-06T22:39:56.3481017Z   CARGO_TERM_COLOR: never
+2026-11-06T22:39:56.3481231Z ##[endgroup]
+2026-11-06T22:39:56.4954517Z Downloading single artifact
+2026-11-06T22:39:56.5151901Z (node:2473) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-06T22:39:56.5152679Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-06T22:39:56.7592912Z Preparing to download the following artifacts:
+2026-11-06T22:39:56.7594607Z - signed-20-2-linux-amd64 (ID: 13545274766, Size: 21710784, Expected Digest: sha256:a2bc6d8a53bcf71be46e7f27a4139e18605217cb739f424b883a12b69c28a0dd)
+2026-11-06T22:39:56.9918378Z Redirecting to blob download url: https://productionresultssa2.blob.core.windows.net/actions-results/5e67f0ed-1883-8b8e-aa01-7b5b0d653f44/workflow-job-run-eee9049d-355e-5db7-9401-a16e3bc9a1c7/artifacts/91bb8ef08c467f4f3d9eade943bb9ad04b894fabd5c781539e81222fce20fb47.zip
+2026-11-06T22:39:56.9920875Z Starting download of artifact to: /home/runner/work/maos/maos/dist
+2026-11-06T22:39:57.2716838Z (node:2473) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-11-06T22:39:58.2711613Z SHA256 digest of downloaded artifact is a2bc6d8a53bcf71be46e7f27a4139e18605217cb739f424b883a12b69c28a0dd
+2026-11-06T22:39:58.2712527Z Artifact download completed successfully.
+2026-11-06T22:39:58.2713021Z Total of 1 artifact(s) downloaded
+2026-11-06T22:39:58.2717916Z Download artifact has finished successfully
+2026-11-06T22:39:58.2846682Z ##[group]Run sudo apt-get update && sudo apt-get install -y python3-cryptography
+2026-11-06T22:39:58.2847324Z [36;1msudo apt-get update && sudo apt-get install -y python3-cryptography[0m
+2026-11-06T22:39:58.2864860Z shell: /usr/bin/bash -e {0}
+2026-11-06T22:39:58.2865134Z env:
+2026-11-06T22:39:58.2865355Z   CARGO_TERM_COLOR: never
+2026-11-06T22:39:58.2865583Z ##[endgroup]
+2026-11-06T22:39:58.3540805Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-11-06T22:39:58.3787588Z Get:6 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-11-06T22:39:58.4447357Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [743 kB]
+2026-11-06T22:39:58.4580253Z Get:8 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [675 kB]
+2026-11-06T22:39:58.4938728Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-11-06T22:39:58.4961691Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-11-06T22:39:58.4995276Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-11-06T22:39:58.5011019Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-11-06T22:39:58.5809327Z Get:9 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1425 kB]
+2026-11-06T22:39:58.5870378Z Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [313 kB]
+2026-11-06T22:39:58.5888859Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1708 kB]
+2026-11-06T22:39:58.5962964Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [343 kB]
+2026-11-06T22:39:58.5983531Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1840 kB]
+2026-11-06T22:39:58.6064075Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [420 kB]
+2026-11-06T22:39:58.6088832Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Packages [50.7 kB]
+2026-11-06T22:39:58.6099153Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [14.3 kB]
+2026-11-06T22:39:58.6690133Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1157 kB]
+2026-11-06T22:39:58.6736788Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [234 kB]
+2026-11-06T22:39:58.7171279Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1228 kB]
+2026-11-06T22:39:58.7228376Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [248 kB]
+2026-11-06T22:39:58.7243518Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1721 kB]
+2026-11-06T22:39:58.7317948Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [394 kB]
+2026-11-06T22:39:58.7336612Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse amd64 Packages [45.4 kB]
+2026-11-06T22:39:58.7342875Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [12.4 kB]
+2026-11-06T22:40:01.7947614Z Fetched 13.0 MB in 1s (9963 kB/s)
+2026-11-06T22:40:02.8416190Z Reading package lists...
+2026-11-06T22:40:02.8778147Z Reading package lists...
+2026-11-06T22:40:03.0715483Z Building dependency tree...
+2026-11-06T22:40:03.0722336Z Reading state information...
+2026-11-06T22:40:03.2412617Z python3-cryptography is already the newest version (41.0.7-4ubuntu0.4).
+2026-11-06T22:40:03.2413396Z python3-cryptography set to manually installed.
+2026-11-06T22:40:03.2414046Z 0 upgraded, 0 newly installed, 0 to remove and 27 not upgraded.
+2026-11-06T22:40:03.2463465Z ##[group]Run mkdir -p evidence
+2026-11-06T22:40:03.2463815Z [36;1mmkdir -p evidence[0m
+2026-11-06T22:40:03.2464258Z [36;1mcase "$ROUTE" in rpm) recipe=maos.spec ;; arch) recipe=PKGBUILD ;; brew) recipe=maos.rb ;; esac[0m
+2026-11-06T22:40:03.2464772Z [36;1mcp "dist/recipes/$recipe" "$RUNNER_TEMP/recipe-correct"[0m
+2026-11-06T22:40:03.2465180Z [36;1mpython3 - "$ROUTE" "dist/recipes/$recipe" <<'PY'[0m
+2026-11-06T22:40:03.2465521Z [36;1mimport pathlib,re,sys[0m
+2026-11-06T22:40:03.2465807Z [36;1mroute, filename=sys.argv[1:][0m
+2026-11-06T22:40:03.2466126Z [36;1mp=pathlib.Path(filename); text=p.read_text()[0m
+2026-11-06T22:40:03.2466792Z [36;1mpattern = r'^[ \t]*system Formula\["python@3\.14"\][^\n]*"verify-release\.py",[^\n]*\n[ \t]*"--pubkey"[^\n]*\n' if route=='brew' else r'^.*python3 verify-release.py .*\n'[0m
+2026-11-06T22:40:03.2467592Z [36;1mtext, count=re.subn(pattern, '    : # verifier bypass plant\n' if route=='arch' else '', text, flags=re.M)[0m
+2026-11-06T22:40:03.2468588Z [36;1massert count==1, (route,count)[0m
+2026-11-06T22:40:03.2468868Z [36;1mp.write_text(text)[0m
+2026-11-06T22:40:03.2469101Z [36;1mPY[0m
+2026-11-06T22:40:03.2469294Z [36;1mset +e[0m
+2026-11-06T22:40:03.2469708Z [36;1mpackaging/witness-recipe.sh "$ROUTE" "$PWD/dist" > evidence/recipe-verifier-bypass.log 2>&1[0m
+2026-11-06T22:40:03.2470154Z [36;1mrc=$?[0m
+2026-11-06T22:40:03.2470368Z [36;1mset -e[0m
+2026-11-06T22:40:03.2470649Z [36;1mcp "$RUNNER_TEMP/recipe-correct" "dist/recipes/$recipe"[0m
+2026-11-06T22:40:03.2471057Z [36;1mcmp "$RUNNER_TEMP/recipe-correct" "dist/recipes/$recipe"[0m
+2026-11-06T22:40:03.2471406Z [36;1mtouch "dist/recipes/$recipe"[0m
+2026-11-06T22:40:03.2471705Z [36;1mcat evidence/recipe-verifier-bypass.log[0m
+2026-11-06T22:40:03.2472008Z [36;1mtest "$rc" -ne 0[0m
+2026-11-06T22:40:03.2472364Z [36;1mgrep -F 'accepted forged signature' evidence/recipe-verifier-bypass.log[0m
+2026-11-06T22:40:03.2485164Z shell: /usr/bin/bash -e {0}
+2026-11-06T22:40:03.2485439Z env:
+2026-11-06T22:40:03.2485660Z   CARGO_TERM_COLOR: never
+2026-11-06T22:40:03.2485898Z   ROUTE: brew
+2026-11-06T22:40:03.2486098Z ##[endgroup]
+2026-11-06T22:41:06.4564629Z [33mWarning:[0m [1mtap-new[0m is a developer command, so Homebrew's
+2026-11-06T22:41:06.4565356Z developer mode has been automatically turned on.
+2026-11-06T22:41:06.4565680Z To turn developer mode off, run:
+2026-11-06T22:41:06.4565935Z   brew developer off
+2026-11-06T22:41:06.4566079Z 
+2026-11-06T22:41:06.4566263Z [32m==>[0m [1mDownloading Homebrew API data[0m
+2026-11-06T22:41:06.4566658Z ✔︎ JSON API packages.x86_64_linux.jws.json
+2026-11-06T22:41:06.4567182Z Initialized empty Git repository in /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/maos/homebrew-verify/.git/
+2026-11-06T22:41:06.4567719Z [main (root-commit) 3dbba69] Create maos/verify tap
+2026-11-06T22:41:06.4568270Z  5 files changed, 194 insertions(+)
+2026-11-06T22:41:06.4568568Z  create mode 100644 .github/dependabot.yml
+2026-11-06T22:41:06.4568921Z  create mode 100644 .github/workflows/autobump.yml
+2026-11-06T22:41:06.4569255Z  create mode 100644 .github/workflows/publish.yml
+2026-11-06T22:41:06.4569584Z  create mode 100644 .github/workflows/tests.yml
+2026-11-06T22:41:06.4569887Z  create mode 100644 README.md
+2026-11-06T22:41:06.4570190Z [34m==>[0m [1mCreated maos/verify[0m
+2026-11-06T22:41:06.4570557Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/maos/homebrew-verify
+2026-11-06T22:41:06.4570847Z 
+2026-11-06T22:41:06.4571047Z When a pull request making changes to a formula (or formulae) becomes green
+2026-11-06T22:41:06.4571491Z (all checks passed), then you can publish the built bottles.
+2026-11-06T22:41:06.4571880Z To do so, run `brew pr-pull` locally or run the `brew pr-pull`
+2026-11-06T22:41:06.4572280Z workflow with the pull request number and, optionally, the pull
+2026-11-06T22:41:06.4572636Z request's expected head commit SHA.
+2026-11-06T22:41:06.4572929Z accepted forged signature: Homebrew recipe
+2026-11-06T22:41:06.4573670Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/maos/0.1.0-alpha.1... (7 files, 60.6MB)
+2026-11-06T22:41:06.4574489Z [32m==>[0m [1mAutoremoving 18 unneeded formulae:[0m
+2026-11-06T22:41:06.4574860Z bzip2
+2026-11-06T22:41:06.4575148Z ca-certificates
+2026-11-06T22:41:06.4575438Z cffi
+2026-11-06T22:41:06.4575740Z cryptography
+2026-11-06T22:41:06.4576079Z expat
+2026-11-06T22:41:06.4576386Z libedit
+2026-11-06T22:41:06.4576657Z libffi
+2026-11-06T22:41:06.4576996Z lz4
+2026-11-06T22:41:06.4577259Z mpdecimal
+2026-11-06T22:41:06.4577611Z ncurses
+2026-11-06T22:41:06.4578209Z openssl@4
+2026-11-06T22:41:06.4578471Z pycparser
+2026-11-06T22:41:06.4578738Z python@3.14
+2026-11-06T22:41:06.4578948Z readline
+2026-11-06T22:41:06.4579127Z sqlite
+2026-11-06T22:41:06.4579309Z xz
+2026-11-06T22:41:06.4579492Z zlib-ng-compat
+2026-11-06T22:41:06.4579687Z zstd
+2026-11-06T22:41:06.4580043Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.10... (3,333 files, 82.6MB)
+2026-11-06T22:41:06.4580640Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/cryptography/50.0.2_2... (248 files, 15.8MB)
+2026-11-06T22:41:06.4581390Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libedit/20260512-3.1... (61 files, 1.8MB)
+2026-11-06T22:41:06.4581914Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/sqlite/3.54.1... (13 files, 7MB)
+2026-11-06T22:41:06.4582433Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/mpdecimal/4.0.1... (22 files, 828KB)
+2026-11-06T22:41:06.4582949Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/zstd/1.5.7_1... (32 files, 3.2MB)
+2026-11-06T22:41:06.4583450Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/cffi/2.1.1_1... (71 files, 2.7MB)
+2026-11-06T22:41:06.4583955Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/expat/2.10.0... (23 files, 993.1KB)
+2026-11-06T22:41:06.4584472Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/openssl@4/4.1.0... (6,878 files, 31.4MB)
+2026-11-06T22:41:06.4584788Z 
+2026-11-06T22:41:06.4609117Z ##[warning]The following openssl@4 configuration files have not been removed!
+If desired, remove them manually with `rm -rf`:
+  /home/linuxbrew/.linuxbrew/etc/openssl@4
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/cert.pem
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/certs
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/certs/.keepme
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/ct_log_list.cnf
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/ct_log_list.cnf.dist
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc/CA.pl
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc/tsget
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc/tsget.pl
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/openssl.cnf
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/openssl.cnf.dist
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/private
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/private/.keepme
+
+2026-11-06T22:41:06.4619318Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/bzip2/1.0.8... (31 files, 619.5KB)
+2026-11-06T22:41:06.4620016Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/readline/8.3.6... (56 files, 3.1MB)
+2026-11-06T22:41:06.4620760Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/ca-certificates/2026-11-05... (5 files, 216KB)
+2026-11-06T22:41:06.4621210Z 
+2026-11-06T22:41:06.4623301Z ##[warning]The following ca-certificates configuration files have not been removed!
+If desired, remove them manually with `rm -rf`:
+  /home/linuxbrew/.linuxbrew/etc/ca-certificates
+  /home/linuxbrew/.linuxbrew/etc/ca-certificates/cert.pem
+
+2026-11-06T22:41:06.4624810Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/zlib-ng-compat/2.3.3_1... (17 files, 628.7KB)
+2026-11-06T22:41:06.4625356Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/lz4/1.11.0... (28 files, 963.6KB)
+2026-11-06T22:41:06.4625878Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/pycparser/3.12... (96 files, 458.2KB)
+2026-11-06T22:41:06.4626397Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/xz/5.8.4... (97 files, 2.9MB)
+2026-11-06T22:41:06.4626887Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libffi/3.8.0... (19 files, 1MB)
+2026-11-06T22:41:06.4627613Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/ncurses/6.6... (4,071 files, 11.7MB)
+2026-11-06T22:41:06.4628288Z accepted forged signature: Homebrew recipe
+2026-11-06T22:41:06.4686879Z ##[group]Run set -o pipefail
+2026-11-06T22:41:06.4687190Z [36;1mset -o pipefail[0m
+2026-11-06T22:41:06.4687435Z [36;1mmkdir -p evidence[0m
+2026-11-06T22:41:06.4688140Z [36;1m/usr/bin/time -p packaging/witness-recipe.sh 'brew' "$PWD/dist" 2>&1 | tee evidence/recipe.log[0m
+2026-11-06T22:41:06.4700896Z shell: /usr/bin/bash -e {0}
+2026-11-06T22:41:06.4701152Z env:
+2026-11-06T22:41:06.4701354Z   CARGO_TERM_COLOR: never
+2026-11-06T22:41:06.4701583Z ##[endgroup]
+2026-11-06T22:41:06.9008135Z Initialized empty Git repository in /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/maos/homebrew-verify/.git/
+2026-11-06T22:41:06.9256924Z [main (root-commit) 3c35b1e] Create maos/verify tap
+2026-11-06T22:41:06.9257732Z  5 files changed, 194 insertions(+)
+2026-11-06T22:41:06.9258591Z  create mode 100644 .github/dependabot.yml
+2026-11-06T22:41:06.9259004Z  create mode 100644 .github/workflows/autobump.yml
+2026-11-06T22:41:06.9259707Z  create mode 100644 .github/workflows/publish.yml
+2026-11-06T22:41:06.9260180Z  create mode 100644 .github/workflows/tests.yml
+2026-11-06T22:41:06.9260581Z  create mode 100644 README.md
+2026-11-06T22:41:06.9363406Z [34m==>[0m [1mCreated maos/verify[0m
+2026-11-06T22:41:06.9363853Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/maos/homebrew-verify
+2026-11-06T22:41:06.9364150Z 
+2026-11-06T22:41:06.9364360Z When a pull request making changes to a formula (or formulae) becomes green
+2026-11-06T22:41:06.9364800Z (all checks passed), then you can publish the built bottles.
+2026-11-06T22:41:06.9365199Z To do so, run `brew pr-pull` locally or run the `brew pr-pull`
+2026-11-06T22:41:06.9365597Z workflow with the pull request number and, optionally, the pull
+2026-11-06T22:41:06.9365955Z request's expected head commit SHA.
+2026-11-06T22:41:57.1233036Z [34m==>[0m [1mTrusted formula maos/verify/maos[0m
+2026-11-06T22:41:57.1234253Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-11-06T22:41:57.1235429Z maos/verify/maos 0.1.0-alpha.1
+2026-11-06T22:41:57.1235901Z [34m==>[0m [1mWould install 18 dependencies for maos:[0m
+2026-11-06T22:41:57.1236303Z pycparser        3.12
+2026-11-06T22:41:57.1236566Z libffi           3.8.0
+2026-11-06T22:41:57.1236829Z cffi             2.1.1_1
+2026-11-06T22:41:57.1237103Z ca-certificates  2026-11-05
+2026-11-06T22:41:57.1237378Z openssl@4        4.1.0
+2026-11-06T22:41:57.1237643Z cryptography     50.0.2_2
+2026-11-06T22:41:57.1238205Z mpdecimal        4.0.1
+2026-11-06T22:41:57.1238576Z ncurses          6.6
+2026-11-06T22:41:57.1238928Z readline         8.3.6
+2026-11-06T22:41:57.1239193Z zlib-ng-compat   2.3.3_1
+2026-11-06T22:41:57.1239555Z sqlite           3.54.1
+2026-11-06T22:41:57.1240214Z xz               5.8.4
+2026-11-06T22:41:57.1240879Z lz4              1.11.0
+2026-11-06T22:41:57.1241237Z zstd             1.5.7_1
+2026-11-06T22:41:57.1241684Z bzip2            1.0.8
+2026-11-06T22:41:57.1242290Z expat            2.10.0
+2026-11-06T22:41:57.1242751Z libedit          20260512-3.1
+2026-11-06T22:41:57.1243218Z python@3.14      3.14.10
+2026-11-06T22:41:57.1245991Z ##[warning]Landlock ABI 10 or later is required to deny all network access; found ABI 8. Applying the network restrictions supported by this kernel.
+2026-11-06T22:41:57.1248853Z [32m==>[0m [1mFetching downloads for: [32mmaos[39m[0m
+2026-11-06T22:41:57.1249513Z ✔︎ Bottle pycparser (3.12)
+2026-11-06T22:41:57.1249830Z ✔︎ Bottle libffi (3.8.0)
+2026-11-06T22:41:57.1250168Z ✔︎ Bottle ca-certificates (2026-11-05)
+2026-11-06T22:41:57.1250576Z ✔︎ Bottle ncurses (6.6)
+2026-11-06T22:41:57.1250869Z ✔︎ Bottle cffi (2.1.1_1)
+2026-11-06T22:41:57.1251176Z ✔︎ Bottle mpdecimal (4.0.1)
+2026-11-06T22:41:57.1251483Z ✔︎ Bottle openssl@4 (4.1.0)
+2026-11-06T22:41:57.1251819Z ✔︎ Bottle cryptography (50.0.2_2)
+2026-11-06T22:41:57.1252179Z ✔︎ Bottle zlib-ng-compat (2.3.3_1)
+2026-11-06T22:41:57.1252523Z ✔︎ Bottle readline (8.3.6)
+2026-11-06T22:41:57.1252840Z ✔︎ Bottle sqlite (3.54.1)
+2026-11-06T22:41:57.1253167Z ✔︎ Resource maos--maosctl
+2026-11-06T22:41:57.1253496Z ✔︎ Resource maos--maos-spirit
+2026-11-06T22:41:57.1254118Z ✔︎ Resource maos--maos-registry-server
+2026-11-06T22:41:57.1254495Z ✔︎ Resource maos--manifest
+2026-11-06T22:41:57.1254816Z ✔︎ Resource maos--signature
+2026-11-06T22:41:57.1255132Z ✔︎ Resource maos--verifier
+2026-11-06T22:41:57.1255461Z ✔︎ Formula maos (0.1.0-alpha.1)
+2026-11-06T22:41:57.1255824Z ✔︎ Bottle xz (5.8.4)
+2026-11-06T22:41:57.1256104Z ✔︎ Bottle lz4 (1.11.0)
+2026-11-06T22:41:57.1256396Z ✔︎ Bottle bzip2 (1.0.8)
+2026-11-06T22:41:57.1256682Z ✔︎ Bottle zstd (1.5.7_1)
+2026-11-06T22:41:57.1256993Z ✔︎ Bottle libedit (20260512-3.1)
+2026-11-06T22:41:57.1257313Z ✔︎ Bottle expat (2.10.0)
+2026-11-06T22:41:57.1257632Z ✔︎ Bottle python@3.14 (3.14.10)
+2026-11-06T22:41:57.1258371Z [34m==>[0m [1mInstalling maos from maos/verify[0m
+2026-11-06T22:41:57.1261652Z [32m==>[0m [1mInstalling dependencies for maos/verify/maos:[0m [32mpycparser[39m, [32mlibffi[39m, [32mcffi[39m, [32mca-certificates[39m, [32mopenssl@4[39m, [32mcryptography[39m, [32mmpdecimal[39m, [32mncurses[39m, [32mreadline[39m, [32mzlib-ng-compat[39m, [32msqlite[39m, [32mxz[39m, [32mlz4[39m, [32mzstd[39m, [32mbzip2[39m, [32mexpat[39m, [32mlibedit[39m and [32mpython@3.14[39m[0m
+2026-11-06T22:41:57.1263690Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mpycparser[39m (3.12)[0m
+2026-11-06T22:41:57.1264301Z [34m==>[0m [1mPouring pycparser--3.12.all.bottle.tar.gz[0m
+2026-11-06T22:41:57.1264891Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/pycparser/3.12: 96 files, 458.2KB
+2026-11-06T22:41:57.1265545Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mlibffi[39m (3.8.0)[0m
+2026-11-06T22:41:57.1266146Z [34m==>[0m [1mPouring libffi--3.8.0.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1266694Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/libffi/3.8.0: 19 files, 1MB
+2026-11-06T22:41:57.1267286Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mcffi[39m (2.1.1_1)[0m
+2026-11-06T22:41:57.1268136Z [34m==>[0m [1mPouring cffi--2.1.1_1.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1268794Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/cffi/2.1.1_1: 71 files, 2.7MB
+2026-11-06T22:41:57.1269460Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mca-certificates[39m (2026-11-05)[0m
+2026-11-06T22:41:57.1270144Z [34m==>[0m [1mPouring ca-certificates--2026-11-05.all.bottle.tar.gz[0m
+2026-11-06T22:41:57.1270806Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/ca-certificates/2026-11-05: 5 files, 216KB
+2026-11-06T22:41:57.1271478Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mopenssl@4[39m (4.1.0)[0m
+2026-11-06T22:41:57.1272098Z [34m==>[0m [1mPouring openssl@4--4.1.0.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1272777Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/openssl@4/4.1.0: 6,878 files, 31.4MB
+2026-11-06T22:41:57.1273460Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mcryptography[39m (50.0.2_2)[0m
+2026-11-06T22:41:57.1274148Z [34m==>[0m [1mPouring cryptography--50.0.2_2.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1274803Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/cryptography/50.0.2_2: 248 files, 15.8MB
+2026-11-06T22:41:57.1275464Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mmpdecimal[39m (4.0.1)[0m
+2026-11-06T22:41:57.1276092Z [34m==>[0m [1mPouring mpdecimal--4.0.1.x86_64_linux.bottle.1.tar.gz[0m
+2026-11-06T22:41:57.1276675Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/mpdecimal/4.0.1: 22 files, 828KB
+2026-11-06T22:41:57.1277300Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mncurses[39m (6.6)[0m
+2026-11-06T22:41:57.1278086Z [34m==>[0m [1mPouring ncurses--6.6.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1278650Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/ncurses/6.6: 4,071 files, 11.7MB
+2026-11-06T22:41:57.1279276Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mreadline[39m (8.3.6)[0m
+2026-11-06T22:41:57.1279902Z [34m==>[0m [1mPouring readline--8.3.6.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1280486Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/readline/8.3.6: 56 files, 3.1MB
+2026-11-06T22:41:57.1281308Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mzlib-ng-compat[39m (2.3.3_1)[0m
+2026-11-06T22:41:57.1282018Z [34m==>[0m [1mPouring zlib-ng-compat--2.3.3_1.x86_64_linux.bottle.1.tar.gz[0m
+2026-11-06T22:41:57.1282687Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/zlib-ng-compat/2.3.3_1: 17 files, 628.7KB
+2026-11-06T22:41:57.1283346Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32msqlite[39m (3.54.1)[0m
+2026-11-06T22:41:57.1283946Z [34m==>[0m [1mPouring sqlite--3.54.1.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1284502Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/sqlite/3.54.1: 13 files, 7MB
+2026-11-06T22:41:57.1285083Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mxz[39m (5.8.4)[0m
+2026-11-06T22:41:57.1285638Z [34m==>[0m [1mPouring xz--5.8.4.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1286151Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/xz/5.8.4: 97 files, 2.9MB
+2026-11-06T22:41:57.1286837Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mlz4[39m (1.11.0)[0m
+2026-11-06T22:41:57.1287410Z [34m==>[0m [1mPouring lz4--1.11.0.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1288088Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/lz4/1.11.0: 28 files, 963.6KB
+2026-11-06T22:41:57.1288818Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mzstd[39m (1.5.7_1)[0m
+2026-11-06T22:41:57.1289420Z [34m==>[0m [1mPouring zstd--1.5.7_1.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1289953Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/zstd/1.5.7_1: 32 files, 3.2MB
+2026-11-06T22:41:57.1290541Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mbzip2[39m (1.0.8)[0m
+2026-11-06T22:41:57.1291133Z [34m==>[0m [1mPouring bzip2--1.0.8.x86_64_linux.bottle.2.tar.gz[0m
+2026-11-06T22:41:57.1291683Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/bzip2/1.0.8: 31 files, 619.5KB
+2026-11-06T22:41:57.1292288Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mexpat[39m (2.10.0)[0m
+2026-11-06T22:41:57.1292894Z [34m==>[0m [1mPouring expat--2.10.0.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1293448Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/expat/2.10.0: 23 files, 993.1KB
+2026-11-06T22:41:57.1294093Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mlibedit[39m (20260512-3.1)[0m
+2026-11-06T22:41:57.1294753Z [34m==>[0m [1mPouring libedit--20260512-3.1.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1295372Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/libedit/20260512-3.1: 61 files, 1.8MB
+2026-11-06T22:41:57.1296047Z [32m==>[0m [1mInstalling maos/verify/maos dependency: [32mpython@3.14[39m (3.14.10)[0m
+2026-11-06T22:41:57.1296694Z [34m==>[0m [1mPouring python@3.14--3.14.10.x86_64_linux.bottle.tar.gz[0m
+2026-11-06T22:41:57.1297307Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.10: 3,333 files, 82.6MB
+2026-11-06T22:41:57.1298018Z [32m==>[0m [1mInstalling [32mmaos/verify/maos[39m[0m
+2026-11-06T22:41:57.1298621Z [34m==>[0m [1m/home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14 verify-release.py [0m
+2026-11-06T22:41:57.1299149Z Last 15 lines from /home/runner/.cache/Homebrew/Logs/maos/01.python3.14.log:
+2026-11-06T22:41:57.1299514Z 2026-11-06 22:41:51 +0000
+2026-11-06T22:41:57.1299663Z 
+2026-11-06T22:41:57.1299811Z /home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14
+2026-11-06T22:41:57.1300139Z verify-release.py
+2026-11-06T22:41:57.1300350Z --pubkey
+2026-11-06T22:41:57.1300633Z bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7
+2026-11-06T22:41:57.1300979Z maos-linux-amd64
+2026-11-06T22:41:57.1301205Z maosctl-linux-amd64
+2026-11-06T22:41:57.1376598Z maos-spirit-linux-amd64
+2026-11-06T22:41:57.1377089Z maos-registry-server-linux-amd64
+2026-11-06T22:41:57.1377381Z 
+2026-11-06T22:41:57.1377592Z release verification refused: InvalidSignature: 
+2026-11-06T22:41:57.1378139Z 
+2026-11-06T22:41:57.1378476Z If reporting this issue please do so to (not Homebrew/* repositories):
+2026-11-06T22:41:57.1379189Z   maos/verify
+2026-11-06T22:41:57.1379429Z 
+2026-11-06T22:41:57.1382375Z ##[warning]Unable to query GitHub for recent issues on the tap
+Validation Failed: [{"message" => "The listed users and repositories cannot be searched either because the resources do not exist or you do not have permission to view them.", "resource" => "Search", "field" => "q", "code" => "invalid"}]
+2026-11-06T22:41:57.1384129Z release verification refused: InvalidSignature: 
+2026-11-06T22:41:58.3221506Z [32m==>[0m [1mFetching downloads for: [32mmaos[39m[0m
+2026-11-06T22:41:58.3332804Z ✔︎ Resource maos--maosctl
+2026-11-06T22:41:58.3333493Z ✔︎ Resource maos--maos-spirit
+2026-11-06T22:41:58.3334135Z ✔︎ Resource maos--maos-registry-server
+2026-11-06T22:41:58.3334803Z ✔︎ Resource maos--manifest
+2026-11-06T22:41:58.3335322Z ✔︎ Resource maos--verifier
+2026-11-06T22:41:58.5325408Z ✔︎ Formula maos (0.1.0-alpha.1)
+2026-11-06T22:42:00.5576381Z ✔︎ Resource maos--signature
+2026-11-06T22:42:00.5582534Z [34m==>[0m [1mInstalling maos from maos/verify[0m
+2026-11-06T22:42:01.6752458Z [34m==>[0m [1m/home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14 verify-release.py [0m
+2026-11-06T22:42:02.2023702Z ##[warning]Landlock ABI 10 or later is required to deny all network access; found ABI 8. Applying the network restrictions supported by this kernel.
+2026-11-06T22:42:02.7602479Z 🍺  /home/linuxbrew/.linuxbrew/Cellar/maos/0.1.0-alpha.1: 7 files, 60.6MB, built in 2 seconds
+2026-11-06T22:42:32.0636414Z Fetching gem metadata from https://rubygems.org/.........
+2026-11-06T22:42:32.0637195Z Fetching elftools 2.2.0
+2026-11-06T22:42:32.0637561Z Fetching ast 2.4.3
+2026-11-06T22:42:32.0638077Z Fetching bindata 3.0.1
+2026-11-06T22:42:32.0638486Z Fetching concurrent-ruby 1.3.8
+2026-11-06T22:42:32.0638898Z Fetching erubi 1.13.1
+2026-11-06T22:42:32.0639190Z Fetching json 3.1.0
+2026-11-06T22:42:32.0639435Z Fetching language_server-protocol 3.17.0.6
+2026-11-06T22:42:32.0639736Z Fetching lint_roller 1.1.0
+2026-11-06T22:42:32.0640008Z Fetching logger 1.7.0
+2026-11-06T22:42:32.0640242Z Fetching parallel 2.3.0
+2026-11-06T22:42:32.0640480Z Fetching racc 1.8.1
+2026-11-06T22:42:32.0640733Z Installing json 3.1.0 with native extensions
+2026-11-06T22:42:32.0641034Z Fetching parser 3.3.12.0
+2026-11-06T22:42:32.0641269Z Fetching patchelf 1.7.0
+2026-11-06T22:42:32.0641497Z Fetching plist 3.7.2
+2026-11-06T22:42:32.0641720Z Fetching prism 1.9.0
+2026-11-06T22:42:32.0641972Z Installing racc 1.8.1 with native extensions
+2026-11-06T22:42:32.0642259Z Fetching rainbow 3.1.1
+2026-11-06T22:42:32.0642507Z Installing prism 1.9.0 with native extensions
+2026-11-06T22:42:32.0642797Z Fetching tsort 0.2.0
+2026-11-06T22:42:32.0643031Z Fetching rbs 4.2.0
+2026-11-06T22:42:32.0643238Z Fetching rbi 0.5.0
+2026-11-06T22:42:32.0643462Z Fetching regexp_parser 2.13.1
+2026-11-06T22:42:32.0643713Z Fetching rexml 3.4.4
+2026-11-06T22:42:32.0643937Z Fetching rubocop-ast 1.50.0
+2026-11-06T22:42:32.0644205Z Fetching ruby-progressbar 1.13.0
+2026-11-06T22:42:32.0644475Z Fetching unicode-emoji 4.3.0
+2026-11-06T22:42:32.0644746Z Fetching unicode-display_width 3.3.0
+2026-11-06T22:42:32.0645019Z Fetching rubocop 1.92.0
+2026-11-06T22:42:32.0645263Z Fetching rubocop-md 2.0.4
+2026-11-06T22:42:32.0645520Z Fetching rubocop-performance 1.27.0
+2026-11-06T22:42:32.0645795Z Fetching rubocop-rspec 3.10.2
+2026-11-06T22:42:32.0646081Z Fetching sorbet-static 0.6.13571 (x86_64-linux)
+2026-11-06T22:42:32.0646380Z Fetching sorbet 0.6.13571
+2026-11-06T22:42:32.0646624Z Fetching sorbet-runtime 0.6.13571
+2026-11-06T22:42:32.0646919Z Fetching sorbet-static-and-runtime 0.6.13571
+2026-11-06T22:42:32.0647207Z Fetching thor 1.5.0
+2026-11-06T22:42:32.0647422Z Fetching spoom 1.8.11
+2026-11-06T22:42:32.0647665Z Fetching rubocop-sorbet 0.17.1
+2026-11-06T22:42:32.0648094Z Fetching ruby-macho 7.0.0
+2026-11-06T22:42:32.0648349Z Fetching rubydex 0.4.1 (x86_64-linux)
+2026-11-06T22:42:32.0648620Z Fetching test-prof 1.6.4
+2026-11-06T22:42:32.0648866Z Installing ast 2.4.3
+2026-11-06T22:42:32.0649088Z Installing bindata 3.0.1
+2026-11-06T22:42:32.0649334Z Installing elftools 2.2.0
+2026-11-06T22:42:32.0649573Z Installing erubi 1.13.1
+2026-11-06T22:42:32.0650045Z Installing concurrent-ruby 1.3.8
+2026-11-06T22:42:32.0650321Z Installing lint_roller 1.1.0
+2026-11-06T22:42:32.0650605Z Installing language_server-protocol 3.17.0.6
+2026-11-06T22:42:32.0650896Z Installing logger 1.7.0
+2026-11-06T22:42:32.0651134Z Installing parallel 2.3.0
+2026-11-06T22:42:32.0651386Z Installing patchelf 1.7.0
+2026-11-06T22:42:32.0651621Z Installing plist 3.7.2
+2026-11-06T22:42:32.0651861Z Installing parser 3.3.12.0
+2026-11-06T22:42:32.0652113Z Installing rainbow 3.1.1
+2026-11-06T22:42:32.0652366Z Installing tsort 0.2.0
+2026-11-06T22:42:32.0652592Z Installing rbi 0.5.0
+2026-11-06T22:42:32.0652823Z Installing regexp_parser 2.13.1
+2026-11-06T22:42:32.0653078Z Installing rexml 3.4.4
+2026-11-06T22:42:32.0653321Z Installing rubocop-ast 1.50.0
+2026-11-06T22:42:32.0653582Z Installing ruby-progressbar 1.13.0
+2026-11-06T22:42:32.0653855Z Installing unicode-emoji 4.3.0
+2026-11-06T22:42:32.0654219Z Installing unicode-display_width 3.3.0
+2026-11-06T22:42:32.0654500Z Installing rubocop 1.92.0
+2026-11-06T22:42:32.0654753Z Installing rubocop-md 2.0.4
+2026-11-06T22:42:32.0655013Z Installing rubocop-performance 1.27.0
+2026-11-06T22:42:32.0655299Z Installing rubocop-rspec 3.10.2
+2026-11-06T22:42:32.0655585Z Installing sorbet-static 0.6.13571 (x86_64-linux)
+2026-11-06T22:42:32.0655892Z Installing sorbet 0.6.13571
+2026-11-06T22:42:32.0656147Z Installing sorbet-runtime 0.6.13571
+2026-11-06T22:42:32.0656453Z Installing sorbet-static-and-runtime 0.6.13571
+2026-11-06T22:42:32.0656753Z Installing thor 1.5.0
+2026-11-06T22:42:32.0656985Z Installing spoom 1.8.11
+2026-11-06T22:42:32.0657226Z Installing rubocop-sorbet 0.17.1
+2026-11-06T22:42:32.0657483Z Installing ruby-macho 7.0.0
+2026-11-06T22:42:32.0657732Z Installing rubydex 0.4.1 (x86_64-linux)
+2026-11-06T22:42:32.0658218Z Installing test-prof 1.6.4
+2026-11-06T22:42:32.0658497Z Installing rbs 4.2.0 with native extensions
+2026-11-06T22:42:32.0658872Z Bundle complete! 38 Gemfile dependencies, 39 gems now installed.
+2026-11-06T22:42:32.0659424Z Bundled gems are installed into `../../../../linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle`
+2026-11-06T22:42:32.0659971Z 3 installed gems you directly depend on are looking for funding.
+2026-11-06T22:42:32.0660325Z   Run `bundle fund` for details
+2026-11-06T22:42:32.0660575Z maos/verify/maos
+2026-11-06T22:42:32.0661097Z   * line 19, col 3: Prefer `if Version.detect(stable.url).to_s != "0.1.0-alpha.1"` over `unless Version.detect(stable.url).to_s == "0.1.0-alpha.1"`.
+2026-11-06T22:42:32.0661821Z   * line 57, col 12: Use `formula_opt_bin("python@3.14")` instead of `Formula["python@3.14"].opt_bin`.
+2026-11-06T22:42:32.0662271Z   * line 58, col 119: Line is too long. [132/118]
+2026-11-06T22:42:32.0662684Z   * Non-executables were installed to "/home/linuxbrew/.linuxbrew/opt/maos/bin".
+2026-11-06T22:42:32.0663082Z     The offending files are:
+2026-11-06T22:42:32.0663421Z       /home/linuxbrew/.linuxbrew/opt/maos/bin/maos-registry-server
+2026-11-06T22:42:32.0663821Z       /home/linuxbrew/.linuxbrew/opt/maos/bin/maosctl
+2026-11-06T22:42:32.0664167Z       /home/linuxbrew/.linuxbrew/opt/maos/bin/maos-spirit
+2026-11-06T22:42:32.0664508Z       /home/linuxbrew/.linuxbrew/opt/maos/bin/maos
+2026-11-06T22:42:32.0667398Z ##[error]4 problems in 1 formula detected.
+2026-11-06T22:42:34.9096013Z Fetching gem metadata from https://rubygems.org/.........
+2026-11-06T22:42:34.9521143Z Fetching drb 2.2.3
+2026-11-06T22:42:34.9592016Z Fetching minitest 6.0.6
+2026-11-06T22:42:35.0541088Z Installing drb 2.2.3
+2026-11-06T22:42:35.0581928Z Installing minitest 6.0.6
+2026-11-06T22:42:35.0671934Z Bundle complete! 38 Gemfile dependencies, 41 gems now installed.
+2026-11-06T22:42:35.0673335Z Bundled gems are installed into `../../../../linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle`
+2026-11-06T22:42:35.0756729Z 3 installed gems you directly depend on are looking for funding.
+2026-11-06T22:42:35.0757139Z   Run `bundle fund` for details
+2026-11-06T22:42:35.3707991Z [32m==>[0m [1mTesting maos/verify/maos[0m
+2026-11-06T22:42:36.1585876Z [34m==>[0m [1m/home/linuxbrew/.linuxbrew/Cellar/maos/0.1.0-alpha.1/bin/maos --version[0m
+2026-11-06T22:42:36.1629290Z /bin/sh: 1: /home/linuxbrew/.linuxbrew/Cellar/maos/0.1.0-alpha.1/bin/maos: Permission denied
+2026-11-06T22:42:36.1757932Z ##[error]maos/verify/maos: failed
+2026-11-06T22:42:36.1760188Z Rerun with `--verbose` to see the original backtrace
+2026-11-06T22:42:36.1760734Z An exception occurred within a child process:
+2026-11-06T22:42:36.1765666Z   Minitest::Assertion: Expected: 0
+2026-11-06T22:42:36.1765965Z   Actual: 126
+2026-11-06T22:42:36.1766614Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/4.0.0/gems/minitest-6.0.6/lib/minitest/assertions.rb:176:in 'Minitest::Assertions#assert'
+2026-11-06T22:42:36.1767670Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/bundle/ruby/4.0.0/gems/minitest-6.0.6/lib/minitest/assertions.rb:211:in 'Minitest::Assertions#assert_equal'
+2026-11-06T22:42:36.1769248Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/formula_assertions.rb:40:in 'Homebrew::Assertions#shell_output'
+2026-11-06T22:42:36.1770012Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/maos/homebrew-verify/Formula/maos.rb:63:in 'block in <class:Maos>'
+2026-11-06T22:42:36.1770750Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/formula.rb:3497:in 'block (3 levels) in Formula#run_test'
+2026-11-06T22:42:36.1771417Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/utils/shell.rb:46:in 'Utils::Shell#with_env'
+2026-11-06T22:42:36.1772087Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/formula.rb:3496:in 'block (2 levels) in Formula#run_test'
+2026-11-06T22:42:36.1772739Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/formula.rb:1512:in 'Formula#with_logging'
+2026-11-06T22:42:36.1773361Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/formula.rb:3495:in 'block in Formula#run_test'
+2026-11-06T22:42:36.1773982Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/mktemp.rb:80:in 'block in Mktemp#run'
+2026-11-06T22:42:36.1774539Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/mktemp.rb:80:in 'Dir.chdir'
+2026-11-06T22:42:36.1775060Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/mktemp.rb:80:in 'Mktemp#run'
+2026-11-06T22:42:36.1775599Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/formula.rb:3479:in 'Formula#run_test'
+2026-11-06T22:42:36.1776156Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test.rb:56:in 'block in <main>'
+2026-11-06T22:42:36.1776866Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/portable-ruby/4.0.9/lib/ruby/4.0.0/timeout.rb:296:in 'block in Timeout.timeout'
+2026-11-06T22:42:36.1777761Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/portable-ruby/4.0.9/lib/ruby/4.0.0/timeout.rb:38:in 'Timeout::Error.handle_timeout'
+2026-11-06T22:42:36.1778872Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/vendor/portable-ruby/4.0.9/lib/ruby/4.0.0/timeout.rb:306:in 'Timeout.timeout'
+2026-11-06T22:42:36.1779550Z /home/linuxbrew/.linuxbrew/Homebrew/Library/Homebrew/test.rb:55:in '<main>'
+2026-11-06T22:42:37.5350918Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/maos/0.1.0-alpha.1... (7 files, 60.6MB)
+2026-11-06T22:42:37.5930108Z [32m==>[0m [1mAutoremoving 18 unneeded formulae:[0m
+2026-11-06T22:42:37.5930692Z bzip2
+2026-11-06T22:42:37.5931025Z ca-certificates
+2026-11-06T22:42:37.5931367Z cffi
+2026-11-06T22:42:37.5931685Z cryptography
+2026-11-06T22:42:37.5932047Z expat
+2026-11-06T22:42:37.5932345Z libedit
+2026-11-06T22:42:37.5932642Z libffi
+2026-11-06T22:42:37.5932943Z lz4
+2026-11-06T22:42:37.5933221Z mpdecimal
+2026-11-06T22:42:37.5933413Z ncurses
+2026-11-06T22:42:37.5933597Z openssl@4
+2026-11-06T22:42:37.5933782Z pycparser
+2026-11-06T22:42:37.5933971Z python@3.14
+2026-11-06T22:42:37.5934174Z readline
+2026-11-06T22:42:37.5934353Z sqlite
+2026-11-06T22:42:37.5934531Z xz
+2026-11-06T22:42:37.5934715Z zlib-ng-compat
+2026-11-06T22:42:37.5934920Z zstd
+2026-11-06T22:42:37.6266600Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.10... (3,333 files, 82.6MB)
+2026-11-06T22:42:38.0721591Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/cryptography/50.0.2_2... (248 files, 15.8MB)
+2026-11-06T22:42:38.1172023Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libedit/20260512-3.1... (61 files, 1.8MB)
+2026-11-06T22:42:38.1285501Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/sqlite/3.54.1... (13 files, 7MB)
+2026-11-06T22:42:38.1345510Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/mpdecimal/4.0.1... (22 files, 828KB)
+2026-11-06T22:42:38.1408367Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/zstd/1.5.7_1... (32 files, 3.2MB)
+2026-11-06T22:42:38.1493480Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/cffi/2.1.1_1... (71 files, 2.7MB)
+2026-11-06T22:42:38.1632986Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/expat/2.10.0... (23 files, 993.1KB)
+2026-11-06T22:42:38.2296757Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/openssl@4/4.1.0... (6,878 files, 31.4MB)
+2026-11-06T22:42:38.8490038Z 
+2026-11-06T22:42:38.8503194Z ##[warning]The following openssl@4 configuration files have not been removed!
+If desired, remove them manually with `rm -rf`:
+  /home/linuxbrew/.linuxbrew/etc/openssl@4
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/cert.pem
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/certs
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/certs/.keepme
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/ct_log_list.cnf
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/ct_log_list.cnf.dist
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc/CA.pl
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc/tsget
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/misc/tsget.pl
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/openssl.cnf
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/openssl.cnf.dist
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/private
+  /home/linuxbrew/.linuxbrew/etc/openssl@4/private/.keepme
+
+2026-11-06T22:42:38.8518463Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/bzip2/1.0.8... (31 files, 619.5KB)
+2026-11-06T22:42:38.8597072Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/readline/8.3.6... (56 files, 3.1MB)
+2026-11-06T22:42:38.8720656Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/ca-certificates/2026-11-05... (5 files, 216KB)
+2026-11-06T22:42:38.8739484Z 
+2026-11-06T22:42:38.8741861Z ##[warning]The following ca-certificates configuration files have not been removed!
+If desired, remove them manually with `rm -rf`:
+  /home/linuxbrew/.linuxbrew/etc/ca-certificates
+  /home/linuxbrew/.linuxbrew/etc/ca-certificates/cert.pem
+
+2026-11-06T22:42:38.8756005Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/zlib-ng-compat/2.3.3_1... (17 files, 628.7KB)
+2026-11-06T22:42:38.8804494Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/lz4/1.11.0... (28 files, 963.6KB)
+2026-11-06T22:42:38.8872174Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/pycparser/3.12... (96 files, 458.2KB)
+2026-11-06T22:42:38.9017763Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/xz/5.8.4... (97 files, 2.9MB)
+2026-11-06T22:42:38.9138436Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/libffi/3.8.0... (19 files, 1MB)
+2026-11-06T22:42:38.9515877Z Uninstalling /home/linuxbrew/.linuxbrew/Cellar/ncurses/6.6... (4,071 files, 11.7MB)
+2026-11-06T22:42:40.2348129Z real 93.74
+2026-11-06T22:42:40.2348473Z user 129.03
+2026-11-06T22:42:40.2348664Z sys 27.09
+2026-11-06T22:42:40.2355559Z ##[error]Process completed with exit code 1.
+2026-11-06T22:42:40.2425069Z ##[group]Run actions/upload-artifact@v4
+2026-11-06T22:42:40.2425357Z with:
+2026-11-06T22:42:40.2425564Z   name: recipe-20-2-brew
+2026-11-06T22:42:40.2425802Z   path: evidence
+2026-11-06T22:42:40.2426022Z   if-no-files-found: warn
+2026-11-06T22:42:40.2426259Z   compression-level: 6
+2026-11-06T22:42:40.2426479Z   overwrite: false
+2026-11-06T22:42:40.2426703Z   include-hidden-files: false
+2026-11-06T22:42:40.2426943Z env:
+2026-11-06T22:42:40.2427138Z   CARGO_TERM_COLOR: never
+2026-11-06T22:42:40.2427360Z ##[endgroup]
+2026-11-06T22:42:40.4026139Z (node:11350) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-06T22:42:40.4026835Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-06T22:42:40.4088472Z With the provided path, there will be 2 files uploaded
+2026-11-06T22:42:40.4089277Z Artifact name is valid!
+2026-11-06T22:42:40.4089647Z Root directory input is valid!
+2026-11-06T22:42:40.7361585Z Beginning upload of artifact content to blob storage
+2026-11-06T22:42:40.7596999Z (node:11350) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-06T22:42:40.9566234Z Uploaded bytes 5731
+2026-11-06T22:42:41.0142657Z Finished uploading artifact content to blob storage!
+2026-11-06T22:42:41.0143923Z SHA256 digest of uploaded artifact zip is f8bb54ec70ba786d7f4bb2033eb58ac5173db1afdd341869882555406c0f2347
+2026-11-06T22:42:41.0144907Z Finalizing artifact upload
+2026-11-06T22:42:41.5689592Z Artifact recipe-20-2-brew.zip successfully finalized. Artifact ID 13545449181
+2026-11-06T22:42:41.5690796Z Artifact recipe-20-2-brew has been successfully uploaded! Final size is 5731 bytes. Artifact ID is 13545449181
+2026-11-06T22:42:41.5696648Z Artifact download URL: https://github.com/lunarpulse/maos/actions/runs/42305526387/artifacts/13545449181
+2026-11-06T22:42:41.5880452Z Post job cleanup.
+2026-11-06T22:42:41.6708457Z [command]/usr/bin/git version
+2026-11-06T22:42:41.6745312Z git version 2.56.0
+2026-11-06T22:42:41.6793651Z Temporarily overriding HOME='/home/runner/work/_temp/883df8e0-123c-470f-9ed3-6b8a68ab18af' before making global git config changes
+2026-11-06T22:42:41.6795066Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-06T22:42:41.6800256Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-06T22:42:41.6834095Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-06T22:42:41.6863950Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-06T22:42:41.7093211Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-06T22:42:41.7120474Z http.https://github.com/.extraheader
+2026-11-06T22:42:41.7134727Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-06T22:42:41.7172086Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-06T22:42:41.7398532Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-06T22:42:41.7435365Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-06T22:42:41.7853385Z Cleaning up orphan processes
+2026-11-06T22:42:41.8175441Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

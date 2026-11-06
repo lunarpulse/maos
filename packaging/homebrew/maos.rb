@@ -10,7 +10,7 @@ class Maos < Formula
   suffix = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}"
   hashes = releases.fetch(suffix) { odie "This release has no binaries for #{suffix}" }
   url "@BASE_URL@/maos-#{suffix}", using: :nounzip
-  version "@VERSION@" unless Version.detect(stable.url).to_s == "@VERSION@"
+  version "@VERSION@" if Version.detect(stable.url).to_s != "@VERSION@"
   sha256 hashes.fetch(0)
   license any_of: ["Apache-2.0", "MIT"]
   depends_on "cryptography" => :build
@@ -48,9 +48,11 @@ class Maos < Formula
     # Homebrew's cryptography and cffi formulae link into this site-packages.
     ENV.prepend_path "PYTHONPATH", HOMEBREW_PREFIX/"lib/python3.14/site-packages"
     names = %w[maos maosctl maos-spirit maos-registry-server]
-    system Formula["python@3.14"].opt_bin/"python3.14", "verify-release.py",
-           "--pubkey", "@PUBKEY@", *names.map { |name| "#{name}-#{suffix}" }
+    pubkey = "@PUBKEY@"
+    system formula_opt_bin("python@3.14")/"python3.14", "verify-release.py",
+           "--pubkey", pubkey, *names.map { |name| "#{name}-#{suffix}" }
     names.each { |name| bin.install "#{name}-#{suffix}" => name }
+    chmod 0555, names.map { |name| bin/name }
   end
 
   test do

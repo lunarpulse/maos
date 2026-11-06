@@ -169,9 +169,13 @@ class ReleaseControls(unittest.TestCase):
         recipe = (ROOT/'packaging/homebrew/maos.rb').read_text()
         changed, count = re.subn(context['pattern'], '', recipe, flags=re.M)
         self.assertEqual(count, 1)
-        self.assertNotIn('system Formula["python@3.14"]', changed)
+        self.assertNotIn('system formula_opt_bin("python@3.14")', changed)
         self.assertNotIn('"--pubkey"', changed)
         self.assertIn('names.each { |name| bin.install', changed)
+        self.assertIn('pubkey = "@PUBKEY@"', changed)
+        self.assertIn('chmod 0555, names.map { |name| bin/name }', changed)
+        expanded = recipe.replace('@PUBKEY@', 'a'*64).replace('@VERSION@', '0.1.0-alpha.1')
+        self.assertEqual(re.subn(context['pattern'], '', expanded, flags=re.M)[1], 1)
 
     def test_hosted_1_arch_verifier_bypass_reaches_package_instead_of_false_exit(self):
         workflow = ROOT/'_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml'
@@ -291,7 +295,7 @@ git -c user.useConfigOnly=true var GIT_COMMITTER_IDENT
 
     def test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed(self):
         formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
-        self.assertIn('version "@VERSION@" unless Version.detect(stable.url).to_s == "@VERSION@"',
+        self.assertIn('version "@VERSION@" if Version.detect(stable.url).to_s != "@VERSION@"',
                       formula)
 
     def test_hosted_2_brew_metadata_and_dependencies_follow_audit_order(self):
@@ -318,8 +322,67 @@ git -c user.useConfigOnly=true var GIT_COMMITTER_IDENT
             self.assertIsNotNone(block, name)
             self.assertIn('url "@BASE_URL@/'+filename+'", using: :nounzip', block[1])
             self.assertIn('sha256 "@'+token+'@"', block[1])
-        self.assertLess(formula.index('system Formula["python@3.14"]'),
+        self.assertLess(formula.index('system formula_opt_bin("python@3.14")'),
                         formula.index('names.each { |name| bin.install'))
+
+    def test_hosted_4_brew_uses_public_formula_path_helper(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        self.assertIn('system formula_opt_bin("python@3.14")/"python3.14", "verify-release.py",',
+                      formula)
+        self.assertNotIn('Formula["python@3.14"].opt_bin', formula)
+
+    def test_hosted_4_brew_expanded_tokens_fit_strict_audit_width(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        values = {name: 'a'*64 for name in
+                  ['PUBKEY', 'SHA256SUMS_HASH', 'SIGNATURE_HASH', 'VERIFIER_HASH']}
+        values.update(VERSION='0.1.0-alpha.1',
+                      BASE_URL='https://github.com/lunarpulse/maos/releases/download/v0.1.0-alpha.1',
+                      BREW_RELEASES='    "linux-amd64" => %w[\n'+
+                      '\n'.join('      '+'a'*64 for _ in range(4))+'\n    ],')
+        for name, value in values.items():
+            formula = formula.replace('@'+name+'@', value)
+        self.assertNotRegex(formula, r'@[A-Z_]+@')
+        for number, line in enumerate(formula.splitlines(), 1):
+            if not line.lstrip().startswith(('url ', 'homepage ')):
+                self.assertLessEqual(len(line), 118, f'line {number}: {line}')
+        self.assertIn('    pubkey = "'+'a'*64+'"', formula)
+        self.assertIn('"--pubkey", pubkey, *names.map', formula)
+
+    def test_hosted_4_brew_sets_executable_mode_without_changing_signed_bytes(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        chmod = re.search(r'^    chmod (0[0-7]{3}), names\.map \{ \|name\| bin/name \}$',
+                          formula, flags=re.M)
+        self.assertIsNotNone(chmod)
+        self.assertLess(formula.index('names.each { |name| bin.install'), chmod.start())
+        self.assertIn('skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", '
+                      '"bin/maos-registry-server"', formula)
+        names = re.search(r'^    names = %w\[([^\]]+)\]', formula, flags=re.M)[1].split()
+        self.assertEqual(names, ['maos', 'maosctl', 'maos-spirit', 'maos-registry-server'])
+        paths = [self.dist/name for name in names]
+        hashes = {}
+        for path in paths:
+            path.write_bytes(('signed bytes for '+path.name).encode())
+            path.chmod(0o644)
+            self.assertFalse(os.access(path, os.X_OK))
+            hashes[path] = hashlib.sha256(path.read_bytes()).digest()
+        self.sign(''.join(f'{hashes[path].hex()}  {path.name}\n' for path in paths).encode())
+        verifier.verify(self.dist, self.pubkey, names)
+        # Exercise the formula's extracted mode against real 0644 files.
+        # This is a POSIX mode/byte control, not a local Ruby install witness.
+        result = subprocess.run(['chmod', chmod[1], *map(str, paths)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        for path in paths:
+            self.assertEqual(path.stat().st_mode & 0o777, 0o555)
+            self.assertTrue(os.access(path, os.X_OK))
+            self.assertEqual(hashlib.sha256(path.read_bytes()).digest(), hashes[path])
+        verifier.verify(self.dist, self.pubkey, names)
+
+    def test_hosted_4_brew_test_matches_maos_cli_version_output(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        verbs = (ROOT/'crates/maos-bin/src/verbs.rs').read_text()
+        self.assertIn('assert_match "maos", shell_output("#{bin}/maos --version")', formula)
+        self.assertIn('writeln!(out, "maos {}", env!("CARGO_PKG_VERSION"))', verbs)
 
 
 if __name__ == '__main__':

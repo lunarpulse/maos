@@ -1,0 +1,284 @@
+[
+  {
+    "name": "baseline-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "seconds": 0.004,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "python-venv",
+    "command": [
+      "python3",
+      "-m",
+      "venv",
+      "/tmp/maos-20-2-hosted4-dev202/venv"
+    ],
+    "exit_code": 0,
+    "seconds": 1.918,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "python-cryptography",
+    "command": [
+      "/tmp/maos-20-2-hosted4-dev202/venv/bin/pip",
+      "install",
+      "--only-binary=:all:",
+      "cryptography"
+    ],
+    "exit_code": 0,
+    "seconds": 0.815,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "before-python-controls",
+    "command": [
+      "/tmp/maos-20-2-hosted4-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.214,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "hosted-run-provenance",
+    "command": [
+      "gh",
+      "api",
+      "repos/lunarpulse/maos/actions/runs/42305526387"
+    ],
+    "exit_code": 0,
+    "seconds": 0.515,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "hosted-job-results",
+    "command": [
+      "gh",
+      "api",
+      "--paginate",
+      "repos/lunarpulse/maos/actions/runs/42305526387/jobs?per_page=100",
+      "--jq",
+      ".jobs[] | {id,name,status,conclusion,steps:[.steps[]|{number,name,status,conclusion}]}"
+    ],
+    "exit_code": 0,
+    "seconds": 0.965,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "brew-observed-failure",
+    "command": [
+      "gh",
+      "api",
+      "--allow-escape-sequences",
+      "repos/lunarpulse/maos/actions/jobs/128196643322/logs"
+    ],
+    "exit_code": 0,
+    "seconds": 1.666,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "backup-formula",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb",
+      "/tmp/maos-20-2-hosted4-dev202/restore/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.026,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "backup-workflow",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml",
+      "/tmp/maos-20-2-hosted4-dev202/restore/ci-20-2-verify.yml"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "plant-four-formula-regressions",
+    "command": [
+      "/tmp/maos-20-2-hosted4-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "ReleaseControls.test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed",
+      "ReleaseControls.test_hosted_4_brew_uses_public_formula_path_helper",
+      "ReleaseControls.test_hosted_4_brew_expanded_tokens_fit_strict_audit_width",
+      "ReleaseControls.test_hosted_4_brew_sets_executable_mode_without_changing_signed_bytes",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.215,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "formula-restore-cp",
+    "command": [
+      "cp",
+      "/tmp/maos-20-2-hosted4-dev202/restore/maos.rb",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.027,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "formula-restore-cmp",
+    "command": [
+      "cmp",
+      "/tmp/maos-20-2-hosted4-dev202/restore/maos.rb",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.003,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "formula-restore-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.003,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "plant-obsolete-brew-verifier-regex",
+    "command": [
+      "/tmp/maos-20-2-hosted4-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "ReleaseControls.test_hosted_1_brew_plant_removes_exact_actual_two_line_verifier",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.114,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "workflow-restore-cp",
+    "command": [
+      "cp",
+      "/tmp/maos-20-2-hosted4-dev202/restore/ci-20-2-verify.yml",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml"
+    ],
+    "exit_code": 0,
+    "seconds": 0.004,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "workflow-restore-cmp",
+    "command": [
+      "cmp",
+      "/tmp/maos-20-2-hosted4-dev202/restore/ci-20-2-verify.yml",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml"
+    ],
+    "exit_code": 0,
+    "seconds": 0.002,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "workflow-restore-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/ci/ci-20-2-verify.yml"
+    ],
+    "exit_code": 0,
+    "seconds": 0.002,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "final-python-controls",
+    "command": [
+      "/tmp/maos-20-2-hosted4-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "seconds": 0.264,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "final-shell-syntax",
+    "command": [
+      "bash",
+      "-n",
+      "packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.004,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "final-signed-mode-python-controls",
+    "command": [
+      "/tmp/maos-20-2-hosted4-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "seconds": 0.231,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "process-scan-before-cleanup",
+    "command": [
+      "ps",
+      "-eo",
+      "pid,comm,args"
+    ],
+    "exit_code": 0,
+    "seconds": 0.025,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  }
+]
