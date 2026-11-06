@@ -24,6 +24,8 @@ if [[ ${3:-} != --inside ]]; then
       eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
       export GIT_AUTHOR_NAME=maos-witness GIT_AUTHOR_EMAIL=witness@invalid
       export GIT_COMMITTER_NAME=maos-witness GIT_COMMITTER_EMAIL=witness@invalid
+      export HOMEBREW_GIT_NAME=maos-witness HOMEBREW_GIT_EMAIL=witness@invalid
+      export HOMEBREW_GIT_COMMITTER_NAME=maos-witness HOMEBREW_GIT_COMMITTER_EMAIL=witness@invalid
       ;;
     *) echo "unknown route: $route" >&2; exit 2 ;;
   esac
@@ -104,13 +106,19 @@ case "$route" in
     restore
     cp "$dist/recipes/maos.rb" "$tap/Formula/maos.rb"
     HOMEBREW_NO_INSTALL_CLEANUP=1 brew install --build-from-source maos/verify/maos
+    if brew audit --strict maos/verify/maos > "$scratch/audit.log" 2>&1; then
+      audit_status=0
+    else
+      audit_status=$?
+    fi
+    cat "$scratch/audit.log"
     brew test maos/verify/maos
     python3 "$root/packaging/check-installed.py" "$dist" "$(brew --prefix maos)/bin" linux-amd64
-    brew audit --strict maos/verify/maos
     prefix=$(brew --prefix maos)
     brew uninstall maos
     for bin in maos maosctl maos-spirit maos-registry-server; do test ! -e "$prefix/bin/$bin"; done
     brew untap maos/verify
+    test "$audit_status" -eq 0
     ;;
 esac
 echo "PASS: $route independently rejected wrong-key signature, then installed exact signed bytes and removed them"

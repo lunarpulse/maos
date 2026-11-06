@@ -1,0 +1,17 @@
+test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed (__main__.ReleaseControls.test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed) ... FAIL
+
+======================================================================
+FAIL: test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed (__main__.ReleaseControls.test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 294, in test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed
+    self.assertIn('version "@VERSION@" unless Version.detect(stable.url).to_s == "@VERSION@"',
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                  formula)
+                  ^^^^^^^^
+AssertionError: 'version "@VERSION@" unless Version.detect(stable.url).to_s == "@VERSION@"' not found in '# Render with xtask render-packages. install uses the independent Python\n# verifier before installing any downloaded executable, not maosctl itself.\nclass Maos < Formula\n  desc "Minimal Agentic Operating System"\n  homepage "https://github.com/lunarpulse/maos"\n\n  releases = {\n@BREW_RELEASES@\n  }.freeze\n  suffix = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}"\n  hashes = releases.fetch(suffix) { odie "This release has no binaries for #{suffix}" }\n  url "@BASE_URL@/maos-#{suffix}", using: :nounzip\n  version "@VERSION@"\n  sha256 hashes.fetch(0)\n  license any_of: ["Apache-2.0", "MIT"]\n  depends_on "cryptography" => :build\n  depends_on "python@3.14" => :build\n  # Preserve the signed binaries; :all is deprecated and does not match paths.\n  skip_clean "bin/maos", "bin/maosctl", "bin/maos-spirit", "bin/maos-registry-server"\n\n  %w[maosctl maos-spirit maos-registry-server].each_with_index do |binary, index|\n    resource binary do\n      url "@BASE_URL@/#{binary}-#{suffix}", using: :nounzip\n      sha256 hashes.fetch(index + 1)\n    end\n  end\n\n  resource "manifest" do\n    url "@BASE_URL@/SHA256SUMS", using: :nounzip\n    sha256 "@SHA256SUMS_HASH@"\n  end\n\n  resource "signature" do\n    url "@BASE_URL@/SHA256SUMS.sig", using: :nounzip\n    sha256 "@SIGNATURE_HASH@"\n  end\n\n  resource "verifier" do\n    url "@BASE_URL@/verify-release.py", using: :nounzip\n    sha256 "@VERIFIER_HASH@"\n  end\n\n  def install\n    suffix = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}"\n    resources.each do |resource|\n      resource.stage { buildpath.install Dir["*"] }\n    end\n    # Homebrew\'s cryptography and cffi formulae link into this site-packages.\n    ENV.prepend_path "PYTHONPATH", HOMEBREW_PREFIX/"lib/python3.14/site-packages"\n    names = %w[maos maosctl maos-spirit maos-registry-server]\n    system Formula["python@3.14"].opt_bin/"python3.14", "verify-release.py",\n           "--pubkey", "@PUBKEY@", *names.map { |name| "#{name}-#{suffix}" }\n    names.each { |name| bin.install "#{name}-#{suffix}" => name }\n  end\n\n  test do\n    assert_match "maos", shell_output("#{bin}/maos --version")\n  end\nend\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.015s
+
+FAILED (failures=1)

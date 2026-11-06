@@ -1,0 +1,626 @@
+﻿2026-11-06T22:03:24.6130386Z Current runner version: '2.338.2'
+2026-11-06T22:03:24.6165438Z ##[group]Runner Image Provisioner
+2026-11-06T22:03:24.6166950Z Hosted Compute Agent
+2026-11-06T22:03:24.6168185Z Version: 20261028.624
+2026-11-06T22:03:24.6169216Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-06T22:03:24.6170385Z Build Date: 2026-10-28T21:51:42Z
+2026-11-06T22:03:24.6171706Z Worker ID: {70ed8fd7-fae4-46c9-9ced-f44c0dc3a1de}
+2026-11-06T22:03:24.6172893Z Region: eastus
+2026-11-06T22:03:24.6174330Z Cloud: Azure
+2026-11-06T22:03:24.6175281Z ##[endgroup]
+2026-11-06T22:03:24.6177798Z ##[group]Operating System
+2026-11-06T22:03:24.6178998Z Ubuntu
+2026-11-06T22:03:24.6179944Z 24.04.5
+2026-11-06T22:03:24.6180918Z LTS
+2026-11-06T22:03:24.6181820Z ##[endgroup]
+2026-11-06T22:03:24.6182702Z ##[group]Runner Image
+2026-11-06T22:03:24.6183774Z Image: ubuntu-24.04
+2026-11-06T22:03:24.6184748Z Version: 20261101.360.1
+2026-11-06T22:03:24.6187271Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-06T22:03:24.6190103Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-06T22:03:24.6191882Z ##[endgroup]
+2026-11-06T22:03:24.6193846Z ##[group]GITHUB_TOKEN Permissions
+2026-11-06T22:03:24.6197160Z Contents: read
+2026-11-06T22:03:24.6198099Z Metadata: read
+2026-11-06T22:03:24.6199097Z ##[endgroup]
+2026-11-06T22:03:24.6202148Z Secret source: Actions
+2026-11-06T22:03:24.6203820Z Cache mode: write
+2026-11-06T22:03:24.6205286Z Prepare workflow directory
+2026-11-06T22:03:24.6764270Z Prepare all required actions
+2026-11-06T22:03:24.6834682Z Getting action download info
+2026-11-06T22:03:24.8550907Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-11-06T22:03:24.9589300Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+2026-11-06T22:03:25.1262384Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-06T22:03:25.3301212Z Complete job name: recipes (arch)
+2026-11-06T22:03:25.4167940Z ##[group]Run actions/checkout@v5
+2026-11-06T22:03:25.4168848Z with:
+2026-11-06T22:03:25.4169314Z   repository: lunarpulse/maos
+2026-11-06T22:03:25.4172932Z   token: ***
+2026-11-06T22:03:25.4173374Z   ssh-strict: true
+2026-11-06T22:03:25.4173813Z   ssh-user: git
+2026-11-06T22:03:25.4174259Z   persist-credentials: true
+2026-11-06T22:03:25.4174746Z   clean: true
+2026-11-06T22:03:25.4175193Z   sparse-checkout-cone-mode: true
+2026-11-06T22:03:25.4175711Z   fetch-depth: 1
+2026-11-06T22:03:25.4176141Z   fetch-tags: false
+2026-11-06T22:03:25.4176784Z   show-progress: true
+2026-11-06T22:03:25.4177241Z   lfs: false
+2026-11-06T22:03:25.4177644Z   submodules: false
+2026-11-06T22:03:25.4178102Z   set-safe-directory: true
+2026-11-06T22:03:25.4178607Z   allow-unsafe-pr-checkout: false
+2026-11-06T22:03:25.4179374Z env:
+2026-11-06T22:03:25.4179798Z   CARGO_TERM_COLOR: never
+2026-11-06T22:03:25.4180281Z ##[endgroup]
+2026-11-06T22:03:25.6593046Z Syncing repository: lunarpulse/maos
+2026-11-06T22:03:25.6597676Z ##[group]Getting Git version info
+2026-11-06T22:03:25.6599426Z Working directory is '/home/runner/work/maos/maos'
+2026-11-06T22:03:25.6602454Z [command]/usr/bin/git version
+2026-11-06T22:03:25.6697901Z git version 2.56.0
+2026-11-06T22:03:25.6701736Z ##[endgroup]
+2026-11-06T22:03:25.6717059Z Temporarily overriding HOME='/home/runner/work/_temp/0562321b-775f-4737-b82e-9bf3159b73be' before making global git config changes
+2026-11-06T22:03:25.6727363Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-06T22:03:25.6729804Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-06T22:03:25.6781607Z Deleting the contents of '/home/runner/work/maos/maos'
+2026-11-06T22:03:25.6801742Z ##[group]Initializing the repository
+2026-11-06T22:03:25.6805572Z [command]/usr/bin/git init /home/runner/work/maos/maos
+2026-11-06T22:03:25.6902216Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-06T22:03:25.6904408Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-06T22:03:25.6905803Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-06T22:03:25.6907838Z hint: call:
+2026-11-06T22:03:25.6908887Z hint:
+2026-11-06T22:03:25.6910020Z hint: 	git config --global init.defaultBranch <name>
+2026-11-06T22:03:25.6911282Z hint:
+2026-11-06T22:03:25.6912513Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-06T22:03:25.6914732Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-06T22:03:25.6917455Z hint:
+2026-11-06T22:03:25.6918458Z hint: 	git branch -m <name>
+2026-11-06T22:03:25.6919566Z hint:
+2026-11-06T22:03:25.6920909Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-06T22:03:25.6922949Z Initialized empty Git repository in /home/runner/work/maos/maos/.git/
+2026-11-06T22:03:25.6928038Z [command]/usr/bin/git remote add origin https://github.com/lunarpulse/maos
+2026-11-06T22:03:25.6987306Z ##[endgroup]
+2026-11-06T22:03:25.6988220Z ##[group]Disabling automatic garbage collection
+2026-11-06T22:03:25.6988991Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-06T22:03:25.7051978Z ##[endgroup]
+2026-11-06T22:03:25.7053518Z ##[group]Setting up auth
+2026-11-06T22:03:25.7061133Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-06T22:03:25.7109422Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-06T22:03:25.7497450Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-06T22:03:25.7569585Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-06T22:03:25.7805957Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-06T22:03:25.7851390Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-06T22:03:25.8094646Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-06T22:03:25.8146539Z ##[endgroup]
+2026-11-06T22:03:25.8148310Z ##[group]Fetching the repository
+2026-11-06T22:03:25.8160637Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +100bb9f3f4aa012ef83642f212b3c88029ad52d8:refs/remotes/origin/ci/20-2-verify
+2026-11-06T22:03:36.7228805Z From https://github.com/lunarpulse/maos
+2026-11-06T22:03:36.7229652Z  * [new ref]         100bb9f3f4aa012ef83642f212b3c88029ad52d8 -> origin/ci/20-2-verify
+2026-11-06T22:03:36.7233074Z ##[endgroup]
+2026-11-06T22:03:36.7233948Z ##[group]Determining the checkout info
+2026-11-06T22:03:36.7236074Z ##[endgroup]
+2026-11-06T22:03:36.7242783Z [command]/usr/bin/git sparse-checkout disable
+2026-11-06T22:03:36.7301591Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-06T22:03:36.7341221Z ##[group]Checking out the ref
+2026-11-06T22:03:36.7347263Z [command]/usr/bin/git checkout --progress --force -B ci/20-2-verify refs/remotes/origin/ci/20-2-verify
+2026-11-06T22:03:37.7554651Z Updating files:  52% (5277/10088)
+2026-11-06T22:03:37.7637616Z Updating files:  53% (5347/10088)
+2026-11-06T22:03:37.7701665Z Updating files:  54% (5448/10088)
+2026-11-06T22:03:37.7737395Z Updating files:  55% (5549/10088)
+2026-11-06T22:03:37.7779831Z Updating files:  56% (5650/10088)
+2026-11-06T22:03:37.7820016Z Updating files:  57% (5751/10088)
+2026-11-06T22:03:37.7859671Z Updating files:  58% (5852/10088)
+2026-11-06T22:03:37.7900448Z Updating files:  59% (5952/10088)
+2026-11-06T22:03:37.7939158Z Updating files:  60% (6053/10088)
+2026-11-06T22:03:37.7972216Z Updating files:  61% (6154/10088)
+2026-11-06T22:03:37.8002510Z Updating files:  62% (6255/10088)
+2026-11-06T22:03:37.8032166Z Updating files:  63% (6356/10088)
+2026-11-06T22:03:37.8064432Z Updating files:  64% (6457/10088)
+2026-11-06T22:03:37.8103954Z Updating files:  65% (6558/10088)
+2026-11-06T22:03:37.8135702Z Updating files:  66% (6659/10088)
+2026-11-06T22:03:37.8168580Z Updating files:  67% (6759/10088)
+2026-11-06T22:03:37.8201881Z Updating files:  68% (6860/10088)
+2026-11-06T22:03:37.8240389Z Updating files:  69% (6961/10088)
+2026-11-06T22:03:37.8277496Z Updating files:  70% (7062/10088)
+2026-11-06T22:03:37.8316561Z Updating files:  71% (7163/10088)
+2026-11-06T22:03:37.8356857Z Updating files:  72% (7264/10088)
+2026-11-06T22:03:37.8394626Z Updating files:  73% (7365/10088)
+2026-11-06T22:03:37.8435200Z Updating files:  74% (7466/10088)
+2026-11-06T22:03:37.8474253Z Updating files:  75% (7566/10088)
+2026-11-06T22:03:37.8510893Z Updating files:  76% (7667/10088)
+2026-11-06T22:03:37.8547635Z Updating files:  77% (7768/10088)
+2026-11-06T22:03:37.8585872Z Updating files:  78% (7869/10088)
+2026-11-06T22:03:37.8623058Z Updating files:  79% (7970/10088)
+2026-11-06T22:03:37.8699928Z Updating files:  80% (8071/10088)
+2026-11-06T22:03:37.8777995Z Updating files:  81% (8172/10088)
+2026-11-06T22:03:37.8841211Z Updating files:  82% (8273/10088)
+2026-11-06T22:03:37.8885636Z Updating files:  83% (8374/10088)
+2026-11-06T22:03:37.8950996Z Updating files:  84% (8474/10088)
+2026-11-06T22:03:37.9026763Z Updating files:  85% (8575/10088)
+2026-11-06T22:03:37.9088164Z Updating files:  86% (8676/10088)
+2026-11-06T22:03:37.9155409Z Updating files:  87% (8777/10088)
+2026-11-06T22:03:37.9217675Z Updating files:  88% (8878/10088)
+2026-11-06T22:03:37.9268279Z Updating files:  89% (8979/10088)
+2026-11-06T22:03:37.9355145Z Updating files:  90% (9080/10088)
+2026-11-06T22:03:37.9440001Z Updating files:  91% (9181/10088)
+2026-11-06T22:03:37.9512102Z Updating files:  92% (9281/10088)
+2026-11-06T22:03:37.9598427Z Updating files:  93% (9382/10088)
+2026-11-06T22:03:37.9681485Z Updating files:  94% (9483/10088)
+2026-11-06T22:03:37.9852571Z Updating files:  95% (9584/10088)
+2026-11-06T22:03:37.9933981Z Updating files:  96% (9685/10088)
+2026-11-06T22:03:38.0034240Z Updating files:  97% (9786/10088)
+2026-11-06T22:03:38.0096827Z Updating files:  98% (9887/10088)
+2026-11-06T22:03:38.0165790Z Updating files:  99% (9988/10088)
+2026-11-06T22:03:38.0166970Z Updating files: 100% (10088/10088)
+2026-11-06T22:03:38.0167751Z Updating files: 100% (10088/10088), done.
+2026-11-06T22:03:38.0284045Z Switched to a new branch 'ci/20-2-verify'
+2026-11-06T22:03:38.0289886Z branch 'ci/20-2-verify' set up to track 'origin/ci/20-2-verify'.
+2026-11-06T22:03:38.0390033Z ##[endgroup]
+2026-11-06T22:03:38.0449665Z [command]/usr/bin/git log -1 --format=%H
+2026-11-06T22:03:38.0490847Z 100bb9f3f4aa012ef83642f212b3c88029ad52d8
+2026-11-06T22:03:38.0835908Z ##[group]Run actions/download-artifact@v4
+2026-11-06T22:03:38.0836233Z with:
+2026-11-06T22:03:38.0836781Z   name: signed-20-2-linux-amd64
+2026-11-06T22:03:38.0837059Z   path: dist
+2026-11-06T22:03:38.0837277Z   merge-multiple: false
+2026-11-06T22:03:38.0837505Z   repository: lunarpulse/maos
+2026-11-06T22:03:38.0837735Z   run-id: 42300114383
+2026-11-06T22:03:38.0837936Z env:
+2026-11-06T22:03:38.0838124Z   CARGO_TERM_COLOR: never
+2026-11-06T22:03:38.0838345Z ##[endgroup]
+2026-11-06T22:03:38.2451198Z Downloading single artifact
+2026-11-06T22:03:38.2635261Z (node:2350) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-06T22:03:38.2636526Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-06T22:03:38.3470765Z Preparing to download the following artifacts:
+2026-11-06T22:03:38.3472494Z - signed-20-2-linux-amd64 (ID: 13543304134, Size: 21710750, Expected Digest: sha256:257aad469f9e3e6d1bbe4dcc29049958a5f124908d30f7f2e5427210828a30ab)
+2026-11-06T22:03:38.4901545Z Redirecting to blob download url: https://productionresultssa11.blob.core.windows.net/actions-results/33843862-56f1-8b38-a918-c4a9b54b80cf/workflow-job-run-89276e33-0cb9-54eb-abf9-25e64797a3a9/artifacts/91bb8ef08c467f4f3d9eade943bb9ad04b894fabd5c781539e81222fce20fb47.zip
+2026-11-06T22:03:38.4904512Z Starting download of artifact to: /home/runner/work/maos/maos/dist
+2026-11-06T22:03:38.5398070Z (node:2350) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-11-06T22:03:39.0597358Z SHA256 digest of downloaded artifact is 257aad469f9e3e6d1bbe4dcc29049958a5f124908d30f7f2e5427210828a30ab
+2026-11-06T22:03:39.0598411Z Artifact download completed successfully.
+2026-11-06T22:03:39.0598986Z Total of 1 artifact(s) downloaded
+2026-11-06T22:03:39.0603155Z Download artifact has finished successfully
+2026-11-06T22:03:39.0795226Z ##[group]Run sudo apt-get update && sudo apt-get install -y python3-cryptography
+2026-11-06T22:03:39.0795930Z [36;1msudo apt-get update && sudo apt-get install -y python3-cryptography[0m
+2026-11-06T22:03:39.0820842Z shell: /usr/bin/bash -e {0}
+2026-11-06T22:03:39.0821130Z env:
+2026-11-06T22:03:39.0821409Z   CARGO_TERM_COLOR: never
+2026-11-06T22:03:39.0821659Z ##[endgroup]
+2026-11-06T22:03:39.1609447Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-11-06T22:03:39.1883532Z Get:6 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-11-06T22:03:39.1981195Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-11-06T22:03:39.2024150Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-11-06T22:03:39.2117328Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-11-06T22:03:39.2119767Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-11-06T22:03:39.2693370Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [743 kB]
+2026-11-06T22:03:39.2886816Z Get:8 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [675 kB]
+2026-11-06T22:03:39.3858676Z Get:9 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1425 kB]
+2026-11-06T22:03:39.3934891Z Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [313 kB]
+2026-11-06T22:03:39.3977879Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1708 kB]
+2026-11-06T22:03:39.4069637Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [343 kB]
+2026-11-06T22:03:39.4127460Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1840 kB]
+2026-11-06T22:03:39.4455605Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [420 kB]
+2026-11-06T22:03:39.4457184Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Packages [50.7 kB]
+2026-11-06T22:03:39.4458464Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [14.3 kB]
+2026-11-06T22:03:39.5008000Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1157 kB]
+2026-11-06T22:03:39.5077479Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [234 kB]
+2026-11-06T22:03:39.5516712Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1228 kB]
+2026-11-06T22:03:39.5591360Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [248 kB]
+2026-11-06T22:03:39.5640670Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1721 kB]
+2026-11-06T22:03:39.5750590Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [394 kB]
+2026-11-06T22:03:39.5763330Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse amd64 Packages [45.4 kB]
+2026-11-06T22:03:39.5780601Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [12.4 kB]
+2026-11-06T22:03:42.8055914Z Fetched 13.0 MB in 1s (9895 kB/s)
+2026-11-06T22:03:43.9507847Z Reading package lists...
+2026-11-06T22:03:43.9886889Z Reading package lists...
+2026-11-06T22:03:44.2099842Z Building dependency tree...
+2026-11-06T22:03:44.2107231Z Reading state information...
+2026-11-06T22:03:44.3801641Z python3-cryptography is already the newest version (41.0.7-4ubuntu0.4).
+2026-11-06T22:03:44.3802580Z python3-cryptography set to manually installed.
+2026-11-06T22:03:44.3803216Z 0 upgraded, 0 newly installed, 0 to remove and 27 not upgraded.
+2026-11-06T22:03:44.3861480Z ##[group]Run mkdir -p evidence
+2026-11-06T22:03:44.3861843Z [36;1mmkdir -p evidence[0m
+2026-11-06T22:03:44.3862308Z [36;1mcase "$ROUTE" in rpm) recipe=maos.spec ;; arch) recipe=PKGBUILD ;; brew) recipe=maos.rb ;; esac[0m
+2026-11-06T22:03:44.3862879Z [36;1mcp "dist/recipes/$recipe" "$RUNNER_TEMP/recipe-correct"[0m
+2026-11-06T22:03:44.3863299Z [36;1mpython3 - "$ROUTE" "dist/recipes/$recipe" <<'PY'[0m
+2026-11-06T22:03:44.3863653Z [36;1mimport pathlib,re,sys[0m
+2026-11-06T22:03:44.3863929Z [36;1mroute, filename=sys.argv[1:][0m
+2026-11-06T22:03:44.3864259Z [36;1mp=pathlib.Path(filename); text=p.read_text()[0m
+2026-11-06T22:03:44.3864982Z [36;1mpattern = r'^[ \t]*system Formula\["python@3\.14"\][^\n]*"verify-release\.py",[^\n]*\n[ \t]*"--pubkey"[^\n]*\n' if route=='brew' else r'^.*python3 verify-release.py .*\n'[0m
+2026-11-06T22:03:44.3865901Z [36;1mtext, count=re.subn(pattern, '    : # verifier bypass plant\n' if route=='arch' else '', text, flags=re.M)[0m
+2026-11-06T22:03:44.3866791Z [36;1massert count==1, (route,count)[0m
+2026-11-06T22:03:44.3867089Z [36;1mp.write_text(text)[0m
+2026-11-06T22:03:44.3867324Z [36;1mPY[0m
+2026-11-06T22:03:44.3867512Z [36;1mset +e[0m
+2026-11-06T22:03:44.3867937Z [36;1mpackaging/witness-recipe.sh "$ROUTE" "$PWD/dist" > evidence/recipe-verifier-bypass.log 2>&1[0m
+2026-11-06T22:03:44.3868414Z [36;1mrc=$?[0m
+2026-11-06T22:03:44.3868614Z [36;1mset -e[0m
+2026-11-06T22:03:44.3868907Z [36;1mcp "$RUNNER_TEMP/recipe-correct" "dist/recipes/$recipe"[0m
+2026-11-06T22:03:44.3869349Z [36;1mcmp "$RUNNER_TEMP/recipe-correct" "dist/recipes/$recipe"[0m
+2026-11-06T22:03:44.3869717Z [36;1mtouch "dist/recipes/$recipe"[0m
+2026-11-06T22:03:44.3870032Z [36;1mcat evidence/recipe-verifier-bypass.log[0m
+2026-11-06T22:03:44.3870362Z [36;1mtest "$rc" -ne 0[0m
+2026-11-06T22:03:44.3870739Z [36;1mgrep -F 'accepted forged signature' evidence/recipe-verifier-bypass.log[0m
+2026-11-06T22:03:44.3891434Z shell: /usr/bin/bash -e {0}
+2026-11-06T22:03:44.3891701Z env:
+2026-11-06T22:03:44.3891914Z   CARGO_TERM_COLOR: never
+2026-11-06T22:03:44.3892154Z   ROUTE: arch
+2026-11-06T22:03:44.3892361Z ##[endgroup]
+2026-11-06T22:04:04.2637118Z Unable to find image 'archlinux:base-devel@sha256:767de6eaa40dcfeda5263a48737ea03a782caabdf3a403b6e6a203c7fd333681' locally
+2026-11-06T22:04:04.2639808Z docker.io/library/archlinux@sha256:767de6eaa40dcfeda5263a48737ea03a782caabdf3a403b6e6a203c7fd333681: Pulling from library/archlinux
+2026-11-06T22:04:04.2641602Z 4d0caf509dc9: Pulling fs layer
+2026-11-06T22:04:04.2642246Z 9f04ed6cad42: Pulling fs layer
+2026-11-06T22:04:04.2643000Z 9f04ed6cad42: Verifying Checksum
+2026-11-06T22:04:04.2643738Z 9f04ed6cad42: Download complete
+2026-11-06T22:04:04.2644389Z 4d0caf509dc9: Download complete
+2026-11-06T22:04:04.2645113Z 4d0caf509dc9: Pull complete
+2026-11-06T22:04:04.2645825Z 9f04ed6cad42: Pull complete
+2026-11-06T22:04:04.2647120Z Digest: sha256:767de6eaa40dcfeda5263a48737ea03a782caabdf3a403b6e6a203c7fd333681
+2026-11-06T22:04:04.2648650Z Status: Downloaded newer image for archlinux@sha256:767de6eaa40dcfeda5263a48737ea03a782caabdf3a403b6e6a203c7fd333681
+2026-11-06T22:04:04.2654948Z :: Synchronizing package databases...
+2026-11-06T22:04:04.2655484Z  core downloading...
+2026-11-06T22:04:04.2655890Z  extra downloading...
+2026-11-06T22:04:04.2656811Z :: Starting full system upgrade...
+2026-11-06T22:04:04.2657436Z warning: sudo-1.9.17.p2-6 is up to date -- reinstalling
+2026-11-06T22:04:04.2658356Z resolving dependencies...
+2026-11-06T22:04:04.2658808Z looking for conflicting packages...
+2026-11-06T22:04:04.2659132Z 
+2026-11-06T22:04:04.2659448Z Package (14)                  Old Version  New Version  Net Change  Download Size
+2026-11-06T22:04:04.2659974Z 
+2026-11-06T22:04:04.2660361Z core/ca-certificates-mozilla  3.132-1      3.133-1       -0.01 MiB       0.37 MiB
+2026-11-06T22:04:04.2661050Z core/debugedit                5.3-2        5.4-1          0.00 MiB       0.05 MiB
+2026-11-06T22:04:04.2661944Z core/expat                    2.9.0-1      2.10.0-1       0.01 MiB       0.13 MiB
+2026-11-06T22:04:04.2662410Z core/fakeroot                 1:1.37.2-3   1:2.1.4-1      0.00 MiB       0.08 MiB
+2026-11-06T22:04:04.2662857Z core/libnghttp2               1.70.0-1     1.71.0-1       0.00 MiB       0.10 MiB
+2026-11-06T22:04:04.2663319Z core/libnghttp3               1.18.0-1     1.19.0-1       0.00 MiB       0.08 MiB
+2026-11-06T22:04:04.2663755Z core/libngtcp2                1.25.0-1     1.26.0-1       0.00 MiB       0.22 MiB
+2026-11-06T22:04:04.2664173Z core/lz4                      1:1.10.0-2   1:1.11.0-1     0.08 MiB       0.20 MiB
+2026-11-06T22:04:04.2664595Z extra/python-cffi                          2.1.1-1        1.40 MiB       0.29 MiB
+2026-11-06T22:04:04.2665041Z extra/python-pycparser                     3.12-1         0.90 MiB       0.14 MiB
+2026-11-06T22:04:04.2665473Z core/sqlite                   3.54.0-1     3.54.1-1       0.00 MiB       2.38 MiB
+2026-11-06T22:04:04.2665882Z core/tzdata                   2026e-1      2026f-1        0.00 MiB       0.30 MiB
+2026-11-06T22:04:04.2666664Z extra/python-cryptography                  50.0.2-1       6.38 MiB       1.46 MiB
+2026-11-06T22:04:04.2667170Z core/sudo                     1.9.17.p2-6  1.9.17.p2-6    0.00 MiB       1.86 MiB
+2026-11-06T22:04:04.2667444Z 
+2026-11-06T22:04:04.2667542Z Total Download Size:    7.65 MiB
+2026-11-06T22:04:04.2667798Z Total Installed Size:  38.92 MiB
+2026-11-06T22:04:04.2668050Z Net Upgrade Size:       8.76 MiB
+2026-11-06T22:04:04.2668209Z 
+2026-11-06T22:04:04.2668336Z :: Proceed with installation? [Y/n] 
+2026-11-06T22:04:04.2668617Z :: Retrieving packages...
+2026-11-06T22:04:04.2668873Z  sqlite-3.54.1-1-x86_64 downloading...
+2026-11-06T22:04:04.2669161Z  sudo-1.9.17.p2-6-x86_64 downloading...
+2026-11-06T22:04:04.2669506Z  python-cryptography-50.0.2-1-x86_64 downloading...
+2026-11-06T22:04:04.2669893Z  ca-certificates-mozilla-3.133-1-x86_64 downloading...
+2026-11-06T22:04:04.2670227Z  tzdata-2026f-1-x86_64 downloading...
+2026-11-06T22:04:04.2670520Z  python-cffi-2.1.1-1-x86_64 downloading...
+2026-11-06T22:04:04.2670816Z  libngtcp2-1.26.0-1-x86_64 downloading...
+2026-11-06T22:04:04.2671095Z  lz4-1:1.11.0-1-x86_64 downloading...
+2026-11-06T22:04:04.2671378Z  python-pycparser-3.12-1-any downloading...
+2026-11-06T22:04:04.2671680Z  expat-2.10.0-1-x86_64 downloading...
+2026-11-06T22:04:04.2671955Z  libnghttp2-1.71.0-1-x86_64 downloading...
+2026-11-06T22:04:04.2672244Z  libnghttp3-1.19.0-1-x86_64 downloading...
+2026-11-06T22:04:04.2672530Z  fakeroot-1:2.1.4-1-x86_64 downloading...
+2026-11-06T22:04:04.2672815Z  debugedit-5.4-1-x86_64 downloading...
+2026-11-06T22:04:04.2673076Z checking keyring...
+2026-11-06T22:04:04.2673300Z checking package integrity...
+2026-11-06T22:04:04.2673550Z loading package files...
+2026-11-06T22:04:04.2673796Z checking for file conflicts...
+2026-11-06T22:04:04.2674065Z :: Processing package changes...
+2026-11-06T22:04:04.2674316Z upgrading tzdata...
+2026-11-06T22:04:04.2674525Z upgrading expat...
+2026-11-06T22:04:04.2674734Z upgrading lz4...
+2026-11-06T22:04:04.2674948Z upgrading sqlite...
+2026-11-06T22:04:04.2675169Z installing python-pycparser...
+2026-11-06T22:04:04.2675423Z installing python-cffi...
+2026-11-06T22:04:04.2675678Z Optional dependencies for python-cffi
+2026-11-06T22:04:04.2676081Z     python-setuptools: "limited api" version checking in cffi.setuptools_ext
+2026-11-06T22:04:04.2676780Z installing python-cryptography...
+2026-11-06T22:04:04.2677120Z reinstalling sudo...
+2026-11-06T22:04:04.2677372Z upgrading ca-certificates-mozilla...
+2026-11-06T22:04:04.2677802Z upgrading libnghttp2...
+2026-11-06T22:04:04.2678034Z upgrading libnghttp3...
+2026-11-06T22:04:04.2678260Z upgrading libngtcp2...
+2026-11-06T22:04:04.2678481Z upgrading debugedit...
+2026-11-06T22:04:04.2678707Z upgrading fakeroot...
+2026-11-06T22:04:04.2678943Z :: Running post-transaction hooks...
+2026-11-06T22:04:04.2679256Z (1/6) Configuring dynamic linker run-time bindings...
+2026-11-06T22:04:04.2679572Z (2/6) Creating temporary files...
+2026-11-06T22:04:04.2680206Z /usr/lib/tmpfiles.d/journal-nocow.conf:26: Failed to resolve specifier: uninitialized /etc/ detected, skipping.
+2026-11-06T22:04:04.2680822Z All rules containing unresolvable specifiers will be skipped.
+2026-11-06T22:04:04.2681205Z (3/6) Reloading system manager configuration...
+2026-11-06T22:04:04.2681518Z   Skipped: Current root is not booted.
+2026-11-06T22:04:04.2681817Z (4/6) Enqueuing marked services...
+2026-11-06T22:04:04.2682083Z   Skipped: Current root is not booted.
+2026-11-06T22:04:04.2682367Z (5/6) Arming ConditionNeedsUpdate...
+2026-11-06T22:04:04.2682639Z (6/6) Rebuilding certificate stores...
+2026-11-06T22:04:04.2682920Z accepted forged signature: AUR recipe
+2026-11-06T22:04:04.2683199Z accepted forged signature: AUR recipe
+2026-11-06T22:04:04.2735946Z ##[group]Run set -o pipefail
+2026-11-06T22:04:04.2736645Z [36;1mset -o pipefail[0m
+2026-11-06T22:04:04.2736927Z [36;1mmkdir -p evidence[0m
+2026-11-06T22:04:04.2737415Z [36;1m/usr/bin/time -p packaging/witness-recipe.sh 'arch' "$PWD/dist" 2>&1 | tee evidence/recipe.log[0m
+2026-11-06T22:04:04.2757585Z shell: /usr/bin/bash -e {0}
+2026-11-06T22:04:04.2757854Z env:
+2026-11-06T22:04:04.2758058Z   CARGO_TERM_COLOR: never
+2026-11-06T22:04:04.2758294Z ##[endgroup]
+2026-11-06T22:04:04.4350648Z :: Synchronizing package databases...
+2026-11-06T22:04:04.7850664Z  core downloading...
+2026-11-06T22:04:04.7851637Z  extra downloading...
+2026-11-06T22:04:04.9643340Z warning: sudo-1.9.17.p2-6 is up to date -- reinstalling
+2026-11-06T22:04:04.9644085Z :: Starting full system upgrade...
+2026-11-06T22:04:04.9679714Z resolving dependencies...
+2026-11-06T22:04:04.9712668Z looking for conflicting packages...
+2026-11-06T22:04:04.9732955Z 
+2026-11-06T22:04:04.9733522Z Package (14)                  Old Version  New Version  Net Change  Download Size
+2026-11-06T22:04:04.9734118Z 
+2026-11-06T22:04:04.9734448Z core/ca-certificates-mozilla  3.132-1      3.133-1       -0.01 MiB       0.37 MiB
+2026-11-06T22:04:04.9735341Z core/debugedit                5.3-2        5.4-1          0.00 MiB       0.05 MiB
+2026-11-06T22:04:04.9735958Z core/expat                    2.9.0-1      2.10.0-1       0.01 MiB       0.13 MiB
+2026-11-06T22:04:04.9736987Z core/fakeroot                 1:1.37.2-3   1:2.1.4-1      0.00 MiB       0.08 MiB
+2026-11-06T22:04:04.9737621Z core/libnghttp2               1.70.0-1     1.71.0-1       0.00 MiB       0.10 MiB
+2026-11-06T22:04:04.9738392Z core/libnghttp3               1.18.0-1     1.19.0-1       0.00 MiB       0.08 MiB
+2026-11-06T22:04:04.9739027Z core/libngtcp2                1.25.0-1     1.26.0-1       0.00 MiB       0.22 MiB
+2026-11-06T22:04:04.9739613Z core/lz4                      1:1.10.0-2   1:1.11.0-1     0.08 MiB       0.20 MiB
+2026-11-06T22:04:04.9740230Z extra/python-cffi                          2.1.1-1        1.40 MiB       0.29 MiB
+2026-11-06T22:04:04.9740880Z extra/python-pycparser                     3.12-1         0.90 MiB       0.14 MiB
+2026-11-06T22:04:04.9741498Z core/sqlite                   3.54.0-1     3.54.1-1       0.00 MiB       2.38 MiB
+2026-11-06T22:04:04.9742033Z core/tzdata                   2026e-1      2026f-1        0.00 MiB       0.30 MiB
+2026-11-06T22:04:04.9742616Z extra/python-cryptography                  50.0.2-1       6.38 MiB       1.46 MiB
+2026-11-06T22:04:04.9743207Z core/sudo                     1.9.17.p2-6  1.9.17.p2-6    0.00 MiB       1.86 MiB
+2026-11-06T22:04:04.9743539Z 
+2026-11-06T22:04:04.9743670Z Total Download Size:    7.65 MiB
+2026-11-06T22:04:04.9744004Z Total Installed Size:  38.92 MiB
+2026-11-06T22:04:04.9745844Z Net Upgrade Size:       8.76 MiB
+2026-11-06T22:04:04.9746181Z 
+2026-11-06T22:04:04.9746674Z :: Proceed with installation? [Y/n] 
+2026-11-06T22:04:04.9747252Z :: Retrieving packages...
+2026-11-06T22:04:05.1226892Z  sqlite-3.54.1-1-x86_64 downloading...
+2026-11-06T22:04:05.1227495Z  sudo-1.9.17.p2-6-x86_64 downloading...
+2026-11-06T22:04:05.1228110Z  python-cryptography-50.0.2-1-x86_64 downloading...
+2026-11-06T22:04:05.1228821Z  ca-certificates-mozilla-3.133-1-x86_64 downloading...
+2026-11-06T22:04:05.1229443Z  tzdata-2026f-1-x86_64 downloading...
+2026-11-06T22:04:05.1229974Z  python-cffi-2.1.1-1-x86_64 downloading...
+2026-11-06T22:04:05.1230494Z  libngtcp2-1.26.0-1-x86_64 downloading...
+2026-11-06T22:04:05.1230827Z  lz4-1:1.11.0-1-x86_64 downloading...
+2026-11-06T22:04:05.1231178Z  python-pycparser-3.12-1-any downloading...
+2026-11-06T22:04:05.1231538Z  expat-2.10.0-1-x86_64 downloading...
+2026-11-06T22:04:05.1231874Z  libnghttp2-1.71.0-1-x86_64 downloading...
+2026-11-06T22:04:05.1232246Z  libnghttp3-1.19.0-1-x86_64 downloading...
+2026-11-06T22:04:05.1232600Z  fakeroot-1:2.1.4-1-x86_64 downloading...
+2026-11-06T22:04:05.1232939Z  debugedit-5.4-1-x86_64 downloading...
+2026-11-06T22:04:05.1233265Z checking keyring...
+2026-11-06T22:04:05.2232409Z checking package integrity...
+2026-11-06T22:04:05.5102811Z loading package files...
+2026-11-06T22:04:05.5228302Z checking for file conflicts...
+2026-11-06T22:04:05.5361995Z :: Processing package changes...
+2026-11-06T22:04:05.5362629Z upgrading tzdata...
+2026-11-06T22:04:05.8057456Z upgrading expat...
+2026-11-06T22:04:05.8184905Z upgrading lz4...
+2026-11-06T22:04:05.8237055Z upgrading sqlite...
+2026-11-06T22:04:05.8580365Z installing python-pycparser...
+2026-11-06T22:04:05.8633996Z installing python-cffi...
+2026-11-06T22:04:05.8744790Z Optional dependencies for python-cffi
+2026-11-06T22:04:05.8745530Z     python-setuptools: "limited api" version checking in cffi.setuptools_ext
+2026-11-06T22:04:05.8746183Z installing python-cryptography...
+2026-11-06T22:04:05.9226318Z reinstalling sudo...
+2026-11-06T22:04:06.0044379Z upgrading ca-certificates-mozilla...
+2026-11-06T22:04:06.0078576Z upgrading libnghttp2...
+2026-11-06T22:04:06.0118302Z upgrading libnghttp3...
+2026-11-06T22:04:06.0155672Z upgrading libngtcp2...
+2026-11-06T22:04:06.0216644Z upgrading debugedit...
+2026-11-06T22:04:06.0241913Z upgrading fakeroot...
+2026-11-06T22:04:06.4040354Z :: Running post-transaction hooks...
+2026-11-06T22:04:06.4040977Z (1/6) Configuring dynamic linker run-time bindings...
+2026-11-06T22:04:06.4707110Z (2/6) Creating temporary files...
+2026-11-06T22:04:06.5318191Z /usr/lib/tmpfiles.d/journal-nocow.conf:26: Failed to resolve specifier: uninitialized /etc/ detected, skipping.
+2026-11-06T22:04:06.5319304Z All rules containing unresolvable specifiers will be skipped.
+2026-11-06T22:04:06.5493555Z (3/6) Reloading system manager configuration...
+2026-11-06T22:04:06.6101886Z   Skipped: Current root is not booted.
+2026-11-06T22:04:06.6108539Z (4/6) Enqueuing marked services...
+2026-11-06T22:04:06.6720098Z   Skipped: Current root is not booted.
+2026-11-06T22:04:06.6720737Z (5/6) Arming ConditionNeedsUpdate...
+2026-11-06T22:04:06.7313916Z (6/6) Rebuilding certificate stores...
+2026-11-06T22:04:09.7092338Z ==> Making package: maos 0.1.0alpha1-1 (Fri Nov  6 22:04:09 2026)
+2026-11-06T22:04:09.7093104Z ==> Checking runtime dependencies...
+2026-11-06T22:04:09.7093745Z ==> Checking buildtime dependencies...
+2026-11-06T22:04:09.7094247Z ==> Retrieving sources...
+2026-11-06T22:04:09.7094692Z   -> Downloading SHA256SUMS...
+2026-11-06T22:04:09.7095326Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:09.7096141Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:09.7096872Z 
+2026-11-06T22:04:09.7097106Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:09.7097710Z   -> Downloading SHA256SUMS.ed25519...
+2026-11-06T22:04:09.7098374Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:09.7099444Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:09.7099863Z 
+2026-11-06T22:04:09.7100099Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:09.7100666Z   -> Downloading verify-release.py...
+2026-11-06T22:04:09.7101308Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:09.7102024Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:09.7102433Z 
+2026-11-06T22:04:09.7102651Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:09.7103202Z   -> Downloading maos-linux-amd64...
+2026-11-06T22:04:09.7103825Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:09.7104536Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:09.7104941Z 
+2026-11-06T22:04:09.7105164Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:09.7105714Z   -> Downloading maosctl-linux-amd64...
+2026-11-06T22:04:09.7107202Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:09.7107960Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:09.7108376Z 
+2026-11-06T22:04:09.7108597Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:09.7109170Z   -> Downloading maos-spirit-linux-amd64...
+2026-11-06T22:04:09.7109828Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:09.7110551Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:09.7110950Z 
+2026-11-06T22:04:09.7111171Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:09.7111801Z   -> Downloading maos-registry-server-linux-amd64...
+2026-11-06T22:04:09.7112551Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:09.7113323Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:09.7113743Z 
+2026-11-06T22:04:09.7113985Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:09.7114567Z ==> Validating source files with sha256sums...
+2026-11-06T22:04:09.7115060Z     SHA256SUMS ... Passed
+2026-11-06T22:04:09.7115484Z     SHA256SUMS.ed25519 ... Passed
+2026-11-06T22:04:09.7115922Z     verify-release.py ... Passed
+2026-11-06T22:04:09.7116940Z ==> Validating source_x86_64 files with sha256sums...
+2026-11-06T22:04:09.7117490Z     maos-linux-amd64 ... Passed
+2026-11-06T22:04:09.7117951Z     maosctl-linux-amd64 ... Passed
+2026-11-06T22:04:09.7118427Z     maos-spirit-linux-amd64 ... Passed
+2026-11-06T22:04:09.7118958Z     maos-registry-server-linux-amd64 ... Passed
+2026-11-06T22:04:09.7139138Z ==> Extracting sources...
+2026-11-06T22:04:09.7139600Z ==> Starting prepare()...
+2026-11-06T22:04:09.7140057Z release verification refused: InvalidSignature: 
+2026-11-06T22:04:09.7140667Z ==> ERROR: A failure occurred in prepare().
+2026-11-06T22:04:09.7141147Z     Aborting...
+2026-11-06T22:04:09.7141559Z release verification refused: InvalidSignature: 
+2026-11-06T22:04:09.7269449Z error: package 'maos' was not found
+2026-11-06T22:04:10.7858312Z ==> Making package: maos 0.1.0alpha1-1 (Fri Nov  6 22:04:10 2026)
+2026-11-06T22:04:10.7882771Z ==> Checking runtime dependencies...
+2026-11-06T22:04:10.8044711Z ==> Checking buildtime dependencies...
+2026-11-06T22:04:10.8288366Z ==> Retrieving sources...
+2026-11-06T22:04:10.8402938Z   -> Downloading SHA256SUMS...
+2026-11-06T22:04:10.8473198Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:10.8474114Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:10.8474622Z 
+2026-11-06T22:04:10.8477558Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:10.8604517Z   -> Downloading SHA256SUMS.ed25519...
+2026-11-06T22:04:10.8688683Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:10.8690025Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:10.8690703Z 
+2026-11-06T22:04:10.8691015Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:10.8834494Z   -> Downloading verify-release.py...
+2026-11-06T22:04:10.8922418Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:10.8923309Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:10.8923804Z 
+2026-11-06T22:04:10.8924051Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:10.9058174Z   -> Downloading maos-linux-amd64...
+2026-11-06T22:04:10.9145192Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:10.9146147Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:10.9146872Z 
+2026-11-06T22:04:10.9520562Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:10.9656617Z   -> Downloading maosctl-linux-amd64...
+2026-11-06T22:04:10.9725123Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:10.9725718Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:10.9726003Z 
+2026-11-06T22:04:10.9827296Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:10.9961776Z   -> Downloading maos-spirit-linux-amd64...
+2026-11-06T22:04:11.0028967Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:11.0030207Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:11.0031083Z 
+2026-11-06T22:04:11.0065281Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:11.0196819Z   -> Downloading maos-registry-server-linux-amd64...
+2026-11-06T22:04:11.0267714Z   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+2026-11-06T22:04:11.0268383Z                                  Dload  Upload  Total   Spent   Left   Speed
+2026-11-06T22:04:11.0268738Z 
+2026-11-06T22:04:11.0283526Z   0      0   0      0   0      0      0      0                              0
+2026-11-06T22:04:11.0362054Z ==> Validating source files with sha256sums...
+2026-11-06T22:04:11.0475543Z     SHA256SUMS ... Passed
+2026-11-06T22:04:11.0576347Z     SHA256SUMS.ed25519 ... Passed
+2026-11-06T22:04:11.0690645Z     verify-release.py ... Passed
+2026-11-06T22:04:11.0720222Z ==> Validating source_x86_64 files with sha256sums...
+2026-11-06T22:04:11.1155237Z     maos-linux-amd64 ... Passed
+2026-11-06T22:04:11.1366113Z     maosctl-linux-amd64 ... Passed
+2026-11-06T22:04:11.1514339Z     maos-spirit-linux-amd64 ... Passed
+2026-11-06T22:04:11.1648264Z     maos-registry-server-linux-amd64 ... Passed
+2026-11-06T22:04:11.1840700Z ==> Extracting sources...
+2026-11-06T22:04:11.3597255Z ==> Starting prepare()...
+2026-11-06T22:04:11.5214764Z verified signature and exact artifact hashes: maos-linux-amd64, maosctl-linux-amd64, maos-spirit-linux-amd64, maos-registry-server-linux-amd64
+2026-11-06T22:04:11.5415795Z ==> Entering fakeroot environment...
+2026-11-06T22:04:12.6597306Z ==> Starting package()...
+2026-11-06T22:04:12.6934168Z ==> Tidying install...
+2026-11-06T22:04:12.6964297Z   -> Removing libtool files...
+2026-11-06T22:04:12.7030980Z   -> Removing static library files...
+2026-11-06T22:04:12.7088883Z   -> Purging unwanted files...
+2026-11-06T22:04:12.7232549Z   -> Compressing man and info pages...
+2026-11-06T22:04:12.7292783Z ==> Checking for packaging issues...
+2026-11-06T22:04:12.8608023Z ==> Creating package "maos"...
+2026-11-06T22:04:12.8641840Z   -> Generating .PKGINFO file...
+2026-11-06T22:04:12.8954991Z   -> Generating .BUILDINFO file...
+2026-11-06T22:04:12.9388617Z   -> Generating .MTREE file...
+2026-11-06T22:04:12.9957692Z   -> Compressing package...
+2026-11-06T22:04:13.1970871Z ==> Leaving fakeroot environment.
+2026-11-06T22:04:13.2033853Z ==> Finished making: maos 0.1.0alpha1-1 (Fri Nov  6 22:04:13 2026)
+2026-11-06T22:04:13.2059824Z ==> Installing package maos with pacman -U...
+2026-11-06T22:04:13.2426628Z loading packages...
+2026-11-06T22:04:13.2427149Z resolving dependencies...
+2026-11-06T22:04:13.2435084Z looking for conflicting packages...
+2026-11-06T22:04:13.2458337Z 
+2026-11-06T22:04:13.2458597Z Package (1)  New Version    Net Change
+2026-11-06T22:04:13.2458959Z 
+2026-11-06T22:04:13.2459145Z maos         0.1.0alpha1-1   57.74 MiB
+2026-11-06T22:04:13.2459460Z 
+2026-11-06T22:04:13.2459629Z Total Installed Size:  57.74 MiB
+2026-11-06T22:04:13.2459927Z 
+2026-11-06T22:04:13.2460685Z :: Proceed with installation? [Y/n] 
+2026-11-06T22:04:13.2461166Z checking keyring...
+2026-11-06T22:04:13.2461606Z checking package integrity...
+2026-11-06T22:04:13.2462051Z loading package files...
+2026-11-06T22:04:13.2462470Z checking for file conflicts...
+2026-11-06T22:04:13.2469552Z :: Processing package changes...
+2026-11-06T22:04:13.2470451Z installing maos...
+2026-11-06T22:04:13.3570153Z :: Running post-transaction hooks...
+2026-11-06T22:04:13.3570870Z (1/1) Arming ConditionNeedsUpdate...
+2026-11-06T22:04:13.3704209Z maos 0.1.0-alpha.1
+2026-11-06T22:04:13.4565923Z identity: /usr/bin/maos = a7028a0c7125c0c0ce4495c8553e59db3ef3b9b54a04db7120e740a90f6d3daf
+2026-11-06T22:04:13.4567666Z identity: /usr/bin/maosctl = d39db0b2a293533e31213a131f75099c9e3a22fcb8a5ec4e4457a95736d3fca5
+2026-11-06T22:04:13.4569141Z identity: /usr/bin/maos-spirit = 2460e10872ea9bfc8024608571c758ad8c9c4cf9b6776f89619577b98b50cb6b
+2026-11-06T22:04:13.4570886Z identity: /usr/bin/maos-registry-server = ba07e6256d0477c63948a4f75abe3fa42465663452cf5f5bbe567f30eeddcffb
+2026-11-06T22:04:13.4773014Z checking dependencies...
+2026-11-06T22:04:13.4802339Z 
+2026-11-06T22:04:13.4802767Z Package (1)  Old Version    Net Change
+2026-11-06T22:04:13.4803222Z 
+2026-11-06T22:04:13.4803458Z maos         0.1.0alpha1-1  -57.74 MiB
+2026-11-06T22:04:13.4803774Z 
+2026-11-06T22:04:13.4803926Z Total Removed Size:  57.74 MiB
+2026-11-06T22:04:13.4804162Z 
+2026-11-06T22:04:13.4809689Z :: Do you want to remove these packages? [Y/n] 
+2026-11-06T22:04:13.4810175Z :: Processing package changes...
+2026-11-06T22:04:13.4810546Z removing maos...
+2026-11-06T22:04:13.5000531Z :: Running post-transaction hooks...
+2026-11-06T22:04:13.5001102Z (1/1) Arming ConditionNeedsUpdate...
+2026-11-06T22:04:13.5081381Z PASS: arch independently rejected wrong-key signature, then installed exact signed bytes and removed them
+2026-11-06T22:04:13.8336680Z real 9.54
+2026-11-06T22:04:13.8337064Z user 0.01
+2026-11-06T22:04:13.8337390Z sys 0.01
+2026-11-06T22:04:13.8417878Z ##[group]Run actions/upload-artifact@v4
+2026-11-06T22:04:13.8418192Z with:
+2026-11-06T22:04:13.8418406Z   name: recipe-20-2-arch
+2026-11-06T22:04:13.8418664Z   path: evidence
+2026-11-06T22:04:13.8418891Z   if-no-files-found: warn
+2026-11-06T22:04:13.8419135Z   compression-level: 6
+2026-11-06T22:04:13.8419359Z   overwrite: false
+2026-11-06T22:04:13.8419583Z   include-hidden-files: false
+2026-11-06T22:04:13.8419820Z env:
+2026-11-06T22:04:13.8420017Z   CARGO_TERM_COLOR: never
+2026-11-06T22:04:13.8420243Z ##[endgroup]
+2026-11-06T22:04:14.0167642Z (node:9741) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-06T22:04:14.0168924Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-06T22:04:14.0247256Z With the provided path, there will be 2 files uploaded
+2026-11-06T22:04:14.0277381Z Artifact name is valid!
+2026-11-06T22:04:14.0277686Z Root directory input is valid!
+2026-11-06T22:04:14.2003660Z Beginning upload of artifact content to blob storage
+2026-11-06T22:04:14.2244512Z (node:9741) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-06T22:04:14.2655743Z Uploaded bytes 3938
+2026-11-06T22:04:14.2811090Z Finished uploading artifact content to blob storage!
+2026-11-06T22:04:14.2812434Z SHA256 digest of uploaded artifact zip is 7a9b1dc3a585fa09a428757853e185615473ab44ad47b993486e1a7837156458
+2026-11-06T22:04:14.2814091Z Finalizing artifact upload
+2026-11-06T22:04:14.6959914Z Artifact recipe-20-2-arch.zip successfully finalized. Artifact ID 13545015270
+2026-11-06T22:04:14.6961746Z Artifact recipe-20-2-arch has been successfully uploaded! Final size is 3938 bytes. Artifact ID is 13545015270
+2026-11-06T22:04:14.6966037Z Artifact download URL: https://github.com/lunarpulse/maos/actions/runs/42300114383/artifacts/13545015270
+2026-11-06T22:04:14.7179949Z Post job cleanup.
+2026-11-06T22:04:14.8075549Z [command]/usr/bin/git version
+2026-11-06T22:04:14.8126718Z git version 2.56.0
+2026-11-06T22:04:14.8172896Z Temporarily overriding HOME='/home/runner/work/_temp/4abc59fa-9051-4b80-adde-d8efcfca1d84' before making global git config changes
+2026-11-06T22:04:14.8174257Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-06T22:04:14.8179491Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/maos/maos
+2026-11-06T22:04:14.8225694Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-06T22:04:14.8265095Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-06T22:04:14.8582799Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-06T22:04:14.8624263Z http.https://github.com/.extraheader
+2026-11-06T22:04:14.8631560Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-06T22:04:14.8669863Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-06T22:04:14.8980529Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-06T22:04:14.9035393Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-06T22:04:14.9457407Z Cleaning up orphan processes
+2026-11-06T22:04:14.9885081Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

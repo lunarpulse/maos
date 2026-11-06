@@ -175,3 +175,37 @@ file-block accounting: **30,269,440B**; observed free-space delta on the scratch
 filesystem: **0B** during concurrent compilation. No physical reclamation amount
 is inferred from allocated blocks. Shared incremental removals0; no deps/build/
 fingerprint deletion. Details are in cleanup.json.
+
+## hosted-3 supersession — 2026-11-06
+
+[Run42300114383](https://github.com/lunarpulse/maos/actions/runs/42300114383),
+attempt1, head100bb9f3 on ci/20-2-verify, completes with **13 green /1 unintended
+red /2 operator skips**. Arch job128180762193 now proves the bypass oracle,
+wrong-key refusal, all-four-file regular staging, installed signed identity
+and removal. This supersedes the Arch limitation above, not Homebrew proof.
+
+Brew job128180762283 again fails128 during tap-new Git commit, before formula
+loading/install/audit. The ordinary GIT_* exports described above are therefore
+**insufficient**, despite the old readonly-Git control passing. hosted-3 adds
+all four HOMEBREW_GIT_* author/committer bridge inputs while retaining GIT_*;
+its regression explicitly resets ordinary Git identity first.
+
+Source review also identified concrete later strict-audit hazards: the actual
+historical renderer emits a294-character four-checksum array against Homebrew's
+118-character limit and WordArray minimum4; an explicit stable version is
+redundant when Homebrew recognizes the GitHub release URL. The renderer now
+emits aligned multiline checksum word arrays; the formula only supplies an
+explicit version when URL detection differs. The audit is logged before other
+post-install checks and its saved status remains blocking after cleanup.
+
+Installed-byte comparison is **not** changed to a staged-copy claim. Upstream
+Linux source-install finish only fixes prefix symlinks; ELF RPATH/interpreter
+relocation belongs to the bottle path. Existing skip_clean paths remain, but
+are not described as an ELF relocation opt-out. Actual hosted behavior is still
+required; no mismatch is tolerated.
+
+See [hosted-3/record.md](../hosted-3/record.md) for primary source links, complete
+hosted logs, four real before/plant/restore controls, final24 Python passes,
+shell exit0, proof limits and cleanup. **No cargo ran. Unlike hosted-2, counted
+Rust renderer source did change:** compiled renderer validation, exact formatted
+KLOC/re-pin and Rust/gate checks remain reserved to Main's cargo handoff.

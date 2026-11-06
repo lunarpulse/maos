@@ -1,0 +1,11 @@
+{
+  "source": "_bmad-output/implementation-artifacts/20-2-deb-airgap-docker-and-formula-corrections-evidence/landing-1/hosted-1/rendered-dev-fixture/maos.rb",
+  "rows": [
+    {
+      "line": 14,
+      "chars": 294
+    }
+  ],
+  "homebrew_line_length_limit": 118,
+  "actual_new_renderer_executed": false
+}

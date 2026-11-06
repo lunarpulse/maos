@@ -146,7 +146,7 @@ The generator spike is NO-GO: AC2 is cut, the existing completeness gate remains
 | NFR-Maint-9 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
 | NFR-Meta-1 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
 | NFR-Obs-1 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
-| NFR-Ops-12 | Owner: `ops-rc-signed-tag`; RE-OWNED 2026-11-05 by 20-2 under rule 10: implementation and blocking default-build netns/replay/TL witness authored in landing-1, but local unshare is denied and hosted proof is operator-only by assignment. Run the evidence ci/ci-20-2-verify.yml recipe and record tag-SHA green + outbound plant before rc acceptance; no runtime pass claimed. The compile-shape run now refuses (exit 2), and check-air-gap is advisory D-20-2-02 C after measured TcpListener/getaddrinfo. |
+| NFR-Ops-12 | Owner: `ops-rc-signed-tag`; RE-OWNED 2026-11-05 by 20-2 under rule 10. Local unshare remains denied. Development-key branch verify run42300114383/head100bb9f3 has green authenticated default-build netns/replay/TL and outbound-plant controls (hosted-3 receipt); this is neither signed-rc-tag proof nor universal network-absence evidence. Record matching signed tag-SHA green + outbound plant before rc acceptance; owner remains open. Compile-shape run refuses (exit2); check-air-gap remains advisory D-20-2-02 C after measured TcpListener/getaddrinfo. |
 | NFR-Ops-2 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
 | NFR-Ops-3 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |
 | NFR-Rel-4 | Ownerless and open. Dispositioned by Story 20-3b landing 2 (2026-10-30), rule 10. |

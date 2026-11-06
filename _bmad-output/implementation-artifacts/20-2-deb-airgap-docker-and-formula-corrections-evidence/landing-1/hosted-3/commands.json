@@ -1,0 +1,361 @@
+[
+  {
+    "name": "baseline-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "python-venv",
+    "command": [
+      "python3",
+      "-m",
+      "venv",
+      "/tmp/maos-20-2-hosted3-dev202/venv"
+    ],
+    "exit_code": 0,
+    "seconds": 1.875
+  },
+  {
+    "name": "python-cryptography",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/pip",
+      "install",
+      "--only-binary=:all:",
+      "cryptography"
+    ],
+    "exit_code": 0,
+    "seconds": 4.471
+  },
+  {
+    "name": "before-python-controls",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.216,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "hosted-run-provenance",
+    "command": [
+      "gh",
+      "api",
+      "repos/lunarpulse/maos/actions/runs/42300114383"
+    ],
+    "exit_code": 0,
+    "seconds": 0.632
+  },
+  {
+    "name": "hosted-job-results",
+    "command": [
+      "gh",
+      "api",
+      "--paginate",
+      "repos/lunarpulse/maos/actions/runs/42300114383/jobs?per_page=100",
+      "--jq",
+      ".jobs[] | {id,name,status,conclusion,steps:[.steps[]|{number,name,status,conclusion}]}"
+    ],
+    "exit_code": 0,
+    "seconds": 0.869
+  },
+  {
+    "name": "brew-observed-failure",
+    "command": [
+      "gh",
+      "api",
+      "repos/lunarpulse/maos/actions/jobs/128180762283/logs"
+    ],
+    "exit_code": 1,
+    "seconds": 1.717
+  },
+  {
+    "name": "brew-observed-failure-raw",
+    "command": [
+      "gh",
+      "api",
+      "--allow-escape-sequences",
+      "repos/lunarpulse/maos/actions/jobs/128180762283/logs"
+    ],
+    "exit_code": 0,
+    "seconds": 1.666
+  },
+  {
+    "name": "arch-observed-success-raw",
+    "command": [
+      "gh",
+      "api",
+      "--allow-escape-sequences",
+      "repos/lunarpulse/maos/actions/jobs/128180762193/logs"
+    ],
+    "exit_code": 0,
+    "seconds": 1.566
+  },
+  {
+    "name": "before-url-version-contract",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "ReleaseControls.test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.176,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "process-scan-before-plants",
+    "command": [
+      "ps",
+      "-eo",
+      "pid,comm,args"
+    ],
+    "exit_code": 0,
+    "seconds": 0.047
+  },
+  {
+    "name": "backup-witness-recipe.sh",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/packaging/witness-recipe.sh",
+      "/tmp/maos-20-2-hosted3-dev202/restore/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.004
+  },
+  {
+    "name": "backup-maos.rb",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb",
+      "/tmp/maos-20-2-hosted3-dev202/restore/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "backup-render_packages.rs",
+    "command": [
+      "cp",
+      "/home/lunarpulse/dev_ws/xtask/src/render_packages.rs",
+      "/tmp/maos-20-2-hosted3-dev202/restore/render_packages.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "plant-homebrew-identity",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "ReleaseControls.test_hosted_3_brew_identity_survives_plain_git_environment_reset",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.115,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "identity-restore-cp",
+    "command": [
+      "cp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/witness-recipe.sh",
+      "/home/lunarpulse/dev_ws/packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "identity-restore-cmp",
+    "command": [
+      "cmp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/witness-recipe.sh",
+      "/home/lunarpulse/dev_ws/packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.003
+  },
+  {
+    "name": "identity-restore-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.002
+  },
+  {
+    "name": "plant-audit-status-bypass",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "ReleaseControls.test_hosted_3_brew_audit_is_logged_blocking_and_precedes_installed_checks",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.064,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "audit-restore-cp",
+    "command": [
+      "cp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/witness-recipe.sh",
+      "/home/lunarpulse/dev_ws/packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.002
+  },
+  {
+    "name": "audit-restore-cmp",
+    "command": [
+      "cmp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/witness-recipe.sh",
+      "/home/lunarpulse/dev_ws/packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.002
+  },
+  {
+    "name": "audit-restore-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "plant-checksum-word-array",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "ReleaseControls.test_hosted_3_brew_strict_style_uses_multiline_checksum_word_arrays",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.164,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "renderer-restore-cp",
+    "command": [
+      "cp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/render_packages.rs",
+      "/home/lunarpulse/dev_ws/xtask/src/render_packages.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "renderer-restore-cmp",
+    "command": [
+      "cmp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/render_packages.rs",
+      "/home/lunarpulse/dev_ws/xtask/src/render_packages.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "renderer-restore-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/xtask/src/render_packages.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "plant-unconditional-url-version",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "ReleaseControls.test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed",
+      "-v"
+    ],
+    "exit_code": 1,
+    "seconds": 0.164,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "formula-restore-cp",
+    "command": [
+      "cp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/maos.rb",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "formula-restore-cmp",
+    "command": [
+      "cmp",
+      "/tmp/maos-20-2-hosted3-dev202/restore/maos.rb",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "formula-restore-touch",
+    "command": [
+      "touch",
+      "/home/lunarpulse/dev_ws/packaging/homebrew/maos.rb"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "final-python-controls",
+    "command": [
+      "/tmp/maos-20-2-hosted3-dev202/venv/bin/python",
+      "packaging/test_release_20_2.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "seconds": 0.865,
+    "extra_env": {
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "name": "final-shell-syntax",
+    "command": [
+      "bash",
+      "-n",
+      "packaging/witness-recipe.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.001
+  },
+  {
+    "name": "process-scan-before-cleanup",
+    "command": [
+      "ps",
+      "-eo",
+      "pid,comm,args"
+    ],
+    "exit_code": 0,
+    "seconds": 0.01
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "own_scratch_removed": "/tmp/maos-20-2-hosted3-dev202",
+  "non_symlink_files": 1133,
+  "own_allocated_file_blocks_removed_bytes": 30257152,
+  "scratch_filesystem_free_before": 804233572352,
+  "scratch_filesystem_free_after": 804233572352,
+  "observed_filesystem_free_delta_bytes": 0,
+  "compiler_process_counts": {
+    "cargo": 1,
+    "rustc": 1,
+    "rustfmt": 0,
+    "clippy-driver": 0
+  },
+  "shared_incremental_pruned": false,
+  "shared_incremental_removed_bytes": 0,
+  "reason": "Main explicitly reserves cargo/shared target for Dev201b; no shared target pruning, regardless of instantaneous process count.",
+  "accounting": "Allocated blocks are not inferred physical reclamation; filesystem free delta includes concurrent activity."
+}

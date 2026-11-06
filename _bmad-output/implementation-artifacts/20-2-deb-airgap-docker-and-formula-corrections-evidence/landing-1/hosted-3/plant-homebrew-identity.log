@@ -1,0 +1,16 @@
+test_hosted_3_brew_identity_survives_plain_git_environment_reset (__main__.ReleaseControls.test_hosted_3_brew_identity_survives_plain_git_environment_reset) ... FAIL
+
+======================================================================
+FAIL: test_hosted_3_brew_identity_survives_plain_git_environment_reset (__main__.ReleaseControls.test_hosted_3_brew_identity_survives_plain_git_environment_reset)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/packaging/test_release_20_2.py", line 269, in test_hosted_3_brew_identity_survives_plain_git_environment_reset
+    self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : bash: line 5: HOMEBREW_GIT_NAME: unbound variable
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.005s
+
+FAILED (failures=1)

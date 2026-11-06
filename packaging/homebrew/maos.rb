@@ -10,7 +10,7 @@ class Maos < Formula
   suffix = "#{OS.mac? ? "darwin" : "linux"}-#{Hardware::CPU.arm? ? "arm64" : "amd64"}"
   hashes = releases.fetch(suffix) { odie "This release has no binaries for #{suffix}" }
   url "@BASE_URL@/maos-#{suffix}", using: :nounzip
-  version "@VERSION@"
+  version "@VERSION@" unless Version.detect(stable.url).to_s == "@VERSION@"
   sha256 hashes.fetch(0)
   license any_of: ["Apache-2.0", "MIT"]
   depends_on "cryptography" => :build
@@ -24,14 +24,17 @@ class Maos < Formula
       sha256 hashes.fetch(index + 1)
     end
   end
+
   resource "manifest" do
     url "@BASE_URL@/SHA256SUMS", using: :nounzip
     sha256 "@SHA256SUMS_HASH@"
   end
+
   resource "signature" do
     url "@BASE_URL@/SHA256SUMS.sig", using: :nounzip
     sha256 "@SIGNATURE_HASH@"
   end
+
   resource "verifier" do
     url "@BASE_URL@/verify-release.py", using: :nounzip
     sha256 "@VERIFIER_HASH@"

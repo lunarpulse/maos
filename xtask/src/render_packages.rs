@@ -132,11 +132,19 @@ pub fn run(dist: &str, output: &str, maosctl: &str, base_url: Option<&str>) -> R
     let mut brew = String::new();
     let mut sources = String::new();
     let mut arches = Vec::new();
-    for (suffix, arch) in [
+    let targets = [
         ("linux-amd64", "x86_64"),
         ("linux-arm64", "aarch64"),
         ("darwin-arm64", ""),
-    ] {
+    ];
+    let brew_width = hashes
+        .keys()
+        .filter_map(|name| name.strip_prefix("maos-"))
+        .filter(|suffix| targets.iter().any(|(target, _)| target == suffix))
+        .map(str::len)
+        .max()
+        .unwrap_or_default();
+    for (suffix, arch) in targets {
         let present = BINS
             .iter()
             .filter(|b| hashes.contains_key(&format!("{b}-{suffix}")))
@@ -151,7 +159,19 @@ pub fn run(dist: &str, output: &str, maosctl: &str, base_url: Option<&str>) -> R
             .iter()
             .map(|b| format!("\"{}\"", hashes[&format!("{b}-{suffix}")]))
             .collect();
-        brew.push_str(&format!("    \"{suffix}\" => [{}],\n", hs.join(", ")));
+        brew.push_str("    \"");
+        brew.push_str(suffix);
+        brew.push('"');
+        for _ in suffix.len()..=brew_width {
+            brew.push(' ');
+        }
+        brew.push_str("=> %w[\n");
+        for hash in &hs {
+            brew.push_str("      ");
+            brew.push_str(hash.trim_matches('"'));
+            brew.push('\n');
+        }
+        brew.push_str("    ],\n");
         if !arch.is_empty() {
             arches.push(format!("'{arch}'"));
             let urls: Vec<_> = BINS

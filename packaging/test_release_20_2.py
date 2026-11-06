@@ -245,6 +245,55 @@ class ReleaseControls(unittest.TestCase):
         self.assertNotIn('git config --global', witness)
         self.assertIn('brew audit --strict maos/verify/maos', witness)
 
+    def test_hosted_3_brew_identity_survives_plain_git_environment_reset(self):
+        witness = (ROOT/'packaging/witness-recipe.sh').read_text()
+        prelude = witness.split('brew)', 1)[1].split(';;', 1)[0]
+        exports = '\n'.join(line.strip() for line in prelude.splitlines()
+                            if line.strip().startswith('export '))
+        environment = {key: value for key, value in os.environ.items()
+                       if not key.startswith(('GIT_', 'HOMEBREW_GIT_')) and key != 'EMAIL'}
+        environment.update(HOME=str(self.dist), GIT_CONFIG_GLOBAL=os.devnull,
+                           GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM='1')
+        # Homebrew clears ordinary Git identity inputs before tap-new calls
+        # Utils::Git.set_name_email!; test the documented HOMEBREW_* bridge.
+        bridge = '''
+unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+export GIT_AUTHOR_NAME="$HOMEBREW_GIT_NAME" GIT_AUTHOR_EMAIL="$HOMEBREW_GIT_EMAIL"
+export GIT_COMMITTER_NAME="$HOMEBREW_GIT_COMMITTER_NAME"
+export GIT_COMMITTER_EMAIL="$HOMEBREW_GIT_COMMITTER_EMAIL"
+git -c user.useConfigOnly=true var GIT_AUTHOR_IDENT
+git -c user.useConfigOnly=true var GIT_COMMITTER_IDENT
+'''
+        result = subprocess.run(['bash', '-euc', exports+'\n'+bridge],
+                                cwd=self.dist, env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertEqual(result.stdout.count('maos-witness <witness@invalid>'), 2)
+
+    def test_hosted_3_brew_audit_is_logged_blocking_and_precedes_installed_checks(self):
+        witness = (ROOT/'packaging/witness-recipe.sh').read_text()
+        self.assertIn('if brew audit --strict maos/verify/maos > "$scratch/audit.log" 2>&1; then',
+                      witness)
+        self.assertIn('cat "$scratch/audit.log"', witness)
+        self.assertIn('test "$audit_status" -eq 0', witness)
+        self.assertLess(witness.index('brew audit --strict maos/verify/maos'),
+                        witness.index('brew test maos/verify/maos'))
+        self.assertLess(witness.index('brew audit --strict maos/verify/maos'),
+                        witness.index('$(brew --prefix maos)/bin'))
+
+    def test_hosted_3_brew_strict_style_uses_multiline_checksum_word_arrays(self):
+        renderer = (ROOT/'xtask/src/render_packages.rs').read_text()
+        self.assertIn('=> %w[\\n', renderer)
+        self.assertNotIn('hs.join(", ")', renderer)
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        for number, line in enumerate(formula.splitlines(), 1):
+            if not line.lstrip().startswith(('url ', 'homepage ')):
+                self.assertLessEqual(len(line), 118, f'line {number}: {line}')
+
+    def test_hosted_3_brew_explicit_version_only_overrides_url_version_when_needed(self):
+        formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
+        self.assertIn('version "@VERSION@" unless Version.detect(stable.url).to_s == "@VERSION@"',
+                      formula)
+
     def test_hosted_2_brew_metadata_and_dependencies_follow_audit_order(self):
         formula = (ROOT/'packaging/homebrew/maos.rb').read_text()
         components = re.findall(r'^  (desc|homepage|url|version|sha256|license|depends_on|skip_clean)\b',
